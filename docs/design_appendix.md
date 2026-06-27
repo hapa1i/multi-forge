@@ -162,11 +162,12 @@ without lifecycle. Remote definitions are never written to `BackendRegistry`.
 Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
 the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
 source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. A `runtime_native` source
-cannot back a proxy: template loading rejects a `proxy.source` pointing at one, because a key-authenticated proxy cannot
-carry a runtime-owned subscription (the "no proxy support for subscriptions" boundary). Shipped local templates no
-longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry inline provider
-`base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path used by
-credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to
+cannot back a proxy: template loading rejects a `proxy.source` pointing at one, because a key-authenticated proxy
+injects its own bearer key and so cannot present the source's runtime-owned subscription credential (the "no key-auth
+proxy support for subscriptions" boundary -- the limit is the key-auth transport, not the source). Shipped local
+templates no longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry
+inline provider `base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path
+used by credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to
 `https://openrouter.ai/api/v1` when no override is configured.
 
 `TEMPLATE_ENV_VARS` remains as a compatibility map for existing auth callers, but it is generated from

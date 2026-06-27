@@ -113,6 +113,37 @@ thing to a pure lane, and it sharpens this epic two ways:
 do not confirm it in headless `pi -p`. That one fact decides whether a future pi runtime is a real *subscription cost
 lane* or just another BYOK/API + local-Ollama lane -- verify before promoting pi from reference to lane.
 
+## Prior art: workweave/router + Avengers-Pro (validates two bets; diverges on mechanism)
+
+`workweave/router` (Go, Elastic-licensed) productionizes Avengers-Pro (arXiv:2508.12631) as a drop-in proxy that picks
+the **model + provider per request** via an on-box embedding cluster-scorer. It sits **one layer below** this epic: it
+varies the model *beneath a fixed harness*, where consumer-lanes choose the harness (runtime) + backend + model per
+known consumer, resolved once and frozen. Forge's `(backend x model)` sub-tuple is the router's *entire* domain; the
+**runtime axis is above it** -- the router never chooses the harness (the user installs it under Claude Code / Codex /
+opencode).
+
+- **Independently validates two bets.** (1) *Subscription billing-as-backend*: it detects OAuth-served turns (Claude Max
+  `sk-ant-oat`, Codex/ChatGPT JWT), bills them 0% with a full-cost *shadow* ledger, and discounts covered models by
+  *observed rate-limit headroom* -- validating T2's **economic/billing** shape (`billing_posture="subscription_quota"`,
+  plus headroom as a future extension). But it reaches that through a **different access shape** than T2: a
+  credential-forwarding passthrough proxy (the future shape flagged in the transport risk note below), not Forge's
+  endpoint-less `runtime_native`. (2) *Capability gating*: a distinct `AgenticLow` ("harness-capable") flag, separate
+  from tool-use quality, filters the eligible pool on tool turns -- an **analog** of this epic's capability floor, not
+  an instance: it is a model/harness *fitness* gate (is this model fit to drive an agentic loop?), where Forge's floor
+  is a runtime-tier minimum. Same instinct -- "emits tool calls" != "can drive the loop".
+- **Diverges on mechanism -- justified by problem shape.** It is *learned + dynamic per-request* (embed -> k-means
+  cluster -> per-cluster quality/cost blend, with a price\<->quality dial = the paper's `alpha`); consumer-lanes is
+  *declarative + frozen*. Dynamic content-aware routing pays on the router's **open user-query stream**; it is the wrong
+  tool for Forge's **closed set of ~15 known consumers**, whose role Forge knows by construction (the router has to
+  reconstruct it from the request). A frozen lane is also structurally immune to the router's dominant practical problem
+  -- the prompt-cache penalty from switching models mid-loop (its top HN critique).
+- **Two borrowable ideas (later, narrow).** (a) Subscription *headroom* + a **subscription-exhaustion fail-open** ("this
+  lane's sub is spent -> degrade to the default lane") narrowly **reopens the "No fallback (de-scoped)" line** above for
+  the exact Claude-Max-quota-wall scenario in "Why now" -- a deliberate **T4** decision (fold into the unsupported-lane
+  failure-mode choice), not a silent reversal or a step toward general dynamic routing. (b) Cache-aware model switching
+  (their session-pin + EV planner) is worth it **only** for the long-lived main loop, never the single-shots (which hold
+  no durable cache to preserve).
+
 ## Inventory this serves (2026-06-25 sweep)
 
 - **M1 `claude -p` agents (6)**: semantic supervisor, memory writer, shadow curation, supervisor shadow replay, review
@@ -176,13 +207,19 @@ the shape is proven -- deferring durable state until a real override exists.
 - **Durable state lands late (T1b)**: the `intent` override + immutable `confirmed` binding are Forge-owned durable
   state; when T1b lands they need a schema version, strict deserialization, and a reset/migration path (coding_standards
   §5). Deferring T1b avoids committing that schema before the shape is proven.
-- **Transport is derived, not chosen**: proxy-vs-direct is forced by (runtime, backend) reachability + the subscription
-  constraint (a proxy authenticates with a key, so it cannot carry a subscription). Model it as resolver-computed, not a
-  user knob.
+- **Transport is derived, not chosen**: proxy-vs-direct is forced by (runtime, backend) reachability. The subscription
+  constraint is *key-auth-specific*, not "no proxy at all": a **key-auth** proxy injects its own bearer key, so it
+  cannot present a runtime-native subscription -- hence T2 rejects a `runtime_native` source backing today's proxy
+  templates (`config/loader.py`). A **same-surface passthrough** that *forwards* the runtime's native subscription
+  credential upstream (as `workweave/router` does for Claude Max / Codex) would be a **distinct future access shape**,
+  not a relaxation of `runtime_native`, and carries a heavier trust posture -- Forge's proxy process would transit the
+  subscription token, which `runtime_native` deliberately avoids today (the runtime owns auth; Forge never sees it).
+  Model transport as resolver-computed, not a user knob.
 - **Codex's hard problems are avoided by scope**: T4 is *headless* (`codex exec` needs no enrollment-gated hooks) and
   *transfer-fed/blind* (no Claude-UUID resume). Do not expand T4 to supervised-Codex-executor-with-enforcement.
 - **Naming**: unit = `consumer` (vs `service`/`client`); `lane`; keep `runtime` narrow. Confirm before code.
-- **Decision recorded**: no fallback; default-to-current-behavior; first new lane = codex-exec supervisor.
+- **Decision recorded**: no *general* fallback (subscription-exhaustion fail-open to the default lane is a pending T4/T5
+  exception decision -- see Prior art); default-to-current-behavior; first new lane = codex-exec supervisor.
 
 ## T3 -> T4 carry-forward seams (fail-open boundary)
 

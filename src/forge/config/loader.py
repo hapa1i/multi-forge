@@ -625,7 +625,7 @@ def _apply_template_source(template: str, template_data: dict[str, Any]) -> None
     # A runtime_native source (e.g. a ChatGPT subscription) is reached through its
     # runtime, which owns the connection and auth; a key-authenticated proxy cannot
     # carry it. Reject here so a template can never mint a proxy for an undialable
-    # backend (T2 non-goal: "no proxy support for subscriptions").
+    # backend (T2 non-goal: no key-auth proxy support for subscriptions).
     if source.endpoint.kind == "runtime_native":
         raise ValueError(
             f"Template '{template}' references runtime-native source '{source.id}', which a proxy cannot back: "
