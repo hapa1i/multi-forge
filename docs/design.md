@@ -506,6 +506,10 @@ them.
 supervisor to use the selected proxy's `opus` tier. Direct supervisors do not get this proxy-tier reset because there is
 no Forge proxy mapping to resolve.
 
+This chain applies to the supervisor's default `claude_code` lane. The `codex` lane arm (`supervisor_runtime="codex"`,
+epic consumer_lanes/T4) bypasses it entirely: `codex exec` runs **direct** to OpenAI with no Forge proxy. See
+[design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference) for the consumer-lane layer.
+
 **Fail behavior by subprocess type:**
 
 | Subprocess    | On unresolved | Rationale                                                        |
