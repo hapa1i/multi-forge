@@ -5,11 +5,11 @@
 
 ## Current focus
 
-Phases 1-4 **implemented and verified** (Option (c)); acceptance tests written; design appendix §A.2.1 synced;
-`change_log.md` entry added; two review findings fixed (see "Review fixes"); `make pre-commit` green. Remaining: commit
-the review-fix work on the branch. Lane move to `done/` waits on a PR merge (user decision). Touchpoints were **verified
-against `main` @ `82076324`** (sweep below); all three design decisions resolved (A = Option (c), user 2026-06-26; B/C
-below).
+Phases 1-4 (Option (c)) + two review findings (see "Review fixes") + a follow-up nit pass (`is_implemented("openai")`
+test, `codex-responses-local` appendix row) are **committed and pushed**; **PR #54** is open against `main`
+(`make pre-commit` green, 4638-test ripple clean). Remaining: review/merge PR #54, then the `doing/ -> done/` lane move
+\+ epic roster T2 -> done. Touchpoints were **verified against `main` @ `82076324`** (sweep below); all three design
+decisions resolved (A = Option (c), user 2026-06-26; B/C below).
 
 ## Verified touchpoints (2026-06-25 sweep -- corrections to the card noted)
 

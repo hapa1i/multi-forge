@@ -150,6 +150,7 @@ The shipped v1 catalog includes:
 | `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                |
 | `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                |
 | `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                              |
+| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace    |
 | `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                     |
 
 Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider`/`billing_posture` values, missing

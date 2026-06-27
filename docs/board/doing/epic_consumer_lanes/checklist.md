@@ -6,18 +6,19 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 ## Current focus
 
 T1a (PR #51, `b84e2462`) and T3 (PR #52, `e66490af`) are both **done** -- the spine (pure resolver + byte-identical
-Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is **implemented and verified** on branch
+Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is **committed and pushed** on branch
 `backend_subscription_sources` (all three decisions resolved -- A = Option (c), user 2026-06-26: `runtime_native` owns
-its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist). Phases 1-4 + tests + design-doc sync +
-change-log are done; remaining is `make pre-commit` then commit, and a PR-merge decision (user) before the `done/` move.
-T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
+its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist). **PR #54** is open against `main`
+(implementation + two review fixes + nit pass; `make pre-commit` green, 4638-test ripple clean), awaiting review/merge
+before the `done/` move + epic roster T2 -> done. T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is
+decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
 | Member       | Card                                  | Lane  | Depends on | State                      |
 | ------------ | ------------------------------------- | ----- | ---------- | -------------------------- |
 | T1a          | `done/consumer_lane_resolver/`        | done  | --         | done (PR #51)              |
-| T2           | `doing/backend_subscription_sources/` | doing | T1a        | impl done; pre-merge       |
+| T2           | `doing/backend_subscription_sources/` | doing | T1a        | PR #54 open (pre-merge)    |
 | T3           | `done/supervisor_lane_driven/`        | done  | T1a        | done (PR #52)              |
 | T4           | inline in `card.md`                   | --    | T1a,T2,T3  | sketch                     |
 | T5           | inline in `card.md`                   | --    | T3,T4      | sketch                     |
@@ -34,8 +35,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - **T2 ships `chatgpt` first; `claude-max` is deferred.** The `chatgpt` path is billing-proven (codex
   `chatgpt_tokens -> subscription_quota`); `claude-max` asserts `claude -p` rides a Max subscription, which is unproven.
   Gate it on T0. So **T0 is non-blocking for T2/T4 but load-bearing for `claude-max`**.
-- **T2 must expand `ProviderType`** (`core/provider_types.py:7` -- add `openai`) and the downstream provider branches
-  (`core/llm/detection.py`, `cli/backend.py:318,426,448,452`); a `chatgpt` source fails validation otherwise.
+- **T2 expanded `ProviderType`** (`core/provider_types.py` -- added catalog-only `openai`). **Resolved**: the originally
+  guessed downstream branches did **not** all need changes. `core/llm/detection.py` was verified unchanged (`openai` is
+  never a `core.llm` routing target; `detect_provider` already maps `openai/<model>` to `litellm_remote`, and
+  `is_implemented("openai")` is `False`); `cli/backend.py` got `runtime_native` display/probe handling rather than the
+  per-line provider branches first guessed.
 
 ## Decisions owed (coordination, not code)
 
