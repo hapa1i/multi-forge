@@ -10,6 +10,11 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
+**Status (2026-06-27):** Phases 1-6 implementation **complete** on branch `codex_exec_supervisor_lane` (commits
+`fa2179b` board open, `577b517` Phase 1, `e7aaaad` Phases 2-5, `919f12c` design docs, `61c9b8d` format). Unit (269) +
+supervisor E2E (10) green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane
+move) + the merge itself. One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
+
 **Verified seam (2026-06-26, against shipped code):**
 
 - **Lane override gating** -- `resolve_lane(consumer, override=...)` (`core/lanes.py:133`) returns the override **only
@@ -191,14 +196,20 @@ T3** (`claude_code` lane).
 
 ### Phase 6 -- Docs + closeout
 
-- [ ] design.md / design_appendix.md §G: note the supervisor lane now admits a codex runtime arm (first non-claude
-  consumer lane). Coordinate with the epic's still-open §G/§3.6.12 sync debt.
-- [ ] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
-- [ ] Integration: the supervisor is a hook path -- run `tests/integration/docker/test_supervisor_e2e.py` before
-  finishing (CLAUDE.md: hooks/supervisor changes need the integration tier, not just unit). A real codex E2E (codex
-  installed + a chatgpt login) is a stretch goal, not a gate -- the unit assertions mock the invoker.
-- [ ] change_log.md entry (Goal / Key changes / Verification); promote durable lessons to `impl_notes.md` after review.
-- [ ] Update epic roster T4 -> done; `git mv doing/ -> done/`.
+- [x] design.md §3.6.12 + design_appendix.md §G note the codex supervisor arm (first non-claude consumer lane): §G's
+  consumer-lane paragraph now describes both arms (claude_code default + codex override) with the blind/transfer-fed,
+  read-only, direct-to-OpenAI, fail-open semantics; §3.6.12 notes the codex arm bypasses the proxy chain. Committed
+  `919f12c`.
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks) -- all hooks Passed. Normalization
+  (mdformat reflow of board/design docs + isort import grouping) committed `61c9b8d`.
+- [x] Integration: `./scripts/test-integration.sh tests/integration/docker/test_supervisor_e2e.py` -> **10 passed**
+  (30.32s). Confirms the `run_supervisor_check` control-flow restructure did not regress the real default `claude -p`
+  supervisor flow (`test_session_set_wires_supervisor_config` exercises the new `supervisor_runtime` field through
+  `forge session set`). A real codex E2E (codex installed + chatgpt login) stays a stretch goal -- unit tests mock the
+  invoker.
+- [ ] **Closeout (post-merge):** change_log.md entry (Goal / Key changes / Verification); propose durable lessons to
+  `impl_notes.md` after human review; update epic roster T4 -> done; `git mv doing/ -> done/`. Per the dogfood pattern
+  (T2: `feat... (#54)` then a separate `docs(board): close out` commit), these land after the feature merges to `main`.
 
 ## Blockers / deferred
 
