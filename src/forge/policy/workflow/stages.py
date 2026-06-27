@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 
 from forge.core.reactive.structured_output import extract_json_from_response
@@ -73,7 +74,7 @@ class FilterStage:
 
 
 class CheckerStage:
-    """Cheap LLM intermediate check via SyncAdapter.ask()."""
+    """Cheap LLM intermediate check via SyncAdapter.complete()."""
 
     def __init__(self, config: CheckerConfig) -> None:
         self._config = config
@@ -85,21 +86,21 @@ class CheckerStage:
             PolicyDecision(allow) to short-circuit (no reviewer needed), or
             None to escalate to the reviewer stage.
         """
+        model = self._config.model
         try:
-            from forge.core.llm import SyncAdapter, get_client
-
             prompt = self._config.prompt_template.format(
                 tool_name=context.tool_name,
                 target_path=context.target_path or "N/A",
                 content=(context.raw_diff or context.new_content or "")[:2000],
                 tags=", ".join(tags),
             )
-
-            client = get_client(self._config.model)
-            adapter = SyncAdapter(client)
-            response = adapter.ask(prompt, system=self._config.system_prompt)
-
-            data = extract_json_from_response(response)
+            data = _complete_with_usage(
+                context=context,
+                prompt=prompt,
+                model=model,
+                system_prompt=self._config.system_prompt,
+                command="policy-checker",
+            )
             if data is None:
                 _log.debug("Checker could not parse response, escalating to reviewer")
                 return None
@@ -110,11 +111,12 @@ class CheckerStage:
 
         except Exception as e:
             _log.warning("CheckerStage failed: %s", e)
+            _emit_stage_error(context=context, model=model, command="policy-checker")
             return None
 
 
 class ReviewerStage:
-    """Deep LLM review via SyncAdapter.ask()."""
+    """Deep LLM review via SyncAdapter.complete()."""
 
     def __init__(self, config: ReviewerConfig) -> None:
         self._config = config
@@ -128,21 +130,21 @@ class ReviewerStage:
         - divergent + low confidence or no citations → warn
         - parse failure → warn (fail-open)
         """
+        model = self._config.model
         try:
-            from forge.core.llm import SyncAdapter, get_client
-
             prompt = self._config.prompt_template.format(
                 tool_name=context.tool_name,
                 target_path=context.target_path or "N/A",
                 content=(context.raw_diff or context.new_content or "")[:4000],
                 tags=", ".join(tags),
             )
-
-            client = get_client(self._config.model)
-            adapter = SyncAdapter(client)
-            response = adapter.ask(prompt, system=self._config.system_prompt)
-
-            data = extract_json_from_response(response)
+            data = _complete_with_usage(
+                context=context,
+                prompt=prompt,
+                model=model,
+                system_prompt=self._config.system_prompt,
+                command="policy-reviewer",
+            )
             if data is None:
                 return PolicyDecision(
                     decision="warn",
@@ -154,11 +156,89 @@ class ReviewerStage:
 
         except Exception as e:
             _log.warning("ReviewerStage failed: %s", e)
+            _emit_stage_error(context=context, model=model, command="policy-reviewer")
             return PolicyDecision(
                 decision="warn",
                 policy_id=policy_id,
                 warnings=[f"Reviewer error: {e}, failing open"],
             )
+
+
+def _provider_label(model: str) -> str | None:
+    """Provider prefix of a ``provider/model`` id (the tagger/plan-check convention)."""
+    return model.split("/", 1)[0] if "/" in model else None
+
+
+def _complete_with_usage(
+    *,
+    context: ActionContext,
+    prompt: str,
+    model: str,
+    system_prompt: str | None,
+    command: str,
+) -> dict[str, Any] | None:
+    """Run a stage LLM call via ``.complete()``, emit a session-tagged usage event, parse JSON.
+
+    Shared by the Checker and Reviewer so the emission contract can't drift between them.
+    Captures exact tokens (``.complete()`` returns ``CompletionResponse.usage`` that ``.ask()``
+    discarded) and tags ``session`` so the row appears in per-session ``forge telemetry activity``.
+    Mirrors ``SyncAdapter.ask``'s implicit system message: prepend ``role="system"`` only when a
+    system prompt is configured (``.complete()`` takes raw messages, so the caller owns it now).
+    Emits ``status="error"``/``parse_error`` on an unparseable response (plan-check is the
+    reference). Returns the parsed dict, or ``None`` on a parse failure.
+    """
+    from forge.core.llm import Message, SyncAdapter, get_client
+    from forge.core.usage import (
+        emit_direct_llm_usage,
+        mint_request_id,
+        resolve_client_base_url,
+        target_is_forge_proxy,
+        with_forge_request_id,
+    )
+
+    client = get_client(model)
+    adapter = SyncAdapter(client)
+    # Exact-cost join only when the client provably targets a Forge proxy (a dangling
+    # X-Request-ID ref is worse than none) -- same gate as the tagger/plan-check.
+    request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
+    hp = with_forge_request_id(None, request_id) if request_id else None
+
+    messages = [Message(role="user", content=prompt)]
+    if system_prompt:
+        messages.insert(0, Message(role="system", content=system_prompt))
+
+    start = time.monotonic()
+    response = adapter.complete(messages, hyperparams=hp)
+    latency_ms = (time.monotonic() - start) * 1000
+
+    data = extract_json_from_response(response.text)
+    emit_direct_llm_usage(
+        command=command,
+        model=model,
+        provider=_provider_label(model),
+        usage=response.usage,
+        status="success" if data is not None else "error",
+        failure_type=None if data is not None else "parse_error",
+        cost_request_id=request_id,
+        latency_ms=latency_ms,
+        session=context.session_name,
+        provider_meta=response.provider_meta,
+    )
+    return data
+
+
+def _emit_stage_error(*, context: ActionContext, model: str, command: str) -> None:
+    """Emit a session-tagged ``status="error"`` usage event for a stage exception (no usage)."""
+    from forge.core.usage import emit_direct_llm_usage
+
+    emit_direct_llm_usage(
+        command=command,
+        model=model,
+        provider=_provider_label(model),
+        status="error",
+        failure_type="exception",
+        session=context.session_name,
+    )
 
 
 def _map_verdict(data: dict[str, Any], policy_id: str) -> PolicyDecision:

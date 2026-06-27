@@ -11,6 +11,8 @@ All errors fail-open (return 0). Uses file-backed cache at
 from __future__ import annotations
 
 import logging
+import os
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -145,8 +147,12 @@ def _classify_event(
     task_subject: str | None = None,
 ) -> str:
     """Classify event via cheap LLM call. Returns single tag string."""
+    # The handler carries no Forge session, so attribute to FORGE_SESSION when the hook set
+    # it, else emit ambient/global (emit_direct_llm_usage no-ops without a run identity).
+    session = os.environ.get("FORGE_SESSION") or None
     try:
-        from forge.core.llm import SyncAdapter, get_client
+        from forge.core.llm import Message, SyncAdapter, get_client
+        from forge.core.usage import emit_direct_llm_usage
 
         prompt = prompt_template.format(
             teammate_name=teammate,
@@ -154,11 +160,31 @@ def _classify_event(
             task_subject=task_subject or "",
         )
         adapter = SyncAdapter(get_client(model))
-        response = adapter.ask(prompt)
-        words = response.strip().lower().split()
+        start = time.monotonic()
+        response = adapter.complete([Message(role="user", content=prompt)])
+        latency_ms = (time.monotonic() - start) * 1000
+        emit_direct_llm_usage(
+            command="team-tagger",
+            model=model,
+            provider=model.split("/", 1)[0] if "/" in model else None,
+            usage=response.usage,
+            latency_ms=latency_ms,
+            session=session,
+        )
+        words = response.text.strip().lower().split()
         return words[0] if words else "routine"
     except Exception as e:
         _log.warning("Team tagger failed: %s", e)
+        from forge.core.usage import emit_direct_llm_usage
+
+        emit_direct_llm_usage(
+            command="team-tagger",
+            model=model,
+            provider=model.split("/", 1)[0] if "/" in model else None,
+            status="error",
+            failure_type="exception",
+            session=session,
+        )
         return "routine"
 
 

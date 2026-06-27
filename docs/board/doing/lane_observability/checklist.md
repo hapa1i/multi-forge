@@ -5,14 +5,15 @@ non-goals). **Branch**: `lane_observability` (opened 2026-06-27; promoted from t
 
 ## Current focus
 
-**EXECUTING 2026-06-27 -- Phase 1 (WS1) in progress.** Decisions D1-D4 resolved; scaffolding committed (`56047204`).
-This checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
-review's three fixes folded in: (M1) "chosen lane" is split across two honest surfaces -- per-call
-`runtime`/`billing_mode` in `forge telemetry activity` (the usage event has no backend id) and the full
-`(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions are **session-tagged** (else
-they miss per-session activity); (M3 low) the epic roster/card/link-control updates landed in this change. Scope is
-three workstreams: WS1 invoker upstream-label fix (the T4 carry-forward), WS2 close the M3 no-emission gaps, WS3 the two
-read surfaces. **Observability only** -- no durable consumer-lane binding (T1b), no billing-inference fix (T0).
+**EXECUTING 2026-06-27 -- Phase 1 (WS1) + Phase 2 (WS2) done; Phase 3 (WS3 read surfaces) next.** Decisions D1-D4
+resolved; scaffolding committed (`56047204`), WS1 (`6cec648e`). This checklist scaffolds T5 from the 2026-06-27
+read-only surface map (4 parallel readers, high-confidence), with the review's three fixes folded in: (M1) "chosen lane"
+is split across two honest surfaces -- per-call `runtime`/`billing_mode` in `forge telemetry activity` (the usage event
+has no backend id) and the full `(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions
+are **session-tagged** (else they miss per-session activity); (M3 low) the epic roster/card/link-control updates landed
+in this change. Scope is three workstreams: WS1 invoker upstream-label fix (the T4 carry-forward), WS2 close the M3
+no-emission gaps, WS3 the two read surfaces. **Observability only** -- no durable consumer-lane binding (T1b), no
+billing-inference fix (T0).
 
 ## Verified surface (2026-06-27 map, against shipped code on `main`)
 
@@ -120,15 +121,21 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 
 ### Phase 2 -- WS2: close the M3 no-emission gaps (D2)
 
-- [ ] Checker + Reviewer stages (`policy/workflow/stages.py`): `.ask()` ->
-  `.complete([Message(role="system", ...), Message(role="user", ...)])` (preserve the system prompt);
+- [x] Checker + Reviewer stages (`policy/workflow/stages.py`): `.ask()` -> `.complete(...)` via a shared
+  `_complete_with_usage` helper (so the two stages can't drift). Preserves the system prompt by mirroring `.ask()`'s
+  guard (prepend `Message(role="system", ...)` **only when** `system_prompt` is set -- it is `str | None`).
   `emit_direct_llm_usage(command="policy-checker"|"policy-reviewer", session=context.session_name, ...)` on success +
-  parse-failure/exception (`status="error"`).
-- [ ] Team event tagger (`policy/team/handlers.py:_classify_event`): same switch; `command="team-tagger"`; `session`
-  from `FORGE_SESSION` best-effort (no session in the handler args), else ambient -- document the choice at the emit
-  call.
-- [ ] Confirm no double-emit and correct `command`/`route`/`reporter`/`confidence` stamps (match the tagger/plan-check
-  contract); verify the events appear session-tagged in per-session `forge telemetry activity`.
+  parse-failure (`status="error"`/`parse_error`) + exception (`_emit_stage_error`, `failure_type="exception"`). Includes
+  the tagger/plan-check exact-cost `request_id` join (best-effort; `resolve_client_base_url`/`target_is_forge_proxy` are
+  exception-safe). **Verified**: `test_emits_session_tagged_usage_event` + `test_parse_failure_emits_error_event` +
+  `test_exception_emits_error_event` (checker + reviewer) in `test_stages.py`.
+- [x] Team event tagger (`policy/team/handlers.py:_classify_event`): same switch (no system prompt -- `.ask(prompt)` had
+  none); `command="team-tagger"`; `session = os.environ.get("FORGE_SESSION") or None` (no session in the handler args),
+  else ambient -- documented at the emit. Emits on success and on exception (`status="error"`). **Verified**:
+  `test_emits_team_tagger_usage_event` + `test_exception_emits_error_event` in `test_handlers.py`.
+- [x] Confirmed no double-emit (one `emit_direct_llm_usage` per call; `len(events) == 1` asserted) with correct
+  `command`/`session`/`provider`/`status` stamps. Migrated all pre-existing stage/tagger tests from `.ask` to
+  `.complete` (moved behavior -> updated tests, not skipped). **Verified**: 469 policy tests green; `mypy` clean.
 
 ### Phase 3 -- WS3: two read surfaces (D3, D4)
 

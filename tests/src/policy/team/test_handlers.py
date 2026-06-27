@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from forge.cli.hooks.commands import _safe_cache_key
+from forge.core.llm import CompletionResponse
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.state import now_iso
 from forge.core.usage.ledger import read_usage_events
@@ -81,7 +82,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.SyncAdapter")
     def test_returns_tag(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "needs-review"
+        mock_adapter.complete.return_value = CompletionResponse(text="needs-review")
         mock_adapter_cls.return_value = mock_adapter
 
         result = _classify_event("test-model", "Prompt: {teammate_name}", "alice", "team-a")
@@ -91,7 +92,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.SyncAdapter")
     def test_strips_whitespace(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "  Routine  \n"
+        mock_adapter.complete.return_value = CompletionResponse(text="  Routine  \n")
         mock_adapter_cls.return_value = mock_adapter
 
         result = _classify_event("test-model", "{teammate_name}", "alice", "team-a")
@@ -101,7 +102,7 @@ class TestClassifyEvent:
     @patch("forge.core.llm.SyncAdapter")
     def test_llm_error_returns_routine(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.side_effect = RuntimeError("LLM down")
+        mock_adapter.complete.side_effect = RuntimeError("LLM down")
         mock_adapter_cls.return_value = mock_adapter
 
         result = _classify_event("test-model", "{teammate_name}", "alice", "team-a")
@@ -111,12 +112,49 @@ class TestClassifyEvent:
     @patch("forge.core.llm.SyncAdapter")
     def test_none_task_subject_handled(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "routine"
+        mock_adapter.complete.return_value = CompletionResponse(text="routine")
         mock_adapter_cls.return_value = mock_adapter
 
         _classify_event("test-model", "{task_subject}", "alice", "team-a", task_subject=None)
-        prompt = mock_adapter.ask.call_args[0][0]
-        assert "None" not in prompt
+        messages = mock_adapter.complete.call_args[0][0]
+        assert "None" not in messages[-1].content
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_emits_team_tagger_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: the team tagger emits a team-tagger usage event, session-tagged from FORGE_SESSION."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
+        monkeypatch.setenv("FORGE_SESSION", "team-sess")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(
+            text="routine", usage={"prompt_tokens": 6, "completion_tokens": 1}
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        _classify_event("gemini/gemini-2.0-flash", "{teammate_name}", "alice", "team-a")
+
+        events = read_usage_events()
+        assert len(events) == 1
+        e = events[0]
+        assert (e.command, e.session, e.provider, e.status) == ("team-tagger", "team-sess", "gemini", "success")
+        assert (e.input_tokens, e.output_tokens) == (6, 1)
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_exception_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: a team-tagger LLM exception emits a status=error event and still returns routine."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.side_effect = RuntimeError("LLM down")
+        mock_adapter_cls.return_value = mock_adapter
+
+        assert _classify_event("gemini/gemini-2.0-flash", "{teammate_name}", "alice", "team-a") == "routine"
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("team-tagger", "error")
 
 
 # --- _run_supervisor ---
