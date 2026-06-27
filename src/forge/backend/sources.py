@@ -14,13 +14,19 @@ from urllib.parse import urlparse
 from forge.core.backend_dependency import BackendDependency
 from forge.core.credential_registry import CREDENTIALS, Credential
 from forge.core.provider_types import ProviderType
+from forge.core.runtime_vocab import LANE_RUNTIME_IDS
 
 ModelSourceKind = Literal["local", "remote"]
-EndpointKind = Literal["literal_url", "connection_value", "local_backend"]
+EndpointKind = Literal["literal_url", "connection_value", "local_backend", "runtime_native"]
+# A source's billing nature (a declared catalog fact), distinct from the
+# per-invocation BillingMode (core/usage/ledger). "subscription_quota" is the one
+# spelling shared between the two; posture is coarse and source-level.
+BillingPosture = Literal["per_token", "subscription_quota", "free"]
 
 _VALID_SOURCE_KINDS = frozenset(get_args(ModelSourceKind))
 _VALID_ENDPOINT_KINDS = frozenset(get_args(EndpointKind))
 _VALID_PROVIDERS = frozenset(get_args(ProviderType))
+_VALID_BILLING_POSTURES = frozenset(get_args(BillingPosture))
 _ENV_VAR_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _SOURCE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
@@ -58,6 +64,17 @@ class SourceEndpoint:
         """Create an endpoint derived from a local backend lifecycle dependency."""
 
         return cls(kind="local_backend")
+
+    @classmethod
+    def runtime_native(cls) -> "SourceEndpoint":
+        """Create an endpoint whose connection and auth are owned by the runtime.
+
+        No URL and no Forge credential -- a subscription reached through its
+        runtime (e.g. ChatGPT via ``codex``). Which runtime can reach it is pinned
+        by the source's ``reachable_via``, not by the endpoint.
+        """
+
+        return cls(kind="runtime_native")
 
     def __post_init__(self) -> None:
         _validate_endpoint(self)
@@ -111,6 +128,11 @@ class ModelSource:
     capabilities: ModelSourceCapabilities = field(default_factory=ModelSourceCapabilities)
     local_lifecycle: LocalBackendLifecycle | None = None
     template_names: tuple[str, ...] = ()
+    billing_posture: BillingPosture = "per_token"
+    # Lane runtimes that can reach this source; empty = any. A subscription whose
+    # auth is a runtime's native login pins it here (chatgpt -> ("codex",)). Read
+    # by forge.core.lanes._reachable; not consulted by transport resolution.
+    reachable_via: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _validate_source(self)
@@ -166,11 +188,29 @@ def _validate_source(source: ModelSource) -> None:
         raise ModelSourceCatalogError(f"invalid model-source kind for {source.id!r}: {source.kind!r}")
     if source.provider not in _VALID_PROVIDERS:
         raise ModelSourceCatalogError(f"invalid provider for {source.id!r}: {source.provider!r}")
-    if not source.credential_ids:
+    if source.billing_posture not in _VALID_BILLING_POSTURES:
+        raise ModelSourceCatalogError(f"invalid billing_posture for {source.id!r}: {source.billing_posture!r}")
+
+    # Credential symmetry by endpoint family: a runtime_native source's auth is
+    # owned by its runtime, so it declares NO Forge credential; every other kind
+    # must declare at least one.
+    if source.endpoint.kind == "runtime_native":
+        if source.credential_ids:
+            raise ModelSourceCatalogError(
+                f"runtime_native source {source.id!r} must not declare credentials (auth is owned by the runtime)"
+            )
+    elif not source.credential_ids:
         raise ModelSourceCatalogError(f"source {source.id!r} must declare at least one credential")
+
     for credential_id in source.credential_ids:
         if credential_id not in CREDENTIALS:
             raise ModelSourceCatalogError(f"source {source.id!r} references unknown credential {credential_id!r}")
+    # reachable_via entries are matched against lane.runtime_id, so a pin outside the
+    # lane runtime axis could never resolve -- reject it at import rather than let it
+    # read as silently "unreachable" in lanes._reachable.
+    for runtime_id in source.reachable_via:
+        if runtime_id not in LANE_RUNTIME_IDS:
+            raise ModelSourceCatalogError(f"source {source.id!r} has unknown reachable_via runtime {runtime_id!r}")
     for template_name in source.template_names:
         if not _SOURCE_ID_RE.match(template_name):
             raise ModelSourceCatalogError(f"source {source.id!r} has invalid template name {template_name!r}")
@@ -205,6 +245,11 @@ def _validate_endpoint(endpoint: SourceEndpoint) -> None:
             raise ModelSourceCatalogError(
                 f"connection_value endpoint default_url must be an http(s) URL, got {endpoint.default_url!r}"
             )
+        return
+
+    if endpoint.kind == "runtime_native":
+        if endpoint.value is not None or endpoint.default_url is not None:
+            raise ModelSourceCatalogError("runtime_native endpoint cannot set value or default_url")
         return
 
     if endpoint.value is not None or endpoint.default_url is not None:
@@ -301,6 +346,20 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         provider="anthropic",
         endpoint=SourceEndpoint.literal_url("https://api.anthropic.com"),
         credential_ids=("anthropic-api",),
+    ),
+    # ChatGPT subscription reached through the codex runtime. Endpoint and auth are
+    # owned by codex (codex login --device-auth -> chatgpt_tokens), so there is no
+    # Forge URL and no Forge credential. Billing is the subscription's quota;
+    # reachable only via codex (the runtime that holds the login). First
+    # runtime_native source (epic consumer_lanes, T2).
+    ModelSource(
+        id="chatgpt",
+        kind="remote",
+        provider="openai",
+        endpoint=SourceEndpoint.runtime_native(),
+        credential_ids=(),
+        billing_posture="subscription_quota",
+        reachable_via=("codex",),
     ),
     ModelSource(
         id="litellm-gemini-local",
@@ -447,6 +506,7 @@ _SOURCE_BY_IDENTIFIER = {
 
 __all__ = [
     "BUILTIN_MODEL_SOURCES",
+    "BillingPosture",
     "EndpointKind",
     "LocalBackendLifecycle",
     "ModelSource",

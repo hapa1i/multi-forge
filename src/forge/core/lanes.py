@@ -22,17 +22,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from forge.backend.sources import ModelSourceNotFoundError, resolve_model_source_id
+from forge.backend.sources import (
+    ModelSourceNotFoundError,
+    get_model_source,
+    resolve_model_source_id,
+)
 from forge.core.runtime.registry import RUNTIMES
+from forge.core.runtime_vocab import CORE_LLM_RUNTIME
 
 ExecutionKind = Literal["single_shot", "tool_agent"]
 CapabilityFloor = ExecutionKind
-
-# The in-process single-shot runtime (``forge.core.llm``). It is deliberately NOT
-# an entry in ``RUNTIMES`` -- that table is the *agent* runtime registry, iterated
-# by ``list_runtimes()`` / ``installed_runtimes()``; a non-agent entry would
-# pollute every caller. The lane runtime axis adds it here instead.
-CORE_LLM_RUNTIME = "core_llm"
 
 _FLOOR_RANK: dict[ExecutionKind, int] = {"single_shot": 0, "tool_agent": 1}
 
@@ -151,8 +150,11 @@ def _satisfies_floor(runtime_id: str, floor: CapabilityFloor) -> bool:
 
 
 def _reachable(runtime_id: str, backend_id: str) -> bool:
-    # T1a has no hard (runtime, backend) pins -- any catalog backend is reachable
-    # by any lane runtime, and the capability floor does the filtering. T2 adds
-    # subscription pins here (e.g. claude-max -> claude only, chatgpt -> codex).
-    del runtime_id, backend_id  # intentionally unused until T2 introduces pins
-    return True
+    # A source may pin the lane runtimes that can reach it: a subscription whose
+    # auth is a runtime's native login is reachable only via that runtime
+    # (chatgpt -> codex). Empty reachable_via = any runtime (every endpoint-based
+    # source, preserving T1a behavior). backend_id is already canonical
+    # (Lane.__post_init__), so the lookup resolves; this stays a pure dict read
+    # (no proxy/registry/network I/O).
+    source = get_model_source(backend_id)
+    return not source.reachable_via or runtime_id in source.reachable_via

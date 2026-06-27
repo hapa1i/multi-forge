@@ -25,6 +25,47 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-26
+
+### consumer_lanes T2: runtime-native subscription sources (ChatGPT via codex)
+
+**Goal**: Let the model-source catalog name a subscription backend whose connection and auth are owned by a runtime (the
+ChatGPT subscription reached through codex), so a lane can target it without inventing a URL or a Forge credential.
+
+**Key changes**:
+
+- `backend/sources.py`: new `runtime_native` `EndpointKind` (`SourceEndpoint.runtime_native()`, no URL/credential) and a
+  `BillingPosture` declaration (`per_token` default | `subscription_quota` | `free`), distinct from the per-invocation
+  `BillingMode` in `core/usage` (shared spelling only). `ModelSource` gains `billing_posture` and
+  `reachable_via: tuple[str, ...]`. Validator symmetry: a `runtime_native` source MUST declare zero credentials and no
+  endpoint URL; every other kind still requires >=1 credential. Added the `chatgpt` built-in (`provider="openai"`,
+  `runtime_native`, `subscription_quota`, `reachable_via=("codex",)`).
+- `core/provider_types.py`: `ProviderType` gains catalog-only `openai` (never a `core.llm` routing target;
+  `detect_provider` maps `openai/<model>` to `litellm_remote`).
+- `core/lanes.py`: `_reachable` now honors `reachable_via` -- a pinned source is reachable only via its listed runtimes
+  (empty = any), so `claude_code/chatgpt` is unconstructible while `codex/chatgpt` resolves.
+- `cli/backend.py`: read surfaces treat `runtime_native` as runtime-owned, not "configured" -- `list` reports auth
+  `runtime_native` / health `runtime-owned`; `test-auth` skips the probe and points to `forge runtime preflight codex`
+  instead of reporting a credential failure.
+- `config/loader.py` (review fix): a `runtime_native` source cannot back a proxy -- template loading rejects a
+  `proxy.source` pointing at one, so a template can never mint a proxy for an undialable backend (enforces the "no proxy
+  support for subscriptions" boundary).
+- `core/runtime_vocab.py` (new, dependency-light; review fix): the lane runtime axis (`{core_llm}` + agent `RUNTIMES`).
+  `sources` validates `reachable_via` pins against it at import, so a typo like `("codx",)` fails loudly instead of
+  reading as silently unreachable in `lanes._reachable`. A drift test locks the vocab to `RUNTIMES`. Sources imports the
+  vocab (not `core.runtime.registry`) because that package pulls `auth`/`template_secrets` back into `sources` -- a
+  cycle; this mirrors the existing dependency-light `core.provider_types` pattern.
+
+**Decision**: runtime-native auth is a first-class semantic of the endpoint kind (Option c), not a relaxed credential
+exception. Forge names the backend and reasons about its billing/reachability; the runtime owns endpoint + auth, and
+`Credential` stays pure.
+
+**Verification**: focused suites pass (`test_sources.py`, `test_lanes.py`, `test_backend_commands.py`, `test_loader.py`,
+plus the custom-template-source regression); 4638 ripple tests across `core`, `backend`, `config`, `proxy`, `cli` pass
+(confirming the `ProviderType += openai` and import-graph changes route nowhere); mypy + pyright clean;
+`make pre-commit` clean. Design appendix §A.2.1 synced (schema bullets, catalog row, operator-view + template
+paragraphs, validation list).
+
 ## 2026-06-25
 
 ### Fix cascade short-circuit E2E: internally-inconsistent plan, not a flake

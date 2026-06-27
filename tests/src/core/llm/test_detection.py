@@ -75,6 +75,10 @@ class TestIsImplemented:
         """OpenRouter has a client implementation."""
         assert is_implemented("openrouter") is True
 
+    def test_openai_is_catalog_only_not_implemented(self):
+        """openai is a catalog/source provider (e.g. chatgpt via codex), never a core.llm routing target."""
+        assert is_implemented("openai") is False
+
 
 class TestPrefixConstants:
     """Tests for prefix constants."""

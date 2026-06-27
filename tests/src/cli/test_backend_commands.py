@@ -526,3 +526,41 @@ def test_show_json_unknown_id_reports_not_found(
     assert payload["adapter_type"] == "nope"
     assert payload["runtime_instance"] is None
     assert payload["config_path"] is None
+
+
+def test_list_json_renders_runtime_native_source_as_runtime_owned(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """A runtime_native source (chatgpt) renders honestly: openai provider, runtime_native
+    endpoint, auth_status=runtime_native, and runtime-owned health -- never a misleading
+    'configured'/'unprobed' from the empty credential set."""
+    result = runner.invoke(main, _backend_args("list", "--json"))
+
+    assert result.exit_code == 0
+    records = {item["source_id"]: item for item in _json_output(result)}
+    chatgpt = records["chatgpt"]
+    assert chatgpt["provider"] == "openai"
+    assert chatgpt["kind"] == "remote"
+    assert chatgpt["endpoint"]["kind"] == "runtime_native"
+    assert chatgpt["auth_status"] == "runtime_native"
+    assert chatgpt["health"] == "runtime-owned"
+    assert chatgpt["required_credentials"] == []
+    assert chatgpt["runtime_instance"] is None
+
+
+def test_test_auth_runtime_native_source_is_skipped_not_failed(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """`test-auth chatgpt` reports runtime-native auth as skipped (verify via codex preflight)
+    and exits 0 -- a subscription backend is not a missing-credential failure."""
+    result = runner.invoke(main, _backend_args("test-auth", "chatgpt", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert payload["provider"] == "openai"
+    assert payload["auth_status"] == "runtime_native"
+    assert payload["missing_required_env_vars"] == []
+    assert payload["probe"]["status"] == "skipped"
+    assert "forge runtime preflight codex" in payload["probe"]["detail"]
