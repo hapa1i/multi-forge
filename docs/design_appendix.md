@@ -1195,11 +1195,13 @@ own model). All other consumers still call the resolver directly. The supervisor
 is a placeholder for T1b's uniform consumer-lane manifest binding.
 
 **Observability (T5).** `forge policy supervisor status` resolves and displays the full `(runtime, backend, model)` lane
-(`resolve_supervisor_lane`: the default claude lane, or the codex override). `forge telemetry activity` shows the
-per-call `runtime`/`billing_mode` each command ran on (`mixed` when a command's events disagree); the usage ledger
-carries no catalog backend id, so the full lane shows only on supervisor status. T5 also closed the three M3 no-emission
-gaps -- the WorkflowPolicy checker/reviewer and the team event tagger now emit `policy-checker`/`policy-reviewer`/
-`team-tagger` usage events (`.complete()` captures the tokens `.ask()` discarded).
+(`resolve_supervisor_lane`: the default claude lane, or the codex override). This is the **declared** lane, not a
+dispatch record: only `runtime_id` is bound today, so the codex `model=gpt-5-codex` it prints is nominal (codex picks
+its own model) and `backend`/`model` become authoritative only when T1b freezes the consumer-lane binding.
+`forge telemetry activity` shows the per-call `runtime`/`billing_mode` each command ran on (`mixed` when a command's
+events disagree); the usage ledger carries no catalog backend id, so the full lane shows only on supervisor status. T5
+also closed the three M3 no-emission gaps -- the WorkflowPolicy checker/reviewer and the team event tagger now emit
+`policy-checker`/`policy-reviewer`/ `team-tagger` usage events (`.complete()` captures the tokens `.ask()` discarded).
 
 ### G.1 Core types (from `core.reactive.routing`)
 

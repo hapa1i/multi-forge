@@ -185,25 +185,25 @@ runners.
 
 ### Policy enforcement
 
-| Command                                                        | Purpose                                                                       |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `forge policy enable --bundle <name>`                          | Enable policy enforcement for current session                                 |
-| `forge policy disable`                                         | Disable policy enforcement                                                    |
-| `forge policy status`                                          | Show current policy state (`--json`)                                          |
-| `forge policy list`                                            | List available bundles and rules (`--json`)                                   |
-| `forge policy check --bundle <name> -f <path>`                 | Evaluate policies on demand                                                   |
-| `forge policy supervisor status`                               | Show supervisor config + resolved `(runtime, backend, model)` lane (`--json`) |
-| `forge policy supervisor evaluate -f <path> -r <id>`           | Evaluate file against approved plan                                           |
-| `forge policy supervisor set <target>`                         | Set persistent supervisor for session                                         |
-| `forge policy supervisor cascade on/off`                       | Toggle the tier-1 plan check (cascade)                                        |
-| `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`           |
-| `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                                 |
-| `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                                  |
-| `forge policy supervisor remove`                               | Remove supervisor entirely                                                    |
-| `forge policy supervisor reload`                               | Reload latest relevant approved plan                                          |
-| `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                                |
-| `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                            |
-| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)                |
+| Command                                                        | Purpose                                                                                                          |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `forge policy enable --bundle <name>`                          | Enable policy enforcement for current session                                                                    |
+| `forge policy disable`                                         | Disable policy enforcement                                                                                       |
+| `forge policy status`                                          | Show current policy state (`--json`)                                                                             |
+| `forge policy list`                                            | List available bundles and rules (`--json`)                                                                      |
+| `forge policy check --bundle <name> -f <path>`                 | Evaluate policies on demand                                                                                      |
+| `forge policy supervisor status`                               | Show supervisor config + the declared `(runtime, backend, model)` lane (only `runtime` is bound today; `--json`) |
+| `forge policy supervisor evaluate -f <path> -r <id>`           | Evaluate file against approved plan                                                                              |
+| `forge policy supervisor set <target>`                         | Set persistent supervisor for session                                                                            |
+| `forge policy supervisor cascade on/off`                       | Toggle the tier-1 plan check (cascade)                                                                           |
+| `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`                                              |
+| `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                                                                    |
+| `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                                                                     |
+| `forge policy supervisor remove`                               | Remove supervisor entirely                                                                                       |
+| `forge policy supervisor reload`                               | Reload latest relevant approved plan                                                                             |
+| `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                                                                   |
+| `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                                                               |
+| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)                                                   |
 
 ### Workflow
 
