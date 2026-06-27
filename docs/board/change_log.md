@@ -27,6 +27,43 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-27
 
+### consumer_lanes T5: lane observability (see/verify the chosen lane + billing)
+
+**Goal**: Make each consumer's chosen lane and how it was billed visible and measurable, and remove the codex
+supervisor's double upstream-outcome row T4 carried forward. Observability only -- no durable consumer-lane binding
+(T1b), no billing-inference fix (T0).
+
+**Key changes**:
+
+- **Configurable upstream operation (WS1)**: additive `Attribution.operation` (default `"workflow.worker"`); the shared
+  invoker emit seam wraps **only** `record_upstream_operation` in `if attribution.operation is None: return`, leaving
+  the early-return guard and `emit_codex_usage`/`emit_worker_usage` untouched. The codex supervisor passes
+  `operation=None`, so its sole upstream row is the engine's `policy.evaluate` -- parity with the claude arm, resolving
+  T4's double-count. Every other consumer defaults to `workflow.worker`.
+- **Close the M3 no-emission gaps (WS2)**: WorkflowPolicy `CheckerStage`/`ReviewerStage` and the team event tagger
+  switched `.ask()` -> `.complete()` to capture `CompletionResponse.usage` (system prompt preserved via an explicit
+  `Message(role="system", ...)`), then emit session-tagged `emit_direct_llm_usage`
+  (`policy-checker`/`policy-reviewer`/`team-tagger`) on success, parse-failure (`status="error"`), and exception.
+  Checker/reviewer tag `session=context.session_name`; the team tagger resolves `FORGE_SESSION` best-effort, else
+  ambient.
+- **Two honest read surfaces (WS3)**: `forge telemetry activity` gains per-call `runtime`/`billing_mode` on
+  `ModelCallActivity` (per-command rollup: uniform value, `mixed` on disagreement, `-`/`unknown` for downstream-only),
+  rendered as a column and in `--json`. `forge policy supervisor status` gains `resolve_supervisor_lane()` and shows the
+  full declared `(runtime, backend, model)` lane (+ `--json`), failing open to `null`/`(unresolved)` on lane drift. The
+  usage ledger carries no backend id, so per-call telemetry shows `runtime`+`billing_mode`; the full lane shows on
+  supervisor status (per-call backend attribution deferred to T1b).
+- **Hardening (adversarial diff review)**: fixed a reviewer double-emit -- verdict mapping moved outside the emit `try`
+  (its own fail-open-to-warn guard), and a malformed `confidence` coerces to `0.0` (system-boundary degrade) -- so one
+  reviewer call can no longer surface as `calls=2/errors=1` in the metric WS2 just added.
+
+**Verification**: full unit suite 7019 passed; hardening round green across 873 policy/invoker/ops tests; mypy +
+`make pre-commit` clean. `test_supervisor_e2e.py` (Docker/real-Claude, release-tier) deferred -- the changes are
+additive telemetry with no dispatch/verdict change. Shipped via PR #56 (`4fc705b4`); design docs (`design_appendix.md`
+§G, `cli_reference.md`) synced in the same PR.
+
+**Epic**: first wave (T1a/T2/T3/T4/T5) complete; epic stays in `doing/` coordinating T1b (durable binding, next cursor),
+T6, and T7. Durable lessons deferred to epic closeout.
+
 ### consumer_lanes T4: codex-exec supervisor lane (first non-Claude consumer lane)
 
 **Goal**: Place the semantic supervisor on a real non-Claude runtime -- headless `codex exec` riding the ChatGPT

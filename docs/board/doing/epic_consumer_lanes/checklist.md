@@ -12,13 +12,15 @@ four cards in `done/`. T2's three decisions are resolved (A = Option (c), user 2
 auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and `design_appendix.md` §A.2.1 is synced. T4
 proved a swappable non-Claude lane behind the narrow `SupervisorConfig.supervisor_runtime` field (blind/transfer-fed,
 read-only, direct-to-OpenAI, fail-open); it also synced `design.md` §3.6.12 + `design_appendix.md` §G to describe both
-supervisor arms, closing the §G/§3.6.12 sync T3 deferred. **T5** (lane observability) is now **open in `doing/`** on
-branch `lane_observability` (promoted from inline sketch 2026-06-27): surface the chosen lane and resulting
-`billing_mode`, close the M3 no-emission gaps, and fix the invoker's `workflow.worker` upstream mislabel T4 carried
-forward; its `card.md` + `checklist.md` are authored in `doing/lane_observability/` and **under review before
-implementation** (four decisions D1-D4 gate Phase 1). **T7** (subscription-exhaustion fail-open) -- the one new ticket
-from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/`
-(depends on T4). T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
+supervisor arms, closing the §G/§3.6.12 sync T3 deferred. **T5** (lane observability) is **done** (PR #56, `4fc705b4`)
+and closed to `done/lane_observability/`: two honest read surfaces (`forge telemetry activity` per-call
+`runtime`/`billing_mode`; `forge policy supervisor status` the full `(runtime, backend, model)` lane), the three M3
+no-emission gaps closed (checker/reviewer/team-tagger now emit session-tagged usage), and the invoker's
+`workflow.worker` upstream mislabel T4 carried forward fixed (additive `Attribution.operation`; codex supervisor sets
+`operation=None` for parity). With T5 done the **first wave (T1a/T2/T3/T4/T5) is complete**; the epic stays in `doing/`
+coordinating T1b (next cursor), T6, and T7. **T7** (subscription-exhaustion fail-open) -- the one new ticket from the
+2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/` (depends on
+T4). T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
@@ -28,7 +30,7 @@ from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `propose
 | T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)              |
 | T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)              |
 | T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)              |
-| T5           | `doing/lane_observability/`                  | doing    | T3,T4      | in progress (branch)       |
+| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)              |
 | T1b          | inline in `card.md`                          | --       | T4         | sketch                     |
 | T6           | inline in `card.md`                          | --       | T1b        | sketch                     |
 | T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26        |
@@ -81,10 +83,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - [x] When T4 opens: branch, `git mv docs/board/todo/codex_exec_supervisor_lane docs/board/doing/`, add its
   `checklist.md`, update this roster. (done -- branch `codex_exec_supervisor_lane`)
 - [x] When T5 opens: branch `lane_observability`, author `doing/lane_observability/card.md` + `checklist.md` from the
-  2026-06-27 surface map, update this roster. (done -- promoted from inline sketch; plan under review)
+  2026-06-27 surface map, update this roster. (done -- promoted from inline sketch; shipped PR #56 and closed to
+  `done/lane_observability/` 2026-06-27)
 - [ ] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
-  `done/codex_exec_supervisor_lane/` (PR #55); **T5 open** -> `doing/lane_observability/`; **T7** (new, from the
-  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. T1b/T6 still inline.
+  `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
+  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. T1b/T6 still inline; T1b is the next cursor.
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`
@@ -100,6 +103,9 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   routing). **Done in T4 (PR #55):** §G's consumer-lane paragraph describes both supervisor arms (claude_code default +
   codex override); §3.6.12 notes the codex arm bypasses the proxy chain. (T3 deferred this "to >1 wired consumer"; T4 is
   that consumer.)
+- [x] T5 ships -> update `design_appendix.md` §G (Observability paragraph: the two read surfaces + `operation=None`
+  upstream-parity fix; per-emitter coverage table gains checker/reviewer/team-tagger rows) and `cli_reference.md`
+  (`forge telemetry activity` lane columns + `forge policy supervisor status` row). Done in PR #56.
 - [ ] T1b ships -> update `design.md` §3.6 (manifest gains consumer-lane `intent`/`confirmed`).
 
 ## Closeout (epic)

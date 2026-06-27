@@ -5,9 +5,9 @@ non-goals). **Branch**: `lane_observability` (opened 2026-06-27; promoted from t
 
 ## Current focus
 
-**EXECUTING 2026-06-27 -- Phases 1-3 (WS1/WS2/WS3) done; Phase 4 (tests) folded in per-phase, Phase 5 (docs + closeout)
-next.** Decisions D1-D4 resolved; committed: scaffolding (`56047204`), WS1 (`6cec648e`), WS2 (`13eeb386`). This
-checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
+**DONE 2026-06-27 -- shipped via PR #56 (`4fc705b4`) and closed out to `done/`.** All five phases complete (WS1/WS2/WS3
+\+ tests + docs); design docs synced in the PR; change_log + epic roster updated at closeout. Decisions D1-D4 resolved.
+This checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
 review's three fixes folded in: (M1) "chosen lane" is split across two honest surfaces -- per-call
 `runtime`/`billing_mode` in `forge telemetry activity` (the usage event has no backend id) and the full
 `(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions are **session-tagged** (else
@@ -165,12 +165,12 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 - [x] design_appendix.md §G (codex `operation=None` upstream-parity fix + the two T5 read surfaces + the three closed M3
   gaps) and the per-emitter coverage table (checker/reviewer/team-tagger rows + the activity lane note);
   cli_reference.md `forge telemetry activity` lane columns and a new `forge policy supervisor status` row.
-- [ ] `make pre-commit` clean (per-file hooks green so far); relevant integration (`test_supervisor_e2e.py`) is
-  Docker/real-Claude release-tier -- the changes are additive telemetry (no dispatch/verdict change), so deferred
-  pending go-ahead (Docker + `ANTHROPIC_API_KEY`).
-- [ ] Closeout (at/after merge to `main`): change_log entry; epic roster T5 -> done; `git mv doing/ -> done/`; promote
-  durable lessons to the epic closeout; clear the epic checklist's "Verify the M3 no-emission gaps are actually silent"
-  item (done here).
+- [x] `make pre-commit` clean; full unit suite 7019 passed. Merged via PR #56 (`4fc705b4`). Relevant integration
+  (`test_supervisor_e2e.py`) is Docker/real-Claude release-tier and stays deferred -- the changes are additive telemetry
+  (no dispatch/verdict change), so unit coverage is the gate.
+- [x] Closeout (2026-06-27, post-merge to `main`): change_log entry added; epic roster + card flipped T5 -> done;
+  `git mv doing/lane_observability -> done/`; epic checklist's "Verify the M3 no-emission gaps are actually silent" item
+  already ticked. Durable lessons deferred to the epic closeout (epic stays in `doing/` coordinating T1b/T6/T7).
 
 ## Acceptance test table
 
