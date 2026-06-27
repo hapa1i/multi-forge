@@ -767,12 +767,14 @@ class TestSupervisorLaneDispatch:
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
 
         codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+        # source_cwd (planner worktree) deliberately differs from context.repo_root (action
+        # worktree) so the cwd assertion below can tell them apart.
         result = _dispatch_supervisor(
             codex_lane,
             prompt="check this",
             config=_make_config(direct=True),
             context=_make_context(),
-            resolved=_ResolvedTarget(resume_id="uuid", source_cwd="/workspace"),
+            resolved=_ResolvedTarget(resume_id="uuid", source_cwd="/planner-checkout"),
             usage_command="supervisor",
         )
 
@@ -783,9 +785,79 @@ class TestSupervisorLaneDispatch:
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
         assert mock_prepare.call_args.kwargs["model"] is None
         assert mock_prepare.call_args.kwargs["prompt"] == "check this"
+        # The ACTION repo (context.repo_root), not the planner's source_cwd.
         assert mock_prepare.call_args.kwargs["cwd"] == "/workspace"
         assert result.stdout == "VERDICT"
         assert result.success is True
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_arm_runs_in_action_repo_not_planner_source_cwd(
+        self, mock_read: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
+    ) -> None:
+        """Regression: codex `cd`s into the ACTION checkout, not the planner's source_cwd.
+
+        In a fork/worktree flow the supervisor resumes the planner session (source_cwd =
+        planner worktree) while the action runs in a different fork worktree
+        (context.repo_root). Codex has no --resume and judges in a read-only sandbox, so
+        rooting it at source_cwd would inspect the wrong branch -- silently unreliable.
+        """
+        from dataclasses import replace
+
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
+
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
+
+        action = replace(_make_context(), repo_root="/fork-worktree")
+        _dispatch_supervisor(
+            Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
+            prompt="check this",
+            config=_make_config(direct=True),
+            context=action,
+            resolved=_ResolvedTarget(resume_id="uuid", source_cwd="/planner-worktree"),
+            usage_command="supervisor",
+        )
+
+        cwd = mock_prepare.call_args.kwargs["cwd"]
+        assert cwd == "/fork-worktree"  # the action repo (context.repo_root)
+        assert cwd != "/planner-worktree"  # NOT the resolved planner source_cwd
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_arm_empty_repo_root_falls_back_to_none_cwd(
+        self, mock_read: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
+    ) -> None:
+        """A shadow candidate can freeze repo_root=""; `cwd or None` inherits the worker cwd
+        rather than passing `cd ""` to the codex subprocess."""
+        from dataclasses import replace
+
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
+
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
+
+        action = replace(_make_context(), repo_root="")
+        _dispatch_supervisor(
+            Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
+            prompt="x",
+            config=_make_config(direct=True),
+            context=action,
+            resolved=_ResolvedTarget(resume_id="uuid", source_cwd="/planner-worktree"),
+            usage_command="supervisor",
+        )
+
+        assert mock_prepare.call_args.kwargs["cwd"] is None
 
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_codex_arm_unready_cache_raises_routing_error(self, mock_read: MagicMock) -> None:

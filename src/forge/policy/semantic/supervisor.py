@@ -477,11 +477,12 @@ def _dispatch_supervisor(
     # uncaught -> engine policy_error -> DENY under fail_mode="closed" (the supervisor's contract
     # is fail-open, design_workflows 1.2).
     if runtime == "codex":
+        # No `resolved`: the codex arm is blind/transfer-fed (no --resume) and runs in the
+        # ACTION repo (context.repo_root), so it needs nothing from the resolved resume target.
         return _dispatch_codex_supervisor(
             prompt=prompt,
             config=config,
             context=context,
-            resolved=resolved,
             usage_command=usage_command,
         )
     raise _SupervisorRoutingError(
@@ -571,7 +572,6 @@ def _dispatch_codex_supervisor(
     prompt: str,
     config: SupervisorConfig,
     context: ActionContext,
-    resolved: _ResolvedTarget,
     usage_command: str,
 ) -> SessionResult:
     """Run the supervisor on the codex-exec lane (T4, epic consumer_lanes).
@@ -579,7 +579,9 @@ def _dispatch_codex_supervisor(
     Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
     be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
     enforces that precondition (plan-present) before selecting this arm; this function does
-    not re-check it. Read-only sandbox (the supervisor inspects, never writes). The invoker
+    not re-check it. Read-only sandbox (the supervisor inspects, never writes), rooted at the
+    **action's** checkout (``context.repo_root``) -- NOT the planner's ``source_cwd`` -- so a
+    fork/worktree flow has codex inspect the branch the action is actually on. The invoker
     auto-emits the SOLE usage event (``emit_codex_usage`` via the request's ``Attribution``);
     this arm must NOT call ``emit_usage_for_session_result`` -- that would double-count.
 
@@ -617,7 +619,14 @@ def _dispatch_codex_supervisor(
             preflight=preflight,
             attribution=Attribution(command=usage_command, session=context.session_name),
             model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
-            cwd=resolved.source_cwd,
+            # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
+            # worktree, needed only because `claude --resume` is CWD-scoped to find the
+            # transcript -- a Claude-arm constraint codex (no --resume) doesn't share. Codex
+            # judges in a read-only sandbox and may inspect the repo; target_path is relative
+            # to context.repo_root, so a fork/worktree flow (planner cwd != action cwd) would
+            # otherwise have codex read the wrong branch. `or None` -> inherit the worker cwd
+            # when a shadow candidate froze an empty repo_root (never `cd ""`).
+            cwd=context.repo_root or None,
             sandbox="read-only",
             timeout_seconds=config.timeout_seconds,
             label="supervisor",

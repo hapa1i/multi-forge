@@ -10,12 +10,13 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
-**Status (2026-06-27):** Phases 1-8 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
+**Status (2026-06-27):** Phases 1-9 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
 docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open)
-in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits, the 2026-06-27 second review) pending commit. Unit suites green
-(supervisor 109, shadow 49, cache 11, runtime CLI + store -> **400** in the combined run); supervisor E2E 10 green;
-`make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane move) + the merge. One item
-deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
+in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits) in `471eec7`; Phase 9 (codex cwd = action repo, the 2026-06-27 follow-up
+review) pending commit. Unit suites green (supervisor 111, shadow 49, cache 11, runtime CLI + store -> **402** in the
+combined run); supervisor E2E 10 green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log,
+impl_notes, lane move) + the merge. One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase
+4).
 
 **Verified seam (2026-06-26, against shipped code):**
 
@@ -294,6 +295,24 @@ mediums confirmed valid.
 - [x] Verified:
   `uv run pytest tests/src/policy/semantic/ tests/src/core/runtime/ tests/src/cli/test_runtime.py tests/src/session/test_store.py`
   -> **400 passed**; mypy + pyright clean on all changed files.
+
+### Phase 9 -- Review follow-up (codex cwd)
+
+A 2026-06-27 follow-up review found one more issue (confirmed valid against shipped code).
+
+- [x] **Codex supervisor runs in the ACTION checkout, not the planner's `source_cwd`.** The arm passed
+  `cwd=resolved.source_cwd` -- the *planner* session's worktree, resolved only because `claude --resume` is CWD-scoped
+  to find the transcript (a Claude-arm constraint codex doesn't share: no `--resume`). Codex judges in a read-only
+  sandbox and may inspect the repo, and `target_path` is relative to `context.repo_root`, so a fork/worktree flow
+  (planner cwd != action cwd) -- or a shadow replay -- had codex inspect the **wrong branch**: silently unreliable
+  supervision. Fix: `cwd=context.repo_root or None` (the action repo; `or None` inherits the worker cwd when a shadow
+  candidate froze an empty `repo_root`, never `cd ""`). `resolved` is now dropped from `_dispatch_codex_supervisor`'s
+  signature -- the codex arm is resume-target-independent, so the unused param is removed (the claude arm still takes
+  it). Verified: `test_codex_arm_runs_in_action_repo_not_planner_source_cwd` (source_cwd `/planner-worktree` !=
+  repo_root `/fork-worktree` -> request cwd is the action repo) +
+  `test_codex_arm_empty_repo_root_falls_back_to_none_cwd`; existing `test_codex_arm_dispatches_through_invoker` updated
+  so its two cwds differ (the old test set both to `/workspace`, so it could not have caught this). Full affected suite
+  -> **402 passed**; supervisor E2E **10 passed**.
 
 ## Blockers / deferred
 
