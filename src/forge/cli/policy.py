@@ -12,6 +12,7 @@ Commands for managing policy enforcement:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -36,6 +37,7 @@ from forge.policy.queries import (
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     apply_checker_options,
+    resolve_supervisor_lane,
     validate_checker_model,
 )
 from forge.session import SessionStore
@@ -46,6 +48,7 @@ from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sessions_dir
 
 console = Console()
+_log = logging.getLogger(__name__)
 
 # Click wrappers over the shared (Click-free) vocabularies. Checker effort uses the
 # core.llm ReasoningEffort set (the tier-1 checker is a core.llm call); supervisor effort
@@ -361,6 +364,15 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
             swp = ts.confirmed.started_with_proxy
             if swp and swp.template:
                 data["source_model"] = swp.template
+    # T5/WS3: the full resolved lane (runtime, backend, model) the supervisor runs on -- this is
+    # where "the chosen lane" shows completely (the per-call usage event carries no backend id).
+    data["supervisor_runtime"] = sup.supervisor_runtime
+    try:
+        lane = resolve_supervisor_lane(sup)
+        data["lane"] = {"runtime": lane.runtime_id, "backend": lane.backend_id, "model": lane.model}
+    except Exception as exc:  # allowed_lanes/_SUPERVISOR_RUNTIMES drift -> show null, never crash status
+        _log.debug("supervisor lane resolution for status failed: %s", exc)
+        data["lane"] = None
     return data
 
 
@@ -949,6 +961,15 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         swp = target_state.confirmed.started_with_proxy
         if swp and swp.template:
             console.print(f"  Source model: {swp.template}")
+
+    # T5/WS3: the full resolved lane (runtime, backend, model) -- where the chosen lane shows.
+    try:
+        lane = resolve_supervisor_lane(sup)
+        console.print(f"  Lane: runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}")
+    except Exception as exc:
+        _log.debug("supervisor lane resolution for status failed: %s", exc)
+        if sup.supervisor_runtime:
+            console.print(f"  Lane: runtime={sup.supervisor_runtime} (unresolved)")
 
     if sup.proxy:
         console.print(f"  Routing: proxy: {sup.proxy}")

@@ -701,6 +701,18 @@ def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
     )
 
 
+def resolve_supervisor_lane(config: SupervisorConfig) -> Lane:
+    """Resolve the full ``(runtime, backend, model)`` lane the supervisor would run on.
+
+    The default claude lane (``claude_code``/``anthropic-direct``/``opus``) unless
+    ``supervisor_runtime`` selects a declared override (the codex lane). Display callers
+    (``forge policy supervisor status``) use this to show the chosen lane completely -- the
+    per-call usage event carries no backend id. Raises ``LaneError`` on
+    ``allowed_lanes``/``_SUPERVISOR_RUNTIMES`` drift; a display caller should catch it.
+    """
+    return resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+
+
 def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,

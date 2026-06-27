@@ -5,15 +5,15 @@ non-goals). **Branch**: `lane_observability` (opened 2026-06-27; promoted from t
 
 ## Current focus
 
-**EXECUTING 2026-06-27 -- Phase 1 (WS1) + Phase 2 (WS2) done; Phase 3 (WS3 read surfaces) next.** Decisions D1-D4
-resolved; scaffolding committed (`56047204`), WS1 (`6cec648e`). This checklist scaffolds T5 from the 2026-06-27
-read-only surface map (4 parallel readers, high-confidence), with the review's three fixes folded in: (M1) "chosen lane"
-is split across two honest surfaces -- per-call `runtime`/`billing_mode` in `forge telemetry activity` (the usage event
-has no backend id) and the full `(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions
-are **session-tagged** (else they miss per-session activity); (M3 low) the epic roster/card/link-control updates landed
-in this change. Scope is three workstreams: WS1 invoker upstream-label fix (the T4 carry-forward), WS2 close the M3
-no-emission gaps, WS3 the two read surfaces. **Observability only** -- no durable consumer-lane binding (T1b), no
-billing-inference fix (T0).
+**EXECUTING 2026-06-27 -- Phases 1-3 (WS1/WS2/WS3) done; Phase 4 (tests) folded in per-phase, Phase 5 (docs + closeout)
+next.** Decisions D1-D4 resolved; committed: scaffolding (`56047204`), WS1 (`6cec648e`), WS2 (`13eeb386`). This
+checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
+review's three fixes folded in: (M1) "chosen lane" is split across two honest surfaces -- per-call
+`runtime`/`billing_mode` in `forge telemetry activity` (the usage event has no backend id) and the full
+`(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions are **session-tagged** (else
+they miss per-session activity); (M3 low) the epic roster/card/link-control updates landed in this change. Scope is
+three workstreams: WS1 invoker upstream-label fix (the T4 carry-forward), WS2 close the M3 no-emission gaps, WS3 the two
+read surfaces. **Observability only** -- no durable consumer-lane binding (T1b), no billing-inference fix (T0).
 
 ## Verified surface (2026-06-27 map, against shipped code on `main`)
 
@@ -139,13 +139,19 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 
 ### Phase 3 -- WS3: two read surfaces (D3, D4)
 
-- [ ] `forge telemetry activity`: thread `runtime` + `billing_mode` from `UsageEvent` into `_aggregate_ledger` and the
-  activity DTOs (`CommandUsage`/`ModelCallActivity`); render in the existing downstream pane (human + `--json`). Per D4:
-  uniform value per row, `mixed` when >1 distinct, `unknown`/`-` for downstream-only rows with no usage-event source.
-- [ ] `forge policy supervisor status`: resolve `supervisor_runtime` to its `Lane` and render the full
-  `(runtime, backend, model)` (+ `--json`) via the existing `_supervisor_status_dict()` helper -- where "the chosen
-  lane" shows completely.
-- [ ] Status-line / `render_summary_line` lane indicator: **deferred** (Decision D3) -- not in T5.
+- [x] `forge telemetry activity`: added `runtime`/`billing_mode` to `ModelCallActivity` and a `_rollup_lane_value`
+  helper; `_build_model_call_pane` stamps event-backed rows (per-command set -> uniform value or `"mixed"`),
+  downstream-only rows stay `None`. Rendered a `Runtime/Billing` column in `cli/activity.py:_render`; `--json` carries
+  the fields for free via `asdict(summary.downstream)`. **Verified**: `test_lane_row_carries_runtime_and_billing` /
+  `test_lane_mixed_when_command_events_disagree` / `test_lane_none_for_downstream_only_row` (`test_usage_summary.py`)
+  and `test_json_carries_runtime_and_billing` / `test_human_render_shows_runtime_billing` (`test_activity.py`).
+- [x] `forge policy supervisor status`: added a public `resolve_supervisor_lane(config)` (default claude lane, or codex
+  override) and surfaced it in `_supervisor_status_dict` (`supervisor_runtime` + `lane` keys) and the human render
+  (`Lane: runtime=... backend=... model=...`); drift fails open to `lane=null`/`(unresolved)`. **Verified**:
+  `test_status_json_carries_default_lane` / `test_status_json_carries_codex_lane` / `test_status_displays_codex_lane`
+  (`test_policy_supervisor.py`), and the `_SUPERVISOR_JSON_KEYS` set updated for the new keys.
+- [x] Status-line / `render_summary_line` lane indicator: **deferred** (Decision D3) -- not in T5. **Verified**:
+  `test_status_line.py` green (the additive DTO fields don't change the summary line).
 
 ### Phase 4 -- Tests (card acceptance table)
 

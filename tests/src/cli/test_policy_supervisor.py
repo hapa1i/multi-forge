@@ -553,6 +553,8 @@ class TestSupervisorStatus:
         "supervisor_effort",
         "resolved_uuid",
         "source_model",
+        "supervisor_runtime",
+        "lane",
     }
 
     def test_status_json_configured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
@@ -577,6 +579,51 @@ class TestSupervisorStatus:
         data = json.loads(result.output)
         assert data["session_name"] == "worker"
         assert data["supervisor"] is None
+
+    def test_status_json_carries_default_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T5/WS3: a default (claude) supervisor reports its full lane (claude_code/anthropic-direct/opus)."""
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        sup = json.loads(result.output)["supervisor"]
+        assert sup["supervisor_runtime"] is None
+        assert sup["lane"] == {"runtime": "claude_code", "backend": "anthropic-direct", "model": "opus"}
+
+    def test_status_json_carries_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T5/WS3: a codex-override supervisor reports the full codex lane (the chosen lane, completely)."""
+        from forge.session.models import SupervisorConfig
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(
+            manifest,
+            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        sup = json.loads(result.output)["supervisor"]
+        assert sup["supervisor_runtime"] == "codex"
+        assert sup["lane"] == {"runtime": "codex", "backend": "chatgpt", "model": "gpt-5-codex"}
+
+    def test_status_displays_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T5/WS3: the human view shows the resolved codex lane line."""
+        from forge.session.models import SupervisorConfig
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(
+            manifest,
+            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
+        assert result.exit_code == 0, result.output
+        assert "Lane: runtime=codex backend=chatgpt model=gpt-5-codex" in result.output
 
 
 class TestSupervisorToggle:

@@ -184,6 +184,12 @@ class ModelCallActivity:
     cost_partial: bool = False
     join_state: str = "downstream_only"
     root_run_ids: list[str] = field(default_factory=list)
+    # T5/WS3: the lane the contributing usage events ran on. `runtime` (claude_code/codex/...)
+    # and `billing_mode` are a uniform value, "mixed" when the row's events disagree, or None for
+    # a downstream-only row with no usage-event source (rendered "-"). The catalog backend is NOT
+    # here -- UsageEvent carries no backend id; the full lane is on `policy supervisor status`.
+    runtime: str | None = None
+    billing_mode: str | None = None
 
 
 @dataclass
@@ -841,6 +847,16 @@ def _build_operation_pane(
     )
 
 
+def _rollup_lane_value(values: set[str]) -> str | None:
+    """D4 lane rollup for a model-call row: the uniform value, ``"mixed"`` when the row's
+    events disagree, or ``None`` when no usage event carried one (a downstream-only row)."""
+    if not values:
+        return None
+    if len(values) == 1:
+        return next(iter(values))
+    return "mixed"
+
+
 def _build_model_call_pane(
     summary: SessionActivitySummary,
     events: list[UsageEvent],
@@ -850,12 +866,20 @@ def _build_model_call_pane(
     roots_by_command: dict[str, set[str]] = {}
     used_roots: set[str] = set()
     used_runs: set[str] = set()
+    # T5/WS3: collect the distinct runtime/billing_mode per command so each event-backed row
+    # renders the lane it ran on (uniform value, or "mixed" when the command's events disagree).
+    runtimes_by_command: dict[str, set[str]] = {}
+    billing_by_command: dict[str, set[str]] = {}
     for event in events:
         if event.root_run_id:
             roots_by_command.setdefault(event.command, set()).add(event.root_run_id)
             used_roots.add(event.root_run_id)
         if event.run_id:
             used_runs.add(event.run_id)
+        if event.runtime:
+            runtimes_by_command.setdefault(event.command, set()).add(event.runtime)
+        if event.billing_mode:
+            billing_by_command.setdefault(event.command, set()).add(event.billing_mode)
 
     rows: list[ModelCallActivity] = []
     used_commands: set[str] = set()
@@ -878,6 +902,8 @@ def _build_model_call_pane(
                 cost_partial=command.cost_micro_usd is None and bool(command.calls or command.workers),
                 join_state="matched" if set(roots) & upstream_roots else "downstream_only",
                 root_run_ids=roots,
+                runtime=_rollup_lane_value(runtimes_by_command.get(command.command, set())),
+                billing_mode=_rollup_lane_value(billing_by_command.get(command.command, set())),
             )
         )
 
