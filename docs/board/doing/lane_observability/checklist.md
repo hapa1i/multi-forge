@@ -155,16 +155,22 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 
 ### Phase 4 -- Tests (card acceptance table)
 
-- [ ] Implement every row of the `card.md` acceptance table; add the missing `test_stages.py` usage tests.
-- [ ] Existing suites stay green (review fan-out byte-identical upstream label; default supervisor unchanged).
+- [x] Implemented every row of the `card.md` acceptance table (folded into each phase); added the previously-missing
+  `test_stages.py` usage tests (the file had zero before). New gate tests drive the FAILURE path so suppression is real.
+- [x] Existing suites stay green: review fan-out keeps the byte-identical `workflow.worker` upstream label
+  (`test_engine.py`/`test_claude_invoker.py`); default supervisor unchanged. **Full unit suite: 7019 passed, 0 failed.**
 
 ### Phase 5 -- Docs + closeout
 
-- [ ] design_appendix.md §A.13 (UsageEvent read surface) + §G note the per-consumer `operation` + lane/billing render;
-  cli_reference.md `forge telemetry activity` / `forge policy supervisor status` columns.
-- [ ] `make pre-commit` clean; relevant integration (`test_supervisor_e2e.py`, activity integration) green.
-- [ ] Closeout: change_log entry; epic roster T5 -> done; `git mv doing/ -> done/`. Promote durable lessons to the epic
-  closeout. Clear the epic checklist's "Verify the M3 no-emission gaps are actually silent" item (done here).
+- [x] design_appendix.md §G (codex `operation=None` upstream-parity fix + the two T5 read surfaces + the three closed M3
+  gaps) and the per-emitter coverage table (checker/reviewer/team-tagger rows + the activity lane note);
+  cli_reference.md `forge telemetry activity` lane columns and a new `forge policy supervisor status` row.
+- [ ] `make pre-commit` clean (per-file hooks green so far); relevant integration (`test_supervisor_e2e.py`) is
+  Docker/real-Claude release-tier -- the changes are additive telemetry (no dispatch/verdict change), so deferred
+  pending go-ahead (Docker + `ANTHROPIC_API_KEY`).
+- [ ] Closeout (at/after merge to `main`): change_log entry; epic roster T5 -> done; `git mv doing/ -> done/`; promote
+  durable lessons to the epic closeout; clear the epic checklist's "Verify the M3 no-emission gaps are actually silent"
+  item (done here).
 
 ## Acceptance test table
 
