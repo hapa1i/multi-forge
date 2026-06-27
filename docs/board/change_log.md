@@ -25,6 +25,48 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-27
+
+### consumer_lanes T4: codex-exec supervisor lane (first non-Claude consumer lane)
+
+**Goal**: Place the semantic supervisor on a real non-Claude runtime -- headless `codex exec` riding the ChatGPT
+subscription -- behind one narrow `SupervisorConfig` field, proving the T1a lane abstraction admits a *swappable* new
+lane (more than T3's byte-identical Claude default). Blind/transfer-fed only; no Codex hooks or policy enforcement.
+
+**Key changes**:
+
+- **Lane plumbing**: `SUPERVISOR_CONSUMER` gains a codex candidate `allowed_lane`
+  (`Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`; backend/model nominal -- only `runtime_id`
+  selects the arm). `SupervisorConfig.supervisor_runtime: str | None` (additive, **no `SCHEMA_VERSION` bump**) is
+  validated in `__post_init__` against `_SUPERVISOR_RUNTIMES = ("claude_code", "codex")`; `_supervisor_lane_override`
+  raises `LaneError` on validated-but-unmapped drift (M3), never silently falling back to claude.
+- **Codex arm** (`_dispatch_codex_supervisor`, replaces T3's `NotImplementedError`): cached preflight ->
+  `prepare_codex_request` (sandbox `read-only`, `model=None`, no resume) -> `CodexHeadlessInvoker` ->
+  `parse_supervisor_verdict(stdout)`. `_headless_to_session_result` folds `runtime_is_error` (a codex turn can fail at
+  exit 0) into the failure signal so a runtime failure isn't misread as unparseable output. Runs in
+  `cwd=context.repo_root` (the action repo, not the planner's `source_cwd` -- Phase 9).
+- **Fail-open everywhere** (supervisor contract, design_workflows §1.2): `resolve_lane(override=...)` moved inside the
+  guard; bad/unknown lane -> `configuration_error`; plan-absent short-circuits *before* spawning codex ->
+  `plan_missing`; all codex setup failures -> `codex_unavailable`. No path bricks the policy hook.
+- **Cached preflight, never `codex doctor` in the hook** (Phase 7): new `core/runtime/codex_preflight_cache.py`;
+  `forge runtime preflight codex` (and `--verify-enrollment`, Phase 10) writes a secret-free cache invalidated by codex
+  binary + `auth.json` + `credentials.yaml` mtimes + TTL (M4). The original `run_doctor=False` plan was inert for
+  ChatGPT-login auth.
+- **Single usage emission** via the invoker's `emit_codex_usage` (the arm never calls `emit_usage_for_session_result`).
+  Shadow auditor replays on the configured lane (`ShadowCandidate.supervisor_runtime`, `SHADOW_SCHEMA_VERSION` 1->2,
+  M1).
+- Docs: design.md §3.6.12 + design_appendix.md §G note the codex arm bypasses the proxy chain (direct to OpenAI).
+
+**Deferred to T5**: the shared `CodexHeadlessInvoker` hardcodes
+`record_upstream_operation(operation="workflow.worker")`, so a codex supervisor's upstream row is mislabeled
+(tokens/`billing_mode` correct; relabeling touches every invoker consumer, so it belongs to T5's telemetry scope).
+
+**Verification**: supervisor unit suite green (`test_supervisor.py` 103+; 8 new T4 acceptance tests + the Phase-1 lane
+tests), shadow 49, preflight cache 11, runtime CLI; `tests/integration/docker/test_supervisor_e2e.py` 10 passed (default
+`claude -p` flow unregressed; `forge session set` wires `supervisor_runtime`); `make pre-commit` clean. Shipped via PR
+#55 (`40b7a1b6`); a 5-agent read-only verification confirmed all of Phases 1-10 + review fixes M1-M5 are present in
+merged `main`.
+
 ## 2026-06-26
 
 ### consumer_lanes T2: runtime-native subscription sources (ChatGPT via codex)

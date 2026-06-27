@@ -4,7 +4,8 @@
 model; resolve once, frozen). This is the **headline capability demo**: the first consumer placed on a *non-Claude*
 runtime, proving the lane abstraction admits a real new lane swappably.
 
-**Lane**: `doing/` (opened 2026-06-26 on branch `codex_exec_supervisor_lane`; `git mv` from `todo/`).
+**Lane**: `done/` (opened 2026-06-26 on branch `codex_exec_supervisor_lane`; shipped via PR #55, `40b7a1b6`; moved
+`doing/ -> done/` at closeout 2026-06-27).
 
 **Proves**: a real new lane (codex-exec) is swappable behind one narrow field -- the lane model is more than the
 byte-identical Claude default T3 shipped.

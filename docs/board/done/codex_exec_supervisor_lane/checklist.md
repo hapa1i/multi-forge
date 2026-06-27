@@ -10,13 +10,14 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
-**Status (2026-06-27):** Phases 1-10 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
-docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open)
-in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits) in `471eec7`; Phase 9 (codex cwd = action repo) in `a7023d5`; Phase 10
-(--verify-enrollment primes the cache, the 2026-06-27 follow-up review) pending commit. Unit suites green (supervisor
-111, shadow 49, cache 11, runtime CLI 16 + store); supervisor E2E 10 green; `make pre-commit` clean. **Remaining:**
-post-merge closeout (change_log, impl_notes, lane move) + the merge. One item deferred to T5: the invoker's
-`workflow.worker` upstream mislabel (Phase 4).
+**Status (2026-06-27):** **Merged to `main` via PR #55 (`40b7a1b6`); board closeout done.** All of Phases 1-10 + review
+fixes M1-M5 confirmed present in merged `main` by a 5-agent read-only verification (`git show --stat 40b7a1b6` lists 20
+files incl. `supervisor.py`, `core/runtime/codex_preflight_cache.py`, and the new tests). Unit suites green (supervisor
+111, shadow 49, cache 11, runtime CLI 16 + store); supervisor E2E 10 green; `make pre-commit` clean. Closeout:
+change_log entry added (2026-06-27); epic roster T4 -> done; card moved `doing/ -> done/`. **impl_notes promotion
+deferred to the epic closeout** (T2/T3 precedent: member closeouts add the change_log entry; durable lessons promote at
+the epic closeout after human review). One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase
+4).
 
 **Verified seam (2026-06-26, against shipped code):**
 
@@ -224,9 +225,11 @@ post-merge closeout (change_log, impl_notes, lane move) + the merge. One item de
   supervisor flow (`test_session_set_wires_supervisor_config` exercises the new `supervisor_runtime` field through
   `forge session set`). A real codex E2E (codex installed + chatgpt login) stays a stretch goal -- unit tests mock the
   invoker.
-- [ ] **Closeout (post-merge):** change_log.md entry (Goal / Key changes / Verification); propose durable lessons to
-  `impl_notes.md` after human review; update epic roster T4 -> done; `git mv doing/ -> done/`. Per the dogfood pattern
-  (T2: `feat... (#54)` then a separate `docs(board): close out` commit), these land after the feature merges to `main`.
+- [x] **Closeout (post-merge):** change_log.md entry added (Goal / Key changes / Verification, 2026-06-27); epic roster
+  T4 -> done; `git mv doing/ -> done/`. Durable lessons are **proposed for the epic closeout** (T2/T3 precedent: member
+  closeouts add the change_log entry; impl_notes promotion happens at the epic closeout after human review). Per the
+  dogfood pattern (T2: `feat... (#54)` then a separate `docs(board): close out` commit), the feature merged via PR #55
+  (`40b7a1b6`) and this closeout lands as a follow-up `docs(board)` commit on `main`.
 
 ### Phase 7 -- Review fixes (cached preflight + setup fail-open)
 

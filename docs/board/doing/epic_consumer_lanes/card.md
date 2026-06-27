@@ -1,15 +1,16 @@
 # Epic: Consumer Lanes -- bind Forge's LLM-work to a chosen (runtime x backend x model) lane
 
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
-first wave is split into member cards (linked beneath the member table): T1a, T3, and T2 are **done** (the spine T1a+T3
-plus the T2 backend axis have landed on `main`). T4 is now open in `doing/codex_exec_supervisor_lane/` and T7 added in
-`proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the spine has landed
-(board_contract "Epics").
+first wave is split into member cards (linked beneath the member table): T1a, T3, T2, and T4 are **done** (the spine
+T1a+T3, the T2 backend axis, and the T4 codex-exec supervisor lane have landed on `main`). T7 is added in
+`proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the first wave has landed
+(board_contract "Epics"). **Next cursor: T5** (observability).
 
-**Status**: Accepted; coordinating in `doing/` (2026-06-25). Spine landed on `main`: T1a (PR #51,
+**Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave landed on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
-#54, runtime-native subscription sources) is **done** in `done/` (2026-06-26). Converged from a 2026-06-25 design
-session; this card is the durable record of that model. Coordination is tracked in `checklist.md`.
+#54, runtime-native subscription sources) is **done** in `done/` (2026-06-26); **T4 (PR #55, codex-exec supervisor lane,
+the headline capability demo) is done in `done/` (2026-06-27)**. Converged from a 2026-06-25 design session; this card
+is the durable record of that model. Coordination is tracked in `checklist.md`.
 
 **One-line motivation**: Make "use a different runtime/backend/model for part of what Forge does" -- Codex on a
 subscription today, a local Ollama tomorrow -- a *registration + a consumer's lane choice*, not a bespoke rewrite each
@@ -189,12 +190,12 @@ once.
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
-(done, PR #52); T4 -> `docs/board/doing/codex_exec_supervisor_lane/` (opened 2026-06-26, branch
-`codex_exec_supervisor_lane`); T7 -> `docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26,
-depends on T4). The rows above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded
-acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
-validated at import in `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable
-state. Schema version/strict-deser/reset rules apply only to T1b's session-manifest binding.
+(done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T7 ->
+`docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26, depends on T4). The rows above stay the
+durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction (verified
+2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in
+`backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
+version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
 **T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
 current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),
