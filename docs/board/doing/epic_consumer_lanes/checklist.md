@@ -5,26 +5,26 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 
 ## Current focus
 
-T1a (PR #51, `b84e2462`) and T3 (PR #52, `e66490af`) are both **done** -- the spine (pure resolver + byte-identical
-Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is **committed and pushed** on branch
-`backend_subscription_sources` (all three decisions resolved -- A = Option (c), user 2026-06-26: `runtime_native` owns
-its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist). **PR #54** is open against `main`
-(implementation + two review fixes + nit pass; `make pre-commit` green, 4638-test ripple clean), awaiting review/merge
-before the `done/` move + epic roster T2 -> done. T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is
-decided (option 2 -- see Decisions).
+T1a (PR #51, `b84e2462`), T3 (PR #52, `e66490af`), and **T2** (PR #54, squash `ff3b96cc`) are all **done** -- the spine
+(pure resolver + byte-identical Claude-default supervisor) plus the backend axis (runtime-native subscription sources)
+are on `main`, all three cards in `done/`. T2's three decisions are resolved (A = Option (c), user 2026-06-26:
+`runtime_native` owns its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and
+`design_appendix.md` §A.2.1 is synced. **T4** (Codex-exec supervisor lane) is the next cursor and is now fully unblocked
+(deps T1a+T2+T3 all landed); T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see
+Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                  | Lane  | Depends on | State                      |
-| ------------ | ------------------------------------- | ----- | ---------- | -------------------------- |
-| T1a          | `done/consumer_lane_resolver/`        | done  | --         | done (PR #51)              |
-| T2           | `doing/backend_subscription_sources/` | doing | T1a        | PR #54 open (pre-merge)    |
-| T3           | `done/supervisor_lane_driven/`        | done  | T1a        | done (PR #52)              |
-| T4           | inline in `card.md`                   | --    | T1a,T2,T3  | sketch                     |
-| T5           | inline in `card.md`                   | --    | T3,T4      | sketch                     |
-| T1b          | inline in `card.md`                   | --    | T4         | sketch                     |
-| T6           | inline in `card.md`                   | --    | T1b        | sketch                     |
-| T0 (sibling) | inline in `card.md`                   | --    | none       | sketch; gates `claude-max` |
+| Member       | Card                                 | Lane | Depends on | State                      |
+| ------------ | ------------------------------------ | ---- | ---------- | -------------------------- |
+| T1a          | `done/consumer_lane_resolver/`       | done | --         | done (PR #51)              |
+| T2           | `done/backend_subscription_sources/` | done | T1a        | done (PR #54)              |
+| T3           | `done/supervisor_lane_driven/`       | done | T1a        | done (PR #52)              |
+| T4           | inline in `card.md`                  | --   | T1a,T2,T3  | sketch (next cursor)       |
+| T5           | inline in `card.md`                  | --   | T3,T4      | sketch                     |
+| T1b          | inline in `card.md`                  | --   | T4         | sketch                     |
+| T6           | inline in `card.md`                  | --   | T1b        | sketch                     |
+| T0 (sibling) | inline in `card.md`                  | --   | none       | sketch; gates `claude-max` |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --

@@ -3,7 +3,8 @@
 **Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (backend =
 `ModelSource`; billing is a property of the backend).
 
-**Lane**: `todo/` (accepted, first wave). No execution branch open yet.
+**Lane**: `done/` (shipped via PR #54, 2026-06-26). Branch `backend_subscription_sources`, squashed to `main` @
+`ff3b96cc`.
 
 **Proves**: billing-as-a-property-of-the-backend, honestly shaped -- a subscription is representable without faking an
 endpoint.

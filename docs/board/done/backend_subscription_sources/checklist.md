@@ -6,10 +6,10 @@
 ## Current focus
 
 Phases 1-4 (Option (c)) + two review findings (see "Review fixes") + a follow-up nit pass (`is_implemented("openai")`
-test, `codex-responses-local` appendix row) are **committed and pushed**; **PR #54** is open against `main`
-(`make pre-commit` green, 4638-test ripple clean). Remaining: review/merge PR #54, then the `doing/ -> done/` lane move
-\+ epic roster T2 -> done. Touchpoints were **verified against `main` @ `82076324`** (sweep below); all three design
-decisions resolved (A = Option (c), user 2026-06-26; B/C below).
+test, `codex-responses-local` appendix row) shipped via **PR #54** (squash `ff3b96cc` on `main`, 2026-06-26;
+`make pre-commit` green, 4638-test ripple clean). **Closed out** (this session): card moved `doing/ -> done/`; epic
+roster T2 -> done; epic "Current focus" -> T4. Touchpoints were **verified against `main` @ `82076324`** (sweep below);
+all three design decisions resolved (A = Option (c), user 2026-06-26; B/C below).
 
 ## Verified touchpoints (2026-06-25 sweep -- corrections to the card noted)
 
@@ -130,8 +130,8 @@ decisions resolved (A = Option (c), user 2026-06-26; B/C below).
   read surface). Epic checklist §A.2.1 design-doc-sync item ticked.
 - [x] `change_log.md` entry (newest-first) added. mypy clean.
 - [x] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks). Verified: all hooks pass.
-- [ ] After PR merges to `main`: move `doing/backend_subscription_sources/` -> `done/`; epic roster T2 -> done; epic
-  "Current focus" -> next cursor (T4).
+- [x] PR merged to `main` (squash `ff3b96cc`): moved `doing/backend_subscription_sources/` -> `done/`; epic roster T2 ->
+  done; epic "Current focus" -> next cursor (T4).
 
 ## Review fixes (2026-06-26)
 
