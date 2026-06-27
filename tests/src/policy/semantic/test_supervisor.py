@@ -52,6 +52,29 @@ def _make_config(**overrides: object) -> SupervisorConfig:
     return SupervisorConfig(**defaults)  # type: ignore[arg-type]
 
 
+def _codex_result(**overrides: Any) -> Any:
+    """Build a HeadlessResult shaped like ``CodexHeadlessInvoker.run`` returns (T4 codex arm).
+
+    Defaults to a clean exit-0 turn; pass ``runtime_is_error``/``returncode``/``stdout`` to
+    model a failed turn. Imported lazily so the helper has no import-time cost for the
+    (majority) claude-only tests.
+    """
+    from forge.core.invoker.types import HeadlessResult
+
+    defaults: dict[str, Any] = {
+        "label": "supervisor",
+        "stdout": "",
+        "stderr": "",
+        "returncode": 0,
+        "duration_seconds": 0.1,
+    }
+    defaults.update(overrides)
+    return HeadlessResult(**defaults)
+
+
+_VALID_VERDICT_STDOUT = '```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```'
+
+
 def _allow_decision(warnings: list[str] | None = None) -> PolicyDecision:
     """Create a clean allow decision."""
     return PolicyDecision(
@@ -727,16 +750,53 @@ class TestSupervisorLaneDispatch:
         assert mock_emit.call_count == 1
         assert result.decision.fail_open is True
 
-    def test_codex_dispatch_arm_not_implemented(self) -> None:
-        """T3 stubs the codex arm; T4 wires it (epic consumer_lanes)."""
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_codex_arm_dispatches_through_invoker(
+        self, mock_preflight: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
+    ) -> None:
+        """T4 wired the codex arm: it preflights (run_doctor=False), builds a read-only request, runs the invoker."""
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import _dispatch_supervisor, _ResolvedTarget
+
+        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
+
+        codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+        result = _dispatch_supervisor(
+            codex_lane,
+            prompt="check this",
+            config=_make_config(direct=True),
+            context=_make_context(),
+            resolved=_ResolvedTarget(resume_id="uuid", source_cwd="/workspace"),
+            usage_command="supervisor",
+        )
+
+        mock_preflight.assert_called_once_with(run_doctor=False)
+        mock_invoker_cls.return_value.run.assert_called_once()
+        # Read-only sandbox + no model pin (codex picks its own); plan-bearing prompt passed through.
+        assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["model"] is None
+        assert mock_prepare.call_args.kwargs["prompt"] == "check this"
+        assert mock_prepare.call_args.kwargs["cwd"] == "/workspace"
+        assert result.stdout == "VERDICT"
+        assert result.success is True
+
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_codex_arm_unready_preflight_raises_routing_error(self, mock_preflight: MagicMock) -> None:
+        """An unready codex preflight raises _SupervisorRoutingError(codex_unavailable); the caller fails open."""
         from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
             _dispatch_supervisor,
             _ResolvedTarget,
+            _SupervisorRoutingError,
         )
 
-        codex_lane = Lane(runtime_id="codex", backend_id="anthropic-direct", model="opus")
-        with pytest.raises(NotImplementedError):
+        mock_preflight.return_value = SimpleNamespace(ready=False, blocking_reason="codex not installed")
+        codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+
+        with pytest.raises(_SupervisorRoutingError) as exc:
             _dispatch_supervisor(
                 codex_lane,
                 prompt="x",
@@ -745,6 +805,9 @@ class TestSupervisorLaneDispatch:
                 resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
                 usage_command="supervisor",
             )
+        assert exc.value.failure_type == "codex_unavailable"
+        assert "codex not installed" in str(exc.value)
+        mock_preflight.assert_called_once_with(run_doctor=False)
 
     def test_unknown_runtime_arm_raises_lane_error(self) -> None:
         """A reachable lane with no supervisor adapter (core_llm) raises LaneError, not a silent skip."""
@@ -764,6 +827,208 @@ class TestSupervisorLaneDispatch:
                 resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
                 usage_command="supervisor",
             )
+
+
+# --- Codex Supervisor Lane Tests (T4) ---
+
+_CODEX_UUID = "12345678-1234-1234-1234-123456789abc"
+
+
+def _codex_config(**overrides: Any) -> SupervisorConfig:
+    """A supervisor config bound to the codex lane (resume_id present, raw-UUID path)."""
+    base: dict[str, Any] = {"resume_id": _CODEX_UUID, "direct": True, "supervisor_runtime": "codex"}
+    base.update(overrides)
+    return _make_config(**base)
+
+
+class TestCodexSupervisorLane:
+    """T4: run_supervisor_check end-to-end on the codex lane override.
+
+    Every non-claude failure (bad lane, unready preflight, plan-absent, in-stream
+    runtime error) must fail OPEN -- the supervisor's contract (design_workflows 1.2).
+    All tests mock the invoker + preflight; no real codex binary is required.
+    """
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="approved plan body")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_override_dispatches_to_codex_and_parses_verdict(
+        self,
+        mock_preflight: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        mock_plan: MagicMock,
+    ) -> None:
+        """A codex override routes to the invoker (not run_claude_session); codex stdout parses like claude's."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
+
+        result = run_supervisor_check(_codex_config(plan_override_path="/plan.md"), _make_context())
+
+        mock_claude.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_called_once()
+        # Blind: codex gets no Claude-UUID resume (transfer-fed via the prompt only).
+        assert mock_prepare.call_args.kwargs.get("resume_thread_id") is None
+        assert result.run_ok is True
+        assert result.parsed is True
+        assert result.decision.decision == "allow"
+        assert not result.decision.fail_open  # a genuine aligned verdict, not a fail-open
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_plan_absent_fails_open_without_spawning_codex(
+        self, mock_preflight: MagicMock, mock_invoker_cls: MagicMock, mock_claude: MagicMock
+    ) -> None:
+        """Codex has no --resume: with no plan in-band, fail open WITHOUT spawning (failure_type=plan_missing)."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        # No plan_override_path => load_plan_override returns None (real path, not patched).
+        result = run_supervisor_check(_codex_config(), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "plan_missing"
+        # Short-circuit is BEFORE any codex work: neither preflight nor the invoker ran.
+        mock_preflight.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_not_called()
+        mock_claude.assert_not_called()
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_preflight_unavailable_fails_open(
+        self, mock_preflight: MagicMock, mock_invoker_cls: MagicMock, mock_plan: MagicMock
+    ) -> None:
+        """An unready preflight fails open (codex_unavailable); the ~20s doctor probe is skipped (run_doctor=False)."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_preflight.return_value = SimpleNamespace(ready=False, blocking_reason="not logged in")
+
+        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "codex_unavailable"
+        mock_preflight.assert_called_once_with(run_doctor=False)
+        mock_invoker_cls.return_value.run.assert_not_called()
+
+    @patch("forge.policy.semantic.supervisor.resolve_lane")
+    def test_bad_lane_resolution_fails_open(self, mock_resolve: MagicMock) -> None:
+        """A LaneError from resolve_lane (override not a declared candidate) degrades to a configuration_error fail-open."""
+        from forge.core.lanes import LaneError
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_resolve.side_effect = LaneError("override is not a declared candidate")
+
+        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "configuration_error"
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_runtime_error_at_exit_zero_is_runtime_failure_not_unparseable(
+        self,
+        mock_preflight: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_plan: MagicMock,
+    ) -> None:
+        """Codex exit-0 + runtime_is_error must classify as a runtime failure, not a parse failure (review claim 7)."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(
+            returncode=0,
+            runtime_is_error=True,
+            stdout="(no final text)",  # not a parseable verdict
+            stderr="model overloaded",
+            run_id="r1",
+            parent_run_id="p1",
+            root_run_id="root1",
+        )
+
+        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        # The runtime-failure gate fired (error set) instead of parsing empty stdout.
+        assert result.decision.failure_type == "subprocess_error"
+        # Run-tree identity is carried onto the fail-open telemetry (read on both paths).
+        assert result.decision.telemetry_run_id == "r1"
+        assert result.decision.telemetry_parent_run_id == "p1"
+        assert result.decision.telemetry_root_run_id == "root1"
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    def test_no_double_emit_on_codex_path(
+        self,
+        mock_preflight: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_plan: MagicMock,
+        mock_emit: MagicMock,
+    ) -> None:
+        """The codex arm relies on the invoker's emit_codex_usage; it must NOT also call the claude-arm emitter."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
+
+        run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        # The claude-arm emitter is never called on the codex path (no double-count).
+        mock_emit.assert_not_called()
+        # The invoker has what it needs to emit exactly one codex usage event: an Attribution.
+        attribution = mock_prepare.call_args.kwargs["attribution"]
+        assert attribution.command == "supervisor"
+        assert attribution.session == "test-session"
+
+    def test_headless_to_session_result_maps_fields_and_folds_runtime_error(self) -> None:
+        """The HeadlessResult->SessionResult adapter carries every load-bearing field and folds runtime_is_error."""
+        from forge.policy.semantic.supervisor import _headless_to_session_result
+
+        # Clean turn: all fields carried, success stays True.
+        ok = _headless_to_session_result(
+            _codex_result(
+                stdout="V",
+                returncode=0,
+                run_id="r",
+                parent_run_id="p",
+                root_run_id="root",
+                input_tokens=10,
+                output_tokens=20,
+                cached_tokens=5,
+                envelope_parsed=True,
+            )
+        )
+        assert ok.success is True
+        assert (ok.stdout, ok.run_id, ok.parent_run_id, ok.root_run_id) == ("V", "r", "p", "root")
+        assert (ok.input_tokens, ok.output_tokens, ok.cached_tokens) == (10, 20, 5)
+        assert ok.envelope_parsed is True
+
+        # Failed turn at exit 0: runtime_is_error folds into error so success flips to False.
+        failed = _headless_to_session_result(
+            _codex_result(returncode=0, runtime_is_error=True, stderr="provider boom", stdout="")
+        )
+        assert failed.success is False
+        assert failed.error == "provider boom"
+        assert failed.runtime_is_error is True
+
+        # Failed turn with empty stderr still gets a non-empty reason (never a blank error).
+        failed_blank = _headless_to_session_result(
+            _codex_result(returncode=0, runtime_is_error=True, stderr="", stdout="")
+        )
+        assert failed_blank.success is False
+        assert failed_blank.error
 
 
 # --- Engine Integration Tests ---

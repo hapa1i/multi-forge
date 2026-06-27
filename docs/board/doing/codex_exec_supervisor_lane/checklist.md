@@ -99,56 +99,63 @@ T3** (`claude_code` lane).
 - [x] **Add `supervisor_runtime` override field to `SupervisorConfig`** (`session/models.py`), validated in
   `__post_init__` against `_SUPERVISOR_RUNTIMES = ("claude_code", "codex")`. Verified: `test_supervisor_runtime_*`
   (none/codex/claude_code valid, bogus rejected) + `test_supervisor_runtime_round_trip` (survives `store.write`/`read`).
-- [ ] `run_supervisor_check` maps the field to the override `Lane` and passes `resolve_lane(SUPERVISOR_CONSUMER,
-  override=...)` **inside** the fail-open guard. **Bundled with Phase 2/3** (the wiring needs the codex arm + the
-  fail-open boundary to be meaningful).
+- [x] `run_supervisor_check` maps the field to the override `Lane` (`_supervisor_lane_override`) and passes
+  `resolve_lane(SUPERVISOR_CONSUMER, override=...)` **inside** the fail-open guard. Done with Phase 2/3 (the wiring needs
+  the codex arm + the fail-open boundary to be meaningful). Verified: `test_override_dispatches_to_codex_and_parses_verdict`
+  (override -> codex arm) + `test_bad_lane_resolution_fails_open` (LaneError inside the guard).
 
 ### Phase 2 -- The `codex` arm of `_dispatch_supervisor`
 
-- [ ] Replace the `raise NotImplementedError` (`supervisor.py:469`) with `_dispatch_codex_supervisor`:
-  - **Preflight (fail-open):** build `CodexPreflight` with `run_doctor=False`; if it raises, raise a
-    `_SupervisorRoutingError` (caught -> fail-open "aligned"), do **not** propagate.
-  - **Attribution:** build one `Attribution(command=usage_command, session=context.session_name, ...)` and pass it to
-    `prepare_codex_request` (which stamps `runtime="codex"` + `billing_mode=preflight.billing_mode`).
-  - **Dispatch:** `prepare_codex_request(prompt=prompt, preflight=..., attribution=..., sandbox="read-only",
+- [x] Replaced the `raise NotImplementedError` with `_dispatch_codex_supervisor` (the codex arm of `_dispatch_supervisor`):
+  - **Preflight (fail-open):** `preflight_codex(run_doctor=False)`; an unready preflight raises
+    `_SupervisorRoutingError(failure_type="codex_unavailable")` (caught -> fail-open), never propagates. Verified:
+    `test_codex_arm_unready_preflight_raises_routing_error` + `test_preflight_unavailable_fails_open`.
+  - **Attribution:** builds one `Attribution(command=usage_command, session=context.session_name)` passed to
+    `prepare_codex_request` (which stamps `runtime="codex"` + `billing_mode=preflight.billing_mode`). Verified:
+    `test_no_double_emit_on_codex_path` (attribution carries command/session).
+  - **Dispatch:** `prepare_codex_request(prompt=..., preflight=..., attribution=..., sandbox="read-only", model=None,
     timeout_seconds=config.timeout_seconds, cwd=resolved.source_cwd)` -> `CodexHeadlessInvoker().run(...)`. **Sandbox is
-    `read-only`**: a supervisor inspects, never edits (defense-in-depth; do not grant `workspace-write`).
-  - **Result (adapt `HeadlessResult` -> `SessionResult`, ALL load-bearing fields):** carry `stdout`, `stderr`,
-    `returncode`, `timed_out`, `error`, and `run_id`/`parent_run_id`/`root_run_id` -- the post-dispatch logic reads every
-    one for fail-open classification + telemetry (on the success path too). **Fold `runtime_is_error`:** when the codex
-    turn reported a failure (`runtime_is_error`, even at exit 0), set `SessionResult.error` to the codex failure reason so
-    the returncode-based `success` gate (`supervisor.py:627`) fires and it is classified as a **runtime failure**, not
-    parsed as an empty/unparseable verdict. Do **not** return only `stdout`.
-- [ ] **Plan context:** rely on the existing preamble injection (plan already in `prompt` when `plan_override_path`
-  resolves). **When no plan content resolves, fail open** (aligned) -- do not let codex evaluate against an empty plan
-  (the Decision above). **Assertion:** codex dispatch with no resolvable plan -> verdict aligned, no codex spawn (or a
-  spawn whose verdict is discarded for aligned -- prefer not spawning).
-- [ ] **Verdict unchanged:** `parse_supervisor_verdict(result.stdout)` consumes codex stdout exactly as claude stdout
-  (the normalized envelope is why). **Assertion:** a codex stdout sample parses to the same `SupervisorVerdict` shape.
-- [ ] **Blind/transfer-fed only:** headless `codex exec`; no codex hook install, no enrollment, no Claude-UUID resume.
-  **Assertion:** the arm's argv is `codex exec --json` with no hook/enrollment side effects (code review + test).
+    `read-only`** (a supervisor inspects, never edits). Verified: `test_codex_arm_dispatches_through_invoker`
+    (`sandbox == "read-only"`, `model is None`).
+  - **Result (adapt `HeadlessResult` -> `SessionResult`, ALL load-bearing fields):** `_headless_to_session_result` carries
+    `stdout`/`stderr`/`returncode`/`timed_out`/`error`/`run_id`/`parent_run_id`/`root_run_id` + tokens/envelope. **Folds
+    `runtime_is_error`:** an exit-0 failed turn gets `error` set so the returncode-based `success` gate fires (runtime
+    failure, not empty-verdict parse). Verified: `test_headless_to_session_result_maps_fields_and_folds_runtime_error`
+    (unit) + `test_runtime_error_at_exit_zero_is_runtime_failure_not_unparseable` (e2e -> `subprocess_error`, ids carried).
+- [x] **Plan context:** relies on the existing preamble injection (plan already in `prompt` when `plan_override_path`
+  resolves). When no plan resolves, `run_supervisor_check` **fails open WITHOUT spawning codex** (`failure_type="plan_missing"`).
+  Verified: `test_plan_absent_fails_open_without_spawning_codex` (preflight + invoker both `assert_not_called`).
+- [x] **Verdict unchanged:** `parse_supervisor_verdict_with_status(result.stdout)` consumes codex stdout exactly as claude
+  stdout. Verified: `test_override_dispatches_to_codex_and_parses_verdict` (codex `_VALID_VERDICT_STDOUT` -> `parsed=True`,
+  decision allow).
+- [x] **Blind/transfer-fed only:** headless `codex exec`; no codex hook install, no enrollment, no Claude-UUID resume. The
+  arm calls only preflight + `prepare_codex_request` + `run`. Verified: `test_override_dispatches_to_codex_and_parses_verdict`
+  asserts `resume_thread_id is None` (no resume); no enrollment/hook-install symbol is referenced by the arm (code review).
 
 ### Phase 3 -- Fail-open wiring (the T3 -> T4 carry-forward seams)
 
-- [ ] Move `resolve_lane(SUPERVISOR_CONSUMER, override=...)` **inside** the `try/except` guard (`supervisor.py:609`), or
-  pre-validate + degrade, so a bad override (`LaneError`) degrades to "aligned" instead of raising uncaught.
-- [ ] The `codex`/unknown arms no longer brick the hook: their failure (preflight error, unknown runtime, plan-absent)
-  converts to the supervisor fail-open decision (extend the caught set / wrap as `_SupervisorRoutingError`).
-  **Assertion:** an invalid override, an unimplemented runtime, a preflight failure, and a plan-absent codex run all
-  yield verdict=aligned, no exception escapes `run_supervisor_check`.
+- [x] `resolve_lane(SUPERVISOR_CONSUMER, override=...)` now runs **inside** a `try/except LaneError` guard; a bad override
+  degrades to `failure_type="configuration_error"` instead of raising uncaught. Verified: `test_bad_lane_resolution_fails_open`.
+- [x] The `codex`/unknown arms no longer brick the hook. The dispatch `except _SupervisorRoutingError` now propagates
+  `e.failure_type` (`codex_unavailable` for preflight), `LaneError` is caught at resolution (`configuration_error`), and
+  plan-absent short-circuits to `plan_missing` -- all converge on `_supervisor_fail_open_decision`. Verified: the four
+  fail-open e2e tests (`test_bad_lane_resolution_fails_open`, `test_preflight_unavailable_fails_open`,
+  `test_plan_absent_fails_open_without_spawning_codex`, `test_runtime_error_at_exit_zero_is_runtime_failure_not_unparseable`)
+  -- each yields `fail_open=True` and no exception escapes `run_supervisor_check`.
 
 ### Phase 4 -- Single usage emission via the invoker (NOT the Claude seam)
 
-- [ ] The codex arm builds the `HeadlessRequest` with **exactly one** `Attribution`; `CodexHeadlessInvoker` emits
-  **exactly one** `emit_codex_usage` (route `codex_exec`, `billing_mode` from the preflight -> `subscription_quota` for
-  chatgpt). **Do NOT call `emit_usage_for_session_result`** (the Claude arm's seam; calling it here double-emits).
-  **Assertion:** one `emit_codex_usage` per codex dispatch; **zero** `emit_usage_for_session_result` on the codex path.
-- [ ] **Verify the upstream-operation label.** `_emit_codex` also records `record_upstream_operation(
-  operation="workflow.worker")` (`codex.py:249`) -- but the supervisor is a **policy check**, not a workflow worker.
-  Confirm whether reusing the invoker's built-in upstream emit mislabels the supervisor's operation (compare what the
-  Claude arm records). If it mislabels, decide: pass a supervisor-appropriate operation, or suppress the invoker's
-  upstream emit for this consumer. **Assertion:** the supervisor's upstream outcome is labeled as a supervisor/policy
-  operation, not `workflow.worker`. Ties to T5.
+- [x] The codex arm builds the `HeadlessRequest` with **exactly one** `Attribution`; `CodexHeadlessInvoker` emits the
+  usage event (route `codex_exec`, `billing_mode` from the preflight). The arm does **not** call
+  `emit_usage_for_session_result` (the Claude seam), so there is no double-count. Verified: `test_no_double_emit_on_codex_path`
+  (`emit_usage_for_session_result` `assert_not_called`; the request carries an `Attribution(command="supervisor")`).
+- [~] **Upstream-operation label = known limitation, deferred to T5.** `_emit_codex` hardcodes
+  `record_upstream_operation(operation="workflow.worker")` (`codex.py:249`), so a codex supervisor's upstream outcome is
+  mislabeled `workflow.worker` instead of a policy/supervisor operation. **Decision:** accept for T4 -- relabeling needs the
+  **shared invoker's** emit contract to accept an operation (it affects every invoker consumer, e.g. review workers), which
+  is T5's telemetry scope, not T4's narrow lane scope. The mislabel is non-fatal: tokens + `billing_mode` are correct, only
+  the `operation` string is wrong; no double-emit, no fail-open impact. Documented in `_dispatch_codex_supervisor`'s
+  docstring and carried to the change log + impl_notes. **Carry-forward to T5.**
 
 ### Phase 5 -- Tests (card acceptance + review-driven additions)
 
@@ -163,12 +170,15 @@ T3** (`claude_code` lane).
 | Preflight failure fails open | codex preflight raises | verdict=aligned, hook not bricked; no ~20s probe (`run_doctor=False`) | `test_supervisor.py` |
 | Plan-absent fails open | codex lane, no `plan_override_path` | verdict=aligned; codex not evaluated against empty plan | `test_supervisor.py` |
 | Codex runtime failure classified right | codex `runtime_is_error=True`, exit 0 | `success=False` -> runtime fail-open (not "unparseable"); `run_id`/`parent`/`root` carried | `test_supervisor.py` |
-| Single usage emission | codex dispatch | exactly one `emit_codex_usage`; **zero** `emit_usage_for_session_result` | `test_supervisor.py` |
-| Upstream label correct | codex dispatch | upstream operation is supervisor/policy, not `workflow.worker` | `test_supervisor.py` |
-| Blind/transfer-fed only | -- | `codex exec --json`; no codex hook install / enrollment | code review + assertion |
+| Single usage emission | codex dispatch | **zero** `emit_usage_for_session_result` (no double-count) | `test_no_double_emit_on_codex_path` |
+| Upstream label (T5) | codex dispatch | **deferred:** invoker hardcodes `workflow.worker` -- documented limitation, carried to T5 | n/a (see Phase 4) |
+| Blind/transfer-fed only | codex override | no resume thread id; arm calls only preflight/prepare/run | `test_override_dispatches_to_codex_and_parses_verdict` |
 
-- [ ] All acceptance rows green.
-- [ ] Existing supervisor suite (94 unit + 215 `tests/src/policy/semantic`) stays green -- default path unchanged.
+- [x] All acceptance rows green **except** "Upstream label" (deferred to T5 by decision -- see Phase 4). The 8 new T4
+  tests + the 2 Phase-1 tests cover every other row.
+- [x] Existing supervisor suite stays green -- default (no-override) path unchanged. Verified:
+  `uv run pytest tests/src/policy/semantic/ tests/src/session/test_store.py` -> **269 passed**
+  (`test_supervisor.py`: 103 passed).
 
 ### Phase 6 -- Docs + closeout
 

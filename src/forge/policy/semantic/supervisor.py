@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from forge.core.invoker.types import Attribution, HeadlessResult
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
@@ -431,13 +432,17 @@ def _supervisor_fail_open_decision(
 
 
 class _SupervisorRoutingError(Exception):
-    """Routing resolution failed for the ``claude_code`` supervisor arm.
+    """A supervisor dispatch arm could not reach its runtime (a fail-open trigger).
 
-    Raised inside the dispatch arm so ``run_supervisor_check`` can emit the
-    structural ``proxy_not_found`` fail-open exactly as the pre-T3 inline path
-    did, while transport resolution lives with the runtime-specific arm (Codex
-    resolves transport differently -- T4).
+    Raised inside a dispatch arm so ``run_supervisor_check`` degrades to the
+    structural fail-open. ``failure_type`` names the cause for telemetry:
+    ``proxy_not_found`` (claude proxy lookup, the pre-T3 default) or
+    ``codex_unavailable`` (codex preflight not ready, T4).
     """
+
+    def __init__(self, message: str, *, failure_type: str = "proxy_not_found") -> None:
+        super().__init__(message)
+        self.failure_type = failure_type
 
 
 def _dispatch_supervisor(
@@ -464,14 +469,18 @@ def _dispatch_supervisor(
             resolved=resolved,
             usage_command=usage_command,
         )
-    # Unreachable via run_supervisor_check in T3: resolve_lane(SUPERVISOR_CONSUMER)
-    # takes no override, so it always returns the claude_code default lane. Both arms
-    # below are exercised only by direct unit calls until T4 wires the codex lane + a
-    # SupervisorConfig override that can select a non-claude runtime. T4 must also
-    # decide the fail-open contract for these (see epic card "T3 -> T4 carry-forward
-    # seams"): the caller catches only _SupervisorRoutingError, so today they propagate.
+    # T4 wired the codex arm. The codex arm raises _SupervisorRoutingError(codex_unavailable)
+    # on an unready preflight; an unknown runtime has no adapter and raises LaneError.
+    # run_supervisor_check catches BOTH and fails open (the supervisor's contract,
+    # design_workflows 1.2) -- a misconfigured/unavailable lane never bricks the policy hook.
     if runtime == "codex":
-        raise NotImplementedError("Codex supervisor lane lands in T4 (epic consumer_lanes)")
+        return _dispatch_codex_supervisor(
+            prompt=prompt,
+            config=config,
+            context=context,
+            resolved=resolved,
+            usage_command=usage_command,
+        )
     raise LaneError(f"No supervisor dispatch arm for runtime {runtime!r}")
 
 
@@ -551,6 +560,103 @@ def _dispatch_claude_supervisor(
     return result
 
 
+def _dispatch_codex_supervisor(
+    *,
+    prompt: str,
+    config: SupervisorConfig,
+    context: ActionContext,
+    resolved: _ResolvedTarget,
+    usage_command: str,
+) -> SessionResult:
+    """Run the supervisor on the codex-exec lane (T4, epic consumer_lanes).
+
+    Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
+    be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
+    enforces that precondition (plan-present) before selecting this arm; this function does
+    not re-check it. Preflight runs with ``run_doctor=False`` -- the ~20s ``codex doctor``
+    probe is too slow for a policy hook -- and an unready preflight raises
+    ``_SupervisorRoutingError(codex_unavailable)`` so the caller fails open. Read-only
+    sandbox (the supervisor inspects, never writes). The invoker auto-emits the SOLE usage
+    event (``emit_codex_usage`` via the request's ``Attribution``); this arm must NOT call
+    ``emit_usage_for_session_result`` -- that would double-count.
+
+    Known limitation (deferred to T5): the invoker's ``_emit_codex`` hardcodes its upstream
+    operation as ``workflow.worker``, which mislabels this policy check. Relabeling needs the
+    shared invoker's emit contract to accept an operation, so it rides T5's telemetry pass
+    rather than T4's narrow lane scope.
+    """
+    from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
+    from forge.core.runtime.codex_preflight import preflight_codex
+
+    preflight = preflight_codex(run_doctor=False)
+    if not preflight.ready:
+        raise _SupervisorRoutingError(
+            f"Codex supervisor lane unavailable: {preflight.blocking_reason or 'not ready'}",
+            failure_type="codex_unavailable",
+        )
+
+    request = prepare_codex_request(
+        prompt=prompt,
+        preflight=preflight,
+        attribution=Attribution(command=usage_command, session=context.session_name),
+        model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
+        cwd=resolved.source_cwd,
+        sandbox="read-only",
+        timeout_seconds=config.timeout_seconds,
+        label="supervisor",
+    )
+    return _headless_to_session_result(CodexHeadlessInvoker().run(request))
+
+
+def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
+    """Adapt an invoker ``HeadlessResult`` to the ``SessionResult`` run_supervisor_check reads.
+
+    Both ``.success`` properties are returncode-only and ignore ``runtime_is_error``, so a
+    Codex turn that exits 0 but reports an in-stream failure (``runtime_is_error=True``)
+    would otherwise reach verdict parsing and be mislabeled as a parse failure on empty
+    output. Fold that case into ``error`` so ``SessionResult.success`` is False and the
+    caller classifies it as a genuine runtime failure (``subprocess_error``). ``stderr``
+    already carries the provider's reason (``_build_result`` surfaces it).
+    """
+    error = result.error
+    if result.success and result.runtime_is_error:
+        error = result.stderr.strip() or "Codex runtime reported a failed turn"
+    return SessionResult(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        returncode=result.returncode,
+        timed_out=result.timed_out,
+        error=error,
+        run_id=result.run_id,
+        parent_run_id=result.parent_run_id,
+        root_run_id=result.root_run_id,
+        cost_micro_usd=result.cost_micro_usd,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cached_tokens=result.cached_tokens,
+        envelope_parsed=result.envelope_parsed,
+        runtime_is_error=result.runtime_is_error,
+    )
+
+
+def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
+    """Map ``config.supervisor_runtime`` to a declared candidate lane, or None for the default.
+
+    None/``"claude_code"`` => no override (the default claude lane). A non-claude runtime
+    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. Returns None for an
+    unknown runtime (validation in ``SupervisorConfig`` rejects those at write time; an
+    unmatched value here would make ``resolve_lane`` fall back to the default rather than
+    raise). The field is validated, so in practice this only returns the codex lane or None.
+    """
+    runtime = config.supervisor_runtime
+    if not runtime or runtime == "claude_code":
+        return None
+    for lane in SUPERVISOR_CONSUMER.allowed_lanes:
+        if lane.runtime_id == runtime:
+            return lane
+    return None
+
+
 def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,
@@ -607,11 +713,36 @@ def run_supervisor_check(
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
-    # Resolve the supervisor's lane (T1a), then dispatch on its runtime. T3 wires
-    # only the default (`claude_code`) lane and keeps the run byte-identical; the
-    # arm owns transport/model/env + the sole usage emission. A routing failure in
-    # the arm surfaces as the unchanged structural fail-open.
-    lane = resolve_lane(SUPERVISOR_CONSUMER)
+    # Resolve the supervisor's lane (T1a) under a fail-open guard, then dispatch on its
+    # runtime. The override (T4) may select the codex lane; resolve_lane rejects any
+    # override outside SUPERVISOR_CONSUMER's declared candidates, raising LaneError. A
+    # misconfigured lane must fail open, never brick the policy hook (design_workflows 1.2).
+    try:
+        lane = resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+    except LaneError as e:
+        _log.warning("Supervisor lane resolution failed: %s", e)
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                f"Supervisor lane unavailable: {e}, failing open",
+                failure_type="configuration_error",
+            )
+        )
+
+    # Codex has no `--resume`: the approved plan reaches it only via the plan-override
+    # preamble (folded into `prompt` above when plan_content is present). With no plan text
+    # we would be asking Codex to check against a plan it cannot see, so fail open WITHOUT
+    # spawning it. Re-checkable: set plan_override_path or run `%policy supervisor reload`,
+    # and the next action re-runs this arm -- the lane is never permanently disabled.
+    if lane.runtime_id == "codex" and not plan_content:
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                "Codex supervisor lane needs an approved plan in-band: set "
+                "SupervisorConfig.plan_override_path or run '%policy supervisor reload'. "
+                "Failing open until a plan is available.",
+                failure_type="plan_missing",
+            )
+        )
+
     try:
         result = _dispatch_supervisor(
             lane,
@@ -625,7 +756,7 @@ def run_supervisor_check(
         return SupervisorRun(
             _supervisor_fail_open_decision(
                 str(e),
-                failure_type="proxy_not_found",
+                failure_type=e.failure_type,
             )
         )
 
