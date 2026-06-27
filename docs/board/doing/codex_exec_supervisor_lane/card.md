@@ -36,14 +36,22 @@ The pieces are shipped:
 - **`SupervisorConfig` gains a narrow runtime override** (`session/models.py:149` -- no `runtime` field today; validate
   in `__post_init__`, the existing seam for `checker_effort`). Default resolves to the `claude_code` lane
   (byte-identical to T3); an override selects `codex`.
-- **Implement the `codex` arm of `_dispatch_supervisor`** (`supervisor.py:469` raises `NotImplementedError` today):
-  build a `CodexPreflight` with **`run_doctor=False`** (skip the ~20s `codex doctor` probe in the hook path; fail open
-  if it raises), `prepare_codex_request` with the composed `prompt` + one `Attribution`, dispatch via
-  `CodexHeadlessInvoker` (sandbox `read-only` -- a supervisor inspects, never edits), parse via
-  `parse_supervisor_verdict(stdout)`. **Adapt the invoker's `HeadlessResult` into the `SessionResult`** the caller
+- **Implement the `codex` arm of `_dispatch_supervisor`** (`supervisor.py:469` raises `NotImplementedError` today): read
+  a **cached** `CodexPreflight` (see preflight bullet below), `prepare_codex_request` with the composed `prompt` + one
+  `Attribution`, dispatch via `CodexHeadlessInvoker` (sandbox `read-only` -- a supervisor inspects, never edits), parse
+  via `parse_supervisor_verdict(stdout)`. **Adapt the invoker's `HeadlessResult` into the `SessionResult`** the caller
   expects, carrying run/telemetry fields and **folding `runtime_is_error`** (a Codex turn can fail at exit 0) into the
   failure signal, so a runtime failure isn't misread as unparseable output. When no approved plan resolves, **fail
-  open** (codex has no `--resume` context).
+  open** (codex has no `--resume` context). **All setup failures** (cache miss, request shaping) degrade to
+  `codex_unavailable` fail-open, never an uncaught raise.
+- **Preflight is cached, never probed in the hook** (revised after 2026-06-27 review -- the original `run_doctor=False`
+  plan was inert for the `chatgpt` backend this lane declares). `run_doctor=False` sees only env auth, so a
+  `codex login --device-auth` (ChatGPT subscription) user would fail closed forever even though `codex exec` runs. A
+  setup-time command (`forge runtime preflight codex`) runs the full `run_doctor=True` preflight once and writes a
+  secret-free disk cache (`core/runtime/codex_preflight_cache.py`); the hook reads it with cheap `stat()`s (codex binary
+  \+ `$CODEX_HOME/auth.json` mtime + TTL invalidation), **no `codex doctor` in the hot path**. Cache miss/stale/unready
+  -> fail open with a "run `forge runtime preflight codex`" hint; a stale-positive self-corrects via the runtime-failure
+  fail-open.
 - **Single usage emission -- via the invoker, not the Claude seam.** The codex request carries **one** `Attribution`;
   `CodexHeadlessInvoker` then emits **one** `emit_codex_usage` (`billing_mode` from the preflight). Do **not** also call
   `emit_usage_for_session_result` (the Claude arm's emitter) -- that double-emits. Verify the invoker's built-in

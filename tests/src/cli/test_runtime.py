@@ -138,6 +138,24 @@ class TestPreflightCmd:
         assert "ahead of the probe-validated" in result.output
         assert "scripts/experiments/codex-hooks/" in result.output
 
+    def test_direct_preflight_writes_cache(self, monkeypatch) -> None:
+        """A direct (no --proxy) preflight persists the cache the supervisor's codex lane reads (T4)."""
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
+        result = CliRunner().invoke(runtime, ["preflight", "codex"])
+        assert result.exit_code == 0
+        assert read_fresh_codex_preflight() == _READY
+
+    def test_proxy_preflight_does_not_write_cache(self, monkeypatch) -> None:
+        """A --proxy preflight answers a different (proxied) question; it must not overwrite the direct cache."""
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
+        result = CliRunner().invoke(runtime, ["preflight", "codex", "--proxy", "my-openai-proxy"])
+        assert result.exit_code == 0
+        assert read_fresh_codex_preflight() is None
+
 
 class TestVerifyEnrollment:
     """`forge runtime preflight codex --verify-enrollment` dispatch + exit codes."""

@@ -10,10 +10,11 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
-**Status (2026-06-27):** Phases 1-6 implementation **complete** on branch `codex_exec_supervisor_lane` (commits
-`fa2179b` board open, `577b517` Phase 1, `e7aaaad` Phases 2-5, `919f12c` design docs, `61c9b8d` format). Unit (269) +
-supervisor E2E (10) green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane
-move) + the merge itself. One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
+**Status (2026-06-27):** Phases 1-7 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
+docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open,
+the 2026-06-27 review fixes) pending commit. Unit suites green (supervisor 106, cache 10, runtime CLI); supervisor E2E
+10 green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane move) + the merge.
+One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
 
 **Verified seam (2026-06-26, against shipped code):**
 
@@ -37,8 +38,9 @@ move) + the merge itself. One item deferred to T5: the invoker's `workflow.worke
   (the Claude arm's sole emitter at `supervisor.py:537`) -- that double-emits.
 - **Preflight is a ~20s probe by default** -- `prepare_codex_request` needs a `CodexPreflight` (`codex.py:155`);
   `preflight_codex`/`assert_codex_ready` default `run_doctor=True` (~20s `codex doctor`); `run_doctor=False` skips it
-  (`codex_preflight.py:165,182,225`). A per-Write/Edit hook must use `run_doctor=False` and fail open on preflight
-  failure.
+  (`codex_preflight.py:165,182,225`). **Superseded (2026-06-27):** `run_doctor=False` is inert for the `chatgpt` backend
+  (env-only auth, can't see `codex_store`), so the hook reads a **cached** `run_doctor=True` preflight instead -- see
+  the preflight Decision + Phase 7.
 - **`SupervisorConfig` round-trips + validates in `__post_init__`** -- dacite deserializes it "on every manifest read /
   session set / start / fork" and runs `__post_init__`, which already rejects bad `checker_effort`/`supervisor_effort`
   (auto-wrapped to `InvalidOverrideValueError` on the strict override path) (`session/models.py:149,~195`). A new
@@ -67,8 +69,21 @@ move) + the merge itself. One item deferred to T5: the invoker's `workflow.worke
   review flagged). The supervisor prompt is self-contained (`SUPERVISOR_PROMPT` + the `_PLAN_OVERRIDE_PREAMBLE` already
   prepended in `run_supervisor_check`). `compose_codex_initial_message` is the **bridge's transfer-framer**
   (`transfer_body` + a separate `task`) -- the wrong shape here. **Card synced** (Phase 0).
-- [x] **Preflight in the hook path = `run_doctor=False` + fail open** (review claim 4). Skip the ~20s `codex doctor`
-  probe in the per-Write/Edit hot path; if preflight raises (codex absent / not ready), degrade to "aligned".
+- [x] **Preflight in the hook path = cached `run_doctor=True`, never doctor in the hook** (revised 2026-06-27 after a
+  review found the original `run_doctor=False` plan inert). `run_doctor=False` falls back to **env-only auth**
+  (`codex_preflight.py:182,401-403`): it cannot see `codex_store`/ChatGPT-login auth, which is exactly the `chatgpt`
+  backend this lane declares (`sources.py:350`), so a `codex login --device-auth` user would get `codex_unavailable`
+  fail-open **forever** even though `codex exec` would run. Fix (user-decided 2026-06-27): a setup-time command
+  (`forge runtime preflight codex`) runs the full `run_doctor=True` preflight ONCE and writes a **secret-free disk
+  cache** (`core/runtime/codex_preflight_cache.py`); the hot-path hook reads it with cheap `stat()`s only (codex-binary
+  \+ `$CODEX_HOME/auth.json` mtime + TTL invalidation), never running doctor. Cache miss/stale/unready -> fail open
+  `codex_unavailable` with a "run `forge runtime preflight codex`" warning. A stale-positive self-corrects: `codex exec`
+  fails in-stream (`runtime_is_error`) -> fail-open. See Phase 7.
+- [x] **All codex-arm setup failures fail open as `codex_unavailable`** (review claim 2, 2026-06-27). Not just the
+  `ready=False` case: the cache read + `prepare_codex_request` are wrapped so **any** exception becomes a
+  `_SupervisorRoutingError(failure_type="codex_unavailable")`, not an uncaught raise that escapes to the engine's
+  generic `policy_error` (which fail-**closes** to deny under `fail_mode="closed"`, and crashes the shadow-auditor path
+  that calls `run_supervisor_check` directly). See Phase 7.
 - [x] **Override field shape = narrow `supervisor_runtime: str | None`** (epic-decided: T4 rides a narrow
   `SupervisorConfig` field; T1b generalizes). Validated in `__post_init__` against `{"claude_code", "codex"}` --
   precedent: `checker_effort` validation in the same `__post_init__`. The arm maps the string to the declared codex
@@ -210,6 +225,36 @@ move) + the merge itself. One item deferred to T5: the invoker's `workflow.worke
 - [ ] **Closeout (post-merge):** change_log.md entry (Goal / Key changes / Verification); propose durable lessons to
   `impl_notes.md` after human review; update epic roster T4 -> done; `git mv doing/ -> done/`. Per the dogfood pattern
   (T2: `feat... (#54)` then a separate `docs(board): close out` commit), these land after the feature merges to `main`.
+
+### Phase 7 -- Review fixes (cached preflight + setup fail-open)
+
+Two issues a 2026-06-27 review caught after Phases 1-6 (both confirmed against shipped code).
+
+- [x] **Issue 1 (High) -- cached `run_doctor=True` preflight so the ChatGPT-login lane actually activates.** New module
+  `core/runtime/codex_preflight_cache.py`:
+  - `write_codex_preflight_cache(preflight)` -- persists the secret-free `CodexPreflight` plus the invalidation key
+    (codex binary path+mtime, `$CODEX_HOME/auth.json` mtime, `written_at`) under
+    `get_forge_home()/cache/codex_preflight.json` (atomic via `state.io.atomic_write_json`).
+  - `read_fresh_codex_preflight()` -- returns the cached `CodexPreflight` only if fresh (version==1, binary sig matches,
+    auth-store mtime matches, within TTL); **discards -> None** on any mismatch/parse error (runtime-only state, always
+    regenerable; never raises).
+  - **Write seam:** `forge runtime preflight codex` (no `--proxy`) writes the cache after its `run_doctor=True`
+    preflight (`cli/runtime.py:230`, best-effort). `--proxy` runs do NOT overwrite the direct cache.
+  - **Hot path:** the codex arm reads `read_fresh_codex_preflight()` instead of `preflight_codex(run_doctor=False)`;
+    miss/stale/unready -> `_SupervisorRoutingError(codex_unavailable)` with a "run `forge runtime preflight codex`"
+    warning. No doctor probe in the hook.
+  - Verified: `tests/src/core/runtime/test_codex_preflight_cache.py` (10 -- round-trip, TTL, binary/auth/version/shape
+    invalidation) + supervisor `test_codex_arm_cold_cache_fails_open` / `test_unready_cache_fails_open` +
+    `test_runtime/test_runtime.py::test_direct_preflight_writes_cache` / `test_proxy_preflight_does_not_write_cache`.
+- [x] **Issue 2 (Medium) -- all codex setup failures fail open.** The arm's cache-read + `prepare_codex_request` + `run`
+  are wrapped: `_SupervisorRoutingError` re-raises as-is; **any other** exception becomes
+  `_SupervisorRoutingError(failure_type="codex_unavailable")`. Verified:
+  `test_cache_read_exception_fails_open_not_uncaught` + `test_request_shaping_exception_fails_open_not_uncaught`
+  (`run_supervisor_check` returns a structured fail-open, no exception escapes).
+- [x] **Updated the Phase 2/5 tests** that patched `preflight_codex` -> now patch `read_fresh_codex_preflight` (the arm
+  no longer calls `preflight_codex`). Supervisor suite: **106 passed**.
+- [x] **Docs:** card codex-arm + preflight bullets corrected; design_appendix §G notes the cached-preflight model.
+  change_log carries the fix at closeout.
 
 ## Blockers / deferred
 

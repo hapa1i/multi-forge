@@ -752,18 +752,18 @@ class TestSupervisorLaneDispatch:
 
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_codex_arm_dispatches_through_invoker(
-        self, mock_preflight: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
+        self, mock_read: MagicMock, mock_prepare: MagicMock, mock_invoker_cls: MagicMock
     ) -> None:
-        """T4 wired the codex arm: it preflights (run_doctor=False), builds a read-only request, runs the invoker."""
+        """T4 codex arm: reads the cached preflight (no doctor in the hook), builds a read-only request, runs invoker."""
         from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
             _dispatch_supervisor,
             _ResolvedTarget,
         )
 
-        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
 
         codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
@@ -776,7 +776,8 @@ class TestSupervisorLaneDispatch:
             usage_command="supervisor",
         )
 
-        mock_preflight.assert_called_once_with(run_doctor=False)
+        # Cached read, NOT a live doctor probe (the whole point of the T4 review fix).
+        mock_read.assert_called_once_with()
         mock_invoker_cls.return_value.run.assert_called_once()
         # Read-only sandbox + no model pin (codex picks its own); plan-bearing prompt passed through.
         assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
@@ -786,9 +787,9 @@ class TestSupervisorLaneDispatch:
         assert result.stdout == "VERDICT"
         assert result.success is True
 
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
-    def test_codex_arm_unready_preflight_raises_routing_error(self, mock_preflight: MagicMock) -> None:
-        """An unready codex preflight raises _SupervisorRoutingError(codex_unavailable); the caller fails open."""
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_arm_unready_cache_raises_routing_error(self, mock_read: MagicMock) -> None:
+        """An unready cached preflight raises _SupervisorRoutingError(codex_unavailable); the caller fails open."""
         from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
             _dispatch_supervisor,
@@ -796,7 +797,7 @@ class TestSupervisorLaneDispatch:
             _SupervisorRoutingError,
         )
 
-        mock_preflight.return_value = SimpleNamespace(ready=False, blocking_reason="codex not installed")
+        mock_read.return_value = SimpleNamespace(ready=False, blocking_reason="codex not installed")
         codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
 
         with pytest.raises(_SupervisorRoutingError) as exc:
@@ -810,7 +811,29 @@ class TestSupervisorLaneDispatch:
             )
         assert exc.value.failure_type == "codex_unavailable"
         assert "codex not installed" in str(exc.value)
-        mock_preflight.assert_called_once_with(run_doctor=False)
+
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight", return_value=None)
+    def test_codex_arm_cold_cache_fails_open(self, mock_read: MagicMock) -> None:
+        """A cold cache (read returns None) raises codex_unavailable with a refresh hint, never spawns codex."""
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+            _SupervisorRoutingError,
+        )
+
+        codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+        with pytest.raises(_SupervisorRoutingError) as exc:
+            _dispatch_supervisor(
+                codex_lane,
+                prompt="x",
+                config=_make_config(direct=True),
+                context=_make_context(),
+                resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
+                usage_command="supervisor",
+            )
+        assert exc.value.failure_type == "codex_unavailable"
+        assert "forge runtime preflight codex" in str(exc.value)
 
     def test_unknown_runtime_arm_raises_lane_error(self) -> None:
         """A reachable lane with no supervisor adapter (core_llm) raises LaneError, not a silent skip."""
@@ -856,10 +879,10 @@ class TestCodexSupervisorLane:
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_override_dispatches_to_codex_and_parses_verdict(
         self,
-        mock_preflight: MagicMock,
+        mock_read: MagicMock,
         mock_prepare: MagicMock,
         mock_invoker_cls: MagicMock,
         mock_claude: MagicMock,
@@ -868,7 +891,7 @@ class TestCodexSupervisorLane:
         """A codex override routes to the invoker (not run_claude_session); codex stdout parses like claude's."""
         from forge.policy.semantic.supervisor import run_supervisor_check
 
-        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
 
         result = run_supervisor_check(_codex_config(plan_override_path="/plan.md"), _make_context())
@@ -884,9 +907,9 @@ class TestCodexSupervisorLane:
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_plan_absent_fails_open_without_spawning_codex(
-        self, mock_preflight: MagicMock, mock_invoker_cls: MagicMock, mock_claude: MagicMock
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, mock_claude: MagicMock
     ) -> None:
         """Codex has no --resume: with no plan in-band, fail open WITHOUT spawning (failure_type=plan_missing)."""
         from forge.policy.semantic.supervisor import run_supervisor_check
@@ -896,27 +919,27 @@ class TestCodexSupervisorLane:
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "plan_missing"
-        # Short-circuit is BEFORE any codex work: neither preflight nor the invoker ran.
-        mock_preflight.assert_not_called()
+        # Short-circuit is BEFORE any codex work: neither the preflight cache read nor the invoker ran.
+        mock_read.assert_not_called()
         mock_invoker_cls.return_value.run.assert_not_called()
         mock_claude.assert_not_called()
 
     @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
-    def test_preflight_unavailable_fails_open(
-        self, mock_preflight: MagicMock, mock_invoker_cls: MagicMock, mock_plan: MagicMock
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_unready_cache_fails_open(
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, mock_plan: MagicMock
     ) -> None:
-        """An unready preflight fails open (codex_unavailable); the ~20s doctor probe is skipped (run_doctor=False)."""
+        """An unready cached preflight fails open (codex_unavailable); no doctor probe in the hook, codex not spawned."""
         from forge.policy.semantic.supervisor import run_supervisor_check
 
-        mock_preflight.return_value = SimpleNamespace(ready=False, blocking_reason="not logged in")
+        mock_read.return_value = SimpleNamespace(ready=False, blocking_reason="not logged in")
 
         result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "codex_unavailable"
-        mock_preflight.assert_called_once_with(run_doctor=False)
+        mock_read.assert_called_once_with()  # cache read, not a live doctor probe
         mock_invoker_cls.return_value.run.assert_not_called()
 
     @patch("forge.policy.semantic.supervisor.resolve_lane")
@@ -935,10 +958,10 @@ class TestCodexSupervisorLane:
     @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_runtime_error_at_exit_zero_is_runtime_failure_not_unparseable(
         self,
-        mock_preflight: MagicMock,
+        mock_read: MagicMock,
         mock_prepare: MagicMock,
         mock_invoker_cls: MagicMock,
         mock_plan: MagicMock,
@@ -946,7 +969,7 @@ class TestCodexSupervisorLane:
         """Codex exit-0 + runtime_is_error must classify as a runtime failure, not a parse failure (review claim 7)."""
         from forge.policy.semantic.supervisor import run_supervisor_check
 
-        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(
             returncode=0,
             runtime_is_error=True,
@@ -971,10 +994,10 @@ class TestCodexSupervisorLane:
     @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.invoker.codex.prepare_codex_request")
-    @patch("forge.core.runtime.codex_preflight.preflight_codex")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
     def test_no_double_emit_on_codex_path(
         self,
-        mock_preflight: MagicMock,
+        mock_read: MagicMock,
         mock_prepare: MagicMock,
         mock_invoker_cls: MagicMock,
         mock_plan: MagicMock,
@@ -983,7 +1006,7 @@ class TestCodexSupervisorLane:
         """The codex arm relies on the invoker's emit_codex_usage; it must NOT also call the claude-arm emitter."""
         from forge.policy.semantic.supervisor import run_supervisor_check
 
-        mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
 
         run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
@@ -994,6 +1017,37 @@ class TestCodexSupervisorLane:
         attribution = mock_prepare.call_args.kwargs["attribution"]
         assert attribution.command == "supervisor"
         assert attribution.session == "test-session"
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_cache_read_exception_fails_open_not_uncaught(self, mock_read: MagicMock, mock_plan: MagicMock) -> None:
+        """An unexpected exception in the cache read becomes codex_unavailable, never escapes (review claim 2)."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_read.side_effect = RuntimeError("boom reading cache")
+
+        # Must NOT raise: run_supervisor_check returns a structured fail-open, not policy_error.
+        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "codex_unavailable"
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_request_shaping_exception_fails_open_not_uncaught(
+        self, mock_read: MagicMock, mock_prepare: MagicMock, mock_plan: MagicMock
+    ) -> None:
+        """An exception in prepare_codex_request (after a ready cache) also degrades to codex_unavailable."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_prepare.side_effect = RuntimeError("bad request shape")
+
+        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "codex_unavailable"
 
     def test_headless_to_session_result_maps_fields_and_folds_runtime_error(self) -> None:
         """The HeadlessResult->SessionResult adapter carries every load-bearing field and folds runtime_is_error."""

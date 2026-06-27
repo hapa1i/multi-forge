@@ -573,12 +573,19 @@ def _dispatch_codex_supervisor(
     Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
     be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
     enforces that precondition (plan-present) before selecting this arm; this function does
-    not re-check it. Preflight runs with ``run_doctor=False`` -- the ~20s ``codex doctor``
-    probe is too slow for a policy hook -- and an unready preflight raises
-    ``_SupervisorRoutingError(codex_unavailable)`` so the caller fails open. Read-only
-    sandbox (the supervisor inspects, never writes). The invoker auto-emits the SOLE usage
-    event (``emit_codex_usage`` via the request's ``Attribution``); this arm must NOT call
-    ``emit_usage_for_session_result`` -- that would double-count.
+    not re-check it. Read-only sandbox (the supervisor inspects, never writes). The invoker
+    auto-emits the SOLE usage event (``emit_codex_usage`` via the request's ``Attribution``);
+    this arm must NOT call ``emit_usage_for_session_result`` -- that would double-count.
+
+    Preflight is **cached, never probed in the hook** (T4 review fix). ``codex doctor`` is
+    ~20s and ``run_doctor=False`` cannot see ``codex_store`` (ChatGPT-login) auth -- the very
+    backend this lane declares -- so the arm reads the ``run_doctor=True`` preflight that
+    ``forge runtime preflight codex`` cached. A cold/stale/unready cache fails open
+    (``codex_unavailable``) with a refresh hint. **All** setup failures (cache read, request
+    shaping, spawn) are wrapped into ``_SupervisorRoutingError(codex_unavailable)`` so nothing
+    escapes ``run_supervisor_check`` uncaught (which would become the engine's generic
+    ``policy_error`` -- a DENY under ``fail_mode="closed"`` -- or crash the shadow-auditor
+    path that calls ``run_supervisor_check`` directly).
 
     Known limitation (deferred to T5): the invoker's ``_emit_codex`` hardcodes its upstream
     operation as ``workflow.worker``, which mislabels this policy check. Relabeling needs the
@@ -586,26 +593,36 @@ def _dispatch_codex_supervisor(
     rather than T4's narrow lane scope.
     """
     from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
-    from forge.core.runtime.codex_preflight import preflight_codex
+    from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
 
-    preflight = preflight_codex(run_doctor=False)
-    if not preflight.ready:
-        raise _SupervisorRoutingError(
-            f"Codex supervisor lane unavailable: {preflight.blocking_reason or 'not ready'}",
-            failure_type="codex_unavailable",
+    try:
+        preflight = read_fresh_codex_preflight()
+        if preflight is None or not preflight.ready:
+            reason = (preflight.blocking_reason if preflight else None) or "no fresh preflight cached"
+            raise _SupervisorRoutingError(
+                f"Codex supervisor lane unavailable: {reason}. Run 'forge runtime preflight codex' to refresh.",
+                failure_type="codex_unavailable",
+            )
+        request = prepare_codex_request(
+            prompt=prompt,
+            preflight=preflight,
+            attribution=Attribution(command=usage_command, session=context.session_name),
+            model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
+            cwd=resolved.source_cwd,
+            sandbox="read-only",
+            timeout_seconds=config.timeout_seconds,
+            label="supervisor",
         )
-
-    request = prepare_codex_request(
-        prompt=prompt,
-        preflight=preflight,
-        attribution=Attribution(command=usage_command, session=context.session_name),
-        model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
-        cwd=resolved.source_cwd,
-        sandbox="read-only",
-        timeout_seconds=config.timeout_seconds,
-        label="supervisor",
-    )
-    return _headless_to_session_result(CodexHeadlessInvoker().run(request))
+        result = CodexHeadlessInvoker().run(request)
+    except _SupervisorRoutingError:
+        raise  # already a structured fail-open trigger (cache miss / unready)
+    except Exception as e:  # any other setup failure must still fail open, not escape uncaught
+        _log.warning("Codex supervisor setup failed: %s", e)
+        raise _SupervisorRoutingError(
+            f"Codex supervisor setup failed: {e}",
+            failure_type="codex_unavailable",
+        ) from e
+    return _headless_to_session_result(result)
 
 
 def _headless_to_session_result(result: HeadlessResult) -> SessionResult:

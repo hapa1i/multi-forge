@@ -7,6 +7,7 @@ headless, hooks, usage source, native resume, install scopes).
 
 from __future__ import annotations
 
+import logging
 import sys
 
 import click
@@ -24,6 +25,8 @@ from forge.core.runtime import (
     list_runtimes,
     preflight_codex,
 )
+
+_log = logging.getLogger(__name__)
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -228,6 +231,18 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
         return
 
     result = preflight_codex(proxy_id=proxy_id)
+
+    # Persist the DIRECT preflight so the supervisor's codex lane (a per-Write/Edit hook)
+    # can read readiness without re-running the ~20s doctor probe (epic consumer_lanes, T4).
+    # A --proxy run answers a different question (proxied Responses posture), so it must not
+    # overwrite the direct cache. Best-effort: a regenerable cache never fails the command.
+    if proxy_id is None:
+        from forge.core.runtime.codex_preflight_cache import write_codex_preflight_cache
+
+        try:
+            write_codex_preflight_cache(result)
+        except OSError as e:
+            _log.warning("Could not write codex preflight cache: %s", e)
 
     if as_json:
         import json
