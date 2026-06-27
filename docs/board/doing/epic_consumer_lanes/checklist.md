@@ -11,9 +11,10 @@ are on `main`, all three cards in `done/`. T2's three decisions are resolved (A 
 `runtime_native` owns its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and
 `design_appendix.md` §A.2.1 is synced. **T4** (Codex-exec supervisor lane) is **open in `doing/`** on branch
 `codex_exec_supervisor_lane` (`git mv` from `todo/`, 2026-06-26), fully unblocked (deps T1a+T2+T3 all landed); its
-execution checklist is authored in `doing/codex_exec_supervisor_lane/`. **T7** (subscription-exhaustion fail-open) -- the one new ticket from the 2026-06-26
-workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/` (depends on T4).
-T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
+execution checklist is authored in `doing/codex_exec_supervisor_lane/`. **T7** (subscription-exhaustion fail-open) --
+the one new ticket from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in
+`proposed/subscription_exhaustion_failopen/` (depends on T4). T5/T1b/T6 stay inline sketches. The `core.llm`
+representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 

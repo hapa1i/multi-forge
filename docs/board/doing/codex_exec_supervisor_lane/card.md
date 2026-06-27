@@ -30,18 +30,20 @@ The pieces are shipped:
 ## Scope (concrete changes)
 
 - **Declare a codex candidate lane.** `SUPERVISOR_CONSUMER` (`supervisor.py:113`) has **no `allowed_lanes`** today, so
-  `resolve_lane(override=codex_lane)` would raise `LaneError`. Add `Lane(runtime_id="codex", backend_id="chatgpt",
-  model=...)` to its `allowed_lanes` (constructible + reachable: `chatgpt.reachable_via=("codex",)` from T2).
+  `resolve_lane(override=codex_lane)` would raise `LaneError`. Add
+  `Lane(runtime_id="codex", backend_id="chatgpt", model=...)` to its `allowed_lanes` (constructible + reachable:
+  `chatgpt.reachable_via=("codex",)` from T2).
 - **`SupervisorConfig` gains a narrow runtime override** (`session/models.py:149` -- no `runtime` field today; validate
-  in `__post_init__`, the existing seam for `checker_effort`). Default resolves to the `claude_code` lane (byte-identical
-  to T3); an override selects `codex`.
+  in `__post_init__`, the existing seam for `checker_effort`). Default resolves to the `claude_code` lane
+  (byte-identical to T3); an override selects `codex`.
 - **Implement the `codex` arm of `_dispatch_supervisor`** (`supervisor.py:469` raises `NotImplementedError` today):
-  build a `CodexPreflight` with **`run_doctor=False`** (skip the ~20s `codex doctor` probe in the hook path; fail open if
-  it raises), `prepare_codex_request` with the composed `prompt` + one `Attribution`, dispatch via `CodexHeadlessInvoker`
-  (sandbox `read-only` -- a supervisor inspects, never edits), parse via `parse_supervisor_verdict(stdout)`. **Adapt the
-  invoker's `HeadlessResult` into the `SessionResult`** the caller expects, carrying run/telemetry fields and **folding
-  `runtime_is_error`** (a Codex turn can fail at exit 0) into the failure signal, so a runtime failure isn't misread as
-  unparseable output. When no approved plan resolves, **fail open** (codex has no `--resume` context).
+  build a `CodexPreflight` with **`run_doctor=False`** (skip the ~20s `codex doctor` probe in the hook path; fail open
+  if it raises), `prepare_codex_request` with the composed `prompt` + one `Attribution`, dispatch via
+  `CodexHeadlessInvoker` (sandbox `read-only` -- a supervisor inspects, never edits), parse via
+  `parse_supervisor_verdict(stdout)`. **Adapt the invoker's `HeadlessResult` into the `SessionResult`** the caller
+  expects, carrying run/telemetry fields and **folding `runtime_is_error`** (a Codex turn can fail at exit 0) into the
+  failure signal, so a runtime failure isn't misread as unparseable output. When no approved plan resolves, **fail
+  open** (codex has no `--resume` context).
 - **Single usage emission -- via the invoker, not the Claude seam.** The codex request carries **one** `Attribution`;
   `CodexHeadlessInvoker` then emits **one** `emit_codex_usage` (`billing_mode` from the preflight). Do **not** also call
   `emit_usage_for_session_result` (the Claude arm's emitter) -- that double-emits. Verify the invoker's built-in
@@ -56,18 +58,18 @@ The pieces are shipped:
 
 ## Acceptance (definition of done)
 
-| Test                         | Fixture                                                         | Assertion                                                 | Test File                                      |
-| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
-| Override dispatches to codex | `SupervisorConfig` codex override + mock `CodexHeadlessInvoker` | dispatch arm = codex, not `run_claude_session`            | `tests/src/policy/semantic/test_supervisor.py` |
-| Default unchanged            | no override                                                     | claude arm, byte-identical to T3                          | `test_supervisor.py`                           |
-| Verdict parses codex stdout  | codex `HeadlessResult.stdout` sample                            | `parse_supervisor_verdict` returns the verdict            | `test_supervisor.py` / `test_verdict.py`       |
-| Bad/unknown lane fails open  | invalid override                                                | verdict = aligned, no exception, hook not bricked         | `test_supervisor.py`                           |
-| Preflight failure fails open | codex preflight raises                                          | verdict = aligned, hook not bricked; `run_doctor=False`   | `test_supervisor.py`                           |
-| Plan-absent fails open       | codex lane, no resolvable plan                                  | verdict = aligned; not evaluated against an empty plan    | `test_supervisor.py`                           |
-| Runtime field round-trips    | manifest read / `session set`                                   | field persists via dacite; invalid value rejected         | `test_models.py` / `test_supervisor.py`        |
-| Codex runtime failure (exit 0) | `runtime_is_error=True` stream                                | classified as runtime failure (fail-open), not unparseable; run ids carried | `test_supervisor.py`             |
-| Single usage emission        | codex dispatch                                                  | one `emit_codex_usage`; zero `emit_usage_for_session_result` | `test_supervisor.py`                        |
-| Blind/transfer-fed only      | --                                                              | headless `codex exec`; no codex hook install / enrollment | code review + assertion                        |
+| Test                           | Fixture                                                         | Assertion                                                                   | Test File                                      |
+| ------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| Override dispatches to codex   | `SupervisorConfig` codex override + mock `CodexHeadlessInvoker` | dispatch arm = codex, not `run_claude_session`                              | `tests/src/policy/semantic/test_supervisor.py` |
+| Default unchanged              | no override                                                     | claude arm, byte-identical to T3                                            | `test_supervisor.py`                           |
+| Verdict parses codex stdout    | codex `HeadlessResult.stdout` sample                            | `parse_supervisor_verdict` returns the verdict                              | `test_supervisor.py` / `test_verdict.py`       |
+| Bad/unknown lane fails open    | invalid override                                                | verdict = aligned, no exception, hook not bricked                           | `test_supervisor.py`                           |
+| Preflight failure fails open   | codex preflight raises                                          | verdict = aligned, hook not bricked; `run_doctor=False`                     | `test_supervisor.py`                           |
+| Plan-absent fails open         | codex lane, no resolvable plan                                  | verdict = aligned; not evaluated against an empty plan                      | `test_supervisor.py`                           |
+| Runtime field round-trips      | manifest read / `session set`                                   | field persists via dacite; invalid value rejected                           | `test_models.py` / `test_supervisor.py`        |
+| Codex runtime failure (exit 0) | `runtime_is_error=True` stream                                  | classified as runtime failure (fail-open), not unparseable; run ids carried | `test_supervisor.py`                           |
+| Single usage emission          | codex dispatch                                                  | one `emit_codex_usage`; zero `emit_usage_for_session_result`                | `test_supervisor.py`                           |
+| Blind/transfer-fed only        | --                                                              | headless `codex exec`; no codex hook install / enrollment                   | code review + assertion                        |
 
 ## Non-goals
 

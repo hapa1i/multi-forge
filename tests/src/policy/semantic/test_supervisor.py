@@ -758,7 +758,10 @@ class TestSupervisorLaneDispatch:
     ) -> None:
         """T4 wired the codex arm: it preflights (run_doctor=False), builds a read-only request, runs the invoker."""
         from forge.core.lanes import Lane
-        from forge.policy.semantic.supervisor import _dispatch_supervisor, _ResolvedTarget
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
 
         mock_preflight.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="VERDICT")
