@@ -2,8 +2,9 @@
 
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
 first wave is split into member cards (linked beneath the member table): T1a, T3, and T2 are **done** (the spine T1a+T3
-plus the T2 backend axis have landed on `main`). T4/T5/T1b/T6 stay inline sketches now that the spine (T1a+T3) has
-landed (board_contract "Epics").
+plus the T2 backend axis have landed on `main`). T4 is now authored in `todo/codex_exec_supervisor_lane/` and T7 added
+in `proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the spine has landed
+(board_contract "Epics").
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). Spine landed on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -137,12 +138,28 @@ opencode).
   tool for Forge's **closed set of ~15 known consumers**, whose role Forge knows by construction (the router has to
   reconstruct it from the request). A frozen lane is also structurally immune to the router's dominant practical problem
   -- the prompt-cache penalty from switching models mid-loop (its top HN critique).
-- **Two borrowable ideas (later, narrow).** (a) Subscription *headroom* + a **subscription-exhaustion fail-open** ("this
-  lane's sub is spent -> degrade to the default lane") narrowly **reopens the "No fallback (de-scoped)" line** above for
-  the exact Claude-Max-quota-wall scenario in "Why now" -- a deliberate **T4** decision (fold into the unsupported-lane
-  failure-mode choice), not a silent reversal or a step toward general dynamic routing. (b) Cache-aware model switching
-  (their session-pin + EV planner) is worth it **only** for the long-lived main loop, never the single-shots (which hold
-  no durable cache to preserve).
+- **Two borrowable ideas (later, narrow).** (a) A **subscription-exhaustion fail-open** ("sub spent -> degrade to the
+  default lane") narrowly **reopens the "No fallback (de-scoped)" line** above for the "Why now" quota wall -- now **its
+  own ticket, T7** (downstream of T4), not a silent reversal or general dynamic routing. Distinct from **T4**, which
+  settles the *unsupported-lane* fail-open (a bad/unimplemented lane -> default); T7 handles a *spent subscription*.
+  Subscription **headroom** is the related read surface, routed to **T5** (see Discussion-derived backlog). (b)
+  Cache-aware model switching (their session-pin + EV planner) is worth it **only** for the long-lived main loop, never
+  the single-shots (which hold no durable cache to preserve).
+
+## Discussion-derived backlog (workweave/Avengers-Pro, 2026-06-26)
+
+The prior-art review produced exactly one *new* ticket -- validations build confidence, not backlog; a ticket falls out
+only where the comparison **challenged** a recorded decision:
+
+- **T7 (new) -- subscription-exhaustion fail-open** -> `docs/board/proposed/subscription_exhaustion_failopen/`: the
+  narrow, one-hop exception to "No fallback" for the "Why now" quota wall. Depends on T4.
+- **T4 decision resolved**: the unsupported-lane failure mode is **catch + fail-open** (consistent with
+  `proxy_not_found`), settling the open T3 -> T4 carry-forward seam.
+- **T5 += two reads**: surface subscription **headroom** (the perishable rate-limit budget workweave reads via
+  `usage.Snapshot.Exhausted()`), and an **"explain the resolved lane" dry-run** (workweave's `/v1/route` analog -- show
+  what lane a consumer resolves to without dispatching).
+- **T0 corroborated**: workweave detects OAuth subscriptions (`sk-ant-oat`) as a real, working signal, so the
+  `claude-max` "does `claude -p` ride the Max subscription?" question is empirically answerable, not speculative.
 
 ## Inventory this serves (2026-06-25 sweep)
 
@@ -159,22 +176,25 @@ once.
 
 ## Member tickets
 
-| Ticket                                                               | Scope                                                                                                                                                                                                                                                                                                                | Depends on | Proves                               |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------ |
-| **T1a -- Pure lane/consumer resolver** (spine)                       | `Lane`/`Consumer` types, default-lane computation, capability-floor + (runtime,backend) reachability gating, valid-lane listing/validation. **No manifest persistence.** No consumer rewired.                                                                                                                        | --         | the seam fits the code               |
-| **T3 -- Supervisor becomes lane-driven** (Claude default)            | Refactor `run_supervisor_check` to resolve a lane + dispatch; default lane = `claude -p`, **byte-identical to today**. No durable schema yet.                                                                                                                                                                        | T1a        | resolver on the existing case        |
-| **T2 -- Backend: runtime-native subscription sources**               | Extend the existing source-access enum (`EndpointKind` today -- rename if `runtime_native` makes "endpoint" a misnomer, but keep **one** enum) with a `runtime_native` shape + add a first-class billing posture; encode (runtime,backend) reachability. **Explicit access/billing vocabulary; no faked endpoints.** | T1a        | billing-as-backend, honestly shaped  |
-| **T4 -- Codex-exec supervisor lane** (capability demo, the headline) | Wire `CodexHeadlessInvoker` as a supervisor dispatch target; the choice rides a **narrow `SupervisorConfig` field**. **Acceptance: blind/transfer-fed only -- MUST NOT use Codex hooks or policy enforcement as part of the claim.**                                                                                 | T1a,T2,T3  | a real new lane, swappably           |
-| **T5 -- Observability**                                              | Surface the chosen lane + resulting `billing_mode` (telemetry/status); close the M3 no-emission gaps so every lane is measurable.                                                                                                                                                                                    | T3,T4      | you can *see/verify* the arbitrage   |
-| **T1b -- Generalize + freeze**                                       | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                    | T4         | a durable contract, shape-proven     |
-| **T6 -- Generalize to other consumers** (optional, later)            | Lane-drive the fan-out workers, taggers, memory writer.                                                                                                                                                                                                                                                              | T1b        | spans consumers, not just supervisor |
+| Ticket                                                                     | Scope                                                                                                                                                                                                                                                                                                                | Depends on | Proves                                       |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------- |
+| **T1a -- Pure lane/consumer resolver** (spine)                             | `Lane`/`Consumer` types, default-lane computation, capability-floor + (runtime,backend) reachability gating, valid-lane listing/validation. **No manifest persistence.** No consumer rewired.                                                                                                                        | --         | the seam fits the code                       |
+| **T3 -- Supervisor becomes lane-driven** (Claude default)                  | Refactor `run_supervisor_check` to resolve a lane + dispatch; default lane = `claude -p`, **byte-identical to today**. No durable schema yet.                                                                                                                                                                        | T1a        | resolver on the existing case                |
+| **T2 -- Backend: runtime-native subscription sources**                     | Extend the existing source-access enum (`EndpointKind` today -- rename if `runtime_native` makes "endpoint" a misnomer, but keep **one** enum) with a `runtime_native` shape + add a first-class billing posture; encode (runtime,backend) reachability. **Explicit access/billing vocabulary; no faked endpoints.** | T1a        | billing-as-backend, honestly shaped          |
+| **T4 -- Codex-exec supervisor lane** (capability demo, the headline)       | Wire `CodexHeadlessInvoker` as a supervisor dispatch target; the choice rides a **narrow `SupervisorConfig` field**. **Acceptance: blind/transfer-fed only -- MUST NOT use Codex hooks or policy enforcement as part of the claim.**                                                                                 | T1a,T2,T3  | a real new lane, swappably                   |
+| **T5 -- Observability**                                                    | Surface the chosen lane + resulting `billing_mode` (telemetry/status); close the M3 no-emission gaps so every lane is measurable.                                                                                                                                                                                    | T3,T4      | you can *see/verify* the arbitrage           |
+| **T1b -- Generalize + freeze**                                             | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                    | T4         | a durable contract, shape-proven             |
+| **T6 -- Generalize to other consumers** (optional, later)                  | Lane-drive the fan-out workers, taggers, memory writer.                                                                                                                                                                                                                                                              | T1b        | spans consumers, not just supervisor         |
+| **T7 -- Subscription-exhaustion fail-open** (new, the discussion's ticket) | When a consumer's subscription lane hits the quota wall, degrade **once** to its default lane (sticky, fail-open) -- the single deliberate exception to "no fallback".                                                                                                                                               | T4         | the "Why now" quota wall is actually handled |
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
-(done, PR #52). The rows above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded
-acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
-validated at import in `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable
-state. Schema version/strict-deser/reset rules apply only to T1b's session-manifest binding.
+(done, PR #52); T4 -> `docs/board/todo/codex_exec_supervisor_lane/` (authored 2026-06-26, next to open); T7 ->
+`docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26, depends on T4). The rows above stay the
+durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction (verified
+2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in
+`backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
+version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
 **T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
 current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),
@@ -218,8 +238,9 @@ the shape is proven -- deferring durable state until a real override exists.
 - **Codex's hard problems are avoided by scope**: T4 is *headless* (`codex exec` needs no enrollment-gated hooks) and
   *transfer-fed/blind* (no Claude-UUID resume). Do not expand T4 to supervised-Codex-executor-with-enforcement.
 - **Naming**: unit = `consumer` (vs `service`/`client`); `lane`; keep `runtime` narrow. Confirm before code.
-- **Decision recorded**: no *general* fallback (subscription-exhaustion fail-open to the default lane is a pending T4/T5
-  exception decision -- see Prior art); default-to-current-behavior; first new lane = codex-exec supervisor.
+- **Decision recorded**: no *general* fallback (subscription-exhaustion fail-open to the default lane is **T7**,
+  downstream of T4 -- the single exception; T4 owns only the *unsupported-lane* fail-open); default-to-current-behavior;
+  first new lane = codex-exec supervisor.
 
 ## T3 -> T4 carry-forward seams (fail-open boundary)
 
