@@ -49,6 +49,38 @@ these flows use. Stay cost-conscious by targeting files
 - **`main`**: Primary branch. All PRs target `main`.
 - **Feature branches**: Branch from `main`, PR back into `main`.
 
+## Commit and PR Writing Style
+
+**Core Philosophy:** Write for a human reviewer, not an execution log. Detail must scale with *risk and novelty*, not
+diff size. Every sentence must earn its place by actively helping someone review, test, or understand the change.
+
+### Commits
+
+- **DO** use conventional prefixes (`feat:`, `fix:`, `docs:`, `chore:`).
+- **DO** write short, imperative, and concrete subjects.
+- **DO** default to a subject line only. Add a body *only* when risk or novelty needs it (non-obvious decision,
+  migration, subtle bug). Mechanical or obvious changes stay subject-only — a blank body is not incompleteness.
+- **DO** split commits by reviewable intent when practical. Avoid noisy checkpoint commits.
+- **DO NOT** use generic AI filler words (e.g., "comprehensive", "robust", "seamless", "key changes", "delves",
+  "significantly improves") unless backed by hard metrics.
+- **DO NOT** narrate the development process, implementation phases, or your internal agent reasoning.
+
+### Pull Requests
+
+- **Focus on the "Why" and "How":** Summarize the intent. Call out non-obvious design decisions, risks, limitations,
+  migrations, and specific areas where the reviewer should focus.
+- **Provide Proof:** Name the commands you ran and any non-passing results (failures/skips) — not full logs.
+- **Skip the Inventory:** DO NOT write file-by-file, commit-by-commit, or function-by-function summaries. Group details
+  by *review concern*, not component inventory.
+- **No Transcripts:** DO NOT include implementation diaries, phase histories, or exhaustive rationale. Move deep context
+  to linked docs. The PR body is a review interface, not a transcript.
+- **Don't Repeat the Diff:** If the code makes it obvious, do not write it in the PR body.
+
+### Final Self-Correction
+
+Before committing or opening or updating a PR re-read your generated description. **Delete any sentence** that is
+filler, states the obvious, or would not change how a human reviews, tests, or understands the commit or the PR.
+
 ## Release Process
 
 Version is in `pyproject.toml`. Publishing is tag-triggered via GitHub Actions (trusted publishing, no local credentials
@@ -137,42 +169,15 @@ When the user describes a new concept (e.g., 'backend', 'work queue'), treat it 
 unless told otherwise. Do not reduce user-defined abstractions to internal implementation details. Ask for clarification
 if scope is unclear rather than assuming minimal scope.
 
-## Critical Thinking on User Input
-
-When the user (or another AI model) provides feedback, corrections, claims, or design notes, do not blindly accept them.
-Instead:
-
-1. **Verify claims against the codebase** — check that referenced behavior, files, or patterns actually exist as
-   described
-2. **Reason through the implications** — consider whether the suggested change is consistent with existing architecture
-3. **Push back when warranted** — if evidence contradicts the user's claim, say so clearly with specifics
-4. **Ask clarifying questions** — if a claim is ambiguous or untestable, ask before assuming it's correct
-
-**Especially in planning mode**: When the user provides feedback on a plan, independently verify their corrections
-before incorporating them. A wrong assumption accepted during planning cascades into a flawed implementation. Treat plan
-reviews as a dialogue, not a dictation.
-
-The user values being challenged over being agreed with. Sycophantic acceptance leads to wasted work and subtle bugs.
-
 ## Code Reviews
 
 When performing code reviews, do a COMPLETE first pass covering ALL findings before presenting results. Do not present a
 partial subset — the user expects comprehensive coverage in a single pass.
 
-## Editing Discipline
-
-When editing documents or code, preserve the user's preferred terminology. Do not replace domain-specific terms (e.g.,
-fact_id, orchestration) unless explicitly asked. When in doubt, ask before renaming.
-
 ## Guidelines (load into context)
 
 @docs/developer/coding_standards.md @docs/developer/testing_guidelines.md @docs/developer/documentation_guidelines.md
 @docs/developer/board_contract.md
-
-## Platform & Environment
-
-**macOS (Darwin)** — use GNU tools, not BSD: `gsed` (not `sed`; different `-i` syntax), `gawk`, `ggrep` (or `rg`; perl
-regex), `gdate` (`--date` parsing), `greadlink -f` (BSD lacks `-f`).
 
 ## Key Documents
 

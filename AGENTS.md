@@ -96,14 +96,34 @@ Version lives in `pyproject.toml`. PyPI publishing is automated: push an annotat
 `.github/workflows/publish.yml` workflow (trusted publishing via OIDC). After tagging, create a GitHub release with
 `gh release create`. No local PyPI credentials are needed.
 
-## Commit & Pull Request Guidelines
+## Commit and PR Writing Style
 
-Recent history follows conventional prefixes such as `feat:`, `fix:`, `docs:`, and `chore:` with short imperative
-subjects; issue references are appended when relevant, for example
-`fix: session resume fails for nested worktree forks (#12)`. Branch from `main` and open PRs back to `main`. Before
-requesting review, run `make pre-commit` and the relevant test targets, summarize behavior changes, list verification
-commands, and link the issue. Include terminal output or screenshots when CLI-visible behavior changes.
+**Core Philosophy:** Write for a human reviewer, not an execution log. Detail must scale with *risk and novelty*, not
+diff size. Every sentence must earn its place by actively helping someone review, test, or understand the change.
 
-## Platform & Environment
+### Commits
 
-**macOS (Darwin)** - Use GNU tools instead of BSD versions: gsed, gawk, ggrep (can also use rg), gdate, greadlink
+- **DO** use conventional prefixes (`feat:`, `fix:`, `docs:`, `chore:`).
+- **DO** write short, imperative, and concrete subjects.
+- **DO** default to a subject line only. Add a body *only* when risk or novelty needs it (non-obvious decision,
+  migration, subtle bug). Mechanical or obvious changes stay subject-only — a blank body is not incompleteness.
+- **DO** split commits by reviewable intent when practical. Avoid noisy checkpoint commits.
+- **DO NOT** use generic AI filler words (e.g., "comprehensive", "robust", "seamless", "key changes", "delves",
+  "significantly improves") unless backed by hard metrics.
+- **DO NOT** narrate the development process, implementation phases, or your internal agent reasoning.
+
+### Pull Requests
+
+- **Focus on the "Why" and "How":** Summarize the intent. Call out non-obvious design decisions, risks, limitations,
+  migrations, and specific areas where the reviewer should focus.
+- **Provide Proof:** Name the commands you ran and any non-passing results (failures/skips) — not full logs.
+- **Skip the Inventory:** DO NOT write file-by-file, commit-by-commit, or function-by-function summaries. Group details
+  by *review concern*, not component inventory.
+- **No Transcripts:** DO NOT include implementation diaries, phase histories, or exhaustive rationale. Move deep context
+  to linked docs. The PR body is a review interface, not a transcript.
+- **Don't Repeat the Diff:** If the code makes it obvious, do not write it in the PR body.
+
+### Final Self-Correction
+
+Before committing or opening or updating a PR re-read your generated description. **Delete any sentence** that is
+filler, states the obvious, or would not change how a human reviews, tests, or understands the commit or the PR.
