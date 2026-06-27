@@ -10,13 +10,13 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
-**Status (2026-06-27):** Phases 1-9 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
+**Status (2026-06-27):** Phases 1-10 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
 docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open)
-in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits) in `471eec7`; Phase 9 (codex cwd = action repo, the 2026-06-27 follow-up
-review) pending commit. Unit suites green (supervisor 111, shadow 49, cache 11, runtime CLI + store -> **402** in the
-combined run); supervisor E2E 10 green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log,
-impl_notes, lane move) + the merge. One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase
-4).
+in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits) in `471eec7`; Phase 9 (codex cwd = action repo) in `a7023d5`; Phase 10
+(--verify-enrollment primes the cache, the 2026-06-27 follow-up review) pending commit. Unit suites green (supervisor
+111, shadow 49, cache 11, runtime CLI 16 + store); supervisor E2E 10 green; `make pre-commit` clean. **Remaining:**
+post-merge closeout (change_log, impl_notes, lane move) + the merge. One item deferred to T5: the invoker's
+`workflow.worker` upstream mislabel (Phase 4).
 
 **Verified seam (2026-06-26, against shipped code):**
 
@@ -313,6 +313,23 @@ A 2026-06-27 follow-up review found one more issue (confirmed valid against ship
   `test_codex_arm_empty_repo_root_falls_back_to_none_cwd`; existing `test_codex_arm_dispatches_through_invoker` updated
   so its two cwds differ (the old test set both to `/workspace`, so it could not have caught this). Full affected suite
   -> **402 passed**; supervisor E2E **10 passed**.
+
+### Phase 10 -- Review follow-up (enrollment primes the cache)
+
+A 2026-06-27 follow-up review found a cache-priming gap (confirmed valid against shipped code).
+
+- [x] **`forge runtime preflight codex --verify-enrollment` now refreshes the direct preflight cache.** The cache write
+  lived only on the plain preflight path, so an operator who treated `--verify-enrollment` (the most thorough readiness
+  command) as THE check still got fail-open supervisor behavior until they re-ran the plain command. The enrollment op
+  already computes the `run_doctor=True` preflight internally (`codex_enrollment.py:106`) and then **discards** it. Fix:
+  the CLI computes the direct preflight itself, threads it into `verify_codex_enrollment(preflight=...)` (so the op
+  skips its own redundant probe -- same probe count), and writes the cache under the same `proxy_id is None` guard the
+  plain path uses. A `--proxy --verify-enrollment` run still computes a proxied preflight and must NOT touch the direct
+  cache. Cache-write logic extracted to `_write_direct_preflight_cache` (shared by both paths). Verified:
+  `test_direct_verify_enrollment_writes_cache` + a cache-stays-empty assertion added to
+  `test_verify_enrollment_honors_proxy_preflight`; the 4 direct enrollment tests gained an autouse `preflight_codex`
+  stub (the CLI now calls it pre-verify). `tests/src/cli/test_runtime.py` + `core/runtime/` -> **124 passed**; mypy +
+  pyright + `make pre-commit` clean.
 
 ## Blockers / deferred
 

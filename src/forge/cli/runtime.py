@@ -169,6 +169,22 @@ def _render_enrollment(console: Console, result: CodexEnrollmentVerification) ->
     console.print(escape(result.reason))
 
 
+def _write_direct_preflight_cache(result: CodexPreflight) -> None:
+    """Persist the DIRECT preflight the supervisor's codex lane reads (epic consumer_lanes, T4).
+
+    Only the no-proxy preflight answers "is direct ``codex exec`` ready?" -- the question the
+    per-Write/Edit supervisor hook asks. A ``--proxy`` run is a different (proxied) question and
+    must never overwrite this, so callers guard on ``proxy_id is None``. Best-effort: a
+    regenerable cache must never fail the command.
+    """
+    from forge.core.runtime.codex_preflight_cache import write_codex_preflight_cache
+
+    try:
+        write_codex_preflight_cache(result)
+    except Exception as e:  # best-effort: a regenerable cache must never fail the command
+        _log.warning("Could not write codex preflight cache: %s", e)
+
+
 @runtime.command("preflight")
 @click.argument("runtime_name", metavar="RUNTIME")
 @click.option(
@@ -215,7 +231,14 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
     if verify_enrollment:
         from forge.core.ops.codex_enrollment import verify_codex_enrollment
 
-        enrollment_preflight = preflight_codex(proxy_id=proxy_id) if proxy_id is not None else None
+        # Compute the preflight HERE (not inside verify_codex_enrollment, which would run the same
+        # run_doctor=True probe and then discard it) so a direct run also refreshes the supervisor
+        # lane's cache. --verify-enrollment is the most thorough readiness command; an operator who
+        # treats it as THE check must not still get fail-open supervision until they separately run
+        # the plain preflight. Proxied runs answer a different question -> never touch the direct cache.
+        enrollment_preflight = preflight_codex(proxy_id=proxy_id)
+        if proxy_id is None:
+            _write_direct_preflight_cache(enrollment_preflight)
         enrollment = verify_codex_enrollment(preflight=enrollment_preflight)
         if as_json:
             import json
@@ -232,17 +255,10 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
 
     result = preflight_codex(proxy_id=proxy_id)
 
-    # Persist the DIRECT preflight so the supervisor's codex lane (a per-Write/Edit hook)
-    # can read readiness without re-running the ~20s doctor probe (epic consumer_lanes, T4).
-    # A --proxy run answers a different question (proxied Responses posture), so it must not
-    # overwrite the direct cache. Best-effort: a regenerable cache never fails the command.
+    # Persist the DIRECT preflight so the supervisor's codex lane (a per-Write/Edit hook) can read
+    # readiness without re-running the ~20s doctor probe (epic consumer_lanes, T4).
     if proxy_id is None:
-        from forge.core.runtime.codex_preflight_cache import write_codex_preflight_cache
-
-        try:
-            write_codex_preflight_cache(result)
-        except Exception as e:  # best-effort: a regenerable cache must never fail the command
-            _log.warning("Could not write codex preflight cache: %s", e)
+        _write_direct_preflight_cache(result)
 
     if as_json:
         import json
