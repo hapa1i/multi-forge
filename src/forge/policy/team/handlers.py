@@ -152,7 +152,13 @@ def _classify_event(
     session = os.environ.get("FORGE_SESSION") or None
     try:
         from forge.core.llm import Message, SyncAdapter, get_client
-        from forge.core.usage import emit_direct_llm_usage
+        from forge.core.usage import (
+            emit_direct_llm_usage,
+            mint_request_id,
+            resolve_client_base_url,
+            target_is_forge_proxy,
+            with_forge_request_id,
+        )
 
         prompt = prompt_template.format(
             teammate_name=teammate,
@@ -160,16 +166,22 @@ def _classify_event(
             task_subject=task_subject or "",
         )
         adapter = SyncAdapter(get_client(model))
+        # Exact-cost join only when the client provably targets a Forge proxy (same gate as
+        # the action tagger / WorkflowPolicy stages); else no header and no cost_request_id.
+        request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
+        hp = with_forge_request_id(None, request_id) if request_id else None
         start = time.monotonic()
-        response = adapter.complete([Message(role="user", content=prompt)])
+        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
         latency_ms = (time.monotonic() - start) * 1000
         emit_direct_llm_usage(
             command="team-tagger",
             model=model,
             provider=model.split("/", 1)[0] if "/" in model else None,
             usage=response.usage,
+            cost_request_id=request_id,
             latency_ms=latency_ms,
             session=session,
+            provider_meta=response.provider_meta,
         )
         words = response.text.strip().lower().split()
         return words[0] if words else "routine"

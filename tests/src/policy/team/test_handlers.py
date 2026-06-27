@@ -156,6 +156,26 @@ class TestClassifyEvent:
         assert len(events) == 1
         assert (events[0].command, events[0].status) == ("team-tagger", "error")
 
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_emits_ambient_when_no_forge_session(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: with no FORGE_SESSION, the team tagger emits ambient (session=None), not crash."""
+        monkeypatch.delenv("FORGE_SESSION", raising=False)
+        monkeypatch.setenv("FORGE_RUN_ID", "run_tt")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tt")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(
+            text="routine", usage={"prompt_tokens": 3, "completion_tokens": 1}
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        _classify_event("gemini/gemini-2.0-flash", "{teammate_name}", "alice", "team-a")
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert events[0].command == "team-tagger"
+        assert events[0].session is None  # ambient: no FORGE_SESSION to attribute
+
 
 # --- _run_supervisor ---
 

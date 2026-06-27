@@ -182,6 +182,38 @@ class TestCheckerStage:
         assert len(events) == 1
         assert (events[0].command, events[0].status) == ("policy-checker", "error")
 
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_system_prompt_prepended_when_set(self, mock_adapter_cls, mock_get_client):
+        """T5/WS2: a configured system prompt becomes a leading role='system' message (the
+        behavior .ask() did implicitly; .complete() takes raw messages, so the caller owns it)."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}", system_prompt="be terse"))
+        stage.check(_ctx(), tags=[], policy_id="wf.test")
+
+        messages = mock_adapter.complete.call_args[0][0]
+        assert messages[0].role == "system" and messages[0].content == "be terse"
+        assert messages[-1].role == "user"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_system_message_when_prompt_unset(self, mock_adapter_cls, mock_get_client):
+        """T5/WS2: with no system prompt (the default), no system message is injected -- exactly
+        mirrors .ask()'s `if system:` guard, so behavior is preserved for system_prompt=None."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))  # system_prompt defaults None
+        stage.check(_ctx(), tags=[], policy_id="wf.test")
+
+        messages = mock_adapter.complete.call_args[0][0]
+        assert len(messages) == 1
+        assert messages[0].role == "user"
+
 
 # --- ReviewerStage ---
 
@@ -303,6 +335,64 @@ class TestReviewerStage:
         events = read_usage_events()
         assert len(events) == 1
         assert (events[0].command, events[0].status) == ("policy-reviewer", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_parse_failure_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: an unparseable reviewer response still emits one status=error event (card: success + failure)."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text="not json at all")
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        assert stage.review(_ctx(), tags=[], policy_id="workflow.test").decision == "warn"
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("policy-reviewer", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_verdict_mapping_crash_emits_single_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """Regression: a response that PARSES but crashes _map_verdict (e.g. non-iterable
+        `violations`) must emit exactly ONE (success) event -- the verdict mapping runs outside
+        the emit try, so it must not re-enter the exception path and double-count the call."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        # divergent (skips the early aligned-return) + a non-iterable `violations` -> `for v in 5`
+        # raises TypeError inside _map_verdict, after the success usage event already fired.
+        mock_adapter.complete.return_value = CompletionResponse(
+            text='{"verdict": "divergent", "confidence": 0.9, "violations": 5}'
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        result = stage.review(_ctx(), tags=[], policy_id="workflow.test")
+        assert result.decision == "warn"  # fails open on the mapping crash
+        assert "failing open" in result.warnings[0].lower()
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1  # exactly one: the success emit, NOT a second error emit
+        assert events[0].status == "success"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_malformed_confidence_degrades_to_low_not_crash(self, mock_adapter_cls, mock_get_client):
+        """A non-numeric `confidence` (system boundary) degrades to low: an aligned verdict still
+        allows; a divergent one falls below threshold -> warn. Never crashes."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"verdict": "aligned", "confidence": "high"}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        assert stage.review(_ctx(), tags=[], policy_id="workflow.test").decision == "allow"
 
 
 # --- _map_verdict ---

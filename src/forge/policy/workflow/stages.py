@@ -145,15 +145,6 @@ class ReviewerStage:
                 system_prompt=self._config.system_prompt,
                 command="policy-reviewer",
             )
-            if data is None:
-                return PolicyDecision(
-                    decision="warn",
-                    policy_id=policy_id,
-                    warnings=["Reviewer could not parse LLM response"],
-                )
-
-            return _map_verdict(data, policy_id)
-
         except Exception as e:
             _log.warning("ReviewerStage failed: %s", e)
             _emit_stage_error(context=context, model=model, command="policy-reviewer")
@@ -161,6 +152,26 @@ class ReviewerStage:
                 decision="warn",
                 policy_id=policy_id,
                 warnings=[f"Reviewer error: {e}, failing open"],
+            )
+
+        if data is None:
+            return PolicyDecision(
+                decision="warn",
+                policy_id=policy_id,
+                warnings=["Reviewer could not parse LLM response"],
+            )
+        # Verdict mapping runs OUTSIDE the emit try: _complete_with_usage already fired the
+        # usage event, so a malformed-field crash here must NOT re-enter the exception path
+        # and emit a SECOND (error) event -- that would double-count the call and invent a
+        # phantom failure in `forge telemetry activity`. Fail open to warn instead.
+        try:
+            return _map_verdict(data, policy_id)
+        except Exception as e:
+            _log.warning("ReviewerStage verdict mapping failed: %s", e)
+            return PolicyDecision(
+                decision="warn",
+                policy_id=policy_id,
+                warnings=[f"Reviewer verdict error: {e}, failing open"],
             )
 
 
@@ -248,7 +259,13 @@ def _map_verdict(data: dict[str, Any], policy_id: str) -> PolicyDecision:
     Only high-confidence denials with citations use ``violations``.
     """
     verdict = data.get("verdict", "aligned")
-    confidence = float(data.get("confidence", 0.0))
+    try:
+        confidence = float(data.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        # Malformed LLM confidence (e.g. "high", null, a list) -- system boundary: degrade to
+        # low confidence rather than crash. An aligned verdict still allows; a divergent one
+        # falls below threshold -> warn (never deny on a garbage confidence).
+        confidence = 0.0
     raw_violations = data.get("violations", [])
 
     if verdict == "aligned":

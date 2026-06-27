@@ -625,6 +625,46 @@ class TestSupervisorStatus:
         assert result.exit_code == 0, result.output
         assert "Lane: runtime=codex backend=chatgpt model=gpt-5-codex" in result.output
 
+    def test_status_json_lane_null_on_resolution_failure(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """T5/WS3: allowed_lanes/_SUPERVISOR_RUNTIMES drift -> resolve raises -> status shows
+        lane=null and never crashes (fail-open display)."""
+        from forge.core.lanes import LaneError
+
+        def _boom(_config: object) -> object:
+            raise LaneError("allowed_lanes drift")
+
+        monkeypatch.setattr("forge.cli.policy.resolve_supervisor_lane", _boom)
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["supervisor"]["lane"] is None
+
+    def test_status_human_lane_unresolved_on_failure(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """T5/WS3: on resolution failure the human view degrades to '(unresolved)' (with the runtime)."""
+        from forge.core.lanes import LaneError
+        from forge.session.models import SupervisorConfig
+
+        def _boom(_config: object) -> object:
+            raise LaneError("allowed_lanes drift")
+
+        monkeypatch.setattr("forge.cli.policy.resolve_supervisor_lane", _boom)
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(
+            manifest,
+            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
+        assert result.exit_code == 0, result.output
+        assert "Lane: runtime=codex (unresolved)" in result.output
+
 
 class TestSupervisorToggle:
     """Tests for forge policy supervisor off/on/remove."""
