@@ -93,6 +93,28 @@ def test_json_shape(monkeypatch) -> None:
     assert rows["supervisor"]["errors"] == 1
 
 
+def test_json_carries_runtime_and_billing(monkeypatch) -> None:
+    """T5/WS3: --json exposes the per-row runtime/billing_mode lane fields."""
+    _patch_resolver(monkeypatch)
+    log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    assert result.exit_code == 0
+    rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
+    assert rows["supervisor"]["runtime"] == "codex"
+    assert rows["supervisor"]["billing_mode"] == "subscription_quota"
+
+
+def test_human_render_shows_runtime_billing(monkeypatch) -> None:
+    """T5/WS3: the human table has a Runtime/Billing column showing the resolved lane."""
+    monkeypatch.setenv("COLUMNS", "200")  # widen so Rich does not truncate the lane cell
+    _patch_resolver(monkeypatch)
+    log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    assert result.exit_code == 0
+    assert "Runtime/Billing" in result.output
+    assert "codex/subscription_quota" in result.output
+
+
 def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     write_upstream_outcome(

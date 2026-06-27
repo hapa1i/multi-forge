@@ -325,6 +325,52 @@ class TestActivityPanes:
         assert summary.total_input_tokens == 11
         assert summary.total_cost_micro_usd == 2_500
 
+    def test_lane_row_carries_runtime_and_billing(self, tmp_path: Path) -> None:
+        """T5/WS3: an event-backed model-call row reports the lane its events ran on."""
+        log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        row = next(r for r in summary.downstream.rows if r.command == "supervisor")
+        assert row.runtime == "codex"
+        assert row.billing_mode == "subscription_quota"
+
+    def test_lane_mixed_when_command_events_disagree(self, tmp_path: Path) -> None:
+        """T5/WS3 (D4): a command whose events span more than one runtime/billing renders 'mixed'."""
+        log_usage_event(_event(command="panel", runtime="claude_code", billing_mode="api"))
+        log_usage_event(
+            _event(
+                command="panel",
+                run_id="run_b",
+                root_run_id="run_b",
+                runtime="codex",
+                billing_mode="subscription_quota",
+            )
+        )
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        row = next(r for r in summary.downstream.rows if r.command == "panel")
+        assert row.runtime == "mixed"
+        assert row.billing_mode == "mixed"
+
+    def test_lane_none_for_downstream_only_row(self, tmp_path: Path) -> None:
+        """T5/WS3 (D4): a downstream-only row with no usage-event source carries no lane (renders '-')."""
+        provider_session_id = derive_provider_session_id("planner", root_run_id="", role="memory_writer")
+        write_downstream_record(
+            DownstreamRecord(
+                kind="attempt",
+                downstream_event_id=mint_downstream_event_id(event_key="lane-downstream-only"),
+                provider_session_id=provider_session_id,
+                provider_command="memory_writer",
+                provider="openrouter",
+                input_tokens=4,
+                output_tokens=1,
+                cost_micros=900,
+            )
+        )
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        row = summary.downstream.rows[0]
+        assert row.join_state == "downstream_only"
+        assert row.runtime is None
+        assert row.billing_mode is None
+
     def test_session_unknown_downstream_record_is_excluded(self, tmp_path: Path) -> None:
         write_downstream_record(
             DownstreamRecord(

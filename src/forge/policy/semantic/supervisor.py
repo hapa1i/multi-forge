@@ -595,13 +595,10 @@ def _dispatch_codex_supervisor(
     ``policy_error`` -- a DENY under ``fail_mode="closed"`` -- or crash the shadow-auditor
     path that calls ``run_supervisor_check`` directly).
 
-    Known limitation (deferred to T5): the invoker's ``_emit_codex`` writes an **additional**
-    upstream-outcome row (``operation="workflow.worker"``) on top of the engine's
-    ``policy.evaluate`` row that both arms already emit. So a codex check persists TWO upstream
-    rows (the extra one mis-categorized) where the claude check persists one -- on every dispatch,
-    including fail-open/error. Suppressing it needs the shared invoker's emit contract to take a
-    caller-supplied operation (or skip its upstream emit), which affects every invoker consumer,
-    so it rides T5's telemetry pass rather than T4's narrow lane scope.
+    Upstream-row parity (T5/WS1): the codex arm passes ``operation=None`` in its ``Attribution``
+    so the shared invoker emits the usage event but skips its ``record_upstream_operation`` row.
+    Both arms therefore persist exactly one upstream outcome -- the engine's ``policy.evaluate`` --
+    instead of the codex arm double-counting with an extra mis-categorized ``workflow.worker`` row.
     """
     from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
     from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
@@ -617,7 +614,9 @@ def _dispatch_codex_supervisor(
         request = prepare_codex_request(
             prompt=prompt,
             preflight=preflight,
-            attribution=Attribution(command=usage_command, session=context.session_name),
+            # operation=None suppresses the invoker's upstream-outcome row (the usage event
+            # still fires); the engine's policy.evaluate is this arm's only upstream row.
+            attribution=Attribution(command=usage_command, session=context.session_name, operation=None),
             model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
             # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
             # worktree, needed only because `claude --resume` is CWD-scoped to find the
@@ -700,6 +699,18 @@ def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
         f"supervisor_runtime {runtime!r} is validated but has no SUPERVISOR_CONSUMER lane "
         f"(allowed_lanes/_SUPERVISOR_RUNTIMES drift)"
     )
+
+
+def resolve_supervisor_lane(config: SupervisorConfig) -> Lane:
+    """Resolve the full ``(runtime, backend, model)`` lane the supervisor would run on.
+
+    The default claude lane (``claude_code``/``anthropic-direct``/``opus``) unless
+    ``supervisor_runtime`` selects a declared override (the codex lane). Display callers
+    (``forge policy supervisor status``) use this to show the chosen lane completely -- the
+    per-call usage event carries no backend id. Raises ``LaneError`` on
+    ``allowed_lanes``/``_SUPERVISOR_RUNTIMES`` drift; a display caller should catch it.
+    """
+    return resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
 
 
 def run_supervisor_check(

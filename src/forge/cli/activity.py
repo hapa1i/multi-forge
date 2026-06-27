@@ -154,6 +154,7 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         table.add_column("Attempts", justify="right")
         table.add_column("Errors", justify="right")
         table.add_column("Join", style="dim")
+        table.add_column("Runtime/Billing", style="dim")
         table.add_column("Tokens in/out", justify="right", style="dim")
         table.add_column("Cost", justify="right", style="dim")
         for model_row in summary.downstream.rows:
@@ -166,11 +167,17 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
                 cost = "-"
             else:
                 cost = f"{'~' if model_row.cost_estimated else ''}{_fmt_usd(model_row.cost_micro_usd)}"
+            # T5/WS3: the lane the row's usage events ran on. "-" for a downstream-only row
+            # (no usage-event source); "mixed" when the command's events disagree.
+            if not model_row.runtime and not model_row.billing_mode:
+                lane = "-"
+            else:
+                lane = f"{model_row.runtime or '?'}/{model_row.billing_mode or '?'}"
             values = [model_row.command, str(model_row.calls)]
             if show_workers:
                 values.append(str(model_row.workers) if model_row.workers else "-")
             errors = f"[red]{model_row.errors}[/red]" if model_row.errors else "0"
-            values += [str(model_row.attempts), errors, model_row.join_state.replace("_", "-"), tokens, cost]
+            values += [str(model_row.attempts), errors, model_row.join_state.replace("_", "-"), lane, tokens, cost]
             table.add_row(*values)
         console.print(table)
 

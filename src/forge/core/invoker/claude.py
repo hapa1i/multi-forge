@@ -155,11 +155,16 @@ def _emit_worker(request: HeadlessRequest, result: HeadlessResult) -> None:
         cached_tokens=result.cached_tokens,
         envelope_parsed=result.envelope_parsed,
     )
+    # Opt-out upstream row: operation=None keeps the usage event above but suppresses
+    # this row (parity with arms whose only upstream row is the engine's policy.evaluate).
+    # See Attribution.operation.
+    if attribution.operation is None:
+        return
     from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 
     record_upstream_operation(
         command=attribution.command,
-        operation="workflow.worker",
+        operation=attribution.operation,
         status=cast(UpstreamStatus, status),
         session=attribution.session,
         run_id=result.run_id,

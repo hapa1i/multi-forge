@@ -787,6 +787,10 @@ class TestSupervisorLaneDispatch:
         assert mock_prepare.call_args.kwargs["prompt"] == "check this"
         # The ACTION repo (context.repo_root), not the planner's source_cwd.
         assert mock_prepare.call_args.kwargs["cwd"] == "/workspace"
+        # T5/WS1: operation=None suppresses the invoker's upstream-outcome row, so this arm's
+        # only upstream row is the engine's policy.evaluate (no double-count). The suppression
+        # itself is proven in tests/src/core/invoker/test_codex_invoker.py.
+        assert mock_prepare.call_args.kwargs["attribution"].operation is None
         assert result.stdout == "VERDICT"
         assert result.success is True
 

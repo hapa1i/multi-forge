@@ -385,6 +385,38 @@ class TestPerWorkerEmission:
         assert outcomes[0].reason_code == "exit_1"
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_operation_label_threads_to_upstream_row(self, mock_popen):
+        """T5/WS1: a non-default Attribution.operation becomes the upstream-outcome label
+        (the usage event still fires regardless). Driven on a failing worker because the
+        volume policy drops successful upstream rows."""
+        mock_popen.return_value = _mock_proc("", returncode=1, stderr="boom")
+        ClaudeHeadlessInvoker().run_parallel(
+            [
+                _req(
+                    env=dict(_IDENT),
+                    attribution=Attribution(command="panel", session="planner", operation="workflow.panel"),
+                )
+            ]
+        )
+        outcomes = read_upstream_outcomes(session="planner", command="panel")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "workflow.panel"
+        assert len(read_usage_events()) == 1
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_operation_none_suppresses_upstream_keeps_usage(self, mock_popen):
+        """T5/WS1: operation=None keeps the per-worker usage event but suppresses the
+        upstream-outcome row -- the gate must not over-reach to emit_worker_usage. Driven on a
+        FAILING worker: a successful upstream row is volume-dropped anyway, so only a failure
+        proves the gate (not the volume policy) does the suppressing."""
+        mock_popen.return_value = _mock_proc("", returncode=1, stderr="boom")
+        ClaudeHeadlessInvoker().run_parallel(
+            [_req(env=dict(_IDENT), attribution=Attribution(command="panel", session="planner", operation=None))]
+        )
+        assert len(read_usage_events()) == 1  # downstream untouched
+        assert read_upstream_outcomes(session="planner", command="panel") == []  # upstream suppressed
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_one_event_per_worker(self, mock_popen):
         mock_popen.return_value = _mock_proc("out")
         attr = Attribution(command="panel")

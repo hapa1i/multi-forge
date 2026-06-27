@@ -2,9 +2,9 @@
 
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
 first wave is split into member cards (linked beneath the member table): T1a, T3, T2, and T4 are **done** (the spine
-T1a+T3, the T2 backend axis, and the T4 codex-exec supervisor lane have landed on `main`). T7 is added in
-`proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the first wave has landed
-(board_contract "Epics"). **Next cursor: T5** (observability).
+T1a+T3, the T2 backend axis, and the T4 codex-exec supervisor lane have landed on `main`). **T5** (lane observability)
+is now open in `doing/lane_observability/` (branch `lane_observability`, plan under review); T7 is added in
+`proposed/subscription_exhaustion_failopen/`; T1b/T6 stay inline sketches (board_contract "Epics").
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave landed on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -190,7 +190,8 @@ once.
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
-(done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T7 ->
+(done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T5 ->
+`docs/board/doing/lane_observability/` (opened 2026-06-27, branch `lane_observability`, plan under review); T7 ->
 `docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26, depends on T4). The rows above stay the
 durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction (verified
 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in

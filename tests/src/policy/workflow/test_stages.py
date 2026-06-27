@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.llm import CompletionResponse
 from forge.policy.types import ActionContext
 from forge.policy.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
 from forge.policy.workflow.stages import (
@@ -77,7 +78,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_aligned_returns_allow(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '```json\n{"aligned": true, "reason": "ok"}\n```'
+        mock_adapter.complete.return_value = CompletionResponse(text='```json\n{"aligned": true, "reason": "ok"}\n```')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="Check: {tool_name} {tags}"))
@@ -91,7 +92,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_not_aligned_returns_none(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '{"aligned": false, "reason": "unusual pattern"}'
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": false, "reason": "unusual pattern"}')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
@@ -103,7 +104,7 @@ class TestCheckerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_unparseable_returns_none(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "I don't know, looks fine"
+        mock_adapter.complete.return_value = CompletionResponse(text="I don't know, looks fine")
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
@@ -113,11 +114,105 @@ class TestCheckerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_llm_error_returns_none(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.side_effect = RuntimeError("LLM down")
+        mock_adapter.complete.side_effect = RuntimeError("LLM down")
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
         assert stage.check(_ctx(), tags=[], policy_id="wf.test") is None
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_emits_session_tagged_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: a checker run emits a session-tagged policy-checker event with exact tokens."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(
+            text='{"aligned": true}', usage={"prompt_tokens": 7, "completion_tokens": 3}
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(model="gemini/gemini-2.0-flash", prompt_template="{tool_name}"))
+        stage.check(_ctx(), tags=[], policy_id="wf.test")
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        e = events[0]
+        assert (e.command, e.session, e.provider, e.status) == ("policy-checker", "test", "gemini", "success")
+        assert (e.input_tokens, e.output_tokens) == (7, 3)
+        assert e.measurement_source == "provider_usage_exact"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_parse_failure_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: an unparseable checker response still emits, status=error (the call happened)."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text="not json")
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
+        assert stage.check(_ctx(), tags=[], policy_id="wf.test") is None
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("policy-checker", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_exception_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: a checker LLM exception emits a status=error event and still fails open to None."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_chk")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_chk")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.side_effect = RuntimeError("LLM down")
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
+        assert stage.check(_ctx(), tags=[], policy_id="wf.test") is None
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("policy-checker", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_system_prompt_prepended_when_set(self, mock_adapter_cls, mock_get_client):
+        """T5/WS2: a configured system prompt becomes a leading role='system' message (the
+        behavior .ask() did implicitly; .complete() takes raw messages, so the caller owns it)."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}", system_prompt="be terse"))
+        stage.check(_ctx(), tags=[], policy_id="wf.test")
+
+        messages = mock_adapter.complete.call_args[0][0]
+        assert messages[0].role == "system" and messages[0].content == "be terse"
+        assert messages[-1].role == "user"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_system_message_when_prompt_unset(self, mock_adapter_cls, mock_get_client):
+        """T5/WS2: with no system prompt (the default), no system message is injected -- exactly
+        mirrors .ask()'s `if system:` guard, so behavior is preserved for system_prompt=None."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))  # system_prompt defaults None
+        stage.check(_ctx(), tags=[], policy_id="wf.test")
+
+        messages = mock_adapter.complete.call_args[0][0]
+        assert len(messages) == 1
+        assert messages[0].role == "user"
 
 
 # --- ReviewerStage ---
@@ -128,7 +223,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_aligned_returns_allow(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '{"verdict": "aligned", "confidence": 0.95}'
+        mock_adapter.complete.return_value = CompletionResponse(text='{"verdict": "aligned", "confidence": 0.95}')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
@@ -141,9 +236,11 @@ class TestReviewerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_divergent_high_confidence_denies(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = (
-            '{"verdict": "divergent", "confidence": 0.95, '
-            '"violations": [{"severity": "high", "evidence": "bad", "citations": ["plan says X"]}]}'
+        mock_adapter.complete.return_value = CompletionResponse(
+            text=(
+                '{"verdict": "divergent", "confidence": 0.95, '
+                '"violations": [{"severity": "high", "evidence": "bad", "citations": ["plan says X"]}]}'
+            )
         )
         mock_adapter_cls.return_value = mock_adapter
 
@@ -158,8 +255,8 @@ class TestReviewerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_divergent_low_confidence_warns(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = (
-            '{"verdict": "divergent", "confidence": 0.4, ' '"violations": [{"evidence": "might be off"}]}'
+        mock_adapter.complete.return_value = CompletionResponse(
+            text='{"verdict": "divergent", "confidence": 0.4, "violations": [{"evidence": "might be off"}]}'
         )
         mock_adapter_cls.return_value = mock_adapter
 
@@ -174,7 +271,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_parse_failure_warns(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "not json at all"
+        mock_adapter.complete.return_value = CompletionResponse(text="not json at all")
         mock_adapter_cls.return_value = mock_adapter
 
         stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
@@ -187,7 +284,7 @@ class TestReviewerStage:
     @patch("forge.core.llm.SyncAdapter")
     def test_llm_error_warns(self, mock_adapter_cls, mock_get_client):
         mock_adapter = MagicMock()
-        mock_adapter.ask.side_effect = RuntimeError("timeout")
+        mock_adapter.complete.side_effect = RuntimeError("timeout")
         mock_adapter_cls.return_value = mock_adapter
 
         stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
@@ -195,6 +292,107 @@ class TestReviewerStage:
 
         assert result.decision == "warn"
         assert "failing open" in result.warnings[0].lower()
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_emits_session_tagged_usage_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: a reviewer run emits a session-tagged policy-reviewer event with exact tokens."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(
+            text='{"verdict": "aligned", "confidence": 0.9}', usage={"prompt_tokens": 11, "completion_tokens": 5}
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(model="gemini/gemini-2.0-flash", prompt_template="{tool_name}"))
+        stage.review(_ctx(), tags=[], policy_id="workflow.test")
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        e = events[0]
+        assert (e.command, e.session, e.provider, e.status) == ("policy-reviewer", "test", "gemini", "success")
+        assert (e.input_tokens, e.output_tokens) == (11, 5)
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_exception_emits_error_event_and_warns(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: a reviewer LLM exception emits status=error and still fails open to warn."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.side_effect = RuntimeError("timeout")
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        result = stage.review(_ctx(), tags=[], policy_id="workflow.test")
+        assert result.decision == "warn"
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("policy-reviewer", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_parse_failure_emits_error_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """T5/WS2: an unparseable reviewer response still emits one status=error event (card: success + failure)."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text="not json at all")
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        assert stage.review(_ctx(), tags=[], policy_id="workflow.test").decision == "warn"
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1
+        assert (events[0].command, events[0].status) == ("policy-reviewer", "error")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_verdict_mapping_crash_emits_single_event(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """Regression: a response that PARSES but crashes _map_verdict (e.g. non-iterable
+        `violations`) must emit exactly ONE (success) event -- the verdict mapping runs outside
+        the emit try, so it must not re-enter the exception path and double-count the call."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_rev")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_rev")
+        mock_adapter = MagicMock()
+        # divergent (skips the early aligned-return) + a non-iterable `violations` -> `for v in 5`
+        # raises TypeError inside _map_verdict, after the success usage event already fired.
+        mock_adapter.complete.return_value = CompletionResponse(
+            text='{"verdict": "divergent", "confidence": 0.9, "violations": 5}'
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        result = stage.review(_ctx(), tags=[], policy_id="workflow.test")
+        assert result.decision == "warn"  # fails open on the mapping crash
+        assert "failing open" in result.warnings[0].lower()
+
+        from forge.core.usage.ledger import read_usage_events
+
+        events = read_usage_events()
+        assert len(events) == 1  # exactly one: the success emit, NOT a second error emit
+        assert events[0].status == "success"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_malformed_confidence_degrades_to_low_not_crash(self, mock_adapter_cls, mock_get_client):
+        """A non-numeric `confidence` (system boundary) degrades to low: an aligned verdict still
+        allows; a divergent one falls below threshold -> warn. Never crashes."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"verdict": "aligned", "confidence": "high"}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        stage = ReviewerStage(ReviewerConfig(prompt_template="{tool_name}"))
+        assert stage.review(_ctx(), tags=[], policy_id="workflow.test").decision == "allow"
 
 
 # --- _map_verdict ---
@@ -359,7 +557,7 @@ class TestCheckerStageEdgeCases:
     def test_aligned_numeric_not_boolean(self, mock_adapter_cls, mock_get_client):
         """aligned=1 (numeric) is not True (boolean identity check)."""
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '{"aligned": 1}'
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": 1}')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
@@ -370,7 +568,7 @@ class TestCheckerStageEdgeCases:
     def test_aligned_null_returns_none(self, mock_adapter_cls, mock_get_client):
         """aligned=null (JSON null) is not True."""
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '{"aligned": null}'
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": null}')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{tool_name}"))
@@ -379,14 +577,15 @@ class TestCheckerStageEdgeCases:
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
     def test_content_truncated_at_2000(self, mock_adapter_cls, mock_get_client):
-        """Content passed to checker is truncated at 2000 chars."""
+        """Content passed to checker is truncated at 2000 chars (read from the user message)."""
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = '{"aligned": true}'
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
         stage = CheckerStage(CheckerConfig(prompt_template="{content}"))
         long_content = "x" * 5000
         stage.check(_ctx(new_content=long_content), tags=[], policy_id="wf.test")
 
-        prompt_arg = mock_adapter.ask.call_args[0][0]
-        assert len(prompt_arg) == 2000
+        messages = mock_adapter.complete.call_args[0][0]
+        user_prompt = messages[-1].content  # no system_prompt configured -> single user message
+        assert len(user_prompt) == 2000

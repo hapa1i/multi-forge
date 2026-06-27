@@ -728,19 +728,24 @@ from upstream or `usage/events`, records whose provider-session id matches the h
 `render_summary_line(...)` on exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error`
 clause still comes from the window's supervisor failure split; JSON exposes those legacy counts under
 `downstream.rows[*].error_kinds`. Cost is reported-or-estimated and may be partial; `forge telemetry costs show` is
-authoritative.
+authoritative. Each model-call row also carries the lane its usage events ran on -- `runtime` and `billing_mode`
+(uniform, `mixed` when a command's events disagree, `null`/`-` for a downstream-only row with no usage-event source).
+The per-call ledger carries **no** catalog backend id, so the full `(runtime, backend, model)` lane shows on
+`forge policy supervisor status`, not here.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
-| Emitter                                                        | Tags `session`? | Notes                                                                                        |
-| -------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                             |
-| Supervisor shadow (`emit_usage_for_session_result` + upstream) | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session |
-| Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                       |
-| Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                              |
-| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`     |
-| Plan check (`emit_direct_llm_usage`, `plan-check`)             | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                             |
-| Action tagger (`emit_direct_llm_usage` + upstream outcome)     | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial       |
+| Emitter                                                              | Tags `session`? | Notes                                                                                        |
+| -------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`)                | Yes             | `session=context.session_name` (= manifest name)                                             |
+| Supervisor shadow (`emit_usage_for_session_result` + upstream)       | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session |
+| Memory writer (`emit_usage_for_session_result`)                      | Yes             | `session=session_name`                                                                       |
+| Workflow verbs panel/analyze/debate/consensus                        | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                              |
+| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`)       | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`     |
+| Plan check (`emit_direct_llm_usage`, `plan-check`)                   | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                             |
+| Action tagger (`emit_direct_llm_usage` + upstream outcome)           | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial       |
+| WorkflowPolicy checker/reviewer (`policy-checker`/`policy-reviewer`) | Yes             | `session=context.session_name`; success + parse-fail/exception (`status="error"`)            |
+| Team event tagger (`emit_direct_llm_usage`, `team-tagger`)           | Partially       | `session=$FORGE_SESSION` best-effort, else ambient (the handler carries no Forge session)    |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/`, `costs/`, and `telemetry/` (§7), so the in-container supervisor/verb events, downstream/upstream telemetry,
@@ -1179,13 +1184,24 @@ is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `
   plan-override preamble. Preflight is **cached, never probed in the hook**: `codex doctor` is ~20s and
   `run_doctor=False` cannot see `codex_store` (ChatGPT-login) auth, so the arm reads the `run_doctor=True` preflight
   that `forge runtime preflight codex` wrote to `core/runtime/codex_preflight_cache.py` (invalidated by codex-binary +
-  `$CODEX_HOME/auth.json` mtime + TTL). The invoker auto-emits the sole `emit_codex_usage`. Every failure (bad override,
-  cold/stale/unready cache, plan-absent, or any setup exception) **fails open** -- the supervisor's contract
-  (design_workflows §1.2).
+  `$CODEX_HOME/auth.json` mtime + TTL). The invoker auto-emits the sole `emit_codex_usage`, and the arm passes
+  `Attribution.operation=None` so the shared invoker **suppresses** its upstream-outcome row -- the engine's
+  `policy.evaluate` is the arm's only upstream row (parity with the claude arm; T5/WS1 resolved T4's documented
+  double-count). Every failure (bad override, cold/stale/unready cache, plan-absent, or any setup exception) **fails
+  open** -- the supervisor's contract (design_workflows §1.2).
 
 Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
 own model). All other consumers still call the resolver directly. The supervisor's narrow `supervisor_runtime` override
 is a placeholder for T1b's uniform consumer-lane manifest binding.
+
+**Observability (T5).** `forge policy supervisor status` resolves and displays the full `(runtime, backend, model)` lane
+(`resolve_supervisor_lane`: the default claude lane, or the codex override). This is the **declared** lane, not a
+dispatch record: only `runtime_id` is bound today, so the codex `model=gpt-5-codex` it prints is nominal (codex picks
+its own model) and `backend`/`model` become authoritative only when T1b freezes the consumer-lane binding.
+`forge telemetry activity` shows the per-call `runtime`/`billing_mode` each command ran on (`mixed` when a command's
+events disagree); the usage ledger carries no catalog backend id, so the full lane shows only on supervisor status. T5
+also closed the three M3 no-emission gaps -- the WorkflowPolicy checker/reviewer and the team event tagger now emit
+`policy-checker`/`policy-reviewer`/ `team-tagger` usage events (`.complete()` captures the tokens `.ask()` discarded).
 
 ### G.1 Core types (from `core.reactive.routing`)
 
