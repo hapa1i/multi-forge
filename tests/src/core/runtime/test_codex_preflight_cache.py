@@ -35,9 +35,10 @@ def _preflight(**overrides: object) -> CodexPreflight:
 
 @pytest.fixture
 def pinned_signatures(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin binary + auth-store signatures and the clock so write and read agree (a cache hit)."""
+    """Pin binary + auth-store + credentials signatures and the clock so write and read agree (a hit)."""
     monkeypatch.setattr(cpc, "_codex_binary_signature", lambda runtime: ("/usr/bin/codex", 1000.0))
     monkeypatch.setattr(cpc, "_auth_store_mtime", lambda: 2000.0)
+    monkeypatch.setattr(cpc, "_credentials_mtime", lambda: 4000.0)
     monkeypatch.setattr(cpc, "_now", lambda: 5000.0)
 
 
@@ -112,6 +113,19 @@ class TestCodexPreflightCacheInvalidation:
         monkeypatch.setattr(cpc, "_auth_store_mtime", lambda: 3333.0)
         assert cpc.read_fresh_codex_preflight() is None
 
+    def test_credentials_change_invalidates(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # M4: _resolve_codex_auth reads CODEX_API_KEY from ~/.forge/credentials.yaml *before* the
+        # codex store, so editing that file changes readiness. Its mtime is a stat-able key.
+        monkeypatch.setattr(cpc, "_codex_binary_signature", lambda runtime: ("/usr/bin/codex", 1000.0))
+        monkeypatch.setattr(cpc, "_auth_store_mtime", lambda: 2000.0)
+        monkeypatch.setattr(cpc, "_now", lambda: 5000.0)
+        monkeypatch.setattr(cpc, "_credentials_mtime", lambda: 4000.0)
+        cpc.write_codex_preflight_cache(_preflight())
+
+        # An edit to credentials.yaml (e.g. a newly added CODEX_API_KEY) -> a different mtime.
+        monkeypatch.setattr(cpc, "_credentials_mtime", lambda: 4444.0)
+        assert cpc.read_fresh_codex_preflight() is None
+
     def test_shape_drift_is_miss(self, pinned_signatures: None) -> None:
         # A payload whose preflight dict no longer matches the CodexPreflight constructor is
         # discarded (TypeError on reconstruct -> None), not propagated.
@@ -123,6 +137,7 @@ class TestCodexPreflightCacheInvalidation:
                 "codex_bin_path": "/usr/bin/codex",
                 "codex_bin_mtime": 1000.0,
                 "auth_store_mtime": 2000.0,
+                "credentials_mtime": 4000.0,  # match pinned_signatures so we reach the shape-drift path
                 "preflight": {"unexpected_field": True},
             },
         )

@@ -241,7 +241,7 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bo
 
         try:
             write_codex_preflight_cache(result)
-        except OSError as e:
+        except Exception as e:  # best-effort: a regenerable cache must never fail the command
             _log.warning("Could not write codex preflight cache: %s", e)
 
     if as_json:

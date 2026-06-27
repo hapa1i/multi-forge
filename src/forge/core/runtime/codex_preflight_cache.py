@@ -9,9 +9,13 @@ backend the lane declares. Without this cache the lane would be permanently
 The cache breaks the tension: a setup-time command (``forge runtime preflight codex``)
 runs the full ``run_doctor=True`` preflight ONCE and writes the secret-free
 :class:`CodexPreflight` here; the hot-path hook reads it with cheap ``stat()`` calls only
-(no subprocess). Invalidation keys on the two things that actually change readiness -- the
-codex binary (an upgrade changes its mtime) and ``$CODEX_HOME/auth.json`` (login/logout
-changes its mtime) -- plus a TTL backstop.
+(no subprocess). Invalidation keys on the readiness inputs Forge can cheaply ``stat`` -- the
+codex binary (an upgrade changes its mtime), ``$CODEX_HOME/auth.json`` (codex's own
+login/logout), and ``~/.forge/credentials.yaml`` (the ``CODEX_API_KEY`` ``_resolve_codex_auth``
+reads *before* the store) -- plus a TTL backstop. Process **env vars** (``CODEX_API_KEY`` /
+``CODEX_ACCESS_TOKEN`` in the environment) can't be ``stat``-ed, so they are covered by the TTL
+only; both stale directions are fail-open-safe and self-correct (a stale positive fails open
+when ``codex exec`` errors; a stale negative just re-runs ``forge runtime preflight codex``).
 
 Runtime-only state: a missing file, a parse failure, a version/shape mismatch, or a stale
 key is treated as a **cache miss** (returns ``None``), never an error -- the cache is
@@ -29,6 +33,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from forge.core.auth.credentials_file import get_credentials_path
 from forge.core.paths import get_forge_home
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.core.runtime.codex_rollouts import codex_home
@@ -66,6 +71,19 @@ def _auth_store_mtime() -> float | None:
         return None
 
 
+def _credentials_mtime() -> float | None:
+    """mtime of ``~/.forge/credentials.yaml``, or None if absent.
+
+    ``_resolve_codex_auth`` reads ``CODEX_API_KEY`` from this file (and env) *before* the codex
+    store, so editing it changes readiness -- but unlike auth.json it is a Forge-owned file we
+    can ``stat`` cheaply. Env-var auth still can't be stat-ed and stays TTL-only.
+    """
+    try:
+        return get_credentials_path().stat().st_mtime
+    except OSError:
+        return None
+
+
 def _codex_binary_signature(runtime: RuntimeSpec) -> tuple[str | None, float | None]:
     """(resolved path, mtime) of the codex binary -- invalidates the cache on an upgrade."""
     path = shutil.which(runtime.headless_cmd[0])
@@ -95,6 +113,7 @@ def write_codex_preflight_cache(
         "codex_bin_path": bin_path,
         "codex_bin_mtime": bin_mtime,
         "auth_store_mtime": _auth_store_mtime(),
+        "credentials_mtime": _credentials_mtime(),
         "preflight": asdict(preflight),
     }
     path = _cache_path()
@@ -110,10 +129,16 @@ def read_fresh_codex_preflight(
 ) -> CodexPreflight | None:
     """Return the cached ``CodexPreflight`` iff still fresh, else ``None`` (cache miss).
 
-    Fresh = schema version matches, the codex binary signature matches, the auth-store
-    mtime matches, and ``written_at`` is within ``ttl_seconds``. Any mismatch, a missing
-    file, or a corrupt/shape-drifted payload is a miss -- never an exception. Pure reads
-    (``which`` + two ``stat`` calls); no ``codex doctor`` subprocess.
+    Fresh = schema version matches, the codex binary signature matches, the auth-store and
+    credentials.yaml mtimes match, and ``written_at`` is within ``ttl_seconds``. Any mismatch,
+    a missing file, or a corrupt/shape-drifted payload is a miss -- never an exception. Pure
+    reads (``which`` + a few ``stat`` calls); no ``codex doctor`` subprocess.
+
+    The "never an exception" contract rests on a narrow ``read_json`` catch plus stat helpers
+    that swallow ``OSError`` -- it is a caller convenience, not the safety boundary. The sole
+    hot-path caller (``_dispatch_codex_supervisor``) wraps this read in ``except Exception`` ->
+    ``codex_unavailable``, so a future helper that broke totality would fail the lane open, not
+    leak through the supervisor.
     """
     runtime = runtime or get_runtime("codex")
     try:
@@ -134,6 +159,9 @@ def read_fresh_codex_preflight(
 
     if raw.get("auth_store_mtime") != _auth_store_mtime():
         return None  # login/logout changed the auth store
+
+    if raw.get("credentials_mtime") != _credentials_mtime():
+        return None  # ~/.forge/credentials.yaml (CODEX_API_KEY) changed since the cache was written
 
     fields = raw.get("preflight")
     if not isinstance(fields, dict):

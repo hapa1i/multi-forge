@@ -162,7 +162,12 @@ def _hold_manifest_lock(lock_path: str, hold_s: float, ready_event: synchronize.
 
 
 class TestSupervisorConfigCompat:
-    """Manifests written before the cascade fields existed load with defaults."""
+    """SupervisorConfig persistence across schema evolution.
+
+    Two concerns: pre-cascade manifests still load with safe defaults (back-compat), and
+    newer fields (cascade checker config, the T4 supervisor_runtime lane override) survive a
+    manifest write/read round-trip.
+    """
 
     def test_old_manifest_without_cascade_fields_loads_defaults(self, tmp_path: Path) -> None:
         from forge.session.models import PolicyIntent, SupervisorConfig

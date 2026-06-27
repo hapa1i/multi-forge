@@ -106,6 +106,8 @@ def reconstruct_config(candidate: dict[str, Any], directory: Path) -> Supervisor
         timeout_seconds=int(candidate.get("timeout_seconds", 45)),
         fork_session=bool(candidate.get("fork_session", True)),
         plan_override_path=plan_override_path,
+        # T4: replay on the same lane production used. Absent (v1 candidate) -> None -> claude.
+        supervisor_runtime=candidate.get("supervisor_runtime"),
     )
 
 

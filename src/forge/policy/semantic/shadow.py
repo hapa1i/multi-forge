@@ -37,7 +37,11 @@ from forge.session.models import SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-SHADOW_SCHEMA_VERSION = 1
+# v2 (T4): ShadowCandidate gains supervisor_runtime so a codex-configured session is replayed
+# on the codex frontier, not silently audited against claude. Old v1 candidates lack the field;
+# reconstruct_config reads it via `.get()` (absent -> None -> claude default), so in-flight v1
+# records still drain cleanly.
+SHADOW_SCHEMA_VERSION = 2
 
 # Record-file suffixes (the candidate's lifecycle states). The `.plan.md` sidecar is deliberately excluded so it is
 # never counted toward the cap nor mistaken for a candidate record.
@@ -81,6 +85,11 @@ class ShadowCandidate:
     forge_root: str | None
     timeout_seconds: int
     fork_session: bool
+    # Lane runtime override (T4): the shadow must replay on the SAME lane production uses, else it
+    # audits the wrong frontier (a codex-configured session measured against the claude judge).
+    # No default: only the capture site constructs ShadowCandidate; stored dicts are read via
+    # `.get()` in reconstruct_config, so absent old-schema values tolerate cleanly there.
+    supervisor_runtime: str | None
 
     # Audit + dimensions (so a later prompt/model change does not turn the history into mixed-quality mush).
     tier1_reason: str
@@ -270,6 +279,7 @@ def capture_candidate(
         forge_root=config.forge_root,
         timeout_seconds=config.timeout_seconds,
         fork_session=config.fork_session,
+        supervisor_runtime=config.supervisor_runtime,
         tier1_reason=tier1_reason,
         checker_provider=checker_provider,
         checker_model=checker_model,

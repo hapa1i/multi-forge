@@ -835,16 +835,22 @@ class TestSupervisorLaneDispatch:
         assert exc.value.failure_type == "codex_unavailable"
         assert "forge runtime preflight codex" in str(exc.value)
 
-    def test_unknown_runtime_arm_raises_lane_error(self) -> None:
-        """A reachable lane with no supervisor adapter (core_llm) raises LaneError, not a silent skip."""
-        from forge.core.lanes import Lane, LaneError
+    def test_unknown_runtime_arm_raises_routing_error(self) -> None:
+        """A reachable lane with no adapter (core_llm) raises _SupervisorRoutingError(configuration_error).
+
+        Critically NOT a bare LaneError: run_supervisor_check's dispatch except catches only
+        _SupervisorRoutingError, so a LaneError here would escape uncaught -> engine policy_error
+        -> DENY under fail_mode='closed' (M2 regression guard).
+        """
+        from forge.core.lanes import Lane
         from forge.policy.semantic.supervisor import (
             _dispatch_supervisor,
             _ResolvedTarget,
+            _SupervisorRoutingError,
         )
 
         single_shot_lane = Lane(runtime_id="core_llm", backend_id="anthropic-direct", model="opus")
-        with pytest.raises(LaneError):
+        with pytest.raises(_SupervisorRoutingError) as exc:
             _dispatch_supervisor(
                 single_shot_lane,
                 prompt="x",
@@ -853,6 +859,38 @@ class TestSupervisorLaneDispatch:
                 resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
                 usage_command="supervisor",
             )
+        assert exc.value.failure_type == "configuration_error"
+
+    def test_supervisor_runtimes_match_allowed_lanes(self) -> None:
+        """Drift guard (M3): _SUPERVISOR_RUNTIMES == {default runtime} ∪ allowed-lane runtime ids.
+
+        The validated runtime set (models.py) and the lane map (SUPERVISOR_CONSUMER) are coupled
+        only by comments. If they drift, a validated-but-unmapped runtime silently falls back to
+        claude. This test fails loudly the moment a runtime is added to one but not the other.
+        """
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        from forge.session.models import _SUPERVISOR_RUNTIMES
+
+        lane_runtimes = {SUPERVISOR_CONSUMER.default_lane.runtime_id} | {
+            lane.runtime_id for lane in SUPERVISOR_CONSUMER.allowed_lanes
+        }
+        assert lane_runtimes == set(_SUPERVISOR_RUNTIMES)
+
+    def test_lane_override_raises_on_validated_but_unmapped_runtime(self, monkeypatch) -> None:
+        """If the runtime set drifts ahead of allowed_lanes, _supervisor_lane_override raises (M3).
+
+        A raise (-> configuration_error fail-open via the resolve guard) beats silently returning
+        None, which would route a misconfigured codex session to the claude default.
+        """
+        from dataclasses import replace
+
+        from forge.core.lanes import LaneError
+        from forge.policy.semantic import supervisor as sup
+
+        # Simulate drift: codex stays a validated runtime, but its lane is gone from allowed_lanes.
+        monkeypatch.setattr(sup, "SUPERVISOR_CONSUMER", replace(sup.SUPERVISOR_CONSUMER, allowed_lanes=()))
+        with pytest.raises(LaneError):
+            sup._supervisor_lane_override(_make_config(supervisor_runtime="codex"))
 
 
 # --- Codex Supervisor Lane Tests (T4) ---
@@ -951,6 +989,25 @@ class TestCodexSupervisorLane:
         mock_resolve.side_effect = LaneError("override is not a declared candidate")
 
         result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "configuration_error"
+
+    @patch("forge.policy.semantic.supervisor.resolve_lane")
+    def test_no_adapter_lane_fails_open_not_uncaught(self, mock_resolve: MagicMock) -> None:
+        """A resolved lane with no dispatch adapter fails open, never escapes uncaught (M2 regression).
+
+        Drives the no-adapter branch through the real dispatch try/except: it must catch the
+        _SupervisorRoutingError(configuration_error) the arm raises, NOT let a bare LaneError escape
+        to the engine (which would DENY under fail_mode='closed').
+        """
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_resolve.return_value = Lane(runtime_id="core_llm", backend_id="anthropic-direct", model="opus")
+
+        # Plain config (no codex override): _supervisor_lane_override -> None, the mock forces core_llm.
+        result = run_supervisor_check(_make_config(resume_id=_CODEX_UUID, direct=True), _make_context())
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "configuration_error"

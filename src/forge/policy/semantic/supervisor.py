@@ -469,10 +469,13 @@ def _dispatch_supervisor(
             resolved=resolved,
             usage_command=usage_command,
         )
-    # T4 wired the codex arm. The codex arm raises _SupervisorRoutingError(codex_unavailable)
-    # on an unready preflight; an unknown runtime has no adapter and raises LaneError.
-    # run_supervisor_check catches BOTH and fails open (the supervisor's contract,
-    # design_workflows 1.2) -- a misconfigured/unavailable lane never bricks the policy hook.
+    # T4 wired the codex arm (raises _SupervisorRoutingError(codex_unavailable) on an unready
+    # preflight). A runtime with no adapter (a future T1b lane reaching here unmapped) also
+    # raises _SupervisorRoutingError -- failure_type="configuration_error" -- so the dispatch
+    # try/except in run_supervisor_check catches it and fails open. It must NOT raise LaneError
+    # here: that except clause catches only _SupervisorRoutingError, so a LaneError would escape
+    # uncaught -> engine policy_error -> DENY under fail_mode="closed" (the supervisor's contract
+    # is fail-open, design_workflows 1.2).
     if runtime == "codex":
         return _dispatch_codex_supervisor(
             prompt=prompt,
@@ -481,7 +484,10 @@ def _dispatch_supervisor(
             resolved=resolved,
             usage_command=usage_command,
         )
-    raise LaneError(f"No supervisor dispatch arm for runtime {runtime!r}")
+    raise _SupervisorRoutingError(
+        f"No supervisor dispatch arm for runtime {runtime!r}",
+        failure_type="configuration_error",
+    )
 
 
 def _dispatch_claude_supervisor(
@@ -587,10 +593,13 @@ def _dispatch_codex_supervisor(
     ``policy_error`` -- a DENY under ``fail_mode="closed"`` -- or crash the shadow-auditor
     path that calls ``run_supervisor_check`` directly).
 
-    Known limitation (deferred to T5): the invoker's ``_emit_codex`` hardcodes its upstream
-    operation as ``workflow.worker``, which mislabels this policy check. Relabeling needs the
-    shared invoker's emit contract to accept an operation, so it rides T5's telemetry pass
-    rather than T4's narrow lane scope.
+    Known limitation (deferred to T5): the invoker's ``_emit_codex`` writes an **additional**
+    upstream-outcome row (``operation="workflow.worker"``) on top of the engine's
+    ``policy.evaluate`` row that both arms already emit. So a codex check persists TWO upstream
+    rows (the extra one mis-categorized) where the claude check persists one -- on every dispatch,
+    including fail-open/error. Suppressing it needs the shared invoker's emit contract to take a
+    caller-supplied operation (or skip its upstream emit), which affects every invoker consumer,
+    so it rides T5's telemetry pass rather than T4's narrow lane scope.
     """
     from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
     from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
@@ -634,6 +643,11 @@ def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
     output. Fold that case into ``error`` so ``SessionResult.success`` is False and the
     caller classifies it as a genuine runtime failure (``subprocess_error``). ``stderr``
     already carries the provider's reason (``_build_result`` surfaces it).
+
+    ``HeadlessResult.cancelled`` and ``runtime_session_id`` are intentionally not carried:
+    ``SessionResult`` has no field for either, a cancellation already surfaces via
+    ``error="cancelled"`` (-> success False -> fail-open), and the supervisor never resumes a
+    codex thread, so its session id is moot.
     """
     error = result.error
     if result.success and result.runtime_is_error:
@@ -660,10 +674,12 @@ def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
     """Map ``config.supervisor_runtime`` to a declared candidate lane, or None for the default.
 
     None/``"claude_code"`` => no override (the default claude lane). A non-claude runtime
-    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. Returns None for an
-    unknown runtime (validation in ``SupervisorConfig`` rejects those at write time; an
-    unmatched value here would make ``resolve_lane`` fall back to the default rather than
-    raise). The field is validated, so in practice this only returns the codex lane or None.
+    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. A validated runtime
+    with NO matching lane (``_SUPERVISOR_RUNTIMES`` drifted ahead of ``allowed_lanes``) raises
+    ``LaneError`` rather than silently returning None -- a None would make ``resolve_lane`` fall
+    back to the claude default, the "stale recognized config degrades to a default" anti-pattern.
+    The raise is caught by the resolve-lane guard in ``run_supervisor_check`` -> configuration_error
+    fail-open. A drift-guard test keeps the two sets in sync so this stays unreachable in practice.
     """
     runtime = config.supervisor_runtime
     if not runtime or runtime == "claude_code":
@@ -671,7 +687,10 @@ def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
     for lane in SUPERVISOR_CONSUMER.allowed_lanes:
         if lane.runtime_id == runtime:
             return lane
-    return None
+    raise LaneError(
+        f"supervisor_runtime {runtime!r} is validated but has no SUPERVISOR_CONSUMER lane "
+        f"(allowed_lanes/_SUPERVISOR_RUNTIMES drift)"
+    )
 
 
 def run_supervisor_check(

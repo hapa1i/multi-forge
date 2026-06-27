@@ -10,11 +10,12 @@ Activate the **inert codex seam** T3 left behind: declare a codex candidate lane
 **fail-open** (the supervisor's contract -- design_workflows §1.2). Default (no override) must stay **byte-identical to
 T3** (`claude_code` lane).
 
-**Status (2026-06-27):** Phases 1-7 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
-docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open,
-the 2026-06-27 review fixes) pending commit. Unit suites green (supervisor 106, cache 10, runtime CLI); supervisor E2E
-10 green; `make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane move) + the merge.
-One item deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
+**Status (2026-06-27):** Phases 1-8 implementation **complete** on branch `codex_exec_supervisor_lane`. Phases 1-6 +
+docs/format in `fa2179b`/`577b517`/`e7aaaad`/`919f12c`/`61c9b8d`/`5227b41`; Phase 7 (cached preflight + setup fail-open)
+in `f62e497`/`682c285`; Phase 8 (M1-M5 + nits, the 2026-06-27 second review) pending commit. Unit suites green
+(supervisor 109, shadow 49, cache 11, runtime CLI + store -> **400** in the combined run); supervisor E2E 10 green;
+`make pre-commit` clean. **Remaining:** post-merge closeout (change_log, impl_notes, lane move) + the merge. One item
+deferred to T5: the invoker's `workflow.worker` upstream mislabel (Phase 4).
 
 **Verified seam (2026-06-26, against shipped code):**
 
@@ -255,6 +256,44 @@ Two issues a 2026-06-27 review caught after Phases 1-6 (both confirmed against s
   no longer calls `preflight_codex`). Supervisor suite: **106 passed**.
 - [x] **Docs:** card codex-arm + preflight bullets corrected; design_appendix §G notes the cached-preflight model.
   change_log carries the fix at closeout.
+
+### Phase 8 -- Review fixes (M1-M5 + nits)
+
+A 2026-06-27 second review (5 mediums + 4 nits). Each claim was verified against shipped code before fixing; all 5
+mediums confirmed valid.
+
+- [x] **M1 -- shadow auditor replays on the configured lane.** `ShadowCandidate` gained `supervisor_runtime` (schema
+  `SHADOW_SCHEMA_VERSION` 1 -> 2); capture freezes `config.supervisor_runtime`, `reconstruct_config` reads it via
+  `.get()` (absent v1 record -> `None` -> claude). Without this a codex-configured session was audited against the
+  claude judge. Verified: `test_shadow_runner.py::test_config_carries_supervisor_runtime` +
+  `test_config_absent_supervisor_runtime_defaults_to_none`; `test_shadow.py::test_schema_constant_present` (now 2) +
+  capture assertion in `test_freezes_raw_fields_and_plan`.
+- [x] **M2 -- no-adapter dispatch fails open, not uncaught.** The `_dispatch_supervisor` no-arm branch raised a bare
+  `LaneError` (uncaught by `run_supervisor_check`'s dispatch try -> engine `policy_error` -> DENY under
+  `fail_mode="closed"`). Now raises `_SupervisorRoutingError(failure_type="configuration_error")`. Verified:
+  `test_no_adapter_lane_fails_open_not_uncaught` (drives the path through `run_supervisor_check`, asserts
+  `fail_open=True` + `configuration_error`) + renamed `test_unknown_runtime_arm_raises_routing_error`.
+- [x] **M3 -- `_SUPERVISOR_RUNTIMES` \<-> `allowed_lanes` drift can't silently fall back to claude.**
+  `_supervisor_lane_override` now raises `LaneError` (caught -> `configuration_error`) when a validated runtime has no
+  `SUPERVISOR_CONSUMER` lane, instead of `return None` (which silently routed to the claude default). Verified:
+  `test_supervisor_runtimes_match_allowed_lanes` (drift guard) +
+  `test_lane_override_raises_on_validated_but_unmapped_runtime`.
+- [x] **M4 -- cache invalidates on Forge `CODEX_API_KEY` changes.** `_resolve_codex_auth` reads `CODEX_API_KEY` from
+  `~/.forge/credentials.yaml` before the codex store, so the cache now keys on that file's mtime (`credentials_mtime`)
+  alongside the binary + auth-store mtimes. Module docstring corrected: env-var auth
+  (`CODEX_API_KEY`/`CODEX_ACCESS_TOKEN` in the process env) stays TTL-only (can't be stat-ed). Verified:
+  `test_codex_preflight_cache.py::test_credentials_change_invalidates`.
+- [x] **M5 -- docstring scope corrected.** `_dispatch_codex_supervisor` now documents that `_emit_codex` writes an
+  **additional** `workflow.worker` upstream row on top of the engine's `policy.evaluate` row both arms emit (codex
+  persists two rows vs claude's one), not a relabel of one row. (Carry-forward to T5 unchanged.)
+- [x] **Nits.** (1) CLI cache-write catches `Exception` (not just `OSError`) under its "never fails the command" comment
+  (`cli/runtime.py`). (2) `read_fresh_codex_preflight` docstring notes "never raises" is a caller convenience resting on
+  helper totality, with the supervisor wrap as the real fail-open boundary. (3) `_headless_to_session_result` docstring
+  notes `cancelled`/`runtime_session_id` are intentionally dropped. (4) `TestSupervisorConfigCompat` docstring clarified
+  to cover both back-compat loading and new-field round-trips (no rename -- a `done/` card references the class name).
+- [x] Verified:
+  `uv run pytest tests/src/policy/semantic/ tests/src/core/runtime/ tests/src/cli/test_runtime.py tests/src/session/test_store.py`
+  -> **400 passed**; mypy + pyright clean on all changed files.
 
 ## Blockers / deferred
 
