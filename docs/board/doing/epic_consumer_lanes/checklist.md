@@ -12,11 +12,13 @@ four cards in `done/`. T2's three decisions are resolved (A = Option (c), user 2
 auth, validator symmetry, runtime-owned display; B/C in the T2 checklist) and `design_appendix.md` §A.2.1 is synced. T4
 proved a swappable non-Claude lane behind the narrow `SupervisorConfig.supervisor_runtime` field (blind/transfer-fed,
 read-only, direct-to-OpenAI, fail-open); it also synced `design.md` §3.6.12 + `design_appendix.md` §G to describe both
-supervisor arms, closing the §G/§3.6.12 sync T3 deferred. **Next cursor: T5** (observability -- surface the chosen lane
-and resulting `billing_mode`, and fix the invoker's `workflow.worker` upstream mislabel that T4 carried forward). **T7**
-(subscription-exhaustion fail-open) -- the one new ticket from the 2026-06-26 workweave/Avengers-Pro discussion -- is
-authored in `proposed/subscription_exhaustion_failopen/` (depends on T4). T5/T1b/T6 stay inline sketches. The `core.llm`
-representation is decided (option 2 -- see Decisions).
+supervisor arms, closing the §G/§3.6.12 sync T3 deferred. **T5** (lane observability) is now **open in `doing/`** on
+branch `lane_observability` (promoted from inline sketch 2026-06-27): surface the chosen lane and resulting
+`billing_mode`, close the M3 no-emission gaps, and fix the invoker's `workflow.worker` upstream mislabel T4 carried
+forward; its `card.md` + `checklist.md` are authored in `doing/lane_observability/` and **under review before
+implementation** (four decisions D1-D4 gate Phase 1). **T7** (subscription-exhaustion fail-open) -- the one new ticket
+from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/`
+(depends on T4). T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
@@ -26,7 +28,7 @@ representation is decided (option 2 -- see Decisions).
 | T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)              |
 | T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)              |
 | T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)              |
-| T5           | inline in `card.md`                          | --       | T3,T4      | sketch                     |
+| T5           | `doing/lane_observability/`                  | doing    | T3,T4      | in progress (branch)       |
 | T1b          | inline in `card.md`                          | --       | T4         | sketch                     |
 | T6           | inline in `card.md`                          | --       | T1b        | sketch                     |
 | T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26        |
@@ -78,11 +80,16 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   update this roster. (done -- branch `consumer_lane_resolver`)
 - [x] When T4 opens: branch, `git mv docs/board/todo/codex_exec_supervisor_lane docs/board/doing/`, add its
   `checklist.md`, update this roster. (done -- branch `codex_exec_supervisor_lane`)
-- [ ] Promote T5/T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
-  `done/codex_exec_supervisor_lane/` (PR #55); **T7** (new, from the workweave discussion) ->
-  `proposed/subscription_exhaustion_failopen/`. T5/T1b/T6 still inline.
-- [ ] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
-  before they become T5 acceptance -- the epic `card.md` flags them "agent-reported, verify".
+- [x] When T5 opens: branch `lane_observability`, author `doing/lane_observability/card.md` + `checklist.md` from the
+  2026-06-27 surface map, update this roster. (done -- promoted from inline sketch; plan under review)
+- [ ] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
+  `done/codex_exec_supervisor_lane/` (PR #55); **T5 open** -> `doing/lane_observability/`; **T7** (new, from the
+  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. T1b/T6 still inline.
+- [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
+  before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
+  (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`
+  (`:143`), team `_classify_event()` (`policy/team/handlers.py:157`) all call `adapter.ask(...)` with no `emit_*`. Now
+  T5 WS2 acceptance.
 
 ## Design-doc sync (board_contract "Design Doc Sync")
 
