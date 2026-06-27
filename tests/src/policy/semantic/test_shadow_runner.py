@@ -193,6 +193,24 @@ class TestReconstruction:
         assert rebuilt.plan_override_path == str(path.parent / candidate["plan_snapshot_file"])
         assert Path(rebuilt.plan_override_path).is_file()
 
+    def test_config_carries_supervisor_runtime(self, tmp_path: Path) -> None:
+        """M1: a codex-configured session must replay on the codex lane, not be audited
+        against the claude judge. The capture freezes supervisor_runtime; the drain replays it."""
+        path = _capture(_ctx(), _cfg(tmp_path, supervisor_runtime="codex"))
+        candidate = json.loads(path.read_text())
+        assert candidate["supervisor_runtime"] == "codex"  # frozen at capture (schema v2)
+        rebuilt = reconstruct_config(candidate, path.parent)
+        assert rebuilt.supervisor_runtime == "codex"
+
+    def test_config_absent_supervisor_runtime_defaults_to_none(self, tmp_path: Path) -> None:
+        """M1 back-compat: an in-flight v1 record (captured before the field existed) lacks
+        supervisor_runtime; reconstruct must read it via .get() -> None -> claude default."""
+        path = _capture(_ctx(), _cfg(tmp_path))
+        candidate = json.loads(path.read_text())
+        del candidate["supervisor_runtime"]  # simulate a pre-T4 (v1) candidate
+        rebuilt = reconstruct_config(candidate, path.parent)
+        assert rebuilt.supervisor_runtime is None
+
     def test_rebuilds_identical_supervisor_prompt(self, tmp_path: Path) -> None:
         ctx = _ctx(raw_diff="@@ -1 +2 @@\n+changed", new_content="ignored when raw_diff present")
         cfg = _cfg(tmp_path)

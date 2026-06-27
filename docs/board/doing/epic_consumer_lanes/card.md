@@ -2,8 +2,8 @@
 
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
 first wave is split into member cards (linked beneath the member table): T1a, T3, and T2 are **done** (the spine T1a+T3
-plus the T2 backend axis have landed on `main`). T4 is now authored in `todo/codex_exec_supervisor_lane/` and T7 added
-in `proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the spine has landed
+plus the T2 backend axis have landed on `main`). T4 is now open in `doing/codex_exec_supervisor_lane/` and T7 added in
+`proposed/subscription_exhaustion_failopen/`; T5/T1b/T6 stay inline sketches now that the spine has landed
 (board_contract "Epics").
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). Spine landed on `main`: T1a (PR #51,
@@ -189,12 +189,12 @@ once.
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
-(done, PR #52); T4 -> `docs/board/todo/codex_exec_supervisor_lane/` (authored 2026-06-26, next to open); T7 ->
-`docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26, depends on T4). The rows above stay the
-durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction (verified
-2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in
-`backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
-version/strict-deser/reset rules apply only to T1b's session-manifest binding.
+(done, PR #52); T4 -> `docs/board/doing/codex_exec_supervisor_lane/` (opened 2026-06-26, branch
+`codex_exec_supervisor_lane`); T7 -> `docs/board/proposed/subscription_exhaustion_failopen/` (authored 2026-06-26,
+depends on T4). The rows above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded
+acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
+validated at import in `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable
+state. Schema version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
 **T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
 current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),

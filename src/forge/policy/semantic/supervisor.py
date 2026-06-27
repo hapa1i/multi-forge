@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from forge.core.invoker.types import Attribution, HeadlessResult
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
@@ -114,6 +115,11 @@ SUPERVISOR_CONSUMER = Consumer(
     id="supervisor",
     capability_floor="tool_agent",
     default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
+    # T4: the codex-exec lane on the ChatGPT subscription (chatgpt.reachable_via=("codex",), T2). An
+    # override must be a declared candidate -- resolve_lane(override=...) rejects anything outside
+    # valid_lanes. backend_id/model are nominal (only runtime_id drives dispatch in T4; codex picks
+    # its own model unless `-m` is passed). T1b generalizes this to a uniform consumer-lane binding.
+    allowed_lanes=(Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),),
 )
 
 
@@ -426,13 +432,17 @@ def _supervisor_fail_open_decision(
 
 
 class _SupervisorRoutingError(Exception):
-    """Routing resolution failed for the ``claude_code`` supervisor arm.
+    """A supervisor dispatch arm could not reach its runtime (a fail-open trigger).
 
-    Raised inside the dispatch arm so ``run_supervisor_check`` can emit the
-    structural ``proxy_not_found`` fail-open exactly as the pre-T3 inline path
-    did, while transport resolution lives with the runtime-specific arm (Codex
-    resolves transport differently -- T4).
+    Raised inside a dispatch arm so ``run_supervisor_check`` degrades to the
+    structural fail-open. ``failure_type`` names the cause for telemetry:
+    ``proxy_not_found`` (claude proxy lookup, the pre-T3 default) or
+    ``codex_unavailable`` (codex preflight not ready, T4).
     """
+
+    def __init__(self, message: str, *, failure_type: str = "proxy_not_found") -> None:
+        super().__init__(message)
+        self.failure_type = failure_type
 
 
 def _dispatch_supervisor(
@@ -459,15 +469,26 @@ def _dispatch_supervisor(
             resolved=resolved,
             usage_command=usage_command,
         )
-    # Unreachable via run_supervisor_check in T3: resolve_lane(SUPERVISOR_CONSUMER)
-    # takes no override, so it always returns the claude_code default lane. Both arms
-    # below are exercised only by direct unit calls until T4 wires the codex lane + a
-    # SupervisorConfig override that can select a non-claude runtime. T4 must also
-    # decide the fail-open contract for these (see epic card "T3 -> T4 carry-forward
-    # seams"): the caller catches only _SupervisorRoutingError, so today they propagate.
+    # T4 wired the codex arm (raises _SupervisorRoutingError(codex_unavailable) on an unready
+    # preflight). A runtime with no adapter (a future T1b lane reaching here unmapped) also
+    # raises _SupervisorRoutingError -- failure_type="configuration_error" -- so the dispatch
+    # try/except in run_supervisor_check catches it and fails open. It must NOT raise LaneError
+    # here: that except clause catches only _SupervisorRoutingError, so a LaneError would escape
+    # uncaught -> engine policy_error -> DENY under fail_mode="closed" (the supervisor's contract
+    # is fail-open, design_workflows 1.2).
     if runtime == "codex":
-        raise NotImplementedError("Codex supervisor lane lands in T4 (epic consumer_lanes)")
-    raise LaneError(f"No supervisor dispatch arm for runtime {runtime!r}")
+        # No `resolved`: the codex arm is blind/transfer-fed (no --resume) and runs in the
+        # ACTION repo (context.repo_root), so it needs nothing from the resolved resume target.
+        return _dispatch_codex_supervisor(
+            prompt=prompt,
+            config=config,
+            context=context,
+            usage_command=usage_command,
+        )
+    raise _SupervisorRoutingError(
+        f"No supervisor dispatch arm for runtime {runtime!r}",
+        failure_type="configuration_error",
+    )
 
 
 def _dispatch_claude_supervisor(
@@ -546,6 +567,141 @@ def _dispatch_claude_supervisor(
     return result
 
 
+def _dispatch_codex_supervisor(
+    *,
+    prompt: str,
+    config: SupervisorConfig,
+    context: ActionContext,
+    usage_command: str,
+) -> SessionResult:
+    """Run the supervisor on the codex-exec lane (T4, epic consumer_lanes).
+
+    Blind/transfer-fed only: Codex has no ``--resume``, so the approved plan must already
+    be folded into ``prompt`` via the plan-override preamble. ``run_supervisor_check``
+    enforces that precondition (plan-present) before selecting this arm; this function does
+    not re-check it. Read-only sandbox (the supervisor inspects, never writes), rooted at the
+    **action's** checkout (``context.repo_root``) -- NOT the planner's ``source_cwd`` -- so a
+    fork/worktree flow has codex inspect the branch the action is actually on. The invoker
+    auto-emits the SOLE usage event (``emit_codex_usage`` via the request's ``Attribution``);
+    this arm must NOT call ``emit_usage_for_session_result`` -- that would double-count.
+
+    Preflight is **cached, never probed in the hook** (T4 review fix). ``codex doctor`` is
+    ~20s and ``run_doctor=False`` cannot see ``codex_store`` (ChatGPT-login) auth -- the very
+    backend this lane declares -- so the arm reads the ``run_doctor=True`` preflight that
+    ``forge runtime preflight codex`` cached. A cold/stale/unready cache fails open
+    (``codex_unavailable``) with a refresh hint. **All** setup failures (cache read, request
+    shaping, spawn) are wrapped into ``_SupervisorRoutingError(codex_unavailable)`` so nothing
+    escapes ``run_supervisor_check`` uncaught (which would become the engine's generic
+    ``policy_error`` -- a DENY under ``fail_mode="closed"`` -- or crash the shadow-auditor
+    path that calls ``run_supervisor_check`` directly).
+
+    Known limitation (deferred to T5): the invoker's ``_emit_codex`` writes an **additional**
+    upstream-outcome row (``operation="workflow.worker"``) on top of the engine's
+    ``policy.evaluate`` row that both arms already emit. So a codex check persists TWO upstream
+    rows (the extra one mis-categorized) where the claude check persists one -- on every dispatch,
+    including fail-open/error. Suppressing it needs the shared invoker's emit contract to take a
+    caller-supplied operation (or skip its upstream emit), which affects every invoker consumer,
+    so it rides T5's telemetry pass rather than T4's narrow lane scope.
+    """
+    from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
+    from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+    try:
+        preflight = read_fresh_codex_preflight()
+        if preflight is None or not preflight.ready:
+            reason = (preflight.blocking_reason if preflight else None) or "no fresh preflight cached"
+            raise _SupervisorRoutingError(
+                f"Codex supervisor lane unavailable: {reason}. Run 'forge runtime preflight codex' to refresh.",
+                failure_type="codex_unavailable",
+            )
+        request = prepare_codex_request(
+            prompt=prompt,
+            preflight=preflight,
+            attribution=Attribution(command=usage_command, session=context.session_name),
+            model=None,  # codex picks its own model; backend_id/model on the lane are nominal in T4
+            # The ACTION's checkout, not resolved.source_cwd. source_cwd is the *planner*
+            # worktree, needed only because `claude --resume` is CWD-scoped to find the
+            # transcript -- a Claude-arm constraint codex (no --resume) doesn't share. Codex
+            # judges in a read-only sandbox and may inspect the repo; target_path is relative
+            # to context.repo_root, so a fork/worktree flow (planner cwd != action cwd) would
+            # otherwise have codex read the wrong branch. `or None` -> inherit the worker cwd
+            # when a shadow candidate froze an empty repo_root (never `cd ""`).
+            cwd=context.repo_root or None,
+            sandbox="read-only",
+            timeout_seconds=config.timeout_seconds,
+            label="supervisor",
+        )
+        result = CodexHeadlessInvoker().run(request)
+    except _SupervisorRoutingError:
+        raise  # already a structured fail-open trigger (cache miss / unready)
+    except Exception as e:  # any other setup failure must still fail open, not escape uncaught
+        _log.warning("Codex supervisor setup failed: %s", e)
+        raise _SupervisorRoutingError(
+            f"Codex supervisor setup failed: {e}",
+            failure_type="codex_unavailable",
+        ) from e
+    return _headless_to_session_result(result)
+
+
+def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
+    """Adapt an invoker ``HeadlessResult`` to the ``SessionResult`` run_supervisor_check reads.
+
+    Both ``.success`` properties are returncode-only and ignore ``runtime_is_error``, so a
+    Codex turn that exits 0 but reports an in-stream failure (``runtime_is_error=True``)
+    would otherwise reach verdict parsing and be mislabeled as a parse failure on empty
+    output. Fold that case into ``error`` so ``SessionResult.success`` is False and the
+    caller classifies it as a genuine runtime failure (``subprocess_error``). ``stderr``
+    already carries the provider's reason (``_build_result`` surfaces it).
+
+    ``HeadlessResult.cancelled`` and ``runtime_session_id`` are intentionally not carried:
+    ``SessionResult`` has no field for either, a cancellation already surfaces via
+    ``error="cancelled"`` (-> success False -> fail-open), and the supervisor never resumes a
+    codex thread, so its session id is moot.
+    """
+    error = result.error
+    if result.success and result.runtime_is_error:
+        error = result.stderr.strip() or "Codex runtime reported a failed turn"
+    return SessionResult(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        returncode=result.returncode,
+        timed_out=result.timed_out,
+        error=error,
+        run_id=result.run_id,
+        parent_run_id=result.parent_run_id,
+        root_run_id=result.root_run_id,
+        cost_micro_usd=result.cost_micro_usd,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cached_tokens=result.cached_tokens,
+        envelope_parsed=result.envelope_parsed,
+        runtime_is_error=result.runtime_is_error,
+    )
+
+
+def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
+    """Map ``config.supervisor_runtime`` to a declared candidate lane, or None for the default.
+
+    None/``"claude_code"`` => no override (the default claude lane). A non-claude runtime
+    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. A validated runtime
+    with NO matching lane (``_SUPERVISOR_RUNTIMES`` drifted ahead of ``allowed_lanes``) raises
+    ``LaneError`` rather than silently returning None -- a None would make ``resolve_lane`` fall
+    back to the claude default, the "stale recognized config degrades to a default" anti-pattern.
+    The raise is caught by the resolve-lane guard in ``run_supervisor_check`` -> configuration_error
+    fail-open. A drift-guard test keeps the two sets in sync so this stays unreachable in practice.
+    """
+    runtime = config.supervisor_runtime
+    if not runtime or runtime == "claude_code":
+        return None
+    for lane in SUPERVISOR_CONSUMER.allowed_lanes:
+        if lane.runtime_id == runtime:
+            return lane
+    raise LaneError(
+        f"supervisor_runtime {runtime!r} is validated but has no SUPERVISOR_CONSUMER lane "
+        f"(allowed_lanes/_SUPERVISOR_RUNTIMES drift)"
+    )
+
+
 def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,
@@ -602,11 +758,36 @@ def run_supervisor_check(
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
-    # Resolve the supervisor's lane (T1a), then dispatch on its runtime. T3 wires
-    # only the default (`claude_code`) lane and keeps the run byte-identical; the
-    # arm owns transport/model/env + the sole usage emission. A routing failure in
-    # the arm surfaces as the unchanged structural fail-open.
-    lane = resolve_lane(SUPERVISOR_CONSUMER)
+    # Resolve the supervisor's lane (T1a) under a fail-open guard, then dispatch on its
+    # runtime. The override (T4) may select the codex lane; resolve_lane rejects any
+    # override outside SUPERVISOR_CONSUMER's declared candidates, raising LaneError. A
+    # misconfigured lane must fail open, never brick the policy hook (design_workflows 1.2).
+    try:
+        lane = resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+    except LaneError as e:
+        _log.warning("Supervisor lane resolution failed: %s", e)
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                f"Supervisor lane unavailable: {e}, failing open",
+                failure_type="configuration_error",
+            )
+        )
+
+    # Codex has no `--resume`: the approved plan reaches it only via the plan-override
+    # preamble (folded into `prompt` above when plan_content is present). With no plan text
+    # we would be asking Codex to check against a plan it cannot see, so fail open WITHOUT
+    # spawning it. Re-checkable: set plan_override_path or run `%policy supervisor reload`,
+    # and the next action re-runs this arm -- the lane is never permanently disabled.
+    if lane.runtime_id == "codex" and not plan_content:
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                "Codex supervisor lane needs an approved plan in-band: set "
+                "SupervisorConfig.plan_override_path or run '%policy supervisor reload'. "
+                "Failing open until a plan is available.",
+                failure_type="plan_missing",
+            )
+        )
+
     try:
         result = _dispatch_supervisor(
             lane,
@@ -620,7 +801,7 @@ def run_supervisor_check(
         return SupervisorRun(
             _supervisor_fail_open_decision(
                 str(e),
-                failure_type="proxy_not_found",
+                failure_type=e.failure_type,
             )
         )
 

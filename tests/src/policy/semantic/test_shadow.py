@@ -162,6 +162,7 @@ class TestCaptureCandidate:
         assert data["resume_id"] == "rid"
         assert data["direct"] is False
         assert data["fork_session"] is True
+        assert data["supervisor_runtime"] is None  # v2 field always serialized; None == claude lane
         # dims + audit + lifecycle
         assert data["tier1_reason"] == "looks aligned"
         assert data["checker_model"] == "google/gemini-3.5-flash"
@@ -370,4 +371,7 @@ class TestConfigValidation:
             compute_effective_intent(manifest, strict=True, override_key="policy.supervisor.shadow_sample_rate")
 
     def test_schema_constant_present(self) -> None:
-        assert shadow.SHADOW_SCHEMA_VERSION == 1
+        # v2 (T4): ShadowCandidate gained supervisor_runtime so a codex session replays on the
+        # codex lane. Old v1 records lack the field and reconstruct to None (claude) -- see
+        # test_shadow_runner.test_config_absent_supervisor_runtime_defaults_to_none.
+        assert shadow.SHADOW_SCHEMA_VERSION == 2

@@ -138,9 +138,33 @@ class TestPreflightCmd:
         assert "ahead of the probe-validated" in result.output
         assert "scripts/experiments/codex-hooks/" in result.output
 
+    def test_direct_preflight_writes_cache(self, monkeypatch) -> None:
+        """A direct (no --proxy) preflight persists the cache the supervisor's codex lane reads (T4)."""
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
+        result = CliRunner().invoke(runtime, ["preflight", "codex"])
+        assert result.exit_code == 0
+        assert read_fresh_codex_preflight() == _READY
+
+    def test_proxy_preflight_does_not_write_cache(self, monkeypatch) -> None:
+        """A --proxy preflight answers a different (proxied) question; it must not overwrite the direct cache."""
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
+        result = CliRunner().invoke(runtime, ["preflight", "codex", "--proxy", "my-openai-proxy"])
+        assert result.exit_code == 0
+        assert read_fresh_codex_preflight() is None
+
 
 class TestVerifyEnrollment:
     """`forge runtime preflight codex --verify-enrollment` dispatch + exit codes."""
+
+    @pytest.fixture(autouse=True)
+    def _stub_preflight(self, monkeypatch) -> None:
+        """The CLI now computes the preflight before verify (to refresh the direct cache), so stub
+        it hermetically. Tests needing a specific preflight (e.g. the proxy path) re-patch it."""
+        monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
 
     @staticmethod
     def _verification(**over):
@@ -203,7 +227,22 @@ class TestVerifyEnrollment:
         assert set(data) == {f.name for f in dc_fields(CodexEnrollmentVerification)}
         assert data["enrolled"] is True
 
+    def test_direct_verify_enrollment_writes_cache(self, monkeypatch) -> None:
+        """A direct --verify-enrollment refreshes the supervisor lane's cache too -- the operator
+        who treats it as THE readiness check should not still get fail-open supervision."""
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        monkeypatch.setattr(
+            "forge.core.ops.codex_enrollment.verify_codex_enrollment",
+            lambda **_kw: self._verification(),
+        )
+        result = CliRunner().invoke(runtime, ["preflight", "codex", "--verify-enrollment"])
+        assert result.exit_code == 0
+        assert read_fresh_codex_preflight() == _READY  # cache primed by the enrollment path
+
     def test_verify_enrollment_honors_proxy_preflight(self, monkeypatch) -> None:
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
         seen: dict[str, object] = {}
         proxy_ready = replace(
             _READY,
@@ -228,3 +267,4 @@ class TestVerifyEnrollment:
         assert result.exit_code == 1
         assert seen["preflight_kwargs"] == {"proxy_id": "local"}
         assert seen["verify_kwargs"] == {"preflight": proxy_ready}
+        assert read_fresh_codex_preflight() is None  # proxied preflight must not touch the direct cache

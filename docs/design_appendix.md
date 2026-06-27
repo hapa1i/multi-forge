@@ -1166,13 +1166,26 @@ fail-open/fail-closed semantics, and per-invocation routing plan remain in desig
 
 **Consumer-lane layering (epic consumer_lanes).** Forge subprocess consumers are migrating to a *consumer-lane* model: a
 `(runtime, backend, model)` lane resolved per consumer and dispatched by runtime (`forge.core.lanes`; the pure resolver
-is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `run_supervisor_check` resolves its
-default lane (`SUPERVISOR_CONSUMER`, runtime `claude_code`) then dispatches through an in-module seam
-(`_dispatch_supervisor`). Only `runtime_id` is load-bearing today (it selects the dispatch arm); `backend_id`/`model` on
-the lane are nominal, and **transport (direct vs proxy / `base_url`) is still derived inside the `claude_code` arm by
-`resolve_subprocess_routing`** (the chain below) -- the lane layer never touches the proxy registry. All other consumers
-still call the resolver directly. A subscription-backed backend axis and additional runtime arms (e.g. `codex`) are
-later tickets.
+is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `run_supervisor_check` resolves its lane
+(`SUPERVISOR_CONSUMER`) then dispatches by runtime through an in-module seam (`_dispatch_supervisor`). Two arms ship:
+
+- **`claude_code`** (default lane) -- the byte-identical `claude -p` path; transport (direct vs proxy / `base_url`) is
+  still derived inside the arm by `resolve_subprocess_routing` (the chain below). The lane layer never touches the proxy
+  registry.
+- **`codex`** (T4) -- the first non-claude consumer lane, selected by the narrow
+  `SupervisorConfig.supervisor_runtime="codex"` override (a declared `SUPERVISOR_CONSUMER` candidate on the `chatgpt`
+  subscription backend, `reachable_via=("codex",)`, T2). Runs headless `codex exec` **direct** to OpenAI (no proxy,
+  read-only sandbox), **blind/transfer-fed** -- Codex has no `--resume`, so the approved plan must reach it via the
+  plan-override preamble. Preflight is **cached, never probed in the hook**: `codex doctor` is ~20s and
+  `run_doctor=False` cannot see `codex_store` (ChatGPT-login) auth, so the arm reads the `run_doctor=True` preflight
+  that `forge runtime preflight codex` wrote to `core/runtime/codex_preflight_cache.py` (invalidated by codex-binary +
+  `$CODEX_HOME/auth.json` mtime + TTL). The invoker auto-emits the sole `emit_codex_usage`. Every failure (bad override,
+  cold/stale/unready cache, plan-absent, or any setup exception) **fails open** -- the supervisor's contract
+  (design_workflows §1.2).
+
+Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
+own model). All other consumers still call the resolver directly. The supervisor's narrow `supervisor_runtime` override
+is a placeholder for T1b's uniform consumer-lane manifest binding.
 
 ### G.1 Core types (from `core.reactive.routing`)
 

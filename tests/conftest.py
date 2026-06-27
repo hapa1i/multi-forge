@@ -62,13 +62,13 @@ __all__ = [
 
 @pytest.fixture(autouse=True)
 def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force tests to use an isolated FORGE_HOME and clear session/root env vars.
+    """Force tests to use an isolated FORGE_HOME and clear session/run-tree env vars.
 
     This prevents user-local state under ~/.forge (including any accidental use of a
     literal "~" directory) from affecting tests. Also clears all Forge env vars that
-    influence session/path resolution, so tests pass when run from inside a
-    Forge-managed Claude Code session (where FORGE_SESSION, FORGE_FORGE_ROOT, etc.
-    are injected).
+    influence session/path resolution or run-tree attribution, so tests pass when run
+    from inside a Forge-managed Claude Code session (where FORGE_SESSION, FORGE_FORGE_ROOT,
+    FORGE_RUN_ID, etc. are injected).
 
     Note: individual tests may override FORGE_HOME explicitly when needed.
     """
@@ -80,6 +80,12 @@ def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FORGE_PARENT_SESSION", raising=False)
     monkeypatch.delenv("FORGE_DEPTH", raising=False)
     monkeypatch.delenv("FORGE_FORGE_ROOT", raising=False)
+    # Run-tree identity leaks from the ambient session and is backfilled onto usage/upstream
+    # events by record_upstream_operation when a caller passes None. Clear it so telemetry
+    # tests stay hermetic (e.g. asserting run_id is None must not pick up the session's id).
+    monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+    monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+    monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
 
 
 @pytest.fixture(autouse=True)
