@@ -5,25 +5,30 @@
 
 ## Current focus
 
-Slice 1 (schema) in progress. Design is fully settled (D1-D3 in `card.md`; persist timing decided -- fold into the
-existing post-eval lock). Tick a box only when its assertion is verified and recorded -- not when work merely starts.
+Slice 1 (schema) **complete**; Slice 2 (binding resolution + injected resolver) is next. Design is fully settled (D1-D3
+in `card.md`; persist timing decided -- fold into the existing post-eval lock). Tick a box only when its assertion is
+verified and recorded -- not when work merely starts.
 
 ## Slices
 
-### Slice 1 -- Manifest schema (`LaneRecord` + `consumer_lanes` sections)
+### Slice 1 -- Manifest schema (`LaneRecord` + `consumer_lanes` sections) -- DONE
 
-- [ ] `LaneRecord` added to `session/models.py`: plain `runtime_id`/`backend_id`/`model` strings; `__post_init__`
-  rejects empty strings only; **no** `core.lanes` / `backend.sources` / `runtime.registry` import.
-- [ ] `ConsumerLaneBinding` (`lane: LaneRecord`, `source: str`, `resolved_at: str`) + `ConsumerLaneIntent`
+- [x] `LaneRecord` added to `session/models.py`: plain `runtime_id`/`backend_id`/`model` strings; `__post_init__`
+  rejects empty **or non-string** values (enforces the `str` annotation, not just truthiness -- Slice 2 setters build it
+  directly); **no** `core.lanes` / `backend.sources` / `runtime.registry` import (docstring mention only). Verified:
+  `test_lanerecord_stores_unknown_ids_without_catalog_validation`, `test_lanerecord_rejects_empty_fields`,
+  `test_lanerecord_rejects_non_string_fields`.
+- [x] `ConsumerLaneBinding` (`lane: LaneRecord`, `source: str`, `resolved_at: str`) + `ConsumerLaneIntent`
   (`supervisor: LaneRecord | None`) + `ConsumerLaneConfirmed` (`supervisor: ConsumerLaneBinding | None`) added as
   **named-field dataclasses**, never `dict`-typed.
-- [ ] `SessionIntent.consumer_lanes: ConsumerLaneIntent | None = None` and
-  `SessionConfirmed.consumer_lanes: ConsumerLaneConfirmed | None = None` wired; `SCHEMA_VERSION` unchanged (additive).
-- [ ] Drift guard: a test asserts `dataclasses.fields(LaneRecord)` names == `fields(Lane)` names (mirrors
-  `test_effort.py`).
-- [ ] Read vs set are different gates: a manifest carrying a full `consumer_lanes.supervisor` round-trips under
-  `dacite(strict=True)`, **while** `validate_key("consumer_lanes.*")` is rejected (Slice 4) -- the file-read path is
-  open, the override-set path is closed.
+- [x] `SessionIntent.consumer_lanes` + `SessionConfirmed.consumer_lanes` wired; `SCHEMA_VERSION` unchanged (additive).
+  Verified: `test_consumer_lanes_default_none`, `test_schema_version`, the strict round-trip tests.
+- [x] Drift guard: `test_lanerecord_field_parity_with_lane` asserts `fields(LaneRecord)` names == `fields(Lane)` names.
+- [x] Read path open: a manifest carrying a full `consumer_lanes.supervisor` round-trips under `dacite(strict=True)`
+  (`test_consumer_lanes_intent_round_trips_strict`, `..._confirmed_...`). The override-**set** reject is Slice 4.
+
+**Verification:** `tests/src/session` + `tests/src/core/test_lanes.py` -> 1022 passed (9 new cases green); mypy + pyright
+clean on `models.py`.
 
 ### Slice 2 -- Binding resolution + freeze seam (injected resolver)
 

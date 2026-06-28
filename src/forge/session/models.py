@@ -257,6 +257,70 @@ class VerificationConfig:
     test_timeout_seconds: int = 300  # 5 minutes default (test_suite only)
 
 
+# --- Consumer lanes (epic consumer_lanes, T1b) ---
+
+
+@dataclass(frozen=True)
+class LaneRecord:
+    """Persisted ``(runtime, backend, model)`` lane placement -- an inert manifest DTO.
+
+    Storage twin of ``forge.core.lanes.Lane``: identical fields, but deliberately
+    **no** catalog/runtime validation, so a manifest read never depends on today's
+    ``RUNTIMES`` / ``ModelSource`` catalogs (a renamed backend leaves a stale
+    binding, not corrupt state). The binding write path converts ``LaneRecord ->
+    Lane`` once to validate; dispatch/status revalidate on demand. Field parity
+    with ``Lane`` is drift-guarded (``tests/src/core/test_lanes.py``).
+    """
+
+    runtime_id: str
+    backend_id: str
+    model: str
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("runtime_id", self.runtime_id),
+            ("backend_id", self.backend_id),
+            ("model", self.model),
+        ):
+            # Enforce the `str` annotation at runtime, not just truthiness: Slice 2
+            # setters build LaneRecord directly (bypassing dacite's type check), and
+            # a non-str like 123 is truthy.
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"LaneRecord requires a non-empty string {name}")
+
+
+@dataclass
+class ConsumerLaneIntent:
+    """Requested per-consumer lane overrides (session-owned intent).
+
+    Named field per consumer (never a ``dict``) so strict deserialization and
+    override-path validation stay per-field. T1b wires the supervisor only; T6
+    adds sibling fields.
+    """
+
+    supervisor: LaneRecord | None = None
+
+
+@dataclass
+class ConsumerLaneBinding:
+    """A consumer's frozen, resolved lane -- written once at first dispatch.
+
+    Inert record plus the anchor the "already bound" reject checks. ``source`` is
+    a plain ``str`` (``"default" | "intent"``) per the fail-open ``*Confirmed`` style.
+    """
+
+    lane: LaneRecord
+    source: str
+    resolved_at: str
+
+
+@dataclass
+class ConsumerLaneConfirmed:
+    """Frozen per-consumer lane bindings (hook-written, write-once per consumer)."""
+
+    supervisor: ConsumerLaneBinding | None = None
+
+
 @dataclass
 class SessionIntent:
     """What Forge intends for this session.
@@ -273,6 +337,8 @@ class SessionIntent:
     memory: MemoryIntent | None = None
     policy: PolicyIntent | None = None
     verification: VerificationConfig | None = None
+    # Frozen-at-first-dispatch consumer-lane overrides (epic consumer_lanes, T1b).
+    consumer_lanes: ConsumerLaneIntent | None = None
 
 
 # --- Confirmed section - what Claude Code actually did (filled by hooks) ---
@@ -533,6 +599,10 @@ class SessionConfirmed:
     # already inherited the CWD. Used by resume to match Claude's project
     # namespace (~/.claude/projects/<encoded-cwd>/).
     claude_project_root: str | None = None
+
+    # Frozen consumer-lane bindings (epic consumer_lanes, T1b). Hook-written
+    # (policy-check `_mutate`), write-once per consumer dispatch.
+    consumer_lanes: ConsumerLaneConfirmed | None = None
 
     confirmed_at: str | None = None  # ISO8601 string
     confirmed_by: str | None = None  # e.g., "hook:SessionStart"

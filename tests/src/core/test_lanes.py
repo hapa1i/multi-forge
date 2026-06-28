@@ -208,3 +208,17 @@ def test_unpinned_backend_reachable_by_any_runtime():
     lanes = valid_lanes(consumer)
     assert _codex_lane() in lanes
     assert claude_openrouter in lanes
+
+
+def test_lanerecord_field_parity_with_lane():
+    """LaneRecord (manifest DTO) must mirror Lane's fields exactly.
+
+    Drift guard for the deliberate duplication: LaneRecord lives in session.models
+    (catalog-free) and re-validates nowhere, so it must stay field-identical to the
+    validating core.lanes.Lane. Mirrors the test_effort.py vocab guard.
+    """
+    from dataclasses import fields
+
+    from forge.session.models import LaneRecord
+
+    assert [f.name for f in fields(LaneRecord)] == [f.name for f in fields(Lane)]
