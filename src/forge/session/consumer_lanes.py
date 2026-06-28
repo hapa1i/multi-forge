@@ -52,39 +52,42 @@ def read_bound_lane(state: SessionState, consumer: Consumer) -> LaneRecord | Non
     return _intent_record(state, consumer)
 
 
-def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer) -> None:
+def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:
     """Freeze ``consumer``'s resolved lane into ``confirmed``, write-if-absent.
 
-    The single immutability seam (card D2): the first policy-check hook that runs
-    a configured consumer records the lane it resolved as durable ground truth;
-    later dispatches and the "already bound" reject read this. Idempotent -- a
+    The single immutability seam (card D2): the first policy-check hook that runs a
+    configured consumer records the lane **it actually dispatched on** as durable ground
+    truth; later dispatches and the "already bound" reject read this. Idempotent -- a
     second call is a no-op once the binding exists.
 
-    Records the consumer default when no intent override is set (``source`` =
-    ``"default"``), else the intent override (``source`` = ``"intent"``). A
-    drifted intent record (a backend renamed out of the catalog) fails
-    ``resolve_lane``; the binding is then *skipped*, never frozen as a
-    known-unusable lane -- dispatch has already failed open as a no-call, so the
-    next dispatch retries once the catalog is whole again.
+    ``lane_record`` is the lane the hook injected at registration (``read_bound_lane``),
+    NOT a fresh manifest read. Passing it explicitly keeps the freeze consistent with the
+    dispatch even if intent changes during the (multi-second) supervisor call: the binding
+    records exactly what ran. None => the dispatch used the consumer default
+    (``source="default"``); a record => the intent override (``source="intent"``).
+
+    A drifted record (a backend renamed out of the catalog) fails ``resolve_lane``; the
+    binding is then *skipped*, never frozen as a known-unusable lane -- dispatch has
+    already failed open as a no-call, so the next dispatch retries once the catalog is
+    whole again.
     """
     if _confirmed_binding(state, consumer) is not None:
         return
 
-    intended = _intent_record(state, consumer)
     try:
-        override = None if intended is None else _record_to_lane(intended)
+        override = None if lane_record is None else _record_to_lane(lane_record)
         resolved = resolve_lane(consumer, override=override)
     except LaneError as e:
-        # Best-effort durable write: a drifted/invalid intent lane must not freeze a
-        # binding the dispatch path can't execute. Dispatch already fails open (no-call);
-        # leaving confirmed unwritten lets a later, valid catalog freeze it.
+        # Best-effort durable write: a drifted/invalid lane must not freeze a binding the
+        # dispatch path can't execute. Dispatch already fails open (no-call); leaving
+        # confirmed unwritten lets a later, valid catalog freeze it.
         _log.warning("Consumer-lane binding for %r skipped (lane no longer valid): %s", consumer.id, e)
         return
 
     record = LaneRecord(resolved.runtime_id, resolved.backend_id, resolved.model)
     binding = ConsumerLaneBinding(
         lane=record,
-        source="default" if intended is None else "intent",
+        source="default" if lane_record is None else "intent",
         resolved_at=now_iso(),
     )
     _set_confirmed_binding(state, consumer, binding)

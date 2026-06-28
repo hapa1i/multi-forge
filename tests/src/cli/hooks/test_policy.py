@@ -320,12 +320,17 @@ class TestSupervisorLaneBindingFreeze:
 
         return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
 
-    def _run_mutate(self, state: Any, effective: MagicMock) -> None:
+    def _run_mutate(self, state: Any, effective: MagicMock, supervisor_lane: Any = None) -> None:
         engine = MagicMock()
         engine.get_collected_state.return_value = {}
         store = MagicMock()
         _persist_policy_state(
-            store=store, engine=engine, result=MagicMock(), effective=effective, context_summary="ctx"
+            store=store,
+            engine=engine,
+            result=MagicMock(),
+            effective=effective,
+            context_summary="ctx",
+            supervisor_lane=supervisor_lane,
         )
         store.update.call_args[1]["mutate"](state)
 
@@ -380,8 +385,27 @@ class TestSupervisorLaneBindingFreeze:
         self._run_mutate(state, self._effective())
         assert state.confirmed.consumer_lanes.supervisor is frozen
 
-    def test_register_injects_bound_lane_from_intent(self) -> None:
-        """register_supervisor_and_restore reads the manifest binding and injects it into the policy."""
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_freeze_records_threaded_dispatch_lane(self, mock_build: MagicMock) -> None:
+        """The freeze records the lane threaded from registration, not a fresh manifest read (P2a).
+
+        Manifest intent is unset (default), but the dispatched lane was codex; the binding must be
+        codex -- proving the freeze follows what dispatched even under a concurrent intent change.
+        """
+        from forge.session.models import LaneRecord
+
+        mock_build.return_value = self._BUILD_RETURN
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()  # intent.consumer_lanes stays None (default)
+        self._run_mutate(state, self._effective(), supervisor_lane=codex)
+
+        binding = state.confirmed.consumer_lanes.supervisor  # type: ignore[union-attr]
+        assert binding is not None
+        assert binding.source == "intent"
+        assert binding.lane == codex
+
+    def test_register_injects_and_returns_bound_lane(self) -> None:
+        """register_supervisor_and_restore reads the manifest binding, injects it, and returns it."""
         from forge.cli.hooks.policy import register_supervisor_and_restore
         from forge.session.models import ConsumerLaneIntent, LaneRecord
 
@@ -389,10 +413,12 @@ class TestSupervisorLaneBindingFreeze:
         eff.policy.supervisor.cascade = False
         eff.policy.supervisor.throttle_seconds = 30
         manifest = self._state()
-        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
 
         engine = MagicMock()
-        register_supervisor_and_restore(engine, eff, manifest)
+        returned = register_supervisor_and_restore(engine, eff, manifest)
 
         registered = engine.register.call_args[0][0]
-        assert registered._lane_record == LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        assert registered._lane_record == codex  # injected into the policy
+        assert returned == codex  # and returned for the caller to thread into the freeze

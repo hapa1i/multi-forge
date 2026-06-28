@@ -5,9 +5,12 @@
 
 ## Current focus
 
-Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze) **complete**; Slice 3 (clean-break removal of
-`supervisor_runtime` + strip-and-warn + shadow lane migration) is next. Design is fully settled (D1-D3 in `card.md`).
-Tick a box only when its assertion is verified and recorded -- not when work merely starts.
+Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + the pulled-forward override reject)
+**complete**; Slice 3 (clean-break removal of `supervisor_runtime` + strip-and-warn + shadow lane migration) is next.
+The branch is **mid-migration and not mergeable until Slice 3**: Slice 2 switched dispatch to `consumer_lanes`, but
+`supervisor_runtime` still backs the status display, so an override-set session would display codex while dispatching
+Claude (review P1). Design is fully settled (D1-D3 in `card.md`). Tick a box only when its assertion is verified and
+recorded -- not when work merely starts.
 
 ## Slices
 
@@ -45,12 +48,14 @@ stays catalog-free, `core.lanes` stays pure): `read_bound_lane` (dispatch source
   `read_bound_lane` is **confirmed-first, else intent** (a frozen binding governs dispatch directly -- strengthens the
   card's "read intent == confirmed by invariant"). Verified: `test_register_injects_bound_lane_from_intent`,
   `TestReadBoundLane.*`.
-- [x] `ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER)` called **inside the existing locked post-eval `_mutate`**
-  (`cli/hooks/policy.py`), gated on a configured supervisor (`resume_id`, not suspended) -- no second lock. Freezes the
-  default lane (`source="default"`) or the intent override (`source="intent"`), write-if-absent; a drifted intent record
-  skips the freeze (never a known-unusable binding). Verified: `TestSupervisorLaneBindingFreeze.*` (default freeze;
-  suspended / no-supervisor skip; write-if-absent), `TestEnsureConsumerLaneBinding.*` (intent freeze, idempotent, drift
-  skip x2).
+- [x] `ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)` called **inside the existing locked
+  post-eval `_mutate`** (`cli/hooks/policy.py`), gated on a configured supervisor (`resume_id`, not suspended) -- no
+  second lock. Freezes the default lane (`source="default"`) or the override (`source="intent"`), write-if-absent; a
+  drifted record skips the freeze. **`supervisor_lane` is threaded from `register_supervisor_and_restore` (the lane the
+  hook injected at dispatch), not a fresh read of the under-lock manifest** -- so a concurrent intent change during the
+  (multi-second) supervisor call can't skew the binding off the lane that ran (review P2a). Verified:
+  `TestSupervisorLaneBindingFreeze.*` (default freeze; suspended/no-supervisor skip; write-if-absent; threaded-lane),
+  `TestEnsureConsumerLaneBinding.*` (override freeze, dispatched-not-intent, idempotent, drift skip x2).
 - [x] Default (no override) path stays **byte-identical**: `lane_record=None -> override=None -> resolve_lane` returns
   the default lane, and the explicit default record (post-freeze) resolves to the same lane
   (`resolve_lane(override=None) == resolve_lane(override=default_lane)`, `lanes.py:91,141`). Existing claude-dispatch
@@ -58,13 +63,23 @@ stays catalog-free, `core.lanes` stays pure): `read_bound_lane` (dispatch source
 - [x] Drift fails open as a **no-call**: a bound lane whose runtime/backend left the catalog raises `LaneError` at the
   `LaneRecord -> Lane` conversion inside the guard -> `configuration_error` fail-open, **neither arm spawned**, never
   the default lane. Verified: `test_drifted_record_fails_open_as_no_call`. (Status "not executable" line is Slice 4.)
+- [x] **`consumer_lanes.*` override reject pulled forward from Slice 4 (review P2b).** Slice 1 added `consumer_lanes` to
+  `SessionIntent`, so `validate_key` accepted it as an override path the moment dispatch began reading it -- a
+  full-object `session set consumer_lanes.supervisor '{...}'` rehydrates into intent and, post-bind, becomes
+  recorded-but-ignored (dispatch is confirmed-first). Now statically rejected like `launch.runtime` (`overrides.py`),
+  pointing to the resolving commands. Verified: `test_consumer_lanes_rejected_as_command_only`.
 
-**Slice 2->3 carry:** `_supervisor_lane_override` + `resolve_supervisor_lane` stay (display path,
-`cli/policy.py:371,967`) and the shadow path passes `lane_record=None` (default replay) until Slice 3 wires the
-`ShadowCandidate` lane. Harmless in practice: no command writes `consumer_lanes` until Slice 4, so every real session
-resolves to the default lane in Slices 2-3 -- display, dispatch, and shadow all agree on default.
+**Slice 2->3 carry (branch NOT mergeable until Slice 3).** `_supervisor_lane_override` + `resolve_supervisor_lane` stay
+(status display, `cli/policy.py:371,967`) and the shadow path passes `lane_record=None` (default replay) until Slice 3.
+This is **not** a self-consistent stopping point (review P1, correcting an earlier claim here): a session that set
+`supervisor_runtime` via the generic override would now **display** codex (status reads `supervisor_runtime`) but
+**dispatch + freeze** the default Claude lane (dispatch reads `consumer_lanes`). The clean-break policy
+(coding_standards §5) wants the dispatch switch and the `supervisor_runtime` removal in **one atomic change**; they are
+split across commits here, so **Slice 3 must land before any merge**. T1b is one branch -> one PR, so it does; the
+divergence is branch-internal only.
 
-**Verification:** full unit suite 7059 passed; mypy + pyright clean on the 3 src + 3 test files.
+**Verification:** `tests/src/{cli,policy,session}` -> 3597 passed (P2a/P2b included); bridge + hook + overrides green;
+mypy + pyright clean.
 
 ### Slice 3 -- Clean-break migration of `supervisor_runtime` (D3)
 
@@ -79,8 +94,9 @@ resolves to the default lane in Slices 2-3 -- display, dispatch, and shadow all 
 
 ### Slice 4 -- Setters, mutation guard, status (D2)
 
-- [ ] `validate_key` **statically rejects** `consumer_lanes.*` (a partial leaf override can't build a `LaneRecord`;
-  mirrors `launch.runtime`, `overrides.py:201`), with a message pointing to `--supervisor-runtime`.
+- [x] `validate_key` **statically rejects** `consumer_lanes.*` -- **done early in Slice 2** (review P2b): the reject
+  must exist the moment dispatch reads `consumer_lanes`, not wait for the setters. Mirrors `launch.runtime`
+  (`overrides.py`); `test_consumer_lanes_rejected_as_command_only`.
 - [ ] Lane setters **expand runtime -> full `LaneRecord`** against `SUPERVISOR_CONSUMER.allowed_lanes`:
   `--supervisor-runtime {claude_code,codex}` on `forge session start` + `forge session fork` (requires `--supervise`),
   and `forge policy supervisor set --runtime`. All write `intent.consumer_lanes.supervisor`.

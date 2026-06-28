@@ -61,9 +61,9 @@ class TestReadBoundLane:
 
 
 class TestEnsureConsumerLaneBinding:
-    def test_freezes_default_when_no_intent_override(self) -> None:
+    def test_freezes_default_when_lane_is_none(self) -> None:
         state = _state()
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER)
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, None)
         assert state.confirmed.consumer_lanes is not None
         binding = state.confirmed.consumer_lanes.supervisor
         assert binding is not None
@@ -71,34 +71,45 @@ class TestEnsureConsumerLaneBinding:
         assert binding.lane == _DEFAULT_RECORD
         assert binding.resolved_at  # stamped
 
-    def test_freezes_intent_override(self) -> None:
-        state = _state(intent=_CODEX_RECORD)
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER)
+    def test_freezes_injected_override(self) -> None:
+        state = _state()
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)
         binding = state.confirmed.consumer_lanes.supervisor  # type: ignore[union-attr]
         assert binding is not None
         assert binding.source == "intent"
         assert binding.lane == _CODEX_RECORD
 
+    def test_freezes_dispatched_lane_not_current_intent(self) -> None:
+        # P2(a): the freeze records the lane the hook injected at dispatch, NOT a fresh read of the
+        # (under-lock) manifest -- so a concurrent intent change during the supervisor call cannot
+        # skew the binding away from the lane that actually ran.
+        state = _state(intent=_DEFAULT_RECORD)  # manifest intent now says "default"...
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)  # ...but codex dispatched
+        binding = state.confirmed.consumer_lanes.supervisor  # type: ignore[union-attr]
+        assert binding is not None
+        assert binding.lane == _CODEX_RECORD  # froze what dispatched, not the manifest default
+
     def test_write_if_absent_is_idempotent(self) -> None:
-        # A pre-existing binding is the immovable ground truth: a second call never rewrites it,
-        # even if intent now asks for a different lane.
+        # A pre-existing binding is the immovable ground truth: a second call never rewrites it.
         frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at="2020-01-01T00:00:00Z")
-        state = _state(intent=_DEFAULT_RECORD, confirmed=frozen)
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER)
+        state = _state(confirmed=frozen)
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, _DEFAULT_RECORD)
         assert state.confirmed.consumer_lanes.supervisor is frozen  # type: ignore[union-attr]
 
     def test_drift_unknown_runtime_skips_freeze(self) -> None:
-        # An intent record that no longer builds a Lane (renamed/removed runtime) is NOT frozen
+        # A dispatched record that no longer builds a Lane (renamed/removed runtime) is NOT frozen
         # as a known-unusable binding; dispatch fails open as a no-call and retries later.
-        state = _state(intent=LaneRecord("ghost_runtime", "anthropic-direct", "opus"))
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER)
+        state = _state()
+        ensure_consumer_lane_binding(
+            state, SUPERVISOR_CONSUMER, LaneRecord("ghost_runtime", "anthropic-direct", "opus")
+        )
         assert state.confirmed.consumer_lanes is None
 
-    def test_intent_not_a_declared_candidate_skips_freeze(self) -> None:
+    def test_not_a_declared_candidate_skips_freeze(self) -> None:
         # A valid Lane that is not one of SUPERVISOR_CONSUMER's declared candidates is rejected by
         # resolve_lane (overrides are an allow-list), so it must not freeze either.
-        state = _state(intent=LaneRecord("gemini", "openrouter", "m"))
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER)
+        state = _state()
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("gemini", "openrouter", "m"))
         assert state.confirmed.consumer_lanes is None
 
 
@@ -118,4 +129,4 @@ def test_unwired_consumer_rejected() -> None:
     """A consumer with no manifest slot is a wiring bug -- reject, never silently no-op."""
     phantom = Consumer("ghost", "tool_agent", Lane("claude_code", "anthropic-direct", "m"))
     with pytest.raises(ValueError, match="no consumer_lanes manifest slot"):
-        ensure_consumer_lane_binding(_state(), phantom)
+        ensure_consumer_lane_binding(_state(), phantom, None)
