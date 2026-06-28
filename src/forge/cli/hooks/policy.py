@@ -173,18 +173,25 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
     sup = effective.policy.supervisor if effective.policy else None
     has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
     if has_supervisor:
-        from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
+        from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            SemanticSupervisorPolicy,
+        )
+        from forge.session.consumer_lanes import read_bound_lane
 
         sup_cfg = effective.policy.supervisor
+        # Inject the supervisor's consumer-lane binding (epic consumer_lanes, T1b). The hook holds
+        # the manifest; the semantic module never reads the store. None => the default lane.
+        lane_record = read_bound_lane(manifest, SUPERVISOR_CONSUMER)
         if sup_cfg and sup_cfg.cascade:
             # Cascade: the cheap tier-1 plan check runs on every event; the frontier
             # supervisor becomes the needs_review resolver (invoked only on escalation).
             from forge.policy.semantic.plan_check import PlanCheckPolicy
 
             engine.register(PlanCheckPolicy(config=sup_cfg))
-            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg))
+            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
         else:
-            engine.register(SemanticSupervisorPolicy(config=sup_cfg))
+            engine.register(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
 
     existing_policy_state = None
     if manifest.confirmed.policy:
@@ -255,6 +262,18 @@ def _persist_policy_decisions(
 
         m.confirmed.confirmed_at = now_iso()
         m.confirmed.confirmed_by = confirmed_by
+
+        # Freeze the supervisor's consumer-lane binding write-if-absent (epic consumer_lanes, T1b):
+        # the first policy-check hook that runs a configured supervisor records the lane it resolved
+        # as durable ground truth (the anchor the "already bound" reject checks). Folded into this
+        # existing locked post-eval write -- no second lock; under the D2 freeze, intent-resolved
+        # equals the binding on every dispatch.
+        sup = effective.policy.supervisor if effective.policy else None
+        if sup and sup.resume_id and not sup.suspended:
+            from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+            from forge.session.consumer_lanes import ensure_consumer_lane_binding
+
+            ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER)
 
     store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
 

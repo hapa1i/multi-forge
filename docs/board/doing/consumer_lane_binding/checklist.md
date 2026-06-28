@@ -5,9 +5,9 @@
 
 ## Current focus
 
-Slice 1 (schema) **complete**; Slice 2 (binding resolution + injected resolver) is next. Design is fully settled (D1-D3
-in `card.md`; persist timing decided -- fold into the existing post-eval lock). Tick a box only when its assertion is
-verified and recorded -- not when work merely starts.
+Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze) **complete**; Slice 3 (clean-break removal of
+`supervisor_runtime` + strip-and-warn + shadow lane migration) is next. Design is fully settled (D1-D3 in `card.md`).
+Tick a box only when its assertion is verified and recorded -- not when work merely starts.
 
 ## Slices
 
@@ -27,21 +27,44 @@ verified and recorded -- not when work merely starts.
 - [x] Read path open: a manifest carrying a full `consumer_lanes.supervisor` round-trips under `dacite(strict=True)`
   (`test_consumer_lanes_intent_round_trips_strict`, `..._confirmed_...`). The override-**set** reject is Slice 4.
 
-**Verification:** `tests/src/session` + `tests/src/core/test_lanes.py` -> 1022 passed (9 new cases green); mypy + pyright
-clean on `models.py`.
+**Verification:** `tests/src/session` + `tests/src/core/test_lanes.py` -> 1022 passed (9 new cases green); mypy +
+pyright clean on `models.py`.
 
-### Slice 2 -- Binding resolution + freeze seam (injected resolver)
+### Slice 2 -- Binding resolution + freeze seam (injected resolver) -- DONE
 
-- [ ] The policy-check hook (holds `SessionStore`) resolves the lane from `intent.consumer_lanes.supervisor` and
-  **injects** it into `run_supervisor_check` (replaces `_supervisor_lane_override(config)`, `supervisor.py:681,777`).
-  `run_supervisor_check` keeps taking `SupervisorConfig + ActionContext` only -- it never reads the store.
-- [ ] `ensure_consumer_lane_binding(state, consumer)` (resolve via `resolve_lane`, validate `LaneRecord -> Lane`, write
-  `confirmed.consumer_lanes.<consumer>` **only if absent**) is called **inside the existing locked post-eval `_mutate`**
-  that already writes `confirmed.policy` (`cli/hooks/policy.py:248-259`) -- no second lock (persist timing decided).
-- [ ] Default (no override) path stays **byte-identical** to T3/T4 (parity assertion).
-- [ ] Drift fails open as a **no-call**: a lane (`LaneRecord -> Lane`) that no longer validates makes the supervisor
-  **skip the check** (aligned/warn, like T4's `codex_unavailable`; design_workflows §1.2), surfaced in status as "not
-  executable". It **never** silently runs the default lane, and never raises into the hook.
+New bridge module `session/consumer_lanes.py` (manifest DTOs \<-> `core.lanes`; lives in neither -- `session.models`
+stays catalog-free, `core.lanes` stays pure): `read_bound_lane` (dispatch source) + `ensure_consumer_lane_binding`
+(freeze), both keyed by `consumer.id` so T6 extends by adding a named field, not editing the bridge.
+
+- [x] Lane injected into dispatch. `register_supervisor_and_restore` (holds the manifest) calls
+  `read_bound_lane(manifest, SUPERVISOR_CONSUMER)` and passes it to `SemanticSupervisorPolicy(lane_record=...)`, which
+  forwards `_evaluate -> invoke_supervisor -> run_supervisor_check`. `run_supervisor_check` converts the injected
+  `LaneRecord -> Lane` **inside its existing fail-open guard** (replacing `_supervisor_lane_override(config)`,
+  `supervisor.py:777`) and never reads the store. The engine (not the hook) calls `run_supervisor_check`, so the
+  injection rides the policy constructor -- same effect as the card's "inject into `run_supervisor_check`".
+  `read_bound_lane` is **confirmed-first, else intent** (a frozen binding governs dispatch directly -- strengthens the
+  card's "read intent == confirmed by invariant"). Verified: `test_register_injects_bound_lane_from_intent`,
+  `TestReadBoundLane.*`.
+- [x] `ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER)` called **inside the existing locked post-eval `_mutate`**
+  (`cli/hooks/policy.py`), gated on a configured supervisor (`resume_id`, not suspended) -- no second lock. Freezes the
+  default lane (`source="default"`) or the intent override (`source="intent"`), write-if-absent; a drifted intent record
+  skips the freeze (never a known-unusable binding). Verified: `TestSupervisorLaneBindingFreeze.*` (default freeze;
+  suspended / no-supervisor skip; write-if-absent), `TestEnsureConsumerLaneBinding.*` (intent freeze, idempotent, drift
+  skip x2).
+- [x] Default (no override) path stays **byte-identical**: `lane_record=None -> override=None -> resolve_lane` returns
+  the default lane, and the explicit default record (post-freeze) resolves to the same lane
+  (`resolve_lane(override=None) == resolve_lane(override=default_lane)`, `lanes.py:91,141`). Existing claude-dispatch
+  tests + `test_none_record_dispatches_default_claude_lane`.
+- [x] Drift fails open as a **no-call**: a bound lane whose runtime/backend left the catalog raises `LaneError` at the
+  `LaneRecord -> Lane` conversion inside the guard -> `configuration_error` fail-open, **neither arm spawned**, never
+  the default lane. Verified: `test_drifted_record_fails_open_as_no_call`. (Status "not executable" line is Slice 4.)
+
+**Slice 2->3 carry:** `_supervisor_lane_override` + `resolve_supervisor_lane` stay (display path,
+`cli/policy.py:371,967`) and the shadow path passes `lane_record=None` (default replay) until Slice 3 wires the
+`ShadowCandidate` lane. Harmless in practice: no command writes `consumer_lanes` until Slice 4, so every real session
+resolves to the default lane in Slices 2-3 -- display, dispatch, and shadow all agree on default.
+
+**Verification:** full unit suite 7059 passed; mypy + pyright clean on the 3 src + 3 test files.
 
 ### Slice 3 -- Clean-break migration of `supervisor_runtime` (D3)
 
@@ -78,19 +101,19 @@ clean on `models.py`.
 
 ## Acceptance tests (fixture-grounded)
 
-| Test                                       | Fixture                                                                 | Assertion                                                              | Test File                                  |
-| ------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------ |
-| `LaneRecord` stores without catalog check  | `LaneRecord("ghost_runtime", "ghost_backend", "m")`                      | constructs; raises **no** `LaneError` (unlike `Lane(...)`)            | `tests/src/session/test_models.py`         |
-| `LaneRecord`/`Lane` field parity           | the two dataclasses                                                      | field names equal (drift guard)                                       | `tests/src/core/test_lanes.py`             |
-| Stale binding still deserializes           | manifest `consumer_lanes.supervisor` on a since-renamed backend          | `load` succeeds; status reports "not executable"; no manifest rewrite | `tests/src/session/test_store.py`          |
-| Binding frozen at first dispatch           | supervisor configured, two PreToolUse dispatches                         | `confirmed.consumer_lanes.supervisor` written once; 2nd reuses it      | `tests/src/policy/semantic/test_supervisor.py` |
-| Default lane byte-identical                | no override                                                              | dispatch argv/route identical to T3/T4 baseline                       | `tests/src/policy/semantic/test_supervisor.py` |
-| Drift fails open as no-call                | bound codex lane, backend removed from catalog                           | supervisor skips (aligned); **not** run on `claude_code` default      | `tests/src/policy/semantic/test_supervisor.py` |
-| Generic lane override rejected             | `set consumer_lanes.supervisor.runtime_id codex`                        | rejected by `validate_key` (points to `--supervisor-runtime`)        | `tests/src/session/test_overrides.py`      |
-| Set lane before bind (resolving cmd)       | unbound session, `policy supervisor set --runtime codex`                 | writes full `consumer_lanes.supervisor` `LaneRecord`; resolves at dispatch | `tests/src/cli/test_policy_supervisor.py`  |
-| Set lane after bind hard-rejects           | bound session, `policy supervisor set --runtime claude_code`             | exits non-zero, actionable message; `confirmed` unchanged             | `tests/src/cli/test_policy_supervisor.py`  |
-| `--supervisor-runtime` round-trips         | `fork P --supervise --supervisor-runtime codex`                          | `intent.consumer_lanes.supervisor` == codex `LaneRecord`              | `tests/src/cli/test_session_commands.py`   |
-| Legacy `supervisor_runtime` strip-on-read  | manifest with `intent.policy.supervisor.supervisor_runtime=codex`        | loads (stripped), warns once; field gone from `SupervisorConfig`     | `tests/src/session/test_store.py`          |
+| Test                                      | Fixture                                                           | Assertion                                                                  | Test File                                      |
+| ----------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- |
+| `LaneRecord` stores without catalog check | `LaneRecord("ghost_runtime", "ghost_backend", "m")`               | constructs; raises **no** `LaneError` (unlike `Lane(...)`)                 | `tests/src/session/test_models.py`             |
+| `LaneRecord`/`Lane` field parity          | the two dataclasses                                               | field names equal (drift guard)                                            | `tests/src/core/test_lanes.py`                 |
+| Stale binding still deserializes          | manifest `consumer_lanes.supervisor` on a since-renamed backend   | `load` succeeds; status reports "not executable"; no manifest rewrite      | `tests/src/session/test_store.py`              |
+| Binding frozen at first dispatch          | supervisor configured, two PreToolUse dispatches                  | `confirmed.consumer_lanes.supervisor` written once; 2nd reuses it          | `tests/src/policy/semantic/test_supervisor.py` |
+| Default lane byte-identical               | no override                                                       | dispatch argv/route identical to T3/T4 baseline                            | `tests/src/policy/semantic/test_supervisor.py` |
+| Drift fails open as no-call               | bound codex lane, backend removed from catalog                    | supervisor skips (aligned); **not** run on `claude_code` default           | `tests/src/policy/semantic/test_supervisor.py` |
+| Generic lane override rejected            | `set consumer_lanes.supervisor.runtime_id codex`                  | rejected by `validate_key` (points to `--supervisor-runtime`)              | `tests/src/session/test_overrides.py`          |
+| Set lane before bind (resolving cmd)      | unbound session, `policy supervisor set --runtime codex`          | writes full `consumer_lanes.supervisor` `LaneRecord`; resolves at dispatch | `tests/src/cli/test_policy_supervisor.py`      |
+| Set lane after bind hard-rejects          | bound session, `policy supervisor set --runtime claude_code`      | exits non-zero, actionable message; `confirmed` unchanged                  | `tests/src/cli/test_policy_supervisor.py`      |
+| `--supervisor-runtime` round-trips        | `fork P --supervise --supervisor-runtime codex`                   | `intent.consumer_lanes.supervisor` == codex `LaneRecord`                   | `tests/src/cli/test_session_commands.py`       |
+| Legacy `supervisor_runtime` strip-on-read | manifest with `intent.policy.supervisor.supervisor_runtime=codex` | loads (stripped), warns once; field gone from `SupervisorConfig`           | `tests/src/session/test_store.py`              |
 
 **Integration (before closeout):** the supervisor dispatch path is hook + `claude -p`/`codex exec`, which unit tests
 don't exercise. Run the relevant real-Claude / real-Codex supervisor E2E

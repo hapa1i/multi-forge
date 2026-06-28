@@ -27,7 +27,12 @@ from forge.policy.semantic.verdict import (
 )
 from forge.policy.types import ActionContext, PolicyDecision
 from forge.session.manager import SessionManager
-from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
+from forge.session.models import (
+    LaneRecord,
+    PolicyIntent,
+    SessionState,
+    SupervisorConfig,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -167,8 +172,12 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
     - cache: ThrottleCache entries {cache_key: {checked_at, verdict, confidence}}
     """
 
-    def __init__(self, config: SupervisorConfig | None = None) -> None:
+    def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
         self._config = config
+        # Injected consumer-lane binding (epic consumer_lanes, T1b): the policy-check hook
+        # resolves it from the manifest and passes it here, so this module never reads the store.
+        # None => the default lane (byte-identical pre-T1b dispatch).
+        self._lane_record = lane_record
         ttl = config.throttle_seconds if config else 30
         self._cache = ThrottleCache(ttl_seconds=ttl)
 
@@ -229,7 +238,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
             return decision
 
         # Invoke supervisor
-        decision = invoke_supervisor(self._config, context)
+        decision = invoke_supervisor(self._config, context, lane_record=self._lane_record)
 
         # Attach intent to deny decisions
         if decision.decision == "deny":
@@ -719,6 +728,7 @@ def run_supervisor_check(
     *,
     intent: str | None = None,
     usage_command: str = "supervisor",
+    lane_record: LaneRecord | None = None,
 ) -> SupervisorRun:
     """Run the frontier supervisor once; return decision + raw verdict + run/parse status.
 
@@ -726,6 +736,10 @@ def run_supervisor_check(
     auditor. ``usage_command`` labels the single cost/ledger emission (the caller
     must NOT emit again -- this is the sole emitter), so the shadow path records
     ``supervisor-shadow`` rather than double-counting as ``supervisor``.
+
+    ``lane_record`` is the injected consumer-lane binding (epic consumer_lanes, T1b):
+    the policy-check hook resolves it from the manifest and passes it, so this function
+    never reads the store. None selects the consumer's default lane.
     """
     from forge.core.reactive.env import should_spawn_subprocesses
 
@@ -770,11 +784,16 @@ def run_supervisor_check(
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
     # Resolve the supervisor's lane (T1a) under a fail-open guard, then dispatch on its
-    # runtime. The override (T4) may select the codex lane; resolve_lane rejects any
-    # override outside SUPERVISOR_CONSUMER's declared candidates, raising LaneError. A
-    # misconfigured lane must fail open, never brick the policy hook (design_workflows 1.2).
+    # runtime. The lane comes from the injected consumer-lane binding (T1b): converting the
+    # stored LaneRecord -> Lane revalidates it against today's catalogs, so a drifted binding
+    # (renamed backend) raises LaneError here and fails open as a no-call -- it never silently
+    # runs the default lane. resolve_lane also rejects any override outside SUPERVISOR_CONSUMER's
+    # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
     try:
-        lane = resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+        override = (
+            None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+        )
+        lane = resolve_lane(SUPERVISOR_CONSUMER, override=override)
     except LaneError as e:
         _log.warning("Supervisor lane resolution failed: %s", e)
         return SupervisorRun(
@@ -856,13 +875,15 @@ def invoke_supervisor(
     context: ActionContext,
     *,
     intent: str | None = None,
+    lane_record: LaneRecord | None = None,
 ) -> PolicyDecision:
     """Invoke the semantic supervisor via claude -p --resume (enforcement path).
 
     Thin wrapper over ``run_supervisor_check`` returning just the composed
-    ``PolicyDecision`` (fail-open on errors).
+    ``PolicyDecision`` (fail-open on errors). ``lane_record`` is the injected
+    consumer-lane binding (None => default lane).
     """
-    return run_supervisor_check(config, context, intent=intent).decision
+    return run_supervisor_check(config, context, intent=intent, lane_record=lane_record).decision
 
 
 # --- Setup-time helpers (used by CLI, direct commands, and --supervise flags) ---

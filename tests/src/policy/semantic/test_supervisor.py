@@ -22,7 +22,7 @@ from forge.policy.engine import build_engine
 from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
 from forge.policy.semantic.verdict import verdict_to_decision
 from forge.policy.types import ActionContext, PolicyDecision, Violation
-from forge.session.models import SupervisorConfig, create_session_state
+from forge.session.models import LaneRecord, SupervisorConfig, create_session_state
 
 # --- Fixtures ---
 
@@ -974,11 +974,62 @@ class TestSupervisorLaneDispatch:
 _CODEX_UUID = "12345678-1234-1234-1234-123456789abc"
 
 
+# The codex lane as a consumer-lane binding (T1b): dispatch now reads the injected lane_record,
+# not a config field, so the codex tests pass this instead of SupervisorConfig.supervisor_runtime.
+_CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+
 def _codex_config(**overrides: Any) -> SupervisorConfig:
-    """A supervisor config bound to the codex lane (resume_id present, raw-UUID path)."""
-    base: dict[str, Any] = {"resume_id": _CODEX_UUID, "direct": True, "supervisor_runtime": "codex"}
+    """A supervisor config for codex-lane dispatch tests (resume_id present, raw-UUID path).
+
+    The codex lane itself is injected via ``lane_record=_CODEX_LANE_RECORD`` at the call site
+    (T1b); it is no longer stored on the config.
+    """
+    base: dict[str, Any] = {"resume_id": _CODEX_UUID, "direct": True}
     base.update(overrides)
     return _make_config(**base)
+
+
+class TestInjectedLaneBinding:
+    """T1b: the supervisor lane is an injected consumer-lane binding, not a config field."""
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_none_record_dispatches_default_claude_lane(self, mock_claude: MagicMock, _mock_emit: MagicMock) -> None:
+        """No injected binding (lane_record=None) resolves to the default claude lane -- byte-identical."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_claude.return_value = SessionResult(stdout=_VALID_VERDICT_STDOUT, stderr="", returncode=0)
+
+        result = run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True), _make_context(), lane_record=None
+        )
+
+        mock_claude.assert_called_once()  # the claude arm, never codex
+        assert result.run_ok is True
+        assert not result.decision.fail_open
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_drifted_record_fails_open_as_no_call(self, mock_claude: MagicMock, mock_invoker_cls: MagicMock) -> None:
+        """A bound lane whose runtime left the catalog fails open as a no-call -- never the default lane.
+
+        Drift surfaces when the injected LaneRecord -> Lane conversion raises inside the resolve guard;
+        the supervisor skips the check (configuration_error) and spawns neither arm. It must NOT silently
+        run claude (the lane the user moved off).
+        """
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        drifted = LaneRecord("ghost_runtime", "anthropic-direct", "opus")
+        result = run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True), _make_context(), lane_record=drifted
+        )
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "configuration_error"
+        mock_claude.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_not_called()
 
 
 class TestCodexSupervisorLane:
@@ -1008,7 +1059,9 @@ class TestCodexSupervisorLane:
         mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
 
-        result = run_supervisor_check(_codex_config(plan_override_path="/plan.md"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/plan.md"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         mock_claude.assert_not_called()
         mock_invoker_cls.return_value.run.assert_called_once()
@@ -1029,7 +1082,7 @@ class TestCodexSupervisorLane:
         from forge.policy.semantic.supervisor import run_supervisor_check
 
         # No plan_override_path => load_plan_override returns None (real path, not patched).
-        result = run_supervisor_check(_codex_config(), _make_context())
+        result = run_supervisor_check(_codex_config(), _make_context(), lane_record=_CODEX_LANE_RECORD)
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "plan_missing"
@@ -1049,7 +1102,9 @@ class TestCodexSupervisorLane:
 
         mock_read.return_value = SimpleNamespace(ready=False, blocking_reason="not logged in")
 
-        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "codex_unavailable"
@@ -1064,7 +1119,9 @@ class TestCodexSupervisorLane:
 
         mock_resolve.side_effect = LaneError("override is not a declared candidate")
 
-        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "configuration_error"
@@ -1082,7 +1139,7 @@ class TestCodexSupervisorLane:
 
         mock_resolve.return_value = Lane(runtime_id="core_llm", backend_id="anthropic-direct", model="opus")
 
-        # Plain config (no codex override): _supervisor_lane_override -> None, the mock forces core_llm.
+        # No injected lane (lane_record=None -> override=None); the resolve_lane mock forces core_llm.
         result = run_supervisor_check(_make_config(resume_id=_CODEX_UUID, direct=True), _make_context())
 
         assert result.decision.fail_open is True
@@ -1113,7 +1170,9 @@ class TestCodexSupervisorLane:
             root_run_id="root1",
         )
 
-        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         assert result.decision.fail_open is True
         # The runtime-failure gate fired (error set) instead of parsing empty stdout.
@@ -1142,7 +1201,7 @@ class TestCodexSupervisorLane:
         mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_invoker_cls.return_value.run.return_value = _codex_result(stdout=_VALID_VERDICT_STDOUT)
 
-        run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD)
 
         # The claude-arm emitter is never called on the codex path (no double-count).
         mock_emit.assert_not_called()
@@ -1160,7 +1219,9 @@ class TestCodexSupervisorLane:
         mock_read.side_effect = RuntimeError("boom reading cache")
 
         # Must NOT raise: run_supervisor_check returns a structured fail-open, not policy_error.
-        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "codex_unavailable"
@@ -1177,7 +1238,9 @@ class TestCodexSupervisorLane:
         mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
         mock_prepare.side_effect = RuntimeError("bad request shape")
 
-        result = run_supervisor_check(_codex_config(plan_override_path="/p"), _make_context())
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
 
         assert result.decision.fail_open is True
         assert result.decision.failure_type == "codex_unavailable"

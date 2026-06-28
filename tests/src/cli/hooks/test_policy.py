@@ -6,6 +6,7 @@ Covers: ClaudeHookAdapter.build_contexts, _persist_policy_state.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -293,3 +294,105 @@ class TestPersistPolicyState:
         mutate_fn = store.update.call_args[1]["mutate"]
         with pytest.raises(TypeError, match="Expected SessionState"):
             mutate_fn("not a session state")
+
+
+class TestSupervisorLaneBindingFreeze:
+    """T1b: the locked post-eval _mutate freezes the supervisor consumer-lane binding, write-if-absent."""
+
+    _BUILD_RETURN = {
+        "forge_version": "0.1.0",
+        "bundles": [],
+        "rules_active": [],
+        "decisions": [],
+        "policy_states": {},
+    }
+
+    def _effective(self, *, resume_id: str | None = "planner", suspended: bool = False) -> MagicMock:
+        eff = MagicMock()
+        eff.policy.bundles = []
+        eff.policy.supervisor.resume_id = resume_id
+        eff.policy.supervisor.suspended = suspended
+        return eff
+
+    def _state(self) -> Any:
+        from forge.core.state import now_iso
+        from forge.session.models import SessionState
+
+        return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+
+    def _run_mutate(self, state: Any, effective: MagicMock) -> None:
+        engine = MagicMock()
+        engine.get_collected_state.return_value = {}
+        store = MagicMock()
+        _persist_policy_state(
+            store=store, engine=engine, result=MagicMock(), effective=effective, context_summary="ctx"
+        )
+        store.update.call_args[1]["mutate"](state)
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_configured_supervisor_freezes_default_binding(self, mock_build: MagicMock) -> None:
+        """A configured supervisor with no intent override freezes the default lane (source='default')."""
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        from forge.session.models import LaneRecord
+
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective())
+
+        assert state.confirmed.consumer_lanes is not None
+        binding = state.confirmed.consumer_lanes.supervisor
+        assert binding is not None
+        assert binding.source == "default"
+        d = SUPERVISOR_CONSUMER.default_lane
+        assert binding.lane == LaneRecord(d.runtime_id, d.backend_id, d.model)
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_suspended_supervisor_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A suspended supervisor is not dispatched, so no binding is frozen."""
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective(suspended=True))
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_no_supervisor_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A policy run with no configured supervisor (resume_id None) freezes nothing."""
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective(resume_id=None))
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_freeze_is_write_if_absent(self, mock_build: MagicMock) -> None:
+        """An existing binding (e.g. a prior codex freeze) is never overwritten by a later default run."""
+        from forge.session.models import (
+            ConsumerLaneBinding,
+            ConsumerLaneConfirmed,
+            LaneRecord,
+        )
+
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        frozen = ConsumerLaneBinding(
+            lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at="2020-01-01T00:00:00Z"
+        )
+        state.confirmed.consumer_lanes = ConsumerLaneConfirmed(supervisor=frozen)
+        self._run_mutate(state, self._effective())
+        assert state.confirmed.consumer_lanes.supervisor is frozen
+
+    def test_register_injects_bound_lane_from_intent(self) -> None:
+        """register_supervisor_and_restore reads the manifest binding and injects it into the policy."""
+        from forge.cli.hooks.policy import register_supervisor_and_restore
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        eff = self._effective()
+        eff.policy.supervisor.cascade = False
+        eff.policy.supervisor.throttle_seconds = 30
+        manifest = self._state()
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
+
+        engine = MagicMock()
+        register_supervisor_and_restore(engine, eff, manifest)
+
+        registered = engine.register.call_args[0][0]
+        assert registered._lane_record == LaneRecord("codex", "chatgpt", "gpt-5-codex")
