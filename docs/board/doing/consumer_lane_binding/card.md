@@ -29,9 +29,9 @@ is persisted as a chosen, frozen fact. Two gaps:
 ## Model
 
 | Layer         | Field                                 | Type                          | Writer                            | Semantics                                                              |
-| ------------- | ------------------------------------- | ----------------------------- | --------------------------------- | --------------------------------------------------------------------- |
-| **Intent**    | `intent.consumer_lanes.supervisor`    | `LaneRecord \| None`          | resolving commands (see D2)        | Requested lane; immutable once `confirmed` exists                     |
-| **Confirmed** | `confirmed.consumer_lanes.supervisor` | `ConsumerLaneBinding \| None` | policy-check hook, first dispatch  | Frozen resolved lane; durable record + the anchor the D2 reject checks |
+| ------------- | ------------------------------------- | ----------------------------- | --------------------------------- | ---------------------------------------------------------------------- |
+| **Intent**    | `intent.consumer_lanes.supervisor`    | `LaneRecord \| None`          | resolving commands (see D2)       | Requested lane; immutable once `confirmed` exists                      |
+| **Confirmed** | `confirmed.consumer_lanes.supervisor` | `ConsumerLaneBinding \| None` | policy-check hook, first dispatch | Frozen resolved lane; durable record + the anchor the D2 reject checks |
 
 Both sections gain a `consumer_lanes` field of a **dataclass with named per-consumer fields** (`supervisor` only in
 T1b), never a `dict[str, ...]` (see D1). Fields are optional + defaulted, so existing manifests load unchanged.
@@ -53,18 +53,20 @@ T1b), never a `dict[str, ...]` (see D1). Fields are optional + defaulted, so exi
   removed runtime turn an old, valid session into "corrupt state" -- it is just a stale historical binding.
 - **Import boundary:** `session.models` is deliberately catalog-free today (imports only `core.effort` / `core.state` /
   `policy.*`, `models.py:13-16`). Importing `core.lanes` would drag the whole `ModelSource` catalog into foundational
-  manifest loading. No hard cycle (`backend.sources` does not import `session.*`), but it violates the file's pattern: it
-  already keeps `_SUPERVISOR_RUNTIMES` (`models.py:30`) and `_CHECKER_EFFORT_LEVELS` (`models.py:27`) as **inline mirrors
-  with a drift-guard test** (`test_effort.py`). `LaneRecord` follows suit: a `dataclasses.fields(LaneRecord) ==
-  fields(Lane)` parity test guards the duplication.
+  manifest loading. No hard cycle (`backend.sources` does not import `session.*`), but it violates the file's pattern:
+  it already keeps `_SUPERVISOR_RUNTIMES` (`models.py:30`) and `_CHECKER_EFFORT_LEVELS` (`models.py:27`) as **inline
+  mirrors with a drift-guard test** (`test_effort.py`). `LaneRecord` follows suit: a
+  `dataclasses.fields(LaneRecord) == fields(Lane)` parity test guards the duplication.
 
 ### D2 -- Freeze at first dispatch; set only through resolving commands; reject a change after bind
 
 - **Single immutability seam:** `ensure_consumer_lane_binding(state, consumer)` resolves via `resolve_lane`, validates
   `LaneRecord -> Lane`, writes `confirmed.consumer_lanes.<consumer>` **only if absent**, and returns the existing
   binding otherwise. Mirrors the `claude_session_id` pre-seed / `LaunchConfirmed` write-once discipline.
+
 - **Timing is "first dispatch," not "session start."** The supervisor can be wired mid-session
   (`forge policy supervisor set`), so the binding freezes the first time the policy-check hook resolves the lane.
+
 - **Resolution is an injected binding resolver (resolves P2).** After D3, `run_supervisor_check` resolves no lane itself
   -- it receives `SupervisorConfig + ActionContext`, not the store. The policy-check hook, which holds `SessionStore`,
   resolves the lane from `intent.consumer_lanes.supervisor` and **injects** it into `run_supervisor_check` (replacing
@@ -73,18 +75,20 @@ T1b), never a `dict[str, ...]` (see D1). Fields are optional + defaulted, so exi
   (`cli/hooks/policy.py:248-259`) -- one lock, and because intent is frozen once bound, intent-resolved == the frozen
   binding on every dispatch. A pre-eval locked persist (literal "dispatch reads confirmed before use") is the
   alternative; it costs a second lock for no functional change under this freeze. **Decided: fold into the existing
-post-eval lock.**
+  post-eval lock.**
+
 - **The lane is set only through resolving commands, never a raw override.** A runtime-only leaf override
   (`session set consumer_lanes.supervisor.runtime_id codex`) cannot rehydrate -- `LaneRecord` requires all three fields
   and the override path strict-rehydrates a sparse dict (`effective.py:90`). So `consumer_lanes.*` is **statically
   rejected by `validate_key`** (like `launch.runtime`, `overrides.py:201`), pointing to the flag. Setters **expand
   runtime -> full `LaneRecord`** against `SUPERVISOR_CONSUMER.allowed_lanes`: the start/fork `--supervisor-runtime` flag
   and `forge policy supervisor set --runtime`.
-- **Hard-reject a lane change after bind, inside the resolving command (stateful).** `forge policy supervisor set
-  --runtime <other>` on a session whose `confirmed.consumer_lanes.supervisor` exists fails -- the guard holds
-  `SessionState`; the cached, stateless `validate_key`/`set_override` (`overrides.py:43,277`) cannot see `confirmed`.
-  Setting the runtime **before** first dispatch is allowed. Warn-and-ignore is the failure mode the `launch.runtime`
-  reject exists to prevent ("recorded but ignored -- worse than rejection"). Message:
+
+- **Hard-reject a lane change after bind, inside the resolving command (stateful).**
+  `forge policy supervisor set --runtime <other>` on a session whose `confirmed.consumer_lanes.supervisor` exists fails
+  -- the guard holds `SessionState`; the cached, stateless `validate_key`/`set_override` (`overrides.py:43,277`) cannot
+  see `confirmed`. Setting the runtime **before** first dispatch is allowed. Warn-and-ignore is the failure mode the
+  `launch.runtime` reject exists to prevent ("recorded but ignored -- worse than rejection"). Message:
 
   ```text
   Error: Cannot change the supervisor lane for an already-bound session.
@@ -156,17 +160,17 @@ billing (T0); a generic `dict`-keyed consumer registry; transport selection (sti
 
 ## Verified touchpoints (file:line, 2026-06-27)
 
-| Concern                          | Location                                                              |
-| -------------------------------- | -------------------------------------------------------------------- |
-| Narrow field to promote          | `session/models.py:166` (+ comment `:163-165`, validation `:203`)    |
-| Catalog-free import precedent    | `session/models.py:13-16,27,30`                                      |
-| Validating domain type           | `core/lanes.py:46` (fields), `:58-71` (`__post_init__`), `:131` (`resolve_lane`) |
-| Strict read paths                | `session/store.py:190`, `session/effective.py:90`                   |
-| Removed-field strip precedent    | `session/store.py:54,183` (`strip_preview_memory_doc_lists`)         |
-| Stateless/cached key validation  | `session/overrides.py:43,90,201,277`                                |
-| Live lane re-resolve (dispatch)  | `policy/semantic/supervisor.py:681,716,777`                         |
-| Confirmed persisted (locked)     | `cli/hooks/policy.py:197-259` (`store.update(mutate=_mutate)`)       |
-| Shadow candidate field           | `policy/semantic/shadow.py:92`                                      |
-| Status lane surface (T5)         | `cli/policy.py:40,369,371,967,971`                                  |
-| Supervise flag family (no lane)  | `cli/session_fork.py:170-221`, `cli/session_lifecycle.py:1199+`     |
-| Write-once confirmed precedent   | `session/models.py:419-445` (`LaunchConfirmed`)                     |
+| Concern                         | Location                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| Narrow field to promote         | `session/models.py:166` (+ comment `:163-165`, validation `:203`)                |
+| Catalog-free import precedent   | `session/models.py:13-16,27,30`                                                  |
+| Validating domain type          | `core/lanes.py:46` (fields), `:58-71` (`__post_init__`), `:131` (`resolve_lane`) |
+| Strict read paths               | `session/store.py:190`, `session/effective.py:90`                                |
+| Removed-field strip precedent   | `session/store.py:54,183` (`strip_preview_memory_doc_lists`)                     |
+| Stateless/cached key validation | `session/overrides.py:43,90,201,277`                                             |
+| Live lane re-resolve (dispatch) | `policy/semantic/supervisor.py:681,716,777`                                      |
+| Confirmed persisted (locked)    | `cli/hooks/policy.py:197-259` (`store.update(mutate=_mutate)`)                   |
+| Shadow candidate field          | `policy/semantic/shadow.py:92`                                                   |
+| Status lane surface (T5)        | `cli/policy.py:40,369,371,967,971`                                               |
+| Supervise flag family (no lane) | `cli/session_fork.py:170-221`, `cli/session_lifecycle.py:1199+`                  |
+| Write-once confirmed precedent  | `session/models.py:419-445` (`LaunchConfirmed`)                                  |

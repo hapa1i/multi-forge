@@ -765,8 +765,9 @@ class TestConsumerLanes:
 
     def test_consumer_lanes_intent_round_trips_strict(self) -> None:
         """A SessionIntent carrying consumer_lanes survives a strict dacite round-trip."""
-        import dacite
         from dataclasses import asdict
+
+        import dacite
 
         intent = SessionIntent(
             consumer_lanes=ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex")),
@@ -778,8 +779,9 @@ class TestConsumerLanes:
 
     def test_consumer_lanes_confirmed_round_trips_strict(self) -> None:
         """A SessionConfirmed carrying a frozen binding survives a strict dacite round-trip."""
-        import dacite
         from dataclasses import asdict
+
+        import dacite
 
         confirmed = SessionConfirmed(
             consumer_lanes=ConsumerLaneConfirmed(

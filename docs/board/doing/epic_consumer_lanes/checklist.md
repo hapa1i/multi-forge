@@ -20,8 +20,9 @@ no-emission gaps closed (checker/reviewer/team-tagger now emit session-tagged us
 `operation=None` for parity). With T5 done the **first wave (T1a/T2/T3/T4/T5) is complete**; the epic stays in `doing/`
 coordinating T1b (next cursor), T6, and T7. **T7** (subscription-exhaustion fail-open) -- the one new ticket from the
 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/` (depends on
-T4). **T1b is promoted to a member card** (`doing/consumer_lane_binding/`, branch `consumer_lane_binding`, 2026-06-27) and is
-the active cursor; T6 stays an inline sketch. The `core.llm` representation is decided (option 2 -- see Decisions).
+T4). **T1b is promoted to a member card** (`doing/consumer_lane_binding/`, branch `consumer_lane_binding`, 2026-06-27)
+and is the active cursor; T6 stays an inline sketch. The `core.llm` representation is decided (option 2 -- see
+Decisions).
 
 ## Member roster and sequencing
 
@@ -88,8 +89,8 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `done/lane_observability/` 2026-06-27)
 - [ ] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
   `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
-  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b promoted** -> `doing/consumer_lane_binding/` (branch
-`consumer_lane_binding`, 2026-06-27), now the active cursor; T6 still inline.
+  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b promoted** ->
+  `doing/consumer_lane_binding/` (branch `consumer_lane_binding`, 2026-06-27), now the active cursor; T6 still inline.
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`
