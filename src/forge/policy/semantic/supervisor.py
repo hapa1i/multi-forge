@@ -687,39 +687,18 @@ def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
     )
 
 
-def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
-    """Map ``config.supervisor_runtime`` to a declared candidate lane, or None for the default.
-
-    None/``"claude_code"`` => no override (the default claude lane). A non-claude runtime
-    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. A validated runtime
-    with NO matching lane (``_SUPERVISOR_RUNTIMES`` drifted ahead of ``allowed_lanes``) raises
-    ``LaneError`` rather than silently returning None -- a None would make ``resolve_lane`` fall
-    back to the claude default, the "stale recognized config degrades to a default" anti-pattern.
-    The raise is caught by the resolve-lane guard in ``run_supervisor_check`` -> configuration_error
-    fail-open. A drift-guard test keeps the two sets in sync so this stays unreachable in practice.
-    """
-    runtime = config.supervisor_runtime
-    if not runtime or runtime == "claude_code":
-        return None
-    for lane in SUPERVISOR_CONSUMER.allowed_lanes:
-        if lane.runtime_id == runtime:
-            return lane
-    raise LaneError(
-        f"supervisor_runtime {runtime!r} is validated but has no SUPERVISOR_CONSUMER lane "
-        f"(allowed_lanes/_SUPERVISOR_RUNTIMES drift)"
-    )
-
-
-def resolve_supervisor_lane(config: SupervisorConfig) -> Lane:
+def resolve_supervisor_lane(lane_record: LaneRecord | None) -> Lane:
     """Resolve the full ``(runtime, backend, model)`` lane the supervisor would run on.
 
-    The default claude lane (``claude_code``/``anthropic-direct``/``opus``) unless
-    ``supervisor_runtime`` selects a declared override (the codex lane). Display callers
-    (``forge policy supervisor status``) use this to show the chosen lane completely -- the
-    per-call usage event carries no backend id. Raises ``LaneError`` on
-    ``allowed_lanes``/``_SUPERVISOR_RUNTIMES`` drift; a display caller should catch it.
+    ``lane_record`` is the supervisor's consumer-lane binding (``read_bound_lane``): None =>
+    the default claude lane; a record => the bound lane. Display callers (``forge policy
+    supervisor status``) use this to show the chosen lane completely -- the per-call usage
+    event carries no backend id. Converting ``LaneRecord -> Lane`` revalidates against today's
+    catalogs, so a drifted binding raises ``LaneError``; a display caller catches it and shows
+    the lane as unresolved / not executable.
     """
-    return resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+    override = None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+    return resolve_lane(SUPERVISOR_CONSUMER, override=override)
 
 
 def run_supervisor_check(

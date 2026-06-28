@@ -36,7 +36,7 @@ from forge.policy.semantic.supervisor import (
 )
 from forge.policy.types import ActionContext
 from forge.session.artifacts import get_artifact_paths
-from forge.session.models import SupervisorConfig
+from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
@@ -106,9 +106,24 @@ def reconstruct_config(candidate: dict[str, Any], directory: Path) -> Supervisor
         timeout_seconds=int(candidate.get("timeout_seconds", 45)),
         fork_session=bool(candidate.get("fork_session", True)),
         plan_override_path=plan_override_path,
-        # T4: replay on the same lane production used. Absent (v1 candidate) -> None -> claude.
-        supervisor_runtime=candidate.get("supervisor_runtime"),
     )
+
+
+def reconstruct_lane(candidate: dict[str, Any]) -> LaneRecord | None:
+    """Rebuild the replay lane from the frozen candidate (epic consumer_lanes, T1b).
+
+    The candidate stores the resolved consumer-lane binding as a ``lane`` dict (v3). None =>
+    the claude default. An older record (no ``lane``) or a malformed one degrades to None ->
+    default replay -- shadow candidates are runtime-only state, discard-and-default per
+    coding_standards section 5.
+    """
+    lane = candidate.get("lane")
+    if not isinstance(lane, dict):
+        return None
+    try:
+        return LaneRecord(lane["runtime_id"], lane["backend_id"], lane["model"])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def run_shadow_candidate(path: Path) -> str | None:
@@ -141,7 +156,10 @@ def run_shadow_candidate(path: Path) -> str | None:
     try:
         context = reconstruct_context(candidate)
         config = reconstruct_config(candidate, processing.parent)
-        run = run_supervisor_check(config, context, intent=SUPERVISOR_INTENT, usage_command=SHADOW_USAGE_COMMAND)
+        lane = reconstruct_lane(candidate)
+        run = run_supervisor_check(
+            config, context, intent=SUPERVISOR_INTENT, usage_command=SHADOW_USAGE_COMMAND, lane_record=lane
+        )
         status = classify_shadow(run)
         candidate["status"] = status
         candidate["run_ok"] = run.run_ok

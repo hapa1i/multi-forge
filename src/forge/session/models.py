@@ -25,9 +25,6 @@ INDEX_VERSION = 1
 # module's import chain stays free of the heavy core.llm package (litellm clients);
 # tests/src/core/test_effort.py is the drift guard that asserts equality.
 _CHECKER_EFFORT_LEVELS = ("none", "low", "medium", "high", "xhigh")
-# Lane runtimes a supervisor may be placed on (epic consumer_lanes, T4). The override maps to
-# SUPERVISOR_CONSUMER's declared lanes; keep in sync with that consumer's allowed_lanes.
-_SUPERVISOR_RUNTIMES = ("claude_code", "codex")
 
 
 # --- Worktree metadata (embedded in SessionState) ---
@@ -160,10 +157,6 @@ class SupervisorConfig:
     proxy: str | None = None  # Optional: proxy_id or template name for base_url lookup
     direct: bool = False  # When True, force direct Anthropic routing
     base_url: str | None = None  # Optional: explicit base_url override
-    # Lane runtime override (epic consumer_lanes, T4): None/"claude_code" => the byte-identical claude -p
-    # supervisor; "codex" => the codex-exec lane. Narrow field; T1b generalizes to a uniform consumer-lane
-    # binding. Validated below against _SUPERVISOR_RUNTIMES.
-    supervisor_runtime: str | None = None
     forge_root: str | None = None  # Scope for name-based lookups (set at wiring time)
     timeout_seconds: int = 45  # Max time to wait for supervisor response (15s margin within 60s hook timeout)
     throttle_seconds: int = 30  # Min time between supervisor calls (for caching)
@@ -199,10 +192,6 @@ class SupervisorConfig:
         if self.checker_effort is not None and self.checker_effort not in _CHECKER_EFFORT_LEVELS:
             raise ValueError(
                 f"checker_effort must be one of {', '.join(_CHECKER_EFFORT_LEVELS)}, got {self.checker_effort!r}"
-            )
-        if self.supervisor_runtime is not None and self.supervisor_runtime not in _SUPERVISOR_RUNTIMES:
-            raise ValueError(
-                f"supervisor_runtime must be one of {', '.join(_SUPERVISOR_RUNTIMES)}, got {self.supervisor_runtime!r}"
             )
 
 

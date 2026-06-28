@@ -937,37 +937,6 @@ class TestSupervisorLaneDispatch:
             )
         assert exc.value.failure_type == "configuration_error"
 
-    def test_supervisor_runtimes_match_allowed_lanes(self) -> None:
-        """Drift guard (M3): _SUPERVISOR_RUNTIMES == {default runtime} ∪ allowed-lane runtime ids.
-
-        The validated runtime set (models.py) and the lane map (SUPERVISOR_CONSUMER) are coupled
-        only by comments. If they drift, a validated-but-unmapped runtime silently falls back to
-        claude. This test fails loudly the moment a runtime is added to one but not the other.
-        """
-        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
-        from forge.session.models import _SUPERVISOR_RUNTIMES
-
-        lane_runtimes = {SUPERVISOR_CONSUMER.default_lane.runtime_id} | {
-            lane.runtime_id for lane in SUPERVISOR_CONSUMER.allowed_lanes
-        }
-        assert lane_runtimes == set(_SUPERVISOR_RUNTIMES)
-
-    def test_lane_override_raises_on_validated_but_unmapped_runtime(self, monkeypatch) -> None:
-        """If the runtime set drifts ahead of allowed_lanes, _supervisor_lane_override raises (M3).
-
-        A raise (-> configuration_error fail-open via the resolve guard) beats silently returning
-        None, which would route a misconfigured codex session to the claude default.
-        """
-        from dataclasses import replace
-
-        from forge.core.lanes import LaneError
-        from forge.policy.semantic import supervisor as sup
-
-        # Simulate drift: codex stays a validated runtime, but its lane is gone from allowed_lanes.
-        monkeypatch.setattr(sup, "SUPERVISOR_CONSUMER", replace(sup.SUPERVISOR_CONSUMER, allowed_lanes=()))
-        with pytest.raises(LaneError):
-            sup._supervisor_lane_override(_make_config(supervisor_runtime="codex"))
-
 
 # --- Codex Supervisor Lane Tests (T4) ---
 

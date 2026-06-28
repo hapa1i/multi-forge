@@ -553,7 +553,6 @@ class TestSupervisorStatus:
         "supervisor_effort",
         "resolved_uuid",
         "source_model",
-        "supervisor_runtime",
         "lane",
     }
 
@@ -586,39 +585,41 @@ class TestSupervisorStatus:
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
         sup = json.loads(result.output)["supervisor"]
-        assert sup["supervisor_runtime"] is None
         assert sup["lane"] == {"runtime": "claude_code", "backend": "anthropic-direct", "model": "opus"}
 
     def test_status_json_carries_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T5/WS3: a codex-override supervisor reports the full codex lane (the chosen lane, completely)."""
-        from forge.session.models import SupervisorConfig
+        """T1b: a codex-bound supervisor reports the full codex lane from its consumer-lane binding."""
+        from forge.session.models import (
+            ConsumerLaneIntent,
+            LaneRecord,
+            SupervisorConfig,
+        )
 
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
-        _apply_supervisor_to_intent(
-            manifest,
-            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
-        )
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
         assert result.exit_code == 0, result.output
         sup = json.loads(result.output)["supervisor"]
-        assert sup["supervisor_runtime"] == "codex"
         assert sup["lane"] == {"runtime": "codex", "backend": "chatgpt", "model": "gpt-5-codex"}
 
     def test_status_displays_codex_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """T5/WS3: the human view shows the resolved codex lane line."""
-        from forge.session.models import SupervisorConfig
+        """T1b: the human view shows the resolved codex lane line from the consumer-lane binding."""
+        from forge.session.models import (
+            ConsumerLaneIntent,
+            LaneRecord,
+            SupervisorConfig,
+        )
 
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
-        _apply_supervisor_to_intent(
-            manifest,
-            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
-        )
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
@@ -628,12 +629,12 @@ class TestSupervisorStatus:
     def test_status_json_lane_null_on_resolution_failure(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
-        """T5/WS3: allowed_lanes/_SUPERVISOR_RUNTIMES drift -> resolve raises -> status shows
-        lane=null and never crashes (fail-open display)."""
+        """A drifted binding (catalog entry removed) -> resolve raises -> status shows lane=null,
+        never crashes (fail-open display)."""
         from forge.core.lanes import LaneError
 
-        def _boom(_config: object) -> object:
-            raise LaneError("allowed_lanes drift")
+        def _boom(_lane: object) -> object:
+            raise LaneError("backend renamed out of the catalog")
 
         monkeypatch.setattr("forge.cli.policy.resolve_supervisor_lane", _boom)
         _make_supervised_project(temp_guard_env, monkeypatch)
@@ -648,8 +649,8 @@ class TestSupervisorStatus:
         from forge.core.lanes import LaneError
         from forge.session.models import SupervisorConfig
 
-        def _boom(_config: object) -> object:
-            raise LaneError("allowed_lanes drift")
+        def _boom(_lane: object) -> object:
+            raise LaneError("backend renamed out of the catalog")
 
         monkeypatch.setattr("forge.cli.policy.resolve_supervisor_lane", _boom)
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -657,13 +658,13 @@ class TestSupervisorStatus:
         manifest.forge_root = str(temp_guard_env)
         _apply_supervisor_to_intent(
             manifest,
-            SupervisorConfig(resume_id="planner", direct=True, supervisor_runtime="codex"),
+            SupervisorConfig(resume_id="planner", direct=True),
         )
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
         result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0, result.output
-        assert "Lane: runtime=codex (unresolved)" in result.output
+        assert "Lane: not executable" in result.output
 
 
 class TestSupervisorToggle:

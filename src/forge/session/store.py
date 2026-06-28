@@ -79,6 +79,35 @@ def strip_preview_memory_doc_lists(data: dict[str, Any], session_name: str = "")
         )
 
 
+def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "") -> None:
+    """Strip the removed ``supervisor_runtime`` field from T4/T5 manifests (epic consumer_lanes, T1b).
+
+    The supervisor lane moved from ``SupervisorConfig.supervisor_runtime`` to the ``consumer_lanes``
+    binding. An old manifest (or override) carrying the field would fail the strict read, so drop it
+    from ``intent.policy.supervisor`` and ``overrides.policy.supervisor`` before dacite. A non-default
+    (codex) value warns once: dispatch no longer honors it, so the lane must be re-pinned via the
+    resolving commands -- surfacing recognized-but-ignored legacy state (coding_standards section 5).
+    """
+    had_nondefault = False
+    for section in ("intent", "overrides"):
+        section_obj = data.get(section)
+        if not isinstance(section_obj, dict):
+            continue
+        policy = section_obj.get("policy")
+        sup = policy.get("supervisor") if isinstance(policy, dict) else None
+        if isinstance(sup, dict) and "supervisor_runtime" in sup:
+            value = sup.pop("supervisor_runtime")
+            if value and value != "claude_code":
+                had_nondefault = True
+    if had_nondefault:
+        _store_logger.warning(
+            "Session '%s' had a supervisor_runtime lane override; the lane now lives in the "
+            "consumer_lanes binding. Stripped on read (dispatch no longer honors it) -- re-pin with "
+            "--supervisor-runtime at start/fork or 'forge policy supervisor set --runtime'.",
+            session_name,
+        )
+
+
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
 
 
@@ -181,6 +210,7 @@ class SessionStore:
             raise ManifestUnreadableError(str(self._manifest_path), f"read error: {e}")
 
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
+        strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
 
         try:

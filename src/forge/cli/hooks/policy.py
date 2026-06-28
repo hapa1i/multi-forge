@@ -194,7 +194,7 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
             # supervisor becomes the needs_review resolver (invoked only on escalation).
             from forge.policy.semantic.plan_check import PlanCheckPolicy
 
-            engine.register(PlanCheckPolicy(config=sup_cfg))
+            engine.register(PlanCheckPolicy(config=sup_cfg, lane_record=lane_record))
             engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
         else:
             engine.register(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))

@@ -5,12 +5,12 @@
 
 ## Current focus
 
-Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + the pulled-forward override reject)
-**complete**; Slice 3 (clean-break removal of `supervisor_runtime` + strip-and-warn + shadow lane migration) is next.
-The branch is **mid-migration and not mergeable until Slice 3**: Slice 2 switched dispatch to `consumer_lanes`, but
-`supervisor_runtime` still backs the status display, so an override-set session would display codex while dispatching
-Claude (review P1). Design is fully settled (D1-D3 in `card.md`). Tick a box only when its assertion is verified and
-recorded -- not when work merely starts.
+Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + the pulled-forward override reject) + 3
+(clean-break removal of `supervisor_runtime`) **complete**. The Slice 2->3 dispatch/display divergence (review P1) is
+now resolved: `supervisor_runtime` no longer exists, so dispatch, freeze, and status all read the same `consumer_lanes`
+binding -- **the branch is mergeable**. Next is Slice 4 (setters + stateful already-bound reject + status drift line;
+the `validate_key` reject already shipped in Slice 2) then Slice 5 (docs sync). Design is fully settled (D1-D3 in
+`card.md`). Tick a box only when its assertion is verified and recorded -- not when work merely starts.
 
 ## Slices
 
@@ -69,28 +69,44 @@ stays catalog-free, `core.lanes` stays pure): `read_bound_lane` (dispatch source
   recorded-but-ignored (dispatch is confirmed-first). Now statically rejected like `launch.runtime` (`overrides.py`),
   pointing to the resolving commands. Verified: `test_consumer_lanes_rejected_as_command_only`.
 
-**Slice 2->3 carry (branch NOT mergeable until Slice 3).** `_supervisor_lane_override` + `resolve_supervisor_lane` stay
-(status display, `cli/policy.py:371,967`) and the shadow path passes `lane_record=None` (default replay) until Slice 3.
-This is **not** a self-consistent stopping point (review P1, correcting an earlier claim here): a session that set
-`supervisor_runtime` via the generic override would now **display** codex (status reads `supervisor_runtime`) but
-**dispatch + freeze** the default Claude lane (dispatch reads `consumer_lanes`). The clean-break policy
-(coding_standards §5) wants the dispatch switch and the `supervisor_runtime` removal in **one atomic change**; they are
-split across commits here, so **Slice 3 must land before any merge**. T1b is one branch -> one PR, so it does; the
-divergence is branch-internal only.
+**Slice 2->3 carry (RESOLVED by Slice 3).** Between Slice 2 and Slice 3 the branch was deliberately inconsistent:
+dispatch + freeze read `consumer_lanes` while status still read `supervisor_runtime`, so an override-set session would
+**display** codex but **dispatch + freeze** the default Claude lane (review P1). The clean-break policy
+(coding_standards §5) wants the dispatch switch and the `supervisor_runtime` removal in **one atomic change**; splitting
+them across commits is acceptable only because T1b is one branch -> one PR, so the divergence never reached `main`.
+Slice 3 deleted the field and repointed status to the same binding, closing the divergence.
 
 **Verification:** `tests/src/{cli,policy,session}` -> 3597 passed (P2a/P2b included); bridge + hook + overrides green;
 mypy + pyright clean.
 
-### Slice 3 -- Clean-break migration of `supervisor_runtime` (D3)
+### Slice 3 -- Clean-break migration of `supervisor_runtime` (D3) -- DONE
 
-- [ ] `SupervisorConfig.supervisor_runtime` deleted; `_supervisor_lane_override` removed (the hook injects the lane).
-- [ ] **Read-time strip-and-warn**: extend `strip_preview_memory_doc_lists` (or a sibling) in `store.py` to drop
-  `intent.policy.supervisor.supervisor_runtime` **and** `overrides...supervisor_runtime` before dacite, warning once if
-  non-default. Without this, every T4/T5 manifest carrying the field fails the strict read.
-- [ ] `ShadowCandidate` carries the resolved lane (not a runtime string); `SHADOW_SCHEMA_VERSION` bumped; shadow replay
-  uses it.
-- [ ] `cli/policy.py` (`:369,371,967,971`) repointed to the binding/intent lane; `rg supervisor_runtime src/` clean
-  except the strip helper.
+- [x] `SupervisorConfig.supervisor_runtime` deleted (with `models.py`'s `_SUPERVISOR_RUNTIMES` tuple + `__post_init__`
+  validation); `_supervisor_lane_override` removed. `resolve_supervisor_lane(lane_record)` now converts the injected
+  `LaneRecord -> Lane` override (the hook injects it; the config no longer carries a runtime). Verified:
+  `test_supervisor.py` codex tests inject `_CODEX_LANE_RECORD`; the two old `_SUPERVISOR_RUNTIMES<->allowed_lanes` drift
+  tests deleted (the field they guarded is gone).
+- [x] **Read-time strip-and-warn**: new sibling `strip_removed_supervisor_runtime(data, session_name)` in `store.py`
+  (called in `read()` after `strip_preview_memory_doc_lists`) drops `intent.policy.supervisor.supervisor_runtime`
+  **and** `overrides.policy.supervisor.supervisor_runtime` before dacite, warning once if the stripped value is
+  non-default (not `None`/`"claude_code"`). Without it every T4/T5 manifest carrying the field would fail the strict
+  read. Verified: `test_legacy_supervisor_runtime_stripped_on_read` (loads, field gone, warns once); old
+  `TestSupervisorRuntimeValidation` deleted.
+- [x] `ShadowCandidate.supervisor_runtime: str | None` -> `lane: LaneRecord | None`; `SHADOW_SCHEMA_VERSION` 2 -> 3;
+  `capture_candidate(..., lane_record=...)` freezes the resolved lane; `shadow_runner.reconstruct_lane(candidate)` reads
+  it back (malformed/absent -> `None` -> default replay) and threads it into
+  `run_supervisor_check(..., lane_record=...)`. Verified: `test_shadow.py::test_freezes_resolved_lane` + schema-3
+  constant; `test_shadow_runner.py::reconstruct_lane` round-trip/absent/malformed.
+- [x] `cli/policy.py` both status sites (JSON helper + text render) repointed to
+  `resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))`; the `data["supervisor_runtime"]` line
+  removed; drift text fallback now `Lane: not executable (binding no longer valid)`. `rg supervisor_runtime src/` is
+  clean except the strip helper + a shadow-migration comment. Verified: `test_policy_supervisor.py` status tests
+  migrated to `consumer_lanes` (JSON null + human "not executable" on resolve failure).
+
+**Verification:** five affected files (`test_supervisor`, `test_shadow`, `test_shadow_runner`, `test_store`,
+`test_policy_supervisor`) -> 266 passed; full unit suite -> 7059 passed, 0 failures; mypy clean on all 10 touched source
+files. `rg 'supervisor_runtime|_SUPERVISOR_RUNTIMES|_supervisor_lane_override' src/` -> only the strip helper +
+shadow-migration comment.
 
 ### Slice 4 -- Setters, mutation guard, status (D2)
 

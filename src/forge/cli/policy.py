@@ -36,11 +36,13 @@ from forge.policy.queries import (
 )
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
+    SUPERVISOR_CONSUMER,
     apply_checker_options,
     resolve_supervisor_lane,
     validate_checker_model,
 )
 from forge.session import SessionStore
+from forge.session.consumer_lanes import read_bound_lane
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
@@ -364,13 +366,13 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
             swp = ts.confirmed.started_with_proxy
             if swp and swp.template:
                 data["source_model"] = swp.template
-    # T5/WS3: the full resolved lane (runtime, backend, model) the supervisor runs on -- this is
-    # where "the chosen lane" shows completely (the per-call usage event carries no backend id).
-    data["supervisor_runtime"] = sup.supervisor_runtime
+    # The full resolved lane (runtime, backend, model) the supervisor runs on -- the chosen
+    # consumer-lane binding (epic consumer_lanes, T1b): confirmed binding if frozen, else intent,
+    # else default. The per-call usage event carries no backend id, so this is where it shows.
     try:
-        lane = resolve_supervisor_lane(sup)
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         data["lane"] = {"runtime": lane.runtime_id, "backend": lane.backend_id, "model": lane.model}
-    except Exception as exc:  # allowed_lanes/_SUPERVISOR_RUNTIMES drift -> show null, never crash status
+    except Exception as exc:  # drifted/removed catalog entry -> show null, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         data["lane"] = None
     return data
@@ -962,14 +964,14 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         if swp and swp.template:
             console.print(f"  Source model: {swp.template}")
 
-    # T5/WS3: the full resolved lane (runtime, backend, model) -- where the chosen lane shows.
+    # The full resolved lane (runtime, backend, model) -- the chosen consumer-lane binding
+    # (epic consumer_lanes, T1b): confirmed binding if frozen, else intent override, else default.
     try:
-        lane = resolve_supervisor_lane(sup)
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         console.print(f"  Lane: runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}")
-    except Exception as exc:
+    except Exception as exc:  # drifted/removed catalog entry -> mark unresolved, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
-        if sup.supervisor_runtime:
-            console.print(f"  Lane: runtime={sup.supervisor_runtime} (unresolved)")
+        console.print("  Lane: [yellow]not executable[/yellow] (binding no longer valid)")
 
     if sup.proxy:
         console.print(f"  Routing: proxy: {sup.proxy}")

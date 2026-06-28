@@ -24,7 +24,7 @@ from forge.policy.semantic.supervisor import (
     plan_fingerprint,
 )
 from forge.policy.types import ActionContext, PolicyDecision, Violation
-from forge.session.models import SupervisorConfig
+from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
@@ -492,8 +492,11 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
     - cache: ThrottleCache entries for clean allows only
     """
 
-    def __init__(self, config: SupervisorConfig | None = None) -> None:
+    def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
         self._config = config
+        # The supervisor's consumer-lane binding (epic consumer_lanes, T1b), threaded so a shadow
+        # candidate is captured with the lane production would replay on (None => default claude).
+        self._lane_record = lane_record
         ttl = config.throttle_seconds if config else 30
         self._cache = ThrottleCache(ttl_seconds=ttl)
 
@@ -601,6 +604,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
                             checker_provider=route.provider,
                             checker_budget_tokens=budget_tokens,
                             checker_prompt_version=CHECKER_PROMPT_VERSION,
+                            lane_record=self._lane_record,
                         )
                 except Exception:  # best-effort audit: never block the hook
                     _log.debug("shadow capture failed", exc_info=True)
