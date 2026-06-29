@@ -201,10 +201,16 @@ rows above stay the durable sketch; the cards carry verified touchpoints + fixtu
 `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
 version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
-**T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
-current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),
-but load-bearing for `claude-max`**: a `claude-max` subscription source must not claim `subscription_quota` until T0
-proves `claude -p` actually rides the Max subscription.
+**T0 -- sibling billing cleanup** (promoted to member card `doing/claude_subscription_billing/` 2026-06-29, branch
+`claude_subscription_billing`; card authored, **awaiting plan review**): revisit the `claude -p` `unknown`/OAuth billing
+assumption (`billing.py`) against current Anthropic `-p` billing. **A 2026-06-29 code-grounded sweep refined the framing**:
+the inference is conservative-*correct* for today's emissions (a *key-resolvable* headless run is genuinely API-billed
+via auto-`--bare`; a *keyless* run already falls through to OAuth and is honestly labeled `unknown`), not buggy -- the
+real gap is that **no Claude subscription signal exists** to classify that keyless path, and
+`infer_billing_mode(direct, has_api_key)` is the wrong shape to add one (key-presence is a capability, not a payer). So T0 is **probe-first**: does `claude -p` ride Max
+*headlessly*, and is it locally detectable (the codex `chatgpt -> subscription_quota` preflight is the template)?
+**Non-blocking for the proven `chatgpt` path (T2/T4), but load-bearing for `claude-max`**: a `claude-max` subscription
+source must not claim `subscription_quota` until T0 proves `claude -p` actually rides the Max subscription.
 
 **Assembly is cheap (verified).** The Codex supervisor (T4) reuses shipped pieces: the verdict parser takes a plain
 string (`verdict.py:86 parse_supervisor_verdict(response: str)`); `CodexHeadlessInvoker` already returns its final text
