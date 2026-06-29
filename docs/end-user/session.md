@@ -571,6 +571,23 @@ forge session start executor --supervise planner --supervisor-proxy openrouter-g
 forge policy supervisor set planner --supervisor-proxy openrouter-gemini
 ```
 
+**Supervisor runtime (lane):** By default the supervisor runs on `claude_code` (`claude -p --resume`). Pin
+`--supervisor-runtime codex` (requires `--supervise`) to route checks to OpenAI's Codex instead; `claude_code` and
+`codex` are the shipped runtimes.
+
+```bash
+# Fork with the supervisor running on codex
+forge session fork planner --worktree --supervise --supervisor-runtime codex
+
+# Or set the runtime on an existing supervised session
+forge policy supervisor set planner --runtime codex
+```
+
+The runtime is **frozen on the first check** and immutable for the session: `set --runtime <other>` then refuses to
+change it (re-pinning the same lane is a no-op). Fork or start a fresh session for a different lane, or run
+`forge policy supervisor remove` (clears the binding) and re-add. `forge session fork` / `resume` carry the requested
+lane to the child, which re-freezes on its own first check. See [policy.md](policy.md#supervisor-runtime-lane).
+
 **Launch-time cascade and checker controls:** `fork` and `start` accept the same tier-1 cascade knobs as
 `forge policy supervisor set`, so you can wire the cheap pre-check at launch instead of in a second command. All require
 `--supervise`:
