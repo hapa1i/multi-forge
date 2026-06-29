@@ -394,8 +394,9 @@ To avoid writer conflicts:
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
     points for the final live conversation identity.
   - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): the policy-check hook freezes the lane it
-    dispatched on, **write-once** at the first check (epic consumer_lanes/T1b). Once frozen it governs dispatch directly
-    (confirmed-first) and the resolving commands refuse to change it.
+    dispatched on, **write-once** at the first check (epic consumer_lanes/T1b) -- but **only when an explicit lane was
+    chosen**. A consumer running on its default lane never freezes, so the default stays re-pinnable. Once frozen it
+    governs dispatch directly (confirmed-first) and the resolving commands refuse to change it to a *different* lane.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -438,9 +439,12 @@ To avoid writer conflicts:
   metadata.
 - **Consumer-lane binding** (epic consumer_lanes/T1b): `intent.consumer_lanes.<consumer>` is the *requested* lane (a
   `LaneRecord`, set only by resolving commands, never a raw `set` override); `confirmed.consumer_lanes.<consumer>` is
-  the `(runtime, backend, model)` the hook *froze* at first dispatch. Frozen is **write-once and immutable** -- the
-  resolving commands reject a change once it exists, and dispatch reads confirmed-first. See
-  [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
+  the `(runtime, backend, model)` the hook *froze* at first dispatch. **Only an explicit lane choice freezes; the
+  default lane never freezes** (a binding exists iff a lane was explicitly pinned), so an unpinned consumer stays
+  re-pinnable. Frozen is **write-once and immutable** -- the resolving commands reject a change to a *different* lane
+  (re-pinning the same lane is an idempotent no-op), and dispatch reads confirmed-first. Removing a consumer
+  (`policy supervisor remove`, `%policy supervisor remove`) clears both its intent and confirmed slots, so a later
+  re-add starts from the default. See [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 

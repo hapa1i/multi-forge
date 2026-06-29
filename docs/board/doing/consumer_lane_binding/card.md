@@ -60,9 +60,11 @@ T1b), never a `dict[str, ...]` (see D1). Fields are optional + defaulted, so exi
 
 ### D2 -- Freeze at first dispatch; set only through resolving commands; reject a change after bind
 
-- **Single immutability seam:** `ensure_consumer_lane_binding(state, consumer)` resolves via `resolve_lane`, validates
-  `LaneRecord -> Lane`, writes `confirmed.consumer_lanes.<consumer>` **only if absent**, and returns the existing
-  binding otherwise. Mirrors the `claude_session_id` pre-seed / `LaunchConfirmed` write-once discipline.
+- **Single immutability seam:** `ensure_consumer_lane_binding(state, consumer, lane_record)` resolves via
+  `resolve_lane`, validates `LaneRecord -> Lane`, and writes `confirmed.consumer_lanes.<consumer>` **only if absent**.
+  **Only an explicit lane freezes:** `lane_record is None` (the consumer ran on its default) is a no-op, so the default
+  never freezes and stays re-pinnable -- a binding exists iff a lane was explicitly chosen (`source` is therefore always
+  `"intent"`). Mirrors the `claude_session_id` pre-seed / `LaunchConfirmed` write-once discipline.
 
 - **Timing is "first dispatch," not "session start."** The supervisor can be wired mid-session
   (`forge policy supervisor set`), so the binding freezes the first time the policy-check hook resolves the lane.
@@ -87,7 +89,8 @@ T1b), never a `dict[str, ...]` (see D1). Fields are optional + defaulted, so exi
 - **Hard-reject a lane change after bind, inside the resolving command (stateful).**
   `forge policy supervisor set --runtime <other>` on a session whose `confirmed.consumer_lanes.supervisor` exists fails
   -- the guard holds `SessionState`; the cached, stateless `validate_key`/`set_override` (`overrides.py:43,277`) cannot
-  see `confirmed`. Setting the runtime **before** first dispatch is allowed. Warn-and-ignore is the failure mode the
+  see `confirmed`. Setting the runtime **before** first dispatch is allowed, and **re-pinning the already-frozen lane is
+  an idempotent no-op** -- only a change to a *different* lane is rejected. Warn-and-ignore is the failure mode the
   `launch.runtime` reject exists to prevent ("recorded but ignored -- worse than rejection"). Message:
 
   ```text

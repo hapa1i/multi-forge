@@ -1195,8 +1195,10 @@ the injected `LaneRecord` and dispatches by runtime through an in-module seam (`
 Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
 own model). All other consumers still call the resolver directly. T1b replaced the narrow `supervisor_runtime` override
 with the uniform consumer-lane manifest binding: the lane is now a persisted `LaneRecord` -- an `intent.consumer_lanes`
-override that the policy-check hook freezes into `confirmed.consumer_lanes` at first dispatch -- set by the resolving
-commands (`--supervisor-runtime`, `policy supervisor set --runtime`) and rejected as a raw `set` override.
+override that the policy-check hook freezes into `confirmed.consumer_lanes` at first dispatch (**only an explicit lane
+freezes; a consumer on its default lane never freezes and stays re-pinnable**) -- set by the resolving commands
+(`--supervisor-runtime`, `policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same
+lane is an idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch
