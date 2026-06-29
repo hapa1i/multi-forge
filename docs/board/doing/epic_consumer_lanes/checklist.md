@@ -18,11 +18,12 @@ and closed to `done/lane_observability/`: two honest read surfaces (`forge telem
 no-emission gaps closed (checker/reviewer/team-tagger now emit session-tagged usage), and the invoker's
 `workflow.worker` upstream mislabel T4 carried forward fixed (additive `Attribution.operation`; codex supervisor sets
 `operation=None` for parity). With T5 done the **first wave (T1a/T2/T3/T4/T5) is complete**; the epic stays in `doing/`
-coordinating T1b (next cursor), T6, and T7. **T7** (subscription-exhaustion fail-open) -- the one new ticket from the
+coordinating T6, T7, and the T0 sibling (T1b done). **T7** (subscription-exhaustion fail-open) -- the one new ticket from the
 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/` (depends on
-T4). **T1b is promoted to a member card** (`doing/consumer_lane_binding/`, branch `consumer_lane_binding`, 2026-06-27)
-and is the active cursor; T6 stays an inline sketch. The `core.llm` representation is decided (option 2 -- see
-Decisions).
+T4). **T1b is done** (PR #57, `6ff555f6`, 2026-06-28; closed to `done/consumer_lane_binding/`): the supervisor lane is now
+a persisted, frozen-at-first-dispatch `consumer_lanes` binding (`intent` requested + immutable `confirmed`). The next
+cursor is open -- T6 stays an inline sketch, T7 is authored in `proposed/`, T0 is independent. The `core.llm`
+representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
@@ -33,7 +34,7 @@ Decisions).
 | T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)              |
 | T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)              |
 | T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)              |
-| T1b          | `doing/consumer_lane_binding/`               | doing    | T4         | active (cursor 2026-06-27) |
+| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)              |
 | T6           | inline in `card.md`                          | --       | T1b        | sketch                     |
 | T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26        |
 | T0 (sibling) | inline in `card.md`                          | --       | none       | sketch; gates `claude-max` |
@@ -89,8 +90,8 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `done/lane_observability/` 2026-06-27)
 - [ ] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
   `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
-  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b promoted** ->
-  `doing/consumer_lane_binding/` (branch `consumer_lane_binding`, 2026-06-27), now the active cursor; T6 still inline.
+  workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b done** ->
+  `done/consumer_lane_binding/` (PR #57, 2026-06-28); T6 still inline (next candidate cursor).
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`

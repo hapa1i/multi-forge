@@ -1,13 +1,14 @@
 # T1b: Consumer-lane binding -- generalize + freeze the supervisor lane
 
-**Epic**: [`docs/board/doing/epic_consumer_lanes/`](../epic_consumer_lanes/card.md) (member **T1b**; depends on T4).
+**Epic**: `docs/board/doing/epic_consumer_lanes/` (member **T1b**; depends on T4).
 
 **Type**: Member card. Promotes the narrow `SupervisorConfig.supervisor_runtime` field (T4) into a uniform, persisted
 consumer-lane binding: a session-owned `intent` override plus an immutable `confirmed` record, resolved once and frozen.
 The supervisor is the single wired consumer; the schema shape is T6-ready (other consumers added later, not here).
 
-**Status**: Active (cursor). Branch `consumer_lane_binding`. Authored 2026-06-27; revised same day after a code-grounded
-review (P1-P2 below) tightened D2/D3 and the durable-state and drift contracts.
+**Status**: Done -- shipped via PR #57 (`6ff555f6`, 2026-06-28): all five slices plus three review-hardening rounds
+merged to `main`. Branch `consumer_lane_binding`. Authored 2026-06-27; revised same day after a code-grounded review
+(P1-P2 below) tightened D2/D3 and the durable-state and drift contracts.
 
 ---
 

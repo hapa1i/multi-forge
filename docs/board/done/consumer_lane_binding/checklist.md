@@ -1,6 +1,6 @@
 # T1b execution checklist: consumer_lane_binding
 
-**Card**: [`card.md`](card.md). **Epic**: [`docs/board/doing/epic_consumer_lanes/`](../epic_consumer_lanes/card.md).
+**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`.
 **Branch**: `consumer_lane_binding`.
 
 ## Current focus
@@ -8,8 +8,9 @@
 All five slices **complete**: 1 (schema) + 2 (binding resolution + injected resolver + freeze + pulled-forward override
 reject) + 3 (clean-break removal of `supervisor_runtime`) + 4 (setters + stateful already-bound reject; status drift
 landed in Slice 3) + 5 (docs sync). Dispatch, freeze, status, and the setters all read/write the same `consumer_lanes`
-binding. **Remaining: closeout** -- the supervisor E2E integration run, the change_log entry, impl_notes promotion
-(after human review), and the `doing/ -> done/` move after merge.
+binding. **Closeout done** (2026-06-28, PR #57 `6ff555f6` on `main`): supervisor E2E (2 passed), change_log entry,
+design-doc sync, and the `doing/ -> done/` move all landed. The impl_notes promotion is the one human-gated step (see
+Closeout).
 
 ## Slices
 
@@ -247,8 +248,16 @@ cover default-lane CLI parity. The `--supervisor-runtime`/`set --runtime` manife
 - [x] `make pre-commit` clean; focused unit suites (7074 passed) + the supervisor E2E (2 passed) green.
 - [x] `change_log.md` entry (Goal / Key changes / Verification) -- 2026-06-28.
 - [x] Epic's T1b design-doc-sync box ticked (epic checklist).
-- [ ] Promote durable lessons to `impl_notes.md` **after human review** (candidates: the inert-DTO-vs-validating-type
-  split that makes status drift fall out for free; freeze-the-dispatched-lane not the re-read manifest; CLI choices
-  derived from the consumer to avoid an allow-list mirror). Gated on human review.
-- [ ] Update epic roster row (T1b -> done) -- at merge.
-- [ ] `git mv docs/board/doing/consumer_lane_binding docs/board/done/` -- **after merge to `main`**.
+- [ ] Promote durable lessons to `impl_notes.md` **after human review**. **Deferred to epic closeout** (consistent with
+  T1a-T5, which also deferred; `impl_notes.md` has no consumer_lanes entries yet, so promoting only T1b would fragment
+  the memory). Candidates, verified against shipped code 2026-06-28: (1) inert storage DTO (`LaneRecord`) vs validating
+  domain type (`Lane`) -- status-drift "not executable" falls out for free, no manifest rewrite; (2) freeze semantics --
+  the default lane never freezes (binding exists iff explicitly pinned), and the post-eval freeze reconciles against the
+  fresh under-lock manifest (`read_bound_lane(fresh) == dispatched lane`) so a concurrent `remove`/`set --runtime` drops
+  the stale write **(this reversed the pre-merge P2a "freeze the dispatched lane unconditionally")**; (3) derive CLI
+  `--runtime` choices from one `supervisor_lane_runtimes()` over the consumer's `allowed_lanes`, not a static
+  `_SUPERVISOR_RUNTIMES` mirror; (4) recurring silent-drop class -- a new `intent` field must be added to the three
+  `manager.py` inheritance allowlists or a pinned parent downgrades the child; (5) removing a manifest field is read-time
+  strip-and-warn, not a version bump (`strip_removed_supervisor_runtime`).
+- [x] Update epic roster row (T1b -> done) -- done 2026-06-28 (epic `checklist.md` + `card.md`).
+- [x] `git mv docs/board/doing/consumer_lane_binding docs/board/done/` -- done 2026-06-28 (this closeout commit).
