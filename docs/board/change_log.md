@@ -25,6 +25,38 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-28
+
+### consumer_lanes T1b: persist + freeze the supervisor lane (consumer-lane binding)
+
+**Goal**: Promote the narrow `SupervisorConfig.supervisor_runtime` field (T4) into a uniform, persisted consumer-lane
+binding -- `intent.consumer_lanes` (requested) + `confirmed.consumer_lanes` (frozen) -- so the supervisor's lane is a
+durable, frozen-at-first-dispatch fact, not a transient runtime string.
+
+**Key changes**:
+
+- **Schema (D1)**: `LaneRecord` (inert manifest DTO, no catalog validation) + `ConsumerLane{Intent,Confirmed,Binding}`
+  named-field dataclasses on `SessionIntent`/`SessionConfirmed`. `session.models` stays catalog-free; a field-parity
+  test guards `LaneRecord` against `core.lanes.Lane`.
+- **Bridge + freeze (D2)**: new `session/consumer_lanes.py` -- `read_bound_lane` (confirmed-first, else intent),
+  `ensure_consumer_lane_binding` (write-once freeze of the *dispatched* lane). The policy-check hook resolves the lane
+  and **injects** it into `run_supervisor_check` (the engine, not the hook, calls it); the freeze records the lane that
+  actually ran, not a re-read of the under-lock manifest (review P2a).
+- **Clean break (D3)**: deleted `SupervisorConfig.supervisor_runtime`, `_SUPERVISOR_RUNTIMES`,
+  `_supervisor_lane_override`. Read-time strip-and-warn for legacy manifests; shadow records bump
+  `SHADOW_SCHEMA_VERSION` 2->3 and freeze a `LaneRecord`.
+- **Setters + reject (D2)**: `--supervisor-runtime` on `session start`/`fork`, `policy supervisor set --runtime`;
+  runtime expands to a full `LaneRecord` from the consumer's declared lanes (no separate allow-list). `set --runtime`
+  hard-rejects once the lane is frozen (stateful, reads confirmed); `consumer_lanes.*` is rejected as a raw `set`
+  override (review P2b). Status reads the frozen binding, revalidates, shows "not executable" on drift without
+  rewriting. start/fork share `apply_supervisor_and_lane` (keeps `session_lifecycle.py` under the 2,500-line guard).
+- **Docs**: design.md §3.5/§3.6.2, design_appendix §G, cli_reference.md synced to the shipped binding.
+
+**Verification**: full unit suite 7074 passed; supervisor E2E (`test_supervise_cli_cascade_wiring`,
+`test_session_set_wires_supervisor_config`) pass; mypy + `make pre-commit` clean; `rg supervisor_runtime src/` clean
+except the strip helper. Codex-lane real-API E2E deferred (needs ChatGPT login); covered at unit level. Branch
+`consumer_lane_binding`, 5 slices.
+
 ## 2026-06-27
 
 ### consumer_lanes T5: lane observability (see/verify the chosen lane + billing)

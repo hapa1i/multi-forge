@@ -169,10 +169,12 @@ verified live in `--help` for all three commands; expansion spot-checked (`codex
 | `--supervisor-runtime` round-trips        | `fork P --supervise --supervisor-runtime codex`                   | `intent.consumer_lanes.supervisor` == codex `LaneRecord`                   | `tests/src/cli/test_session_commands.py`       |
 | Legacy `supervisor_runtime` strip-on-read | manifest with `intent.policy.supervisor.supervisor_runtime=codex` | loads (stripped), warns once; field gone from `SupervisorConfig`           | `tests/src/session/test_store.py`              |
 
-**Integration (before closeout):** the supervisor dispatch path is hook + `claude -p`/`codex exec`, which unit tests
-don't exercise. Run the relevant real-Claude / real-Codex supervisor E2E
-(`tests/integration/docker/test_supervisor_e2e.py`) once Slices 2-4 land -- default-lane parity + a codex-lane bind +
-the already-bound reject.
+**Integration (run at closeout):** `test_supervisor_e2e.py::test_supervise_cli_cascade_wiring` (real
+`policy supervisor set` through the modified command) + `test_session_set_wires_supervisor_config` (generic
+`session set policy.supervisor.*`, validates the Slice 2 `validate_key` change) -> **2 passed** (Docker, ~9s). These
+cover default-lane CLI parity. The `--supervisor-runtime`/`set --runtime` manifest writes are unit-covered with a real
+`SessionStore` (`test_session_commands.py`, `test_policy_supervisor.py`); a real **codex-lane** dispatch E2E is deferred
+(needs a ChatGPT login the test env lacks).
 
 ## Blockers / deferred
 
@@ -183,9 +185,12 @@ the already-bound reject.
 
 ## Closeout
 
-- [ ] All slice assertions ticked with verification recorded.
-- [ ] `make pre-commit` clean; focused unit suites + the supervisor E2E green.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Promote durable lessons to `impl_notes.md` after human review.
-- [ ] Update epic roster (T1b -> done) and the epic's T1b design-doc-sync box.
-- [ ] `git mv docs/board/doing/consumer_lane_binding docs/board/done/` after merge to `main`.
+- [x] All slice assertions ticked with verification recorded.
+- [x] `make pre-commit` clean; focused unit suites (7074 passed) + the supervisor E2E (2 passed) green.
+- [x] `change_log.md` entry (Goal / Key changes / Verification) -- 2026-06-28.
+- [x] Epic's T1b design-doc-sync box ticked (epic checklist).
+- [ ] Promote durable lessons to `impl_notes.md` **after human review** (candidates: the inert-DTO-vs-validating-type
+  split that makes status drift fall out for free; freeze-the-dispatched-lane not the re-read manifest; CLI choices
+  derived from the consumer to avoid an allow-list mirror). Gated on human review.
+- [ ] Update epic roster row (T1b -> done) -- at merge.
+- [ ] `git mv docs/board/doing/consumer_lane_binding docs/board/done/` -- **after merge to `main`**.
