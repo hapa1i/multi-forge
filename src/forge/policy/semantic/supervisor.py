@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from forge.core.invoker.types import Attribution, HeadlessResult
-from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import SessionResult, run_claude_session
@@ -27,7 +27,12 @@ from forge.policy.semantic.verdict import (
 )
 from forge.policy.types import ActionContext, PolicyDecision
 from forge.session.manager import SessionManager
-from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
+from forge.session.models import (
+    LaneRecord,
+    PolicyIntent,
+    SessionState,
+    SupervisorConfig,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -123,6 +128,17 @@ SUPERVISOR_CONSUMER = Consumer(
 )
 
 
+def supervisor_lane_runtimes() -> tuple[str, ...]:
+    """Runtime ids the supervisor lane can be set to (default first, deduplicated).
+
+    Drives the ``--supervisor-runtime`` / ``--runtime`` CLI choices from the single
+    ``SUPERVISOR_CONSUMER`` declaration, so there is no separate runtime allow-list to
+    drift (the failure mode the deleted ``_SUPERVISOR_RUNTIMES`` mirror invited). Derived
+    from ``valid_lanes`` so the menu only offers runtimes whose lane currently resolves.
+    """
+    return tuple(dict.fromkeys(lane.runtime_id for lane in valid_lanes(SUPERVISOR_CONSUMER)))
+
+
 def plan_fingerprint(path: str, forge_root: str | None) -> str:
     """Return a cheap fingerprint for cache key differentiation: path:mtime_ns:size."""
     resolved = Path(path)
@@ -167,8 +183,12 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
     - cache: ThrottleCache entries {cache_key: {checked_at, verdict, confidence}}
     """
 
-    def __init__(self, config: SupervisorConfig | None = None) -> None:
+    def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
         self._config = config
+        # Injected consumer-lane binding (epic consumer_lanes, T1b): the policy-check hook
+        # resolves it from the manifest and passes it here, so this module never reads the store.
+        # None => the default lane (byte-identical pre-T1b dispatch).
+        self._lane_record = lane_record
         ttl = config.throttle_seconds if config else 30
         self._cache = ThrottleCache(ttl_seconds=ttl)
 
@@ -229,7 +249,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
             return decision
 
         # Invoke supervisor
-        decision = invoke_supervisor(self._config, context)
+        decision = invoke_supervisor(self._config, context, lane_record=self._lane_record)
 
         # Attach intent to deny decisions
         if decision.decision == "deny":
@@ -678,39 +698,22 @@ def _headless_to_session_result(result: HeadlessResult) -> SessionResult:
     )
 
 
-def _supervisor_lane_override(config: SupervisorConfig) -> Lane | None:
-    """Map ``config.supervisor_runtime`` to a declared candidate lane, or None for the default.
-
-    None/``"claude_code"`` => no override (the default claude lane). A non-claude runtime
-    resolves to the matching ``SUPERVISOR_CONSUMER.allowed_lanes`` entry. A validated runtime
-    with NO matching lane (``_SUPERVISOR_RUNTIMES`` drifted ahead of ``allowed_lanes``) raises
-    ``LaneError`` rather than silently returning None -- a None would make ``resolve_lane`` fall
-    back to the claude default, the "stale recognized config degrades to a default" anti-pattern.
-    The raise is caught by the resolve-lane guard in ``run_supervisor_check`` -> configuration_error
-    fail-open. A drift-guard test keeps the two sets in sync so this stays unreachable in practice.
-    """
-    runtime = config.supervisor_runtime
-    if not runtime or runtime == "claude_code":
-        return None
-    for lane in SUPERVISOR_CONSUMER.allowed_lanes:
-        if lane.runtime_id == runtime:
-            return lane
-    raise LaneError(
-        f"supervisor_runtime {runtime!r} is validated but has no SUPERVISOR_CONSUMER lane "
-        f"(allowed_lanes/_SUPERVISOR_RUNTIMES drift)"
-    )
-
-
-def resolve_supervisor_lane(config: SupervisorConfig) -> Lane:
+def resolve_supervisor_lane(lane_record: LaneRecord | None) -> Lane:
     """Resolve the full ``(runtime, backend, model)`` lane the supervisor would run on.
 
-    The default claude lane (``claude_code``/``anthropic-direct``/``opus``) unless
-    ``supervisor_runtime`` selects a declared override (the codex lane). Display callers
-    (``forge policy supervisor status``) use this to show the chosen lane completely -- the
-    per-call usage event carries no backend id. Raises ``LaneError`` on
-    ``allowed_lanes``/``_SUPERVISOR_RUNTIMES`` drift; a display caller should catch it.
+    ``lane_record`` is the supervisor's consumer-lane binding (``read_bound_lane``): None =>
+    the default claude lane; a record => the bound lane. Display callers (``forge policy
+    supervisor status``) use this to show the chosen lane completely -- the per-call usage
+    event carries no backend id. Converting ``LaneRecord -> Lane`` revalidates against today's
+    catalogs, so a drifted binding raises ``LaneError``; a display caller catches it and shows
+    the lane as unresolved / not executable.
     """
-    return resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+    override = (
+        None
+        if lane_record is None
+        else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
+    )
+    return resolve_lane(SUPERVISOR_CONSUMER, override=override)
 
 
 def run_supervisor_check(
@@ -719,6 +722,7 @@ def run_supervisor_check(
     *,
     intent: str | None = None,
     usage_command: str = "supervisor",
+    lane_record: LaneRecord | None = None,
 ) -> SupervisorRun:
     """Run the frontier supervisor once; return decision + raw verdict + run/parse status.
 
@@ -726,6 +730,10 @@ def run_supervisor_check(
     auditor. ``usage_command`` labels the single cost/ledger emission (the caller
     must NOT emit again -- this is the sole emitter), so the shadow path records
     ``supervisor-shadow`` rather than double-counting as ``supervisor``.
+
+    ``lane_record`` is the injected consumer-lane binding (epic consumer_lanes, T1b):
+    the policy-check hook resolves it from the manifest and passes it, so this function
+    never reads the store. None selects the consumer's default lane.
     """
     from forge.core.reactive.env import should_spawn_subprocesses
 
@@ -770,11 +778,18 @@ def run_supervisor_check(
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
     # Resolve the supervisor's lane (T1a) under a fail-open guard, then dispatch on its
-    # runtime. The override (T4) may select the codex lane; resolve_lane rejects any
-    # override outside SUPERVISOR_CONSUMER's declared candidates, raising LaneError. A
-    # misconfigured lane must fail open, never brick the policy hook (design_workflows 1.2).
+    # runtime. The lane comes from the injected consumer-lane binding (T1b): converting the
+    # stored LaneRecord -> Lane revalidates it against today's catalogs, so a drifted binding
+    # (renamed backend) raises LaneError here and fails open as a no-call -- it never silently
+    # runs the default lane. resolve_lane also rejects any override outside SUPERVISOR_CONSUMER's
+    # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
     try:
-        lane = resolve_lane(SUPERVISOR_CONSUMER, override=_supervisor_lane_override(config))
+        override = (
+            None
+            if lane_record is None
+            else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
+        )
+        lane = resolve_lane(SUPERVISOR_CONSUMER, override=override)
     except LaneError as e:
         _log.warning("Supervisor lane resolution failed: %s", e)
         return SupervisorRun(
@@ -856,13 +871,15 @@ def invoke_supervisor(
     context: ActionContext,
     *,
     intent: str | None = None,
+    lane_record: LaneRecord | None = None,
 ) -> PolicyDecision:
     """Invoke the semantic supervisor via claude -p --resume (enforcement path).
 
     Thin wrapper over ``run_supervisor_check`` returning just the composed
-    ``PolicyDecision`` (fail-open on errors).
+    ``PolicyDecision`` (fail-open on errors). ``lane_record`` is the injected
+    consumer-lane binding (None => default lane).
     """
-    return run_supervisor_check(config, context, intent=intent).decision
+    return run_supervisor_check(config, context, intent=intent, lane_record=lane_record).decision
 
 
 # --- Setup-time helpers (used by CLI, direct commands, and --supervise flags) ---
@@ -1125,6 +1142,24 @@ def apply_supervisor_to_intent(
     # Clear conflicting override so intent.policy.enabled takes effect.
     if manifest.overrides:
         delete_override(manifest.overrides, "policy.enabled")
+
+
+def apply_supervisor_and_lane(
+    manifest: SessionState,
+    sup_config: SupervisorConfig,
+    lane_record: LaneRecord | None,
+) -> None:
+    """Write the supervisor config and (if set) its consumer-lane binding in one mutate.
+
+    The shared start/fork wiring: ``apply_supervisor_to_intent`` plus, when
+    ``--supervisor-runtime`` was given, the already-expanded ``lane_record`` into
+    ``intent.consumer_lanes.supervisor``. ``None`` leaves the lane to the consumer default.
+    """
+    from forge.session.consumer_lanes import set_intent_lane
+
+    apply_supervisor_to_intent(manifest, sup_config)
+    if lane_record is not None:
+        set_intent_lane(manifest, SUPERVISOR_CONSUMER, lane_record)
 
 
 # --- Plan reload resolution ---

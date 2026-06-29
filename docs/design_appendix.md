@@ -1171,15 +1171,17 @@ fail-open/fail-closed semantics, and per-invocation routing plan remain in desig
 
 **Consumer-lane layering (epic consumer_lanes).** Forge subprocess consumers are migrating to a *consumer-lane* model: a
 `(runtime, backend, model)` lane resolved per consumer and dispatched by runtime (`forge.core.lanes`; the pure resolver
-is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `run_supervisor_check` resolves its lane
-(`SUPERVISOR_CONSUMER`) then dispatches by runtime through an in-module seam (`_dispatch_supervisor`). Two arms ship:
+is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- the policy-check hook resolves its lane
+from the `consumer_lanes` binding (`SUPERVISOR_CONSUMER`) and **injects** it into `run_supervisor_check`, which converts
+the injected `LaneRecord` and dispatches by runtime through an in-module seam (`_dispatch_supervisor`). Two arms ship:
 
 - **`claude_code`** (default lane) -- the byte-identical `claude -p` path; transport (direct vs proxy / `base_url`) is
   still derived inside the arm by `resolve_subprocess_routing` (the chain below). The lane layer never touches the proxy
   registry.
-- **`codex`** (T4) -- the first non-claude consumer lane, selected by the narrow
-  `SupervisorConfig.supervisor_runtime="codex"` override (a declared `SUPERVISOR_CONSUMER` candidate on the `chatgpt`
-  subscription backend, `reachable_via=("codex",)`, T2). Runs headless `codex exec` **direct** to OpenAI (no proxy,
+- **`codex`** -- the first non-claude consumer lane, selected by the supervisor's `consumer_lanes` binding (a declared
+  `SUPERVISOR_CONSUMER` candidate on the `chatgpt` subscription backend, `reachable_via=("codex",)`, T2). The
+  policy-check hook reads the binding (`read_bound_lane`, confirmed-first then intent) and **injects** the resolved lane
+  into `run_supervisor_check`, which never reads the store. Runs headless `codex exec` **direct** to OpenAI (no proxy,
   read-only sandbox), **blind/transfer-fed** -- Codex has no `--resume`, so the approved plan must reach it via the
   plan-override preamble. Preflight is **cached, never probed in the hook**: `codex doctor` is ~20s and
   `run_doctor=False` cannot see `codex_store` (ChatGPT-login) auth, so the arm reads the `run_doctor=True` preflight
@@ -1191,17 +1193,23 @@ is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `
   open** -- the supervisor's contract (design_workflows §1.2).
 
 Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
-own model). All other consumers still call the resolver directly. The supervisor's narrow `supervisor_runtime` override
-is a placeholder for T1b's uniform consumer-lane manifest binding.
+own model). All other consumers still call the resolver directly. T1b replaced the narrow `supervisor_runtime` override
+with the uniform consumer-lane manifest binding: the lane is now a persisted `LaneRecord` -- an `intent.consumer_lanes`
+override that the policy-check hook freezes into `confirmed.consumer_lanes` at first dispatch (**only an explicit lane
+freezes; a consumer on its default lane never freezes and stays re-pinnable**) -- set by the resolving commands
+(`--supervisor-runtime`, `policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same
+lane is an idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
-**Observability (T5).** `forge policy supervisor status` resolves and displays the full `(runtime, backend, model)` lane
-(`resolve_supervisor_lane`: the default claude lane, or the codex override). This is the **declared** lane, not a
-dispatch record: only `runtime_id` is bound today, so the codex `model=gpt-5-codex` it prints is nominal (codex picks
-its own model) and `backend`/`model` become authoritative only when T1b freezes the consumer-lane binding.
-`forge telemetry activity` shows the per-call `runtime`/`billing_mode` each command ran on (`mixed` when a command's
-events disagree); the usage ledger carries no catalog backend id, so the full lane shows only on supervisor status. T5
-also closed the three M3 no-emission gaps -- the WorkflowPolicy checker/reviewer and the team event tagger now emit
-`policy-checker`/`policy-reviewer`/ `team-tagger` usage events (`.complete()` captures the tokens `.ask()` discarded).
+**Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
+`resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch
+record, T1b), else the `intent` override or the default claude lane. `runtime_id` selects the arm; the codex
+`model=gpt-5-codex` stays nominal (codex picks its own model). Status revalidates `LaneRecord -> Lane` on every call and
+**never rewrites** the manifest, so a frozen lane whose catalog entry was later removed prints `Lane: not executable`
+rather than crashing or silently falling back to the default. `forge telemetry activity` shows the per-call
+`runtime`/`billing_mode` each command ran on (`mixed` when a command's events disagree); the usage ledger carries no
+catalog backend id, so the full lane shows only on supervisor status. T5 also closed the three M3 no-emission gaps --
+the WorkflowPolicy checker/reviewer and the team event tagger now emit `policy-checker`/`policy-reviewer`/ `team-tagger`
+usage events (`.complete()` captures the tokens `.ask()` discarded).
 
 ### G.1 Core types (from `core.reactive.routing`)
 

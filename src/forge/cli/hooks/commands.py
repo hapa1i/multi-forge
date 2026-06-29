@@ -1169,7 +1169,7 @@ def policy_check() -> None:
         print(f"[forge] Policy check: cannot build engine: {e}", file=sys.stderr)
         sys.exit(0)
 
-    register_supervisor_and_restore(engine, effective, manifest)
+    supervisor_lane = register_supervisor_and_restore(engine, effective, manifest)
 
     import time
 
@@ -1193,6 +1193,7 @@ def policy_check() -> None:
             result=result,
             effective=effective,
             context_summary=target_label,
+            supervisor_lane=supervisor_lane,
         )
     except Exception as e:
         print(f"[forge] Policy state persistence failed: {e}", file=sys.stderr)
@@ -1343,7 +1344,7 @@ def codex_policy_check() -> None:
         print(f"[forge] Policy check: cannot build engine: {e}", file=sys.stderr)
         sys.exit(0)
 
-    register_supervisor_and_restore(engine, effective, manifest)
+    supervisor_lane = register_supervisor_and_restore(engine, effective, manifest)
 
     import time
 
@@ -1390,6 +1391,7 @@ def codex_policy_check() -> None:
             entries=[(result, f"apply_patch:{path}" if path else "apply_patch") for path, result in file_results],
             effective=effective,
             confirmed_by="hook:codex-policy-check",
+            supervisor_lane=supervisor_lane,
         )
     except Exception as e:
         print(f"[forge] Policy state persistence failed: {e}", file=sys.stderr)

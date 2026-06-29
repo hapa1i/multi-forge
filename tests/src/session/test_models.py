@@ -9,7 +9,11 @@ from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
     CodexConfirmed,
+    ConsumerLaneBinding,
+    ConsumerLaneConfirmed,
+    ConsumerLaneIntent,
     DesignatedDoc,
+    LaneRecord,
     LaunchConfirmed,
     LaunchIntent,
     MemoryIntent,
@@ -715,3 +719,83 @@ class TestConstants:
     def test_index_version(self) -> None:
         """INDEX_VERSION should be 1."""
         assert INDEX_VERSION == 1
+
+
+class TestConsumerLanes:
+    """LaneRecord DTO + consumer_lanes manifest sections (epic consumer_lanes, T1b)."""
+
+    def test_lanerecord_stores_unknown_ids_without_catalog_validation(self) -> None:
+        """LaneRecord is an inert DTO: it must NOT validate against the live catalogs.
+
+        Contrast with core.lanes.Lane, which raises on an unknown runtime/backend. A
+        stale historical binding must stay loadable, not become corrupt state.
+        """
+        from forge.core.lanes import Lane, LaneError
+
+        rec = LaneRecord("ghost_runtime", "ghost_backend", "ghost-model")
+        assert (rec.runtime_id, rec.backend_id, rec.model) == ("ghost_runtime", "ghost_backend", "ghost-model")
+        # The validating twin rejects the same values.
+        with pytest.raises(LaneError):
+            Lane("ghost_runtime", "ghost_backend", "ghost-model")
+
+    @pytest.mark.parametrize("field", ["runtime_id", "backend_id", "model"])
+    def test_lanerecord_rejects_empty_fields(self, field: str) -> None:
+        """Each LaneRecord field must be a non-empty string."""
+        kwargs = {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}
+        kwargs[field] = ""
+        with pytest.raises(ValueError, match=field):
+            LaneRecord(**kwargs)
+
+    @pytest.mark.parametrize("bad_value", [123, None, True, 1.5])
+    def test_lanerecord_rejects_non_string_fields(self, bad_value: object) -> None:
+        """A LaneRecord field must be a real str (matches the annotation), not just truthy.
+
+        Slice 2 setters build LaneRecord directly, bypassing dacite's type check.
+        """
+        with pytest.raises(ValueError, match="runtime_id"):
+            LaneRecord(bad_value, "chatgpt", "gpt-5-codex")  # type: ignore[arg-type]  # runtime-validation test
+
+    def test_lanerecord_is_frozen(self) -> None:
+        """LaneRecord is a frozen value object (like core.lanes.Lane)."""
+        import dataclasses
+
+        rec = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            rec.model = "other"  # type: ignore[misc]
+
+    def test_consumer_lanes_intent_round_trips_strict(self) -> None:
+        """A SessionIntent carrying consumer_lanes survives a strict dacite round-trip."""
+        from dataclasses import asdict
+
+        import dacite
+
+        intent = SessionIntent(
+            consumer_lanes=ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex")),
+        )
+        restored = dacite.from_dict(SessionIntent, asdict(intent), config=dacite.Config(strict=True))
+        assert restored == intent
+        assert restored.consumer_lanes is not None
+        assert restored.consumer_lanes.supervisor == LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+    def test_consumer_lanes_confirmed_round_trips_strict(self) -> None:
+        """A SessionConfirmed carrying a frozen binding survives a strict dacite round-trip."""
+        from dataclasses import asdict
+
+        import dacite
+
+        confirmed = SessionConfirmed(
+            consumer_lanes=ConsumerLaneConfirmed(
+                supervisor=ConsumerLaneBinding(
+                    lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+                    source="intent",
+                    resolved_at=now_iso(),
+                ),
+            ),
+        )
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored == confirmed
+
+    def test_consumer_lanes_default_none(self) -> None:
+        """consumer_lanes is optional + defaulted (additive schema change, no version bump)."""
+        assert SessionIntent().consumer_lanes is None
+        assert SessionConfirmed().consumer_lanes is None

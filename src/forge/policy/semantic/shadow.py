@@ -33,15 +33,15 @@ from forge.session.artifacts import (
     make_content_hash,
     safe_copy_file,
 )
-from forge.session.models import SupervisorConfig
+from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# v2 (T4): ShadowCandidate gains supervisor_runtime so a codex-configured session is replayed
-# on the codex frontier, not silently audited against claude. Old v1 candidates lack the field;
-# reconstruct_config reads it via `.get()` (absent -> None -> claude default), so in-flight v1
-# records still drain cleanly.
-SHADOW_SCHEMA_VERSION = 2
+# v3 (T1b): the replay lane is the resolved consumer-lane binding (a LaneRecord), replacing the
+# v2 supervisor_runtime string. Shadow candidates are runtime-only state; an in-flight older
+# record simply lacks ``lane`` and replays on the claude default (reconstruct reads it via
+# `.get()`), which is acceptable to discard-and-default per coding_standards section 5.
+SHADOW_SCHEMA_VERSION = 3
 
 # Record-file suffixes (the candidate's lifecycle states). The `.plan.md` sidecar is deliberately excluded so it is
 # never counted toward the cap nor mistaken for a candidate record.
@@ -85,11 +85,12 @@ class ShadowCandidate:
     forge_root: str | None
     timeout_seconds: int
     fork_session: bool
-    # Lane runtime override (T4): the shadow must replay on the SAME lane production uses, else it
+    # Resolved replay lane (T1b): the shadow must replay on the SAME lane production uses, else it
     # audits the wrong frontier (a codex-configured session measured against the claude judge).
-    # No default: only the capture site constructs ShadowCandidate; stored dicts are read via
-    # `.get()` in reconstruct_config, so absent old-schema values tolerate cleanly there.
-    supervisor_runtime: str | None
+    # A frozen LaneRecord (not a runtime string), so backend/model survive too. No default: only
+    # the capture site constructs ShadowCandidate; stored dicts are read via `.get()` in
+    # reconstruct, so absent old-schema values tolerate cleanly there.
+    lane: LaneRecord | None
 
     # Audit + dimensions (so a later prompt/model change does not turn the history into mixed-quality mush).
     tier1_reason: str
@@ -218,6 +219,7 @@ def capture_candidate(
     checker_provider: str | None,
     checker_budget_tokens: int,
     checker_prompt_version: int,
+    lane_record: LaneRecord | None = None,
 ) -> Path | None:
     """Freeze a sampled tier-1 allow as a pending shadow candidate.
 
@@ -279,7 +281,7 @@ def capture_candidate(
         forge_root=config.forge_root,
         timeout_seconds=config.timeout_seconds,
         fork_session=config.fork_session,
-        supervisor_runtime=config.supervisor_runtime,
+        lane=lane_record,
         tier1_reason=tier1_reason,
         checker_provider=checker_provider,
         checker_model=checker_model,

@@ -6,6 +6,7 @@ Covers: ClaudeHookAdapter.build_contexts, _persist_policy_state.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -293,3 +294,157 @@ class TestPersistPolicyState:
         mutate_fn = store.update.call_args[1]["mutate"]
         with pytest.raises(TypeError, match="Expected SessionState"):
             mutate_fn("not a session state")
+
+
+class TestSupervisorLaneBindingFreeze:
+    """T1b: the locked post-eval _mutate freezes the supervisor consumer-lane binding, write-if-absent."""
+
+    _BUILD_RETURN = {
+        "forge_version": "0.1.0",
+        "bundles": [],
+        "rules_active": [],
+        "decisions": [],
+        "policy_states": {},
+    }
+
+    def _effective(self, *, resume_id: str | None = "planner", suspended: bool = False) -> MagicMock:
+        eff = MagicMock()
+        eff.policy.bundles = []
+        eff.policy.supervisor.resume_id = resume_id
+        eff.policy.supervisor.suspended = suspended
+        return eff
+
+    def _state(self) -> Any:
+        from forge.core.state import now_iso
+        from forge.session.models import SessionState
+
+        return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+
+    def _run_mutate(self, state: Any, effective: MagicMock, supervisor_lane: Any = None) -> None:
+        engine = MagicMock()
+        engine.get_collected_state.return_value = {}
+        store = MagicMock()
+        _persist_policy_state(
+            store=store,
+            engine=engine,
+            result=MagicMock(),
+            effective=effective,
+            context_summary="ctx",
+            supervisor_lane=supervisor_lane,
+        )
+        store.update.call_args[1]["mutate"](state)
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_configured_supervisor_on_default_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A configured supervisor running on its default lane freezes nothing (MEDIUM contract).
+
+        supervisor_lane is None (no explicit choice), so confirmed stays empty and the lane is
+        still re-pinnable -- immutability protects an explicit choice, not the default.
+        """
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective())  # supervisor_lane defaults to None (ran on default)
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_suspended_supervisor_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A suspended supervisor is not dispatched, so no binding is frozen."""
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective(suspended=True))
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_no_supervisor_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A policy run with no configured supervisor (resume_id None) freezes nothing."""
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        self._run_mutate(state, self._effective(resume_id=None))
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_freeze_is_write_if_absent(self, mock_build: MagicMock) -> None:
+        """An existing binding is never overwritten by a later check dispatching the same lane."""
+        from forge.session.models import (
+            ConsumerLaneBinding,
+            ConsumerLaneConfirmed,
+            LaneRecord,
+        )
+
+        mock_build.return_value = self._BUILD_RETURN
+        state = self._state()
+        frozen = ConsumerLaneBinding(
+            lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at="2020-01-01T00:00:00Z"
+        )
+        state.confirmed.consumer_lanes = ConsumerLaneConfirmed(supervisor=frozen)
+        # Dispatch matches the frozen lane (read_bound_lane is confirmed-first -> codex), so the
+        # stale-write guard passes and ensure's write-if-absent runs: the prior binding wins, never
+        # rewritten (the 2020 resolved_at survives, proving identity).
+        self._run_mutate(state, self._effective(), supervisor_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
+        assert state.confirmed.consumer_lanes.supervisor is frozen
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_stale_lane_dropped_when_bound_lane_changed(self, mock_build: MagicMock) -> None:
+        """Stale-write guard (supersedes P2a): a concurrent set/remove that changes the bound lane
+        between dispatch and the under-lock freeze drops the stale dispatched lane.
+
+        ``supervisor_lane`` (codex) is what dispatched, but the fresh manifest no longer dispatches it
+        (here it has no consumer_lanes -> default), so the freeze is skipped. This is the seam that
+        stops a removed/re-pointed lane from being resurrected by a long in-flight check.
+        """
+        from forge.session.models import LaneRecord
+
+        mock_build.return_value = self._BUILD_RETURN
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()  # fresh manifest dispatches the default; codex was the stale dispatch
+        self._run_mutate(state, self._effective(), supervisor_lane=codex)
+
+        # read_bound_lane(state) is None (default) != codex -> nothing frozen.
+        assert state.confirmed.consumer_lanes is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_default_run_does_not_lock_out_later_pin(self, mock_build: MagicMock) -> None:
+        """Lock-out regression (MEDIUM): a supervisor that first ran on its default lane must still
+        accept a later explicit pin. The default run freezes nothing, so the next run on an injected
+        lane freezes normally -- an early default check never locks the user into the default.
+        """
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._BUILD_RETURN
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+
+        # First check ran on the default (no injected lane) -> nothing frozen, lane stays re-pinnable.
+        # Capture into a throwaway local so the `is None` assertion doesn't narrow the attribute
+        # expression itself (the second _run_mutate repopulates it, but mypy can't see that).
+        self._run_mutate(state, self._effective())
+        after_default = state.confirmed.consumer_lanes
+        assert after_default is None
+
+        # The user then pins codex (intent), and a later check dispatches + freezes it. The fresh
+        # manifest dispatches codex, so the stale-write guard passes.
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        self._run_mutate(state, self._effective(), supervisor_lane=codex)
+        confirmed = state.confirmed.consumer_lanes
+        assert confirmed is not None
+        assert confirmed.supervisor is not None
+        assert confirmed.supervisor.lane == codex
+
+    def test_register_injects_and_returns_bound_lane(self) -> None:
+        """register_supervisor_and_restore reads the manifest binding, injects it, and returns it."""
+        from forge.cli.hooks.policy import register_supervisor_and_restore
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        eff = self._effective()
+        eff.policy.supervisor.cascade = False
+        eff.policy.supervisor.throttle_seconds = 30
+        manifest = self._state()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+
+        engine = MagicMock()
+        returned = register_supervisor_and_restore(engine, eff, manifest)
+
+        registered = engine.register.call_args[0][0]
+        assert registered._lane_record == codex  # injected into the policy
+        assert returned == codex  # and returned for the caller to thread into the freeze

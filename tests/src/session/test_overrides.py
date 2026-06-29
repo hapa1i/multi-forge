@@ -145,6 +145,26 @@ class TestValidateKey:
         """Only launch.runtime is blocked; sibling launch keys keep working."""
         assert validate_key("launch.mode") == ["launch", "mode"]
 
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "consumer_lanes",
+            "consumer_lanes.supervisor",
+            "consumer_lanes.supervisor.runtime_id",
+        ],
+    )
+    def test_consumer_lanes_rejected_as_command_only(self, key: str) -> None:
+        """consumer_lanes.* is set only via resolving commands, never a raw override (T1b).
+
+        The whole subtree is blocked -- a partial leaf can't rehydrate a 3-field LaneRecord, and a
+        full-object override would bypass the runtime->LaneRecord expansion + already-bound reject and,
+        after first dispatch, become recorded-but-ignored (dispatch reads the frozen confirmed binding).
+        """
+        with pytest.raises(InvalidOverrideKeyError) as exc_info:
+            validate_key(key)
+        assert "set via resolving commands" in str(exc_info.value)
+        assert "--supervisor-runtime" in str(exc_info.value)
+
     def test_unknown_nested_key_rejected(self) -> None:
         """Unknown nested keys are rejected."""
         with pytest.raises(InvalidOverrideKeyError) as exc_info:

@@ -39,6 +39,7 @@ from forge.core.state.exceptions import StateCorruptedError, StateUnreadableErro
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     apply_checker_options,
+    supervisor_lane_runtimes,
     validate_checker_model,
 )
 from forge.session import (
@@ -843,6 +844,7 @@ def launch_new_session(
     checker_provider: str | None = None,
     checker_effort: str | None = None,
     supervisor_effort: str | None = None,
+    supervisor_runtime: str | None = None,
     subprocess_proxy: str | None = None,
     direct_model: str | None = None,
     memory_flag: bool | None = None,
@@ -1014,9 +1016,11 @@ def launch_new_session(
     # --- wire supervisor (if requested) ---
     if supervise_target and _supervisor_source_state is not None:
         from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            apply_supervisor_and_lane,
             apply_supervisor_routing,
-            apply_supervisor_to_intent,
         )
+        from forge.session.consumer_lanes import lane_record_for_runtime
         from forge.session.models import SupervisorConfig
         from forge.session.store import SessionStore
 
@@ -1048,9 +1052,12 @@ def launch_new_session(
         if supervisor_effort is not None:
             sup_config.supervisor_effort = supervisor_effort
 
+        # --supervisor-runtime expands to a full lane and rides the same locked supervisor update.
+        lane = lane_record_for_runtime(SUPERVISOR_CONSUMER, supervisor_runtime) if supervisor_runtime else None
+
         forge_root = _sup_forge_root
         store = SessionStore(forge_root, manifest.name)
-        store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
+        store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
         manifest = store.read()
 
     # --- compute launch parameters ---
@@ -1250,6 +1257,13 @@ def launch_new_session(
     help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
 )
 @click.option(
+    "--supervisor-runtime",
+    "supervisor_runtime",
+    type=click.Choice(list(supervisor_lane_runtimes())),
+    default=None,
+    help="Supervisor lane runtime (claude_code/codex; requires --supervise)",
+)
+@click.option(
     "--subprocess-proxy",
     "subprocess_proxy",
     type=str,
@@ -1288,6 +1302,7 @@ def start(
     checker_provider: str | None,
     checker_effort: str | None,
     supervisor_effort: str | None,
+    supervisor_runtime: str | None,
     subprocess_proxy: str | None,
     memory_flag: str | None,
     runtime: str,
@@ -1340,9 +1355,11 @@ def start(
         print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
         sys.exit(1)
     if (
-        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
     ) and not supervise_target:
-        print_error("--cascade/--checker-*/--supervisor-effort require --supervise", console=console)
+        print_error(
+            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise", console=console
+        )
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
@@ -1407,6 +1424,7 @@ def start(
             checker_provider=checker_provider,
             checker_effort=checker_effort,
             supervisor_effort=supervisor_effort,
+            supervisor_runtime=supervisor_runtime,
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
             memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,

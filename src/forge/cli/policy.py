@@ -27,6 +27,7 @@ from rich.text import Text
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.lanes import LaneError
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -36,15 +37,29 @@ from forge.policy.queries import (
 )
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
+    SUPERVISOR_CONSUMER,
     apply_checker_options,
     resolve_supervisor_lane,
+    supervisor_lane_runtimes,
     validate_checker_model,
 )
 from forge.session import SessionStore
+from forge.session.consumer_lanes import (
+    clear_consumer_lane,
+    confirmed_lane,
+    lane_record_for_runtime,
+    read_bound_lane,
+    set_intent_lane,
+)
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
-from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
+from forge.session.models import (
+    LaneRecord,
+    PolicyIntent,
+    SessionState,
+    SupervisorConfig,
+)
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sessions_dir
 
 console = Console()
@@ -56,6 +71,7 @@ _log = logging.getLogger(__name__)
 _CHECKER_PROVIDER_CHOICES = click.Choice(list(CHECKER_PROVIDER_CHOICES))
 _CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
 _SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
+_SUPERVISOR_RUNTIME_CHOICES = click.Choice(list(supervisor_lane_runtimes()))
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -364,13 +380,13 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
             swp = ts.confirmed.started_with_proxy
             if swp and swp.template:
                 data["source_model"] = swp.template
-    # T5/WS3: the full resolved lane (runtime, backend, model) the supervisor runs on -- this is
-    # where "the chosen lane" shows completely (the per-call usage event carries no backend id).
-    data["supervisor_runtime"] = sup.supervisor_runtime
+    # The full resolved lane (runtime, backend, model) the supervisor runs on -- the chosen
+    # consumer-lane binding (epic consumer_lanes, T1b): confirmed binding if frozen, else intent,
+    # else default. The per-call usage event carries no backend id, so this is where it shows.
     try:
-        lane = resolve_supervisor_lane(sup)
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         data["lane"] = {"runtime": lane.runtime_id, "backend": lane.backend_id, "model": lane.model}
-    except Exception as exc:  # allowed_lanes/_SUPERVISOR_RUNTIMES drift -> show null, never crash status
+    except Exception as exc:  # drifted/removed catalog entry -> show null, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         data["lane"] = None
     return data
@@ -962,14 +978,14 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         if swp and swp.template:
             console.print(f"  Source model: {swp.template}")
 
-    # T5/WS3: the full resolved lane (runtime, backend, model) -- where the chosen lane shows.
+    # The full resolved lane (runtime, backend, model) -- the chosen consumer-lane binding
+    # (epic consumer_lanes, T1b): confirmed binding if frozen, else intent override, else default.
     try:
-        lane = resolve_supervisor_lane(sup)
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
         console.print(f"  Lane: runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}")
-    except Exception as exc:
+    except Exception as exc:  # drifted/removed catalog entry -> mark unresolved, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
-        if sup.supervisor_runtime:
-            console.print(f"  Lane: runtime={sup.supervisor_runtime} (unresolved)")
+        console.print("  Lane: [yellow]not executable[/yellow] (binding no longer valid)")
 
     if sup.proxy:
         console.print(f"  Routing: proxy: {sup.proxy}")
@@ -991,6 +1007,29 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
             console.print(f"  Checker effort: {sup.checker_effort}")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")
+
+
+class _SupervisorLaneFrozenError(Exception):
+    """Signals `set --runtime` that the lane was frozen concurrently (under-lock re-check).
+
+    Raised inside the locked mutate so ``store.update`` aborts before persisting (the write is
+    the last step after ``mutate``); the caller catches it and reuses the same reject as the
+    pre-lock fast path.
+    """
+
+    def __init__(self, frozen: LaneRecord) -> None:
+        super().__init__("supervisor lane already frozen")
+        self.frozen = frozen
+
+
+def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
+    """Print the already-bound supervisor-lane reject (caller exits 1)."""
+    print_error_with_tip(
+        "Cannot change the supervisor lane for an already-bound session.",
+        f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
+        "Start or fork a fresh session to use a different lane.",
+        console=console,
+    )
 
 
 @supervisor.command(name="set")
@@ -1044,6 +1083,13 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     default=None,
     help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max)",
 )
+@click.option(
+    "--runtime",
+    "runtime",
+    type=_SUPERVISOR_RUNTIME_CHOICES,
+    default=None,
+    help="Supervisor lane runtime (claude_code/codex); rejected once the lane is frozen",
+)
 def supervisor_set(
     target: str,
     session_name: str | None,
@@ -1055,6 +1101,7 @@ def supervisor_set(
     checker_provider: str | None,
     checker_effort: str | None,
     supervisor_effort: str | None,
+    runtime: str | None,
 ) -> None:
     """Set the semantic supervisor target for the session.
 
@@ -1091,6 +1138,29 @@ def supervisor_set(
     store, _state = _resolve_policy_session(cwd, session_name)
     name = _state.name
     manifest = store.read()
+
+    # Resolve the supervisor lane before any side effect. The binding is immutable once
+    # frozen (card D2): a post-bind --runtime would write intent that dispatch ignores
+    # (read_bound_lane is confirmed-first) -- the "recorded but ignored" failure the
+    # launch.runtime reject also guards. This pre-lock check on the unlocked read is a
+    # fast path that fails before the proxy auto-start below; the authoritative guard is
+    # the under-lock re-check in _apply (a hook can freeze between this read and that
+    # write). Expanded to a full LaneRecord up front so a bad runtime also fails early.
+    lane_record: LaneRecord | None = None
+    if runtime is not None:
+        try:
+            lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
+        except LaneError as e:
+            print_error(f"{e}", console=console)
+            sys.exit(1)
+        # Reject only a genuine *change*: re-pinning the already-frozen lane is an
+        # idempotent no-op (the user re-runs `set --runtime <same>` to also retarget
+        # the supervisor). Expanding lane_record first lets us compare full records.
+        frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
+        if frozen is not None and frozen != lane_record:
+            _reject_supervisor_lane_change(frozen)
+            sys.exit(1)
+
     # Validate the target in the selected session's scope, not CWD: a cross-worktree
     # --session would otherwise search the wrong project.
     _policy_fr = manifest.forge_root or _resolve_forge_root(cwd)
@@ -1154,8 +1224,29 @@ def supervisor_set(
             checker_effort=checker_effort,
         )
 
-    store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
+    def _apply(m: SessionState) -> None:
+        # Authoritative already-bound guard: re-check the *fresh* manifest under the lock. A
+        # hook may have frozen confirmed.consumer_lanes between the unlocked read above and
+        # here; writing a *different* intent lane now would be recorded-but-ignored (dispatch
+        # is confirmed-first). A same-lane re-pin (frozen == lane_record) is a permitted no-op.
+        # Raise to abort the whole update -- store.update persists only if the mutate returns,
+        # so nothing (not even the supervisor config) is written.
+        if lane_record is not None:
+            frozen = confirmed_lane(m, SUPERVISOR_CONSUMER)
+            if frozen is not None and frozen != lane_record:
+                raise _SupervisorLaneFrozenError(frozen)
+        apply_supervisor_to_intent(m, sup_config)
+        if lane_record is not None:
+            set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
+
+    try:
+        store.update(timeout_s=5.0, mutate=_apply)
+    except _SupervisorLaneFrozenError as exc:
+        _reject_supervisor_lane_change(exc.frozen)
+        sys.exit(1)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
+    if lane_record is not None:
+        console.print(f"  Lane: runtime={lane_record.runtime_id} (freezes on first check)")
     if routing_display:
         label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
         console.print(f"  Routing ({label}): {routing_display}")
@@ -1229,6 +1320,9 @@ def supervisor_remove(session_name: str | None) -> None:
     def _remove_sup(m: SessionState) -> None:
         if m.intent.policy and m.intent.policy.supervisor:
             m.intent.policy.supervisor = None
+        # The lane binding belongs to the supervisor consumer: removing the supervisor must
+        # orphan-clear it (intent + confirmed), else read_bound_lane resurrects it on a re-add.
+        clear_consumer_lane(m, SUPERVISOR_CONSUMER)
 
     store.update(timeout_s=5.0, mutate=_remove_sup)
     console.print(f"Supervisor removed from session [cyan]{name}[/cyan]")

@@ -25,9 +25,6 @@ INDEX_VERSION = 1
 # module's import chain stays free of the heavy core.llm package (litellm clients);
 # tests/src/core/test_effort.py is the drift guard that asserts equality.
 _CHECKER_EFFORT_LEVELS = ("none", "low", "medium", "high", "xhigh")
-# Lane runtimes a supervisor may be placed on (epic consumer_lanes, T4). The override maps to
-# SUPERVISOR_CONSUMER's declared lanes; keep in sync with that consumer's allowed_lanes.
-_SUPERVISOR_RUNTIMES = ("claude_code", "codex")
 
 
 # --- Worktree metadata (embedded in SessionState) ---
@@ -160,10 +157,6 @@ class SupervisorConfig:
     proxy: str | None = None  # Optional: proxy_id or template name for base_url lookup
     direct: bool = False  # When True, force direct Anthropic routing
     base_url: str | None = None  # Optional: explicit base_url override
-    # Lane runtime override (epic consumer_lanes, T4): None/"claude_code" => the byte-identical claude -p
-    # supervisor; "codex" => the codex-exec lane. Narrow field; T1b generalizes to a uniform consumer-lane
-    # binding. Validated below against _SUPERVISOR_RUNTIMES.
-    supervisor_runtime: str | None = None
     forge_root: str | None = None  # Scope for name-based lookups (set at wiring time)
     timeout_seconds: int = 45  # Max time to wait for supervisor response (15s margin within 60s hook timeout)
     throttle_seconds: int = 30  # Min time between supervisor calls (for caching)
@@ -199,10 +192,6 @@ class SupervisorConfig:
         if self.checker_effort is not None and self.checker_effort not in _CHECKER_EFFORT_LEVELS:
             raise ValueError(
                 f"checker_effort must be one of {', '.join(_CHECKER_EFFORT_LEVELS)}, got {self.checker_effort!r}"
-            )
-        if self.supervisor_runtime is not None and self.supervisor_runtime not in _SUPERVISOR_RUNTIMES:
-            raise ValueError(
-                f"supervisor_runtime must be one of {', '.join(_SUPERVISOR_RUNTIMES)}, got {self.supervisor_runtime!r}"
             )
 
 
@@ -257,6 +246,72 @@ class VerificationConfig:
     test_timeout_seconds: int = 300  # 5 minutes default (test_suite only)
 
 
+# --- Consumer lanes (epic consumer_lanes, T1b) ---
+
+
+@dataclass(frozen=True)
+class LaneRecord:
+    """Persisted ``(runtime, backend, model)`` lane placement -- an inert manifest DTO.
+
+    Storage twin of ``forge.core.lanes.Lane``: identical fields, but deliberately
+    **no** catalog/runtime validation, so a manifest read never depends on today's
+    ``RUNTIMES`` / ``ModelSource`` catalogs (a renamed backend leaves a stale
+    binding, not corrupt state). The binding write path converts ``LaneRecord ->
+    Lane`` once to validate; dispatch/status revalidate on demand. Field parity
+    with ``Lane`` is drift-guarded (``tests/src/core/test_lanes.py``).
+    """
+
+    runtime_id: str
+    backend_id: str
+    model: str
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("runtime_id", self.runtime_id),
+            ("backend_id", self.backend_id),
+            ("model", self.model),
+        ):
+            # Enforce the `str` annotation at runtime, not just truthiness: Slice 2
+            # setters build LaneRecord directly (bypassing dacite's type check), and
+            # a non-str like 123 is truthy.
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"LaneRecord requires a non-empty string {name}")
+
+
+@dataclass
+class ConsumerLaneIntent:
+    """Requested per-consumer lane overrides (session-owned intent).
+
+    Named field per consumer (never a ``dict``) so strict deserialization and
+    override-path validation stay per-field. T1b wires the supervisor only; T6
+    adds sibling fields.
+    """
+
+    supervisor: LaneRecord | None = None
+
+
+@dataclass
+class ConsumerLaneBinding:
+    """A consumer's frozen, resolved lane -- written once at first dispatch.
+
+    Inert record plus the anchor the "already bound" reject checks. A binding exists
+    iff an *explicit* lane choice was frozen (the default lane never freezes), so
+    ``source`` is currently always ``"intent"``; it stays a plain ``str`` per the
+    fail-open ``*Confirmed`` style and as a forward slot for future provenance (T6).
+    """
+
+    lane: LaneRecord
+    source: str
+    resolved_at: str
+
+
+@dataclass
+class ConsumerLaneConfirmed:
+    """Frozen per-consumer lane bindings (hook-written, write-once per consumer)."""
+
+    supervisor: ConsumerLaneBinding | None = None
+
+
 @dataclass
 class SessionIntent:
     """What Forge intends for this session.
@@ -273,6 +328,8 @@ class SessionIntent:
     memory: MemoryIntent | None = None
     policy: PolicyIntent | None = None
     verification: VerificationConfig | None = None
+    # Frozen-at-first-dispatch consumer-lane overrides (epic consumer_lanes, T1b).
+    consumer_lanes: ConsumerLaneIntent | None = None
 
 
 # --- Confirmed section - what Claude Code actually did (filled by hooks) ---
@@ -533,6 +590,10 @@ class SessionConfirmed:
     # already inherited the CWD. Used by resume to match Claude's project
     # namespace (~/.claude/projects/<encoded-cwd>/).
     claude_project_root: str | None = None
+
+    # Frozen consumer-lane bindings (epic consumer_lanes, T1b). Hook-written
+    # (policy-check `_mutate`), write-once per consumer dispatch.
+    consumer_lanes: ConsumerLaneConfirmed | None = None
 
     confirmed_at: str | None = None  # ISO8601 string
     confirmed_by: str | None = None  # e.g., "hook:SessionStart"

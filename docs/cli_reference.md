@@ -48,10 +48,11 @@ Note: `session resume --fresh --review` opens the per-child user-notes overlay (
 Session transfer context lives under `forge session transfer`.
 
 `fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
-`--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), and `--supervisor-effort`
-(`low/medium/high/xhigh/max`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier
-when no plan exists yet (unlike `forge policy supervisor set --cascade`, which resolves the plan eagerly). See
-[session.md](end-user/session.md).
+`--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), `--supervisor-effort`
+(`low/medium/high/xhigh/max`), and `--supervisor-runtime` (`claude_code/codex` -- the supervisor's consumer lane, frozen
+at its first policy check; a fork's child gets its own binding). Launch-time `--cascade` sets the flag only; the runtime
+hook escalates to the frontier when no plan exists yet (unlike `forge policy supervisor set --cascade`, which resolves
+the plan eagerly). See [session.md](end-user/session.md).
 
 Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)):
 `forge session start <name> --runtime codex` launches the interactive `codex` TUI (bare, or an interactive bridge with
@@ -185,25 +186,26 @@ runners.
 
 ### Policy enforcement
 
-| Command                                                        | Purpose                                                                                                          |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `forge policy enable --bundle <name>`                          | Enable policy enforcement for current session                                                                    |
-| `forge policy disable`                                         | Disable policy enforcement                                                                                       |
-| `forge policy status`                                          | Show current policy state (`--json`)                                                                             |
-| `forge policy list`                                            | List available bundles and rules (`--json`)                                                                      |
-| `forge policy check --bundle <name> -f <path>`                 | Evaluate policies on demand                                                                                      |
-| `forge policy supervisor status`                               | Show supervisor config + the declared `(runtime, backend, model)` lane (only `runtime` is bound today; `--json`) |
-| `forge policy supervisor evaluate -f <path> -r <id>`           | Evaluate file against approved plan                                                                              |
-| `forge policy supervisor set <target>`                         | Set persistent supervisor for session                                                                            |
-| `forge policy supervisor cascade on/off`                       | Toggle the tier-1 plan check (cascade)                                                                           |
-| `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`                                              |
-| `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                                                                    |
-| `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                                                                     |
-| `forge policy supervisor remove`                               | Remove supervisor entirely                                                                                       |
-| `forge policy supervisor reload`                               | Reload latest relevant approved plan                                                                             |
-| `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                                                                   |
-| `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                                                               |
-| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)                                                   |
+| Command                                                        | Purpose                                                                                                                                        |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge policy enable --bundle <name>`                          | Enable policy enforcement for current session                                                                                                  |
+| `forge policy disable`                                         | Disable policy enforcement                                                                                                                     |
+| `forge policy status`                                          | Show current policy state (`--json`)                                                                                                           |
+| `forge policy list`                                            | List available bundles and rules (`--json`)                                                                                                    |
+| `forge policy check --bundle <name> -f <path>`                 | Evaluate policies on demand                                                                                                                    |
+| `forge policy supervisor status`                               | Show supervisor config + the bound `(runtime, backend, model)` lane (frozen binding, else intent/default; `not executable` on drift; `--json`) |
+| `forge policy supervisor evaluate -f <path> -r <id>`           | Evaluate file against approved plan                                                                                                            |
+| `forge policy supervisor set <target>`                         | Set persistent supervisor for session                                                                                                          |
+| `forge policy supervisor cascade on/off`                       | Toggle the tier-1 plan check (cascade)                                                                                                         |
+| `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`                                                                            |
+| `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                                                                                                  |
+| `forge policy supervisor set <target> --runtime <r>`           | Set the supervisor consumer lane (`claude_code/codex`); rejected once the lane is frozen                                                       |
+| `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                                                                                                   |
+| `forge policy supervisor remove`                               | Remove supervisor entirely                                                                                                                     |
+| `forge policy supervisor reload`                               | Reload latest relevant approved plan                                                                                                           |
+| `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                                                                                                 |
+| `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                                                                                             |
+| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)                                                                                 |
 
 ### Workflow
 

@@ -8,7 +8,7 @@ from typing import Any
 from forge.core.state import now_iso
 from forge.policy.types import ActionContext, CompositeDecision
 from forge.session import SessionStore
-from forge.session.models import SessionState
+from forge.session.models import LaneRecord, SessionState
 from forge.session.store import HOOK_LOCK_TIMEOUT_S
 
 
@@ -164,32 +164,46 @@ def build_hook_engine(effective: Any) -> Any:
     return build_engine(bundles, fail_mode=fail_mode, bundle_config=bundle_config or None)
 
 
-def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) -> None:
+def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) -> LaneRecord | None:
     """Register the semantic supervisor (cascade-aware) and restore persisted state.
 
     Registration precedes ``restore_state`` so cached supervisor/plan-check state is
     restored into the registered policy instances.
+
+    Returns the supervisor's injected consumer-lane binding (None when no supervisor is
+    configured, or when it resolves to the default lane). The caller threads this same
+    value into the post-eval freeze so the binding records the lane that actually
+    dispatched -- not a fresh manifest read that could race a concurrent intent change.
     """
     sup = effective.policy.supervisor if effective.policy else None
     has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
+    lane_record: LaneRecord | None = None
     if has_supervisor:
-        from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
+        from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            SemanticSupervisorPolicy,
+        )
+        from forge.session.consumer_lanes import read_bound_lane
 
         sup_cfg = effective.policy.supervisor
+        # Inject the supervisor's consumer-lane binding (epic consumer_lanes, T1b). The hook holds
+        # the manifest; the semantic module never reads the store. None => the default lane.
+        lane_record = read_bound_lane(manifest, SUPERVISOR_CONSUMER)
         if sup_cfg and sup_cfg.cascade:
             # Cascade: the cheap tier-1 plan check runs on every event; the frontier
             # supervisor becomes the needs_review resolver (invoked only on escalation).
             from forge.policy.semantic.plan_check import PlanCheckPolicy
 
-            engine.register(PlanCheckPolicy(config=sup_cfg))
-            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg))
+            engine.register(PlanCheckPolicy(config=sup_cfg, lane_record=lane_record))
+            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
         else:
-            engine.register(SemanticSupervisorPolicy(config=sup_cfg))
+            engine.register(SemanticSupervisorPolicy(config=sup_cfg, lane_record=lane_record))
 
     existing_policy_state = None
     if manifest.confirmed.policy:
         existing_policy_state = manifest.confirmed.policy.policy_states
     engine.restore_state(existing_policy_state)
+    return lane_record
 
 
 def _persist_policy_decisions(
@@ -200,6 +214,7 @@ def _persist_policy_decisions(
     entries: list[tuple[Any, str]],
     effective: Any,
     confirmed_by: str = "hook:policy-check",
+    supervisor_lane: LaneRecord | None = None,
 ) -> None:
     """Persist one decision-log entry per (result, context_summary) pair in one write.
 
@@ -256,6 +271,31 @@ def _persist_policy_decisions(
         m.confirmed.confirmed_at = now_iso()
         m.confirmed.confirmed_by = confirmed_by
 
+        # Freeze the supervisor's consumer-lane binding write-if-absent (epic consumer_lanes, T1b):
+        # at the first policy check for a configured supervisor, record the *explicitly chosen* lane
+        # as durable ground truth (the anchor the "already bound" reject checks). Folded into this
+        # existing locked post-eval write -- no second lock. ensure_consumer_lane_binding no-ops when
+        # the lane is the default (``supervisor_lane is None``), so an unpinned session is never
+        # frozen and stays re-pinnable (`set --runtime`).
+        #
+        # Stale-write guard: the supervisor call ran WITHOUT the lock (multi-second), so a concurrent
+        # `supervisor remove` / `set --runtime` can change the bound lane between dispatch and this
+        # under-lock write. ``supervisor_lane`` is the lane threaded from registration (what
+        # dispatched); freeze it only if the FRESH manifest still dispatches it. A removed or
+        # re-pointed lane no longer matches read_bound_lane(m), so the stale write is dropped instead
+        # of resurrecting a binding the user just cleared -- a later uncontested check freezes the
+        # then-current lane.
+        sup = effective.policy.supervisor if effective.policy else None
+        if sup and sup.resume_id and not sup.suspended:
+            from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+            from forge.session.consumer_lanes import (
+                ensure_consumer_lane_binding,
+                read_bound_lane,
+            )
+
+            if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane:
+                ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
+
     store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
 
 
@@ -266,6 +306,7 @@ def _persist_policy_state(
     result: Any,
     effective: Any,
     context_summary: str,
+    supervisor_lane: LaneRecord | None = None,
 ) -> None:
     """Persist policy state updates to session manifest (single-entry wrapper).
 
@@ -281,6 +322,7 @@ def _persist_policy_state(
         engine_state={} if blocked else engine.get_collected_state(),
         entries=[(result, context_summary)],
         effective=effective,
+        supervisor_lane=supervisor_lane,
     )
 
 

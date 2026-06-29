@@ -138,6 +138,25 @@ class TestCountExisting:
 
 
 class TestCaptureCandidate:
+    def test_freezes_resolved_lane(self, tmp_path: Path) -> None:
+        """The injected lane_record freezes onto the candidate as a `lane` dict for faithful replay (T1b)."""
+        from forge.session.models import LaneRecord
+
+        out = capture_candidate(
+            _cfg(tmp_path),
+            _ctx(),
+            cache_key="ck-lane",
+            tier1_reason="aligned",
+            checker_model="google/gemini-3.5-flash",
+            checker_provider="openrouter",
+            checker_budget_tokens=32000,
+            checker_prompt_version=1,
+            lane_record=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+        )
+        assert out is not None
+        data = json.loads(out.read_text())
+        assert data["lane"] == {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}
+
     def test_freezes_raw_fields_and_plan(self, tmp_path: Path) -> None:
         cfg = _cfg(tmp_path)
         ctx = _ctx(new_content="print('hi')", raw_diff="@@ -1 +1 @@", tool_args={"a": 1})
@@ -162,7 +181,7 @@ class TestCaptureCandidate:
         assert data["resume_id"] == "rid"
         assert data["direct"] is False
         assert data["fork_session"] is True
-        assert data["supervisor_runtime"] is None  # v2 field always serialized; None == claude lane
+        assert data["lane"] is None  # v3 field always serialized; None == claude default lane
         # dims + audit + lifecycle
         assert data["tier1_reason"] == "looks aligned"
         assert data["checker_model"] == "google/gemini-3.5-flash"
@@ -371,7 +390,7 @@ class TestConfigValidation:
             compute_effective_intent(manifest, strict=True, override_key="policy.supervisor.shadow_sample_rate")
 
     def test_schema_constant_present(self) -> None:
-        # v2 (T4): ShadowCandidate gained supervisor_runtime so a codex session replays on the
-        # codex lane. Old v1 records lack the field and reconstruct to None (claude) -- see
-        # test_shadow_runner.test_config_absent_supervisor_runtime_defaults_to_none.
-        assert shadow.SHADOW_SCHEMA_VERSION == 2
+        # v3 (T1b): the replay lane is the resolved consumer-lane binding (a LaneRecord),
+        # replacing the v2 supervisor_runtime string. Older records lack `lane` and reconstruct
+        # to None (claude) -- see test_shadow_runner.test_reconstruct_lane_absent_defaults_to_none.
+        assert shadow.SHADOW_SCHEMA_VERSION == 3

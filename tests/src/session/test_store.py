@@ -219,22 +219,32 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy.supervisor.checker_provider == "litellm_local"
         assert loaded.intent.policy.supervisor.checker_budget_tokens == 64000
 
-    def test_supervisor_runtime_round_trip(self, tmp_path: Path) -> None:
-        """T4: the lane runtime override persists through a manifest write/read."""
-        from forge.session.models import PolicyIntent, SupervisorConfig
+    def test_legacy_supervisor_runtime_stripped_on_read(self, tmp_path: Path, caplog) -> None:
+        """A T4/T5 manifest carrying supervisor_runtime loads (field stripped) and warns once (T1b clean break)."""
+        import json
+        import logging
 
-        store = SessionStore(str(tmp_path), "codex-lane-session")
-        state = create_session_state("codex-lane-session", worktree_path=str(tmp_path))
-        state.intent.policy = PolicyIntent(
-            enabled=True,
-            supervisor=SupervisorConfig(resume_id="planner", supervisor_runtime="codex"),
-        )
+        from forge.session.models import PolicyIntent, SupervisorConfig
+        from forge.session.store import get_manifest_path
+
+        store = SessionStore(str(tmp_path), "legacy-codex")
+        state = create_session_state("legacy-codex", worktree_path=str(tmp_path))
+        state.intent.policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id="planner"))
         store.write(state)
 
-        loaded = store.read()
+        # Inject the removed field into the on-disk manifest (simulate a pre-T1b write).
+        manifest_path = get_manifest_path(str(tmp_path), "legacy-codex")
+        data = json.loads(manifest_path.read_text())
+        data["intent"]["policy"]["supervisor"]["supervisor_runtime"] = "codex"
+        manifest_path.write_text(json.dumps(data))
+
+        with caplog.at_level(logging.WARNING):
+            loaded = store.read()  # must NOT raise on the strict read
+
         assert loaded.intent.policy is not None
         assert loaded.intent.policy.supervisor is not None
-        assert loaded.intent.policy.supervisor.supervisor_runtime == "codex"
+        assert not hasattr(loaded.intent.policy.supervisor, "supervisor_runtime")  # field gone
+        assert any("supervisor_runtime" in r.message for r in caplog.records)  # warned once
 
 
 class TestEffortVocabularyValidation:
@@ -287,33 +297,6 @@ class TestEffortVocabularyValidation:
 
         with pytest.raises(ValueError):
             SupervisorConfig(supervisor_effort="bogus")
-
-
-class TestSupervisorRuntimeValidation:
-    """SupervisorConfig.supervisor_runtime lane-override vocabulary (epic consumer_lanes, T4)."""
-
-    def test_supervisor_runtime_none_is_valid(self) -> None:
-        from forge.session.models import SupervisorConfig
-
-        # Absent override => the byte-identical claude_code default lane.
-        assert SupervisorConfig().supervisor_runtime is None
-
-    def test_supervisor_runtime_codex_is_valid(self) -> None:
-        from forge.session.models import SupervisorConfig
-
-        assert SupervisorConfig(supervisor_runtime="codex").supervisor_runtime == "codex"
-
-    def test_supervisor_runtime_claude_code_is_valid(self) -> None:
-        from forge.session.models import SupervisorConfig
-
-        assert SupervisorConfig(supervisor_runtime="claude_code").supervisor_runtime == "claude_code"
-
-    def test_supervisor_runtime_bogus_rejected(self) -> None:
-        from forge.session.models import SupervisorConfig
-
-        # Validated in __post_init__ (the dacite-invoked path); unknown runtime is rejected.
-        with pytest.raises(ValueError):
-            SupervisorConfig(supervisor_runtime="gemini")
 
 
 class TestSessionStoreUpdate:

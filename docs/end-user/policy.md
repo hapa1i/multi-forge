@@ -199,8 +199,9 @@ blocking. The `tdd.no-skip-tests` policy is unaffected (always blocks skip patte
 
 ### Semantic supervisor (advanced)
 
-The semantic supervisor is an LLM session that validates Write/Edit actions against an approved plan. It uses
-`claude -p --resume <session_id>` to continue a planning session in a read-only advisory role.
+The semantic supervisor is an LLM session that validates Write/Edit actions against an approved plan. By default it uses
+`claude -p --resume <session_id>` to continue a planning session in a read-only advisory role; the runtime is selectable
+(see [Supervisor runtime (lane)](#supervisor-runtime-lane) below).
 
 Configured in the session manifest under `policy.supervisor`:
 
@@ -220,6 +221,26 @@ cite specific plan items — that's multi-needle retrieval over a long context, 
 the wrong benchmark for this role. For per-family supervisor picks (including the Opus 4.6 vs 4.8 split, when to
 cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient
 alternative), see [model_selection.md](model_selection.md).
+
+### Supervisor runtime (lane)
+
+The supervisor runs on `claude_code` (the default `claude -p --resume` path) unless you pin a different runtime. The
+only other shipped runtime is `codex`, which routes the check to OpenAI's Codex (`codex exec`, direct — no proxy)
+instead of Claude:
+
+```bash
+# Pin at configure time (--supervisor-runtime requires --supervise on start/fork)
+forge session fork planner --supervise --supervisor-runtime codex
+
+# Or on an existing supervised session
+forge policy supervisor set planner --runtime codex
+```
+
+The chosen runtime is **frozen on the first check**: once the supervisor has dispatched, the lane is immutable for that
+session. `forge policy supervisor set --runtime <other>` then refuses to change it (re-pinning the *same* lane is a
+no-op). To use a different lane, start or fork a fresh session, or run `forge policy supervisor remove` first — remove
+clears the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
+`(runtime, backend, model)` lane.
 
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 

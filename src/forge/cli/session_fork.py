@@ -25,6 +25,7 @@ from forge.core.paths import display_path
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     apply_checker_options,
+    supervisor_lane_runtimes,
     validate_checker_model,
 )
 from forge.session import (
@@ -221,6 +222,13 @@ __all__ = ["fork"]
     help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
 )
 @click.option(
+    "--supervisor-runtime",
+    "supervisor_runtime",
+    type=click.Choice(list(supervisor_lane_runtimes())),
+    default=None,
+    help="Supervisor lane runtime (claude_code/codex; requires --supervise)",
+)
+@click.option(
     "--force",
     "-f",
     is_flag=True,
@@ -258,6 +266,7 @@ def fork(
     checker_provider: str | None,
     checker_effort: str | None,
     supervisor_effort: str | None,
+    supervisor_runtime: str | None,
     force: bool,
     memory_flag: str | None,
 ) -> None:
@@ -293,9 +302,11 @@ def fork(
         print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
         sys.exit(1)
     if (
-        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
     ) and not supervise_target:
-        print_error("--cascade/--checker-*/--supervisor-effort require --supervise", console=console)
+        print_error(
+            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise", console=console
+        )
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
@@ -701,9 +712,11 @@ def fork(
     # --- wire supervisor (if --supervise flag set) ---
     if supervise_target:
         from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            apply_supervisor_and_lane,
             apply_supervisor_routing,
-            apply_supervisor_to_intent,
         )
+        from forge.session.consumer_lanes import lane_record_for_runtime
         from forge.session.models import SupervisorConfig
         from forge.session.store import SessionStore
 
@@ -734,8 +747,14 @@ def fork(
         )
         if supervisor_effort is not None:
             sup_config.supervisor_effort = supervisor_effort
+
+        # The child gets its own consumer-lane binding (the parent's confirmed lane stays true):
+        # --supervisor-runtime expands to a full lane written into the fork's intent, frozen at
+        # the child's first policy check.
+        lane = lane_record_for_runtime(SUPERVISOR_CONSUMER, supervisor_runtime) if supervisor_runtime else None
+
         fork_store = SessionStore(fork_forge_root, fork_manifest.name)
-        fork_store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
+        fork_store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
         fork_manifest = fork_store.read()
 
     if _preflight_routing:

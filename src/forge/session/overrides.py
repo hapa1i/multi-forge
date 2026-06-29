@@ -207,6 +207,19 @@ def validate_key(key: str) -> list[str]:
             hint="start a new session with --runtime instead",
         )
 
+    if first_part == "consumer_lanes":
+        # Consumer-lane bindings (epic consumer_lanes, T1b) are set only through resolving commands
+        # (--supervisor-runtime at start/fork, 'forge policy supervisor set --runtime'), which expand a
+        # runtime to a full validated LaneRecord and enforce the already-bound reject. A raw override --
+        # partial (can't rehydrate a 3-field LaneRecord) or full-object (bypasses that validation, and
+        # after first dispatch is recorded-but-ignored since dispatch reads the frozen confirmed binding)
+        # -- is rejected like launch.runtime: recorded-but-ignored is worse than rejection.
+        raise InvalidOverrideKeyError(
+            key,
+            "consumer lanes are set via resolving commands, not overrides",
+            hint="use --supervisor-runtime at session start/fork or 'forge policy supervisor set --runtime'",
+        )
+
     if "*" in key:
         # Wildcards are handled separately by expand_wildcard
         # validate_key should not receive wildcard keys directly
