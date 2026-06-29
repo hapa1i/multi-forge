@@ -45,6 +45,7 @@ from forge.policy.semantic.supervisor import (
 )
 from forge.session import SessionStore
 from forge.session.consumer_lanes import (
+    clear_consumer_lane,
     confirmed_lane,
     lane_record_for_runtime,
     read_bound_lane,
@@ -1008,6 +1009,29 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         console.print(f"  Plan override: {sup.plan_override_path}")
 
 
+class _SupervisorLaneFrozenError(Exception):
+    """Signals `set --runtime` that the lane was frozen concurrently (under-lock re-check).
+
+    Raised inside the locked mutate so ``store.update`` aborts before persisting (the write is
+    the last step after ``mutate``); the caller catches it and reuses the same reject as the
+    pre-lock fast path.
+    """
+
+    def __init__(self, frozen: LaneRecord) -> None:
+        super().__init__("supervisor lane already frozen")
+        self.frozen = frozen
+
+
+def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
+    """Print the already-bound supervisor-lane reject (caller exits 1)."""
+    print_error_with_tip(
+        "Cannot change the supervisor lane for an already-bound session.",
+        f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
+        "Start or fork a fresh session to use a different lane.",
+        console=console,
+    )
+
+
 @supervisor.command(name="set")
 @click.argument("target")
 @_session_option
@@ -1118,19 +1142,15 @@ def supervisor_set(
     # Resolve the supervisor lane before any side effect. The binding is immutable once
     # frozen (card D2): a post-bind --runtime would write intent that dispatch ignores
     # (read_bound_lane is confirmed-first) -- the "recorded but ignored" failure the
-    # launch.runtime reject also guards. The stateless validate_key can't see confirmed,
-    # so this stateful guard lives here. Expanded to a full LaneRecord up front so a bad
-    # runtime fails before the proxy auto-start below.
+    # launch.runtime reject also guards. This pre-lock check on the unlocked read is a
+    # fast path that fails before the proxy auto-start below; the authoritative guard is
+    # the under-lock re-check in _apply (a hook can freeze between this read and that
+    # write). Expanded to a full LaneRecord up front so a bad runtime also fails early.
     lane_record: LaneRecord | None = None
     if runtime is not None:
         frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
         if frozen is not None:
-            print_error_with_tip(
-                "Cannot change the supervisor lane for an already-bound session.",
-                f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
-                "Start or fork a fresh session to use a different lane.",
-                console=console,
-            )
+            _reject_supervisor_lane_change(frozen)
             sys.exit(1)
         try:
             lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
@@ -1202,11 +1222,24 @@ def supervisor_set(
         )
 
     def _apply(m: SessionState) -> None:
+        # Authoritative already-bound guard: re-check the *fresh* manifest under the lock. A
+        # hook may have frozen confirmed.consumer_lanes between the unlocked read above and
+        # here; writing the intent lane now would be recorded-but-ignored (dispatch is
+        # confirmed-first). Raise to abort the whole update -- store.update persists only if
+        # the mutate returns, so nothing (not even the supervisor config) is written.
+        if lane_record is not None:
+            frozen = confirmed_lane(m, SUPERVISOR_CONSUMER)
+            if frozen is not None:
+                raise _SupervisorLaneFrozenError(frozen)
         apply_supervisor_to_intent(m, sup_config)
         if lane_record is not None:
             set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
 
-    store.update(timeout_s=5.0, mutate=_apply)
+    try:
+        store.update(timeout_s=5.0, mutate=_apply)
+    except _SupervisorLaneFrozenError as exc:
+        _reject_supervisor_lane_change(exc.frozen)
+        sys.exit(1)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
     if lane_record is not None:
         console.print(f"  Lane: runtime={lane_record.runtime_id} (frozen at first check)")
@@ -1283,6 +1316,9 @@ def supervisor_remove(session_name: str | None) -> None:
     def _remove_sup(m: SessionState) -> None:
         if m.intent.policy and m.intent.policy.supervisor:
             m.intent.policy.supervisor = None
+        # The lane binding belongs to the supervisor consumer: removing the supervisor must
+        # orphan-clear it (intent + confirmed), else read_bound_lane resurrects it on a re-add.
+        clear_consumer_lane(m, SUPERVISOR_CONSUMER)
 
     store.update(timeout_s=5.0, mutate=_remove_sup)
     console.print(f"Supervisor removed from session [cyan]{name}[/cyan]")

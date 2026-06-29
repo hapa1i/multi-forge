@@ -1365,6 +1365,27 @@ class TestGuardSupervisorToggle:
         assert updated.intent.policy is not None
         assert updated.intent.policy.supervisor is None
 
+    def test_remove_clears_consumer_lane(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Review P2: the direct %policy supervisor remove path must also orphan-clear the
+        # supervisor consumer lane (same shape as `forge policy supervisor remove`), else
+        # read_bound_lane resurrects it on a re-add.
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        store = _make_supervised_session(tmp_path, monkeypatch)
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda m: setattr(m.intent, "consumer_lanes", ConsumerLaneIntent(supervisor=codex)),
+        )
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervisor remove", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+        assert result.exit_code == 0
+
+        updated = store.read()
+        assert updated.intent.consumer_lanes is None or updated.intent.consumer_lanes.supervisor is None
+
     def test_off_without_supervisor_reports_not_configured(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -95,6 +95,22 @@ def set_intent_lane(state: SessionState, consumer: Consumer, lane_record: LaneRe
     setattr(state.intent.consumer_lanes, _slot(consumer), lane_record)
 
 
+def clear_consumer_lane(state: SessionState, consumer: Consumer) -> None:
+    """Drop ``consumer``'s lane from **both** intent and confirmed (binding teardown).
+
+    Supervisor ``remove`` calls this: the lane binding belongs to the consumer, so removing
+    the consumer orphans it. Clearing the pending ``intent`` override **and** any frozen
+    ``confirmed`` binding makes a later re-add start from the consumer default -- otherwise
+    ``read_bound_lane`` (confirmed-first, else intent) would resurrect the removed lane (e.g.
+    ``set --runtime codex`` -> ``remove`` -> ``set planner`` would still dispatch codex).
+    """
+    slot = _slot(consumer)
+    if state.intent.consumer_lanes is not None:
+        setattr(state.intent.consumer_lanes, slot, None)
+    if state.confirmed.consumer_lanes is not None:
+        setattr(state.confirmed.consumer_lanes, slot, None)
+
+
 def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:
     """Freeze ``consumer``'s resolved lane into ``confirmed``, write-if-absent.
 

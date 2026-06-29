@@ -844,8 +844,15 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
         def _remove(m: object) -> None:
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
+            from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+            from forge.session.consumer_lanes import clear_consumer_lane
+
             if m.intent.policy and m.intent.policy.supervisor:
                 m.intent.policy.supervisor = None
+            # Orphan-clear the supervisor consumer lane (intent + confirmed) so a re-add
+            # starts from the default lane, not a resurrected binding (matches `policy
+            # supervisor remove`).
+            clear_consumer_lane(m, SUPERVISOR_CONSUMER)
 
         try:
             store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_remove)

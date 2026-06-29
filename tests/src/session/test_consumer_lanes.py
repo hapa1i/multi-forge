@@ -8,6 +8,7 @@ from forge.core.lanes import Consumer, Lane, LaneError
 from forge.core.state import now_iso
 from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
 from forge.session.consumer_lanes import (
+    clear_consumer_lane,
     confirmed_lane,
     ensure_consumer_lane_binding,
     lane_record_for_runtime,
@@ -161,6 +162,26 @@ class TestConfirmedLane:
     def test_returns_frozen_lane(self) -> None:
         frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
         assert confirmed_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) == _CODEX_RECORD
+
+
+# --- clear_consumer_lane (binding teardown on supervisor remove) ---
+
+
+class TestClearConsumerLane:
+    def test_clears_both_intent_and_confirmed(self) -> None:
+        # remove orphan-clears the binding: a stale lane in either slot would otherwise be
+        # resurrected by read_bound_lane (confirmed-first, else intent) on a re-add.
+        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
+        state = _state(intent=_CODEX_RECORD, confirmed=frozen)
+        clear_consumer_lane(state, SUPERVISOR_CONSUMER)
+        assert state.intent.consumer_lanes.supervisor is None  # type: ignore[union-attr]
+        assert state.confirmed.consumer_lanes.supervisor is None  # type: ignore[union-attr]
+        assert read_bound_lane(state, SUPERVISOR_CONSUMER) is None
+
+    def test_noop_when_unset(self) -> None:
+        state = _state()
+        clear_consumer_lane(state, SUPERVISOR_CONSUMER)  # no sections -> no error
+        assert read_bound_lane(state, SUPERVISOR_CONSUMER) is None
 
 
 # --- generality / drift guards ---
