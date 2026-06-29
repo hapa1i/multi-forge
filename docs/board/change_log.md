@@ -51,11 +51,16 @@ durable, frozen-at-first-dispatch fact, not a transient runtime string.
   override (review P2b). Status reads the frozen binding, revalidates, shows "not executable" on drift without
   rewriting. start/fork share `apply_supervisor_and_lane` (keeps `session_lifecycle.py` under the 2,500-line guard).
 - **Docs**: design.md §3.5/§3.6.2, design_appendix §G, cli_reference.md synced to the shipped binding.
+- **Hardening (review)**: `set --runtime` re-checks the frozen binding **under the lock** (the pre-lock check is now a
+  fast path) -- a hook freezing `confirmed.consumer_lanes` mid-command can no longer persist a recorded-but-ignored
+  intent lane (`store.update` skips the write when the mutate raises). `supervisor remove` (CLI **and** `%policy` direct
+  path) now orphan-clears the lane binding (intent + confirmed) via `clear_consumer_lane`, so
+  `set --runtime codex; remove; set planner` no longer resurrects codex through `read_bound_lane`.
 
-**Verification**: full unit suite 7074 passed; supervisor E2E (`test_supervise_cli_cascade_wiring`,
-`test_session_set_wires_supervisor_config`) pass; mypy + `make pre-commit` clean; `rg supervisor_runtime src/` clean
-except the strip helper. Codex-lane real-API E2E deferred (needs ChatGPT login); covered at unit level. Branch
-`consumer_lane_binding`, 5 slices.
+**Verification**: full unit suite 7079 passed (incl. TOCTOU-abort + set/remove/set repro); supervisor E2E
+(`test_supervise_cli_cascade_wiring`, `test_session_set_wires_supervisor_config`) pass; mypy + `make pre-commit` clean;
+`rg supervisor_runtime src/` clean except the strip helper. Codex-lane real-API E2E deferred (needs ChatGPT login);
+covered at unit level. Branch `consumer_lane_binding`, 5 slices + review hardening.
 
 ## 2026-06-27
 

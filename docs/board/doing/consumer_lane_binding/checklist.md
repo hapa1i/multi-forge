@@ -135,6 +135,15 @@ shadow-migration comment.
 -> 404 passed (15 new); full unit suite -> 7074 passed, 0 failures; mypy + pyright + `make pre-commit` clean. Flags
 verified live in `--help` for all three commands; expansion spot-checked (`codex -> chatgpt/gpt-5-codex`).
 
+**Review hardening (P2, post-Slice-5).** Two set/remove gaps closed: (1) `set --runtime` re-checks the frozen binding
+**under the lock** in `_apply` (the pre-lock check is now a fast path) -- a concurrent freeze can no longer persist a
+recorded-but-ignored intent lane (`store.update` skips the write when the mutate raises); (2) `supervisor remove` (CLI +
+`%policy` direct path) orphan-clears the lane (intent + confirmed) via `clear_consumer_lane`, so
+`set --runtime codex; remove; set planner` no longer resurrects codex. Verified:
+`test_runtime_race_frozen_under_lock_aborts`, `test_set_remove_set_does_not_resurrect_lane`,
+`test_user_prompt_dispatcher.py::test_remove_clears_consumer_lane`, `test_consumer_lanes.py::TestClearConsumerLane`;
+full unit suite 7079 passed.
+
 ### Slice 5 -- Docs sync (board_contract "Design Doc Sync") -- DONE
 
 - [x] design.md §3.5 (ownership): `intent.consumer_lanes.supervisor` added to CLI writes (resolving commands);
