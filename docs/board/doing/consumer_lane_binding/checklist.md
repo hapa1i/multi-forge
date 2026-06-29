@@ -52,11 +52,12 @@ stays catalog-free, `core.lanes` stays pure): `read_bound_lane` (dispatch source
   second lock. Freezes **only an explicitly chosen** lane (`source="intent"`), write-if-absent; the default lane
   (`supervisor_lane is None`) **never freezes** and stays re-pinnable (revised round-2, see Review hardening below); a
   drifted record skips the freeze. **`supervisor_lane` is threaded from `register_supervisor_and_restore` (the lane the
-  hook injected at dispatch), not a fresh read of the under-lock manifest** -- so a concurrent intent change during the
-  (multi-second) supervisor call can't skew the binding off the lane that ran (review P2a). Verified:
-  `TestSupervisorLaneBindingFreeze.*` (default does **not** freeze; suspended/no-supervisor skip; write-if-absent;
-  threaded-lane; no lock-out), `TestEnsureConsumerLaneBinding.*` (override freeze, dispatched-not-intent, None no-op,
-  idempotent, drift skip x2).
+  hook injected at dispatch); the freeze lands only if the FRESH under-lock manifest still dispatches it
+  (`read_bound_lane(m) == supervisor_lane`)** -- a concurrent `remove`/`set --runtime` during the (multi-second)
+  supervisor call drops the stale write instead of resurrecting it (round-3 stale-write guard, supersedes P2a; see
+  Review hardening below). Verified: `TestSupervisorLaneBindingFreeze.*` (default does **not** freeze;
+  suspended/no-supervisor skip; write-if-absent; stale-lane dropped; no lock-out), `TestEnsureConsumerLaneBinding.*`
+  (override freeze, given-lane-not-intent, None no-op, idempotent, drift skip x2).
 - [x] Default (no override) path stays **byte-identical**: `lane_record=None -> override=None -> resolve_lane` returns
   the default lane, and an explicitly-pinned default record resolves to the same lane as no override
   (`resolve_lane(override=None) == resolve_lane(override=default_lane)`, `lanes.py:91,141`). Existing claude-dispatch
@@ -169,6 +170,22 @@ full unit suite 7079 passed.
 **Verification:** affected unit files (`test_consumer_lanes`, `test_policy::TestSupervisorLaneBindingFreeze`,
 `test_policy_supervisor`, the new regression) + `test_supervisor.py` -> all green; `make pre-commit` clean.
 
+**Review hardening (round 3, PR #57).** Two items from the third review:
+
+- **HIGH (stale hook resurrects a lane after `remove`):** the post-eval freeze gated on the pre-call `effective` config
+  and froze the pre-call `supervisor_lane`, never reading the fresh under-lock manifest. A `supervisor remove` (clears
+  `intent.policy.supervisor` + both consumer-lane slots) landing during a multi-second check was overwritten -- the
+  stale hook wrote `confirmed.consumer_lanes.supervisor = codex` back, and a later `set planner` resurrected codex via
+  confirmed-first dispatch. Fix: freeze only when `read_bound_lane(m) == supervisor_lane` under the lock, so a
+  removed/re-pointed lane drops the stale write; a later uncontested check freezes the then-current lane. **This
+  supersedes P2a** (`test_freeze_records_threaded_dispatch_lane`, which froze the dispatched lane unconditionally): the
+  only writer of `intent.consumer_lanes` is a deliberate user command, so a concurrent change is intent to honor, not
+  noise to ignore. Regression: `tests/regression/test_bug_consumer_lane_stale_freeze_after_remove.py` (remove, re-point,
+  and an uncontested-still-freezes control).
+- **MEDIUM (end-user docs stale for lane selection):** `docs/end-user/policy.md`, `model_selection.md`, and `session.md`
+  described the supervisor as `claude -p --resume` only and omitted `--supervisor-runtime` / `set --runtime` and the
+  freeze semantics. Documented the selectable runtime (claude_code default vs codex) and the write-once binding.
+
 ### Slice 5 -- Docs sync (board_contract "Design Doc Sync") -- DONE
 
 - [x] design.md §3.5 (ownership): `intent.consumer_lanes.supervisor` added to CLI writes (resolving commands);
@@ -189,24 +206,26 @@ full unit suite 7079 passed.
 
 ## Acceptance tests (fixture-grounded)
 
-| Test                                      | Fixture                                                           | Assertion                                                                                | Test File                                                        |
-| ----------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `LaneRecord` stores without catalog check | `LaneRecord("ghost_runtime", "ghost_backend", "m")`               | constructs; raises **no** `LaneError` (unlike `Lane(...)`)                               | `tests/src/session/test_models.py`                               |
-| `LaneRecord`/`Lane` field parity          | the two dataclasses                                               | field names equal (drift guard)                                                          | `tests/src/core/test_lanes.py`                                   |
-| Stale binding still deserializes          | manifest `consumer_lanes.supervisor` on a since-renamed backend   | `load` succeeds; status reports "not executable"; no manifest rewrite                    | `tests/src/session/test_store.py`                                |
-| Explicit lane frozen at first dispatch    | supervisor configured **with `--runtime codex`**, two dispatches  | `confirmed.consumer_lanes.supervisor` written once; 2nd reuses it; default never freezes | `tests/src/cli/hooks/test_policy.py`                             |
-| Default lane byte-identical               | no override                                                       | dispatch argv/route identical to T3/T4 baseline                                          | `tests/src/policy/semantic/test_supervisor.py`                   |
-| Drift fails open as no-call               | bound codex lane, backend removed from catalog                    | supervisor skips (aligned); **not** run on `claude_code` default                         | `tests/src/policy/semantic/test_supervisor.py`                   |
-| Generic lane override rejected            | `set consumer_lanes.supervisor.runtime_id codex`                  | rejected by `validate_key` (points to `--supervisor-runtime`)                            | `tests/src/session/test_overrides.py`                            |
-| Set lane before bind (resolving cmd)      | unbound session, `policy supervisor set --runtime codex`          | writes full `consumer_lanes.supervisor` `LaneRecord`; resolves at dispatch               | `tests/src/cli/test_policy_supervisor.py`                        |
-| Set lane after bind hard-rejects          | bound session, `policy supervisor set --runtime claude_code`      | exits non-zero, actionable message; `confirmed` unchanged                                | `tests/src/cli/test_policy_supervisor.py`                        |
-| `--supervisor-runtime` round-trips        | `fork P --supervise --supervisor-runtime codex`                   | `intent.consumer_lanes.supervisor` == codex `LaneRecord`                                 | `tests/src/cli/test_session_commands.py`                         |
-| Legacy `supervisor_runtime` strip-on-read | manifest with `intent.policy.supervisor.supervisor_runtime=codex` | loads (stripped), warns once; field gone from `SupervisorConfig`                         | `tests/src/session/test_store.py`                                |
-| Fork/resume/relaunch inherit lane (HIGH)  | codex-pinned parent, fork + resume + relaunch                     | child `intent.consumer_lanes.supervisor` == codex; child `confirmed` is None             | `tests/regression/test_bug_consumer_lane_fork_resume_inherit.py` |
-| Default run never freezes (lock-out)      | supervisor on default lane runs, then explicit pin                | nothing frozen on the default run; a later explicit pin still freezes                    | `tests/src/cli/hooks/test_policy.py`                             |
-| Re-pin same lane is idempotent            | codex-frozen session, `set --runtime codex`                       | exit 0, no already-bound reject; binding intact                                          | `tests/src/cli/test_policy_supervisor.py`                        |
-| Remove clears confirmed lane              | codex-frozen session, `policy supervisor remove`                  | `confirmed.consumer_lanes.supervisor` cleared (re-add starts from default)               | `tests/src/cli/test_policy_supervisor.py`                        |
-| Status shows confirmed over intent        | intent=codex, confirmed=claude default                            | status displays the frozen claude lane (confirmed-first)                                 | `tests/src/cli/test_policy_supervisor.py`                        |
+| Test                                      | Fixture                                                           | Assertion                                                                                | Test File                                                              |
+| ----------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `LaneRecord` stores without catalog check | `LaneRecord("ghost_runtime", "ghost_backend", "m")`               | constructs; raises **no** `LaneError` (unlike `Lane(...)`)                               | `tests/src/session/test_models.py`                                     |
+| `LaneRecord`/`Lane` field parity          | the two dataclasses                                               | field names equal (drift guard)                                                          | `tests/src/core/test_lanes.py`                                         |
+| Stale binding still deserializes          | manifest `consumer_lanes.supervisor` on a since-renamed backend   | `load` succeeds; status reports "not executable"; no manifest rewrite                    | `tests/src/session/test_store.py`                                      |
+| Explicit lane frozen at first dispatch    | supervisor configured **with `--runtime codex`**, two dispatches  | `confirmed.consumer_lanes.supervisor` written once; 2nd reuses it; default never freezes | `tests/src/cli/hooks/test_policy.py`                                   |
+| Default lane byte-identical               | no override                                                       | dispatch argv/route identical to T3/T4 baseline                                          | `tests/src/policy/semantic/test_supervisor.py`                         |
+| Drift fails open as no-call               | bound codex lane, backend removed from catalog                    | supervisor skips (aligned); **not** run on `claude_code` default                         | `tests/src/policy/semantic/test_supervisor.py`                         |
+| Generic lane override rejected            | `set consumer_lanes.supervisor.runtime_id codex`                  | rejected by `validate_key` (points to `--supervisor-runtime`)                            | `tests/src/session/test_overrides.py`                                  |
+| Set lane before bind (resolving cmd)      | unbound session, `policy supervisor set --runtime codex`          | writes full `consumer_lanes.supervisor` `LaneRecord`; resolves at dispatch               | `tests/src/cli/test_policy_supervisor.py`                              |
+| Set lane after bind hard-rejects          | bound session, `policy supervisor set --runtime claude_code`      | exits non-zero, actionable message; `confirmed` unchanged                                | `tests/src/cli/test_policy_supervisor.py`                              |
+| `--supervisor-runtime` round-trips        | `fork P --supervise --supervisor-runtime codex`                   | `intent.consumer_lanes.supervisor` == codex `LaneRecord`                                 | `tests/src/cli/test_session_commands.py`                               |
+| Legacy `supervisor_runtime` strip-on-read | manifest with `intent.policy.supervisor.supervisor_runtime=codex` | loads (stripped), warns once; field gone from `SupervisorConfig`                         | `tests/src/session/test_store.py`                                      |
+| Fork/resume/relaunch inherit lane (HIGH)  | codex-pinned parent, fork + resume + relaunch                     | child `intent.consumer_lanes.supervisor` == codex; child `confirmed` is None             | `tests/regression/test_bug_consumer_lane_fork_resume_inherit.py`       |
+| Default run never freezes (lock-out)      | supervisor on default lane runs, then explicit pin                | nothing frozen on the default run; a later explicit pin still freezes                    | `tests/src/cli/hooks/test_policy.py`                                   |
+| Re-pin same lane is idempotent            | codex-frozen session, `set --runtime codex`                       | exit 0, no already-bound reject; binding intact                                          | `tests/src/cli/test_policy_supervisor.py`                              |
+| Remove clears confirmed lane              | codex-frozen session, `policy supervisor remove`                  | `confirmed.consumer_lanes.supervisor` cleared (re-add starts from default)               | `tests/src/cli/test_policy_supervisor.py`                              |
+| Status shows confirmed over intent        | intent=codex, confirmed=claude default                            | status displays the frozen claude lane (confirmed-first)                                 | `tests/src/cli/test_policy_supervisor.py`                              |
+| Stale freeze dropped after remove (HIGH)  | in-flight check (codex), fresh manifest post-`remove`             | freeze skipped; `confirmed.consumer_lanes` stays None (no resurrection)                  | `tests/regression/test_bug_consumer_lane_stale_freeze_after_remove.py` |
+| Uncontested freeze still lands            | in-flight check (codex), fresh manifest still pins codex          | `confirmed.consumer_lanes.supervisor` frozen to codex                                    | `tests/regression/test_bug_consumer_lane_stale_freeze_after_remove.py` |
 
 **Integration (run at closeout):** `test_supervisor_e2e.py::test_supervise_cli_cascade_wiring` (real
 `policy supervisor set` through the modified command) + `test_session_set_wires_supervisor_config` (generic
