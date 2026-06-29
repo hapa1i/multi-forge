@@ -273,18 +273,28 @@ def _persist_policy_decisions(
 
         # Freeze the supervisor's consumer-lane binding write-if-absent (epic consumer_lanes, T1b):
         # at the first policy check for a configured supervisor, record the *explicitly chosen* lane
-        # as durable ground truth (the anchor the "already bound" reject checks). The gate here is
-        # config-presence; ensure_consumer_lane_binding no-ops when the lane is the default
-        # (``supervisor_lane is None``), so an unpinned session is never frozen and stays re-pinnable
-        # (`set --runtime`). Folded into this existing locked post-eval write -- no second lock.
-        # ``supervisor_lane`` is the lane the hook injected at registration, so the freeze records
-        # exactly what dispatched even if intent changed during the supervisor call.
+        # as durable ground truth (the anchor the "already bound" reject checks). Folded into this
+        # existing locked post-eval write -- no second lock. ensure_consumer_lane_binding no-ops when
+        # the lane is the default (``supervisor_lane is None``), so an unpinned session is never
+        # frozen and stays re-pinnable (`set --runtime`).
+        #
+        # Stale-write guard: the supervisor call ran WITHOUT the lock (multi-second), so a concurrent
+        # `supervisor remove` / `set --runtime` can change the bound lane between dispatch and this
+        # under-lock write. ``supervisor_lane`` is the lane threaded from registration (what
+        # dispatched); freeze it only if the FRESH manifest still dispatches it. A removed or
+        # re-pointed lane no longer matches read_bound_lane(m), so the stale write is dropped instead
+        # of resurrecting a binding the user just cleared -- a later uncontested check freezes the
+        # then-current lane.
         sup = effective.policy.supervisor if effective.policy else None
         if sup and sup.resume_id and not sup.suspended:
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
-            from forge.session.consumer_lanes import ensure_consumer_lane_binding
+            from forge.session.consumer_lanes import (
+                ensure_consumer_lane_binding,
+                read_bound_lane,
+            )
 
-            ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
+            if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane:
+                ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
 
     store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
 

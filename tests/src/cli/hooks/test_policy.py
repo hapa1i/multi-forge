@@ -364,8 +364,7 @@ class TestSupervisorLaneBindingFreeze:
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_freeze_is_write_if_absent(self, mock_build: MagicMock) -> None:
-        """An existing binding is never overwritten, even by a later run dispatching a different lane."""
-        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        """An existing binding is never overwritten by a later check dispatching the same lane."""
         from forge.session.models import (
             ConsumerLaneBinding,
             ConsumerLaneConfirmed,
@@ -378,30 +377,30 @@ class TestSupervisorLaneBindingFreeze:
             lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at="2020-01-01T00:00:00Z"
         )
         state.confirmed.consumer_lanes = ConsumerLaneConfirmed(supervisor=frozen)
-        # Inject a *different* explicit lane so we reach the pre-existing-binding short-circuit,
-        # not the trivial None early-return: write-if-absent must keep the prior codex binding.
-        d = SUPERVISOR_CONSUMER.default_lane
-        self._run_mutate(state, self._effective(), supervisor_lane=LaneRecord(d.runtime_id, d.backend_id, d.model))
+        # Dispatch matches the frozen lane (read_bound_lane is confirmed-first -> codex), so the
+        # stale-write guard passes and ensure's write-if-absent runs: the prior binding wins, never
+        # rewritten (the 2020 resolved_at survives, proving identity).
+        self._run_mutate(state, self._effective(), supervisor_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
         assert state.confirmed.consumer_lanes.supervisor is frozen
 
     @patch("forge.policy.store.build_policy_state_update")
-    def test_freeze_records_threaded_dispatch_lane(self, mock_build: MagicMock) -> None:
-        """The freeze records the lane threaded from registration, not a fresh manifest read (P2a).
+    def test_stale_lane_dropped_when_bound_lane_changed(self, mock_build: MagicMock) -> None:
+        """Stale-write guard (supersedes P2a): a concurrent set/remove that changes the bound lane
+        between dispatch and the under-lock freeze drops the stale dispatched lane.
 
-        Manifest intent is unset (default), but the dispatched lane was codex; the binding must be
-        codex -- proving the freeze follows what dispatched even under a concurrent intent change.
+        ``supervisor_lane`` (codex) is what dispatched, but the fresh manifest no longer dispatches it
+        (here it has no consumer_lanes -> default), so the freeze is skipped. This is the seam that
+        stops a removed/re-pointed lane from being resurrected by a long in-flight check.
         """
         from forge.session.models import LaneRecord
 
         mock_build.return_value = self._BUILD_RETURN
         codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
-        state = self._state()  # intent.consumer_lanes stays None (default)
+        state = self._state()  # fresh manifest dispatches the default; codex was the stale dispatch
         self._run_mutate(state, self._effective(), supervisor_lane=codex)
 
-        binding = state.confirmed.consumer_lanes.supervisor  # type: ignore[union-attr]
-        assert binding is not None
-        assert binding.source == "intent"
-        assert binding.lane == codex
+        # read_bound_lane(state) is None (default) != codex -> nothing frozen.
+        assert state.confirmed.consumer_lanes is None
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_default_run_does_not_lock_out_later_pin(self, mock_build: MagicMock) -> None:
@@ -409,7 +408,7 @@ class TestSupervisorLaneBindingFreeze:
         accept a later explicit pin. The default run freezes nothing, so the next run on an injected
         lane freezes normally -- an early default check never locks the user into the default.
         """
-        from forge.session.models import LaneRecord
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
 
         mock_build.return_value = self._BUILD_RETURN
         codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
@@ -422,7 +421,9 @@ class TestSupervisorLaneBindingFreeze:
         after_default = state.confirmed.consumer_lanes
         assert after_default is None
 
-        # A later check on an explicitly-pinned codex lane freezes normally.
+        # The user then pins codex (intent), and a later check dispatches + freezes it. The fresh
+        # manifest dispatches codex, so the stale-write guard passes.
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
         self._run_mutate(state, self._effective(), supervisor_lane=codex)
         confirmed = state.confirmed.consumer_lanes
         assert confirmed is not None

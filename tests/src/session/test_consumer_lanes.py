@@ -81,15 +81,16 @@ class TestEnsureConsumerLaneBinding:
         assert binding.source == "intent"
         assert binding.lane == _CODEX_RECORD
 
-    def test_freezes_dispatched_lane_not_current_intent(self) -> None:
-        # P2(a): the freeze records the lane the hook injected at dispatch, NOT a fresh read of the
-        # (under-lock) manifest -- so a concurrent intent change during the supervisor call cannot
-        # skew the binding away from the lane that actually ran.
-        state = _state(intent=_DEFAULT_RECORD)  # manifest intent now says "default"...
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)  # ...but codex dispatched
+    def test_freezes_given_lane_not_a_fresh_intent_read(self) -> None:
+        # ensure freezes the lane it is *given*, never re-reading intent -- a pure write-if-absent.
+        # The freshness/staleness decision is the caller's: the hook guards with
+        # ``read_bound_lane(m) == supervisor_lane`` before calling, dropping a stale lane there, not
+        # here (see tests/regression/test_bug_consumer_lane_stale_freeze_after_remove.py).
+        state = _state(intent=_DEFAULT_RECORD)  # intent says "default"...
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)  # ...but caller passed codex
         binding = state.confirmed.consumer_lanes.supervisor  # type: ignore[union-attr]
         assert binding is not None
-        assert binding.lane == _CODEX_RECORD  # froze what dispatched, not the manifest default
+        assert binding.lane == _CODEX_RECORD  # froze exactly what it was given
 
     def test_write_if_absent_is_idempotent(self) -> None:
         # A pre-existing binding is the immovable ground truth: a second call never rewrites it.

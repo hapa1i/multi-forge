@@ -444,7 +444,10 @@ To avoid writer conflicts:
   re-pinnable. Frozen is **write-once and immutable** -- the resolving commands reject a change to a *different* lane
   (re-pinning the same lane is an idempotent no-op), and dispatch reads confirmed-first. Removing a consumer
   (`policy supervisor remove`, `%policy supervisor remove`) clears both its intent and confirmed slots, so a later
-  re-add starts from the default. See [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
+  re-add starts from the default. The post-eval freeze runs lock-free during the (multi-second) check, so it lands only
+  when the fresh under-lock manifest still dispatches the lane it ran on — a concurrent remove/reconfigure drops the
+  stale write rather than resurrecting a cleared binding. See
+  [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
