@@ -46,18 +46,21 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 - [ ] **Phase-1 no-go (brittle signal)** -- not taken: (c) is `stable-preflight` (`can_use_bare`).
 - [ ] **Per-token (labeling, not kill)** -- **refuted**: cost-present on a keyless run is an estimate, not per-token
   billing (with no key there is nothing to bill an API). Only a metered-console-OAuth account would qualify -- card Q3.
-- [x] **Proceed**: (a0)/(a) positive **and** (c) `stable-preflight` -> Phase 1. `billing_mode` keyed off `can_use_bare`
-  (keyless => subscription), cost stays `unavailable`. (b) did not pick `subscription_quota` vs
-  `subscription_headless_credit` -- a semantics call (card Q3).
+- [x] **Proceed**: (a0)/(a) positive **and** (c) `stable-preflight` -> Phase 1. `can_use_bare` False is the **necessary
+  gate** (key wins); the `subscription_*` **label** additionally needs an explicit `claude-max` declaration --
+  undeclared keyless stays `unknown` (`can_use_bare` can't see Free/Pro/Max). Cost stays `unavailable`. (b) did not pick
+  `subscription_quota` vs `subscription_headless_credit` -- a semantics call (card Q3).
 
 ### Phase 1 -- Auth-posture resolver + thread it (Option A; gated on Phase 0 "Proceed")
 
 - [ ] Preflight-style resolver classifies a run's auth method (key vs subscription) from the Phase 0 (c) signal --
   structural analogue of `_resolve_codex_auth` (`core/runtime/codex_preflight.py:365-403`). New path; **not** a branch
   in `infer_billing_mode` (its `(direct, has_api_key)` shape can't see auth method).
-- [ ] **Precedence**: the resolver yields a `subscription_*` mode **only when `can_use_bare` is False** (no resolvable
-  key), so a machine with both a key and a Max session is never mislabeled subscription -- key wins, mirroring codex's
-  `stored API key` before `stored ChatGPT tokens`.
+- [ ] **Precedence + label gate**: `can_use_bare` False is **necessary but not sufficient**. Key resolvable => `api`
+  (key wins, mirroring codex's `stored API key` before `stored ChatGPT tokens`). But `can_use_bare` proves only the
+  OAuth *path*, not the account's plan, so a `subscription_*` **label** also requires an explicit `claude-max`
+  declaration (Phase 2 `billing_posture`); **undeclared keyless => `unknown`** (honest-don't-know). Phase 1 therefore
+  emits `unknown` until the Phase 2 declaration exists -- the two couple.
 - [ ] **Option A -- resolve once, thread it**: resolve the posture at session start and pass a new
   `resolved_billing_mode` through **all four** `emit_usage_for_session_result` callers -- `supervisor.py:578`,
   `memory_writer.py:526`, `shadow_curation.py:306`, `team/handlers.py:249` -- *not* re-derived inside `emit`. Omitting
@@ -82,7 +85,8 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 
 | Test                                                           | Fixture                                                                                          | Assertion                                                                      | Test File                                                       |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Subscription-authed run emits a subscription mode              | resolver sees the (c) signal, `can_use_bare` False, no cost                                      | `billing_mode` is the chosen `subscription_*` (not `unknown`/`api`)            | `tests/src/core/usage/test_emit.py`                             |
+| Declared `claude-max` + keyless run emits a subscription mode  | `can_use_bare` False **and** a `claude-max` declaration in scope                                 | `billing_mode` is the chosen `subscription_*` (not `unknown`/`api`)            | `tests/src/core/usage/test_emit.py`                             |
+| **Undeclared keyless OAuth stays `unknown`**                   | `can_use_bare` False, **no** `claude-max` declaration                                            | `billing_mode == "unknown"` (label needs a declaration, not just keyless)      | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
 | **Precedence: key + Max coexist -> `api`, never subscription** | key resolvable (`can_use_bare` True) *and* a Max session present                                 | `billing_mode == "api"`; resolver does **not** yield `subscription_*`          | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
 | Key-authed run stays `api` (byte-identical)                    | direct run, key present, no subscription signal                                                  | `billing_mode == "api"`; emission unchanged from today                         | `tests/src/core/usage/test_emit.py`                             |
 | Proxied run stays `unknown`                                    | `base_url` set                                                                                   | `billing_mode == "unknown"` (conservatism preserved)                           | `tests/src/core/usage/test_billing.py`                          |

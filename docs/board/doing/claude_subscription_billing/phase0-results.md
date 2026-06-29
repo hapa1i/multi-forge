@@ -53,8 +53,10 @@ Every Claude-side artifact candidate failed:
   useless.
 
 The dependable signal is **`can_use_bare`** (`core/reactive/env.py:70`): keyless (`can_use_bare` False) + a completing
-turn => the run rode OAuth/subscription; keyed => the runner adds `--bare` => api. Preflight, Forge-owned, no unowned
-external schema. The auth mode is read from the run's **input**, not its artifacts.
+turn => the run rode the OAuth *path*; keyed => the runner adds `--bare` => api. Preflight, Forge-owned, no unowned
+external schema; read from the run's **input**, not its artifacts. **It is a necessary gate, not sufficient proof of a
+subscription:** it cannot see the account's plan (Free/Pro/Max), so the durable `subscription_*` label needs an explicit
+`claude-max` declaration on top of it (see card Phase 1).
 
 ## Probe self-corrections (the run improved the harness)
 
@@ -66,23 +68,33 @@ Running the probe for real exposed two flaws in its own first-cut interpretation
    metered-console-OAuth account (Q3), which the envelope can't reveal.
 2. **The detection candidate list omitted `can_use_bare`.** The first cut enumerated only external artifacts and
    concluded `[SIGNAL-RUNTIME-ONLY]`. Adding `can_use_bare` as the primary candidate yields `[SIGNAL-STABLE-PREFLIGHT]`.
+3. **The token-env path could read as clean subscription.** A keyless run with `CLAUDE_CODE_OAUTH_TOKEN` /
+   `ANTHROPIC_AUTH_TOKEN` set rides an *injected token* (any account), but the first cut still stamped
+   `[SHAPE-SUBSCRIPTION]` with only a soft note. Fixed: stage 00 now emits `[KEYLESS-BUT-TOKEN-ENV]` and the turn emits
+   `[SHAPE-SUBSCRIPTION-UNVERIFIED]`. This run had **no** token env (`oauth_token_env_present=false`), so the result
+   stands.
 
 ## Decision gate outcome
 
 - [x] **Proceed** -- (a0)/(a) positive **and** (c) `[SIGNAL-STABLE-PREFLIGHT]`. Go to Phase 1: the auth-posture resolver
-  keyed off `can_use_bare` (keyless => subscription), threaded through all four `emit_usage_for_session_result` callers;
-  cost stays `unavailable`.
+  uses `can_use_bare` as the **necessary gate** (key wins) and emits `subscription_*` only with an explicit `claude-max`
+  declaration (undeclared keyless => `unknown`), threaded through all four `emit_usage_for_session_result` callers; cost
+  stays `unavailable`.
 - [ ] Full kill (architectural) -- not taken: (a0)/(a) positive.
 - [ ] Phase-1 no-go (brittle signal) -- not taken: (c) is stable-preflight.
 - [ ] Per-token (labeling) -- refuted: cost-present on a keyless run is an estimate, not per-token billing.
 
 ## Q1-Q3 status
 
-- **Q1 (detection-signal risk): RESOLVED.** The signal is `can_use_bare`, not a brittle Claude-side artifact. The kill
-  #2 risk did not materialize.
+- **Q1 (detection-signal risk): stability RESOLVED.** A *stable* signal exists -- `can_use_bare`, not a brittle
+  Claude-side artifact (kill #2 did not materialize). Caveat: it is a **necessary gate, not sufficient** -- it proves
+  the OAuth path, not the account's plan -- so the durable label still needs a `claude-max` declaration (see Phase 1 /
+  Q3).
 - **Q2 (Phase-2 scope):** unchanged -- still a scope decision (split the `claude-max` `ModelSource` to a follow-on?). If
   credit semantics are chosen, `BillingPosture` needs `subscription_headless_credit` first.
 - **Q3 (which `billing_mode`): still open.** (b) did **not** disambiguate -- `total_cost_usd` is an estimate present
   whether the draw is quota- or credit-based, so the cost field can't pick `subscription_quota` vs
   `subscription_headless_credit`. This is a semantics decision; (d) quota-draw evidence would inform it but was not run.
-  Resolve before Phase 1 emits a concrete mode.
+  Resolve before Phase 1 emits a concrete mode. Separately, whether a keyless run is a *paid* subscription **at all**
+  (vs Free/metered) is not envelope-visible either -- which is why the label requires a `claude-max` declaration, not
+  just `can_use_bare`.

@@ -125,15 +125,16 @@ codex probes) that establishes, in order:
    billing." **The live run refutes the (b) test:** `total_cost_usd` is present even on Max ($0.04, an estimate), so
    cost-presence is **not** evidence of per-token billing on a keyless run -- with no key there is nothing to bill an
    API. This outcome therefore only applies to a metered-console-OAuth account (not Max/Pro), which the envelope cannot
-   reveal; it needs out-of-band proof (Q3). For Max/Pro, keyless + completed => subscription.
+   reveal; it needs out-of-band proof (Q3). For a **declared** Max lane, keyless + completed => subscription; an
+   **undeclared** keyless run stays `unknown` -- `can_use_bare` can't see the account's plan (see Phase 1).
 
 ## Proposed approach (phases; 1+ gated on Phase 0)
 
-| Phase                                                                      | Scope                                                                                                                                                                                                                                     | Gated on         |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| **0 -- Probe**                                                             | Operator-gated harness under `scripts/experiments/`; `phase0-results.md` answers (a0)-(d). No `src/` change.                                                                                                                              | --               |
-| **1 -- Auth-posture resolver + thread it**                                 | Preflight-style resolver classifies a run's auth method from the Phase 0 (c) signal (mirrors `_resolve_codex_auth`), **only when `can_use_bare` is False** (key wins). Thread the posture through all four emit callers (Option A below). | Phase 0 positive |
-| **2 -- `claude-max` ModelSource** *(scope decision -- may be a follow-on)* | Add the `claude-max` source (`runtime_native`, `reachable_via=("claude_code",)`). **Prereq:** extend `BillingPosture` if credit semantics are chosen (it lacks `subscription_headless_credit` today).                                     | Phase 1          |
+| Phase                                                        | Scope                                                                                                                                                                                                                                                                                                         | Gated on         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **0 -- Probe**                                               | Operator-gated harness under `scripts/experiments/`; `phase0-results.md` answers (a0)-(d). No `src/` change.                                                                                                                                                                                                  | --               |
+| **1 -- Auth-posture resolver + thread it**                   | Preflight-style resolver (mirrors `_resolve_codex_auth`). `can_use_bare` False is a **necessary gate** (key wins) but **not sufficient**: emit `subscription_*` only when a `claude-max` declaration is in scope, else `unknown`. Thread the posture through all four emit callers (Option A below).          | Phase 0 positive |
+| **2 -- `claude-max` ModelSource** *(now coupled to Phase 1)* | Add the `claude-max` source (`runtime_native`, `reachable_via=("claude_code",)`); its `billing_posture` **is the declaration** Phase 1 needs, so Phase 1 emits `unknown` until it exists. **Prereq:** extend `BillingPosture` if credit semantics are chosen (it lacks `subscription_headless_credit` today). | Phase 1          |
 
 Phase 0 ships no `src/` change (like the openrouter Phase 0). Phases 1-2 are sketched for review, **not** committed-to
 until the probe lands.
@@ -143,10 +144,17 @@ auth method is known, at preflight") means: resolve the auth posture **once at s
 known) and thread it as a new `resolved_billing_mode` argument through **all four** `emit_usage_for_session_result`
 callers -- `supervisor.py:578`, `memory_writer.py:526`, `shadow_curation.py:306`, `team/handlers.py:249` -- *not*
 re-derived inside `emit`. Each caller computes its own `direct`/`base_url` today, so the posture must ride alongside.
-**Precedence (codex-style):** yield a `subscription_*` mode **only when `can_use_bare` is False**, so a machine with
-both an API key and a Max session is never mislabeled subscription (the key wins, exactly as codex checks
-`stored API key` before `stored ChatGPT tokens`). **Omitting any of the four callers** silently leaves that consumer
-labeling subscription runs `unknown` -- an acceptance test must cover all four.
+**Precedence + the label gate (reframed 2026-06-29).** `can_use_bare` False is **necessary but not sufficient**. It is
+the *gate* -- a resolvable key wins (key present => `api`, exactly as codex checks `stored API key` before
+`stored ChatGPT tokens`) -- but it only proves the run takes the OAuth *path*, **not** that the account is a paid
+subscription: it cannot see Free/Pro/Max, and (unlike codex's `stored ChatGPT tokens` credential-*type* signal) Claude
+exposes no equivalent. So the durable `subscription_*` **label** requires an explicit declaration -- the `claude-max`
+lane / operator-declared `billing_posture` (Phase 2) -- consistent with §A.8 ("an explicit declaration, never
+inferred"). Absent a declaration, keyless OAuth stays **`unknown`** (the module's honest-don't-know contract).
+Consequence: **Phase 1 alone can only emit `unknown`; the `claude-max` declaration (Phase 2) is what lights up the
+label**, so the two couple. **Omitting any of the four callers** (`supervisor.py:578`, `memory_writer.py:526`,
+`shadow_curation.py:306`, `team/handlers.py:249`) silently leaves that consumer at `unknown` -- an acceptance test must
+cover all four.
 
 ## Scope
 

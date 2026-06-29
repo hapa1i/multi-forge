@@ -314,9 +314,20 @@ def cmd_precondition(args: argparse.Namespace) -> int:
     note = "keyless confirmed (can_use_bare False)."
     if state["anthropic_base_url_set"]:
         note += " ANTHROPIC_BASE_URL is set; the turn forces DIRECT routing anyway."
-    if state["oauth_token_env_present"]:
-        note += " An OAuth token env var IS present: a passing turn may ride that token, not the keychain Max session."
     append_oracle(capture_dir, args.label, note)
+    if state["oauth_token_env_present"]:
+        # No API key, but an injected OAuth token IS a credential -- it authenticates some
+        # account, not provably the stored Keychain Max session, so this is NOT a clean
+        # keyless test. Flag it (the turn marks the run UNVERIFIED); don't abort -- the
+        # operator can still learn the path rides *a* subscription token.
+        append_oracle(
+            capture_dir,
+            args.label,
+            "WARNING: CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_AUTH_TOKEN is set -- not a clean keychain test. "
+            "Unset it to prove the stored Max session rides; otherwise the turn is [SHAPE-SUBSCRIPTION-UNVERIFIED].",
+        )
+        write_verdict(capture_dir, "[KEYLESS-BUT-TOKEN-ENV]")
+        return 0
     write_verdict(capture_dir, "[KEYLESS-OK]")
     return 0
 
@@ -374,8 +385,13 @@ def cmd_turn(args: argparse.Namespace) -> int:
         shape = "[OAUTH-NONTTY-FAILED]"  # architectural kill: keyless auth needs a TTY/login
     elif not completed:
         shape = "[TURN-INCONCLUSIVE]"
+    elif state["oauth_token_env_present"]:
+        # A third keyless credential source: an injected OAuth token authenticates SOME
+        # account (possibly a different/metered/non-Max one), not provably the stored
+        # Keychain Max session. Do not claim the clean subscription verdict.
+        shape = "[SHAPE-SUBSCRIPTION-UNVERIFIED]"  # rode an injected token; account/plan unproven
     else:
-        shape = "[SHAPE-SUBSCRIPTION]"  # keyless + completed => rode the subscription
+        shape = "[SHAPE-SUBSCRIPTION]"  # keyless + no token env + completed => rode the stored session
 
     record = {
         "kind": "turn",
@@ -409,8 +425,8 @@ def cmd_turn(args: argparse.Namespace) -> int:
         append_oracle(
             capture_dir,
             args.label,
-            "NOTE: an OAuth token env var was present -- this turn may have ridden that token, "
-            "not the interactive keychain Max session. Re-run with it unset to isolate the keychain path.",
+            "NOTE: an OAuth token env var was present -> verdict is [SHAPE-SUBSCRIPTION-UNVERIFIED] (rode an injected "
+            "token, not provably the Keychain Max session). Re-run with it unset to isolate the keychain path.",
         )
     write_verdict(capture_dir, shape)
     # rc maps to the *probe*'s success (did we get a usable reading?), not the turn's.
