@@ -377,8 +377,8 @@ def cmd_turn(args: argparse.Namespace) -> int:
 
     # Composite shape. KEY FINDING (live Max run, 2026-06-29): a keyless turn that
     # completes MUST have ridden OAuth -- with no API key and no proxy there is nothing
-    # to bill an API per-token -- so it is a subscription run REGARDLESS of the cost
-    # field. total_cost_usd is an API-list-price ESTIMATE present even on Max ($0.041 for
+    # to bill an API per-token -- so it is a subscription *candidate* REGARDLESS of the
+    # cost field. total_cost_usd is an API-list-price ESTIMATE present even on Max ($0.041 for
     # a 4-token reply), so it is NOT a billing discriminator: record it as evidence, keep
     # it `unavailable` for the cost plane (design 3.14), never let it flip the label.
     if a0 == "[OAUTH-NONTTY-FAILED]":
@@ -391,7 +391,10 @@ def cmd_turn(args: argparse.Namespace) -> int:
         # Keychain Max session. Do not claim the clean subscription verdict.
         shape = "[SHAPE-SUBSCRIPTION-UNVERIFIED]"  # rode an injected token; account/plan unproven
     else:
-        shape = "[SHAPE-SUBSCRIPTION]"  # keyless + no token env + completed => rode the stored session
+        # "Candidate", not "subscription": we proved it rode the stored OAuth session, but
+        # can_use_bare can't see the account's plan (Free/Pro/Max) -- the durable subscription
+        # label needs a claude-max declaration on top (see card Phase 1).
+        shape = "[SHAPE-SUBSCRIPTION-CANDIDATE]"  # keyless + no token env => rode the stored OAuth session
 
     record = {
         "kind": "turn",
@@ -419,7 +422,8 @@ def cmd_turn(args: argparse.Namespace) -> int:
             capture_dir,
             args.label,
             "NOTE: cost_value is an API-list-price ESTIMATE present even on Max -- not a billing "
-            "discriminator. Keyless + completed => subscription; keep cost `unavailable` (design 3.14).",
+            "discriminator. Keyless + completed => subscription candidate (plan needs a declaration); "
+            "keep cost `unavailable` (design 3.14).",
         )
     if state["oauth_token_env_present"] and completed:
         append_oracle(

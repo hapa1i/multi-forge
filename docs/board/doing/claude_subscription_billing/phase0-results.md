@@ -21,14 +21,14 @@ artifact. Harness: `scripts/experiments/claude-subscription/`. All evidence belo
 
 ## Findings
 
-| Signal                      | Verdict                     | Evidence (sanitized)                                                          |
-| --------------------------- | --------------------------- | ----------------------------------------------------------------------------- |
-| (a0) non-TTY OAuth feasible | `[OAUTH-NONTTY-OK]`         | `auth_marker_seen=false`; rode the Keychain Max session non-TTY               |
-| (a) keyless turn completes  | yes                         | `rc=0`, `has_result=true`, `is_error=false`, `subtype=success`                |
-| (b) billing signal          | `[COST-PRESENT]`            | `total_cost_usd=0.0412665`, usage 2923 in / 4 out                             |
-| (b) composite shape         | `[SHAPE-SUBSCRIPTION]`      | keyless + completed => rode the subscription (cost is an estimate, see below) |
-| (c) detection signal        | `[SIGNAL-STABLE-PREFLIGHT]` | chosen = `can_use_bare`; all artifact candidates failed (see below)           |
-| (d) quota draw              | not run                     | `claude -p` exposes no `anthropic-ratelimit-*` headers; deferred              |
+| Signal                      | Verdict                          | Evidence (sanitized)                                                                                  |
+| --------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| (a0) non-TTY OAuth feasible | `[OAUTH-NONTTY-OK]`              | `auth_marker_seen=false`; rode the Keychain Max session non-TTY                                       |
+| (a) keyless turn completes  | yes                              | `rc=0`, `has_result=true`, `is_error=false`, `subtype=success`                                        |
+| (b) billing signal          | `[COST-PRESENT]`                 | `total_cost_usd=0.0412665`, usage 2923 in / 4 out                                                     |
+| (b) composite shape         | `[SHAPE-SUBSCRIPTION-CANDIDATE]` | keyless + completed => rode the stored OAuth session (a candidate; durable label needs a declaration) |
+| (c) detection signal        | `[SIGNAL-STABLE-PREFLIGHT]`      | chosen = `can_use_bare`; all artifact candidates failed (see below)                                   |
+| (d) quota draw              | not run                          | `claude -p` exposes no `anthropic-ratelimit-*` headers; deferred                                      |
 
 ## The load-bearing finding: cost-presence is not a billing signal
 
@@ -69,8 +69,8 @@ Running the probe for real exposed two flaws in its own first-cut interpretation
 2. **The detection candidate list omitted `can_use_bare`.** The first cut enumerated only external artifacts and
    concluded `[SIGNAL-RUNTIME-ONLY]`. Adding `can_use_bare` as the primary candidate yields `[SIGNAL-STABLE-PREFLIGHT]`.
 3. **The token-env path could read as clean subscription.** A keyless run with `CLAUDE_CODE_OAUTH_TOKEN` /
-   `ANTHROPIC_AUTH_TOKEN` set rides an *injected token* (any account), but the first cut still stamped
-   `[SHAPE-SUBSCRIPTION]` with only a soft note. Fixed: stage 00 now emits `[KEYLESS-BUT-TOKEN-ENV]` and the turn emits
+   `ANTHROPIC_AUTH_TOKEN` set rides an *injected token* (any account), but the first cut still stamped the clean
+   subscription verdict with only a soft note. Fixed: stage 00 now emits `[KEYLESS-BUT-TOKEN-ENV]` and the turn emits
    `[SHAPE-SUBSCRIPTION-UNVERIFIED]`. This run had **no** token env (`oauth_token_env_present=false`), so the result
    stands.
 

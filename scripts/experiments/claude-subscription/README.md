@@ -45,11 +45,12 @@ harness's `[COST-PRESENT]`/`[COST-ABSENT]`.
 - **10-turn** (verdict.txt carries the decision-relevant token; the per-signal tags are in the record/oracle):
   - `[OAUTH-NONTTY-FAILED]` -- keyless auth needs a TTY/login (**kill #1, architectural**).
   - `[TURN-INCONCLUSIVE]` -- turn failed for a non-auth reason (timeout / model error); rerun.
-  - `[SHAPE-SUBSCRIPTION]` -- completed keyless with **no** OAuth-token env. With no key and no proxy the turn can
-    *only* have ridden the stored OAuth session, so it is a subscription run **regardless of the cost field**. (Live Max
-    run 2026-06-29: `total_cost_usd` is **present** -- an API-list-price estimate, $0.04 for a 4-token reply -- so cost
-    is **not** a billing discriminator; it is recorded as evidence but never flips the label. This refutes the
-    `[COST-ABSENT]`-on-OAuth expectation.)
+  - `[SHAPE-SUBSCRIPTION-CANDIDATE]` -- completed keyless with **no** OAuth-token env. With no key and no proxy the turn
+    can *only* have ridden the stored OAuth session -- a subscription **candidate regardless of the cost field**, but
+    only a candidate: `can_use_bare` can't see the account's plan (a free/metered login reads the same), so the durable
+    label needs a `claude-max` declaration. (Live Max run 2026-06-29: `total_cost_usd` is **present** -- an
+    API-list-price estimate, $0.04 for a 4-token reply -- so cost is **not** a billing discriminator; it is recorded as
+    evidence but never flips the label. This refutes the `[COST-ABSENT]`-on-OAuth expectation.)
   - `[SHAPE-SUBSCRIPTION-UNVERIFIED]` -- completed keyless **but** an OAuth token env var was set, so the turn rode an
     *injected token* (any account, possibly metered/non-Max), not provably the stored Keychain session. Not a clean
     proceed; re-run with the token unset.
@@ -73,18 +74,18 @@ reporting "subscription" is the single failure mode T0 is built to avoid.
 
 The checklist's three-way decision gate reads directly off stage 10 + stage 20:
 
-| Outcome                       | Reading                                                        | Action                                                                                                                    |
-| ----------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Full kill (architectural)** | `[OAUTH-NONTTY-FAILED]`                                        | subscription lane impossible; close the `claude-max` question                                                             |
-| **Phase-1 no-go (brittle)**   | `[SHAPE-SUBSCRIPTION]` **but** detection `RUNTIME-ONLY`/`NONE` | do **not** emit a guessed `subscription_*`; record the finding                                                            |
-| **Re-run (unclean test)**     | `[SHAPE-SUBSCRIPTION-UNVERIFIED]` / `[KEYLESS-BUT-TOKEN-ENV]`  | a token env confounded the test; unset it and re-run before concluding                                                    |
-| **Proceed**                   | `[SHAPE-SUBSCRIPTION]` **and** detection `STABLE-PREFLIGHT`    | Phase 1; subscription *label* gated on `can_use_bare` **and** a `claude-max` declaration (card); cost stays `unavailable` |
+| Outcome                       | Reading                                                                  | Action                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Full kill (architectural)** | `[OAUTH-NONTTY-FAILED]`                                                  | subscription lane impossible; close the `claude-max` question                                                             |
+| **Phase-1 no-go (brittle)**   | `[SHAPE-SUBSCRIPTION-CANDIDATE]` **but** detection `RUNTIME-ONLY`/`NONE` | do **not** emit a guessed `subscription_*`; record the finding                                                            |
+| **Re-run (unclean test)**     | `[SHAPE-SUBSCRIPTION-UNVERIFIED]` / `[KEYLESS-BUT-TOKEN-ENV]`            | a token env confounded the test; unset it and re-run before concluding                                                    |
+| **Proceed**                   | `[SHAPE-SUBSCRIPTION-CANDIDATE]` **and** detection `STABLE-PREFLIGHT`    | Phase 1; subscription *label* gated on `can_use_bare` **and** a `claude-max` declaration (card); cost stays `unavailable` |
 
 The earlier "per-token" outcome is gone: cost-presence on a *keyless* run is an estimate, not proof of metered billing,
 so there is no envelope-only path to a per-token conclusion. But `can_use_bare` sees only key-resolvability, **not the
-account's plan** (Free/Pro/Max) -- a free or metered OAuth login would also read as `[SHAPE-SUBSCRIPTION]`. So the probe
-proves the *path*; the durable `subscription_*` **label** needs an explicit `claude-max` declaration (card Phase 1 +
-Phase 2), not `can_use_bare` alone -- **card Q3**.
+account's plan** (Free/Pro/Max) -- a free or metered OAuth login would also read as `[SHAPE-SUBSCRIPTION-CANDIDATE]`. So
+the probe proves the *path*; the durable `subscription_*` **label** needs an explicit `claude-max` declaration (card
+Phase 1 + Phase 2), not `can_use_bare` alone -- **card Q3**.
 
 ## Running
 
