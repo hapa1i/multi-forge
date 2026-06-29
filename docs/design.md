@@ -366,6 +366,9 @@ To avoid writer conflicts:
   - `intent` + `overrides` sections in `<forge_root>/.forge/sessions/<session_name>/forge.session.json`
   - `intent.launch` records relaunch mode plus sidecar-specific options (image, extra mounts) when the session is
     created or derived
+  - `intent.consumer_lanes.supervisor` (a `LaneRecord`) when a resolving command requests a non-default supervisor lane
+    (`forge session start`/`fork --supervisor-runtime`, `forge policy supervisor set --runtime`); the lane is rejected
+    as a raw `set` override (epic consumer_lanes/T1b)
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
@@ -390,6 +393,9 @@ To avoid writer conflicts:
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
     points for the final live conversation identity.
+  - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): the policy-check hook freezes the lane it
+    dispatched on, **write-once** at the first check (epic consumer_lanes/T1b). Once frozen it governs dispatch directly
+    (confirmed-first) and the resolving commands refuse to change it.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -430,6 +436,11 @@ To avoid writer conflicts:
   `verbosity`, `thinking_budget_tokens`).
 - **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
   metadata.
+- **Consumer-lane binding** (epic consumer_lanes/T1b): `intent.consumer_lanes.<consumer>` is the *requested* lane (a
+  `LaneRecord`, set only by resolving commands, never a raw `set` override); `confirmed.consumer_lanes.<consumer>` is
+  the `(runtime, backend, model)` the hook *froze* at first dispatch. Frozen is **write-once and immutable** -- the
+  resolving commands reject a change once it exists, and dispatch reads confirmed-first. See
+  [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
@@ -506,9 +517,9 @@ them.
 supervisor to use the selected proxy's `opus` tier. Direct supervisors do not get this proxy-tier reset because there is
 no Forge proxy mapping to resolve.
 
-This chain applies to the supervisor's default `claude_code` lane. The `codex` lane arm (`supervisor_runtime="codex"`,
-epic consumer_lanes/T4) bypasses it entirely: `codex exec` runs **direct** to OpenAI with no Forge proxy. See
-[design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference) for the consumer-lane layer.
+This chain applies to the supervisor's default `claude_code` lane. The `codex` lane arm (the supervisor's
+`consumer_lanes` binding, epic consumer_lanes) bypasses it entirely: `codex exec` runs **direct** to OpenAI with no
+Forge proxy. See [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference) for the consumer-lane layer.
 
 **Fail behavior by subprocess type:**
 

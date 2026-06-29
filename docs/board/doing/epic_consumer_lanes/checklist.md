@@ -109,9 +109,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - [x] T5 ships -> update `design_appendix.md` §G (Observability paragraph: the two read surfaces + `operation=None`
   upstream-parity fix; per-emitter coverage table gains checker/reviewer/team-tagger rows) and `cli_reference.md`
   (`forge telemetry activity` lane columns + `forge policy supervisor status` row). Done in PR #56.
-- [ ] T1b ships -> update `design.md` §3.6 (manifest gains consumer-lane `intent`/`confirmed`) + §3.5
-  (`confirmed.consumer_lanes` hook-written, write-once per consumer dispatch); `design_appendix.md` §G (binding now
-  persisted + frozen). Plan: `doing/consumer_lane_binding/checklist.md` Slice 5.
+- [x] T1b ships -> updated `design.md` §3.5 (`intent.consumer_lanes` CLI-written, `confirmed.consumer_lanes`
+  hook-written write-once) + §3.6.2 (consumer-lane binding invariant: intent=requested, confirmed=frozen/immutable);
+  `design_appendix.md` §G (supervisor lane now the persisted/frozen `consumer_lanes` binding, hook-injected; T5
+  observability reads the frozen binding, `not executable` on drift); `cli_reference.md` (`--supervisor-runtime` launch
+  control + `set --runtime` row + status drift). Done on branch `consumer_lane_binding` (Slice 5).
 
 ## Closeout (epic)
 

@@ -5,11 +5,11 @@
 
 ## Current focus
 
-Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + pulled-forward override reject) + 3
-(clean-break removal of `supervisor_runtime`) + 4 (setters + stateful already-bound reject; status drift landed in Slice
-3\) **complete**. Dispatch, freeze, status, and the setters all read/write the same `consumer_lanes` binding. **Only
-Slice 5 (docs sync) remains** before closeout. Design is fully settled (D1-D3 in `card.md`). Tick a box only when its
-assertion is verified and recorded -- not when work merely starts.
+All five slices **complete**: 1 (schema) + 2 (binding resolution + injected resolver + freeze + pulled-forward override
+reject) + 3 (clean-break removal of `supervisor_runtime`) + 4 (setters + stateful already-bound reject; status drift
+landed in Slice 3) + 5 (docs sync). Dispatch, freeze, status, and the setters all read/write the same `consumer_lanes`
+binding. **Remaining: closeout** -- the supervisor E2E integration run, the change_log entry, impl_notes promotion
+(after human review), and the `doing/ -> done/` move after merge.
 
 ## Slices
 
@@ -135,14 +135,23 @@ shadow-migration comment.
 -> 404 passed (15 new); full unit suite -> 7074 passed, 0 failures; mypy + pyright + `make pre-commit` clean. Flags
 verified live in `--help` for all three commands; expansion spot-checked (`codex -> chatgpt/gpt-5-codex`).
 
-### Slice 5 -- Docs sync (board_contract "Design Doc Sync")
+### Slice 5 -- Docs sync (board_contract "Design Doc Sync") -- DONE
 
-- [ ] design.md §3.5 (ownership): `confirmed.consumer_lanes` is hook-written (policy-check `_mutate`), write-once.
-- [ ] design.md §3.6 (manifest gains consumer-lane `intent`/`confirmed`); design_appendix §G (the binding is now
-  persisted + frozen, supervisor wired via injected resolver).
-- [ ] cli_reference.md: `--supervisor-runtime` on start/fork + `policy supervisor set --runtime`; the `consumer_lanes.*`
-  set rejection; the already-bound rejection; status drift line.
-- [ ] Tick the epic checklist "Design-doc sync" T1b row.
+- [x] design.md §3.5 (ownership): `intent.consumer_lanes.supervisor` added to CLI writes (resolving commands);
+  `confirmed.consumer_lanes` added to hook writes (policy-check freeze, **write-once**, confirmed-first dispatch).
+- [x] design.md §3.6.2 gained the consumer-lane binding invariant (intent = requested `LaneRecord`, confirmed = frozen
+  immutable, set only by resolving commands); the §3.6.12 `supervisor_runtime="codex"` mention repointed to the
+  `consumer_lanes` binding. design_appendix §G: supervisor lane is now the persisted/frozen binding the hook **injects**
+  (not `run_supervisor_check`-resolved); the T5 observability paragraph reads the frozen binding, `not executable` on
+  drift, never rewrites.
+- [x] cli_reference.md: `--supervisor-runtime` added to the start/fork launch-controls paragraph; a
+  `set <target> --runtime` row added; the status row no longer says "only `runtime` is bound" (now the bound lane +
+  drift). The `consumer_lanes.*` raw-`set` rejection is noted in design.md §3.5/§3.6.2.
+- [x] Epic checklist "Design-doc sync" T1b row ticked with the shipped doc list.
+
+**Verification:** `rg supervisor_runtime docs/{design,design_appendix,design_workflows,cli_reference}.md docs/end-user/`
+-> only the one deliberate historical sentence in §G ("T1b replaced the narrow `supervisor_runtime` override...");
+`make pre-commit` (mdformat) clean.
 
 ## Acceptance tests (fixture-grounded)
 
