@@ -5,12 +5,11 @@
 
 ## Current focus
 
-Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + the pulled-forward override reject) + 3
-(clean-break removal of `supervisor_runtime`) **complete**. The Slice 2->3 dispatch/display divergence (review P1) is
-now resolved: `supervisor_runtime` no longer exists, so dispatch, freeze, and status all read the same `consumer_lanes`
-binding -- **the branch is mergeable**. Next is Slice 4 (setters + stateful already-bound reject + status drift line;
-the `validate_key` reject already shipped in Slice 2) then Slice 5 (docs sync). Design is fully settled (D1-D3 in
-`card.md`). Tick a box only when its assertion is verified and recorded -- not when work merely starts.
+Slices 1 (schema) + 2 (binding resolution + injected resolver + freeze + pulled-forward override reject) + 3
+(clean-break removal of `supervisor_runtime`) + 4 (setters + stateful already-bound reject; status drift landed in Slice
+3\) **complete**. Dispatch, freeze, status, and the setters all read/write the same `consumer_lanes` binding. **Only
+Slice 5 (docs sync) remains** before closeout. Design is fully settled (D1-D3 in `card.md`). Tick a box only when its
+assertion is verified and recorded -- not when work merely starts.
 
 ## Slices
 
@@ -108,19 +107,33 @@ mypy + pyright clean.
 files. `rg 'supervisor_runtime|_SUPERVISOR_RUNTIMES|_supervisor_lane_override' src/` -> only the strip helper +
 shadow-migration comment.
 
-### Slice 4 -- Setters, mutation guard, status (D2)
+### Slice 4 -- Setters, mutation guard, status (D2) -- DONE
 
 - [x] `validate_key` **statically rejects** `consumer_lanes.*` -- **done early in Slice 2** (review P2b): the reject
   must exist the moment dispatch reads `consumer_lanes`, not wait for the setters. Mirrors `launch.runtime`
   (`overrides.py`); `test_consumer_lanes_rejected_as_command_only`.
-- [ ] Lane setters **expand runtime -> full `LaneRecord`** against `SUPERVISOR_CONSUMER.allowed_lanes`:
-  `--supervisor-runtime {claude_code,codex}` on `forge session start` + `forge session fork` (requires `--supervise`),
-  and `forge policy supervisor set --runtime`. All write `intent.consumer_lanes.supervisor`.
-- [ ] Stateful **already-bound reject** lives in `policy supervisor set --runtime` (holds `SessionState`): if
-  `confirmed.consumer_lanes.supervisor` exists, fail with the actionable message; `confirmed` unchanged. Before first
-  dispatch it is allowed.
-- [ ] `forge policy supervisor status` reads the confirmed binding when present, revalidates `LaneRecord -> Lane`, and
-  reports "binding no longer executable" on drift **without** rewriting the manifest.
+- [x] Lane setters **expand runtime -> full `LaneRecord`** via `lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)`
+  (bridge helper, iterates `valid_lanes`): `--supervisor-runtime {claude_code,codex}` on `forge session start` +
+  `forge session fork` (requires `--supervise`, extends the existing flag-family check), and
+  `forge policy supervisor set --runtime`. All write `intent.consumer_lanes.supervisor` via `set_intent_lane` inside the
+  same locked update that writes the `SupervisorConfig`. The Choice menu is derived from `supervisor_lane_runtimes()`
+  (one source, no `_SUPERVISOR_RUNTIMES`-style mirror). Verified:
+  `test_session_commands.py::test_{fork,start}_supervise_runtime_persists_lane` + `..._without_supervise_errors`;
+  `test_policy_supervisor.py::test_runtime_writes_intent_lane` + `test_no_runtime_leaves_lane_unset`; bridge
+  `test_consumer_lanes.py::TestLaneRecordForRuntime`/`TestSetIntentLane`.
+- [x] Stateful **already-bound reject** lives in `policy supervisor set --runtime` (holds `SessionState`): if
+  `confirmed.consumer_lanes.supervisor` exists, `print_error_with_tip` names the frozen `runtime/backend/model` and
+  exits 1; `confirmed` and `intent` unchanged. Checked before any proxy side effect; before first dispatch it is
+  allowed. Verified: `test_policy_supervisor.py::test_runtime_after_bind_rejected`.
+- [x] `forge policy supervisor status` reads the confirmed binding when present, revalidates `LaneRecord -> Lane`, and
+  reports drift **without** rewriting the manifest -- **landed in Slice 3** (status repointed to
+  `resolve_supervisor_lane(read_bound_lane(...))`, confirmed-first; drift -> `Lane: not executable`). The D1 inert-DTO
+  vs validating-domain-type split makes the read path revalidate every call, so no extra drift check was needed.
+
+**Verification:**
+`tests/src/{session/test_consumer_lanes, cli/test_policy_supervisor, cli/test_session_commands, policy/semantic/test_supervisor}`
+-> 404 passed (15 new); full unit suite -> 7074 passed, 0 failures; mypy + pyright + `make pre-commit` clean. Flags
+verified live in `--help` for all three commands; expansion spot-checked (`codex -> chatgpt/gpt-5-codex`).
 
 ### Slice 5 -- Docs sync (board_contract "Design Doc Sync")
 

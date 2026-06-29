@@ -717,6 +717,18 @@ class TestSupervisorLaneDispatch:
         # Default (no override) stays claude_code -- byte-identical to T3.
         assert resolve_lane(SUPERVISOR_CONSUMER).runtime_id == "claude_code"
 
+    def test_supervisor_lane_runtimes_derive_from_consumer(self) -> None:
+        """T1b: the --supervisor-runtime/--runtime CLI choices come from the consumer's declared
+        lanes (default first), so there is no separate runtime allow-list to drift."""
+        from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            supervisor_lane_runtimes,
+        )
+
+        runtimes = supervisor_lane_runtimes()
+        assert runtimes == ("claude_code", "codex")
+        assert runtimes[0] == SUPERVISOR_CONSUMER.default_lane.runtime_id  # default first
+
     @patch("forge.core.usage.emit_usage_for_session_result")
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_single_usage_emission_on_success(self, mock_run: MagicMock, mock_emit: MagicMock) -> None:

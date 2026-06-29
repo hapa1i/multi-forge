@@ -10,9 +10,18 @@ from click.testing import CliRunner
 from pytest import fixture
 
 from forge.cli.main import main
+from forge.core.state import now_iso
 from forge.policy.types import PolicyDecision, Violation
 from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import PolicyIntent, StartedWithProxy, SupervisorConfig
+from forge.session.models import (
+    ConsumerLaneBinding,
+    ConsumerLaneConfirmed,
+    LaneRecord,
+    PolicyIntent,
+    SessionState,
+    StartedWithProxy,
+    SupervisorConfig,
+)
 
 
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
@@ -830,6 +839,75 @@ class TestSupervisorSetTimeoutFlag:
         runner = CliRunner()
         result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--timeout", "0"])
         assert result.exit_code == 2  # Click IntRange(min=1) usage error
+
+
+class TestSupervisorSetRuntimeFlag:
+    """--runtime on `policy supervisor set`: writes the consumer-lane binding; rejects a post-bind change."""
+
+    _CODEX = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+    def _set_and_read(self, project: Path, args: list[str]) -> SessionState:
+        """Run ``policy supervisor set planner <args>`` against a real store; return the persisted manifest."""
+        store = SessionStore(str(project), "test-session")
+        state = create_session_state("test-session", worktree_path=str(project))
+        state.forge_root = str(project)
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", *args])
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
+        return store.read()
+
+    def test_runtime_writes_intent_lane(self, temp_guard_env: Path) -> None:
+        manifest = self._set_and_read(temp_guard_env, ["--runtime", "codex"])
+        assert manifest.intent.consumer_lanes is not None
+        assert manifest.intent.consumer_lanes.supervisor == self._CODEX
+
+    def test_no_runtime_leaves_lane_unset(self, temp_guard_env: Path) -> None:
+        # Setting other supervisor options must not implicitly bind a lane.
+        manifest = self._set_and_read(temp_guard_env, [])
+        assert manifest.intent.consumer_lanes is None
+
+    def test_runtime_after_bind_rejected(self, temp_guard_env: Path) -> None:
+        # Once confirmed.consumer_lanes.supervisor is frozen, --runtime is rejected: dispatch is
+        # confirmed-first, so a new intent lane would be recorded-but-ignored (the launch.runtime
+        # failure mode). The reject is stateful (reads confirmed), unlike the cached validate_key.
+        store = SessionStore(str(temp_guard_env), "test-session")
+        state = create_session_state("test-session", worktree_path=str(temp_guard_env))
+        state.forge_root = str(temp_guard_env)
+        state.confirmed.consumer_lanes = ConsumerLaneConfirmed(
+            supervisor=ConsumerLaneBinding(lane=self._CODEX, source="intent", resolved_at=now_iso())
+        )
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--runtime", "claude_code"])
+
+        assert result.exit_code == 1, result.output
+        assert "already-bound" in result.output
+        assert "frozen on codex/chatgpt/gpt-5-codex" in result.output
+        after = store.read()
+        # The frozen binding is untouched, and no intent lane was written.
+        assert after.confirmed.consumer_lanes is not None
+        assert after.confirmed.consumer_lanes.supervisor is not None
+        assert after.confirmed.consumer_lanes.supervisor.lane == self._CODEX
+        assert after.intent.consumer_lanes is None
 
 
 # --- Cascade tests for `forge policy supervisor cascade` and `set --cascade` ---

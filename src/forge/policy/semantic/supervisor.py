@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from forge.core.invoker.types import Attribution, HeadlessResult
-from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import SessionResult, run_claude_session
@@ -126,6 +126,17 @@ SUPERVISOR_CONSUMER = Consumer(
     # its own model unless `-m` is passed). T1b generalizes this to a uniform consumer-lane binding.
     allowed_lanes=(Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),),
 )
+
+
+def supervisor_lane_runtimes() -> tuple[str, ...]:
+    """Runtime ids the supervisor lane can be set to (default first, deduplicated).
+
+    Drives the ``--supervisor-runtime`` / ``--runtime`` CLI choices from the single
+    ``SUPERVISOR_CONSUMER`` declaration, so there is no separate runtime allow-list to
+    drift (the failure mode the deleted ``_SUPERVISOR_RUNTIMES`` mirror invited). Derived
+    from ``valid_lanes`` so the menu only offers runtimes whose lane currently resolves.
+    """
+    return tuple(dict.fromkeys(lane.runtime_id for lane in valid_lanes(SUPERVISOR_CONSUMER)))
 
 
 def plan_fingerprint(path: str, forge_root: str | None) -> str:
@@ -1125,6 +1136,24 @@ def apply_supervisor_to_intent(
     # Clear conflicting override so intent.policy.enabled takes effect.
     if manifest.overrides:
         delete_override(manifest.overrides, "policy.enabled")
+
+
+def apply_supervisor_and_lane(
+    manifest: SessionState,
+    sup_config: SupervisorConfig,
+    lane_record: LaneRecord | None,
+) -> None:
+    """Write the supervisor config and (if set) its consumer-lane binding in one mutate.
+
+    The shared start/fork wiring: ``apply_supervisor_to_intent`` plus, when
+    ``--supervisor-runtime`` was given, the already-expanded ``lane_record`` into
+    ``intent.consumer_lanes.supervisor``. ``None`` leaves the lane to the consumer default.
+    """
+    from forge.session.consumer_lanes import set_intent_lane
+
+    apply_supervisor_to_intent(manifest, sup_config)
+    if lane_record is not None:
+        set_intent_lane(manifest, SUPERVISOR_CONSUMER, lane_record)
 
 
 # --- Plan reload resolution ---

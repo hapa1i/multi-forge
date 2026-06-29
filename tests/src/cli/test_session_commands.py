@@ -21,7 +21,12 @@ from forge.session import IndexStore, SessionManager, SessionStore, create_sessi
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 from forge.session.exceptions import DirtyWorktreeError, SessionNotFoundError
-from forge.session.models import Derivation, StartedWithProxy, SystemPromptIntent
+from forge.session.models import (
+    Derivation,
+    LaneRecord,
+    StartedWithProxy,
+    SystemPromptIntent,
+)
 
 
 def _iso_days_ago(days: int) -> str:
@@ -4346,6 +4351,80 @@ class TestSupervisorLaunchControls:
         assert sup.checker_provider == "litellm_local"  # normalized dash->underscore
         assert sup.checker_effort == "low"
         assert sup.supervisor_effort == "medium"
+
+    # --- persistence: --supervisor-runtime writes the consumer-lane binding (not SupervisorConfig) ---
+
+    def test_fork_supervisor_runtime_without_supervise_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        self._seed_supervise_parent(runner, temp_env, "sup-parent")
+        result = runner.invoke(
+            main,
+            ["session", "fork", "sup-parent", "--name", "child", "--supervisor-runtime", "codex", "--no-launch"],
+        )
+        assert result.exit_code != 0
+        assert "require --supervise" in result.output
+
+    def test_start_supervisor_runtime_without_supervise_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(
+            main, ["session", "start", "child-start", "--supervisor-runtime", "codex", "--no-launch"]
+        )
+        assert result.exit_code != 0
+        assert "require --supervise" in result.output
+
+    def test_fork_supervise_runtime_persists_lane(self, runner: CliRunner, temp_env: Path) -> None:
+        # The lane lands in intent.consumer_lanes.supervisor (the binding), not SupervisorConfig;
+        # the child gets its own fresh binding, frozen at its first policy check.
+        self._seed_supervise_parent(runner, temp_env, "sup-parent")
+
+        with patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "sup-parent",
+                    "--name",
+                    "codex-child",
+                    "--supervise",
+                    "--supervisor-runtime",
+                    "codex",
+                    "--no-launch",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        lanes = SessionStore(str(temp_env), "codex-child").read().intent.consumer_lanes
+        assert lanes is not None
+        assert lanes.supervisor == LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+    def test_start_supervise_runtime_persists_lane(self, runner: CliRunner, temp_env: Path) -> None:
+        from unittest.mock import MagicMock
+
+        mock_source = MagicMock()
+        mock_source.confirmed.started_with_proxy = None
+        mock_source.forge_root = str(temp_env)
+
+        with (
+            patch("forge.policy.semantic.supervisor.validate_supervisor_target", return_value=mock_source),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None),
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "codex-start",
+                    "--supervise",
+                    "planner",
+                    "--supervisor-runtime",
+                    "codex",
+                    "--no-launch",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        lanes = SessionStore(str(temp_env), "codex-start").read().intent.consumer_lanes
+        assert lanes is not None
+        assert lanes.supervisor == LaneRecord("codex", "chatgpt", "gpt-5-codex")
 
 
 class TestMainGroup:

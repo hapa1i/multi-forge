@@ -27,6 +27,7 @@ from rich.text import Text
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.lanes import LaneError
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -39,14 +40,25 @@ from forge.policy.semantic.supervisor import (
     SUPERVISOR_CONSUMER,
     apply_checker_options,
     resolve_supervisor_lane,
+    supervisor_lane_runtimes,
     validate_checker_model,
 )
 from forge.session import SessionStore
-from forge.session.consumer_lanes import read_bound_lane
+from forge.session.consumer_lanes import (
+    confirmed_lane,
+    lane_record_for_runtime,
+    read_bound_lane,
+    set_intent_lane,
+)
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
-from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
+from forge.session.models import (
+    LaneRecord,
+    PolicyIntent,
+    SessionState,
+    SupervisorConfig,
+)
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sessions_dir
 
 console = Console()
@@ -58,6 +70,7 @@ _log = logging.getLogger(__name__)
 _CHECKER_PROVIDER_CHOICES = click.Choice(list(CHECKER_PROVIDER_CHOICES))
 _CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
 _SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
+_SUPERVISOR_RUNTIME_CHOICES = click.Choice(list(supervisor_lane_runtimes()))
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -1046,6 +1059,13 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     default=None,
     help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max)",
 )
+@click.option(
+    "--runtime",
+    "runtime",
+    type=_SUPERVISOR_RUNTIME_CHOICES,
+    default=None,
+    help="Supervisor lane runtime (claude_code/codex); rejected once the lane is frozen",
+)
 def supervisor_set(
     target: str,
     session_name: str | None,
@@ -1057,6 +1077,7 @@ def supervisor_set(
     checker_provider: str | None,
     checker_effort: str | None,
     supervisor_effort: str | None,
+    runtime: str | None,
 ) -> None:
     """Set the semantic supervisor target for the session.
 
@@ -1093,6 +1114,30 @@ def supervisor_set(
     store, _state = _resolve_policy_session(cwd, session_name)
     name = _state.name
     manifest = store.read()
+
+    # Resolve the supervisor lane before any side effect. The binding is immutable once
+    # frozen (card D2): a post-bind --runtime would write intent that dispatch ignores
+    # (read_bound_lane is confirmed-first) -- the "recorded but ignored" failure the
+    # launch.runtime reject also guards. The stateless validate_key can't see confirmed,
+    # so this stateful guard lives here. Expanded to a full LaneRecord up front so a bad
+    # runtime fails before the proxy auto-start below.
+    lane_record: LaneRecord | None = None
+    if runtime is not None:
+        frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
+        if frozen is not None:
+            print_error_with_tip(
+                "Cannot change the supervisor lane for an already-bound session.",
+                f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
+                "Start or fork a fresh session to use a different lane.",
+                console=console,
+            )
+            sys.exit(1)
+        try:
+            lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
+        except LaneError as e:
+            print_error(f"{e}", console=console)
+            sys.exit(1)
+
     # Validate the target in the selected session's scope, not CWD: a cross-worktree
     # --session would otherwise search the wrong project.
     _policy_fr = manifest.forge_root or _resolve_forge_root(cwd)
@@ -1156,8 +1201,15 @@ def supervisor_set(
             checker_effort=checker_effort,
         )
 
-    store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
+    def _apply(m: SessionState) -> None:
+        apply_supervisor_to_intent(m, sup_config)
+        if lane_record is not None:
+            set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
+
+    store.update(timeout_s=5.0, mutate=_apply)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
+    if lane_record is not None:
+        console.print(f"  Lane: runtime={lane_record.runtime_id} (frozen at first check)")
     if routing_display:
         label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
         console.print(f"  Routing ({label}): {routing_display}")

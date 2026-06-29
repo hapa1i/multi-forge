@@ -20,11 +20,12 @@ from __future__ import annotations
 import logging
 from dataclasses import fields
 
-from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.state import now_iso
 from forge.session.models import (
     ConsumerLaneBinding,
     ConsumerLaneConfirmed,
+    ConsumerLaneIntent,
     LaneRecord,
     SessionState,
 )
@@ -50,6 +51,48 @@ def read_bound_lane(state: SessionState, consumer: Consumer) -> LaneRecord | Non
     if binding is not None:
         return binding.lane
     return _intent_record(state, consumer)
+
+
+def confirmed_lane(state: SessionState, consumer: Consumer) -> LaneRecord | None:
+    """Return ``consumer``'s frozen lane record, or None if not yet bound.
+
+    The resolving commands' already-bound reject reads this: a non-None result
+    means the lane is frozen, so ``policy supervisor set --runtime`` must refuse to
+    change it (the binding is immutable once written, card D2).
+    """
+    binding = _confirmed_binding(state, consumer)
+    return None if binding is None else binding.lane
+
+
+def lane_record_for_runtime(consumer: Consumer, runtime_id: str) -> LaneRecord:
+    """Expand a runtime id to ``consumer``'s full declared lane on that runtime.
+
+    A runtime alone is not a lane: this recovers the ``(runtime, backend, model)``
+    the consumer declares as a valid candidate for ``runtime_id`` (its default or an
+    allowed lane). The CLI lane setters call it so they persist a full ``LaneRecord``
+    without re-encoding backend/model -- ``SUPERVISOR_CONSUMER`` stays the one place
+    that pairs a runtime with its backend/model. Raises ``LaneError`` if the consumer
+    has no valid candidate lane on that runtime.
+    """
+    for lane in valid_lanes(consumer):
+        if lane.runtime_id == runtime_id:
+            return LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
+    raise LaneError(f"Consumer {consumer.id!r} has no valid lane on runtime {runtime_id!r}")
+
+
+def set_intent_lane(state: SessionState, consumer: Consumer, lane_record: LaneRecord) -> None:
+    """Record ``consumer``'s requested lane in ``intent`` (the resolving-command setter).
+
+    The write companion to ``read_bound_lane``'s intent branch: resolving commands
+    (start/fork ``--supervisor-runtime``, ``policy supervisor set --runtime``) call this
+    to record the requested placement. The freeze (``ensure_consumer_lane_binding``) later
+    copies the lane that actually dispatched into ``confirmed``. Callers enforce the
+    already-bound reject (``confirmed_lane``) before invoking this -- it does not itself
+    guard against overwriting a request on an already-frozen session.
+    """
+    if state.intent.consumer_lanes is None:
+        state.intent.consumer_lanes = ConsumerLaneIntent()
+    setattr(state.intent.consumer_lanes, _slot(consumer), lane_record)
 
 
 def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from forge.core.lanes import Consumer, Lane
+from forge.core.lanes import Consumer, Lane, LaneError
 from forge.core.state import now_iso
 from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
 from forge.session.consumer_lanes import (
+    confirmed_lane,
     ensure_consumer_lane_binding,
+    lane_record_for_runtime,
     read_bound_lane,
+    set_intent_lane,
 )
 from forge.session.models import (
     ConsumerLaneBinding,
@@ -111,6 +114,53 @@ class TestEnsureConsumerLaneBinding:
         state = _state()
         ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("gemini", "openrouter", "m"))
         assert state.confirmed.consumer_lanes is None
+
+
+# --- lane_record_for_runtime (the resolving-command expansion) ---
+
+
+class TestLaneRecordForRuntime:
+    def test_expands_default_runtime_to_full_lane(self) -> None:
+        # A runtime id alone is not a lane: expansion recovers the declared (runtime, backend, model).
+        assert lane_record_for_runtime(SUPERVISOR_CONSUMER, "claude_code") == _DEFAULT_RECORD
+
+    def test_expands_allowed_runtime_to_full_lane(self) -> None:
+        assert lane_record_for_runtime(SUPERVISOR_CONSUMER, "codex") == _CODEX_RECORD
+
+    def test_unknown_runtime_raises(self) -> None:
+        # A runtime with no declared candidate lane is a setter bug, not a silent default.
+        with pytest.raises(LaneError, match="no valid lane on runtime 'bogus'"):
+            lane_record_for_runtime(SUPERVISOR_CONSUMER, "bogus")
+
+
+# --- set_intent_lane (the resolving-command intent write) ---
+
+
+class TestSetIntentLane:
+    def test_writes_intent_slot_creating_section(self) -> None:
+        state = _state()
+        set_intent_lane(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)
+        assert state.intent.consumer_lanes is not None
+        assert state.intent.consumer_lanes.supervisor == _CODEX_RECORD
+
+    def test_overwrites_prior_intent_request(self) -> None:
+        # Before the freeze, re-setting the intent lane is allowed (the post-bind reject lives in
+        # the CLI, which reads confirmed). set_intent_lane itself is an unconditional write.
+        state = _state(intent=_DEFAULT_RECORD)
+        set_intent_lane(state, SUPERVISOR_CONSUMER, _CODEX_RECORD)
+        assert state.intent.consumer_lanes.supervisor == _CODEX_RECORD  # type: ignore[union-attr]
+
+
+# --- confirmed_lane (the already-bound reject's reader) ---
+
+
+class TestConfirmedLane:
+    def test_none_when_unbound(self) -> None:
+        assert confirmed_lane(_state(intent=_CODEX_RECORD), SUPERVISOR_CONSUMER) is None
+
+    def test_returns_frozen_lane(self) -> None:
+        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
+        assert confirmed_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) == _CODEX_RECORD
 
 
 # --- generality / drift guards ---
