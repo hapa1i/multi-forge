@@ -272,11 +272,13 @@ def _persist_policy_decisions(
         m.confirmed.confirmed_by = confirmed_by
 
         # Freeze the supervisor's consumer-lane binding write-if-absent (epic consumer_lanes, T1b):
-        # the first policy-check hook that runs a configured supervisor records the lane it dispatched
-        # as durable ground truth (the anchor the "already bound" reject checks). Folded into this
-        # existing locked post-eval write -- no second lock. ``supervisor_lane`` is the lane the hook
-        # injected at registration, so the freeze records exactly what dispatched even if intent
-        # changed during the supervisor call (not a fresh read of this under-lock manifest).
+        # at the first policy check for a configured supervisor, record the *explicitly chosen* lane
+        # as durable ground truth (the anchor the "already bound" reject checks). The gate here is
+        # config-presence; ensure_consumer_lane_binding no-ops when the lane is the default
+        # (``supervisor_lane is None``), so an unpinned session is never frozen and stays re-pinnable
+        # (`set --runtime`). Folded into this existing locked post-eval write -- no second lock.
+        # ``supervisor_lane`` is the lane the hook injected at registration, so the freeze records
+        # exactly what dispatched even if intent changed during the supervisor call.
         sup = effective.policy.supervisor if effective.policy else None
         if sup and sup.resume_id and not sup.suspended:
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER

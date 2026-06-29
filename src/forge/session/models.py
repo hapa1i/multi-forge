@@ -294,8 +294,10 @@ class ConsumerLaneIntent:
 class ConsumerLaneBinding:
     """A consumer's frozen, resolved lane -- written once at first dispatch.
 
-    Inert record plus the anchor the "already bound" reject checks. ``source`` is
-    a plain ``str`` (``"default" | "intent"``) per the fail-open ``*Confirmed`` style.
+    Inert record plus the anchor the "already bound" reject checks. A binding exists
+    iff an *explicit* lane choice was frozen (the default lane never freezes), so
+    ``source`` is currently always ``"intent"``; it stays a plain ``str`` per the
+    fail-open ``*Confirmed`` style and as a forward slot for future provenance (T6).
     """
 
     lane: LaneRecord

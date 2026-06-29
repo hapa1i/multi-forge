@@ -34,7 +34,7 @@ _log = logging.getLogger(__name__)
 
 # One named field per consumer on each section; the two must stay in lockstep so a
 # consumer's intent slot has a matching confirmed slot. Guarded by
-# test_consumer_lanes.test_intent_confirmed_slots_match.
+# test_consumer_lanes.test_intent_and_confirmed_slots_match.
 _CONSUMER_LANE_SLOTS = frozenset(f.name for f in fields(ConsumerLaneConfirmed))
 
 
@@ -112,30 +112,34 @@ def clear_consumer_lane(state: SessionState, consumer: Consumer) -> None:
 
 
 def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:
-    """Freeze ``consumer``'s resolved lane into ``confirmed``, write-if-absent.
+    """Freeze ``consumer``'s explicitly-chosen lane into ``confirmed``, write-if-absent.
 
-    The single immutability seam (card D2): the first policy-check hook that runs a
-    configured consumer records the lane **it actually dispatched on** as durable ground
-    truth; later dispatches and the "already bound" reject read this. Idempotent -- a
-    second call is a no-op once the binding exists.
+    The single immutability seam (card D2). ``lane_record`` is the lane the hook injected at
+    registration (``read_bound_lane`` -- confirmed-first, else the intent override), NOT a fresh
+    manifest read, so the freeze records exactly what dispatched even if intent changes during
+    the (multi-second) supervisor call.
 
-    ``lane_record`` is the lane the hook injected at registration (``read_bound_lane``),
-    NOT a fresh manifest read. Passing it explicitly keeps the freeze consistent with the
-    dispatch even if intent changes during the (multi-second) supervisor call: the binding
-    records exactly what ran. None => the dispatch used the consumer default
-    (``source="default"``); a record => the intent override (``source="intent"``).
+    **The default lane is never frozen.** ``lane_record is None`` means no explicit choice was
+    recorded (neither ``confirmed`` nor ``intent``) and the consumer ran on its default; we leave
+    ``confirmed`` empty. That keeps the default re-resolvable and lets the user pin a lane later
+    (``set --runtime``) without tripping the already-bound reject -- immutability protects an
+    *explicit* choice, not an unconfigured default. Only an explicit lane freezes, always
+    ``source="intent"``.
 
-    A drifted record (a backend renamed out of the catalog) fails ``resolve_lane``; the
-    binding is then *skipped*, never frozen as a known-unusable lane -- dispatch has
-    already failed open as a no-call, so the next dispatch retries once the catalog is
-    whole again.
+    Idempotent -- a second call is a no-op once the binding exists. A drifted record (a backend
+    renamed out of the catalog) fails ``resolve_lane`` and is *skipped*, never frozen as a
+    known-unusable lane; dispatch has already failed open as a no-call, so a later valid catalog
+    can still freeze it.
     """
-    if _confirmed_binding(state, consumer) is not None:
+    # Reject an unwired consumer up front (internal boundary, never a silent no-op): the no-op
+    # branches below (already-bound, or default/None) would otherwise skip slot validation on a
+    # fresh manifest, since _confirmed_binding early-returns before reaching _slot.
+    _slot(consumer)
+    if lane_record is None or _confirmed_binding(state, consumer) is not None:
         return
 
     try:
-        override = None if lane_record is None else _record_to_lane(lane_record)
-        resolved = resolve_lane(consumer, override=override)
+        resolved = resolve_lane(consumer, override=_record_to_lane(lane_record))
     except LaneError as e:
         # Best-effort durable write: a drifted/invalid lane must not freeze a binding the
         # dispatch path can't execute. Dispatch already fails open (no-call); leaving
@@ -144,17 +148,15 @@ def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_r
         return
 
     record = LaneRecord(resolved.runtime_id, resolved.backend_id, resolved.model)
-    binding = ConsumerLaneBinding(
-        lane=record,
-        source="default" if lane_record is None else "intent",
-        resolved_at=now_iso(),
-    )
+    binding = ConsumerLaneBinding(lane=record, source="intent", resolved_at=now_iso())
     _set_confirmed_binding(state, consumer, binding)
 
 
 def _record_to_lane(record: LaneRecord) -> Lane:
     """Validate a stored LaneRecord against today's catalogs (raises LaneError on drift)."""
-    return Lane(record.runtime_id, record.backend_id, record.model)
+    # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not
+    # constructor order, so positional construction would silently swap a reordered field.
+    return Lane(runtime_id=record.runtime_id, backend_id=record.backend_id, model=record.model)
 
 
 def _slot(consumer: Consumer) -> str:

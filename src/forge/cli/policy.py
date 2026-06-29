@@ -1148,14 +1148,17 @@ def supervisor_set(
     # write). Expanded to a full LaneRecord up front so a bad runtime also fails early.
     lane_record: LaneRecord | None = None
     if runtime is not None:
-        frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
-        if frozen is not None:
-            _reject_supervisor_lane_change(frozen)
-            sys.exit(1)
         try:
             lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
         except LaneError as e:
             print_error(f"{e}", console=console)
+            sys.exit(1)
+        # Reject only a genuine *change*: re-pinning the already-frozen lane is an
+        # idempotent no-op (the user re-runs `set --runtime <same>` to also retarget
+        # the supervisor). Expanding lane_record first lets us compare full records.
+        frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
+        if frozen is not None and frozen != lane_record:
+            _reject_supervisor_lane_change(frozen)
             sys.exit(1)
 
     # Validate the target in the selected session's scope, not CWD: a cross-worktree
@@ -1224,12 +1227,13 @@ def supervisor_set(
     def _apply(m: SessionState) -> None:
         # Authoritative already-bound guard: re-check the *fresh* manifest under the lock. A
         # hook may have frozen confirmed.consumer_lanes between the unlocked read above and
-        # here; writing the intent lane now would be recorded-but-ignored (dispatch is
-        # confirmed-first). Raise to abort the whole update -- store.update persists only if
-        # the mutate returns, so nothing (not even the supervisor config) is written.
+        # here; writing a *different* intent lane now would be recorded-but-ignored (dispatch
+        # is confirmed-first). A same-lane re-pin (frozen == lane_record) is a permitted no-op.
+        # Raise to abort the whole update -- store.update persists only if the mutate returns,
+        # so nothing (not even the supervisor config) is written.
         if lane_record is not None:
             frozen = confirmed_lane(m, SUPERVISOR_CONSUMER)
-            if frozen is not None:
+            if frozen is not None and frozen != lane_record:
                 raise _SupervisorLaneFrozenError(frozen)
         apply_supervisor_to_intent(m, sup_config)
         if lane_record is not None:
@@ -1242,7 +1246,7 @@ def supervisor_set(
         sys.exit(1)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
     if lane_record is not None:
-        console.print(f"  Lane: runtime={lane_record.runtime_id} (frozen at first check)")
+        console.print(f"  Lane: runtime={lane_record.runtime_id} (freezes on first check)")
     if routing_display:
         label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
         console.print(f"  Routing ({label}): {routing_display}")

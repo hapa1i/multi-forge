@@ -708,7 +708,11 @@ def resolve_supervisor_lane(lane_record: LaneRecord | None) -> Lane:
     catalogs, so a drifted binding raises ``LaneError``; a display caller catches it and shows
     the lane as unresolved / not executable.
     """
-    override = None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+    override = (
+        None
+        if lane_record is None
+        else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
+    )
     return resolve_lane(SUPERVISOR_CONSUMER, override=override)
 
 
@@ -781,7 +785,9 @@ def run_supervisor_check(
     # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
     try:
         override = (
-            None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+            None
+            if lane_record is None
+            else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
         )
         lane = resolve_lane(SUPERVISOR_CONSUMER, override=override)
     except LaneError as e:

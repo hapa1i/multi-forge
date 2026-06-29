@@ -760,7 +760,11 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     - ``%policy supervisor remove``: remove supervisor entirely
     - ``%policy supervisor reload [path]``: reload latest relevant approved plan
     - ``%policy supervisor cascade on|off``: toggle the tier-1 plan check
-    - ``%policy supervisor``: show current config
+    - ``%policy supervisor``: show current config (including the bound consumer lane)
+
+    The consumer-lane *runtime* is intentionally not settable here -- it is a resolving-command
+    flag (``forge policy supervisor set --runtime``) so the binding stays write-once. This path
+    only shows the bound lane.
     """
     from forge.session.models import SessionState
 
@@ -1090,6 +1094,17 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
             lines.append(f"  UUID: {uuid[:16]}...")
     except Exception:
         pass
+    try:
+        from forge.policy.semantic.supervisor import (
+            SUPERVISOR_CONSUMER,
+            resolve_supervisor_lane,
+        )
+        from forge.session.consumer_lanes import read_bound_lane
+
+        lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
+        lines.append(f"  Lane: runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}")
+    except Exception:  # drifted/removed catalog entry -> show unresolved, never break the status reply
+        lines.append("  Lane: not executable (binding no longer valid)")
     if sup.proxy:
         lines.append(f"  Routing: proxy: {sup.proxy}")
     elif sup.direct:

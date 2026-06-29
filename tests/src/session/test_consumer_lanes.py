@@ -56,7 +56,7 @@ class TestReadBoundLane:
     def test_confirmed_wins_over_intent(self) -> None:
         # The frozen binding governs dispatch directly: a (drifted/edited) intent must not
         # override a recorded binding. confirmed-first is the "resolved once and frozen" contract.
-        frozen = ConsumerLaneBinding(lane=_DEFAULT_RECORD, source="default", resolved_at=now_iso())
+        frozen = ConsumerLaneBinding(lane=_DEFAULT_RECORD, source="intent", resolved_at=now_iso())
         state = _state(intent=_CODEX_RECORD, confirmed=frozen)
         assert read_bound_lane(state, SUPERVISOR_CONSUMER) == _DEFAULT_RECORD
 
@@ -65,15 +65,13 @@ class TestReadBoundLane:
 
 
 class TestEnsureConsumerLaneBinding:
-    def test_freezes_default_when_lane_is_none(self) -> None:
+    def test_none_lane_does_not_freeze(self) -> None:
+        # The default lane never freezes (MEDIUM contract): lane_record is None means the
+        # consumer ran on its default with no explicit choice, so confirmed stays empty and
+        # the lane remains re-pinnable via `set --runtime` (no spurious already-bound reject).
         state = _state()
         ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, None)
-        assert state.confirmed.consumer_lanes is not None
-        binding = state.confirmed.consumer_lanes.supervisor
-        assert binding is not None
-        assert binding.source == "default"
-        assert binding.lane == _DEFAULT_RECORD
-        assert binding.resolved_at  # stamped
+        assert state.confirmed.consumer_lanes is None
 
     def test_freezes_injected_override(self) -> None:
         state = _state()

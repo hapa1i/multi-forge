@@ -335,21 +335,16 @@ class TestSupervisorLaneBindingFreeze:
         store.update.call_args[1]["mutate"](state)
 
     @patch("forge.policy.store.build_policy_state_update")
-    def test_configured_supervisor_freezes_default_binding(self, mock_build: MagicMock) -> None:
-        """A configured supervisor with no intent override freezes the default lane (source='default')."""
-        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
-        from forge.session.models import LaneRecord
+    def test_configured_supervisor_on_default_does_not_freeze(self, mock_build: MagicMock) -> None:
+        """A configured supervisor running on its default lane freezes nothing (MEDIUM contract).
 
+        supervisor_lane is None (no explicit choice), so confirmed stays empty and the lane is
+        still re-pinnable -- immutability protects an explicit choice, not the default.
+        """
         mock_build.return_value = self._BUILD_RETURN
         state = self._state()
-        self._run_mutate(state, self._effective())
-
-        assert state.confirmed.consumer_lanes is not None
-        binding = state.confirmed.consumer_lanes.supervisor
-        assert binding is not None
-        assert binding.source == "default"
-        d = SUPERVISOR_CONSUMER.default_lane
-        assert binding.lane == LaneRecord(d.runtime_id, d.backend_id, d.model)
+        self._run_mutate(state, self._effective())  # supervisor_lane defaults to None (ran on default)
+        assert state.confirmed.consumer_lanes is None
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_suspended_supervisor_does_not_freeze(self, mock_build: MagicMock) -> None:
@@ -369,7 +364,8 @@ class TestSupervisorLaneBindingFreeze:
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_freeze_is_write_if_absent(self, mock_build: MagicMock) -> None:
-        """An existing binding (e.g. a prior codex freeze) is never overwritten by a later default run."""
+        """An existing binding is never overwritten, even by a later run dispatching a different lane."""
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
         from forge.session.models import (
             ConsumerLaneBinding,
             ConsumerLaneConfirmed,
@@ -382,7 +378,10 @@ class TestSupervisorLaneBindingFreeze:
             lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at="2020-01-01T00:00:00Z"
         )
         state.confirmed.consumer_lanes = ConsumerLaneConfirmed(supervisor=frozen)
-        self._run_mutate(state, self._effective())
+        # Inject a *different* explicit lane so we reach the pre-existing-binding short-circuit,
+        # not the trivial None early-return: write-if-absent must keep the prior codex binding.
+        d = SUPERVISOR_CONSUMER.default_lane
+        self._run_mutate(state, self._effective(), supervisor_lane=LaneRecord(d.runtime_id, d.backend_id, d.model))
         assert state.confirmed.consumer_lanes.supervisor is frozen
 
     @patch("forge.policy.store.build_policy_state_update")
@@ -403,6 +402,32 @@ class TestSupervisorLaneBindingFreeze:
         assert binding is not None
         assert binding.source == "intent"
         assert binding.lane == codex
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_default_run_does_not_lock_out_later_pin(self, mock_build: MagicMock) -> None:
+        """Lock-out regression (MEDIUM): a supervisor that first ran on its default lane must still
+        accept a later explicit pin. The default run freezes nothing, so the next run on an injected
+        lane freezes normally -- an early default check never locks the user into the default.
+        """
+        from forge.session.models import LaneRecord
+
+        mock_build.return_value = self._BUILD_RETURN
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+
+        # First check ran on the default (no injected lane) -> nothing frozen, lane stays re-pinnable.
+        # Capture into a throwaway local so the `is None` assertion doesn't narrow the attribute
+        # expression itself (the second _run_mutate repopulates it, but mypy can't see that).
+        self._run_mutate(state, self._effective())
+        after_default = state.confirmed.consumer_lanes
+        assert after_default is None
+
+        # A later check on an explicitly-pinned codex lane freezes normally.
+        self._run_mutate(state, self._effective(), supervisor_lane=codex)
+        confirmed = state.confirmed.consumer_lanes
+        assert confirmed is not None
+        assert confirmed.supervisor is not None
+        assert confirmed.supervisor.lane == codex
 
     def test_register_injects_and_returns_bound_lane(self) -> None:
         """register_supervisor_and_restore reads the manifest binding, injects it, and returns it."""

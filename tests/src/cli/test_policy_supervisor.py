@@ -635,6 +635,33 @@ class TestSupervisorStatus:
         assert result.exit_code == 0, result.output
         assert "Lane: runtime=codex backend=chatgpt model=gpt-5-codex" in result.output
 
+    def test_status_displays_confirmed_lane_over_intent(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """T1b: with both intent and a frozen binding, status shows the *confirmed* lane.
+
+        read_bound_lane is confirmed-first, so the displayed lane is the one that actually
+        dispatches -- a drifted intent override must not mislead the status view.
+        """
+        from forge.session.models import ConsumerLaneIntent
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        # Intent says codex, but the frozen binding is the default claude lane -> confirmed wins.
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
+        manifest.confirmed.consumer_lanes = ConsumerLaneConfirmed(
+            supervisor=ConsumerLaneBinding(
+                lane=LaneRecord("claude_code", "anthropic-direct", "opus"), source="intent", resolved_at=now_iso()
+            )
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
+        assert result.exit_code == 0, result.output
+        assert "Lane: runtime=claude_code backend=anthropic-direct model=opus" in result.output
+
     def test_status_json_lane_null_on_resolution_failure(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
@@ -714,6 +741,29 @@ class TestSupervisorToggle:
         updated = store.read()
         assert updated.intent.policy is not None
         assert updated.intent.policy.supervisor is None
+
+    def test_remove_clears_confirmed_consumer_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        # remove tears down the supervisor's *frozen* lane too, not just intent: the binding
+        # belongs to the consumer, so a later re-add starts from the default and never
+        # resurrects the removed lane (read_bound_lane is confirmed-first, else intent).
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        manifest.confirmed.consumer_lanes = ConsumerLaneConfirmed(
+            supervisor=ConsumerLaneBinding(
+                lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at=now_iso()
+            )
+        )
+        store = SessionStore(str(temp_guard_env), "worker")
+        store.write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "remove"])
+        assert result.exit_code == 0
+
+        updated = store.read()
+        confirmed = updated.confirmed.consumer_lanes
+        assert confirmed is None or confirmed.supervisor is None
 
     def test_off_without_supervisor_reports_not_configured(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
@@ -910,19 +960,22 @@ class TestSupervisorSetRuntimeFlag:
         assert after.intent.consumer_lanes is None
 
     def test_runtime_race_frozen_under_lock_aborts(self, temp_guard_env: Path, monkeypatch) -> None:
-        # TOCTOU (review P2): the pre-lock check sees the lane unbound, but a hook freezes
-        # confirmed between that read and the locked write. The under-lock re-check must abort
-        # so no recorded-but-ignored intent lane is persisted (dispatch is confirmed-first).
+        # TOCTOU (review P2): the pre-lock check sees the lane unbound, but a hook freezes a
+        # *different* lane (the default claude) between that read and the locked write. The
+        # under-lock re-check must abort so our codex intent is not persisted as
+        # recorded-but-ignored (dispatch is confirmed-first on the hook's frozen lane). A
+        # same-lane race would be an idempotent no-op, so the conflict must be a different lane.
         store = SessionStore(str(temp_guard_env), "test-session")
         state = create_session_state("test-session", worktree_path=str(temp_guard_env))
         state.forge_root = str(temp_guard_env)
         store.write(state)
 
         calls = {"n": 0}
+        hook_frozen = LaneRecord("claude_code", "anthropic-direct", "opus")  # != the requested codex lane
 
         def _fake_confirmed_lane(_m, _consumer):
             calls["n"] += 1
-            return None if calls["n"] == 1 else self._CODEX  # unbound pre-lock, frozen under lock
+            return None if calls["n"] == 1 else hook_frozen  # unbound pre-lock, a different lane under lock
 
         monkeypatch.setattr("forge.cli.policy.confirmed_lane", _fake_confirmed_lane)
 
@@ -972,6 +1025,36 @@ class TestSupervisorSetRuntimeFlag:
 
         # No bound lane survives: read_bound_lane returns None -> the default claude lane dispatches.
         assert read_bound_lane(store.read(), SUPERVISOR_CONSUMER) is None
+
+    def test_runtime_resetting_same_lane_is_idempotent(self, temp_guard_env: Path) -> None:
+        # Re-pinning the *already-frozen* lane is a permitted no-op, not an already-bound reject:
+        # only a different lane is rejected (test_runtime_after_bind_rejected). The command still
+        # succeeds so a user can re-run `set --runtime codex` to also retarget the supervisor.
+        store = SessionStore(str(temp_guard_env), "test-session")
+        state = create_session_state("test-session", worktree_path=str(temp_guard_env))
+        state.forge_root = str(temp_guard_env)
+        state.confirmed.consumer_lanes = ConsumerLaneConfirmed(
+            supervisor=ConsumerLaneBinding(lane=self._CODEX, source="intent", resolved_at=now_iso())
+        )
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--runtime", "codex"])
+
+        assert result.exit_code == 0, result.output
+        assert "already-bound" not in result.output
+        after = store.read()
+        # Frozen binding intact, and intent now also records the (same) requested lane.
+        assert after.confirmed.consumer_lanes.supervisor.lane == self._CODEX  # type: ignore[union-attr]
+        assert after.intent.consumer_lanes.supervisor == self._CODEX  # type: ignore[union-attr]
 
 
 # --- Cascade tests for `forge policy supervisor cascade` and `set --cascade` ---
