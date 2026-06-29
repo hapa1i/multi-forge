@@ -5,11 +5,11 @@
 
 ## Current focus
 
-**Awaiting plan review before implementation.** Card + checklist scaffolded; nothing committed, no `src/` change. Lane
-**decided: `doing/`** (an execution branch exists; board_contract's discriminator is "todo/ = no active branch"). Phase
-0 is an operator-gated probe and the gate for everything below; Phases 1-2 are **conditional on a positive Phase 0**.
-Review targets: the framing correction (incomplete, not buggy), the **detection-signal risk** (card Q1 -- the real soft
-spot), and the three-way kill criterion.
+**Phase 0 done (2026-06-29); outcome = PROCEED.** The probe ran on a live Claude Max box: keyless `claude -p` rides Max
+headlessly, and the detection signal is `can_use_bare` (see `phase0-results.md`). **Phase 1 (the auth-posture resolver)
+is unblocked and is the next implementation step.** Lane **stays `doing/`**. The run corrected two of the probe's own
+assumptions: cost-presence is an API-list-price estimate (not a per-token signal), and the stable signal is Forge's
+`can_use_bare`, not a brittle Claude-side artifact.
 
 ## Phases
 
@@ -25,31 +25,30 @@ sources count). If a key is resolvable, the runner hydrates it and adds `--bare`
 
 Produces `phase0-results.md` answering, with verbatim evidence:
 
-- [ ] **(a0) Non-TTY OAuth feasible at all? (gates the rest)**: can `claude -p` use a pre-authenticated Max/Pro session
-  in a non-TTY context? Omitting `--bare` only *permits* OAuth; OAuth usually needs a TTY/browser. Assertion: a
-  documented keyless turn that authenticates via the subscription, **or** a documented confirmation it cannot (kill #1).
-- [ ] **(a) Keyless turn completes**: given (a0), a keyless `claude -p` completes a real turn via the Max session.
-  (Runner already allows the path -- `session_runner.py:183`, test `test_session_runner.py:200`; **no runner change in
-  scope**.)
-- [ ] **(b) Billing signal**: the `--output-format json` envelope reports a dollar `cost` (API-equivalent) or
-  usage-but-no-cost (subscription/quota). Assertion: the captured cost field, tagged `[COST-PRESENT]`/`[COST-ABSENT]`.
-- [ ] **(c) Detection signal + stability**: enumerate each candidate **with its failure mode** and pick the most stable
-  (or report none qualifies): `claude config get` (no stable JSON contract), `~/.claude/credentials.json` / OS keychain
-  (OS-specific, unowned schema), envelope-cost-null (runtime-only, not preflight). Assertion: a named signal + a
-  stability verdict (`stable-preflight` / `runtime-only` / `none`).
-- [ ] **(d) Quota draw** (optional; informs T5/T7): does the run draw down Max quota / surface rate-limit headroom?
-- [ ] `phase0-results.md` written; `sanitize.sh` clean (no secrets); `make pre-commit` clean on the harness.
+- [x] **(a0) Non-TTY OAuth feasible? (gates the rest)** -- **YES** (`[OAUTH-NONTTY-OK]`): a keyless `claude -p`
+  authenticated via the Keychain Max session in a non-TTY context (`auth_marker_seen=false`,
+  `oauth_token_env_present=false`).
+- [x] **(a) Keyless turn completes** -- **YES**: `rc=0`, `subtype=success`, `is_error=false` (no runner change; the
+  runner already permits the path -- `session_runner.py:183`).
+- [x] **(b) Billing signal** -- `[COST-PRESENT]`, `total_cost_usd=$0.0412665` (2923 in / 4 out). **This is an
+  API-list-price ESTIMATE present even on Max -- NOT a billing discriminator** (refutes the `[COST-ABSENT]`-on-OAuth
+  expectation; cost stays `unavailable` for the cost plane).
+- [x] **(c) Detection signal + stability** -- `[SIGNAL-STABLE-PREFLIGHT]` = **`can_use_bare`** (Forge's own
+  key-resolvability predicate; preflight, owned, stable). The artifact candidates failed: `config get` hangs,
+  `credentials.json`/keychain unowned, envelope-cost-null doesn't fire (cost is present on Max).
+- [ ] **(d) Quota draw** (optional; informs T5/T7) -- **not run** (`claude -p` exposes no `anthropic-ratelimit-*`
+  headers; deferred).
+- [x] `phase0-results.md` written; `sanitize.sh` clean (no secrets); harness `ruff`/`mypy`/`pyright`/`pre-commit` clean.
 
 ### Decision gate (after Phase 0 -- three outcomes, do not conflate)
 
-- [ ] **Full kill (architectural)**: (a0)/(a) negative -> the subscription lane is impossible; document + close the
-  `claude-max`-as-subscription question in the epic. **Stop.**
-- [ ] **Phase-1 no-go (brittle signal)**: (a)/(b) positive but (c) = `none`/`runtime-only` below the bar -> do **not**
-  emit a guessed `subscription_*`; record the finding (optionally as future runtime-only work). **Stop.**
-- [ ] **Per-token (labeling, not kill)**: keyless auth succeeds but (b) = cost-present -> keep `api`/`unknown`; note the
-  path's non-billing value (fidelity/decorrelation) separately. **Stop the billing work.**
-- [ ] **Proceed**: (a0)/(a)/(b) positive **and** (c) `stable-preflight` -> Phase 1; record the `billing_mode` value (b)
-  implies (`subscription_quota` vs `subscription_headless_credit` -- card Q3).
+- [ ] **Full kill (architectural)** -- not taken: (a0)/(a) are positive.
+- [ ] **Phase-1 no-go (brittle signal)** -- not taken: (c) is `stable-preflight` (`can_use_bare`).
+- [ ] **Per-token (labeling, not kill)** -- **refuted**: cost-present on a keyless run is an estimate, not per-token
+  billing (with no key there is nothing to bill an API). Only a metered-console-OAuth account would qualify -- card Q3.
+- [x] **Proceed**: (a0)/(a) positive **and** (c) `stable-preflight` -> Phase 1. `billing_mode` keyed off `can_use_bare`
+  (keyless => subscription), cost stays `unavailable`. (b) did not pick `subscription_quota` vs
+  `subscription_headless_credit` -- a semantics call (card Q3).
 
 ### Phase 1 -- Auth-posture resolver + thread it (Option A; gated on Phase 0 "Proceed")
 
@@ -93,10 +92,10 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 
 ## Blockers / deferred
 
-- **Phase 0 is operator-gated**: needs a real Claude Max/Pro session on the operator's machine (the test env likely
-  lacks one) **with no resolvable API key** (see precondition). Results land in `phase0-results.md`.
-- **Card open questions Q1-Q3** are review inputs -- resolve before Phase 1 (especially Q1, the detection-signal
-  tolerance).
+- **Phase 0 done (2026-06-29)** on a live Max box (key stripped via `env -u` to satisfy the keyless precondition; no
+  durable state touched). Results in `phase0-results.md`.
+- **Q1 resolved** (detection signal = `can_use_bare`). **Q2** (Phase-2 scope) and **Q3** (`subscription_quota` vs
+  `subscription_headless_credit`) remain -- resolve Q3 before Phase 1 emits a concrete mode.
 - T6 (placing a consumer on the lane) and T7 (exhaustion fail-open) stay out of scope.
 
 ## Closeout

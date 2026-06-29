@@ -7,14 +7,14 @@ wave, **load-bearing for a future `claude-max` lane**).
 question the epic deferred -- *does a headless `claude -p` actually ride a Claude Max/Pro subscription, and can Forge
 detect it locally?* -- and makes Forge's `billing_mode` honest about the answer.
 
-**Status**: Card authored 2026-06-29 on branch `claude_subscription_billing`; revised same day after review (the
-detection-signal risk, Phase-1 caller count, keyless precondition, and lane decision). **Awaiting plan review before any
-implementation** -- nothing committed; no `src/` change exists; Phase 0 is an operator-gated probe.
+**Status**: Card authored 2026-06-29 on branch `claude_subscription_billing`; revised same day after review. **Phase 0
+probe built and run on a live Claude Max box (2026-06-29); outcome = PROCEED** (see `phase0-results.md`): keyless
+`claude -p` rides Max headlessly, and the dependable detection signal is `can_use_bare` (Forge's own key-resolvability
+predicate), not any run artifact. Phase 1 (the auth-posture resolver) is unblocked but not yet implemented.
 
 **Lane decision (resolved)**: stays in `doing/`. board_contract's todo/-vs-doing/ discriminator is "todo/ means *no
-execution branch is active*"; an execution branch exists and the epic coordinates T0 as the active (gated) cursor, so
-`doing/` is contract-correct. The status above makes the "no code yet" state explicit so this is not misread as coding
-in flight.
+execution branch is active*"; an execution branch exists and the epic coordinates T0 as the active cursor, so `doing/`
+is contract-correct.
 
 ---
 
@@ -41,7 +41,8 @@ today:
   But omitting `--bare` only **permits** OAuth -- it is **not proof** that `claude -p` actually performs OAuth in a
   non-TTY context (design_workflows §3.4 says only that `--bare` *disables* OAuth, not that `-p` *enables* it
   headlessly). Today such a run is labeled `"unknown"` (`_anthropic_key_present()` is False) -- **honest but
-  unclassified, not a mislabel.** Whether that path can even authenticate, and how to classify it, is the whole of T0.
+  unclassified, not a mislabel.** **Phase 0 (2026-06-29) now answers this: the keyless path DOES authenticate via the
+  Max session headlessly, so the honest label is a subscription mode, not `"unknown"`** -- that relabel is Phase 1.
 
 The real gap is **shape and coverage, not correctness**:
 
@@ -102,11 +103,13 @@ codex probes) that establishes, in order:
   `provider_usage_exact`/`unavailable` -- design §3.14 -- so the *cost* honesty exists; only the `billing_mode` label is
   missing.)
 - **(c) Detection signal + stability (the soft spot)**: what *local*, *programmatic*, *stable* signal distinguishes a
-  subscription-authed `claude` from a key-authed one? Enumerate each candidate **with its failure mode**:
-  `claude config get` (no documented stable JSON contract), reading `~/.claude/credentials.json` / OS keychain
-  (OS-specific, a schema Forge does not own and Anthropic can change), or an **envelope-cost-null runtime probe**
-  (works, but it is a *runtime* signal, not a *preflight* one -- it can only classify *after* a billed turn, unlike
-  codex's pre-dispatch `doctor`). Report which (if any) is stable enough to depend on.
+  subscription-authed `claude` from a key-authed one? Candidates enumerated **with failure modes**: `claude config get`
+  (no documented stable JSON contract -- and the live run showed it *hangs* non-TTY), `~/.claude/credentials.json` / OS
+  keychain (OS-specific, unowned schema), and an envelope-cost-null runtime probe (*does not even fire* -- the live run
+  showed cost is **present** on Max). **Resolved (2026-06-29): the dependable signal is `can_use_bare` itself** --
+  Forge's own key-resolvability predicate (keyless => rides OAuth/subscription; keyed => `--bare` => api). It is
+  preflight, Forge-owned, and needs no unowned external schema. The (c) question is detected from the run's *input*, not
+  its artifacts.
 - **(d) Quota draw** (optional, informs T5/T7): does the run draw down Max quota / surface rate-limit headroom?
 
 ### Kill criterion (three distinct outcomes -- do not conflate)
@@ -118,9 +121,11 @@ codex probes) that establishes, in order:
    preflight signal; only an after-the-fact runtime probe or an unowned-schema read). *Labeling* is then too unreliable
    to ship: record the finding, do **not** emit a guessed `subscription_*` (that violates the module's honest-don't-know
    contract). A runtime-only `unavailable`-cost note may be documented as future work.
-3. **Per-token-billed (labeling decision, not a kill).** Keyless auth *succeeds* but (b) shows it is still
-   per-token/API-equivalent billed. The *path* works but offers no billing arbitrage -- keep `api`/`unknown`; the lane
-   may still have non-billing value (fidelity/decorrelation), tracked separately.
+3. **Per-token-billed (labeling decision, not a kill).** Originally framed as "keyless succeeds but (b) shows per-token
+   billing." **The live run refutes the (b) test:** `total_cost_usd` is present even on Max ($0.04, an estimate), so
+   cost-presence is **not** evidence of per-token billing on a keyless run -- with no key there is nothing to bill an
+   API. This outcome therefore only applies to a metered-console-OAuth account (not Max/Pro), which the envelope cannot
+   reveal; it needs out-of-band proof (Q3). For Max/Pro, keyless + completed => subscription.
 
 ## Proposed approach (phases; 1+ gated on Phase 0)
 
@@ -155,13 +160,13 @@ review agrees; otherwise it is the unblocked follow-on.
 
 ## Open questions (for review)
 
-1. **Detection-signal stability (the MEDIUM soft spot -- biggest risk).** The card leans on the codex
-   `_resolve_codex_auth` analogy, but codex has a first-class `codex doctor --json` contract and **Claude has no known
-   equivalent**. Two compounding unknowns: **(i)** can `claude -p` even do **non-TTY OAuth** (Phase 0 a0)? -- omitting
-   `--bare` only *permits* OAuth, and §3.4 only says `--bare` *disables* it; **(ii)** every candidate **local** signal
-   is brittle (`config get` = no stable JSON; `credentials.json`/keychain = unowned, OS-specific schema; cost-null =
-   runtime-only, not preflight). **"Only brittle signals exist" is itself a Phase-1 no-go** (kill #2). Resolve the
-   tolerance for a runtime-only (non-preflight) signal before Phase 1.
+1. **Detection-signal stability (was the MEDIUM soft spot) -- RESOLVED 2026-06-29.** The fear was that Claude has no
+   `codex doctor` equivalent and every Claude-side artifact signal is brittle (`config get` = no stable JSON / hangs;
+   `credentials.json`/keychain = unowned schema; cost-null = doesn't fire, cost is present on Max). **Resolution: don't
+   read a Claude-side artifact at all** -- the discriminator is `can_use_bare` (Forge's own predicate): keyless +
+   completing turn => subscription; keyed => api. Preflight, Forge-owned, stable. **(i)** non-TTY OAuth works (a0
+   confirmed); **(ii)** the signal is the *input* (is a key resolvable?), not a brittle artifact. The kill #2 risk did
+   not materialize.
 2. **Phase 2 (`claude-max` `ModelSource`) -- in T0 or a follow-on?** The epic says T0 "gates" (= *unblocks*) it.
    Recommendation: keep T0 = probe + billing signal; split the source to a thin follow-on. **Prerequisite either way:**
    `BillingPosture` (`backend/sources.py:24`) is `Literal["per_token","subscription_quota","free"]` -- it has **no**
@@ -169,8 +174,10 @@ review agrees; otherwise it is the unblocked follow-on.
    carry it.
 3. **Which `billing_mode` value?** Leaning **`subscription_headless_credit`** -- the `BillingMode` enum literal is
    *named* for exactly this (headless work on subscription credit) and keeps it distinct from codex's
-   `subscription_quota`. Still probe-decided by (b); flagged because it affects both `BillingMode` (invocation)
-   semantics and the `BillingPosture` gap above.
+   `subscription_quota`. **(b) did NOT disambiguate** -- `total_cost_usd` is an estimate, equally present whether the
+   draw is quota- or credit-based, so the cost field can't pick between `subscription_quota` and
+   `subscription_headless_credit`. This is a semantics decision (+ the `BillingPosture` gap below), not probe-decided;
+   (d) quota-draw evidence would inform it but was not run.
 
 ## Verified touchpoints (file:line, 2026-06-29)
 
@@ -187,4 +194,4 @@ review agrees; otherwise it is the unblocked follow-on.
 | Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                      |
 | Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                         |
 | Reserved subscription modes                 | design_appendix **§A.13**                                                                                                            | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                     |
-| No structured claude auth diagnostic        | (`src/`-wide: no `claude doctor`/`config get`/`credentials.json`)                                                                    | Forge has no codex-`doctor` equivalent to read -- the MEDIUM detection risk                                                                           |
+| Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => subscription -- the dependable signal    |

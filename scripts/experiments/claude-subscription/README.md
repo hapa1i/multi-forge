@@ -43,16 +43,18 @@ harness's `[COST-PRESENT]`/`[COST-ABSENT]`.
 - **10-turn** (verdict.txt carries the decision-relevant token; the per-signal tags are in the record/oracle):
   - `[OAUTH-NONTTY-FAILED]` -- keyless auth needs a TTY/login (**kill #1, architectural**).
   - `[TURN-INCONCLUSIVE]` -- turn failed for a non-auth reason (timeout / model error); rerun.
-  - `[SHAPE-SUBSCRIPTION-LIKELY]` -- completed keyless **and** cost-absent + usage-present (the expected subscription
-    signature).
-  - `[SHAPE-PER-TOKEN-OR-ESTIMATE]` -- completed keyless but a dollar `total_cost_usd` is present. Ambiguous: a real
-    per-token charge **or** Claude Code's informational estimate (**card Q3** -- which `billing_mode`).
+  - `[SHAPE-SUBSCRIPTION]` -- completed keyless. With no key and no proxy the turn can *only* have ridden OAuth, so it
+    is a subscription run **regardless of the cost field**. (Live Max run 2026-06-29: `total_cost_usd` is **present** --
+    an API-list-price estimate, $0.04 for a 4-token reply -- so cost is **not** a billing discriminator; it is recorded
+    as evidence but never flips the label. This refutes the `[COST-ABSENT]`-on-OAuth expectation.)
   - Per-signal tags in the record: `a0_oauth_nontty` ∈ {`[OAUTH-NONTTY-OK]`,`-FAILED`,`-INCONCLUSIVE`}; `b_cost_signal`
-    ∈ {`[COST-PRESENT]`,`[COST-ABSENT]`,`[COST-INCONCLUSIVE]`}.
+    ∈ {`[COST-PRESENT]`,`[COST-ABSENT]`,`[COST-INCONCLUSIVE]`} (informational; does not change the shape).
 - **20-detection:** `[SIGNAL-STABLE-PREFLIGHT]` (a named, Forge-ownable, preflight signal exists) ·
-  `[SIGNAL-RUNTIME-ONLY]` (the only discriminator is the post-turn cost-null -- not classifiable at preflight) ·
-  `[SIGNAL-NONE]` (no candidate qualifies). The honest expected outcome given there is **no `codex doctor`-equivalent**
-  for Claude is `RUNTIME-ONLY` or `NONE` -- that is **card Q1**, the real soft spot.
+  `[SIGNAL-RUNTIME-ONLY]` (the only discriminator is a post-turn artifact) · `[SIGNAL-NONE]` (no candidate qualifies).
+  **Resolved (2026-06-29): `[SIGNAL-STABLE-PREFLIGHT]`.** The dependable signal is **`can_use_bare`** -- Forge's own
+  key-resolvability predicate (keyless => the run rides OAuth/subscription; keyed => `--bare` => api). It needs no
+  unowned external schema, unlike `claude config get` (hangs / no contract), `credentials.json`/keychain (unowned), or
+  envelope-cost-null (does not even fire -- cost is present on Max). This favorably resolves **card Q1**.
 - **30-quota:** `[QUOTA-OBSERVED]` · `[QUOTA-UNOBSERVED]` (the expected default -- `claude -p` does not surface
   `anthropic-ratelimit-*` headers).
 
@@ -63,12 +65,15 @@ reporting "subscription" is the single failure mode T0 is built to avoid.
 
 The checklist's three-way decision gate reads directly off stage 10 + stage 20:
 
-| Outcome                       | Reading                                                             | Action                                                         |
-| ----------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Full kill (architectural)** | `[OAUTH-NONTTY-FAILED]`                                             | subscription lane impossible; close the `claude-max` question  |
-| **Phase-1 no-go (brittle)**   | `SHAPE-SUBSCRIPTION-LIKELY` **but** detection `RUNTIME-ONLY`/`NONE` | do **not** emit a guessed `subscription_*`; record the finding |
-| **Per-token (labeling)**      | `[SHAPE-PER-TOKEN-OR-ESTIMATE]`                                     | keep `api`/`unknown`; note the non-billing value separately    |
-| **Proceed**                   | `SHAPE-SUBSCRIPTION-LIKELY` **and** detection `STABLE-PREFLIGHT`    | Phase 1; record which `billing_mode` (b) implies (card Q3)     |
+| Outcome                       | Reading                                                        | Action                                                                     |
+| ----------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Full kill (architectural)** | `[OAUTH-NONTTY-FAILED]`                                        | subscription lane impossible; close the `claude-max` question              |
+| **Phase-1 no-go (brittle)**   | `[SHAPE-SUBSCRIPTION]` **but** detection `RUNTIME-ONLY`/`NONE` | do **not** emit a guessed `subscription_*`; record the finding             |
+| **Proceed**                   | `[SHAPE-SUBSCRIPTION]` **and** detection `STABLE-PREFLIGHT`    | Phase 1; `billing_mode` keyed off `can_use_bare`, cost stays `unavailable` |
+
+The earlier "per-token" outcome is gone: cost-presence on a *keyless* run is an estimate, not proof of metered billing,
+so there is no envelope-only path to a per-token conclusion. The one residual is a metered-console-OAuth account (not
+Max/Pro), which the envelope can't reveal and which needs out-of-band proof -- **card Q3**.
 
 ## Running
 

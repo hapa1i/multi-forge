@@ -364,15 +364,18 @@ def cmd_turn(args: argparse.Namespace) -> int:
     else:
         b = "[COST-ABSENT]"
 
-    # Composite shape -> maps to the decision gate's three outcomes.
+    # Composite shape. KEY FINDING (live Max run, 2026-06-29): a keyless turn that
+    # completes MUST have ridden OAuth -- with no API key and no proxy there is nothing
+    # to bill an API per-token -- so it is a subscription run REGARDLESS of the cost
+    # field. total_cost_usd is an API-list-price ESTIMATE present even on Max ($0.041 for
+    # a 4-token reply), so it is NOT a billing discriminator: record it as evidence, keep
+    # it `unavailable` for the cost plane (design 3.14), never let it flip the label.
     if a0 == "[OAUTH-NONTTY-FAILED]":
-        shape = "[OAUTH-NONTTY-FAILED]"  # architectural kill
+        shape = "[OAUTH-NONTTY-FAILED]"  # architectural kill: keyless auth needs a TTY/login
     elif not completed:
         shape = "[TURN-INCONCLUSIVE]"
-    elif b == "[COST-ABSENT]":
-        shape = "[SHAPE-SUBSCRIPTION-LIKELY]"
     else:
-        shape = "[SHAPE-PER-TOKEN-OR-ESTIMATE]"  # cost number present: real charge OR estimate (card Q3)
+        shape = "[SHAPE-SUBSCRIPTION]"  # keyless + completed => rode the subscription
 
     record = {
         "kind": "turn",
@@ -395,6 +398,13 @@ def cmd_turn(args: argparse.Namespace) -> int:
         f"(b) cost signal: {b} (cost_value={env.get('cost_value')!r}, "
         f"usage in/out={env.get('input_tokens')}/{env.get('output_tokens')})",
     )
+    if completed:
+        append_oracle(
+            capture_dir,
+            args.label,
+            "NOTE: cost_value is an API-list-price ESTIMATE present even on Max -- not a billing "
+            "discriminator. Keyless + completed => subscription; keep cost `unavailable` (design 3.14).",
+        )
     if state["oauth_token_env_present"] and completed:
         append_oracle(
             capture_dir,
@@ -426,7 +436,30 @@ def cmd_detection(args: argparse.Namespace) -> int:
     home = Path(os.path.expanduser("~"))
     candidates: list[dict[str, Any]] = []
 
-    # Candidate 1: `claude config get` -- key NAMES only, never values.
+    # Candidate 0 (the real signal): key-resolvability via can_use_bare -- the SAME
+    # predicate session_runner uses to decide --bare. Forge-owned, preflight, stable,
+    # non-leaking. can_use_bare False => the run is keyless => a completing turn (stage
+    # 10) rode OAuth/subscription; True => the runner adds --bare => api. Phase 1 keys
+    # off this, and it needs no unowned external schema. The live Max run showed the
+    # envelope-cost signal does NOT discriminate (cost is present even on Max), so this
+    # input-side predicate -- not any run artifact -- is the dependable signal.
+    cub: dict[str, Any] = {
+        "name": "can_use_bare (key-resolvability; the runner's own predicate)",
+        "available_preflight": True,
+        "stable_contract": True,
+        "leaks_secret": False,
+    }
+    try:
+        ks = keyless_state()
+        cub["key_resolvable"] = ks["key_resolvable"]
+        cub["implied_auth_path"] = "api (--bare)" if ks["key_resolvable"] else "keyless (OAuth/subscription)"
+    except Exception as exc:
+        cub["error"] = str(exc)[:120]
+        cub["stable_contract"] = False  # cannot read the predicate here -> not usable
+    candidates.append(cub)
+
+    # Candidate 1: `claude config get` -- key NAMES only, never values. Secondary: the
+    # live run showed it hangs / has no clean non-TTY contract.
     cfg: dict[str, Any] = {
         "name": "claude config get",
         "available_preflight": True,
@@ -530,6 +563,12 @@ def cmd_detection(args: argparse.Namespace) -> int:
             f"stable={c['stable_contract']} leaks={c['leaks_secret']}",
         )
     append_oracle(capture_dir, args.label, f"chosen: {chosen} -> {v}")
+    append_oracle(
+        capture_dir,
+        args.label,
+        "NOTE: can_use_bare is the preflight discriminator of the INTENDED path; a completing "
+        "keyless turn (stage 10) confirms it actually rode subscription.",
+    )
     write_verdict(capture_dir, v)
     return 0
 
