@@ -62,8 +62,8 @@ The real gap is **shape and coverage, not correctness**:
 
 So T0 is not "fix `billing.py`." It is: **prove whether the already-allowed keyless OAuth path actually rides the Max
 subscription, and if so add a preflight-resolved subscription signal** (mirroring the codex sibling) so the `claude-max`
-lane the epic wants can claim `subscription_quota`/`subscription_headless_credit` honestly. No runner change is needed
-to *reach* the keyless path -- the gap is classification, not plumbing.
+lane the epic wants can claim `subscription_quota` honestly (Q3, resolved). No runner change is needed to *reach* the
+keyless path -- the gap is classification, not plumbing.
 
 ## The proven sibling (the pattern to mirror -- and where the analogy breaks)
 
@@ -130,11 +130,11 @@ codex probes) that establishes, in order:
 
 ## Proposed approach (phases; 1+ gated on Phase 0)
 
-| Phase                                                        | Scope                                                                                                                                                                                                                                                                                                         | Gated on         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| **0 -- Probe**                                               | Operator-gated harness under `scripts/experiments/`; `phase0-results.md` answers (a0)-(d). No `src/` change.                                                                                                                                                                                                  | --               |
-| **1 -- Auth-posture resolver + thread it**                   | Preflight-style resolver (mirrors `_resolve_codex_auth`). `can_use_bare` False is a **necessary gate** (key wins) but **not sufficient**: emit `subscription_*` only when a `claude-max` declaration is in scope, else `unknown`. Thread the posture through all four emit callers (Option A below).          | Phase 0 positive |
-| **2 -- `claude-max` ModelSource** *(now coupled to Phase 1)* | Add the `claude-max` source (`runtime_native`, `reachable_via=("claude_code",)`); its `billing_posture` **is the declaration** Phase 1 needs, so Phase 1 emits `unknown` until it exists. **Prereq:** extend `BillingPosture` if credit semantics are chosen (it lacks `subscription_headless_credit` today). | Phase 1          |
+| Phase                                                        | Scope                                                                                                                                                                                                                                                                                                     | Gated on         |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **0 -- Probe**                                               | Operator-gated harness under `scripts/experiments/`; `phase0-results.md` answers (a0)-(d). No `src/` change.                                                                                                                                                                                              | --               |
+| **1 -- Auth-posture resolver + thread it**                   | Preflight-style resolver (mirrors `_resolve_codex_auth`). `can_use_bare` False is a **necessary gate** (key wins) but **not sufficient**: emit `subscription_*` only when a `claude-max` declaration is in scope, else `unknown`. Thread the posture through all four emit callers (Option A below).      | Phase 0 positive |
+| **2 -- `claude-max` ModelSource** *(now coupled to Phase 1)* | Add the `claude-max` source (`runtime_native`, `reachable_via=("claude_code",)`, `billing_posture="subscription_quota"`); this declaration **is** what Phase 1 needs, so Phase 1 emits `unknown` until it exists. No `BillingPosture` change needed (Q3 = `subscription_quota`, already a valid posture). | Phase 1          |
 
 Phase 0 ships no `src/` change (like the openrouter Phase 0). Phases 1-2 are sketched for review, **not** committed-to
 until the probe lands.
@@ -176,16 +176,22 @@ review agrees; otherwise it is the unblocked follow-on.
    confirmed); **(ii)** the signal is the *input* (is a key resolvable?), not a brittle artifact. The kill #2 risk did
    not materialize.
 2. **Phase 2 (`claude-max` `ModelSource`) -- in T0 or a follow-on?** The epic says T0 "gates" (= *unblocks*) it.
-   Recommendation: keep T0 = probe + billing signal; split the source to a thin follow-on. **Prerequisite either way:**
-   `BillingPosture` (`backend/sources.py:24`) is `Literal["per_token","subscription_quota","free"]` -- it has **no**
-   `subscription_headless_credit`, so credit semantics require extending that type before a `claude-max` source can
-   carry it.
-3. **Which `billing_mode` value?** Leaning **`subscription_headless_credit`** -- the `BillingMode` enum literal is
-   *named* for exactly this (headless work on subscription credit) and keeps it distinct from codex's
-   `subscription_quota`. **(b) did NOT disambiguate** -- `total_cost_usd` is an estimate, equally present whether the
-   draw is quota- or credit-based, so the cost field can't pick between `subscription_quota` and
-   `subscription_headless_credit`. This is a semantics decision (+ the `BillingPosture` gap below), not probe-decided;
-   (d) quota-draw evidence would inform it but was not run.
+   Recommendation: keep T0 = probe + billing signal; split the source to a thin follow-on. **No `BillingPosture` change
+   needed** now that Q3 = `subscription_quota` (`backend/sources.py:24` already carries it) -- the `claude-max` source
+   declares `billing_posture="subscription_quota"`, exactly like `chatgpt`.
+3. **Which `billing_mode` value? RESOLVED 2026-06-29: `subscription_quota`** (reverses the earlier
+   `subscription_headless_credit` lean). Decisive evidence: the existing headless consumer-subscription case --
+   `codex exec` -- already maps to `subscription_quota`, with the comment *"Consumer ChatGPT is provably
+   quota/credit-billed"* (`codex_preflight.py:401-403`). The codebase already folds "credit" semantics **into**
+   `subscription_quota`; Claude Max headless is the exact analog. Reinforcing: the epic anticipated it ("a claude-max
+   source must not claim `subscription_quota` until T0 proves it" -- now proven); `subscription_quota` is the only
+   subscription mode with a defined consumer (the other two literals carry no docstring/semantics); `BillingPosture`
+   already carries `subscription_quota` so the Phase 2 "extend `BillingPosture`" prereq **evaporates**; and Claude Max
+   is a usage-quota subscription (headless `-p` draws the same Max limits, not a separate credit pool). The lean was
+   purely nominal -- "credit" implies a pool that does not exist. **Caveat:** (d) quota-draw was not measured; if
+   Anthropic ever exposes a *distinct* headless-credit meter, revisit. **Follow-on:** `subscription_headless_credit` now
+   has no consumer -- a removal candidate (`subscription_interactive` stays reserved for possible interactive-Max
+   labeling).
 
 ## Verified touchpoints (file:line, 2026-06-29)
 
@@ -197,7 +203,7 @@ review agrees; otherwise it is the unblocked follow-on.
 | Key-presence check                          | `core/usage/emit.py:549-556` (`_anthropic_key_present`)                                                                              | `resolve_env_or_credential("ANTHROPIC_API_KEY")` -- capability, not payer                                                                             |
 | Headless `--bare`/auth decision             | `core/reactive/session_runner.py:123-125,183,208-213`; tests `test_session_runner.py:200,209`                                        | `--bare` auto-added **only when a key is resolvable** (`can_use_bare(env)`); keyless runs omit `--bare`, *permitting* (not proving) OAuth fallthrough |
 | `BillingMode` enum                          | `core/usage/ledger.py:66-72`                                                                                                         | `subscription_*` declared; only `subscription_quota` emitted (codex)                                                                                  |
-| `BillingPosture` gap (Phase 2 prereq)       | `backend/sources.py:24`                                                                                                              | `Literal["per_token","subscription_quota","free"]` -- **no `subscription_headless_credit`**                                                           |
+| `BillingPosture` (Q3 resolved -> no gap)    | `backend/sources.py:24`                                                                                                              | `Literal["per_token","subscription_quota","free"]` already carries `subscription_quota`; Q3 = quota, so no extension needed                           |
 | Proven codex sibling (key-first precedence) | `core/runtime/codex_preflight.py:365-403` (`_resolve_codex_auth`)                                                                    | `stored API key` -> `api` **before** `stored ChatGPT tokens` -> `subscription_quota`, at **preflight**                                                |
 | Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                      |
 | Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                         |

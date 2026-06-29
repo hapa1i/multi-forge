@@ -78,9 +78,9 @@ now fixed in the harness + card:
 ## Decision gate outcome
 
 - [x] **Proceed** -- (a0)/(a) positive **and** (c) `[SIGNAL-STABLE-PREFLIGHT]`. Go to Phase 1: the auth-posture resolver
-  uses `can_use_bare` as the **necessary gate** (key wins) and emits `subscription_*` only with an explicit `claude-max`
-  declaration (undeclared keyless => `unknown`), threaded through all four `emit_usage_for_session_result` callers; cost
-  stays `unavailable`.
+  uses `can_use_bare` as the **necessary gate** (key wins) and emits `subscription_quota` only with an explicit
+  `claude-max` declaration (undeclared keyless => `unknown`), threaded through all four `emit_usage_for_session_result`
+  callers; cost stays `unavailable`.
 - [ ] Full kill (architectural) -- not taken: (a0)/(a) positive.
 - [ ] Phase-1 no-go (brittle signal) -- not taken: (c) is stable-preflight.
 - [ ] Per-token (labeling) -- refuted: cost-present on a keyless run is an estimate, not per-token billing.
@@ -91,11 +91,12 @@ now fixed in the harness + card:
   Claude-side artifact (kill #2 did not materialize). Caveat: it is a **necessary gate, not sufficient** -- it proves
   the OAuth path, not the account's plan -- so the durable label still needs a `claude-max` declaration (see Phase 1 /
   Q3).
-- **Q2 (Phase-2 scope):** unchanged -- still a scope decision (split the `claude-max` `ModelSource` to a follow-on?). If
-  credit semantics are chosen, `BillingPosture` needs `subscription_headless_credit` first.
-- **Q3 (which `billing_mode`): still open.** (b) did **not** disambiguate -- `total_cost_usd` is an estimate present
-  whether the draw is quota- or credit-based, so the cost field can't pick `subscription_quota` vs
-  `subscription_headless_credit`. This is a semantics decision; (d) quota-draw evidence would inform it but was not run.
-  Resolve before Phase 1 emits a concrete mode. Separately, whether a keyless run is a *paid* subscription **at all**
-  (vs Free/metered) is not envelope-visible either -- which is why the label requires a `claude-max` declaration, not
-  just `can_use_bare`.
+- **Q2 (Phase-2 scope):** still a scope decision (split the `claude-max` `ModelSource` to a follow-on?), but **no longer
+  blocked on a `BillingPosture` change** -- Q3 = `subscription_quota`, already a valid posture.
+- **Q3 (which `billing_mode`): RESOLVED -- `subscription_quota`.** (b) couldn't disambiguate from cost (an estimate
+  either way), so this was settled on semantics: the existing headless consumer-subscription case (`codex exec`) already
+  maps to `subscription_quota` (`codex_preflight.py:401-403`, comment "Consumer ChatGPT is provably
+  quota/credit-billed"), and `subscription_headless_credit` has no defined consumer. Claude Max headless is the exact
+  analog. Caveat: (d) was not run; if a *distinct* headless-credit meter ever appears, revisit. (Separately, whether a
+  keyless run is a *paid* subscription at all -- vs Free/metered -- still needs the `claude-max` declaration, not just
+  `can_use_bare`.)

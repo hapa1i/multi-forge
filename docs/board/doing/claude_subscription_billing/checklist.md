@@ -48,8 +48,8 @@ Produces `phase0-results.md` answering, with verbatim evidence:
   billing (with no key there is nothing to bill an API). Only a metered-console-OAuth account would qualify -- card Q3.
 - [x] **Proceed**: (a0)/(a) positive **and** (c) `stable-preflight` -> Phase 1. `can_use_bare` False is the **necessary
   gate** (key wins); the `subscription_*` **label** additionally needs an explicit `claude-max` declaration --
-  undeclared keyless stays `unknown` (`can_use_bare` can't see Free/Pro/Max). Cost stays `unavailable`. (b) did not pick
-  `subscription_quota` vs `subscription_headless_credit` -- a semantics call (card Q3).
+  undeclared keyless stays `unknown` (`can_use_bare` can't see Free/Pro/Max). Cost stays `unavailable`. **Q3 resolved:
+  `subscription_quota`** (codex headless precedent -- card Q3).
 
 ### Phase 1 -- Auth-posture resolver + thread it (Option A; gated on Phase 0 "Proceed")
 
@@ -72,34 +72,34 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 
 ### Phase 2 -- `claude-max` ModelSource (scope decision per card Q2; gated on Phase 1)
 
-- [ ] **Prereq**: if (b) chose credit semantics, extend `BillingPosture` (`backend/sources.py:24`) with
-  `subscription_headless_credit` before the source can carry it (it has only `per_token`/`subscription_quota`/`free`
-  today).
-- [ ] Add `claude-max` to `BUILTIN_MODEL_SOURCES`: `runtime_native` endpoint (no Forge credential), `billing_posture`
-  per (b), `reachable_via=("claude_code",)` -- mirroring `chatgpt`.
+- [x] **Prereq resolved**: Q3 = `subscription_quota`, which `BillingPosture` already carries -- **no type extension
+  needed** (the earlier `subscription_headless_credit` extension is moot).
+- [ ] Add `claude-max` to `BUILTIN_MODEL_SOURCES`: `runtime_native` endpoint (no Forge credential),
+  `billing_posture="subscription_quota"`, `reachable_via=("claude_code",)` -- mirroring `chatgpt`.
 - [ ] Catalog validation + `forge model backend list/test-auth` treat it runtime-owned (auth `runtime_native`, health
   `runtime-owned`), like `chatgpt`.
 - [ ] **Decision recorded** (card Q2): confirmed in T0, or split to a follow-on.
 
 ## Acceptance tests (fixture-grounded; Phase 1+, authored once the probe sets the signal)
 
-| Test                                                           | Fixture                                                                                          | Assertion                                                                      | Test File                                                       |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Declared `claude-max` + keyless run emits a subscription mode  | `can_use_bare` False **and** a `claude-max` declaration in scope                                 | `billing_mode` is the chosen `subscription_*` (not `unknown`/`api`)            | `tests/src/core/usage/test_emit.py`                             |
-| **Undeclared keyless OAuth stays `unknown`**                   | `can_use_bare` False, **no** `claude-max` declaration                                            | `billing_mode == "unknown"` (label needs a declaration, not just keyless)      | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
-| **Precedence: key + Max coexist -> `api`, never subscription** | key resolvable (`can_use_bare` True) *and* a Max session present                                 | `billing_mode == "api"`; resolver does **not** yield `subscription_*`          | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
-| Key-authed run stays `api` (byte-identical)                    | direct run, key present, no subscription signal                                                  | `billing_mode == "api"`; emission unchanged from today                         | `tests/src/core/usage/test_emit.py`                             |
-| Proxied run stays `unknown`                                    | `base_url` set                                                                                   | `billing_mode == "unknown"` (conservatism preserved)                           | `tests/src/core/usage/test_billing.py`                          |
-| **All four callers thread the posture**                        | each of supervisor/memory-writer/shadow-curation/team handler emits under a subscription posture | every consumer records the `subscription_*` mode (no caller left at `unknown`) | `tests/src/core/usage/test_emit.py` + per-consumer suites       |
-| Resolver maps signal -> mode                                   | the (c) signal present/absent                                                                    | resolver returns the subscription mode / falls back honestly                   | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
-| `claude-max` source validates (Phase 2)                        | catalog load                                                                                     | `runtime_native`, declares no credential, `reachable_via=("claude_code",)`     | `tests/src/backend/test_sources.py`                             |
+| Test                                                           | Fixture                                                                                          | Assertion                                                                                                 | Test File                                                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Declared `claude-max` + keyless run emits a subscription mode  | `can_use_bare` False **and** a `claude-max` declaration in scope                                 | `billing_mode == "subscription_quota"` (not `unknown`/`api`)                                              | `tests/src/core/usage/test_emit.py`                             |
+| **Undeclared keyless OAuth stays `unknown`**                   | `can_use_bare` False, **no** `claude-max` declaration                                            | `billing_mode == "unknown"` (label needs a declaration, not just keyless)                                 | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
+| **Precedence: key + Max coexist -> `api`, never subscription** | key resolvable (`can_use_bare` True) *and* a Max session present                                 | `billing_mode == "api"`; resolver does **not** yield `subscription_*`                                     | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
+| Key-authed run stays `api` (byte-identical)                    | direct run, key present, no subscription signal                                                  | `billing_mode == "api"`; emission unchanged from today                                                    | `tests/src/core/usage/test_emit.py`                             |
+| Proxied run stays `unknown`                                    | `base_url` set                                                                                   | `billing_mode == "unknown"` (conservatism preserved)                                                      | `tests/src/core/usage/test_billing.py`                          |
+| **All four callers thread the posture**                        | each of supervisor/memory-writer/shadow-curation/team handler emits under a subscription posture | every consumer records `subscription_quota` (no caller left at `unknown`)                                 | `tests/src/core/usage/test_emit.py` + per-consumer suites       |
+| Resolver maps signal -> mode                                   | the (c) signal present/absent                                                                    | resolver returns the subscription mode / falls back honestly                                              | `tests/src/core/runtime/test_claude_billing_preflight.py` (new) |
+| `claude-max` source validates (Phase 2)                        | catalog load                                                                                     | `runtime_native`, `billing_posture="subscription_quota"`, no credential, `reachable_via=("claude_code",)` | `tests/src/backend/test_sources.py`                             |
 
 ## Blockers / deferred
 
 - **Phase 0 done (2026-06-29)** on a live Max box (key stripped via `env -u` to satisfy the keyless precondition; no
   durable state touched). Results in `phase0-results.md`.
-- **Q1 resolved** (detection signal = `can_use_bare`). **Q2** (Phase-2 scope) and **Q3** (`subscription_quota` vs
-  `subscription_headless_credit`) remain -- resolve Q3 before Phase 1 emits a concrete mode.
+- **Q1 resolved** (detection signal = `can_use_bare`); **Q3 resolved** (`subscription_quota` -- codex headless
+  precedent). **Q2** (Phase-2 scope: source in T0 or a thin follow-on) remains -- no longer blocked on a
+  `BillingPosture` change.
 - T6 (placing a consumer on the lane) and T7 (exhaustion fail-open) stay out of scope.
 
 ## Closeout
