@@ -60,7 +60,8 @@ subscription:** it cannot see the account's plan (Free/Pro/Max), so the durable 
 
 ## Probe self-corrections (the run improved the harness)
 
-Running the probe for real exposed two flaws in its own first-cut interpretation, now fixed in the harness + card:
+Running the probe for real (items 1-2) plus review (item 3) surfaced three corrections to its first-cut interpretation,
+now fixed in the harness + card:
 
 1. **The decision gate mis-resolved cost-present.** It mapped a completed-keyless run with a cost to "per-token / keep
    `api`". Corrected: keyless + completed => subscription regardless of the cost field (the cost is an estimate). The
