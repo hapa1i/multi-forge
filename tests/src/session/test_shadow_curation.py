@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from forge.core.lanes import Lane, valid_lanes
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.usage.ledger import read_usage_events
+from forge.session.models import LaneRecord
 from forge.session.shadow_curation import (
     SHADOW_CURATION_CONSUMER,
     ShadowEntry,
@@ -617,6 +618,7 @@ class TestRunShadowCurationEffort:
 # ---------------------------------------------------------------------------
 
 _CODEX_LANE = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+_CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-lane manifest DTO
 # prepare_codex_request is mocked in these tests, so billing_mode is never read off the preflight.
 _READY_PREFLIGHT = SimpleNamespace(ready=True, blocking_reason=None)
 
@@ -652,13 +654,13 @@ class TestCodexShadowCuration:
         return [ShadowEntry("docs/n.md", ".forge/memory/s.md", "generic", "s1", str(root), "content")]
 
     def _run(self, root: Path, **kwargs: Any):
+        kwargs.setdefault("lane_record", _CODEX_LANE_RECORD)
         return run_shadow_curation(
             session_name="s1",
             forge_root=root,
             official_path="docs/n.md",
             official_content="# Notes",
             shadow_entries=self._entries(root),
-            runtime_id="codex",
             **kwargs,
         )
 
@@ -847,4 +849,45 @@ class TestCodexShadowCuration:
 
         assert result.success
         mock_claude.assert_called_once()
+        mock_read.assert_not_called()
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_invalid_explicit_lane_fails_loud_no_dispatch_no_freeze(
+        self,
+        mock_read: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """A drifted/corrupt explicit binding (codex runtime paired with a non-codex backend) is not
+        a declared candidate, so resolve_lane rejects it and curation fails loud as a no-call --
+        never dispatching the wrong arm (mirrors the supervisor's resolve_lane guard). No freeze."""
+        freeze = MagicMock()
+        result = self._run(tmp_path, lane_record=LaneRecord("codex", "anthropic-direct", "opus"), on_dispatch=freeze)
+
+        assert result.success is False
+        assert result.report_path is None
+        assert result.error is not None
+        assert "invalid lane" in result.error
+        assert "forge session lane" in result.error  # names the re-pin / clear recovery path
+        mock_claude.assert_not_called()  # NOT a silent claude fallback
+        mock_invoker_cls.return_value.run.assert_not_called()  # codex never spawned
+        mock_read.assert_not_called()  # never reached arm selection
+        freeze.assert_not_called()  # validation precedes on_dispatch -> no freeze on an invalid lane
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_unknown_runtime_fails_loud_not_silent_claude(
+        self, mock_read: MagicMock, mock_claude: MagicMock, tmp_path: Path
+    ) -> None:
+        """An unknown runtime in a stale binding must fail loud, NOT silently fall through to the
+        claude arm -- the pre-fix hazard of selecting the arm from a raw, unvalidated runtime_id."""
+        result = self._run(tmp_path, lane_record=LaneRecord("vllm", "chatgpt", "gpt-5-codex"))
+
+        assert result.success is False
+        assert result.error is not None
+        assert "invalid lane" in result.error
+        mock_claude.assert_not_called()
         mock_read.assert_not_called()

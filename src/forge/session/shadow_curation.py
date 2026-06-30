@@ -16,9 +16,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from forge.core.lanes import Consumer, Lane
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.ops.context import ExecutionContext
 from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+from forge.session.models import LaneRecord
 
 logger = logging.getLogger(__name__)
 
@@ -293,17 +294,19 @@ def run_shadow_curation(
     scope: str = "project",
     reasoning_effort: str | None = None,
     backend_id: str | None = None,
-    runtime_id: str = "claude_code",
+    lane_record: LaneRecord | None = None,
     on_dispatch: Callable[[], None] | None = None,
 ) -> CurationResult:
-    """Build prompt, call the bound runtime, persist report.
+    """Build prompt, validate the bound lane, call the resolved runtime, persist report.
 
-    The caller (CLI) resolves routing via ``resolve_writer_base_url()`` and passes
-    ``base_url`` + ``direct``. ``reasoning_effort`` is the ``claude --effort`` level for the
-    curation ``claude -p`` run. ``runtime_id`` selects the dispatch arm (epic consumer_lanes
-    T6b): ``"claude_code"`` (default) runs ``claude -p``; ``"codex"`` runs ``codex exec`` via
+    The caller (CLI) resolves routing via ``resolve_writer_base_url()`` and passes ``base_url`` +
+    ``direct``. ``reasoning_effort`` is the ``claude --effort`` level for the curation ``claude -p``
+    run. ``lane_record`` is the consumer-lane binding (``read_bound_lane``, epic consumer_lanes T6b);
+    it is validated against ``SHADOW_CURATION_CONSUMER``'s declared candidates and its runtime selects
+    the dispatch arm: ``"claude_code"`` runs ``claude -p``; ``"codex"`` runs ``codex exec`` via
     ``_dispatch_codex_shadow_curation`` (read-only, blind/inlined prompt, fail-loud on a cold
-    preflight). ``base_url``/``direct``/``reasoning_effort``/``backend_id`` are claude-arm-only.
+    preflight). ``None`` resolves to the default (claude) lane; an invalid/drifted explicit binding
+    fails loud. ``base_url``/``direct``/``reasoning_effort``/``backend_id`` are claude-arm-only.
     """
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.reactive.session_runner import run_claude_session
@@ -314,6 +317,30 @@ def run_shadow_curation(
         official_content=official_content,
         shadow_entries=shadow_entries,
     )
+
+    # Validate the bound lane against the consumer's declared candidates BEFORE selecting an arm
+    # (mirrors the supervisor's LaneRecord -> Lane -> resolve_lane guard, supervisor.py). A
+    # LaneRecord is Forge-owned durable state, so a stale/corrupt explicit binding -- a codex
+    # runtime paired with a non-codex backend, or an unknown runtime -- must fail loud as a no-call,
+    # never silently dispatch the wrong arm or degrade to claude. A None binding (no placement)
+    # resolves to the default claude lane with no error.
+    try:
+        override = (
+            None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+        )
+        runtime_id = resolve_lane(SHADOW_CURATION_CONSUMER, override=override).runtime_id
+    except LaneError as e:
+        logger.warning("Shadow-curation lane binding invalid for %s (session %s): %s", official_path, session_name, e)
+        return CurationResult(
+            success=False,
+            report_path=None,
+            stdout="",
+            error=(
+                f"Shadow-curation is bound to an invalid lane: {e}. Re-pin it with "
+                "'forge session lane set --consumer shadow_curation --runtime <claude_code|codex>' "
+                "or clear it with 'forge session lane clear --consumer shadow_curation'."
+            ),
+        )
 
     # Runtime-keyed dispatch (epic consumer_lanes T6b): the codex arm is a self-contained early
     # return that owns its own preflight gate, freeze timing, and (auto) emission, so the claude

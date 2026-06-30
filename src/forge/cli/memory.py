@@ -926,10 +926,9 @@ def _review_curate(
         scope=scope,
         reasoning_effort=effective_effort,
         backend_id=backend_id,
-        # T6b: select the claude/codex arm; a None binding resolves to the consumer's default.
-        runtime_id=(
-            dispatched_lane.runtime_id if dispatched_lane else SHADOW_CURATION_CONSUMER.default_lane.runtime_id
-        ),
+        # T6b: pass the raw bound lane; run_shadow_curation validates it (resolve_lane guard) and
+        # selects the claude/codex arm, failing loud on an invalid/drifted explicit binding.
+        lane_record=dispatched_lane,
         # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
         # keep confirmed consistent with the billed backend (epic consumer_lanes T6a).
         on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
