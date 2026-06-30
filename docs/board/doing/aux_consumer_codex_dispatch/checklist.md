@@ -4,9 +4,11 @@
 
 ## Current focus
 
-**Scope resolved (D1): shadow-curation only** -- memory-writer deferred to T6c, team-supervisor deferred (D2). Research
-complete (2026-06-30 sweep; verified touchpoints in `card.md`). **Phase 1 is ready to start on the next go-ahead;** no
-`src/` change has been made yet.
+**Scope resolved (D1): shadow-curation only** -- memory-writer deferred to T6c, team-supervisor deferred (D2). **Phase 1
+(codex arm) is implemented and unit-tested** (2026-06-30): the `codex` arm ships in `shadow_curation.py`, the CLI
+threads `runtime_id` + surfaces `CurationResult.error`, and 8 new arm tests + 2 CLI tests + the lane/lane-set tests
+pass. Remaining: **Phase 2** (observability check + design-doc sync + epic roster). Integration: a real `codex exec` E2E
+is release-tier (ChatGPT login), gap recorded in the verification gate.
 
 ## Decisions (resolved 2026-06-30)
 
@@ -22,42 +24,44 @@ complete (2026-06-30 sweep; verified touchpoints in `card.md`). **Phase 1 is rea
   surfaced in the human failure branch AND `--json` (today both drop any non-`stdout` message, `cli/memory.py:935-957`);
   `stdout` is the human-only zero-schema fallback. The cold-preflight hint must be CLI-visible and tested.
 
-## Phase 1 -- shadow-curation codex arm (recommended core; unstarted)
+## Phase 1 -- shadow-curation codex arm (implemented + unit-tested 2026-06-30)
 
-D1 resolved to shadow-curation; Phase 1 is the implementation cursor.
+D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
 
-- [ ] Add the codex `allowed_lane` to `SHADOW_CURATION_CONSUMER` (`session/shadow_curation.py:28-33`):
-  `Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`. Assertion:
-  `valid_lanes(SHADOW_CURATION_CONSUMER)` contains the codex lane;
-  `forge session lane set --consumer shadow_curation --runtime codex` resolves (was `LaneError`).
-- [ ] Thread the resolved `Lane`/`runtime_id` into `run_shadow_curation` (currently receives `backend_id` +
-  `on_dispatch` but not the runtime). Assertion: the dispatch function can read `runtime_id` at the branch point.
-- [ ] Insert the runtime-keyed branch at `session/shadow_curation.py:315`: `claude_code` -> existing
-  `run_claude_session`; `codex` -> new `_dispatch_codex_shadow_curation`. Assertion: a claude-lane run is byte-identical
-  to today (golden/diff).
-- [ ] Implement `_dispatch_codex_shadow_curation` mirroring `_dispatch_codex_supervisor`: `read_fresh_codex_preflight`
+- [x] Added the codex `allowed_lane` to `SHADOW_CURATION_CONSUMER` (`session/shadow_curation.py:28-36`):
+  `Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`. Verified:
+  `test_shadow_curation_consumer_allows_codex_lane` (codex lane in `valid_lanes`, claude-max preserved);
+  `test_set_shadow_curation_via_codex_runtime` (`lane set --runtime codex` resolves, exit 0, was `LaneError`).
+- [x] Threaded `runtime_id` into `run_shadow_curation` (new `runtime_id: str = "claude_code"` param); the CLI passes
+  `dispatched_lane.runtime_id`, falling back to the consumer's default-lane runtime on a `None` binding
+  (`cli/memory.py`). Verified by the dispatch tests selecting the arm through the public entry.
+- [x] Inserted the runtime-keyed branch before the claude `on_dispatch`: `codex` -> early return into
+  `_dispatch_codex_shadow_curation`; `claude_code` path left byte-identical. Verified:
+  `test_claude_runtime_never_touches_codex` (claude path runs, codex preflight never read).
+- [x] Implemented `_dispatch_codex_shadow_curation` mirroring `_dispatch_codex_supervisor`: `read_fresh_codex_preflight`
   ->
-  `prepare_codex_request(prompt, preflight, sandbox="read-only", model=None, attribution=Attribution(command="curation", session=session_name, operation="memory.shadow_curation"))`
-  -> `CodexHeadlessInvoker().run` -> `CurationResult(success=..., stdout=result.stdout, report_path=...)`. Assertion: a
-  successful codex run persists the curation report from codex stdout; no file writes by codex (read-only). **Pin
-  `operation="memory.shadow_curation"`** (not the `Attribution` default `workflow.worker`, `types.py:42`; not `None`) so
-  the invoker's auto-recorded upstream row matches the claude path (`shadow_curation.py:341-342`) -- no T4 mislabel.
-- [ ] Map codex-arm failure into shadow-curation's **fail-loud** degrade (D3) with a **CLI-visible** hint:
-  cold/stale/missing preflight or a failed codex turn -> `CurationResult(success=False, ...)` carrying "Codex not ready
-  -- run `forge runtime preflight codex`". **Carrier (D5):** `CurationResult` has no message field (only
-  `success`/`report_path`/`stdout`, `shadow_curation.py:53-59`) and the CLI prints only `stdout` on the human failure
-  branch while `--json` omits it (`cli/memory.py:935-957`) -- add `CurationResult.error: str | None`, surfaced in BOTH
-  the human branch and `--json` (`stdout` is the human-only zero-schema fallback). Assertion: cold-cache run does NOT
-  fall back to claude, does NOT silently succeed, AND the CLI failure output (human + `--json`) contains the preflight
-  hint.
-- [ ] Single emitter per arm: the **manual** emit block (`emit_usage_for_session_result` + `record_upstream_operation`,
-  `shadow_curation.py:325-351`) is **claude-arm-only** -- move it inside the claude branch. The codex arm emits **only**
-  via the invoker's auto `emit_codex_usage` + invoker-recorded upstream (driven by the pinned `Attribution`). Assertion:
-  exactly one usage event per run; the codex usage carries `runtime=codex`/`billing_mode=subscription_quota` AND its
-  upstream row carries `operation="memory.shadow_curation"` (not `workflow.worker`); no double-emit.
-- [ ] Freeze parity: confirm `persist_lane_freeze` still fires on a real codex dispatch via the existing `on_dispatch`
-  hook, with the `read_bound_lane == dispatched_lane` equality guard threading the codex lane. Assertion: a codex
-  dispatch freezes the codex lane into `confirmed.consumer_lanes`; a skip never freezes.
+  `prepare_codex_request(sandbox="read-only", model=None, cwd=str(forge_root), attribution=Attribution(command="curation", session=session_name, operation="memory.shadow_curation"))`
+  -> `CodexHeadlessInvoker().run` -> persist report from `result.stdout`. **`operation` pinned** (not the
+  `workflow.worker` default, not `None` like the supervisor) so the invoker's auto upstream row matches the claude path.
+  Verified: `test_dispatches_through_invoker_and_persists_from_stdout`, `test_pins_operation_and_skips_claude_emitter`.
+- [x] Mapped codex failure into **fail-loud** degrade (D3) with a **CLI-visible** hint via the **D5** carrier (added
+  `CurationResult.error: str | None`, surfaced in the human failure branch via `print_error` AND in `--json`).
+  `HeadlessResult.runtime_is_error` is folded so an exit-0-but-failed turn fails loud. Verified:
+  `test_cold_preflight_fails_loud_no_fallback_no_freeze`, `test_unready_preflight_surfaces_blocking_reason`,
+  `test_failed_turn_fails_loud_but_still_freezes`, `test_exit_zero_but_runtime_error_fails_loud`, and CLI
+  `test_review_curate_failure_surfaces_error_{json,human}`.
+- [x] Single emitter per arm: the codex arm returns before the claude manual-emit block, so
+  `emit_usage_for_session_result` is structurally claude-only; the codex arm emits solely via the invoker's auto
+  `emit_codex_usage` + invoker-recorded upstream (driven by the pinned `Attribution`). Verified:
+  `test_pins_operation_and_skips_claude_emitter` (`emit_usage_for_session_result` not called;
+  `attribution.operation == "memory.shadow_curation"`). Note: the runtime=codex/billing_mode=subscription_quota usage
+  event itself is proven at the invoker layer (`test_codex_emit.py`), not re-asserted here (the arm only owns the
+  `Attribution`).
+- [x] Freeze parity (with a timing refinement): `on_dispatch` fires **after** the preflight gate passes -- a
+  cold-preflight skip-return never spawns codex, so per `impl_notes` ("freeze only past every skip-return") it must not
+  freeze; a turn that spawns and then fails still freezes (claude-arm parity). Verified:
+  `test_successful_dispatch_fires_freeze`, `test_failed_turn_fails_loud_but_still_freezes` (freeze fires),
+  `test_cold_preflight_fails_loud_no_fallback_no_freeze` (freeze does not fire).
 
 ## Phase 2 -- observability + docs (unstarted)
 
@@ -70,25 +74,31 @@ D1 resolved to shadow-curation; Phase 1 is the implementation cursor.
 - [ ] Update epic `doing/epic_consumer_lanes/` roster + `card.md` T6b references for whatever ships vs defers (T6c for
   memory-writer; team-supervisor decision recorded).
 
-## Acceptance tests (fixture-grounded; unstarted)
+## Acceptance tests (implemented + passing 2026-06-30)
 
-| Test                     | Fixture                                         | Assertion                                                                                                                                                                     | Test File                                                            |
-| ------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| codex lane is selectable | `SHADOW_CURATION_CONSUMER` + codex allowed_lane | `valid_lanes` includes codex; `lane set --runtime codex` resolves (no `LaneError`)                                                                                            | `tests/src/core/test_lanes.py`, `tests/src/cli/test_session_lane.py` |
-| codex arm dispatches     | fresh preflight cached, codex lane bound        | `CodexHeadlessInvoker.run` called once; curation report = codex stdout; no `run_claude_session` call                                                                          | `tests/src/session/test_shadow_curation.py`                          |
-| claude path unchanged    | default lane                                    | claude dispatch byte-identical to pre-T6b (no codex branch taken)                                                                                                             | `tests/src/session/test_shadow_curation.py`                          |
-| cold cache fails loud    | no/stale preflight, codex lane bound            | `success=False` + preflight hint surfaced by the CLI failure output, human + `--json` (`tests/src/cli/test_memory.py`); NO claude fallback; NO silent success                 | `tests/src/session/test_shadow_curation.py`                          |
-| no doctor in path        | preflight cache present                         | `read_fresh_codex_preflight` read; `codex doctor` never spawned                                                                                                               | `tests/src/session/test_shadow_curation.py`                          |
-| single usage event       | codex success                                   | exactly one usage event; codex usage `runtime=codex`/`billing_mode=subscription_quota`; upstream `operation="memory.shadow_curation"` (not `workflow.worker`); no double-emit | `tests/src/session/test_shadow_curation.py` (+ usage assertions)     |
-| freeze on codex dispatch | codex lane bound, real dispatch                 | codex lane frozen into `confirmed`; equality guard holds; skip never freezes                                                                                                  | `tests/src/cli/test_consumer_lane_freeze.py`                         |
+| Test                              | Fixture                                         | Assertion                                                                                                                                                                                         | Test File / name                                                                                                                                                              |
+| --------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| codex lane is selectable          | `SHADOW_CURATION_CONSUMER` + codex allowed_lane | `valid_lanes` includes codex (claude-max preserved); `lane set --runtime codex` resolves (no `LaneError`)                                                                                         | `test_shadow_curation.py::test_shadow_curation_consumer_allows_codex_lane`; `test_session_lane.py::test_set_shadow_curation_via_codex_runtime`                                |
+| codex arm dispatches              | fresh preflight cached, `runtime_id="codex"`    | `CodexHeadlessInvoker.run` called once; report = codex stdout; no `run_claude_session`; read-only/`model=None`/`cwd=forge_root`                                                                   | `test_shadow_curation.py::test_dispatches_through_invoker_and_persists_from_stdout`                                                                                           |
+| claude path unchanged             | default runtime                                 | claude path runs; `read_fresh_codex_preflight` never read (codex branch inert)                                                                                                                    | `test_shadow_curation.py::test_claude_runtime_never_touches_codex`                                                                                                            |
+| cold cache fails loud             | `read_fresh_codex_preflight` -> None            | `success=False` + hint; NO claude fallback; NO spawn; skip-return -> NO freeze; CLI human + `--json` carry the hint                                                                               | `test_shadow_curation.py::test_cold_preflight_fails_loud_no_fallback_no_freeze`; `test_memory.py::test_review_curate_failure_surfaces_error_{json,human}`                     |
+| no doctor in path                 | preflight cache present                         | `read_fresh_codex_preflight` read once (no `codex doctor` subprocess)                                                                                                                             | `test_shadow_curation.py::test_dispatches_through_invoker_and_persists_from_stdout` (`mock_read.assert_called_once_with()`)                                                   |
+| single emitter / pinned operation | codex success                                   | claude `emit_usage_for_session_result` not called; `Attribution.operation == "memory.shadow_curation"`, `command="curation"` (invoker auto-emits the one event -- proven in `test_codex_emit.py`) | `test_shadow_curation.py::test_pins_operation_and_skips_claude_emitter`                                                                                                       |
+| freeze parity                     | spy `on_dispatch`                               | success + failed-turn freeze; cold-preflight skip never freezes                                                                                                                                   | `test_shadow_curation.py::test_successful_dispatch_fires_freeze`, `::test_failed_turn_fails_loud_but_still_freezes`, `::test_cold_preflight_fails_loud_no_fallback_no_freeze` |
+| runtime-error fold                | exit 0 + `runtime_is_error=True`                | folded to `success=False` (no empty report persisted); hint carries the stderr reason                                                                                                             | `test_shadow_curation.py::test_exit_zero_but_runtime_error_fails_loud`                                                                                                        |
 
 ## Verification gate
 
-- [ ] Focused suites green: `test_shadow_curation.py`, `test_lanes.py`, `test_session_lane.py`,
-  `test_consumer_lane_freeze.py`, billing.
-- [ ] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks).
-- [ ] Integration: codex-lane dispatch is a real `codex exec` path -- run the relevant integration/real-codex check if
-  reachable, else record the gap (ChatGPT-login E2E may be release-tier, like T4's codex E2E).
+- [x] Focused suites green: `test_shadow_curation.py` (35), `test_memory.py`, `test_session_lane.py`,
+  `test_consumer_lane_freeze.py`, `test_lanes.py`, `test_billing.py` -> 157 passed; plus wider regression sweep
+  (`policy/semantic`, `core/invoker`, `core/usage`, `session/`, `codex_preflight_cache`) 1318 passed, and full
+  `tests/src/cli` 2145 passed.
+- [x] `make pre-commit` clean on changed files (ruff/black/isort/mypy/pyright/gitleaks all pass; black wrapped one
+  ternary, re-staged).
+- [ ] Integration: codex-lane dispatch is a real `codex exec` path. **Gap recorded:** a real-codex E2E needs a
+  ChatGPT-login + a fresh preflight cache, so it is release-tier exactly like T4's codex E2E. The invoker subprocess
+  path is unchanged by T6b and is already covered by `test_codex_invoker.py` + the T4 E2E; the new arm is mocked at the
+  invoker boundary (same strategy as the supervisor codex arm). No new always-on integration test added.
 
 ## Closeout
 

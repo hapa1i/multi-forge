@@ -926,6 +926,10 @@ def _review_curate(
         scope=scope,
         reasoning_effort=effective_effort,
         backend_id=backend_id,
+        # T6b: select the claude/codex arm; a None binding resolves to the consumer's default.
+        runtime_id=(
+            dispatched_lane.runtime_id if dispatched_lane else SHADOW_CURATION_CONSUMER.default_lane.runtime_id
+        ),
         # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
         # keep confirmed consistent with the billed backend (epic consumer_lanes T6a).
         on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
@@ -940,6 +944,7 @@ def _review_curate(
                     "report_path": str(result.report_path) if result.report_path else None,
                     "shadow_count": len(shadow_entries),
                     "scope": scope,
+                    "error": result.error,
                 },
                 indent=2,
             )
@@ -951,7 +956,12 @@ def _review_curate(
         if result.report_path:
             console.print(f"\n[dim]Report saved: {result.report_path}[/dim]")
     else:
-        console.print("[red]Curation failed.[/red]")
+        # T6b: the codex arm carries an actionable hint (e.g. a cold preflight) in result.error;
+        # the claude arm leaves it None, so the generic headline is preserved unchanged.
+        if result.error:
+            print_error(result.error, console=err_console)
+        else:
+            console.print("[red]Curation failed.[/red]")
         if result.stdout:
             console.print(result.stdout)
         sys.exit(1)
