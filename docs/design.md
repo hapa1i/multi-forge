@@ -1007,10 +1007,13 @@ and usage. Exactly **one** reporter attributes cost per run: a **proxied** run k
 (`forge_proxy`/`reported`, Claude's Anthropic-priced `total_cost_usd` ignored as wrong-and-duplicate); a **direct** run
 self-reports (`claude_code`/`reported`/`runtime_native`) — closing the prior `unavailable` gap on direct verbs — or,
 when the envelope carries usage but no dollar figure (OAuth), records exact tokens with cost honestly `unavailable`.
-Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` status-line segment surfaces this as
-`forge +$Y`: Forge-added LLM spend for the session, **excluding** the main interactive harness
-(`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
-([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
+Tokens follow the cost source (no mixed provenance). The run's `billing_mode` is resolved separately from cost: a
+keyless direct `claude -p` consumer bound to a subscription lane (the `claude-max` backend) is labeled
+`subscription_quota` (`resolve_billing_mode`, gated on the bound backend's `subscription_quota` posture; a resolvable
+key still wins as `api`), while cost stays `unavailable` — only the label changes, never a fabricated dollar figure. The
+opt-in `forge_cost` status-line segment surfaces this as `forge +$Y`: Forge-added LLM spend for the session,
+**excluding** the main interactive harness (`route=claude_interactive`), reported-or-unavailable and distinct from
+Claude's native cost ([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
 
 **Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
 to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens

@@ -242,6 +242,22 @@ no-op). To use a different lane, start or fork a fresh session, or run `forge po
 clears the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
 `(runtime, backend, model)` lane.
 
+### Claude Max subscription billing (`--backend claude-max`)
+
+By default the `claude_code` lane uses the `anthropic-direct` backend, so the supervisor's spend is labeled like any API
+run. If you run on a Claude Max/Pro subscription and want headless checks attributed to it, pin the lane's **backend**
+(`claude-max` and the default share the `claude_code` runtime, so `--runtime` alone can't select it):
+
+```bash
+forge policy supervisor set planner --backend claude-max
+```
+
+For a check to actually ride the subscription, the run must be **keyless and direct**: no resolvable `ANTHROPIC_API_KEY`
+(env or `~/.forge/credentials.yaml`) and no proxy. Then the check authenticates via your Claude login and its usage
+event is labeled `billing_mode=subscription_quota`. A resolvable key always wins (labeled `api`), and a proxied run
+stays `unknown` — Forge never guesses. Cost stays `unavailable` for subscription runs (no per-token dollar figure is
+fabricated); only the label changes. Like `--runtime`, the backend is **frozen on the first check**.
+
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 
 Every supervisor check replays the planning session's full context — expensive when most checks come back "aligned". The
