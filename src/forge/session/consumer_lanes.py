@@ -88,6 +88,17 @@ def confirmed_lane(state: SessionState, consumer: Consumer) -> LaneRecord | None
     return None if binding is None else binding.lane
 
 
+def intent_lane(state: SessionState, consumer: Consumer) -> LaneRecord | None:
+    """Return ``consumer``'s requested (pre-freeze) ``intent`` lane, or None.
+
+    The read companion to ``set_intent_lane`` and the intent-side counterpart of
+    ``confirmed_lane``: ``forge session lane show`` reads both to surface drift -- a
+    requested lane that differs from the frozen binding (or an intent override that
+    has not yet frozen).
+    """
+    return _intent_record(state, consumer)
+
+
 def lane_record_for_runtime(consumer: Consumer, runtime_id: str) -> LaneRecord:
     """Expand a runtime id to ``consumer``'s full declared lane on that runtime.
 
@@ -162,6 +173,20 @@ def clear_consumer_lane(state: SessionState, consumer: Consumer) -> None:
         setattr(state.intent.consumer_lanes, slot, None)
     if state.confirmed.consumer_lanes is not None:
         setattr(state.confirmed.consumer_lanes, slot, None)
+
+
+def clear_intent_lane(state: SessionState, consumer: Consumer) -> None:
+    """Drop ``consumer``'s ``intent`` override only, leaving any frozen ``confirmed`` binding.
+
+    The ``forge session lane clear`` setter. Unlike ``clear_consumer_lane`` (full teardown of
+    *both* sections, used by supervisor ``remove``), this preserves an already-frozen binding:
+    immutability protects the lane a run committed to for the session. Clearing *before* the
+    freeze removes the pending request (back to default); clearing *after* is a no-op for
+    dispatch (``read_bound_lane`` is confirmed-first) and surfaces as drift in ``show``, then
+    resets on the next session.
+    """
+    if state.intent.consumer_lanes is not None:
+        setattr(state.intent.consumer_lanes, _slot(consumer), None)
 
 
 def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:

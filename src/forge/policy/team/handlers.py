@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -47,6 +48,7 @@ def handle_teammate_idle(
     config: TeamSupervisorConfig,
     cache: dict[str, Any],
     backend_id: str | None = None,
+    on_dispatch: Callable[[], None] | None = None,
 ) -> tuple[int, str]:
     """Handle TeammateIdle event.
 
@@ -74,7 +76,9 @@ def handle_teammate_idle(
     if not config.resume_id:
         return 0, ""
 
-    exit_code, feedback = _run_supervisor(config, teammate, team, "idle", "", backend_id=backend_id)
+    exit_code, feedback = _run_supervisor(
+        config, teammate, team, "idle", "", backend_id=backend_id, on_dispatch=on_dispatch
+    )
     cache[cache_key] = {
         "checked_at": now_iso(),
         "exit_code": exit_code,
@@ -88,6 +92,7 @@ def handle_task_completed(
     config: TeamSupervisorConfig,
     cache: dict[str, Any],
     backend_id: str | None = None,
+    on_dispatch: Callable[[], None] | None = None,
 ) -> tuple[int, str]:
     """Handle TaskCompleted event.
 
@@ -128,7 +133,9 @@ def handle_task_completed(
         return 0, ""
 
     task_context = f"Task: {task_subject or 'unknown'} (id: {task_id})"
-    exit_code, feedback = _run_supervisor(config, teammate, team, "task-completed", task_context, backend_id=backend_id)
+    exit_code, feedback = _run_supervisor(
+        config, teammate, team, "task-completed", task_context, backend_id=backend_id, on_dispatch=on_dispatch
+    )
 
     block_count = cached.get("block_count", 0) + (1 if exit_code == 2 else 0)
     cache[cache_key] = {
@@ -221,6 +228,7 @@ def _run_supervisor(
     event_type: str,
     task_context: str,
     backend_id: str | None = None,
+    on_dispatch: Callable[[], None] | None = None,
 ) -> tuple[int, str]:
     """Run cross-team supervisor. Returns ``(exit_code, feedback)``.
 
@@ -249,6 +257,11 @@ def _run_supervisor(
     # attributed too (direct -> claude_code self-report; proxied -> forge_proxy snapshot).
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.usage import emit_usage_for_session_result
+
+    # Past the depth + proxy guards: committed to a claude -p dispatch. Notify the caller so the
+    # consumer-lane freeze records only a lane that actually ran (epic consumer_lanes T6a).
+    if on_dispatch is not None:
+        on_dispatch()
 
     with track_verb_cost("team-supervisor", [base_url] if base_url else []) as cost:
         result = run_claude_session(

@@ -366,9 +366,11 @@ To avoid writer conflicts:
   - `intent` + `overrides` sections in `<forge_root>/.forge/sessions/<session_name>/forge.session.json`
   - `intent.launch` records relaunch mode plus sidecar-specific options (image, extra mounts) when the session is
     created or derived
-  - `intent.consumer_lanes.supervisor` (a `LaneRecord`) when a resolving command requests a non-default supervisor lane
-    (`forge session start`/`fork --supervisor-runtime`, `forge policy supervisor set --runtime`); the lane is rejected
-    as a raw `set` override (epic consumer_lanes/T1b)
+  - `intent.consumer_lanes.<consumer>` (a `LaneRecord`) when a command requests a non-default lane for a consumer:
+    `forge session lane set --consumer <id> --runtime/--backend` is the general surface for all four consumers
+    (supervisor, memory-writer, shadow-curation, team-supervisor); the supervisor also has
+    `forge session start`/`fork --supervisor-runtime` and `forge policy supervisor set --runtime/--backend`. All write
+    the same slot via `set_intent_lane` -- never a raw `set` override (epic consumer_lanes/T1b, T6a)
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
@@ -393,10 +395,16 @@ To avoid writer conflicts:
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
     points for the final live conversation identity.
-  - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): the policy-check hook freezes the lane it
-    dispatched on, **write-once** at the first check (epic consumer_lanes/T1b) -- but **only when an explicit lane was
-    chosen**. A consumer running on its default lane never freezes, so the default stays re-pinnable. Once frozen it
-    governs dispatch directly (confirmed-first) and the resolving commands refuse to change it to a *different* lane.
+  - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): each consumer's dispatch point freezes the
+    lane it dispatched on, **write-once** at first dispatch (epic consumer_lanes/T1b, T6a) -- but **only when an
+    explicit lane was chosen**. All four mirror one pattern: resolve the lane once (the read `backend_id` comes from),
+    then under the lock re-check `read_bound_lane(m) == dispatched_lane` before freezing, so a concurrent re-pin/clear
+    drops the stale write instead of recording a lane the run never billed. The supervisor freezes in the policy-check
+    hook (`cli/hooks/policy.py`); memory-writer, shadow-curation, and team-supervisor freeze from an `on_dispatch` hook
+    at the actual `run_claude_session` call (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run,
+    and a skipped/throttled run never freezes). A consumer running on its default lane never freezes, so the default
+    stays re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the resolving commands refuse to
+    change it to a *different* lane.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -437,16 +445,17 @@ To avoid writer conflicts:
   `verbosity`, `thinking_budget_tokens`).
 - **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
   metadata.
-- **Consumer-lane binding** (epic consumer_lanes/T1b): `intent.consumer_lanes.<consumer>` is the *requested* lane (a
-  `LaneRecord`, set only by resolving commands, never a raw `set` override); `confirmed.consumer_lanes.<consumer>` is
-  the `(runtime, backend, model)` the hook *froze* at first dispatch. **Only an explicit lane choice freezes; the
-  default lane never freezes** (a binding exists iff a lane was explicitly pinned), so an unpinned consumer stays
-  re-pinnable. Frozen is **write-once and immutable** -- the resolving commands reject a change to a *different* lane
-  (re-pinning the same lane is an idempotent no-op), and dispatch reads confirmed-first. Removing a consumer
-  (`policy supervisor remove`, `%policy supervisor remove`) clears both its intent and confirmed slots, so a later
-  re-add starts from the default. The post-eval freeze runs lock-free during the (multi-second) check, so it lands only
-  when the fresh under-lock manifest still dispatches the lane it ran on — a concurrent remove/reconfigure drops the
-  stale write rather than resurrecting a cleared binding. See
+- **Consumer-lane binding** (epic consumer_lanes/T1b, T6a): `intent.consumer_lanes.<consumer>` is the *requested* lane
+  (a `LaneRecord`, set by the dedicated lane commands -- `forge session lane set` for all four consumers, plus the
+  supervisor's `forge policy supervisor set` / `--supervisor-runtime` -- never a raw `set` override);
+  `confirmed.consumer_lanes.<consumer>` is the `(runtime, backend, model)` the consumer's dispatch point *froze* at
+  first dispatch. **Only an explicit lane choice freezes; the default lane never freezes** (a binding exists iff a lane
+  was explicitly pinned), so an unpinned consumer stays re-pinnable. Frozen is **write-once and immutable** -- the
+  resolving commands reject a change to a *different* lane (re-pinning the same lane is an idempotent no-op), and
+  dispatch reads confirmed-first. Removing a consumer (`policy supervisor remove`, `%policy supervisor remove`) clears
+  both its intent and confirmed slots, so a later re-add starts from the default. The post-eval freeze runs lock-free
+  during the (multi-second) check, so it lands only when the fresh under-lock manifest still dispatches the lane it ran
+  on — a concurrent remove/reconfigure drops the stale write rather than resurrecting a cleared binding. See
   [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).

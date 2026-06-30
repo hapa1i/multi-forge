@@ -3,10 +3,11 @@
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
 first wave is split into member cards (linked beneath the member table): **T1a, T3, T2, T4, and T5 are all done** -- the
 spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's lane observability have landed on `main`.
-The **first wave is complete**; the epic stays in `doing/` coordinating T6 and T7 (added in
-`proposed/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
-`done/consumer_lane_binding/`; T6 stays an inline sketch (board_contract "Epics"). With T1b done, the next cursor is
-open (T6, T7, or the T0 sibling).
+The **first wave is complete**; the epic stays in `doing/` coordinating T6 (now T6a active + T6b sketch) and T7 (added
+in `proposed/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
+`done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is active in
+`doing/aux_consumer_lane_placement/`; **T6b** (codex dispatch) stays an inline sketch (board_contract "Epics"). With T1b
+and the T0 sibling both done (T0: PR #58, `b0614325`), the next cursor is **T6a** (active).
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -188,7 +189,8 @@ once.
 | **T4 -- Codex-exec supervisor lane** (capability demo, the headline)       | Wire `CodexHeadlessInvoker` as a supervisor dispatch target; the choice rides a **narrow `SupervisorConfig` field**. **Acceptance: blind/transfer-fed only -- MUST NOT use Codex hooks or policy enforcement as part of the claim.**                                                                                 | T1a,T2,T3  | a real new lane, swappably                   |
 | **T5 -- Observability**                                                    | Surface the chosen lane + resulting `billing_mode` (telemetry/status); close the M3 no-emission gaps so every lane is measurable.                                                                                                                                                                                    | T3,T4      | you can *see/verify* the arbitrage           |
 | **T1b -- Generalize + freeze**                                             | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                    | T4         | a durable contract, shape-proven             |
-| **T6 -- Generalize to other consumers** (optional, later)                  | Lane-drive the fan-out workers, taggers, memory writer.                                                                                                                                                                                                                                                              | T1b        | spans consumers, not just supervisor         |
+| **T6a -- Aux-consumer lane placement** (claude-max billing UX)             | Generalize the supervisor's lane-binding UX (CLI + freeze) to memory-writer / shadow-curation / team-supervisor; declare them on `claude-max`. **Level 1: no dispatch change** (claude-max shares the claude_code runtime).                                                                                          | T1b        | the binding contract spans 4 consumers       |
+| **T6b -- Aux-consumer codex dispatch** (optional, later)                   | Add codex-exec (+ future) as a real dispatch arm for aux consumers: codex in `allowed_lanes` + dispatch refactor + fail-open (mirrors T4); fan-out workers + taggers are different shapes, later.                                                                                                                    | T6a        | a non-claude runtime for aux work            |
 | **T7 -- Subscription-exhaustion fail-open** (new, the discussion's ticket) | When a consumer's subscription lane hits the quota wall, degrade **once** to its default lane (sticky, fail-open) -- the single deliberate exception to "no fallback".                                                                                                                                               | T4         | the "Why now" quota wall is actually handled |
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
@@ -201,17 +203,16 @@ rows above stay the durable sketch; the cards carry verified touchpoints + fixtu
 `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
 version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
-**T0 -- sibling billing cleanup** (promoted to member card `doing/claude_subscription_billing/` 2026-06-29, branch
-`claude_subscription_billing`; card authored, **awaiting plan review**): revisit the `claude -p` `unknown`/OAuth billing
-assumption (`billing.py`) against current Anthropic `-p` billing. **A 2026-06-29 code-grounded sweep refined the
-framing**: the inference is conservative-*correct* for today's emissions (a *key-resolvable* headless run is genuinely
-API-billed via auto-`--bare`; a *keyless* run already falls through to OAuth and is honestly labeled `unknown`), not
-buggy -- the real gap is that **no Claude subscription signal exists** to classify that keyless path, and
-`infer_billing_mode(direct, has_api_key)` is the wrong shape to add one (key-presence is a capability, not a payer). So
-T0 is **probe-first**: does `claude -p` ride Max *headlessly*, and is it locally detectable (the codex
-`chatgpt -> subscription_quota` preflight is the template)? **Non-blocking for the proven `chatgpt` path (T2/T4), but
-load-bearing for `claude-max`**: a `claude-max` subscription source must not claim `subscription_quota` until T0 proves
-`claude -p` actually rides the Max subscription.
+**T0 -- sibling billing cleanup** (**done** -- `done/claude_subscription_billing/`, PR #58 `b0614325`, 2026-06-29;
+branch `claude_subscription_billing`): revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
+current Anthropic `-p` billing. **A 2026-06-29 code-grounded sweep refined the framing**: the inference is
+conservative-*correct* for today's emissions (a *key-resolvable* headless run is genuinely API-billed via auto-`--bare`;
+a *keyless* run already falls through to OAuth and is honestly labeled `unknown`), not buggy -- the real gap is that
+**no Claude subscription signal exists** to classify that keyless path, and `infer_billing_mode(direct, has_api_key)` is
+the wrong shape to add one (key-presence is a capability, not a payer). So T0 is **probe-first**: does `claude -p` ride
+Max *headlessly*, and is it locally detectable (the codex `chatgpt -> subscription_quota` preflight is the template)?
+**Non-blocking for the proven `chatgpt` path (T2/T4), but load-bearing for `claude-max`**: a `claude-max` subscription
+source must not claim `subscription_quota` until T0 proves `claude -p` actually rides the Max subscription.
 
 **Assembly is cheap (verified).** The Codex supervisor (T4) reuses shipped pieces: the verdict parser takes a plain
 string (`verdict.py:86 parse_supervisor_verdict(response: str)`); `CodexHeadlessInvoker` already returns its final text

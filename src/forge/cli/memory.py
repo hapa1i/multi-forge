@@ -908,9 +908,11 @@ def _review_curate(
     # (curation already inherits proxy/direct routing from the same config).
     effective_effort = effort or (config.effort if config else None)
 
-    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.cli.consumer_lane_freeze import persist_lane_freeze
+    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
     from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
 
+    dispatched_lane = read_bound_lane(state, SHADOW_CURATION_CONSUMER)
     backend_id = read_bound_backend_id(state, SHADOW_CURATION_CONSUMER)
 
     result = run_shadow_curation(
@@ -924,6 +926,9 @@ def _review_curate(
         scope=scope,
         reasoning_effort=effective_effort,
         backend_id=backend_id,
+        # Freeze only on the actual dispatch (on_dispatch); threaded lane + equality guard
+        # keep confirmed consistent with the billed backend (epic consumer_lanes T6a).
+        on_dispatch=lambda: persist_lane_freeze(resolved.store, SHADOW_CURATION_CONSUMER, dispatched_lane),
     )
 
     if as_json:

@@ -10,7 +10,8 @@ and Forge now emits `billing_mode="subscription_quota"` for a keyless direct run
 `claude-max`. Decisions taken in review: billing wired for **all four** consumers; the label is gated on the **bound
 backend's `billing_posture`** (not a magic string); declaration UX is **supervisor-only** this card
 (`forge policy supervisor set --backend claude-max`), with the other three consumers getting the read/emit plumbing +
-manifest slots (bindable in tests/programmatically). Lane **stays `doing/`** until merge.
+manifest slots (bindable in tests/programmatically). **Done**: merged as PR #58 (`b0614325`); card closed to `done/`
+(2026-06-29).
 
 ## Phases
 
@@ -111,7 +112,8 @@ Produces `phase0-results.md` answering, with verbatim evidence:
   `test_claude_max_binding_emits_subscription_quota`); `make pre-commit` clean; design §3.14 / appendix §A.13 + source
   catalog + `cli_reference` + end-user `policy.md` synced.
 - [x] Phase 2 `claude-max` source + docs (no `BillingPosture` extension -- Q3 = `subscription_quota`, already carried).
-- [x] `change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Promote durable lessons to `impl_notes.md` after human review (or fold into the epic closeout, per the T1a-T5
-  pattern).
-- [ ] Update epic roster row (T0 -> done) and `git mv doing/ -> done/` after merge.
+- [x] `change_log.md` entry (Goal / Key changes / Verification) -- landed in PR #58.
+- [x] Durable lessons folded into the epic closeout (T1a-T5 pattern; no per-member `impl_notes.md` entry). The
+  `billing_mode` != key-presence invariant is already in `impl_notes.md`; promote the `can_use_bare`
+  necessary-but-not-sufficient refinement at epic closeout.
+- [x] Epic roster row updated (T0 -> done) and `git mv doing/ -> done/` (PR #58 merged, 2026-06-29).

@@ -11,6 +11,7 @@ from forge.session.consumer_lanes import (
     clear_consumer_lane,
     confirmed_lane,
     ensure_consumer_lane_binding,
+    intent_lane,
     lane_record_for_runtime,
     read_bound_lane,
     set_intent_lane,
@@ -114,6 +115,25 @@ class TestEnsureConsumerLaneBinding:
         state = _state()
         ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("gemini", "openrouter", "m"))
         assert state.confirmed.consumer_lanes is None
+
+
+# --- intent_lane (the show-command read companion) ---
+
+
+class TestIntentLane:
+    """``intent_lane`` reads the *requested* (pre-freeze) slot only -- the intent-side
+    counterpart of ``confirmed_lane`` that ``forge session lane show`` pairs to surface drift."""
+
+    def test_none_when_unset(self) -> None:
+        assert intent_lane(_state(), SUPERVISOR_CONSUMER) is None
+
+    def test_returns_requested_record(self) -> None:
+        assert intent_lane(_state(intent=_CODEX_RECORD), SUPERVISOR_CONSUMER) == _CODEX_RECORD
+
+    def test_reads_intent_slot_only_not_confirmed(self) -> None:
+        # A frozen binding with no intent override -> intent_lane is None (drift is intent vs confirmed).
+        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
+        assert intent_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) is None
 
 
 # --- lane_record_for_runtime (the resolving-command expansion) ---

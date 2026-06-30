@@ -258,6 +258,21 @@ event is labeled `billing_mode=subscription_quota`. A resolvable key always wins
 stays `unknown` — Forge never guesses. Cost stays `unavailable` for subscription runs (no per-token dollar figure is
 fabricated); only the label changes. Like `--runtime`, the backend is **frozen on the first check**.
 
+**Other Forge LLM-work can ride the subscription too.** The memory writer, shadow curation, and the team supervisor take
+the same backend pin through the general `forge session lane` surface:
+
+```bash
+forge session lane set --consumer memory-writer --backend claude-max
+forge session lane set --consumer shadow-curation --backend claude-max
+forge session lane set --consumer team-supervisor --backend claude-max
+forge session lane show          # requested vs frozen lane per consumer
+```
+
+Same rules as the supervisor: the run must be **keyless and direct** to be labeled `subscription_quota` (a resolvable
+key → `api`, a proxy → `unknown`), and the lane freezes on that consumer's first dispatch. These consumers only offer
+the `claude-max` backend on the default `claude_code` runtime, so this changes the billing label only — never where or
+how the work runs.
+
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 
 Every supervisor check replays the planning session's full context — expensive when most checks come back "aligned". The

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from forge.core.lanes import Consumer, Lane
@@ -363,6 +364,7 @@ def run_memory_writer(
     timeout_seconds: int | None = None,
     designated_docs: list[DesignatedDoc] | None = None,
     backend_id: str | None = None,
+    on_dispatch: Callable[[], None] | None = None,
 ) -> bool:
     """Run the memory writer as a ``claude -p`` subprocess.
 
@@ -522,6 +524,11 @@ def run_memory_writer(
 
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
     tracking_url = base_url
+
+    # Past every skip-return: this run is committed to a claude -p dispatch. Notify the caller
+    # so a consumer-lane freeze records only a lane that actually ran (epic consumer_lanes T6a).
+    if on_dispatch is not None:
+        on_dispatch()
 
     with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(

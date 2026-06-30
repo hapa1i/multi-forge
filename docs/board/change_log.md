@@ -25,6 +25,32 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-30
+
+### consumer_lanes T6a: Aux-consumer lane placement (claude-max billing for the three non-supervisor consumers)
+
+**Goal**: Pin the memory writer, shadow curation, and team supervisor to `claude-max` so their keyless+direct runs bill
+`subscription_quota` like the supervisor -- closing T0's deferred operator half. No dispatch change (claude-max shares
+the `claude_code` runtime; codex-exec stays T6b).
+
+**Key changes**:
+
+- **Phase 1 (CLI)**: `forge session lane set/show/clear --consumer <id>` -- the canonical surface for all four consumers
+  (session-owned `intent.consumer_lanes`); `forge policy supervisor set` stays the supervisor convenience (same slot).
+- **Phase 2 (freeze)**: best-effort `persist_lane_freeze` (`cli/consumer_lane_freeze.py`) fired from an `on_dispatch`
+  hook at each consumer's real `run_claude_session` call, threading the dispatched lane with the supervisor's under-lock
+  `read_bound_lane(m) == dispatched_lane` guard (memory-writer, shadow-curation, both team hooks).
+- **Corrections**: billing honesty lands at Phase 1, not the freeze (`read_bound_backend_id` is
+  confirmed-first-else-intent); the freeze is immutability/observability parity. A review then hardened the first cut:
+  freeze only on a real dispatch (skips no longer freeze), thread the lane + equality guard so `confirmed` can't diverge
+  from the billed backend (retracts "freezing before dispatch closes the window"), and use `HOOK_LOCK_TIMEOUT_S` in
+  hooks.
+- Docs: design §3.5/§3.6.2, appendix §G, cli_reference, end-user policy.md.
+
+**Verification**: New unit tests (`test_consumer_lane_freeze.py`, memory-writer + team-hook wiring incl.
+no-freeze-on-skip and the equality guard); billing covered transitively by `test_billing.py` +
+`test_read_bound_backend_id_for_all_consumers`. 7135 unit + handoff integration (10, Docker) green; pre-commit clean.
+
 ## 2026-06-29
 
 ### consumer_lanes T0: Claude Max subscription billing mode (Phase 1+2)
