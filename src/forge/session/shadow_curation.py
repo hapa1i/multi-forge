@@ -325,8 +325,12 @@ def run_shadow_curation(
     # never silently dispatch the wrong arm or degrade to claude. A None binding (no placement)
     # resolves to the default claude lane with no error.
     try:
+        # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not
+        # constructor order (matches consumer_lanes._record_to_lane + the supervisor path).
         override = (
-            None if lane_record is None else Lane(lane_record.runtime_id, lane_record.backend_id, lane_record.model)
+            None
+            if lane_record is None
+            else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
         )
         runtime_id = resolve_lane(SHADOW_CURATION_CONSUMER, override=override).runtime_id
     except LaneError as e:
