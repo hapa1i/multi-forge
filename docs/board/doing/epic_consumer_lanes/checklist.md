@@ -30,24 +30,26 @@ bound to `claude-max` (supervisor declaration via `set --backend`; the other thr
 done** (PR #59, 2026-06-30; closed to `done/aux_consumer_lane_placement/`): the supervisor's lane-binding UX + freeze
 now span all four consumers, and the three aux consumers freeze **only on a real dispatch** (an `on_dispatch` hook fired
 past every skip-return, guarded by a `read_bound_lane == dispatched_lane` equality check). With the first wave + T1b +
-T0 + T6a all done, **no member is the active cursor**; the epic stays in `doing/` coordinating the T6b codex-dispatch
-sketch and the T7 proposal (authored in `proposed/`). The `core.llm` representation is decided (option 2 -- see
-Decisions).
+T0 + T6a all done, **T6b is the active cursor** (promoted 2026-06-30 to `doing/aux_consumer_codex_dispatch/`; research
+done, scope resolved to shadow-curation only (D1) -- the card's headline finding is that the three aux consumers are NOT
+uniform: shadow-curation is a clean mirror-T4, team-supervisor is plan-blind without new context machinery,
+memory-writer is a different file-editing shape deferred to T6c). The epic stays in `doing/` coordinating it and the T7
+proposal (authored in `proposed/`). The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                         | Lane     | Depends on | State                     |
-| ------------ | -------------------------------------------- | -------- | ---------- | ------------------------- |
-| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)             |
-| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)             |
-| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)             |
-| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)             |
-| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)             |
-| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)             |
-| T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)             |
-| T6b          | inline in `card.md`                          | --       | T6a        | sketch (codex dispatch)   |
-| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26       |
-| T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`) |
+| Member       | Card                                         | Lane     | Depends on | State                         |
+| ------------ | -------------------------------------------- | -------- | ---------- | ----------------------------- |
+| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)                 |
+| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)                 |
+| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)                 |
+| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)                 |
+| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)                 |
+| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)                 |
+| T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)                 |
+| T6b          | `doing/aux_consumer_codex_dispatch/`         | doing    | T6a        | active (shadow-curation only) |
+| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26           |
+| T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`)     |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6a -> T6b. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
@@ -102,7 +104,8 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
   workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b done** -> `done/consumer_lane_binding/`
   (PR #57, 2026-06-28). **T0 done** -> `done/claude_subscription_billing/` (PR #58, `b0614325`, 2026-06-29). **T6a
-  done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); T6b (codex dispatch) still inline.
+  done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); **T6b promoted** ->
+  `doing/aux_consumer_codex_dispatch/` (2026-06-30, active; shadow-curation only).
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`
