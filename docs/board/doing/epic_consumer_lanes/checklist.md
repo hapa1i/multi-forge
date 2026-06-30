@@ -23,24 +23,25 @@ from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `propose
 (depends on T4). **T1b is done** (PR #57, `6ff555f6`, 2026-06-28; closed to `done/consumer_lane_binding/`): the
 supervisor lane is now a persisted, frozen-at-first-dispatch `consumer_lanes` binding (`intent` requested + immutable
 `confirmed`). **T0 is the active cursor**: promoted to a member card (`doing/claude_subscription_billing/`, branch
-`claude_subscription_billing`, 2026-06-29), card authored and **awaiting plan review** before implementation -- it is
-probe-first (does `claude -p` ride Max headlessly?), so the first deliverable is an operator-gated probe, not a code
-change. T6 stays an inline sketch; T7 is authored in `proposed/`. The `core.llm` representation is decided (option 2 --
-see Decisions).
+`claude_subscription_billing`, 2026-06-29). Phase 0 proved keyless `claude -p` rides Max headlessly; **Phase 1+2 are
+implemented and verified** -- a `claude-max` `runtime_native` source plus `resolve_billing_mode`, threaded through all
+four consumers, emit `subscription_quota` for a keyless direct run bound to `claude-max` (supervisor declaration via
+`set --backend`; the other three bindable but UX-deferred). Awaiting merge. T6 stays an inline sketch; T7 is authored in
+`proposed/`. The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                         | Lane     | Depends on | State                                     |
-| ------------ | -------------------------------------------- | -------- | ---------- | ----------------------------------------- |
-| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)                             |
-| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)                             |
-| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)                             |
-| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)                             |
-| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)                             |
-| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)                             |
-| T6           | inline in `card.md`                          | --       | T1b        | sketch                                    |
-| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26                       |
-| T0 (sibling) | `doing/claude_subscription_billing/`         | doing    | none       | card authored 2026-06-29; awaiting review |
+| Member       | Card                                         | Lane     | Depends on | State                                                       |
+| ------------ | -------------------------------------------- | -------- | ---------- | ----------------------------------------------------------- |
+| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)                                               |
+| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)                                               |
+| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)                                               |
+| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)                                               |
+| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)                                               |
+| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)                                               |
+| T6           | inline in `card.md`                          | --       | T1b        | sketch                                                      |
+| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26                                         |
+| T0 (sibling) | `doing/claude_subscription_billing/`         | doing    | none       | Phase 0-2 implemented + verified 2026-06-29; awaiting merge |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --

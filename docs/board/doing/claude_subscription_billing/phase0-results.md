@@ -64,7 +64,8 @@ Running the probe for real (items 1-2) plus review (item 3) surfaced three corre
 now fixed in the harness + card:
 
 1. **The decision gate mis-resolved cost-present.** It mapped a completed-keyless run with a cost to "per-token / keep
-   `api`". Corrected: keyless + completed => the stored OAuth *path* -- a subscription **candidate** regardless of the cost field (the cost is an estimate; the durable label still needs a declared `claude-max`). The
+   `api`". Corrected: keyless + completed => the stored OAuth *path* -- a subscription **candidate** regardless of the
+   cost field (the cost is an estimate; the durable label still needs a declared `claude-max`). The
    `[SHAPE-PER-TOKEN-OR-ESTIMATE]` shape was removed; the gate's "per-token" branch now applies only to a
    metered-console-OAuth account (Q3), which the envelope can't reveal.
 2. **The detection candidate list omitted `can_use_bare`.** The first cut enumerated only external artifacts and

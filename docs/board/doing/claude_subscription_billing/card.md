@@ -158,13 +158,18 @@ cover all four.
 
 ## Scope
 
-**In**: the Phase 0 probe + findings doc; (conditional on a positive probe) the Claude auth-posture resolver + honest
-`billing_mode` emission threaded through all four emit callers.
+**In**: the Phase 0 probe + findings doc; the Claude auth-posture resolver + honest `billing_mode` emission threaded
+through all four emit callers; the `claude-max` `ModelSource` (Phase 2, Q2 resolved at plan review -- all-four billing
+chosen, so the source ships in T0); and the **supervisor** billing-declaration UX
+(`forge policy supervisor set --backend claude-max`) -- backend selection, since `--runtime` cannot pick `claude-max`
+(it shares the `claude_code` runtime).
 
-**Out (this card)**: placing any *consumer* on the `claude-max` lane (T6-style wiring); the subscription-exhaustion
-fail-open (T7); changing interactive-session billing *display* (status-line `cost_mode` stays a user declaration); any
-local price/cost inference (forbidden -- design §3.14). The `claude-max` `ModelSource` (Phase 2) is **in scope only if**
-review agrees; otherwise it is the unblocked follow-on.
+**Out (this card)**: T6-style *dispatch* wiring (routing a consumer's *execution* through a non-default lane transport
+-- `claude-max` shares the `claude_code` runtime, so dispatch is byte-identical; only the billing *label* moves); the
+operator declaration CLI + binding freeze for the three non-supervisor consumers (their billing *mechanism* ships now;
+the declaration UX is a follow-on -- bindable programmatically/in tests); the subscription-exhaustion fail-open (T7);
+changing interactive-session billing *display* (status-line `cost_mode` stays a user declaration); any local price/cost
+inference (forbidden -- design §3.14).
 
 ## Open questions (for review)
 
@@ -172,13 +177,13 @@ review agrees; otherwise it is the unblocked follow-on.
    `codex doctor` equivalent and every Claude-side artifact signal is brittle (`config get` = no stable JSON / hangs;
    `credentials.json`/keychain = unowned schema; cost-null = doesn't fire, cost is present on Max). **Resolution: don't
    read a Claude-side artifact at all** -- the discriminator is `can_use_bare` (Forge's own predicate): keyless +
-   completing turn => the stored OAuth *path* (a subscription **candidate**; the durable label needs a declared `claude-max`); keyed => api. Preflight, Forge-owned, stable. **(i)** non-TTY OAuth works (a0
-   confirmed); **(ii)** the signal is the *input* (is a key resolvable?), not a brittle artifact. The kill #2 risk did
-   not materialize.
-2. **Phase 2 (`claude-max` `ModelSource`) -- in T0 or a follow-on?** The epic says T0 "gates" (= *unblocks*) it.
-   Recommendation: keep T0 = probe + billing signal; split the source to a thin follow-on. **No `BillingPosture` change
-   needed** now that Q3 = `subscription_quota` (`backend/sources.py:24` already carries it) -- the `claude-max` source
-   declares `billing_posture="subscription_quota"`, exactly like `chatgpt`.
+   completing turn => the stored OAuth *path* (a subscription **candidate**; the durable label needs a declared
+   `claude-max`); keyed => api. Preflight, Forge-owned, stable. **(i)** non-TTY OAuth works (a0 confirmed); **(ii)** the
+   signal is the *input* (is a key resolvable?), not a brittle artifact. The kill #2 risk did not materialize.
+2. **Phase 2 (`claude-max` `ModelSource`) -- in T0 or a follow-on? RESOLVED 2026-06-29: in T0.** At plan review the user
+   chose all-four-consumer billing, so the source ships in this card (not a follow-on). No `BillingPosture` change (Q3 =
+   `subscription_quota`, `backend/sources.py:24` already carries it) -- the `claude-max` source declares
+   `billing_posture="subscription_quota"`, exactly like `chatgpt`.
 3. **Which `billing_mode` value? RESOLVED 2026-06-29: `subscription_quota`** (reverses the earlier
    `subscription_headless_credit` lean). Decisive evidence: the existing headless consumer-subscription case --
    `codex exec` -- already maps to `subscription_quota`, with the comment *"Consumer ChatGPT is provably
@@ -195,17 +200,21 @@ review agrees; otherwise it is the unblocked follow-on.
 
 ## Verified touchpoints (file:line, 2026-06-29)
 
-| Concern                                     | Location                                                                                                                             | Current behavior                                                                                                                                      |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inference function (the "stale" claim)      | `core/usage/billing.py:14-28`                                                                                                        | `"api"` iff `direct and has_api_key`, else `"unknown"`; never subscription                                                                            |
-| Sole inference caller                       | `core/usage/emit.py:137` (`emit_usage_for_session_result`)                                                                           | `infer_billing_mode(direct=direct and not base_url, has_api_key=_anthropic_key_present())`                                                            |
-| Emit callers to thread (Phase 1, Option A)  | `policy/semantic/supervisor.py:578`, `session/memory_writer.py:526`, `session/shadow_curation.py:306`, `policy/team/handlers.py:249` | four independent call sites, each computes `direct`/`base_url` itself -- **all** must thread `resolved_billing_mode`                                  |
-| Key-presence check                          | `core/usage/emit.py:549-556` (`_anthropic_key_present`)                                                                              | `resolve_env_or_credential("ANTHROPIC_API_KEY")` -- capability, not payer                                                                             |
-| Headless `--bare`/auth decision             | `core/reactive/session_runner.py:123-125,183,208-213`; tests `test_session_runner.py:200,209`                                        | `--bare` auto-added **only when a key is resolvable** (`can_use_bare(env)`); keyless runs omit `--bare`, *permitting* (not proving) OAuth fallthrough |
-| `BillingMode` enum                          | `core/usage/ledger.py:66-72`                                                                                                         | `subscription_*` declared; only `subscription_quota` emitted (codex)                                                                                  |
-| `BillingPosture` (Q3 resolved -> no gap)    | `backend/sources.py:24`                                                                                                              | `Literal["per_token","subscription_quota","free"]` already carries `subscription_quota`; Q3 = quota, so no extension needed                           |
-| Proven codex sibling (key-first precedence) | `core/runtime/codex_preflight.py:365-403` (`_resolve_codex_auth`)                                                                    | `stored API key` -> `api` **before** `stored ChatGPT tokens` -> `subscription_quota`, at **preflight**                                                |
-| Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                      |
-| Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                         |
-| Reserved subscription modes                 | design_appendix **§A.13**                                                                                                            | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                     |
-| Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => the stored OAuth *path* (subscription **candidate**; durable label needs a declared `claude-max`) -- a dependable *gate*, not sufficient proof    |
+> **Pre-implementation snapshot** -- the code state that *motivated* Phase 1, not shipped behavior. Phase 1 has since
+> landed: the inference caller now calls `resolve_billing_mode(..., backend_id=...)` (row updated below). For shipped
+> behavior see the change log and design §3.14 / appendix §A.13.
+
+| Concern                                     | Location                                                                                                                             | Current behavior                                                                                                                                                                                                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inference function (the "stale" claim)      | `core/usage/billing.py:14-28`                                                                                                        | `"api"` iff `direct and has_api_key`, else `"unknown"`; never subscription                                                                                                                                                                                  |
+| Inference caller (resolver, shipped)        | `core/usage/emit.py` (`emit_usage_for_session_result`)                                                                               | **shipped Phase 1:** `resolve_billing_mode(direct=direct and not base_url, has_api_key=_anthropic_key_present(), backend_id=backend_id)` (was `infer_billing_mode(...)`)                                                                                    |
+| Emit callers to thread (Phase 1, Option A)  | `policy/semantic/supervisor.py:578`, `session/memory_writer.py:526`, `session/shadow_curation.py:306`, `policy/team/handlers.py:249` | four independent call sites, each computes `direct`/`base_url` itself -- **all** must thread `resolved_billing_mode`                                                                                                                                        |
+| Key-presence check                          | `core/usage/emit.py:549-556` (`_anthropic_key_present`)                                                                              | `resolve_env_or_credential("ANTHROPIC_API_KEY")` -- capability, not payer                                                                                                                                                                                   |
+| Headless `--bare`/auth decision             | `core/reactive/session_runner.py:123-125,183,208-213`; tests `test_session_runner.py:200,209`                                        | `--bare` auto-added **only when a key is resolvable** (`can_use_bare(env)`); keyless runs omit `--bare`, *permitting* (not proving) OAuth fallthrough                                                                                                       |
+| `BillingMode` enum                          | `core/usage/ledger.py:66-72`                                                                                                         | `subscription_*` declared; only `subscription_quota` emitted (codex)                                                                                                                                                                                        |
+| `BillingPosture` (Q3 resolved -> no gap)    | `backend/sources.py:24`                                                                                                              | `Literal["per_token","subscription_quota","free"]` already carries `subscription_quota`; Q3 = quota, so no extension needed                                                                                                                                 |
+| Proven codex sibling (key-first precedence) | `core/runtime/codex_preflight.py:365-403` (`_resolve_codex_auth`)                                                                    | `stored API key` -> `api` **before** `stored ChatGPT tokens` -> `subscription_quota`, at **preflight**                                                                                                                                                      |
+| Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                                                                                                                            |
+| Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                                                                                                                               |
+| Reserved subscription modes                 | design_appendix **§A.13**                                                                                                            | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                                                                                                                           |
+| Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => the stored OAuth *path* (subscription **candidate**; durable label needs a declared `claude-max`) -- a dependable *gate*, not sufficient proof |

@@ -25,6 +25,39 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-29
+
+### consumer_lanes T0: Claude Max subscription billing mode (Phase 1+2)
+
+**Goal**: Emit `billing_mode="subscription_quota"` for a keyless, direct `claude -p` run whose bound consumer-lane
+backend is `claude-max`, instead of the conservative `unknown` -- honestly, with no local cost inference.
+
+**Key changes**:
+
+- New `claude-max` `ModelSource` (`backend/sources.py`): `runtime_native`, `provider="anthropic"`, no credential,
+  `billing_posture="subscription_quota"`, `reachable_via=("claude_code",)` -- the claude_code analog of `chatgpt`.
+- `resolve_billing_mode(*, direct, has_api_key, backend_id)` (`core/usage/billing.py`) delegates to `infer_billing_mode`
+  and upgrades only a keyless direct run on a `subscription_quota`-posture backend; a resolvable key still wins (`api`),
+  proxied stays `unknown`, a drifted backend fails open to `unknown`. First consumer of `billing_posture`.
+- `emit_usage_for_session_result` gained `backend_id`; all four consumers thread their bound backend via new
+  `read_bound_backend_id(state, consumer)` (None for an absent OR drifted binding). New `Consumer` defs for
+  memory-writer/shadow-curation/team-supervisor + 6 manifest slots on `ConsumerLane{Intent,Confirmed}`.
+- Declaration UX (supervisor-only this card): `lane_record_for(consumer, *, runtime, backend)` +
+  `forge policy supervisor set --backend claude-max` (backend selection -- `--runtime` can't pick `claude-max`, which
+  shares the `claude_code` runtime). The other three consumers' operator CLI is a follow-on.
+- `forge model backend` runtime-native probe hint now derives from `reachable_via` (one helper, both call sites), so
+  `claude-max` points at the Claude login, not codex preflight.
+- Docs: design §3.14, appendix §A.13 + source catalog, `cli_reference`, end-user `policy.md`.
+
+**Decisions**: billing wired for all four consumers; label gated on the bound backend's `billing_posture` (no magic
+string); declaration UX supervisor-only; card Q2 resolved (source ships in T0). `subscription_headless_credit` stays an
+unused reserved `BillingMode` literal (removal candidate, deferred).
+
+**Verification**: `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat); ~700 unit tests across
+usage/billing/emit, consumer_lanes, backend sources, supervisor, team handlers, memory-writer, shadow-curation;
+memory-writer handoff integration green in Docker (10 passed). Real-claude supervisor e2e deferred to release
+validation.
+
 ## 2026-06-28
 
 ### consumer_lanes T1b: persist + freeze the supervisor lane (consumer-lane binding)
