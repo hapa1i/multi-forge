@@ -56,12 +56,17 @@ def read_bound_lane(state: SessionState, consumer: Consumer) -> LaneRecord | Non
 def read_bound_backend_id(state: SessionState, consumer: Consumer) -> str | None:
     """Return the backend id to bill ``consumer``'s run under, or None.
 
-    The billing companion to ``read_bound_lane``: returns a concrete backend id only for a
+    The billing companion to ``read_bound_lane``. Returns a concrete backend id only for a
     *valid explicit* binding. Returns None when there is no binding -- the consumer ran on its
     default lane, so billing resolves from key/direct alone -- OR when an explicit binding has
-    drifted out of the catalog, an honest "don't know" (``unknown`` billing) rather than a silent
-    substitution of the default (absence vs. corruption). Mirrors the supervisor's fail-open
-    posture around invalid lanes (``resolve_lane`` in ``run_supervisor_check``).
+    drifted out of the catalog: an honest "don't know" (``unknown`` billing) rather than a silent
+    substitution of the default (absence vs. corruption). The drift fail-open mirrors the
+    supervisor's posture around invalid lanes (``resolve_lane`` in ``run_supervisor_check``).
+
+    Not a blanket no-raise contract: an *unwired* consumer (no ``consumer_lanes`` manifest slot)
+    raises ``ValueError`` from the underlying slot lookup, before the drift guard -- a programmer
+    error / internal-boundary rejection (coding_standards §6), not a don't-know. Production call
+    sites pass wired consumer constants, so that path is unreachable there.
     """
     record = read_bound_lane(state, consumer)
     if record is None:
