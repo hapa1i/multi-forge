@@ -46,6 +46,10 @@ the `claude_code` runtime; codex-exec stays T6b).
   from the billed backend (retracts "freezing before dispatch closes the window"), and use `HOOK_LOCK_TIMEOUT_S` in
   hooks.
 - Docs: design §3.5/§3.6.2, appendix §G, cli_reference, end-user policy.md.
+- **Closeout (2026-06-30)**: card moved `doing/ -> done/aux_consumer_lane_placement/`, epic roster marked T6a done. An
+  investigation confirmed the supervisor's eager freeze-at-first-check (vs aux freeze-on-dispatch) is correct for its
+  *registered* lifecycle, not a bug; the intentional asymmetry is now documented (`policy.py` /
+  `consumer_lane_freeze.py` comments, design §3.5, appendix §G) and promoted to `impl_notes.md`.
 
 **Verification**: New unit tests (`test_consumer_lane_freeze.py`, memory-writer + team-hook wiring incl.
 no-freeze-on-skip and the equality guard); billing covered transitively by `test_billing.py` +
@@ -1246,177 +1250,31 @@ pre-existing hand-built `errors`-only tests stay green via the fallback) and `te
 (ruff/black/isort/mypy/pyright/mdformat/gitleaks). No integration tier — `forge activity` is a read-only render over the
 ledger + manifest. Additive optional fields only; no durable-schema change.
 
-## 2026-06-15
+## 2026-06-15 (compacted)
 
-### openrouter_observability Phase 2 review fixes (R1–R3): no metadata lost on the incident path
-
-**Goal**: Close three gaps a review found in the shipped Phase 2 carry-through, all on paths the card exists to trace.
-
-**Key changes**:
-
-- **R1 (high) — cancelled streams keep the gen id**: `openrouter.py` stream now **emits `provider_meta` on the first
-  content/tool event** (not only terminal usage/`response_end`), and `client_adapter.py` carries it as a **dedicated
-  metadata-only chunk** (`choices=[]`) the instant it first appears. A stream aborted before its final usage chunk — the
-  incident — now still delivers `provider_generation_id` to the Phase 3 seam.
-- **R2 (medium) — LiteLLM Responses streaming fallback keeps meta**: the synthetic events (text_delta, tool_call_delta,
-  usage, response_end) now pass `provider_meta=response.provider_meta` instead of dropping it.
-- **R3 (low/med) — direct OpenRouter non-streaming populates headers**: `_make_completion_request` switches to
-  `with_raw_response.create()` (`raw.parse()` + `raw.headers`) so the direct path gets allowlisted
-  `provider_meta.headers` like the LiteLLM path. The header allowlist (`provider_trace_headers` +
-  `merge_provider_headers`) moved to `openai_compat.py` so both paths share one source; the prior "deferred" scope note
-  is removed.
-
-**Verification**: +6 unit tests (incident carrier chunk, end-before-usage, Responses fallback meta, direct-path headers,
-shared-allowlist merge); full `make test-unit` 6125 passed; mypy + pyright clean; scoped `pre-commit` clean.
-
-### openrouter_observability Phase 2: provider metadata through core.llm (additive ProviderTraceMeta)
-
-**Goal**: Lift the provider/generation id, selected upstream, and allowlisted correlation headers out of raw provider
-dicts and carry them to the proxy boundary on an additive, nested `ProviderTraceMeta`, kept separate from Forge's
-synthetic `chatcmpl-<ts>` id.
-
-**Key changes**:
-
-- `core/llm/types.py` + `__init__.py`: new `ProviderTraceMeta(BaseModel)` (7 optional fields); `provider_meta` added to
-  `CompletionResponse` and `StreamEvent`; exported. Additive — fakes/old providers keep working.
-- `openai_compat.py`: `provider_trace_meta()` sets `provider_response_id` from `body.id`, `provider_generation_id` only
-  when the id is a `gen-…` (so `chatcmpl-` ids don't masquerade), `selected_provider` from the body `provider` field.
-- `openrouter.py` stream: captures the **first-seen** `chunk.id` (set-once, `isinstance(str)` guarded) and attaches it
-  to the usage/`response_end` events — first-seen is what survives a cancelled stream (the incident).
-- `litellm.py`: tiny exact-name header allowlist (`provider_trace_headers`) + `_merge_response_metadata` populating
-  `provider_meta.headers` on the raw-response paths (never auth/cookies). Direct `openrouter.py` header capture deferred
-  (it has no `with_raw_response`; body/chunk id already carries the gen id).
-- `proxy/client_adapter.py`: widened `AdapterProviderType` to include `"openrouter"` (removed the now-redundant
-  `type: ignore`); `provider_meta` carried as a typed `model_dump` under `_provider_meta` (non-streaming) and the usage
-  chunk (streaming), mirroring `reported_cost_micros` and kept distinct from the synthetic id.
-
-**Verification**: +25 unit tests across `test_types`, `test_openai_compat`, `test_openrouter`, `test_litellm_cost`,
-`test_client_adapter`; full `make test-unit` 6119 passed; mypy + pyright + `make pre-commit` clean. (Reconstruction +
-the converters read land at the Phase 3 trace seam.)
-
-### openrouter_observability Phase 1: Forge-owned session ids + X-Forge-Session/Command headers
-
-**Goal**: Mint opaque, path-free provider grouping ids and propagate the hashed session name + command role from
-headless spawns to the proxy via two new sanitized, leak-gated headers — the identity foundation later phases join on.
-
-**Key changes**:
-
-- `core/run_id.py`: added `derive_provider_session_id(label, root_run_id, role)` (SHA-256 12-hex; explicit
-  `forge_run_<hash(root_run_id)>` fallback when no session label), one `sanitize_label` that canonicalizes all separator
-  runs to `_` (so the id suffix and `X-Forge-Command` can't drift), and `is_valid_label`/`is_valid_provider_session_id`
-  validators distinct from `RUN_ID_RE`. Header/env-var name constants added.
-- `core/reactive/env.py`: `_apply_correlation_headers` stamps `X-Forge-Session` (always emittable via the fallback) +
-  `X-Forge-Command` (role only), both added to the Forge-owned strip-set, gated to a proven Forge proxy.
-- Headless spawns tag their role + session: `supervisor` (`supervisor.py`), `memory_writer` (`memory_writer.py`),
-  `review` (`engine.py`, command-only). Used the existing `run_claude_session(extra_env=...)` pass-through — no
-  signature change (the plan's "plumbing gap" was a misread).
-- `proxy/server.py`: middleware reads + validates both headers (spoof/over-long → `None`), stores on `request.state`
-  before both wire branches; getter `_forge_session_command` added for the Phase 3 trace writer. Headers are never
-  forwarded upstream (passthrough allowlist already excludes them — asserted, not re-stripped).
-- `design_appendix.md` §A.13: documented the two headers as internal-only correlation, distinct from Phase 5 `user`.
-
-**Verification**: New `test_server_forge_headers.py` (10) + additions to `test_run_id.py`, `test_env.py`,
-`test_supervisor.py`, `test_memory_writer.py`; full `make test-unit` 6094 passed; `make pre-commit` clean.
-
-### openrouter_observability Phase 0: live-probe the OpenRouter externals
-
-**Goal**: Pin the live OpenRouter behaviors the card's later phases assume, before any provider-id field is populated.
-
-**Key changes**:
-
-- **Probe harness** (`scripts/experiments/openrouter/`): operator-gated, staged `reproduce.sh` + `lib.sh` +
-  scan-and-fail `sanitize.sh` + async/typed `helpers/or_probe.py` + 5 stages + README. Reuses Forge credential
-  resolution read-only; metadata-only records (no keys; no raw bodies without `--debug-raw`).
-- **Findings** (`phase0-results.md`): the `gen-` id is in `body.id`, the `x-generation-id` header, **and** every
-  streaming `chunk.id` (stable) -> streaming `provider_generation_id` is **not** structurally `None` (corrects the card
-  hedge); Forge's canonical types drop it today. A stream cancelled after the first chunk is `[REMOTE-ABSENT]` (not
-  retrievable via `/generation` or `/activity`), so a local-only trace is justified. On the direct path OpenRouter
-  **records the OpenAI-standard `user`** (`[CHANNEL-USER-RECOGNIZED]`) but **ignores a custom `session_id`** -> Phase 5
-  channel correction: inject under `user`, not `session_id`. Sticky routing `[STICKY-NEUTRAL]` across both arms
-  (recognition is not routing impact) -> no enable recommendation; flag stays opt-in for observability.
-- **Bug caught + fixed**: probe 2's first `[REMOTE-PRESENT-GENERATION]` was a false positive -- `_http_get` counted a
-  404 JSON error body as "present". Fixed with an HTTP-200 gate (`_generation_present`), an eventual-consistency poll
-  (`~23s`; an immediate `/generation` lookup 404s even for completed calls, which index in ~3s), and a completed-call
-  baseline control that only allows `[REMOTE-ABSENT]` when the control indexes while the aborted id does not.
-- **Review fixes** (post-run): `sanitize.sh` now **requires** GNU sed/grep (BSD silently no-ops `\b`, risking a
-  false-clean secret scan); probe 3 recognition now polls the indexed `/generation` record (`_poll_generation_body`) --
-  the polled re-run **flipped** `[CHANNEL-UNVERIFIABLE]` to `[CHANNEL-USER-RECOGNIZED]` (the un-polled lookup had masked
-  a real recognition); `_routing_verdict` now spans **both** sticky arms so a `user` divergence can't hide behind a
-  neutral `session_id`.
-
-**Verification**: Adversarial workflow (3 independent agents) confirmed the false positive and audited every probe for
-the bug class. Helper offline-tested (status gate + interleaved poll + both-arm routing verdict). Operator re-ran probes
-1-3: probe 1 `[GENID-IN-STREAM-CHUNK]`, probe 2 `[REMOTE-ABSENT]`, probe 3 `[CHANNEL-USER-RECOGNIZED]`. Pre-commit clean
-on all changed files (ruff/black/isort/mypy/pyright/mdformat/gitleaks); `sanitize.sh` OK. All four probes settled; Phase
-0 ships no `src/` change.
-
-### supervisor_launch_controls: launch-time cascade parity + reasoning effort across all `claude -p` subprocesses
-
-**Goal**: Give `forge session fork/start --supervise` the tier-1 cascade knobs `forge policy supervise` already had, and
-add a per-caller reasoning-effort lever to every Forge-spawned `claude -p` subprocess (no global default).
-
-**Key changes**:
-
-- **Cascade parity**: `fork` and `start` gained `--cascade`/`--checker-model`/`--checker-provider` (all require
-  `--supervise`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier when no plan
-  exists yet (asymmetric with `policy supervise --cascade`, which resolves the plan eagerly).
-- **Shared checker helpers**: extracted `CHECKER_PROVIDER_CHOICES`, `normalize_checker_provider_arg`,
-  `validate_checker_model`, and `apply_checker_options` into `policy/semantic/supervisor.py` (Click-free); consolidated
-  the duplicate provider normalizer in `plan_check.py` to one source.
-- **Two effort vocabularies** (kept distinct): `claude --effort` = `low/medium/high/xhigh/max` (`max` Claude-only),
-  validated by new top-level leaf `core/effort.py`; core.llm `ReasoningEffort` = `none/low/medium/high/xhigh` (`none`
-  checker-only), validated in `core/llm/types.py`. `session/models.py` keeps a drift-guarded inline mirror to stay
-  import-light.
-- **Two argv builders learn `--effort`**: `run_claude_session` (central `-p` builder) appends `--effort` after `--model`
-  and **fails loud** if an older `claude` rejects it (no silent rerun-at-default, unlike the `--output-format` retry);
-  `review/engine.py:_prepare_worker` appends it to the fan-out argv.
-- **Per-caller wiring**: `SupervisorConfig.supervisor_effort`/`.checker_effort`, `MemoryWriterConfig.effort`,
-  `TeamSupervisorConfig.effort`; threaded into the supervisor frontier, tier-1 checker (`ModelHyperparameters` + effort
-  in the plan-check cache key), memory writer, shadow curation, team supervisor, and the workflow fan-out. CLI flags:
-  `--supervisor-effort`/`--checker-effort` on fork/start/`policy supervise`, `--supervisor-effort` on the one-shot
-  `policy supervisor`, `--effort` on `memory enable`, `memory shadows review --curate`, and
-  `workflow {panel,analyze,debate,consensus}`.
-- **Memory enable early-return fix**: `_set_memory_activation` now short-circuits only when enabled/mode/effort are all
-  unchanged, so `forge memory enable --effort high` persists on an already-enabled same-mode session.
-- Additive optional fields only — no `SCHEMA_VERSION` bump. No global `RuntimeConfig` default-effort knob (per-caller by
-  decision). Docs updated: `end-user/session.md`, `end-user/memory.md`, `cli_reference.md`, `design_workflows.md`.
-
-**Verification**: 906 unit tests pass across new + touched files (incl. new `tests/src/core/test_effort.py`
-vocab/drift-guard, `run_claude_session` fail-loud, fork/start persistence, per-consumer forwarding, vocab matrix, memory
-early-return regression); `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); integration green:
-`test_session_commands_integration.py::test_fork_supervise_cascade_effort_persists` and
-`test_supervisor_e2e.py::test_supervisor_effort_reaches_claude_argv` (`--effort medium` in the logged claude argv).
-
-### same_dir_transfer_forks: decouple transfer mode from worktree isolation in `forge session fork`
-
-**Goal**: Let a same-directory fork run a curated *transfer* launch (fresh child Claude session + assembled parent
-context) instead of always native `--resume --fork-session`, and stop silently dropping `--strategy`/`--inline-plan` on
-same-dir forks (the bug from the supervisor investigation).
-
-**Key changes** (`src/forge/cli/session_fork.py`, `manager.py`, `session_lifecycle.py`):
-
-- **Auto-switch**: explicit `--strategy`/`--inline-plan` on a same-dir fork resolves `resume_mode = "transfer"` pre-fork
-  (gated on `resume_mode is None`, so `--resume-mode native-relocate` never auto-switches) and prints a non-silent info
-  line. The existing `--resume-mode transfer` is the explicit same-dir-legal opt-in; `native-relocate` stays
-  worktree/`--into`-only. No `--fresh-transfer` flag.
-- **Branch widened, not duplicated**: the worktree-transfer branch predicate becomes
-  `uses_fresh_transfer = (is_worktree_fork and not native_relocate) or same_dir_transfer`, resolving `worktree_path` per
-  case. Six launch refs (sidecar `session_id`/`resume_id`/`fork_session`/**`register_fork`**/`system_prompt_file`; host
-  `active_claude_session_id`) now key on it. `register_fork` is load-bearing: with `fork_session=False` it is the only
-  thing setting `FORGE_FORK_NAME`. Budget preflight widened to `is_cross_dir or resume_mode == "transfer"`.
-- **Derivation correct under partial failure**: `manager.fork_session` writes the `"transfer"` baseline (+ pre-recorded
-  `context_file`) for same-dir transfer, so a best-effort CLI `_persist_fork_transfer_derivation` refinement failure
-  can't leave a requested transfer fork recorded as `"native"`.
-- **Deferred-resume guard**: `_get_deferred_same_dir_fork_resume_id` returns `None` when
-  `derivation.resume_mode == "transfer"`, before the confirmed-state guard — a failed UUID pre-seed can no longer
-  silently native-resume a `--no-launch` transfer fork.
-- **Docs**: `design.md`, `end-user/session.md`, `cli_reference.md` updated; help strings dropped "worktree-only"
-  framing.
-
-**Verification**: 41 unit tests green (7 new same-dir CLI tests, 3 regression incl. a direct guard test, new manager
-derivation test); 4 integration tests green (new same-dir transfer argv has `--session-id` +
-`--append-system-prompt-file` and lacks `--resume`/`--fork-session`; 3 adjacent fork-launch regressions unchanged);
-`make pre-commit` clean.
+- **openrouter_observability Phases 0-2 + review fixes** (detail in `done/openrouter_observability/`): live-probed the
+  OpenRouter externals first (Phase 0 -- the `gen-` id is in `body.id`, the `x-generation-id` header, and every stream
+  `chunk.id`; a stream cancelled after its first chunk is remote-absent, justifying a local-only trace; the direct path
+  records the OpenAI-standard `user` but ignores a custom `session_id`, steering Phase 5 to inject under `user`). Phase
+  1 minted Forge-owned provider session ids + two leak-gated `X-Forge-Session`/`X-Forge-Command` headers; Phase 2
+  carried provider/generation id + allowlisted headers to the proxy boundary on an additive `ProviderTraceMeta`, kept
+  separate from Forge's synthetic `chatcmpl-` id. Review fixes (R1-R3) closed the incident path: a cancelled stream
+  emits `provider_meta` on the first content event (not only terminal usage), the LiteLLM Responses fallback keeps meta,
+  and the direct non-streaming path populates headers via `with_raw_response`. Verification: +25 then +6 unit tests;
+  full `make test-unit` green at each step; mypy/pyright/pre-commit clean.
+- **supervisor_launch_controls** (detail in `done/supervisor_launch_controls/`): gave `fork/start --supervise` the
+  tier-1 cascade knobs `policy supervise` had, and added per-caller `--effort` to every Forge-spawned `claude -p` (no
+  global default). Two effort vocabularies kept distinct (`claude --effort` low/medium/high/xhigh/max via
+  `core/effort.py`; core.llm `ReasoningEffort` none/low/medium/high/xhigh); `run_claude_session` appends `--effort` and
+  fails loud on an older `claude`. Additive optional fields, no SCHEMA_VERSION bump. Verification: 906 unit + 2
+  integration green; pre-commit clean.
+- **same_dir_transfer_forks** (detail in `done/same_dir_transfer_forks/`): a same-dir fork with explicit
+  `--strategy`/`--inline-plan` auto-switches to a curated `transfer` launch (gated on `resume_mode is None`) instead of
+  silently dropping them; the worktree-transfer branch widened to
+  `(is_worktree_fork and not native_relocate) or same_dir_transfer` rather than duplicating. Derivation writes the
+  transfer baseline pre-refinement so a best-effort failure can't record a transfer fork as native. Verification: 41
+  unit
+  - 4 integration green; pre-commit clean.
 
 ## 2026-06-10 -- 2026-06-14 (compacted)
 

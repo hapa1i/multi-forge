@@ -21,16 +21,18 @@ no-emission gaps closed (checker/reviewer/team-tagger now emit session-tagged us
 coordinating T6, T7, and the T0 sibling (T1b done). **T7** (subscription-exhaustion fail-open) -- the one new ticket
 from the 2026-06-26 workweave/Avengers-Pro discussion -- is authored in `proposed/subscription_exhaustion_failopen/`
 (depends on T4). **T1b is done** (PR #57, `6ff555f6`, 2026-06-28; closed to `done/consumer_lane_binding/`): the
-supervisor lane is now a persisted, frozen-at-first-dispatch `consumer_lanes` binding (`intent` requested + immutable
-`confirmed`). **T0 is done** (PR #58, `b0614325`): shipped as a member card (`done/claude_subscription_billing/`, branch
-`claude_subscription_billing`, 2026-06-29). Phase 0 proved keyless `claude -p` rides Max headlessly; **Phase 1+2 are
-implemented and verified** -- a `claude-max` `runtime_native` source plus `resolve_billing_mode`, threaded through all
-four consumers, emit `subscription_quota` for a keyless direct run bound to `claude-max` (supervisor declaration via
-`set --backend`; the other three bindable but UX-deferred). With T0 done, **T6a** (aux-consumer lane placement -- the
-claude-max billing UX for memory-writer / shadow-curation / team-supervisor) is **now the active cursor**
-(`doing/aux_consumer_lane_placement/`, branch `aux_consumer_lane_placement`, 2026-06-29; Level-1 placement-only, no
-dispatch change). The T6b codex-dispatch slice and T7 stay later; T7 is authored in `proposed/`. The `core.llm`
-representation is decided (option 2 -- see Decisions).
+supervisor lane is now a persisted, frozen-at-first-policy-check `consumer_lanes` binding (`intent` requested +
+immutable `confirmed`). **T0 is done** (PR #58, `b0614325`): shipped as a member card
+(`done/claude_subscription_billing/`, branch `claude_subscription_billing`, 2026-06-29). Phase 0 proved keyless
+`claude -p` rides Max headlessly; **Phase 1+2 are implemented and verified** -- a `claude-max` `runtime_native` source
+plus `resolve_billing_mode`, threaded through all four consumers, emit `subscription_quota` for a keyless direct run
+bound to `claude-max` (supervisor declaration via `set --backend`; the other three bindable but UX-deferred). **T6a is
+done** (PR #59, 2026-06-30; closed to `done/aux_consumer_lane_placement/`): the supervisor's lane-binding UX + freeze
+now span all four consumers, and the three aux consumers freeze **only on a real dispatch** (an `on_dispatch` hook fired
+past every skip-return, guarded by a `read_bound_lane == dispatched_lane` equality check). With the first wave + T1b +
+T0 + T6a all done, **no member is the active cursor**; the epic stays in `doing/` coordinating the T6b codex-dispatch
+sketch and the T7 proposal (authored in `proposed/`). The `core.llm` representation is decided (option 2 -- see
+Decisions).
 
 ## Member roster and sequencing
 
@@ -42,7 +44,7 @@ representation is decided (option 2 -- see Decisions).
 | T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)             |
 | T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)             |
 | T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)             |
-| T6a          | `doing/aux_consumer_lane_placement/`         | doing    | T1b,T0     | doing (placement UX)      |
+| T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)             |
 | T6b          | inline in `card.md`                          | --       | T6a        | sketch (codex dispatch)   |
 | T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26       |
 | T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`) |
@@ -100,8 +102,7 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
   workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b done** -> `done/consumer_lane_binding/`
   (PR #57, 2026-06-28). **T0 done** -> `done/claude_subscription_billing/` (PR #58, `b0614325`, 2026-06-29). **T6a
-  promoted** -> `doing/aux_consumer_lane_placement/` (branch `aux_consumer_lane_placement`, 2026-06-29); T6b (codex
-  dispatch) still inline.
+  done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); T6b (codex dispatch) still inline.
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`

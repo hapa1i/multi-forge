@@ -16,6 +16,12 @@ manifest:
   equality guard): a concurrent ``forge session lane set/clear`` between dispatch and this
   write drops the stale freeze instead of recording a lane the run did not bill.
 
+The *timing* differs from the supervisor by design, even though the guard mechanism is shared.
+The supervisor is a registered, session-scoped entity (``resume_id``) and freezes eagerly at
+the first policy check, because registration is its commitment point (T1b). These consumers are
+per-hook invocations with no registration -- a skip means no work ran -- so their only honest
+commitment point is the dispatch itself. Same guard, different trigger.
+
 Per the boundary framework (coding_standards.md §5), the persist is the outermost caller's
 call to make non-blocking: a lock/IO failure degrades to "retry on the next dispatch" -- the
 freeze is bookkeeping and billing reads the lane regardless.

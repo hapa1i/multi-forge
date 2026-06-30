@@ -285,6 +285,11 @@ def _persist_policy_decisions(
         # re-pointed lane no longer matches read_bound_lane(m), so the stale write is dropped instead
         # of resurrecting a binding the user just cleared -- a later uncontested check freezes the
         # then-current lane.
+        #
+        # Timing note: this eager freeze (first check for a *registered* supervisor) is deliberate
+        # and differs from the aux consumers, which freeze only on a real dispatch
+        # (cli/consumer_lane_freeze.py, T6a) -- they have no registration commitment point, so a
+        # skip must not freeze. Same equality-guard mechanism, different trigger.
         sup = effective.policy.supervisor if effective.policy else None
         if sup and sup.resume_id and not sup.suspended:
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER

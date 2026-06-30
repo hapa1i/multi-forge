@@ -5,9 +5,10 @@ first wave is split into member cards (linked beneath the member table): **T1a, 
 spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's lane observability have landed on `main`.
 The **first wave is complete**; the epic stays in `doing/` coordinating T6 (now T6a active + T6b sketch) and T7 (added
 in `proposed/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
-`done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is active in
-`doing/aux_consumer_lane_placement/`; **T6b** (codex dispatch) stays an inline sketch (board_contract "Epics"). With T1b
-and the T0 sibling both done (T0: PR #58, `b0614325`), the next cursor is **T6a** (active).
+`done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59,
+`done/aux_consumer_lane_placement/`); **T6b** (codex dispatch) stays an inline sketch (board_contract "Epics"). With
+T1b, the T0 sibling (PR #58, `b0614325`), and T6a (PR #59) all done, **no member is the active cursor**; the epic stays
+in `doing/` coordinating the T6b sketch and the T7 proposal.
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -197,11 +198,12 @@ once.
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
 (done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T5 ->
 `docs/board/done/lane_observability/` (done, PR #56); T7 -> `docs/board/proposed/subscription_exhaustion_failopen/`
-(authored 2026-06-26, depends on T4); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28). The
-rows above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction
-(verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in
-`backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
-version/strict-deser/reset rules apply only to T1b's session-manifest binding.
+(authored 2026-06-26, depends on T4); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28); T6a ->
+`docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30). The rows above stay the durable sketch; the
+cards carry verified touchpoints + fixture-grounded acceptance. **Correction (verified 2026-06-25):** the `ModelSource`
+catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in `backend/sources.py`), so T2 is an
+*internal-surface clean break* -- **not** Forge-owned durable state. Schema version/strict-deser/reset rules apply only
+to T1b's session-manifest binding.
 
 **T0 -- sibling billing cleanup** (**done** -- `done/claude_subscription_billing/`, PR #58 `b0614325`, 2026-06-29;
 branch `claude_subscription_billing`): revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against

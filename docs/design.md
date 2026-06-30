@@ -395,16 +395,18 @@ To avoid writer conflicts:
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
     points for the final live conversation identity.
-  - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): each consumer's dispatch point freezes the
-    lane it dispatched on, **write-once** at first dispatch (epic consumer_lanes/T1b, T6a) -- but **only when an
-    explicit lane was chosen**. All four mirror one pattern: resolve the lane once (the read `backend_id` comes from),
-    then under the lock re-check `read_bound_lane(m) == dispatched_lane` before freezing, so a concurrent re-pin/clear
-    drops the stale write instead of recording a lane the run never billed. The supervisor freezes in the policy-check
-    hook (`cli/hooks/policy.py`); memory-writer, shadow-curation, and team-supervisor freeze from an `on_dispatch` hook
-    at the actual `run_claude_session` call (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run,
-    and a skipped/throttled run never freezes). A consumer running on its default lane never freezes, so the default
-    stays re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the resolving commands refuse to
-    change it to a *different* lane.
+  - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): freezes a consumer's chosen lane
+    **write-once** (epic consumer_lanes/T1b, T6a) -- but **only when an explicit lane was chosen**. All four mirror one
+    guard: resolve the lane once (the read `backend_id` comes from), then under the lock re-check
+    `read_bound_lane(m) == dispatched_lane` before freezing, so a concurrent re-pin/clear drops the stale write instead
+    of recording a lane the run never billed. The *freeze trigger* differs by lifecycle, by design: the supervisor is a
+    registered, session-scoped entity (`resume_id`) and freezes eagerly at the **first policy check**
+    (`cli/hooks/policy.py`), its commitment point; memory-writer, shadow-curation, and team-supervisor have no
+    registration, so they freeze only on a **real dispatch** -- from an `on_dispatch` hook at the actual
+    `run_claude_session` call (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run, and a
+    skipped/throttled run never freezes). A consumer running on its default lane never freezes, so the default stays
+    re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the resolving commands refuse to change
+    it to a *different* lane.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -448,14 +450,15 @@ To avoid writer conflicts:
 - **Consumer-lane binding** (epic consumer_lanes/T1b, T6a): `intent.consumer_lanes.<consumer>` is the *requested* lane
   (a `LaneRecord`, set by the dedicated lane commands -- `forge session lane set` for all four consumers, plus the
   supervisor's `forge policy supervisor set` / `--supervisor-runtime` -- never a raw `set` override);
-  `confirmed.consumer_lanes.<consumer>` is the `(runtime, backend, model)` the consumer's dispatch point *froze* at
-  first dispatch. **Only an explicit lane choice freezes; the default lane never freezes** (a binding exists iff a lane
-  was explicitly pinned), so an unpinned consumer stays re-pinnable. Frozen is **write-once and immutable** -- the
-  resolving commands reject a change to a *different* lane (re-pinning the same lane is an idempotent no-op), and
-  dispatch reads confirmed-first. Removing a consumer (`policy supervisor remove`, `%policy supervisor remove`) clears
-  both its intent and confirmed slots, so a later re-add starts from the default. The post-eval freeze runs lock-free
-  during the (multi-second) check, so it lands only when the fresh under-lock manifest still dispatches the lane it ran
-  on — a concurrent remove/reconfigure drops the stale write rather than resurrecting a cleared binding. See
+  `confirmed.consumer_lanes.<consumer>` is the `(runtime, backend, model)` the consumer *froze* at its first engagement
+  -- the supervisor at its first policy check, the aux consumers at their first real dispatch (§3.5). **Only an explicit
+  lane choice freezes; the default lane never freezes** (a binding exists iff a lane was explicitly pinned), so an
+  unpinned consumer stays re-pinnable. Frozen is **write-once and immutable** -- the resolving commands reject a change
+  to a *different* lane (re-pinning the same lane is an idempotent no-op), and dispatch reads confirmed-first. Removing
+  a consumer (`policy supervisor remove`, `%policy supervisor remove`) clears both its intent and confirmed slots, so a
+  later re-add starts from the default. The post-eval freeze runs lock-free during the (multi-second) check, so it lands
+  only when the fresh under-lock manifest still dispatches the lane it ran on — a concurrent remove/reconfigure drops
+  the stale write rather than resurrecting a cleared binding. See
   [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 - **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
   subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).

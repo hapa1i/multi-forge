@@ -1202,10 +1202,11 @@ the injected `LaneRecord` and dispatches by runtime through an in-module seam (`
 Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
 own model). All other consumers still call the resolver directly. T1b replaced the narrow `supervisor_runtime` override
 with the uniform consumer-lane manifest binding: the lane is now a persisted `LaneRecord` -- an `intent.consumer_lanes`
-override that the policy-check hook freezes into `confirmed.consumer_lanes` at first dispatch (**only an explicit lane
-freezes; a consumer on its default lane never freezes and stays re-pinnable**) -- set by the resolving commands
-(`--supervisor-runtime`, `policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same
-lane is an idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
+override that the policy-check hook freezes into `confirmed.consumer_lanes` at the **first policy check** for a
+registered supervisor -- its commitment point, not a dispatch (**only an explicit lane freezes; a consumer on its
+default lane never freezes and stays re-pinnable**) -- set by the resolving commands (`--supervisor-runtime`,
+`policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same lane is an idempotent
+no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
 **Aux consumers on `claude-max` (T6a).** Memory-writer, shadow-curation, and team-supervisor are bindable through the
 same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
@@ -1213,10 +1214,12 @@ same machinery, but **billing-only** -- their sole declared override is the `cla
 is T6b). `forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer
 freezes it into `confirmed` from an `on_dispatch` hook at its actual `run_claude_session` call (`persist_lane_freeze`,
 best-effort -- a lock failure never blocks the run, and a skipped/throttled run never freezes), threading the dispatched
-lane with the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses.
-`read_bound_backend_id` yields `claude-max`, and a **keyless + direct** run is labeled `subscription_quota` (a
-resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from the `intent` write alone (the read is
-confirmed-first **then intent**); the freeze adds immutability + a stable observable binding, not the billing label.
+lane with the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard
+mechanism is shared; the *trigger* differs by design -- the supervisor freezes eagerly at registration, these only on a
+real dispatch, because aux consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`,
+and a **keyless + direct** run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run ->
+`unknown`). Billing is honest from the `intent` write alone (the read is confirmed-first **then intent**); the freeze
+adds immutability + a stable observable binding, not the billing label.
 
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch

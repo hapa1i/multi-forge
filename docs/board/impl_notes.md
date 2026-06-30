@@ -36,6 +36,36 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Consumer-lane freeze: immutability, not billing; per-lifecycle trigger (consumer_lanes T1b/T6a, shipped 2026-06-30)
+
+Durable rules for `confirmed.consumer_lanes` and the two freeze sites: the supervisor in `cli/hooks/policy.py`, and
+`cli/consumer_lane_freeze.py::persist_lane_freeze` for memory-writer / shadow-curation / team-supervisor.
+
+- **The freeze is immutability + observability, NOT billing-enablement.** `read_bound_lane` / `read_bound_backend_id`
+  read **confirmed-first else intent**, so the CLI's `intent` write already bills honestly (a keyless+direct
+  `claude-max` run -> `subscription_quota`). Freezing into `confirmed` only adds write-once immutability and a stable
+  observable lane. Do not gate billing on the freeze or add per-consumer billing tests -- `resolve_billing_mode` is
+  consumer-agnostic (covered by `test_billing.py` + `test_read_bound_backend_id_for_all_consumers`).
+- **Two lifecycles, two freeze triggers -- by design (do not unify).** The supervisor is a *registered*, session-scoped
+  entity (`resume_id`) and freezes **eagerly at the first policy check** -- registration is its commitment point, and
+  the eager freeze is what anchors T1b's "already bound" reject. The aux consumers are *per-hook invocations* with no
+  registration, so they freeze **only on a real dispatch** (an `on_dispatch` hook fired past every skip-return:
+  below-min-turns / no-docs for memory-writer; cache/tagger/resume/depth for team). Making the supervisor
+  freeze-on-dispatch would leave a registered-but-never-escalated supervisor's lane unfrozen and break the reject UX --
+  an investigation (2026-06-30) confirmed its freeze fires on cache hits / cascade plan-check-only allows, which is
+  correct for its lifecycle, not a bug.
+- **Shared guard: thread the dispatched lane, re-check equality under the lock -- never fresh-read.** Both sites pass
+  the lane the run dispatched on (the same read `backend_id` came from) and freeze only if
+  `read_bound_lane(m) == dispatched_lane` still holds under the lock, so a concurrent `lane set/clear` drops the stale
+  write. Re-reading the manifest under the lock instead (the first T6a cut) lets `confirmed` diverge from the billed
+  backend -- that was the review's Finding 2.
+- **Freeze is best-effort bookkeeping.** A lock/IO failure in `persist_lane_freeze` is swallowed (logged at debug); the
+  run proceeds and the next dispatch retries. Hook sites pass `HOOK_LOCK_TIMEOUT_S` (0.2s), not the helper's 5.0s
+  default.
+- **Test the trigger, not the LLM.** Fake the consumer to invoke (or skip) its `on_dispatch` hook to assert
+  freeze-on-dispatch vs skip-never-freezes without a real `claude -p` call (`test_consumer_lane_freeze.py`,
+  `test_memory_writer_cli.py`, `test_team_hook_lane_freeze.py`).
+
 ### CLI command aliases and canonical names (forge_cli_cleanup Slice 05, shipped 2026-06-24)
 
 Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command rename.
