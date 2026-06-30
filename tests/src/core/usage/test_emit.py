@@ -135,6 +135,39 @@ class TestEmitForSessionResult:
         assert e.billing_mode == "api"  # direct + key present
         assert (e.route, e.reporter, e.confidence) == ("claude_p", None, "unavailable")
 
+    def test_keyless_direct_on_claude_max_is_subscription_quota(self, monkeypatch) -> None:
+        # Keyless + direct + bound to the claude-max subscription lane -> subscription_quota
+        # (the T0 upgrade). Cost stays null/unavailable (design 3.14): only the label changes.
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,
+        )
+        emit_usage_for_session_result(
+            _ok_result(),
+            command="supervisor",
+            cost=VerbCostResult(verb="supervisor"),
+            direct=True,
+            backend_id="claude-max",
+        )
+        e = read_usage_events()[0]
+        assert e.billing_mode == "subscription_quota"
+        assert e.cost_micro_usd is None and e.confidence == "unavailable"
+
+    def test_key_present_on_claude_max_is_api(self, monkeypatch) -> None:
+        # Precedence: a resolvable key on the same lane is still api, never subscription.
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: "sk-test",
+        )
+        emit_usage_for_session_result(
+            _ok_result(),
+            command="supervisor",
+            cost=VerbCostResult(verb="supervisor"),
+            direct=True,
+            backend_id="claude-max",
+        )
+        assert read_usage_events()[0].billing_mode == "api"
+
     def test_failure_status_and_type(self) -> None:
         emit_usage_for_session_result(_ok_result(returncode=1, error="boom"), command="supervisor")
         e = read_usage_events()[0]
