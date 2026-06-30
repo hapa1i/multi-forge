@@ -419,6 +419,15 @@ def _resolved_endpoint_url(source: ModelSource, instance: BackendInstance | None
     return None
 
 
+def _runtime_native_probe_detail(source: ModelSource) -> str:
+    """Verification hint for a runtime-native source (auth owned by its runtime, not Forge)."""
+    if "codex" in source.reachable_via:
+        return "runtime-native auth; verify with 'forge runtime preflight codex'"
+    if "claude_code" in source.reachable_via:
+        return "runtime-native auth; verify the Claude subscription login via 'claude'"
+    return "runtime-native auth; verify via the owning runtime's login"
+
+
 def _probe_model_source(
     source: ModelSource,
     *,
@@ -428,7 +437,7 @@ def _probe_model_source(
     if source.endpoint.kind == "runtime_native":
         return _ProbeResult(
             status="skipped",
-            detail="runtime-native auth; verify with 'forge runtime preflight codex'",
+            detail=_runtime_native_probe_detail(source),
         )
 
     import httpx
@@ -752,7 +761,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     if auth["status"] == "runtime_native":
         probe = _ProbeResult(
             status="skipped",
-            detail="runtime-native auth; verify with 'forge runtime preflight codex'",
+            detail=_runtime_native_probe_detail(source),
         )
     elif auth["status"] != "configured":
         missing = ", ".join(auth["missing_required_env_vars"])
