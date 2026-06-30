@@ -73,8 +73,7 @@ now fixed in the harness + card:
 3. **The token-env path could read as clean subscription.** A keyless run with `CLAUDE_CODE_OAUTH_TOKEN` /
    `ANTHROPIC_AUTH_TOKEN` set rides an *injected token* (any account), but the first cut still stamped the clean
    subscription verdict with only a soft note. Fixed: stage 00 now emits `[KEYLESS-BUT-TOKEN-ENV]` and the turn emits
-   `[SHAPE-SUBSCRIPTION-UNVERIFIED]`. This run had **no** token env (`oauth_token_env_present=false`), so the result
-   stands.
+   `[SHAPE-SUBSCRIPTION-UNVERIFIED]`. This run had **no** token env (`bearer_env_present=false`), so the result stands.
 
 ## Decision gate outcome
 

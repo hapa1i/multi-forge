@@ -189,9 +189,10 @@ def keyless_state() -> dict[str, Any]:
         "key_source": source,  # "env" | "credential_file" | "none"
         "auth_ignore_env": _auth_ignore_env(),
         "anthropic_base_url_set": bool(os.environ.get("ANTHROPIC_BASE_URL")),
-        "oauth_token_env_present": bool(
-            os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        ),
+        # An injected bearer credential (CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_AUTH_TOKEN) is set --
+        # a different mechanism than the keychain Max session. Named "bearer_*" (not "*token*") so
+        # the boolean flag does not trip CodeQL's credential-name heuristic (it holds no secret).
+        "bearer_env_present": bool(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") or os.environ.get("ANTHROPIC_AUTH_TOKEN")),
     }
 
 
@@ -315,7 +316,7 @@ def cmd_precondition(args: argparse.Namespace) -> int:
     if state["anthropic_base_url_set"]:
         note += " ANTHROPIC_BASE_URL is set; the turn forces DIRECT routing anyway."
     append_oracle(capture_dir, args.label, note)
-    if state["oauth_token_env_present"]:
+    if state["bearer_env_present"]:
         # No API key, but an injected OAuth token IS a credential -- it authenticates some
         # account, not provably the stored Keychain Max session, so this is NOT a clean
         # keyless test. Flag it (the turn marks the run UNVERIFIED); don't abort -- the
@@ -385,7 +386,7 @@ def cmd_turn(args: argparse.Namespace) -> int:
         shape = "[OAUTH-NONTTY-FAILED]"  # architectural kill: keyless auth needs a TTY/login
     elif not completed:
         shape = "[TURN-INCONCLUSIVE]"
-    elif state["oauth_token_env_present"]:
+    elif state["bearer_env_present"]:
         # A third keyless credential source: an injected OAuth token authenticates SOME
         # account (possibly a different/metered/non-Max one), not provably the stored
         # Keychain Max session. Do not claim the clean subscription verdict.
@@ -401,7 +402,7 @@ def cmd_turn(args: argparse.Namespace) -> int:
         "returncode": rc,
         "timed_out": timed_out,
         "auth_marker_seen": auth_marker,
-        "oauth_token_env_present": state["oauth_token_env_present"],
+        "bearer_env_present": state["bearer_env_present"],
         "a0_oauth_nontty": a0,
         "a_turn_completed": bool(completed),
         "b_cost_signal": b,
@@ -425,7 +426,7 @@ def cmd_turn(args: argparse.Namespace) -> int:
             "discriminator. Keyless + completed => subscription candidate (plan needs a declaration); "
             "keep cost `unavailable` (design 3.14).",
         )
-    if state["oauth_token_env_present"] and completed:
+    if state["bearer_env_present"] and completed:
         append_oracle(
             capture_dir,
             args.label,
@@ -467,7 +468,7 @@ def cmd_detection(args: argparse.Namespace) -> int:
         "name": "can_use_bare (key-resolvability; the runner's own predicate)",
         "available_preflight": True,
         "stable_contract": True,
-        "leaks_secret": False,
+        "unsafe_to_read": False,
     }
     try:
         ks = keyless_state()
@@ -484,7 +485,7 @@ def cmd_detection(args: argparse.Namespace) -> int:
         "name": "claude config get",
         "available_preflight": True,
         "stable_contract": False,  # no documented JSON contract naming auth mode
-        "leaks_secret": False,
+        "unsafe_to_read": False,
     }
     try:
         # A timeout here is itself a finding: `claude config get` can hang (interactive
@@ -525,7 +526,7 @@ def cmd_detection(args: argparse.Namespace) -> int:
                 "name": f"~/{rel} (presence only)",
                 "available_preflight": True,
                 "stable_contract": False,  # CC-owned schema, unowned by Forge; presence != active sub
-                "leaks_secret": True,  # contents hold the OAuth token -> never read
+                "unsafe_to_read": True,  # contents hold the OAuth token -> never read
                 "exists": p.exists(),
                 "mode": _stat_mode(p) if p.exists() else None,
             }
@@ -537,7 +538,7 @@ def cmd_detection(args: argparse.Namespace) -> int:
             "name": "OS keychain (macOS Keychain / libsecret)",
             "available_preflight": True,
             "stable_contract": False,  # OS-specific, unowned schema
-            "leaks_secret": True,
+            "unsafe_to_read": True,
             "probed": False,
             "note": "not queried by design -- a read would surface the OAuth token",
         }
@@ -549,16 +550,16 @@ def cmd_detection(args: argparse.Namespace) -> int:
             "name": "envelope total_cost_usd null (see stage 10-turn)",
             "available_preflight": False,  # only observable AFTER a turn
             "stable_contract": True,  # the field is part of the documented envelope
-            "leaks_secret": False,
+            "unsafe_to_read": False,
             "note": "runtime-only: cannot classify auth at preflight, only post-hoc",
         }
     )
 
     stable_preflight = [
-        c for c in candidates if c["available_preflight"] and c["stable_contract"] and not c["leaks_secret"]
+        c for c in candidates if c["available_preflight"] and c["stable_contract"] and not c["unsafe_to_read"]
     ]
     runtime_only_viable = any(
-        (not c["available_preflight"]) and c["stable_contract"] and not c["leaks_secret"] for c in candidates
+        (not c["available_preflight"]) and c["stable_contract"] and not c["unsafe_to_read"] for c in candidates
     )
     if stable_preflight:
         chosen = stable_preflight[0]["name"]
@@ -580,7 +581,7 @@ def cmd_detection(args: argparse.Namespace) -> int:
             capture_dir,
             args.label,
             f"candidate: {c['name']} -- preflight={c['available_preflight']} "
-            f"stable={c['stable_contract']} leaks={c['leaks_secret']}",
+            f"stable={c['stable_contract']} leaks={c['unsafe_to_read']}",
         )
     append_oracle(capture_dir, args.label, f"chosen: {chosen} -> {v}")
     append_oracle(

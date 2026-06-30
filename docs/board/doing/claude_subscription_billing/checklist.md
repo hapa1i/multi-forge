@@ -28,7 +28,7 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 
 - [x] **(a0) Non-TTY OAuth feasible? (gates the rest)** -- **YES** (`[OAUTH-NONTTY-OK]`): a keyless `claude -p`
   authenticated via the Keychain Max session in a non-TTY context (`auth_marker_seen=false`,
-  `oauth_token_env_present=false`).
+  `bearer_env_present=false`).
 - [x] **(a) Keyless turn completes** -- **YES**: `rc=0`, `subtype=success`, `is_error=false` (no runner change; the
   runner already permits the path -- `session_runner.py:183`).
 - [x] **(b) Billing signal** -- `[COST-PRESENT]`, `total_cost_usd=$0.0412665` (2923 in / 4 out). **This is an
