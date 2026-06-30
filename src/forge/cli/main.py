@@ -34,6 +34,7 @@ from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
+from .session_lane import session_lane  # noqa: E402
 from .session_memory import session_memory  # noqa: E402
 from .status_line import status_line  # noqa: E402
 from .telemetry import telemetry  # noqa: E402
@@ -418,10 +419,11 @@ main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
 
 # Session-scoped subgroups are wired onto `session` here (the assembly layer),
-# not inside session.py: both transfer.py and session_memory.py import `console`
-# from session.py, so having session.py import them would form a cycle.
+# not inside session.py: transfer.py, session_memory.py, and session_lane.py import
+# `console` from session.py, so having session.py import them would form a cycle.
 session.add_command(transfer_cmd, name="transfer")
 session.add_command(session_memory, name="memory")
+session.add_command(session_lane, name="lane")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402

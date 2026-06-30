@@ -7,8 +7,11 @@
 
 Generalize the supervisor's lane-binding UX (CLI write + dispatch-time freeze) to **memory-writer, shadow-curation,
 team-supervisor** so each can be declared on `claude-max` and emit honest `subscription_quota` billing on keyless+direct
-runs. No dispatch-runtime change (claude-max shares the `claude_code` runtime). **First action: settle the CLI surface
-decision (Phase 0) before writing code.**
+runs. No dispatch-runtime change (claude-max shares the `claude_code` runtime). **Phase 0 (CLI surface) + Phase 1 (CLI
+set/show/clear) DONE**: `cli/session_lane.py` over the consumer-generic helpers (`set_intent_lane` / `intent_lane` /
+`clear_intent_lane`), wired as `forge session lane`; `tests/src/cli/test_session_lane.py` (10) + full CLI suite (2127)
+green, ruff/black/mypy/pyright clean. **Next: Phase 2** -- freeze at first dispatch for memory-writer / shadow-curation
+/ team-supervisor.
 
 ## Phases
 
@@ -19,21 +22,22 @@ decision (Phase 0) before writing code.**
   (`intent.consumer_lanes`), so the surface sits under `forge session`, mirroring `forge session memory`
   (`main.py:424`). Rejected top-level `forge lane` (falsely global), `forge policy lane` (overfits supervisor),
   per-domain (scatters).
-- [ ] Confirm the supervisor's existing `forge policy supervisor set --runtime/--backend` (`cli/policy.py:1103-1257`)
-  stays and writes the same `intent` slot via `set_intent_lane` (no second storage path). Assert: one writer
-  (`set_intent_lane`), at most two entry points.
+- [x] Confirm the supervisor's existing `forge policy supervisor set --runtime/--backend` (`cli/policy.py:1103-1257`)
+  stays and writes the same `intent` slot via `set_intent_lane` (no second storage path). **Verified**:
+  `forge session lane` writes via `set_intent_lane`; `supervisor set` untouched -- two entry points, one writer.
 
 ### Phase 1 -- Consumer-parameterized CLI (set / show / clear)
 
-- [ ] New command writes `intent.consumer_lanes.<consumer>` for any of the four consumers via the existing
+- [x] New command writes `intent.consumer_lanes.<consumer>` for any of the four consumers via the existing
   `set_intent_lane(state, consumer, lane_record_for(consumer, runtime=..., backend=...))`
   (`session/consumer_lanes.py:136`). Assert: `forge session lane set --consumer memory_writer --backend claude-max`
   populates `ConsumerLaneIntent.memory_writer` (`session/models.py:282`).
-- [ ] `show` renders each consumer's `intent` (requested) + `confirmed` (frozen) lane, reusing the resolver
-  (`resolve_lane`) for the effective lane; mark drift (`intent != confirmed`) explicitly.
-- [ ] `clear` removes a consumer's `intent` override (does not touch the immutable `confirmed` -- frozen is frozen).
+- [x] `show` renders each consumer's `intent` (requested) + `confirmed` (frozen) lane and flags drift
+  (`intent != confirmed`); `--json` for scripts. (Effective lane is confirmed-first per `read_bound_lane`, not a
+  separate column.)
+- [x] `clear` removes a consumer's `intent` override (does not touch the immutable `confirmed` -- frozen is frozen).
   Assert: clearing after a freeze leaves `confirmed` intact and surfaces the drift in `show`.
-- [ ] Unknown/invalid `--consumer` rejects via the existing `_CONSUMER_LANE_SLOTS` membership
+- [x] Unknown/invalid `--consumer` rejects via the existing `_CONSUMER_LANE_SLOTS` membership
   (`session/consumer_lanes.py:38`); a non-`claude-max` backend on a claude-only consumer rejects through `resolve_lane`
   (`LaneError`), surfaced through `forge.cli.output` helpers (no hand-rolled `Tip:`/error markup).
 
