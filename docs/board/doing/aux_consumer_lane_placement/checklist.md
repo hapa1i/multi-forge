@@ -14,7 +14,8 @@ Phase 2 freeze (pure `freeze_bound_lane` in `consumer_lanes.py` + best-effort `p
 `test_session_lane.py` (10) + `test_consumer_lane_freeze.py` (4) + `TestFreezeBoundLane` (4) + memory-writer CLI wiring
 (2) + team-hook wiring (4) green; handoff **integration** (10, Docker) green; ruff/black/mypy/pyright clean. **Billing
 honesty already lands at Phase 1** (`read_bound_backend_id` is confirmed-first-else-`intent`); the freeze is
-immutability/observability parity, not billing-enablement. **Next: Phase 3 docs sync + final pre-commit.**
+immutability/observability parity, not billing-enablement. **Phases 1-3 implemented + verified on-branch; remaining
+closeout (epic roster T6a -> done, `git mv doing/ -> done/`) is post-merge.**
 
 ## Phases
 
@@ -86,7 +87,7 @@ immutability/observability parity, not billing-enablement. **Next: Phase 3 docs 
   consumer) / §3.6.2 (the general lane CLI), `design_appendix.md` §G (new "Aux consumers on claude-max (T6a)" para --
   billing-only, dispatch byte-identical), `cli_reference.md` (new "Session lane" subsection), end-user
   `docs/end-user/policy.md` (aux-consumer claude-max via `forge session lane`).
-- [ ] `make pre-commit` clean (mdformat, ruff, mypy, pyright).
+- [x] Pre-commit clean on the full changed set (isort, ruff, black, mypy, pyright, mdformat) -- 2026-06-30.
 
 ## Acceptance tests (fixture-grounded)
 
@@ -112,7 +113,7 @@ immutability/observability parity, not billing-enablement. **Next: Phase 3 docs 
 
 ## Closeout
 
-- [ ] Phases 1-3 assertions ticked with verification recorded.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification incl. named integration tests).
+- [x] Phases 1-3 assertions ticked with verification recorded.
+- [x] `change_log.md` entry (Goal / Key changes / Verification incl. named integration test).
 - [ ] Update epic roster (T6a -> done) + link-control item; `git mv doing/ -> done/` after merge.
 - [ ] Durable lessons: fold into epic closeout (T1a-T5 pattern) unless a new invariant warrants `impl_notes.md` review.

@@ -25,6 +25,32 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-30
+
+### consumer_lanes T6a: Aux-consumer lane placement (claude-max billing for the three non-supervisor consumers)
+
+**Goal**: Pin the memory writer, shadow curation, and team supervisor to `claude-max` so their keyless+direct runs bill
+`subscription_quota` like the supervisor -- closing T0's deferred operator half. No dispatch change (claude-max shares
+the `claude_code` runtime; codex-exec stays T6b).
+
+**Key changes**:
+
+- **Phase 1 (CLI)**: `forge session lane set/show/clear --consumer <id>` -- the canonical surface for all four consumers
+  (session-owned `intent.consumer_lanes`); `forge policy supervisor set` stays the supervisor convenience (same slot).
+- **Phase 2 (freeze)**: pure `freeze_bound_lane` + best-effort `persist_lane_freeze` (`cli/consumer_lane_freeze.py`),
+  called *before* dispatch at memory-writer, shadow-curation, and both team hooks. Freezing before dispatch collapses
+  the race window, so these need no equality guard; the supervisor keeps its after-dispatch guarded freeze (load-bearing
+  for its unlocked multi-second call).
+- **Correction**: billing honesty lands at Phase 1, not the freeze -- `read_bound_backend_id` is
+  confirmed-first-else-intent, so the intent write alone resolves `claude-max`. The freeze is immutability/observability
+  parity; card Problem #2 reframed.
+- Docs: design §3.5/§3.6.2, appendix §G, cli_reference, end-user policy.md.
+
+**Verification**: New unit tests (`TestFreezeBoundLane`, `test_consumer_lane_freeze.py`, memory-writer CLI wiring,
+`test_team_hook_lane_freeze.py`). Billing covered transitively by `test_billing.py` +
+`test_read_bound_backend_id_for_all_consumers` (no redundant per-consumer tests). Integration
+`test_handoff_integration.py` 10 passed (Docker). Pre-commit clean.
+
 ## 2026-06-29
 
 ### consumer_lanes T0: Claude Max subscription billing mode (Phase 1+2)
