@@ -1210,16 +1210,40 @@ no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
 **Aux consumers on `claude-max` (T6a).** Memory-writer, shadow-curation, and team-supervisor are bindable through the
 same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
-`claude_code` runtime as the default, so placement changes the **billing label, not dispatch** (no codex-style arm; that
-is T6b). `forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer
-freezes it into `confirmed` from an `on_dispatch` hook at its actual `run_claude_session` call (`persist_lane_freeze`,
-best-effort -- a lock failure never blocks the run, and a skipped/throttled run never freezes), threading the dispatched
-lane with the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard
-mechanism is shared; the *trigger* differs by design -- the supervisor freezes eagerly at registration, these only on a
-real dispatch, because aux consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`,
-and a **keyless + direct** run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run ->
-`unknown`). Billing is honest from the `intent` write alone (the read is confirmed-first **then intent**); the freeze
-adds immutability + a stable observable binding, not the billing label.
+`claude_code` runtime as the default, so the `claude-max` binding changes the **billing label, not dispatch** (the
+separate `codex` lane that *does* change dispatch is T6b, below -- shadow-curation only).
+`forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer freezes it
+into `confirmed` from an `on_dispatch` hook at its actual `run_claude_session` call (`persist_lane_freeze`, best-effort
+-- a lock failure never blocks the run, and a skipped/throttled run never freezes), threading the dispatched lane with
+the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard mechanism is
+shared; the *trigger* differs by design -- the supervisor freezes eagerly at registration, these only on a real
+dispatch, because aux consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`, and
+a **keyless + direct** run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run -> `unknown`).
+Billing is honest from the `intent` write alone (the read is confirmed-first **then intent**); the freeze adds
+immutability + a stable observable binding, not the billing label.
+
+**Shadow-curation codex arm (T6b).** Shadow-curation -- the clean mirror-T4 aux consumer (blind, read-only,
+stdout-is-output) -- is the first aux consumer with a real non-claude dispatch arm. Its `allowed_lanes` gain
+`Lane(codex, chatgpt, gpt-5-codex)`; the curate CLI threads `dispatched_lane.runtime_id` into `run_shadow_curation`,
+which branches before the claude `on_dispatch` into `_dispatch_codex_shadow_curation` (the `claude_code` path stays
+byte-identical). The arm mirrors `_dispatch_codex_supervisor` -- cached preflight, read-only `codex exec` direct to
+OpenAI, self-contained inlined prompt -- but maps into shadow-curation's own contract, which diverges from the
+supervisor's on three axes:
+
+- **Degrade: fail-loud, not fail-open.** User-invoked, so a cold/unready preflight or a failed turn returns
+  `CurationResult(success=False)` carrying a refresh hint surfaced by the CLI (human via `print_error` + `--json`, the
+  new `CurationResult.error`); it never silently falls back to claude.
+- **Upstream row: `operation="memory.shadow_curation"`, not `None`.** Curation has no engine `policy.evaluate` row, so
+  the invoker's auto `record_upstream_operation` is its only upstream outcome and must match the claude path -- the
+  opposite of the supervisor arm, which suppresses that row.
+- **Freeze past the preflight skip-gate.** `on_dispatch` fires only after preflight passes: a cold preflight that never
+  spawns codex does not freeze; a turn that spawns then fails still freezes (claude-arm parity). `runtime_is_error` is
+  folded (the invoker's `success` is returncode-only) so an exit-0-but-failed turn fails loud instead of persisting an
+  empty report.
+
+Memory-writer (workspace-write, transcript-fed) and team-supervisor (plan-blind without snapshot machinery) stay
+billing-only for now -- memory-writer deferred to T6c, team-supervisor pending a context-model change -- because their
+shapes diverge from the mirror-T4 template.
 
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch

@@ -63,16 +63,20 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   `test_successful_dispatch_fires_freeze`, `test_failed_turn_fails_loud_but_still_freezes` (freeze fires),
   `test_cold_preflight_fails_loud_no_fallback_no_freeze` (freeze does not fire).
 
-## Phase 2 -- observability + docs (unstarted)
+## Phase 2 -- observability + docs (design synced; closeout pending)
 
-- [ ] `forge telemetry activity` shows the shadow-curation run on `runtime=codex` / `billing_mode=subscription_quota`;
-  `forge session lane show` shows the bound + frozen codex lane.
-- [ ] Design-doc sync: `design_appendix.md` §G (extend the consumer-lane note -- aux consumers can now take a codex
-  dispatch arm, not just the supervisor); `design.md` §3.6.12 if the resolver narrative needs it; `cli_reference.md`
-  (`forge session lane set --consumer shadow_curation --runtime codex` now valid). end-user `policy.md`/`memory.md` if
-  the user-facing curation flow changes.
-- [ ] Update epic `doing/epic_consumer_lanes/` roster + `card.md` T6b references for whatever ships vs defers (T6c for
-  memory-writer; team-supervisor decision recorded).
+- [x] Observability. `forge session lane show` surfaces the bound + frozen codex lane today (T6a/T5 machinery, no new
+  code in T6b). `forge telemetry activity` showing the run on `runtime=codex` / `billing_mode=subscription_quota` rides
+  the invoker's `emit_codex_usage` (shared with T4) and is only exercisable on a real `codex exec` run -- folded into
+  the release-tier E2E gap (verification gate). No T6b-specific observability code was needed.
+- [x] Design-doc sync: `design_appendix.md` consumer-lane note extended with a **Shadow-curation codex arm (T6b)**
+  paragraph (fail-loud vs fail-open, `operation` pinned vs the supervisor's `None`, freeze-past-the-skip-gate) and the
+  T6a `claude-max` paragraph's "no codex arm; that is T6b" forward-ref narrowed. `cli_reference.md` lane-set bullet now
+  states `--runtime codex` dispatches a real arm for `supervisor`/`shadow_curation` only. `design.md` resolver narrative
+  needed no change (runtime-keyed dispatch already described). end-user `policy.md`/`memory.md`: no change -- the curate
+  UX is unchanged except the new fail-loud preflight hint, which is self-explanatory.
+- [x] Epic updated: `epic_consumer_lanes/checklist.md` current-focus + roster note "Phase 1 landed in-branch"; T6c
+  (memory-writer) + team-supervisor deferral already recorded in the epic card T6b row and this card.
 
 ## Acceptance tests (implemented + passing 2026-06-30)
 

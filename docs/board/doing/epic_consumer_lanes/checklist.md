@@ -33,23 +33,25 @@ past every skip-return, guarded by a `read_bound_lane == dispatched_lane` equali
 T0 + T6a all done, **T6b is the active cursor** (promoted 2026-06-30 to `doing/aux_consumer_codex_dispatch/`; research
 done, scope resolved to shadow-curation only (D1) -- the card's headline finding is that the three aux consumers are NOT
 uniform: shadow-curation is a clean mirror-T4, team-supervisor is plan-blind without new context machinery,
-memory-writer is a different file-editing shape deferred to T6c). The epic stays in `doing/` coordinating it and the T7
-proposal (authored in `proposed/`). The `core.llm` representation is decided (option 2 -- see Decisions).
+memory-writer is a different file-editing shape deferred to T6c). **T6b Phase 1 (the codex dispatch arm) is implemented
+and unit-tested in-branch (commit `6869dbaa`); design docs are synced; Phase 2 closeout and merge remain.** The epic
+stays in `doing/` coordinating it and the T7 proposal (authored in `proposed/`). The `core.llm` representation is
+decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                         | Lane     | Depends on | State                         |
-| ------------ | -------------------------------------------- | -------- | ---------- | ----------------------------- |
-| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)                 |
-| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)                 |
-| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)                 |
-| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)                 |
-| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)                 |
-| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)                 |
-| T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)                 |
-| T6b          | `doing/aux_consumer_codex_dispatch/`         | doing    | T6a        | active (shadow-curation only) |
-| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26           |
-| T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`)     |
+| Member       | Card                                         | Lane     | Depends on | State                     |
+| ------------ | -------------------------------------------- | -------- | ---------- | ------------------------- |
+| T1a          | `done/consumer_lane_resolver/`               | done     | --         | done (PR #51)             |
+| T2           | `done/backend_subscription_sources/`         | done     | T1a        | done (PR #54)             |
+| T3           | `done/supervisor_lane_driven/`               | done     | T1a        | done (PR #52)             |
+| T4           | `done/codex_exec_supervisor_lane/`           | done     | T1a,T2,T3  | done (PR #55)             |
+| T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)             |
+| T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)             |
+| T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)             |
+| T6b          | `doing/aux_consumer_codex_dispatch/`         | doing    | T6a        | Phase 1 landed in-branch  |
+| T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26       |
+| T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`) |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6a -> T6b. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
