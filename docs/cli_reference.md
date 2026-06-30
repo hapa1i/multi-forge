@@ -200,6 +200,7 @@ runners.
 | `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set`                                                                            |
 | `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                                                                                                  |
 | `forge policy supervisor set <target> --runtime <r>`           | Set the supervisor consumer lane (`claude_code/codex`); rejected once the lane is frozen                                                       |
+| `forge policy supervisor set <target> --backend <b>`           | Set the supervisor lane backend (`claude-max` = Max subscription billing); rejected once the lane is frozen                                    |
 | `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                                                                                                   |
 | `forge policy supervisor remove`                               | Remove supervisor entirely                                                                                                                     |
 | `forge policy supervisor reload`                               | Reload latest relevant approved plan                                                                                                           |

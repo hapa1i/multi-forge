@@ -34,7 +34,7 @@ from forge.core.telemetry.downstream import (
     mint_downstream_event_id,
     write_downstream_record,
 )
-from forge.core.usage.billing import infer_billing_mode
+from forge.core.usage.billing import resolve_billing_mode
 from forge.core.usage.ledger import (
     BillingMode,
     SourceRefs,
@@ -89,6 +89,7 @@ def emit_usage_for_session_result(
     model: str | None = None,
     base_url: str | None = None,
     direct: bool = False,
+    backend_id: str | None = None,
     runtime: str = "claude_code",
 ) -> None:
     """Emit one verb-level UsageEvent for a completed ``run_claude_session`` call.
@@ -96,7 +97,9 @@ def emit_usage_for_session_result(
     No-ops when the result carries no run identity (nothing to attribute).
     ``cost`` is the ``track_verb_cost`` holder; an unmeasured holder (no proxy in
     the path) yields ``measurement_source="unattributed"`` with null cost rather
-    than a fabricated $0.
+    than a fabricated $0. ``backend_id`` is the run's bound consumer-lane backend
+    (or None): a keyless direct run on a subscription-posture backend is billed as
+    that subscription mode (see ``resolve_billing_mode``).
     """
     try:
         if not result.run_id:
@@ -134,7 +137,11 @@ def emit_usage_for_session_result(
             session=session,
             workflow=workflow,
             model=model,
-            billing_mode=infer_billing_mode(direct=effective_direct, has_api_key=_anthropic_key_present()),
+            billing_mode=resolve_billing_mode(
+                direct=effective_direct,
+                has_api_key=_anthropic_key_present(),
+                backend_id=backend_id,
+            ),
             measurement_source=measurement.measurement_source,
             attribution_granularity="verb",
             route="claude_p",

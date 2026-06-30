@@ -130,9 +130,12 @@ Source definitions have:
   `gemini-api`. By validator symmetry a `runtime_native` source declares **none** (auth is runtime-owned); every other
   endpoint kind declares at least one
 - `billing_posture`: declared billing nature, `per_token` (default), `subscription_quota`, or `free`. Distinct from the
-  per-invocation `BillingMode` in `core/usage`; the two share only the `subscription_quota` spelling
+  per-invocation `BillingMode` in `core/usage`, but its first consumer: `resolve_billing_mode` reads a keyless direct
+  run's bound-lane backend posture and emits `subscription_quota` when the posture is `subscription_quota` (the shared
+  spelling)
 - `reachable_via`: lane runtimes that can reach the source, empty = any. A subscription pins the runtime whose native
-  login authenticates it (`chatgpt -> ("codex",)`); `forge.core.lanes._reachable` reads this
+  login authenticates it (`chatgpt -> ("codex",)`, `claude-max -> ("claude_code",)`); `forge.core.lanes._reachable`
+  reads this
 - `capabilities`: currently includes auth-probe, provider-trace eligibility, and provider-user-grouping capability
 - `local_lifecycle`: local-only refinement with adapter and default port; required env vars are derived from
   `credential_ids`; remote sources never set it
@@ -140,18 +143,19 @@ Source definitions have:
 
 The shipped v1 catalog includes:
 
-| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                    |
-| ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ------------------------------------------------------------------------ |
-| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable                                    |
-| `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates                                         |
-| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle                                      |
-| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source                                        |
-| `chatgpt`                 | remote | `openai`         | `runtime_native` (no URL)            | (none)           | Subscription via codex; `subscription_quota`, `reachable_via=("codex",)` |
-| `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                |
-| `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                |
-| `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                              |
-| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace    |
-| `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                     |
+| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                                           |
+| ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------- |
+| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable                                                           |
+| `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates                                                                |
+| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle                                                             |
+| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source                                                               |
+| `chatgpt`                 | remote | `openai`         | `runtime_native` (no URL)            | (none)           | Subscription via codex; `subscription_quota`, `reachable_via=("codex",)`                        |
+| `claude-max`              | remote | `anthropic`      | `runtime_native` (no URL)            | (none)           | Claude Max subscription via claude_code; `subscription_quota`, `reachable_via=("claude_code",)` |
+| `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                                       |
+| `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                                       |
+| `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                                                     |
+| `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace                           |
+| `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                                            |
 
 Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider`/`billing_posture` values, missing
 or unknown credentials, a `runtime_native` source that declares any credential or endpoint URL, a `reachable_via` entry
@@ -640,7 +644,10 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   exact (4g root-join) and/or runtime-reported (`runtime_native`) — renders **without** the `~` estimate marker
   (`cost_estimated=False` on the summary/command DTOs); a figure mixing in a snapshot estimate keeps `~`.
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
-  (`unknown` is the honest default where the signal is ambiguous).
+  (`unknown` is the honest default where the signal is ambiguous). `subscription_quota` is emitted for a keyless
+  headless consumer subscription -- `codex exec` on ChatGPT, and (T0) a keyless direct run bound to the `claude-max`
+  lane (`resolve_billing_mode`, gated on the bound backend's `subscription_quota` posture); `subscription_interactive`
+  and `subscription_headless_credit` stay reserved.
 - `attribution_granularity`: `worker` | `verb` | `session`.
 - `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` | `gemini_headless` — how the
   work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm`/`codex_exec` (plus `None` on an

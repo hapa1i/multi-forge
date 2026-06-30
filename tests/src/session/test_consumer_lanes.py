@@ -200,3 +200,68 @@ def test_unwired_consumer_rejected() -> None:
     phantom = Consumer("ghost", "tool_agent", Lane("claude_code", "anthropic-direct", "m"))
     with pytest.raises(ValueError, match="no consumer_lanes manifest slot"):
         ensure_consumer_lane_binding(_state(), phantom, None)
+
+
+def test_t0_sibling_consumers_bind_and_read_claude_max() -> None:
+    """The three T0 consumers have working manifest slots: a claude-max lane binds and reads back."""
+    from forge.core.lanes import valid_lanes
+    from forge.policy.team.handlers import TEAM_SUPERVISOR_CONSUMER
+    from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
+    from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
+
+    record = LaneRecord("claude_code", "claude-max", "opus")
+    for consumer in (MEMORY_WRITER_CONSUMER, SHADOW_CURATION_CONSUMER, TEAM_SUPERVISOR_CONSUMER):
+        assert "claude-max" in {lane.backend_id for lane in valid_lanes(consumer)}, consumer.id
+        state = SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+        set_intent_lane(state, consumer, record)  # exercises _slot -> raises if unwired
+        ensure_consumer_lane_binding(state, consumer, read_bound_lane(state, consumer))
+        assert read_bound_lane(state, consumer) == record, consumer.id
+
+
+def test_read_bound_backend_id_for_all_consumers() -> None:
+    """The billing read side for every wired consumer: a claude-max binding yields the backend id;
+    no binding and a drifted binding both yield None (absence vs. corruption -> unknown billing)."""
+    from forge.policy.team.handlers import TEAM_SUPERVISOR_CONSUMER
+    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
+    from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
+
+    consumers = (SUPERVISOR_CONSUMER, MEMORY_WRITER_CONSUMER, SHADOW_CURATION_CONSUMER, TEAM_SUPERVISOR_CONSUMER)
+
+    def _fresh() -> SessionState:
+        return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
+
+    for consumer in consumers:
+        assert read_bound_backend_id(_fresh(), consumer) is None, consumer.id  # no binding
+
+        bound = _fresh()
+        set_intent_lane(bound, consumer, LaneRecord("claude_code", "claude-max", "opus"))
+        assert read_bound_backend_id(bound, consumer) == "claude-max", consumer.id  # valid binding
+
+        drifted = _fresh()
+        set_intent_lane(drifted, consumer, LaneRecord("claude_code", "ghost-backend", "opus"))
+        assert read_bound_backend_id(drifted, consumer) is None, consumer.id  # drift -> honest None
+
+
+def test_lane_record_for_backend_selects_subscription_lane() -> None:
+    """lane_record_for(backend=...) disambiguates claude-max from the default claude_code lane;
+    lane_record_for_runtime cannot (it returns the first match)."""
+    from forge.session.consumer_lanes import lane_record_for
+
+    claude_max = LaneRecord("claude_code", "claude-max", "opus")
+    assert lane_record_for(SUPERVISOR_CONSUMER, backend="claude-max") == claude_max
+    # Runtime alone still returns the first claude_code lane (the default), not claude-max.
+    assert lane_record_for_runtime(SUPERVISOR_CONSUMER, "claude_code") == _DEFAULT_RECORD
+    # Both constraints together pin the same lane.
+    assert lane_record_for(SUPERVISOR_CONSUMER, runtime="claude_code", backend="claude-max") == claude_max
+
+
+def test_lane_record_for_rejects_unknown_empty_and_contradictory() -> None:
+    from forge.session.consumer_lanes import lane_record_for
+
+    with pytest.raises(LaneError):
+        lane_record_for(SUPERVISOR_CONSUMER, backend="nonexistent")
+    with pytest.raises(LaneError, match="requires a runtime or backend"):
+        lane_record_for(SUPERVISOR_CONSUMER)
+    with pytest.raises(LaneError):  # codex + claude-max: no lane matches both
+        lane_record_for(SUPERVISOR_CONSUMER, runtime="codex", backend="claude-max")

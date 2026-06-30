@@ -53,6 +53,30 @@ def read_bound_lane(state: SessionState, consumer: Consumer) -> LaneRecord | Non
     return _intent_record(state, consumer)
 
 
+def read_bound_backend_id(state: SessionState, consumer: Consumer) -> str | None:
+    """Return the backend id to bill ``consumer``'s run under, or None.
+
+    The billing companion to ``read_bound_lane``. Returns a concrete backend id only for a
+    *valid explicit* binding. Returns None when there is no binding -- the consumer ran on its
+    default lane, so billing resolves from key/direct alone -- OR when an explicit binding has
+    drifted out of the catalog: an honest "don't know" (``unknown`` billing) rather than a silent
+    substitution of the default (absence vs. corruption). The drift fail-open mirrors the
+    supervisor's posture around invalid lanes (``resolve_lane`` in ``run_supervisor_check``).
+
+    Not a blanket no-raise contract: an *unwired* consumer (no ``consumer_lanes`` manifest slot)
+    raises ``ValueError`` from the underlying slot lookup, before the drift guard -- a programmer
+    error / internal-boundary rejection (coding_standards §6), not a don't-know. Production call
+    sites pass wired consumer constants, so that path is unreachable there.
+    """
+    record = read_bound_lane(state, consumer)
+    if record is None:
+        return None
+    try:
+        return resolve_lane(consumer, override=_record_to_lane(record)).backend_id
+    except LaneError:
+        return None
+
+
 def confirmed_lane(state: SessionState, consumer: Consumer) -> LaneRecord | None:
     """Return ``consumer``'s frozen lane record, or None if not yet bound.
 
@@ -78,6 +102,35 @@ def lane_record_for_runtime(consumer: Consumer, runtime_id: str) -> LaneRecord:
         if lane.runtime_id == runtime_id:
             return LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
     raise LaneError(f"Consumer {consumer.id!r} has no valid lane on runtime {runtime_id!r}")
+
+
+def lane_record_for(consumer: Consumer, *, runtime: str | None = None, backend: str | None = None) -> LaneRecord:
+    """Expand a runtime and/or backend constraint to the consumer's unique matching lane.
+
+    Generalizes ``lane_record_for_runtime`` beyond the runtime axis: ``claude-max`` and the
+    default ``anthropic-direct`` share the ``claude_code`` runtime, so a *backend* constraint is
+    the only way to select the subscription lane. Matches against ``valid_lanes`` (the gated
+    default + allowed set). Unlike the runtime-only helper (first match), this requires a *unique*
+    match -- a backend id appears in at most one of a consumer's lanes, so a backend constraint is
+    unambiguous. Raises ``LaneError`` if no candidate matches, the match is ambiguous, or neither
+    constraint is given.
+    """
+    if runtime is None and backend is None:
+        raise LaneError("lane_record_for requires a runtime or backend constraint")
+    matches = [
+        lane
+        for lane in valid_lanes(consumer)
+        if (runtime is None or lane.runtime_id == runtime) and (backend is None or lane.backend_id == backend)
+    ]
+    if not matches:
+        raise LaneError(f"Consumer {consumer.id!r} has no valid lane for runtime={runtime!r} backend={backend!r}")
+    if len(matches) > 1:
+        raise LaneError(
+            f"Consumer {consumer.id!r} matches multiple lanes for runtime={runtime!r} backend={backend!r}; "
+            "specify both runtime and backend to disambiguate"
+        )
+    lane = matches[0]
+    return LaneRecord(lane.runtime_id, lane.backend_id, lane.model)
 
 
 def set_intent_lane(state: SessionState, consumer: Consumer, lane_record: LaneRecord) -> None:

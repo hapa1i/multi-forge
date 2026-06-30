@@ -908,6 +908,11 @@ def _review_curate(
     # (curation already inherits proxy/direct routing from the same config).
     effective_effort = effort or (config.effort if config else None)
 
+    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
+
+    backend_id = read_bound_backend_id(state, SHADOW_CURATION_CONSUMER)
+
     result = run_shadow_curation(
         session_name=resolved.store.session_name,
         forge_root=forge_root,
@@ -918,6 +923,7 @@ def _review_curate(
         direct=direct,
         scope=scope,
         reasoning_effort=effective_effort,
+        backend_id=backend_id,
     )
 
     if as_json:

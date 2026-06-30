@@ -1745,10 +1745,17 @@ def teammate_idle() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
-    from forge.policy.team.handlers import handle_teammate_idle
+    from forge.policy.team.handlers import (
+        TEAM_SUPERVISOR_CONSUMER,
+        handle_teammate_idle,
+    )
+    from forge.session.consumer_lanes import read_bound_backend_id
 
+    backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
     cache_key = _safe_cache_key(data.get("session_id"))
-    exit_code, feedback = _run_team_handler(cache_key, lambda cache: handle_teammate_idle(data, config, cache))
+    exit_code, feedback = _run_team_handler(
+        cache_key, lambda cache: handle_teammate_idle(data, config, cache, backend_id=backend_id)
+    )
     if exit_code == 2 and feedback:
         print(feedback, file=sys.stderr)
     sys.exit(exit_code)
@@ -1780,10 +1787,17 @@ def task_completed() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
-    from forge.policy.team.handlers import handle_task_completed
+    from forge.policy.team.handlers import (
+        TEAM_SUPERVISOR_CONSUMER,
+        handle_task_completed,
+    )
+    from forge.session.consumer_lanes import read_bound_backend_id
 
+    backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
     cache_key = _safe_cache_key(data.get("session_id"))
-    exit_code, feedback = _run_team_handler(cache_key, lambda cache: handle_task_completed(data, config, cache))
+    exit_code, feedback = _run_team_handler(
+        cache_key, lambda cache: handle_task_completed(data, config, cache, backend_id=backend_id)
+    )
     if exit_code == 2 and feedback:
         print(feedback, file=sys.stderr)
     sys.exit(exit_code)

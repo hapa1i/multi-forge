@@ -124,7 +124,13 @@ SUPERVISOR_CONSUMER = Consumer(
     # override must be a declared candidate -- resolve_lane(override=...) rejects anything outside
     # valid_lanes. backend_id/model are nominal (only runtime_id drives dispatch in T4; codex picks
     # its own model unless `-m` is passed). T1b generalizes this to a uniform consumer-lane binding.
-    allowed_lanes=(Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),),
+    # T0 (claude subscription): the keyless claude_code lane on the Claude Max subscription
+    # (claude-max.reachable_via=("claude_code",)). backend_id is load-bearing for billing only --
+    # resolve_billing_mode reads its subscription posture; the claude_code dispatch arm is unchanged.
+    allowed_lanes=(
+        Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
+        Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),
+    ),
 )
 
 
@@ -137,6 +143,16 @@ def supervisor_lane_runtimes() -> tuple[str, ...]:
     from ``valid_lanes`` so the menu only offers runtimes whose lane currently resolves.
     """
     return tuple(dict.fromkeys(lane.runtime_id for lane in valid_lanes(SUPERVISOR_CONSUMER)))
+
+
+def supervisor_lane_backends() -> tuple[str, ...]:
+    """Backend ids the supervisor lane can be set to (default first, deduplicated).
+
+    Drives the ``--backend`` CLI choices from ``SUPERVISOR_CONSUMER``. Needed because
+    ``claude-max`` and the default ``anthropic-direct`` share the ``claude_code`` runtime, so
+    ``--runtime`` alone cannot select the subscription lane (it returns the first match).
+    """
+    return tuple(dict.fromkeys(lane.backend_id for lane in valid_lanes(SUPERVISOR_CONSUMER)))
 
 
 def plan_fingerprint(path: str, forge_root: str | None) -> str:
@@ -488,6 +504,7 @@ def _dispatch_supervisor(
             context=context,
             resolved=resolved,
             usage_command=usage_command,
+            backend_id=lane.backend_id,
         )
     # T4 wired the codex arm (raises _SupervisorRoutingError(codex_unavailable) on an unready
     # preflight). A runtime with no adapter (a future T1b lane reaching here unmapped) also
@@ -518,6 +535,7 @@ def _dispatch_claude_supervisor(
     context: ActionContext,
     resolved: _ResolvedTarget,
     usage_command: str,
+    backend_id: str,
 ) -> SessionResult:
     """Run the supervisor as ``claude -p`` -- the byte-identical pre-T3 path.
 
@@ -583,6 +601,7 @@ def _dispatch_claude_supervisor(
         model=model,
         base_url=base_url,
         direct=config.direct,
+        backend_id=backend_id,
     )
     return result
 

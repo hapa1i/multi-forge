@@ -564,3 +564,42 @@ def test_test_auth_runtime_native_source_is_skipped_not_failed(
     assert payload["missing_required_env_vars"] == []
     assert payload["probe"]["status"] == "skipped"
     assert "forge runtime preflight codex" in payload["probe"]["detail"]
+
+
+def test_list_json_renders_claude_max_as_runtime_owned(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """claude-max renders like chatgpt: anthropic provider, runtime_native endpoint,
+    auth_status=runtime_native, runtime-owned health, no Forge credential."""
+    result = runner.invoke(main, _backend_args("list", "--json"))
+
+    assert result.exit_code == 0
+    records = {item["source_id"]: item for item in _json_output(result)}
+    claude_max = records["claude-max"]
+    assert claude_max["provider"] == "anthropic"
+    assert claude_max["kind"] == "remote"
+    assert claude_max["endpoint"]["kind"] == "runtime_native"
+    assert claude_max["auth_status"] == "runtime_native"
+    assert claude_max["health"] == "runtime-owned"
+    assert claude_max["required_credentials"] == []
+    assert claude_max["runtime_instance"] is None
+
+
+def test_test_auth_claude_max_skipped_with_claude_hint_not_codex(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """`test-auth claude-max` skips (runtime-owned) and points at the Claude login,
+    never the codex preflight -- the hint derives from reachable_via."""
+    result = runner.invoke(main, _backend_args("test-auth", "claude-max", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert payload["provider"] == "anthropic"
+    assert payload["auth_status"] == "runtime_native"
+    assert payload["missing_required_env_vars"] == []
+    assert payload["probe"]["status"] == "skipped"
+    detail = payload["probe"]["detail"]
+    assert "codex" not in detail
+    assert "claude" in detail.lower()

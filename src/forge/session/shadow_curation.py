@@ -15,10 +15,21 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from forge.core.lanes import Consumer, Lane
 from forge.core.ops.context import ExecutionContext
 from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 
 logger = logging.getLogger(__name__)
+
+
+# Consumer-lane identity (epic consumer_lanes, T0). claude-max is the only non-default lane
+# (claude_code runtime, subscription posture); backend_id is load-bearing for billing only.
+SHADOW_CURATION_CONSUMER = Consumer(
+    id="shadow_curation",
+    capability_floor="tool_agent",
+    default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
+    allowed_lanes=(Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +284,7 @@ def run_shadow_curation(
     timeout_seconds: int = 120,
     scope: str = "project",
     reasoning_effort: str | None = None,
+    backend_id: str | None = None,
 ) -> CurationResult:
     """Build prompt, call LLM, persist report.
 
@@ -310,6 +322,7 @@ def run_shadow_curation(
         session=session_name,
         base_url=base_url,
         direct=direct,
+        backend_id=backend_id,
     )
     status: UpstreamStatus = "success" if result.success else "timeout" if result.timed_out else "error"
     reason_code = None

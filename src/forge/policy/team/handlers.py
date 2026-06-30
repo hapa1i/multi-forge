@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from forge.core.lanes import Consumer, Lane
 from forge.core.reactive.proxy import lookup_proxy_base_url
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.reactive.structured_output import extract_json_from_response
@@ -30,10 +31,22 @@ from forge.policy.team.prompts import (
 _log = logging.getLogger(__name__)
 
 
+# Consumer-lane identity (epic consumer_lanes, T0): the team supervisor is a DISTINCT consumer
+# from the semantic supervisor (different config/contract). claude-max is its only non-default
+# lane (claude_code runtime, subscription posture); backend_id is load-bearing for billing only.
+TEAM_SUPERVISOR_CONSUMER = Consumer(
+    id="team_supervisor",
+    capability_floor="tool_agent",
+    default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
+    allowed_lanes=(Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),),
+)
+
+
 def handle_teammate_idle(
     data: dict[str, Any],
     config: TeamSupervisorConfig,
     cache: dict[str, Any],
+    backend_id: str | None = None,
 ) -> tuple[int, str]:
     """Handle TeammateIdle event.
 
@@ -61,7 +74,7 @@ def handle_teammate_idle(
     if not config.resume_id:
         return 0, ""
 
-    exit_code, feedback = _run_supervisor(config, teammate, team, "idle", "")
+    exit_code, feedback = _run_supervisor(config, teammate, team, "idle", "", backend_id=backend_id)
     cache[cache_key] = {
         "checked_at": now_iso(),
         "exit_code": exit_code,
@@ -74,6 +87,7 @@ def handle_task_completed(
     data: dict[str, Any],
     config: TeamSupervisorConfig,
     cache: dict[str, Any],
+    backend_id: str | None = None,
 ) -> tuple[int, str]:
     """Handle TaskCompleted event.
 
@@ -114,7 +128,7 @@ def handle_task_completed(
         return 0, ""
 
     task_context = f"Task: {task_subject or 'unknown'} (id: {task_id})"
-    exit_code, feedback = _run_supervisor(config, teammate, team, "task-completed", task_context)
+    exit_code, feedback = _run_supervisor(config, teammate, team, "task-completed", task_context, backend_id=backend_id)
 
     block_count = cached.get("block_count", 0) + (1 if exit_code == 2 else 0)
     cache[cache_key] = {
@@ -206,6 +220,7 @@ def _run_supervisor(
     team: str,
     event_type: str,
     task_context: str,
+    backend_id: str | None = None,
 ) -> tuple[int, str]:
     """Run cross-team supervisor. Returns ``(exit_code, feedback)``.
 
@@ -252,6 +267,7 @@ def _run_supervisor(
         cost=cost,
         base_url=base_url,
         direct=config.direct,
+        backend_id=backend_id,
     )
     if not result.success:
         _log.warning("Team supervisor failed: %s", result.error)

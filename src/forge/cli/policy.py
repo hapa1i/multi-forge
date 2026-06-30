@@ -40,6 +40,7 @@ from forge.policy.semantic.supervisor import (
     SUPERVISOR_CONSUMER,
     apply_checker_options,
     resolve_supervisor_lane,
+    supervisor_lane_backends,
     supervisor_lane_runtimes,
     validate_checker_model,
 )
@@ -47,6 +48,7 @@ from forge.session import SessionStore
 from forge.session.consumer_lanes import (
     clear_consumer_lane,
     confirmed_lane,
+    lane_record_for,
     lane_record_for_runtime,
     read_bound_lane,
     set_intent_lane,
@@ -72,6 +74,7 @@ _CHECKER_PROVIDER_CHOICES = click.Choice(list(CHECKER_PROVIDER_CHOICES))
 _CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
 _SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
 _SUPERVISOR_RUNTIME_CHOICES = click.Choice(list(supervisor_lane_runtimes()))
+_SUPERVISOR_BACKEND_CHOICES = click.Choice(list(supervisor_lane_backends()))
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -1090,6 +1093,13 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
     default=None,
     help="Supervisor lane runtime (claude_code/codex); rejected once the lane is frozen",
 )
+@click.option(
+    "--backend",
+    "backend",
+    type=_SUPERVISOR_BACKEND_CHOICES,
+    default=None,
+    help="Supervisor lane backend (e.g. claude-max for the Max subscription); rejected once frozen",
+)
 def supervisor_set(
     target: str,
     session_name: str | None,
@@ -1102,6 +1112,7 @@ def supervisor_set(
     checker_effort: str | None,
     supervisor_effort: str | None,
     runtime: str | None,
+    backend: str | None,
 ) -> None:
     """Set the semantic supervisor target for the session.
 
@@ -1147,9 +1158,14 @@ def supervisor_set(
     # the under-lock re-check in _apply (a hook can freeze between this read and that
     # write). Expanded to a full LaneRecord up front so a bad runtime also fails early.
     lane_record: LaneRecord | None = None
-    if runtime is not None:
+    if runtime is not None or backend is not None:
         try:
-            lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
+            # A backend constraint selects the unique lane (claude-max vs the default
+            # anthropic-direct, both claude_code); runtime alone keeps the first-match default.
+            if backend is not None:
+                lane_record = lane_record_for(SUPERVISOR_CONSUMER, runtime=runtime, backend=backend)
+            elif runtime is not None:
+                lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
         except LaneError as e:
             print_error(f"{e}", console=console)
             sys.exit(1)
@@ -1246,7 +1262,10 @@ def supervisor_set(
         sys.exit(1)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
     if lane_record is not None:
-        console.print(f"  Lane: runtime={lane_record.runtime_id} (freezes on first check)")
+        console.print(
+            f"  Lane: runtime={lane_record.runtime_id} backend={lane_record.backend_id} "
+            f"model={lane_record.model} (freezes on first check)"
+        )
     if routing_display:
         label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
         console.print(f"  Routing ({label}): {routing_display}")

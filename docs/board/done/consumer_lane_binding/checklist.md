@@ -1,7 +1,6 @@
 # T1b execution checklist: consumer_lane_binding
 
-**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`.
-**Branch**: `consumer_lane_binding`.
+**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**: `consumer_lane_binding`.
 
 ## Current focus
 
@@ -257,7 +256,7 @@ cover default-lane CLI parity. The `--supervisor-runtime`/`set --runtime` manife
   the stale write **(this reversed the pre-merge P2a "freeze the dispatched lane unconditionally")**; (3) derive CLI
   `--runtime` choices from one `supervisor_lane_runtimes()` over the consumer's `allowed_lanes`, not a static
   `_SUPERVISOR_RUNTIMES` mirror; (4) recurring silent-drop class -- a new `intent` field must be added to the three
-  `manager.py` inheritance allowlists or a pinned parent downgrades the child; (5) removing a manifest field is read-time
-  strip-and-warn, not a version bump (`strip_removed_supervisor_runtime`).
+  `manager.py` inheritance allowlists or a pinned parent downgrades the child; (5) removing a manifest field is
+  read-time strip-and-warn, not a version bump (`strip_removed_supervisor_runtime`).
 - [x] Update epic roster row (T1b -> done) -- done 2026-06-28 (epic `checklist.md` + `card.md`).
 - [x] `git mv docs/board/doing/consumer_lane_binding docs/board/done/` -- done 2026-06-28 (this closeout commit).

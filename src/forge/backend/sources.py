@@ -361,6 +361,20 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         billing_posture="subscription_quota",
         reachable_via=("codex",),
     ),
+    # Claude Max/Pro subscription reached through the claude_code runtime. Endpoint
+    # and auth are owned by claude -p (keychain OAuth login), so there is no Forge
+    # URL and no Forge credential. Billing is the subscription's quota; reachable
+    # only via claude_code (the runtime that holds the login). The claude_code
+    # analog of chatgpt (epic consumer_lanes, T0).
+    ModelSource(
+        id="claude-max",
+        kind="remote",
+        provider="anthropic",
+        endpoint=SourceEndpoint.runtime_native(),
+        credential_ids=(),
+        billing_posture="subscription_quota",
+        reachable_via=("claude_code",),
+    ),
     ModelSource(
         id="litellm-gemini-local",
         kind="local",

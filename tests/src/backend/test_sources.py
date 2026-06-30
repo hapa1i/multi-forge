@@ -279,11 +279,27 @@ def test_chatgpt_subscription_source_is_runtime_native() -> None:
     assert source.reachable_via == ("codex",)
 
 
+def test_claude_max_subscription_source_is_runtime_native() -> None:
+    """The claude-max source: anthropic provider, runtime_native endpoint (no URL/credential), subscription billing."""
+
+    source = get_model_source("claude-max")
+    assert source.provider == "anthropic"
+    assert source.kind == "remote"
+    assert source.endpoint.kind == "runtime_native"
+    assert source.endpoint.value is None
+    assert source.endpoint.default_url is None
+    assert source.credential_ids == ()
+    assert source.required_env_vars == ()
+    assert source.local_lifecycle is None
+    assert source.billing_posture == "subscription_quota"
+    assert source.reachable_via == ("claude_code",)
+
+
 def test_billing_posture_defaults_to_per_token() -> None:
     """Every endpoint-based source keeps the per_token default -- no behavior change from the new field."""
 
     for source in list_model_sources():
-        if source.id == "chatgpt":
+        if source.id in {"chatgpt", "claude-max"}:
             continue
         assert source.billing_posture == "per_token", source.id
 
