@@ -9,13 +9,14 @@ Generalize the supervisor's lane-binding UX (CLI write + dispatch-time freeze) t
 team-supervisor** so each can be declared on `claude-max` and emit honest `subscription_quota` billing on keyless+direct
 runs. No dispatch-runtime change (claude-max shares the `claude_code` runtime). **Phases 0-2 DONE**: Phase 1 CLI
 (`cli/session_lane.py` over `set_intent_lane` / `intent_lane` / `clear_intent_lane`, wired as `forge session lane`);
-Phase 2 freeze (pure `freeze_bound_lane` in `consumer_lanes.py` + best-effort `persist_lane_freeze` in
-`cli/consumer_lane_freeze.py`, called before dispatch at memory-writer / shadow-curation / both team hooks). Tests:
-`test_session_lane.py` (10) + `test_consumer_lane_freeze.py` (4) + `TestFreezeBoundLane` (4) + memory-writer CLI wiring
-(2) + team-hook wiring (4) green; handoff **integration** (10, Docker) green; ruff/black/mypy/pyright clean. **Billing
-honesty already lands at Phase 1** (`read_bound_backend_id` is confirmed-first-else-`intent`); the freeze is
-immutability/observability parity, not billing-enablement. **Phases 1-3 implemented + verified on-branch; remaining
-closeout (epic roster T6a -> done, `git mv doing/ -> done/`) is post-merge.**
+Phase 2 freeze (`persist_lane_freeze` in `cli/consumer_lane_freeze.py`, fired from an `on_dispatch` hook at each
+consumer's actual `run_claude_session` call, threading the dispatched lane with the supervisor's under-lock equality
+guard -- see "Review hardening" below). Tests: `test_session_lane.py` (10) + `test_consumer_lane_freeze.py` (6) +
+`TestIntentLane` (3) + memory-writer CLI wiring (3) + team-hook wiring (6) green; handoff **integration** (10, Docker)
+green; ruff/black/mypy/pyright clean. **Billing honesty already lands at Phase 1** (`read_bound_backend_id` is
+confirmed-first-else-`intent`); the freeze is immutability/observability parity, not billing-enablement. **Phases 1-3
+implemented + verified on-branch; remaining closeout (epic roster T6a -> done, `git mv doing/ -> done/`) is
+post-merge.**
 
 ## Phases
 
@@ -47,28 +48,48 @@ closeout (epic roster T6a -> done, `git mv doing/ -> done/`) is post-merge.**
 
 ### Phase 2 -- Generalized freeze at first dispatch (the three points)
 
-- [x] **memory-writer**: freeze write-once *before* dispatch via
-  `persist_lane_freeze(store, manifest, MEMORY_WRITER_CONSUMER)` at `cli/memory_writer.py` (right after the
-  `read_bound_backend_id` read). Verified: `test_run_cmd_freezes_declared_lane` -- declared claude-max freezes into
-  `confirmed` and `backend_id=="claude-max"` reaches `run_memory_writer`; `test_run_cmd_undeclared_lane_does_not_freeze`
-  -- no decl -> no freeze, `backend_id None`.
-- [x] **shadow-curation**: same `persist_lane_freeze(resolved.store, state, SHADOW_CURATION_CONSUMER)` at
-  `cli/memory.py` (before `run_shadow_curation`). Shares the unit-tested helper; the shadow runner's `backend_id` thread
-  is covered by `tests/src/session/test_shadow_curation.py`. (No dedicated `curate` CLI harness exists; building one to
-  cover 3 lines identical to the two proven sites is disproportionate -- noted, not deferred debt.)
-- [x] **team-supervisor**: `persist_lane_freeze(store, manifest, TEAM_SUPERVISOR_CONSUMER)` at **both** hooks
-  (`cli/hooks/commands.py` teammate-idle + task-completed), after the `config.enabled` guard, before
-  `_run_team_handler`. Verified: `tests/src/cli/hooks/test_team_hook_lane_freeze.py` parametrizes both hooks x
-  declared/undeclared (4).
-- [x] **Factoring (corrected from the original "one helper, four call sites").** The shared *primitive* is
-  `ensure_consumer_lane_binding` (used by both the supervisor freeze and the new `freeze_bound_lane`). The three new
-  sites share `freeze_bound_lane` (pure mutate) + `persist_lane_freeze` (best-effort `store.update` wrapper, freezes
-  *before* dispatch). The **supervisor keeps its own guarded inline freeze** (`cli/hooks/policy.py:274-297`): its
-  `read_bound_lane(m) == supervisor_lane` re-check is **load-bearing** race protection for its multi-second *unlocked*
-  call and cannot collapse into the shared wrapper. So: one shared primitive, one new mutate, one new persist wrapper, 4
-  new call sites; the supervisor is deliberately not refactored onto the wrapper.
+The freeze fires from an `on_dispatch` callback at each consumer's actual `run_claude_session` call (the dispatch
+point), threading the lane resolved once at the call site (the read `backend_id` comes from) and re-checking
+`read_bound_lane(m) == dispatched_lane` under the lock -- the supervisor's pattern (`cli/hooks/policy.py:296`). Shared
+wrapper: `persist_lane_freeze(store, consumer, dispatched_lane, *, timeout_s)` (`cli/consumer_lane_freeze.py`).
+
+- [x] **memory-writer**:
+  `run_memory_writer(..., on_dispatch=lambda: persist_lane_freeze(store, MEMORY_WRITER_CONSUMER, dispatched_lane))`; the
+  runner calls `on_dispatch()` past every skip-return (`session/memory_writer.py`, before `run_claude_session`).
+  Verified by `test_memory_writer_cli.py`: freezes on a real dispatch; **no freeze when the writer skips**
+  (below-min-turns/no-docs); undeclared -> no freeze.
+- [x] **shadow-curation**: same `on_dispatch` into `run_shadow_curation` (`cli/memory.py`). The runner has no skip path,
+  so the hook fires on every call; the `backend_id` thread is covered by `tests/src/session/test_shadow_curation.py`.
+  (No dedicated `curate` CLI harness exists; the wiring is identical to the two proven sites.)
+- [x] **team-supervisor**: a `_freeze` closure (timeout `HOOK_LOCK_TIMEOUT_S`) threaded as `on_dispatch` through
+  `handle_teammate_idle` / `handle_task_completed` -> `_run_supervisor`, which calls it past the depth + proxy guards
+  (`policy/team/handlers.py`). Verified by `test_team_hook_lane_freeze.py` (both hooks x dispatch / skip / undeclared,
+  6): a cache/tagger/resume/depth skip never freezes.
+- [x] **Factoring.** Shared *primitive* `ensure_consumer_lane_binding` (supervisor + the new helper). The three new
+  sites share `persist_lane_freeze` (the guarded best-effort `store.update`); the supervisor keeps its own inline freeze
+  folded into the policy-persist write (no second lock). The old fresh-read `freeze_bound_lane` was **removed** -- the
+  threaded lane replaces it (see Review hardening, Finding 2).
 - [x] Dispatch is unchanged: each consumer still calls `run_claude_session(...)` with no runtime branch; no
   `resolve_lane`-driven dispatch arm added (that is T6b). The freeze is an additive `confirmed` write only.
+
+### Review hardening (2026-06-30)
+
+A code review surfaced three issues with the first freeze cut (freeze at the call site, fresh under-lock read). All
+verified against the code and fixed:
+
+- [x] **Finding 1 (premature freeze).** The call-site freeze fired before confirming a real dispatch
+  (`run_memory_writer` skips at below-min-turns/no-docs/no-ready-specs; team handler skips at cache/tagger/resume +
+  `_run_supervisor` depth guard). **Fix**: freeze from an `on_dispatch` hook at the actual `run_claude_session` call, so
+  a skipped/throttled run never freezes. (Verified valid; the supervisor itself freezes eagerly in cascade, but the
+  intermittent consumers warranted the stricter behavior -- decided "freeze only on real dispatch".)
+- [x] **Finding 2 (billing/freeze divergence).** The helper re-read `read_bound_lane(m)` under the lock instead of the
+  lane `backend_id` came from, so a concurrent `lane set/clear` could record a different lane than the run billed.
+  **Fix**: thread the dispatched lane + equality guard `read_bound_lane(m) == dispatched_lane` (supervisor parity); drop
+  the stale write otherwise. (Retracts the earlier "freezing before dispatch collapses the race window" claim -- it did
+  not; the window was between the `backend_id` read and the under-lock re-read.)
+- [x] **Finding 3 (hook timeout).** The team-hook freeze used the helper's `5.0s` default vs the established
+  `HOOK_LOCK_TIMEOUT_S = 0.2`. **Fix**: hooks pass `HOOK_LOCK_TIMEOUT_S`; the background memory-writer/shadow CLI keep
+  `5.0`.
 
 ### Phase 3 -- Tests + docs sync
 
@@ -91,18 +112,19 @@ closeout (epic roster T6a -> done, `git mv doing/ -> done/`) is post-merge.**
 
 ## Acceptance tests (fixture-grounded)
 
-| Test                                          | Fixture                                               | Assertion                                        | Test File                                                                                 |
-| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Consumer -> backend_id (all 4)                | declared `claude-max` via `intent` only               | `read_bound_backend_id == "claude-max"`          | `test_consumer_lanes.py::test_read_bound_backend_id_for_all_consumers`                    |
-| Declared claude-max + keyless -> subscription | `direct`, no key, `backend_id="claude-max"`           | `billing_mode == "subscription_quota"`           | `test_billing.py::test_keyless_direct_on_subscription_backend_is_subscription_quota` (T0) |
-| Undeclared keyless stays unknown              | `direct`, no key, `backend_id=None`                   | `billing_mode == "unknown"`                      | `test_billing.py::test_undeclared_keyless_is_unknown` (T0)                                |
-| Key present forces api (precedence)           | `direct`, key, `backend_id="claude-max"`              | `billing_mode == "api"`                          | `test_billing.py::test_key_and_subscription_backend_coexist_is_api` (T0)                  |
-| CLI set writes intent slot                    | `forge session lane set --consumer memory_writer ...` | `ConsumerLaneIntent.memory_writer` populated     | `test_session_lane.py`                                                                    |
-| Freeze write-once + drift surfaced            | declare, freeze, re-declare different                 | `confirmed` unchanged; `show` flags drift        | `test_consumer_lanes.py::TestFreezeBoundLane`, `test_session_lane.py`                     |
-| Freeze persists at dispatch (CLI + hook)      | declared claude-max; mocked dispatch                  | `confirmed` frozen; `backend_id` reaches runner  | `test_memory_writer_cli.py`, `test_team_hook_lane_freeze.py`                              |
-| Persist is best-effort                        | declared; `store.update` raises                       | no exception; `confirmed` unwritten; lock-skip   | `test_consumer_lane_freeze.py`                                                            |
-| Dispatch byte-identical                       | declared claude-max handoff run (Docker)              | run still `claude_code`; no codex arm; 10 passed | `tests/integration/cli/test_handoff_integration.py`                                       |
-| Unknown consumer rejects                      | `--consumer bogus`                                    | error via output helper; non-zero exit           | `test_session_lane.py`                                                                    |
+| Test                                          | Fixture                                               | Assertion                                         | Test File                                                                                 |
+| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Consumer -> backend_id (all 4)                | declared `claude-max` via `intent` only               | `read_bound_backend_id == "claude-max"`           | `test_consumer_lanes.py::test_read_bound_backend_id_for_all_consumers`                    |
+| Declared claude-max + keyless -> subscription | `direct`, no key, `backend_id="claude-max"`           | `billing_mode == "subscription_quota"`            | `test_billing.py::test_keyless_direct_on_subscription_backend_is_subscription_quota` (T0) |
+| Undeclared keyless stays unknown              | `direct`, no key, `backend_id=None`                   | `billing_mode == "unknown"`                       | `test_billing.py::test_undeclared_keyless_is_unknown` (T0)                                |
+| Key present forces api (precedence)           | `direct`, key, `backend_id="claude-max"`              | `billing_mode == "api"`                           | `test_billing.py::test_key_and_subscription_backend_coexist_is_api` (T0)                  |
+| CLI set writes intent slot                    | `forge session lane set --consumer memory_writer ...` | `ConsumerLaneIntent.memory_writer` populated      | `test_session_lane.py`                                                                    |
+| Freeze only on real dispatch (CLI + hook)     | declared; on_dispatch fires vs a skip path            | dispatch -> `confirmed` frozen; skip -> no freeze | `test_memory_writer_cli.py`, `test_team_hook_lane_freeze.py`                              |
+| Equality guard drops a stale lane             | dispatched lane != current bound (concurrent re-pin)  | no freeze recorded                                | `test_consumer_lane_freeze.py::test_equality_guard_drops_a_stale_lane`                    |
+| Freeze is write-once + drift via show         | re-dispatch same lane; re-declare different in show   | `confirmed` unchanged; `show` flags drift         | `test_consumer_lane_freeze.py`, `test_session_lane.py`                                    |
+| Persist is best-effort + hook timeout         | `store.update` raises; `timeout_s` forwarded          | no exception; `confirmed` unwritten; timeout set  | `test_consumer_lane_freeze.py`                                                            |
+| Dispatch byte-identical                       | declared claude-max handoff run (Docker)              | run still `claude_code`; no codex arm; 10 passed  | `tests/integration/cli/test_handoff_integration.py`                                       |
+| Unknown consumer rejects                      | `--consumer bogus`                                    | error via output helper; non-zero exit            | `test_session_lane.py`                                                                    |
 
 ## Blockers / deferred
 

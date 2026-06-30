@@ -397,12 +397,14 @@ To avoid writer conflicts:
     points for the final live conversation identity.
   - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): each consumer's dispatch point freezes the
     lane it dispatched on, **write-once** at first dispatch (epic consumer_lanes/T1b, T6a) -- but **only when an
-    explicit lane was chosen**. The supervisor freezes in the policy-check hook (`cli/hooks/policy.py`, after its
-    multi-second unlocked call, with a load-bearing re-check guard); memory-writer, shadow-curation, and team-supervisor
-    freeze *before* dispatch at their CLI/hook entries via `persist_lane_freeze` (best-effort -- a lock failure never
-    blocks the run, since billing reads the `intent` lane regardless). A consumer running on its default lane never
-    freezes, so the default stays re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the
-    resolving commands refuse to change it to a *different* lane.
+    explicit lane was chosen**. All four mirror one pattern: resolve the lane once (the read `backend_id` comes from),
+    then under the lock re-check `read_bound_lane(m) == dispatched_lane` before freezing, so a concurrent re-pin/clear
+    drops the stale write instead of recording a lane the run never billed. The supervisor freezes in the policy-check
+    hook (`cli/hooks/policy.py`); memory-writer, shadow-curation, and team-supervisor freeze from an `on_dispatch` hook
+    at the actual `run_claude_session` call (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run,
+    and a skipped/throttled run never freezes). A consumer running on its default lane never freezes, so the default
+    stays re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the resolving commands refuse to
+    change it to a *different* lane.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`

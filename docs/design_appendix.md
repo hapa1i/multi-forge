@@ -1211,10 +1211,12 @@ lane is an idempotent no-op; `policy supervisor remove` clears both the intent a
 same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
 `claude_code` runtime as the default, so placement changes the **billing label, not dispatch** (no codex-style arm; that
 is T6b). `forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer
-freezes it into `confirmed` *before* dispatch via `persist_lane_freeze` (best-effort -- a lock failure never blocks the
-run). `read_bound_backend_id` then yields `claude-max`, and a **keyless + direct** run is labeled `subscription_quota`
-(a resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from the `intent` write alone (the read
-is confirmed-first **then intent**); the freeze adds immutability + a stable observable binding, not the billing label.
+freezes it into `confirmed` from an `on_dispatch` hook at its actual `run_claude_session` call (`persist_lane_freeze`,
+best-effort -- a lock failure never blocks the run, and a skipped/throttled run never freezes), threading the dispatched
+lane with the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses.
+`read_bound_backend_id` yields `claude-max`, and a **keyless + direct** run is labeled `subscription_quota` (a
+resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from the `intent` write alone (the read is
+confirmed-first **then intent**); the freeze adds immutability + a stable observable binding, not the billing label.
 
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch

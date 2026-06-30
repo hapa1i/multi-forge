@@ -11,7 +11,6 @@ from forge.session.consumer_lanes import (
     clear_consumer_lane,
     confirmed_lane,
     ensure_consumer_lane_binding,
-    freeze_bound_lane,
     intent_lane,
     lane_record_for_runtime,
     read_bound_lane,
@@ -118,39 +117,23 @@ class TestEnsureConsumerLaneBinding:
         assert state.confirmed.consumer_lanes is None
 
 
-# --- freeze_bound_lane (the non-supervisor first-dispatch freeze) ---
+# --- intent_lane (the show-command read companion) ---
 
 
-class TestFreezeBoundLane:
-    """``freeze_bound_lane`` = freeze whatever ``read_bound_lane`` resolves (the three aux
-    consumers dispatch on the bound lane, so it is the lane to pin)."""
+class TestIntentLane:
+    """``intent_lane`` reads the *requested* (pre-freeze) slot only -- the intent-side
+    counterpart of ``confirmed_lane`` that ``forge session lane show`` pairs to surface drift."""
 
-    def test_freezes_the_intent_override(self) -> None:
-        state = _state(intent=_CODEX_RECORD)
-        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
-        assert confirmed_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD
+    def test_none_when_unset(self) -> None:
+        assert intent_lane(_state(), SUPERVISOR_CONSUMER) is None
 
-    def test_default_lane_is_not_frozen(self) -> None:
-        # Nothing declared -> read_bound_lane is None -> the default is never pinned.
-        state = _state()
-        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
-        assert state.confirmed.consumer_lanes is None
+    def test_returns_requested_record(self) -> None:
+        assert intent_lane(_state(intent=_CODEX_RECORD), SUPERVISOR_CONSUMER) == _CODEX_RECORD
 
-    def test_is_write_once(self) -> None:
-        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at="2020-01-01T00:00:00Z")
-        state = _state(intent=_DEFAULT_RECORD, confirmed=frozen)
-        freeze_bound_lane(state, SUPERVISOR_CONSUMER)  # intent says default, but confirmed already won
-        assert state.confirmed.consumer_lanes.supervisor is frozen  # type: ignore[union-attr]
-
-    def test_re_declaration_after_freeze_surfaces_as_drift(self) -> None:
-        # Declare, dispatch (freeze), then re-declare a different lane: confirmed is immutable,
-        # so the new request only lands in intent -- the drift `show` flags.
-        state = _state(intent=_CODEX_RECORD)
-        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
-        set_intent_lane(state, SUPERVISOR_CONSUMER, _DEFAULT_RECORD)
-        assert confirmed_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD  # unchanged
-        assert intent_lane(state, SUPERVISOR_CONSUMER) == _DEFAULT_RECORD  # drifted request
-        assert read_bound_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD  # dispatch follows confirmed
+    def test_reads_intent_slot_only_not_confirmed(self) -> None:
+        # A frozen binding with no intent override -> intent_lane is None (drift is intent vs confirmed).
+        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at=now_iso())
+        assert intent_lane(_state(confirmed=frozen), SUPERVISOR_CONSUMER) is None
 
 
 # --- lane_record_for_runtime (the resolving-command expansion) ---

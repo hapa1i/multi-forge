@@ -37,19 +37,19 @@ the `claude_code` runtime; codex-exec stays T6b).
 
 - **Phase 1 (CLI)**: `forge session lane set/show/clear --consumer <id>` -- the canonical surface for all four consumers
   (session-owned `intent.consumer_lanes`); `forge policy supervisor set` stays the supervisor convenience (same slot).
-- **Phase 2 (freeze)**: pure `freeze_bound_lane` + best-effort `persist_lane_freeze` (`cli/consumer_lane_freeze.py`),
-  called *before* dispatch at memory-writer, shadow-curation, and both team hooks. Freezing before dispatch collapses
-  the race window, so these need no equality guard; the supervisor keeps its after-dispatch guarded freeze (load-bearing
-  for its unlocked multi-second call).
-- **Correction**: billing honesty lands at Phase 1, not the freeze -- `read_bound_backend_id` is
-  confirmed-first-else-intent, so the intent write alone resolves `claude-max`. The freeze is immutability/observability
-  parity; card Problem #2 reframed.
+- **Phase 2 (freeze)**: best-effort `persist_lane_freeze` (`cli/consumer_lane_freeze.py`) fired from an `on_dispatch`
+  hook at each consumer's real `run_claude_session` call, threading the dispatched lane with the supervisor's under-lock
+  `read_bound_lane(m) == dispatched_lane` guard (memory-writer, shadow-curation, both team hooks).
+- **Corrections**: billing honesty lands at Phase 1, not the freeze (`read_bound_backend_id` is
+  confirmed-first-else-intent); the freeze is immutability/observability parity. A review then hardened the first cut:
+  freeze only on a real dispatch (skips no longer freeze), thread the lane + equality guard so `confirmed` can't diverge
+  from the billed backend (retracts "freezing before dispatch closes the window"), and use `HOOK_LOCK_TIMEOUT_S` in
+  hooks.
 - Docs: design §3.5/§3.6.2, appendix §G, cli_reference, end-user policy.md.
 
-**Verification**: New unit tests (`TestFreezeBoundLane`, `test_consumer_lane_freeze.py`, memory-writer CLI wiring,
-`test_team_hook_lane_freeze.py`). Billing covered transitively by `test_billing.py` +
-`test_read_bound_backend_id_for_all_consumers` (no redundant per-consumer tests). Integration
-`test_handoff_integration.py` 10 passed (Docker). Pre-commit clean.
+**Verification**: New unit tests (`test_consumer_lane_freeze.py`, memory-writer + team-hook wiring incl.
+no-freeze-on-skip and the equality guard); billing covered transitively by `test_billing.py` +
+`test_read_bound_backend_id_for_all_consumers`. 7135 unit + handoff integration (10, Docker) green; pre-commit clean.
 
 ## 2026-06-29
 

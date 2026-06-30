@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -285,6 +286,7 @@ def run_shadow_curation(
     scope: str = "project",
     reasoning_effort: str | None = None,
     backend_id: str | None = None,
+    on_dispatch: Callable[[], None] | None = None,
 ) -> CurationResult:
     """Build prompt, call LLM, persist report.
 
@@ -303,6 +305,11 @@ def run_shadow_curation(
     )
 
     tracking_urls = [base_url] if base_url else []
+
+    # Committed to a claude -p dispatch -- notify the caller so the consumer-lane freeze
+    # records only a lane that actually ran (epic consumer_lanes T6a).
+    if on_dispatch is not None:
+        on_dispatch()
 
     with track_verb_cost("curation", tracking_urls) as cost:
         result = run_claude_session(

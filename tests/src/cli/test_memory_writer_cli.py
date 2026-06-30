@@ -165,19 +165,31 @@ def test_run_cmd_passport_strategy_used(tmp_path: Path) -> None:
     assert docs[0].strategy == "changelog"  # passport strategy only
 
 
-def test_run_cmd_freezes_declared_lane(tmp_path: Path) -> None:
-    """A declared claude-max lane freezes into confirmed at the handoff dispatch, and the
-    same backend_id flows to the runner (the billing input)."""
-    root = tmp_path.resolve()
+def _dispatching(**kwargs: object) -> bool:
+    """Stand-in for run_memory_writer that ACTUALLY dispatches: invokes the on_dispatch hook."""
+    on_dispatch = kwargs.get("on_dispatch")
+    if callable(on_dispatch):
+        on_dispatch()
+    return True
+
+
+def _declared_handoff_store(root: Path) -> SessionStore:
     manifest = create_session_state("session")
     manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
     set_intent_lane(manifest, MEMORY_WRITER_CONSUMER, _CLAUDE_MAX)
     store = SessionStore(str(root), "session")
     store.write(manifest)
+    return store
 
+
+def test_run_cmd_freezes_on_real_dispatch(tmp_path: Path) -> None:
+    """When the writer actually dispatches (on_dispatch fires), the declared lane freezes and
+    the same backend_id flows to the runner (the billing input)."""
+    root = tmp_path.resolve()
+    store = _declared_handoff_store(root)
     with (
         patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
-        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.run_memory_writer", side_effect=_dispatching) as mock_run,
     ):
         result = _run(root)
 
@@ -188,13 +200,29 @@ def test_run_cmd_freezes_declared_lane(tmp_path: Path) -> None:
     assert confirmed.memory_writer.lane == _CLAUDE_MAX
 
 
+def test_run_cmd_no_freeze_when_writer_skips(tmp_path: Path) -> None:
+    """Declared lane, but the writer skips without dispatching (no on_dispatch, e.g.
+    below-min-turns/no-docs): the lane must NOT freeze (Finding 1)."""
+    root = tmp_path.resolve()
+    store = _declared_handoff_store(root)
+    with (
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        # return_value=True without invoking on_dispatch == a skip path inside run_memory_writer.
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True),
+    ):
+        result = _run(root)
+
+    assert result.exit_code == 0, result.output
+    assert store.read().confirmed.consumer_lanes is None
+
+
 def test_run_cmd_undeclared_lane_does_not_freeze(tmp_path: Path) -> None:
-    """No declaration -> the default lane is never frozen and backend_id stays None."""
+    """No declaration -> dispatched lane is None -> even a real dispatch never freezes; backend_id None."""
     root = tmp_path.resolve()
     _write_handoff_session(root)
     with (
         patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
-        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.run_memory_writer", side_effect=_dispatching) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output

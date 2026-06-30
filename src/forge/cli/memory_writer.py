@@ -74,7 +74,7 @@ def run_cmd(
     import dataclasses
 
     from forge.cli.consumer_lane_freeze import persist_lane_freeze
-    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
     from forge.session.memory_writer import (
         MEMORY_WRITER_CONSUMER,
         resolve_writer_base_url,
@@ -107,10 +107,8 @@ def run_cmd(
 
     designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
+    dispatched_lane = read_bound_lane(manifest, MEMORY_WRITER_CONSUMER)
     backend_id = read_bound_backend_id(manifest, MEMORY_WRITER_CONSUMER)
-    # Freeze the chosen lane before dispatch so the rest of the session bills/observes one
-    # stable lane (write-once; default and already-frozen are no-ops).
-    persist_lane_freeze(store, manifest, MEMORY_WRITER_CONSUMER)
 
     success = run_memory_writer(
         session_name=session_name,
@@ -121,6 +119,10 @@ def run_cmd(
         timeout_seconds=timeout,
         designated_docs=designated_docs,
         backend_id=backend_id,
+        # Freeze only if the writer actually dispatches (on_dispatch fires at the claude -p
+        # call); the threaded lane + under-lock equality guard keep confirmed consistent with
+        # the billed backend (epic consumer_lanes T6a).
+        on_dispatch=lambda: persist_lane_freeze(store, MEMORY_WRITER_CONSUMER, dispatched_lane),
     )
 
     if not success:

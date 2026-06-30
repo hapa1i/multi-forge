@@ -1,19 +1,24 @@
-"""Best-effort first-dispatch freeze of a consumer's bound lane (epic consumer_lanes T6a).
+"""Best-effort dispatch-time freeze of a consumer's bound lane (epic consumer_lanes T6a).
 
-The non-supervisor consumers -- memory-writer, shadow-curation, team-supervisor --
-dispatch on whatever ``read_bound_lane`` resolves, then pin that choice into ``confirmed``
-so billing and observability see one stable lane for the rest of the session and a later
-re-declaration is rejected (the same write-once contract the supervisor already honors).
+The non-supervisor consumers -- memory-writer, shadow-curation, team-supervisor -- dispatch
+on the lane ``read_bound_lane`` resolves, then pin that exact lane into ``confirmed`` so a
+later re-declaration is rejected and observability sees one stable lane for the session.
 
-This is the CLI/hook-boundary wrapper: per the boundary framework (coding_standards.md
-§5), the outermost caller decides whether a persist failure blocks the run. Here it does
-not -- the freeze is bookkeeping, and billing still reads the intent lane regardless -- so
-a lock/IO failure degrades to "retry on the next dispatch". The pure write-once mutate is
-``forge.session.consumer_lanes.freeze_bound_lane``.
+This mirrors the supervisor freeze (``cli/hooks/policy.py``) rather than re-reading the
+manifest:
 
-The supervisor does NOT use this. It freezes *after* its multi-second unlocked LLM call and
-must guard the lane that actually dispatched (``cli/hooks/policy.py``); these sites freeze
-*before* dispatch, so the bound lane cannot drift under them.
+- The caller resolves the lane ONCE (the same read ``backend_id`` came from) and threads it
+  in as ``dispatched_lane``, so the frozen lane cannot diverge from the billed lane.
+- The freeze runs from each consumer's ``on_dispatch`` hook -- at the actual
+  ``run_claude_session`` call -- so a skipped/throttled/cached run never freezes a lane it
+  never used.
+- Under the lock it re-checks ``read_bound_lane(m) == dispatched_lane`` (the supervisor's
+  equality guard): a concurrent ``forge session lane set/clear`` between dispatch and this
+  write drops the stale freeze instead of recording a lane the run did not bill.
+
+Per the boundary framework (coding_standards.md §5), the persist is the outermost caller's
+call to make non-blocking: a lock/IO failure degrades to "retry on the next dispatch" -- the
+freeze is bookkeeping and billing reads the lane regardless.
 """
 
 from __future__ import annotations
@@ -21,33 +26,36 @@ from __future__ import annotations
 import logging
 
 from forge.core.lanes import Consumer
-from forge.session.consumer_lanes import (
-    confirmed_lane,
-    freeze_bound_lane,
-    read_bound_lane,
-)
-from forge.session.models import SessionState
+from forge.session.consumer_lanes import ensure_consumer_lane_binding, read_bound_lane
+from forge.session.models import LaneRecord, SessionState
 from forge.session.store import SessionStore
 
 logger = logging.getLogger(__name__)
 
 
 def persist_lane_freeze(
-    store: SessionStore, state: SessionState, consumer: Consumer, *, timeout_s: float = 5.0
+    store: SessionStore, consumer: Consumer, dispatched_lane: LaneRecord | None, *, timeout_s: float = 5.0
 ) -> None:
-    """Freeze ``consumer``'s bound lane into ``confirmed`` (write-once), best-effort.
+    """Freeze ``dispatched_lane`` into ``consumer``'s ``confirmed`` slot (write-once), best-effort.
 
-    ``state`` is the caller's already-read manifest; ``store`` must address the same session.
-    Skips the write lock on the hot path -- when the lane is already frozen or nothing was
-    declared (the default lane is never frozen) -- so a steady-state dispatch pays no lock
-    cost. The freeze re-checks under lock, so the skip is an optimization, not the guard. A
-    lock or IO failure is swallowed: the freeze is bookkeeping and the next dispatch retries.
+    Call from the consumer's ``on_dispatch`` hook so it runs only on a real dispatch.
+    ``dispatched_lane`` is the lane the run dispatched on (``read_bound_lane`` at the call site);
+    ``None`` (the default lane) is never frozen. ``store`` must address the same session.
+
+    The freeze re-checks the lane under the lock and drops the write if a concurrent edit
+    changed it (supervisor parity). A lock/IO failure is swallowed -- the next dispatch retries.
     """
-    # Cheap pre-check on the already-read manifest: avoid taking the write lock on every
-    # dispatch once frozen (the steady state) or when the consumer runs on its default.
-    if confirmed_lane(state, consumer) is not None or read_bound_lane(state, consumer) is None:
-        return
+    if dispatched_lane is None:
+        return  # the default lane is never frozen
+
+    def _mutate(m: SessionState) -> None:
+        # Equality guard (mirrors cli/hooks/policy.py): only freeze if the manifest still
+        # dispatches this exact lane. A re-pin/clear between dispatch and here changes
+        # read_bound_lane, so the stale write is dropped rather than recording an unused lane.
+        if read_bound_lane(m, consumer) == dispatched_lane:
+            ensure_consumer_lane_binding(m, consumer, dispatched_lane)
+
     try:
-        store.update(timeout_s=timeout_s, mutate=lambda m: freeze_bound_lane(m, consumer))
+        store.update(timeout_s=timeout_s, mutate=_mutate)
     except Exception:  # best-effort: freeze is bookkeeping; a persist failure must not abort the run
         logger.debug("consumer-lane freeze for %s skipped (persist failed)", consumer.id, exc_info=True)

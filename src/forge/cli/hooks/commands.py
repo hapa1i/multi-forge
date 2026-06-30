@@ -1750,15 +1750,20 @@ def teammate_idle() -> None:
         TEAM_SUPERVISOR_CONSUMER,
         handle_teammate_idle,
     )
-    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
 
+    dispatched_lane = read_bound_lane(manifest, TEAM_SUPERVISOR_CONSUMER)
     backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
-    # Freeze before dispatch so the team supervisor bills/observes one stable lane for the
-    # session (write-once; only reached once config is enabled and a lane is declared).
-    persist_lane_freeze(store, manifest, TEAM_SUPERVISOR_CONSUMER)
+
+    def _freeze() -> None:
+        # Fires from _run_supervisor's on_dispatch, so the lane freezes only on a real dispatch
+        # (not a cache/tagger/depth skip). Short HOOK_LOCK_TIMEOUT_S keeps the hook responsive (T6a).
+        persist_lane_freeze(store, TEAM_SUPERVISOR_CONSUMER, dispatched_lane, timeout_s=HOOK_LOCK_TIMEOUT_S)
+
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(
-        cache_key, lambda cache: handle_teammate_idle(data, config, cache, backend_id=backend_id)
+        cache_key,
+        lambda cache: handle_teammate_idle(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
     )
     if exit_code == 2 and feedback:
         print(feedback, file=sys.stderr)
@@ -1796,15 +1801,20 @@ def task_completed() -> None:
         TEAM_SUPERVISOR_CONSUMER,
         handle_task_completed,
     )
-    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
 
+    dispatched_lane = read_bound_lane(manifest, TEAM_SUPERVISOR_CONSUMER)
     backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
-    # Freeze before dispatch so the team supervisor bills/observes one stable lane for the
-    # session (write-once; only reached once config is enabled and a lane is declared).
-    persist_lane_freeze(store, manifest, TEAM_SUPERVISOR_CONSUMER)
+
+    def _freeze() -> None:
+        # Fires from _run_supervisor's on_dispatch, so the lane freezes only on a real dispatch
+        # (not a cache/tagger/depth skip). Short HOOK_LOCK_TIMEOUT_S keeps the hook responsive (T6a).
+        persist_lane_freeze(store, TEAM_SUPERVISOR_CONSUMER, dispatched_lane, timeout_s=HOOK_LOCK_TIMEOUT_S)
+
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(
-        cache_key, lambda cache: handle_task_completed(data, config, cache, backend_id=backend_id)
+        cache_key,
+        lambda cache: handle_task_completed(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
     )
     if exit_code == 2 and feedback:
         print(feedback, file=sys.stderr)
