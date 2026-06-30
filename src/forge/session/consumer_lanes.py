@@ -230,6 +230,23 @@ def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_r
     _set_confirmed_binding(state, consumer, binding)
 
 
+def freeze_bound_lane(state: SessionState, consumer: Consumer) -> None:
+    """Freeze ``consumer``'s currently-bound lane into ``confirmed`` (write-if-absent).
+
+    The first-dispatch freeze for the non-supervisor consumers (memory-writer,
+    shadow-curation, team-supervisor): they dispatch on whatever ``read_bound_lane``
+    resolves, so the lane to freeze *is* that read. Thin wrapper over
+    ``ensure_consumer_lane_binding`` -- write-once, the default (None) is never frozen,
+    a drifted record is skipped.
+
+    The supervisor does NOT use this. It threads the lane that actually dispatched and
+    re-checks equality under lock, because its lane can be re-pinned during the
+    multi-second *unlocked* supervisor call (``cli/hooks/policy.py``). These three freeze
+    *before* dispatch, so there is no such window and the fresh read is the bound lane.
+    """
+    ensure_consumer_lane_binding(state, consumer, read_bound_lane(state, consumer))
+
+
 def _record_to_lane(record: LaneRecord) -> Lane:
     """Validate a stored LaneRecord against today's catalogs (raises LaneError on drift)."""
     # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not

@@ -98,6 +98,21 @@ Session-scoped activation and reports (whether the memory writer runs for a sess
   `--json` emits the latest report's path + content, or the report list under `--all`. Flattened leaf (the former
   `forge memory report show`).
 
+### Session lane
+
+Per-consumer lane placement (session-owned `intent.consumer_lanes`, frozen at first dispatch). Binds a Forge LLM-work
+consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` (hyphens accepted) -- to a
+`(runtime, backend, model)` lane:
+
+- `forge session lane set --consumer <id>` (`--runtime`, `--backend`, `--session`): record a consumer's requested lane.
+  `--backend claude-max` attributes a keyless+direct run to a Claude Max subscription
+  (`billing_mode=subscription_quota`); rejected once a *different* lane is frozen. The general surface for all four
+  consumers -- the supervisor also has `forge policy supervisor set --runtime/--backend` (same slot).
+- `forge session lane show` (`--session`, `--json`): each consumer's requested (`intent`) and frozen (`confirmed`) lane,
+  flagging drift.
+- `forge session lane clear --consumer <id>` (`--session`): drop a consumer's requested lane (an already-frozen binding
+  stays until it resets next session).
+
 ### Proxy management
 
 | Command                              | Purpose                                                 |

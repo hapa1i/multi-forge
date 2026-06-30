@@ -11,6 +11,8 @@ from forge.session.consumer_lanes import (
     clear_consumer_lane,
     confirmed_lane,
     ensure_consumer_lane_binding,
+    freeze_bound_lane,
+    intent_lane,
     lane_record_for_runtime,
     read_bound_lane,
     set_intent_lane,
@@ -114,6 +116,41 @@ class TestEnsureConsumerLaneBinding:
         state = _state()
         ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("gemini", "openrouter", "m"))
         assert state.confirmed.consumer_lanes is None
+
+
+# --- freeze_bound_lane (the non-supervisor first-dispatch freeze) ---
+
+
+class TestFreezeBoundLane:
+    """``freeze_bound_lane`` = freeze whatever ``read_bound_lane`` resolves (the three aux
+    consumers dispatch on the bound lane, so it is the lane to pin)."""
+
+    def test_freezes_the_intent_override(self) -> None:
+        state = _state(intent=_CODEX_RECORD)
+        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
+        assert confirmed_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD
+
+    def test_default_lane_is_not_frozen(self) -> None:
+        # Nothing declared -> read_bound_lane is None -> the default is never pinned.
+        state = _state()
+        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
+        assert state.confirmed.consumer_lanes is None
+
+    def test_is_write_once(self) -> None:
+        frozen = ConsumerLaneBinding(lane=_CODEX_RECORD, source="intent", resolved_at="2020-01-01T00:00:00Z")
+        state = _state(intent=_DEFAULT_RECORD, confirmed=frozen)
+        freeze_bound_lane(state, SUPERVISOR_CONSUMER)  # intent says default, but confirmed already won
+        assert state.confirmed.consumer_lanes.supervisor is frozen  # type: ignore[union-attr]
+
+    def test_re_declaration_after_freeze_surfaces_as_drift(self) -> None:
+        # Declare, dispatch (freeze), then re-declare a different lane: confirmed is immutable,
+        # so the new request only lands in intent -- the drift `show` flags.
+        state = _state(intent=_CODEX_RECORD)
+        freeze_bound_lane(state, SUPERVISOR_CONSUMER)
+        set_intent_lane(state, SUPERVISOR_CONSUMER, _DEFAULT_RECORD)
+        assert confirmed_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD  # unchanged
+        assert intent_lane(state, SUPERVISOR_CONSUMER) == _DEFAULT_RECORD  # drifted request
+        assert read_bound_lane(state, SUPERVISOR_CONSUMER) == _CODEX_RECORD  # dispatch follows confirmed
 
 
 # --- lane_record_for_runtime (the resolving-command expansion) ---

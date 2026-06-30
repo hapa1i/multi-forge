@@ -73,6 +73,7 @@ def run_cmd(
 
     import dataclasses
 
+    from forge.cli.consumer_lane_freeze import persist_lane_freeze
     from forge.session.consumer_lanes import read_bound_backend_id
     from forge.session.memory_writer import (
         MEMORY_WRITER_CONSUMER,
@@ -107,6 +108,9 @@ def run_cmd(
     designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
     backend_id = read_bound_backend_id(manifest, MEMORY_WRITER_CONSUMER)
+    # Freeze the chosen lane before dispatch so the rest of the session bills/observes one
+    # stable lane (write-once; default and already-frozen are no-ops).
+    persist_lane_freeze(store, manifest, MEMORY_WRITER_CONSUMER)
 
     success = run_memory_writer(
         session_name=session_name,

@@ -1745,6 +1745,7 @@ def teammate_idle() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
+    from forge.cli.consumer_lane_freeze import persist_lane_freeze
     from forge.policy.team.handlers import (
         TEAM_SUPERVISOR_CONSUMER,
         handle_teammate_idle,
@@ -1752,6 +1753,9 @@ def teammate_idle() -> None:
     from forge.session.consumer_lanes import read_bound_backend_id
 
     backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
+    # Freeze before dispatch so the team supervisor bills/observes one stable lane for the
+    # session (write-once; only reached once config is enabled and a lane is declared).
+    persist_lane_freeze(store, manifest, TEAM_SUPERVISOR_CONSUMER)
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(
         cache_key, lambda cache: handle_teammate_idle(data, config, cache, backend_id=backend_id)
@@ -1787,6 +1791,7 @@ def task_completed() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
+    from forge.cli.consumer_lane_freeze import persist_lane_freeze
     from forge.policy.team.handlers import (
         TEAM_SUPERVISOR_CONSUMER,
         handle_task_completed,
@@ -1794,6 +1799,9 @@ def task_completed() -> None:
     from forge.session.consumer_lanes import read_bound_backend_id
 
     backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
+    # Freeze before dispatch so the team supervisor bills/observes one stable lane for the
+    # session (write-once; only reached once config is enabled and a lane is declared).
+    persist_lane_freeze(store, manifest, TEAM_SUPERVISOR_CONSUMER)
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(
         cache_key, lambda cache: handle_task_completed(data, config, cache, backend_id=backend_id)

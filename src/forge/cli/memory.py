@@ -908,10 +908,13 @@ def _review_curate(
     # (curation already inherits proxy/direct routing from the same config).
     effective_effort = effort or (config.effort if config else None)
 
+    from forge.cli.consumer_lane_freeze import persist_lane_freeze
     from forge.session.consumer_lanes import read_bound_backend_id
     from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
 
     backend_id = read_bound_backend_id(state, SHADOW_CURATION_CONSUMER)
+    # Freeze before dispatch -- same write-once lane pin as the memory writer.
+    persist_lane_freeze(resolved.store, state, SHADOW_CURATION_CONSUMER)
 
     result = run_shadow_curation(
         session_name=resolved.store.session_name,

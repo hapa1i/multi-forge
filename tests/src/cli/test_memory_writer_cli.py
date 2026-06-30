@@ -8,13 +8,18 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli.memory_writer import memory_writer
+from forge.session.consumer_lanes import set_intent_lane
+from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
 from forge.session.models import (
+    LaneRecord,
     MemoryIntent,
     MemoryWriterConfig,
     create_session_state,
 )
 from forge.session.passport import synthesize_passport, write_passport
 from forge.session.store import SessionStore
+
+_CLAUDE_MAX = LaneRecord("claude_code", "claude-max", "opus")
 
 
 def _write_handoff_session(worktree: Path, *, subprocess_proxy: str | None = None) -> None:
@@ -158,6 +163,43 @@ def test_run_cmd_passport_strategy_used(tmp_path: Path) -> None:
     docs = mock_run.call_args.kwargs["designated_docs"]
     assert len(docs) == 1
     assert docs[0].strategy == "changelog"  # passport strategy only
+
+
+def test_run_cmd_freezes_declared_lane(tmp_path: Path) -> None:
+    """A declared claude-max lane freezes into confirmed at the handoff dispatch, and the
+    same backend_id flows to the runner (the billing input)."""
+    root = tmp_path.resolve()
+    manifest = create_session_state("session")
+    manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
+    set_intent_lane(manifest, MEMORY_WRITER_CONSUMER, _CLAUDE_MAX)
+    store = SessionStore(str(root), "session")
+    store.write(manifest)
+
+    with (
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
+    ):
+        result = _run(root)
+
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs["backend_id"] == "claude-max"
+    confirmed = store.read().confirmed.consumer_lanes
+    assert confirmed is not None and confirmed.memory_writer is not None
+    assert confirmed.memory_writer.lane == _CLAUDE_MAX
+
+
+def test_run_cmd_undeclared_lane_does_not_freeze(tmp_path: Path) -> None:
+    """No declaration -> the default lane is never frozen and backend_id stays None."""
+    root = tmp_path.resolve()
+    _write_handoff_session(root)
+    with (
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
+    ):
+        result = _run(root)
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs["backend_id"] is None
+    assert SessionStore(str(root), "session").read().confirmed.consumer_lanes is None
 
 
 def test_run_cmd_shadow_doc_scanned(tmp_path: Path) -> None:

@@ -1207,6 +1207,15 @@ freezes; a consumer on its default lane never freezes and stays re-pinnable**) -
 (`--supervisor-runtime`, `policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same
 lane is an idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
+**Aux consumers on `claude-max` (T6a).** Memory-writer, shadow-curation, and team-supervisor are bindable through the
+same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
+`claude_code` runtime as the default, so placement changes the **billing label, not dispatch** (no codex-style arm; that
+is T6b). `forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer
+freezes it into `confirmed` *before* dispatch via `persist_lane_freeze` (best-effort -- a lock failure never blocks the
+run). `read_bound_backend_id` then yields `claude-max`, and a **keyless + direct** run is labeled `subscription_quota`
+(a resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from the `intent` write alone (the read
+is confirmed-first **then intent**); the freeze adds immutability + a stable observable binding, not the billing label.
+
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch
 record, T1b), else the `intent` override or the default claude lane. `runtime_id` selects the arm; the codex

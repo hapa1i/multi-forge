@@ -7,7 +7,8 @@ billing label + the three consumers' defs/slots/threading).
 **Type**: Member card. UX-generalization slice. No new runtime, no dispatch change.
 
 **Status**: Authored 2026-06-29 on branch `aux_consumer_lane_placement`. Scope fixed at **Level 1 (placement UX only)**
-in a 2026-06-29 planning review (the Level 2 codex-dispatch slice is split out as **T6b**).
+in a 2026-06-29 planning review (the Level 2 codex-dispatch slice is split out as **T6b**). **Phase 1 (CLI) + Phase 2
+(freeze) implemented 2026-06-30**; Phase 3 (docs sync + integration) in progress. See `checklist.md`.
 
 ---
 
@@ -23,14 +24,19 @@ sites pass `backend_id`).
 T0 **deliberately deferred the operator half** for those three ("the other three consumers' operator CLI + binding
 freeze is a follow-on -- bindable in tests/programmatically now"). The result is an honesty gap for the "Why now"
 persona (Claude Max, no API key): the supervisor bills `subscription_quota`, but their memory-writer / shadow-curation /
-team-supervisor aux runs still bill **`unknown`**, because:
+team-supervisor aux runs still bill **`unknown`** -- because **no CLI writes their `intent` override**.
+`forge policy supervisor set` (`cli/policy.py:1160-1171`) hardcodes `SUPERVISOR_CONSUMER`, so there is no surface to set
+`intent.consumer_lanes.{memory_writer,shadow_curation,team_supervisor}`. With neither `intent` nor `confirmed`,
+`read_bound_backend_id` returns `None` and the label stays `unknown`.
 
-1. **No CLI writes their `intent` override.** `forge policy supervisor set` (`cli/policy.py:1160-1171`) hardcodes
-   `SUPERVISOR_CONSUMER`; there is no surface to set
-   `intent.consumer_lanes.{memory_writer,shadow_curation,team_supervisor}`.
-2. **No freeze writes their `confirmed` binding.** The dispatch-time freeze (`cli/hooks/policy.py:274-297`) hardcodes
-   `SUPERVISOR_CONSUMER`, so the three never get a frozen binding -- and `read_bound_backend_id` returns `None`, so the
-   billing label stays `unknown`.
+**The freeze is a second, separable concern -- not the billing blocker.** `read_bound_backend_id` reads
+`read_bound_lane`, which is confirmed-first **else `intent`** else None, so once the CLI writes the `intent` override
+billing already resolves `claude-max` from `intent` alone -- **no freeze required** (proven by
+`test_read_bound_backend_id_for_all_consumers`, which binds via `intent` only). What the three still lack is the
+supervisor's **write-once freeze** (`cli/hooks/policy.py:274-297`, also `SUPERVISOR_CONSUMER`-only): without it their
+lane stays `intent`-only -- re-declarable mid-session, with no immutable `confirmed` record. T6a adds the freeze for
+**parity** (lock the lane for the session + a stable observable binding), not to turn billing on. So billing honesty
+lands at **Phase 1** (the CLI); **Phase 2** (the freeze) is immutability/observability hardening.
 
 The capability gap is **UX only**: the resolver, billing, schema, and threading already exist for all four.
 
