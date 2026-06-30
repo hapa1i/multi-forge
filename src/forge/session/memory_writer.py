@@ -25,6 +25,7 @@ import logging
 import re
 from pathlib import Path
 
+from forge.core.lanes import Consumer, Lane
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
@@ -44,6 +45,17 @@ from forge.session.passport import (
 from forge.session.validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
+
+
+# Consumer-lane identity (epic consumer_lanes, T0). claude-max is the only non-default lane
+# (claude_code runtime, subscription posture); backend_id is load-bearing for billing only --
+# dispatch stays claude_code/run_claude_session.
+MEMORY_WRITER_CONSUMER = Consumer(
+    id="memory_writer",
+    capability_floor="tool_agent",
+    default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
+    allowed_lanes=(Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),),
+)
 
 
 def _default_timeout() -> int:
@@ -350,6 +362,7 @@ def run_memory_writer(
     base_url: str | None = None,
     timeout_seconds: int | None = None,
     designated_docs: list[DesignatedDoc] | None = None,
+    backend_id: str | None = None,
 ) -> bool:
     """Run the memory writer as a ``claude -p`` subprocess.
 
@@ -530,6 +543,7 @@ def run_memory_writer(
         session=session_name,
         base_url=base_url,
         direct=config.direct,
+        backend_id=backend_id,
     )
 
     if not result.success:

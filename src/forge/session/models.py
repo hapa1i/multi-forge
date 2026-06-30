@@ -283,11 +283,14 @@ class ConsumerLaneIntent:
     """Requested per-consumer lane overrides (session-owned intent).
 
     Named field per consumer (never a ``dict``) so strict deserialization and
-    override-path validation stay per-field. T1b wires the supervisor only; T6
-    adds sibling fields.
+    override-path validation stay per-field. T1b wired the supervisor; T0 added the
+    three sibling consumers for subscription billing.
     """
 
     supervisor: LaneRecord | None = None
+    memory_writer: LaneRecord | None = None
+    shadow_curation: LaneRecord | None = None
+    team_supervisor: LaneRecord | None = None
 
 
 @dataclass
@@ -310,6 +313,9 @@ class ConsumerLaneConfirmed:
     """Frozen per-consumer lane bindings (hook-written, write-once per consumer)."""
 
     supervisor: ConsumerLaneBinding | None = None
+    memory_writer: ConsumerLaneBinding | None = None
+    shadow_curation: ConsumerLaneBinding | None = None
+    team_supervisor: ConsumerLaneBinding | None = None
 
 
 @dataclass

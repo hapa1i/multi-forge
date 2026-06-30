@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from forge.core.reactive.session_runner import SessionResult
+from forge.core.usage.ledger import read_usage_events
 from forge.session.shadow_curation import (
     ShadowEntry,
     _doc_slug,
@@ -228,6 +230,34 @@ class TestRunShadowCuration:
         assert result.success
         assert result.report_path is not None
         assert result.report_path.exists()
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    def test_claude_max_binding_emits_subscription_quota(
+        self, mock_run: MagicMock, tmp_path: Path, monkeypatch
+    ) -> None:
+        """A keyless, direct, claude-max-bound curation run threads backend_id ->
+        emit, so the usage event is labeled subscription_quota."""
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,  # keyless: no resolvable ANTHROPIC_API_KEY
+        )
+        mock_run.return_value = SessionResult(stdout="## Promote\n- Item", stderr="", returncode=0, run_id="run_cur")
+        entries = [
+            ShadowEntry("docs/n.md", ".forge/memory/s.md", "generic", "s1", str(tmp_path), "content"),
+        ]
+        run_shadow_curation(
+            session_name="s1",
+            forge_root=tmp_path,
+            official_path="docs/n.md",
+            official_content="# Notes",
+            shadow_entries=entries,
+            direct=True,
+            backend_id="claude-max",
+        )
+
+        events = read_usage_events(command="curation")
+        assert len(events) == 1
+        assert events[0].billing_mode == "subscription_quota"
 
     @patch("forge.core.reactive.session_runner.run_claude_session")
     @patch("forge.core.reactive.cost_tracking.track_verb_cost")

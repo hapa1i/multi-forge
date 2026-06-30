@@ -73,7 +73,12 @@ def run_cmd(
 
     import dataclasses
 
-    from forge.session.memory_writer import resolve_writer_base_url, run_memory_writer
+    from forge.session.consumer_lanes import read_bound_backend_id
+    from forge.session.memory_writer import (
+        MEMORY_WRITER_CONSUMER,
+        resolve_writer_base_url,
+        run_memory_writer,
+    )
     from forge.session.project_memory import (
         DEFAULT_SCAN_ROOTS,
         is_memory_enabled,
@@ -101,6 +106,8 @@ def run_cmd(
 
     designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
+    backend_id = read_bound_backend_id(manifest, MEMORY_WRITER_CONSUMER)
+
     success = run_memory_writer(
         session_name=session_name,
         forge_root=effective_root,
@@ -109,6 +116,7 @@ def run_cmd(
         base_url=base_url,
         timeout_seconds=timeout,
         designated_docs=designated_docs,
+        backend_id=backend_id,
     )
 
     if not success:

@@ -14,6 +14,7 @@ import pytest
 
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.upstream import read_upstream_outcomes
+from forge.core.usage.ledger import read_usage_events
 from forge.session.memory_writer import (
     _dedupe_specs,
     _stdout_indicates_permission_denied,
@@ -722,6 +723,32 @@ class TestRunHandoffAgent:
         assert len(outcomes) == 1
         assert outcomes[0].status == "error"
         assert outcomes[0].latency_ms == 0.0
+
+    def test_claude_max_binding_emits_subscription_quota(self, workspace: Path, monkeypatch) -> None:
+        """A keyless, direct, claude-max-bound writer run threads backend_id through
+        run_memory_writer -> emit, so the usage event is labeled subscription_quota.
+        Covers the read->run->emit forwarding glue (types alone miss a dropped arg)."""
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,  # keyless: no resolvable ANTHROPIC_API_KEY
+        )
+        mock_result = SessionResult(stdout="", stderr="", returncode=0, run_id="run_mw")
+        with (
+            patch("forge.session.memory_writer.is_claude_available", return_value=True),
+            patch("forge.session.memory_writer.run_claude_session", return_value=mock_result),
+        ):
+            run_memory_writer(
+                session_name="test",
+                forge_root=workspace,
+                transcript_snapshot_rel=".forge/artifacts/test/transcripts/uuid-123.jsonl",
+                config=MemoryWriterConfig(enabled=True, min_turns=1, direct=True),
+                designated_docs=self._default_docs(),
+                backend_id="claude-max",
+            )
+
+        events = read_usage_events(command="memory-writer")
+        assert len(events) == 1
+        assert events[0].billing_mode == "subscription_quota"
 
     def test_stamps_provider_trace_identity_env(self, workspace: Path) -> None:
         """Phase 1: the writer tags its spawn with the session name + memory_writer role."""

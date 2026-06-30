@@ -361,6 +361,30 @@ class TestHandleTeammateIdle:
         exit_code, _ = handle_teammate_idle(_idle_event(), _config(), cache)
         assert exit_code == 0
 
+    @patch("forge.policy.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
+    def test_claude_max_binding_emits_subscription_quota(self, _mock_classify, mock_session, monkeypatch):
+        """End-to-end through the public handler: a claude-max backend_id threads
+        handle_teammate_idle -> _run_supervisor -> emit, so the usage event is
+        labeled subscription_quota. Guards the forwarding a type check can't (a
+        dropped read or a None passed in a refactor)."""
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,  # keyless: no resolvable ANTHROPIC_API_KEY
+        )
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "aligned"}',
+            stderr="",
+            returncode=0,
+            run_id="team-run-max",
+            root_run_id="team-run-max",
+        )
+        handle_teammate_idle(_idle_event(), _config(direct=True), {}, backend_id="claude-max")
+
+        events = read_usage_events(command="team-supervisor")
+        assert len(events) == 1
+        assert events[0].billing_mode == "subscription_quota"
+
 
 # --- handle_task_completed ---
 
