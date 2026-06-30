@@ -7,14 +7,15 @@ wave, **load-bearing for a future `claude-max` lane**).
 question the epic deferred -- *does a headless `claude -p` actually ride a Claude Max/Pro subscription, and can Forge
 detect it locally?* -- and makes Forge's `billing_mode` honest about the answer.
 
-**Status**: Card authored 2026-06-29 on branch `claude_subscription_billing`; revised same day after review. **Phase 0
-probe built and run on a live Claude Max box (2026-06-29); outcome = PROCEED** (see `phase0-results.md`): keyless
-`claude -p` rides Max headlessly, and the dependable detection signal is `can_use_bare` (Forge's own key-resolvability
-predicate), not any run artifact. Phase 1 (the auth-posture resolver) is unblocked but not yet implemented.
+**Status**: **Done** -- shipped in PR #58 (`b0614325`, 2026-06-29) and closed out to `done/`. **Phase 0 probe built and
+run on a live Claude Max box (2026-06-29); outcome = PROCEED** (see `phase0-results.md`): keyless `claude -p` rides Max
+headlessly, and the dependable detection signal is `can_use_bare` (Forge's own key-resolvability predicate), not any run
+artifact. Phases 1+2 (auth-posture resolver + `claude-max` `ModelSource`) shipped: a keyless direct run bound to
+`claude-max` now emits `billing_mode="subscription_quota"`, threaded through all four emit callers.
 
-**Lane decision (resolved)**: stays in `doing/`. board_contract's todo/-vs-doing/ discriminator is "todo/ means *no
-execution branch is active*"; an execution branch exists and the epic coordinates T0 as the active cursor, so `doing/`
-is contract-correct.
+**Lane decision (resolved)**: closed to `done/` at completion (PR #58). While active it stayed in `doing/` --
+board_contract's todo/-vs-doing/ discriminator is "todo/ means *no execution branch is active*"; an execution branch
+existed and the epic coordinated T0 as the active cursor, so `doing/` was contract-correct.
 
 ---
 

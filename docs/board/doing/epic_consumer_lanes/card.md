@@ -5,8 +5,8 @@ first wave is split into member cards (linked beneath the member table): **T1a, 
 spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's lane observability have landed on `main`.
 The **first wave is complete**; the epic stays in `doing/` coordinating T6 and T7 (added in
 `proposed/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
-`done/consumer_lane_binding/`; T6 stays an inline sketch (board_contract "Epics"). With T1b done, the next cursor is
-open (T6, T7, or the T0 sibling).
+`done/consumer_lane_binding/`; T6 stays an inline sketch (board_contract "Epics"). With T1b and the T0 sibling both done
+(T0: PR #58, `b0614325`), the next cursor is open (T6 or T7).
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -201,17 +201,16 @@ rows above stay the durable sketch; the cards carry verified touchpoints + fixtu
 `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
 version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
-**T0 -- sibling billing cleanup** (promoted to member card `doing/claude_subscription_billing/` 2026-06-29, branch
-`claude_subscription_billing`; card authored, **awaiting plan review**): revisit the `claude -p` `unknown`/OAuth billing
-assumption (`billing.py`) against current Anthropic `-p` billing. **A 2026-06-29 code-grounded sweep refined the
-framing**: the inference is conservative-*correct* for today's emissions (a *key-resolvable* headless run is genuinely
-API-billed via auto-`--bare`; a *keyless* run already falls through to OAuth and is honestly labeled `unknown`), not
-buggy -- the real gap is that **no Claude subscription signal exists** to classify that keyless path, and
-`infer_billing_mode(direct, has_api_key)` is the wrong shape to add one (key-presence is a capability, not a payer). So
-T0 is **probe-first**: does `claude -p` ride Max *headlessly*, and is it locally detectable (the codex
-`chatgpt -> subscription_quota` preflight is the template)? **Non-blocking for the proven `chatgpt` path (T2/T4), but
-load-bearing for `claude-max`**: a `claude-max` subscription source must not claim `subscription_quota` until T0 proves
-`claude -p` actually rides the Max subscription.
+**T0 -- sibling billing cleanup** (**done** -- `done/claude_subscription_billing/`, PR #58 `b0614325`, 2026-06-29;
+branch `claude_subscription_billing`): revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
+current Anthropic `-p` billing. **A 2026-06-29 code-grounded sweep refined the framing**: the inference is
+conservative-*correct* for today's emissions (a *key-resolvable* headless run is genuinely API-billed via auto-`--bare`;
+a *keyless* run already falls through to OAuth and is honestly labeled `unknown`), not buggy -- the real gap is that
+**no Claude subscription signal exists** to classify that keyless path, and `infer_billing_mode(direct, has_api_key)` is
+the wrong shape to add one (key-presence is a capability, not a payer). So T0 is **probe-first**: does `claude -p` ride
+Max *headlessly*, and is it locally detectable (the codex `chatgpt -> subscription_quota` preflight is the template)?
+**Non-blocking for the proven `chatgpt` path (T2/T4), but load-bearing for `claude-max`**: a `claude-max` subscription
+source must not claim `subscription_quota` until T0 proves `claude -p` actually rides the Max subscription.
 
 **Assembly is cheap (verified).** The Codex supervisor (T4) reuses shipped pieces: the verdict parser takes a plain
 string (`verdict.py:86 parse_supervisor_verdict(response: str)`); `CodexHeadlessInvoker` already returns its final text
