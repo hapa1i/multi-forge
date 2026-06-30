@@ -404,6 +404,28 @@ class TestHandleTaskCompleted:
         assert exit_code == 2
         assert "Needs rework" in feedback
 
+    @patch("forge.policy.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
+    def test_claude_max_binding_emits_subscription_quota(self, _mock_classify, mock_session, monkeypatch):
+        """Sibling to the idle path: handle_task_completed -> _run_supervisor -> emit threads
+        backend_id at an independent call site, so cover it too (not just teammate-idle)."""
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,  # keyless: no resolvable ANTHROPIC_API_KEY
+        )
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "aligned"}',
+            stderr="",
+            returncode=0,
+            run_id="task-run-max",
+            root_run_id="task-run-max",
+        )
+        handle_task_completed(_task_event(), _config(direct=True), {}, backend_id="claude-max")
+
+        events = read_usage_events(command="team-supervisor")
+        assert len(events) == 1
+        assert events[0].billing_mode == "subscription_quota"
+
     @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Still bad"))
     @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_escape_hatch_auto_allows(self, _mock_classify, _mock_supervisor):

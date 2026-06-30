@@ -1012,6 +1012,57 @@ class TestInjectedLaneBinding:
         mock_claude.assert_not_called()
         mock_invoker_cls.return_value.run.assert_not_called()
 
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_claude_max_binding_emits_subscription_quota(self, mock_claude: MagicMock, monkeypatch) -> None:
+        """The headline consumer: a claude-max binding threads lane.backend_id through
+        _dispatch_supervisor -> _dispatch_claude_supervisor -> emit, so a keyless direct run is
+        labeled subscription_quota. Drives the real dispatch glue (not a direct emit call), so a
+        refactor that drops backend_id on the way to emit -- which types can't catch -- fails."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.core.usage.ledger import read_usage_events
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: None,  # keyless
+        )
+        mock_claude.return_value = SessionResult(
+            stdout=_VALID_VERDICT_STDOUT, stderr="", returncode=0, run_id="sup-max"
+        )
+
+        run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True),
+            _make_context(),
+            lane_record=LaneRecord("claude_code", "claude-max", "opus"),
+        )
+
+        events = read_usage_events(command="supervisor")
+        assert len(events) == 1
+        assert events[0].billing_mode == "subscription_quota"
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_claude_max_binding_with_key_present_is_api(self, mock_claude: MagicMock, monkeypatch) -> None:
+        """Precedence twin: a resolvable key on the same claude-max lane still bills api."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.core.usage.ledger import read_usage_events
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: "sk-test",  # key resolvable -> api wins over the subscription lane
+        )
+        mock_claude.return_value = SessionResult(
+            stdout=_VALID_VERDICT_STDOUT, stderr="", returncode=0, run_id="sup-key"
+        )
+
+        run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True),
+            _make_context(),
+            lane_record=LaneRecord("claude_code", "claude-max", "opus"),
+        )
+
+        assert read_usage_events(command="supervisor")[0].billing_mode == "api"
+
 
 class TestCodexSupervisorLane:
     """T4: run_supervisor_check end-to-end on the codex lane override.
