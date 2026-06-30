@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+from forge.core.lanes import Lane, valid_lanes
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.usage.ledger import read_usage_events
+from forge.session.models import LaneRecord
 from forge.session.shadow_curation import (
+    SHADOW_CURATION_CONSUMER,
     ShadowEntry,
     _doc_slug,
     build_curation_prompt,
@@ -606,3 +611,283 @@ class TestRunShadowCurationEffort:
 
         call_kwargs = mock_run.call_args
         assert call_kwargs.kwargs.get("reasoning_effort") == "medium"
+
+
+# ---------------------------------------------------------------------------
+# Codex dispatch arm (epic consumer_lanes T6b)
+# ---------------------------------------------------------------------------
+
+_CODEX_LANE = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+_CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-lane manifest DTO
+# prepare_codex_request is mocked in these tests, so billing_mode is never read off the preflight.
+_READY_PREFLIGHT = SimpleNamespace(ready=True, blocking_reason=None)
+
+
+def _codex_result(**overrides: Any) -> Any:
+    """A HeadlessResult shaped like ``CodexHeadlessInvoker.run`` returns (T6b codex arm).
+
+    Defaults to a clean exit-0 turn; pass ``returncode``/``runtime_is_error``/``stderr`` to model
+    a failed turn.
+    """
+    from forge.core.invoker.types import HeadlessResult
+
+    defaults: dict[str, Any] = {
+        "label": "curation",
+        "stdout": "## Promote\n- Item",
+        "stderr": "",
+        "returncode": 0,
+        "duration_seconds": 0.1,
+    }
+    defaults.update(overrides)
+    return HeadlessResult(**defaults)
+
+
+def test_shadow_curation_consumer_allows_codex_lane() -> None:
+    """T6b adds (does not replace) the codex lane: both claude-max and codex are valid."""
+    lanes = valid_lanes(SHADOW_CURATION_CONSUMER)
+    assert _CODEX_LANE in lanes
+    assert Lane("claude_code", "claude-max", "opus") in lanes
+
+
+class TestCodexShadowCuration:
+    def _entries(self, root: Path) -> list[ShadowEntry]:
+        return [ShadowEntry("docs/n.md", ".forge/memory/s.md", "generic", "s1", str(root), "content")]
+
+    def _run(self, root: Path, **kwargs: Any):
+        kwargs.setdefault("lane_record", _CODEX_LANE_RECORD)
+        return run_shadow_curation(
+            session_name="s1",
+            forge_root=root,
+            official_path="docs/n.md",
+            official_content="# Notes",
+            shadow_entries=self._entries(root),
+            **kwargs,
+        )
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_dispatches_through_invoker_and_persists_from_stdout(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Reads the cached preflight (no doctor), builds a read-only request, persists codex stdout."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="## Promote\n- From codex")
+
+        result = self._run(tmp_path)
+
+        # Cached read (no `codex doctor` in the path), invoker ran once, claude never touched.
+        mock_read.assert_called_once_with()
+        mock_invoker_cls.return_value.run.assert_called_once()
+        mock_claude.assert_not_called()
+        # Read-only sandbox, no model pin (codex picks its own), self-contained prompt at forge_root.
+        assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["model"] is None
+        assert mock_prepare.call_args.kwargs["cwd"] == str(tmp_path)
+        # Report persisted from codex stdout.
+        assert result.success
+        assert result.report_path is not None and result.report_path.exists()
+        assert "From codex" in result.report_path.read_text(encoding="utf-8")
+        assert result.error is None
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_pins_operation_and_skips_claude_emitter(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_emit: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Single emitter: the codex path never calls the claude-arm emitter; the Attribution it hands
+        the invoker pins operation="memory.shadow_curation" so the auto-recorded upstream row matches
+        the claude path (NOT the workflow.worker default, NOT None like the supervisor arm)."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result()
+
+        self._run(tmp_path)
+
+        mock_emit.assert_not_called()
+        attribution = mock_prepare.call_args.kwargs["attribution"]
+        assert attribution.command == "curation"
+        assert attribution.session == "s1"
+        assert attribution.operation == "memory.shadow_curation"
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight", return_value=None)
+    def test_cold_preflight_fails_loud_no_fallback_no_freeze(
+        self,
+        mock_read: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """A cold cache fails loud with the refresh hint, never falls back to claude, never spawns
+        codex, and -- as a skip-return -- never freezes the lane."""
+        freeze = MagicMock()
+        result = self._run(tmp_path, on_dispatch=freeze)
+
+        assert result.success is False
+        assert result.report_path is None
+        assert result.error is not None
+        assert "forge runtime preflight codex" in result.error
+        mock_claude.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_not_called()
+        freeze.assert_not_called()
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_unready_preflight_surfaces_blocking_reason(
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        mock_read.return_value = SimpleNamespace(ready=False, blocking_reason="codex not installed")
+
+        result = self._run(tmp_path)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "codex not installed" in result.error
+        assert "forge runtime preflight codex" in result.error
+        mock_invoker_cls.return_value.run.assert_not_called()
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_failed_turn_fails_loud_but_still_freezes(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """A non-zero codex turn fails loud, but the freeze still fires -- past the preflight gate the
+        consumer genuinely dispatched on the codex lane (claude-arm parity)."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(returncode=1, stderr="boom", stdout="partial")
+        freeze = MagicMock()
+
+        result = self._run(tmp_path, on_dispatch=freeze)
+
+        assert result.success is False
+        assert result.report_path is None
+        assert result.error is not None and "boom" in result.error
+        freeze.assert_called_once()
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_exit_zero_but_runtime_error_fails_loud(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """HeadlessResult.success is returncode-only; an exit-0 turn that reports an in-stream error
+        (runtime_is_error) must still fail loud instead of persisting an empty report."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(
+            returncode=0, runtime_is_error=True, stderr="model refused"
+        )
+
+        result = self._run(tmp_path)
+
+        assert result.success is False
+        assert result.report_path is None
+        assert result.error is not None and "model refused" in result.error
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_successful_dispatch_fires_freeze(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result()
+        freeze = MagicMock()
+
+        result = self._run(tmp_path, on_dispatch=freeze)
+
+        assert result.success
+        freeze.assert_called_once()
+
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    @patch("forge.core.reactive.cost_tracking.track_verb_cost")
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    def test_claude_runtime_never_touches_codex(
+        self,
+        mock_claude: MagicMock,
+        mock_cost: MagicMock,
+        mock_read: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """The default claude_code runtime takes the existing claude path and never reads the codex
+        preflight -- the codex branch is inert unless explicitly selected."""
+        mock_claude.return_value = SessionResult(stdout="## Promote\n- Item", stderr="", returncode=0, run_id="r")
+
+        result = run_shadow_curation(
+            session_name="s1",
+            forge_root=tmp_path,
+            official_path="docs/n.md",
+            official_content="# Notes",
+            shadow_entries=self._entries(tmp_path),
+        )
+
+        assert result.success
+        mock_claude.assert_called_once()
+        mock_read.assert_not_called()
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_invalid_explicit_lane_fails_loud_no_dispatch_no_freeze(
+        self,
+        mock_read: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """A drifted/corrupt explicit binding (codex runtime paired with a non-codex backend) is not
+        a declared candidate, so resolve_lane rejects it and curation fails loud as a no-call --
+        never dispatching the wrong arm (mirrors the supervisor's resolve_lane guard). No freeze."""
+        freeze = MagicMock()
+        result = self._run(tmp_path, lane_record=LaneRecord("codex", "anthropic-direct", "opus"), on_dispatch=freeze)
+
+        assert result.success is False
+        assert result.report_path is None
+        assert result.error is not None
+        assert "invalid lane" in result.error
+        assert "forge session lane" in result.error  # names the re-pin / clear recovery path
+        mock_claude.assert_not_called()  # NOT a silent claude fallback
+        mock_invoker_cls.return_value.run.assert_not_called()  # codex never spawned
+        mock_read.assert_not_called()  # never reached arm selection
+        freeze.assert_not_called()  # validation precedes on_dispatch -> no freeze on an invalid lane
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_unknown_runtime_fails_loud_not_silent_claude(
+        self, mock_read: MagicMock, mock_claude: MagicMock, tmp_path: Path
+    ) -> None:
+        """An unknown runtime in a stale binding must fail loud, NOT silently fall through to the
+        claude arm -- the pre-fix hazard of selecting the arm from a raw, unvalidated runtime_id."""
+        result = self._run(tmp_path, lane_record=LaneRecord("vllm", "chatgpt", "gpt-5-codex"))
+
+        assert result.success is False
+        assert result.error is not None
+        assert "invalid lane" in result.error
+        mock_claude.assert_not_called()
+        mock_read.assert_not_called()

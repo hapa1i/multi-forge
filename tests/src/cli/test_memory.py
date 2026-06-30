@@ -783,6 +783,53 @@ class TestShadowsReview:
         assert "report_path" in data
         assert data["shadow_count"] == 1
 
+    def _seed_shadow(self, runner: CliRunner, forge_root: Path) -> None:
+        """Track impl_notes and write a shadow so --curate reaches the dispatch (past the no-shadows guard)."""
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        (forge_root / ".forge/memory/shadow_docs_impl_notes.md").write_text("- [ ] Item\n", encoding="utf-8")
+
+    def test_review_curate_failure_surfaces_error_json(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """T6b/D5: a fail-loud CurationResult.error (e.g. cold codex preflight) is carried in --json,
+        with exit 1 -- not dropped like it was before the error field existed."""
+        from forge.session.shadow_curation import CurationResult
+
+        self._seed_shadow(runner, seeded_session[0])
+        hint = "Codex curation unavailable: no fresh preflight cached. Run 'forge runtime preflight codex' to refresh."
+        monkeypatch.setattr(
+            "forge.session.shadow_curation.run_shadow_curation",
+            lambda *a, **kw: CurationResult(success=False, report_path=None, stdout="", error=hint),
+        )
+
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate", "--json"]
+        )
+        assert result.exit_code == 1, result.output
+        data = json.loads(result.output)
+        assert data["success"] is False
+        assert data["error"] == hint
+        assert "forge runtime preflight codex" in data["error"]
+
+    def test_review_curate_failure_surfaces_error_human(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """T6b/D5: the same hint reaches the human (non-JSON) failure output, so a user who bound codex
+        and never refreshed the preflight sees the actionable fix, not just a bare 'Curation failed.'"""
+        from forge.session.shadow_curation import CurationResult
+
+        self._seed_shadow(runner, seeded_session[0])
+        hint = "Codex curation unavailable: no fresh preflight cached. Run 'forge runtime preflight codex' to refresh."
+        monkeypatch.setattr(
+            "forge.session.shadow_curation.run_shadow_curation",
+            lambda *a, **kw: CurationResult(success=False, report_path=None, stdout="", error=hint),
+        )
+
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+        assert result.exit_code == 1, result.output
+        # Rich soft-wraps at the harness's terminal width; normalize before matching the hint.
+        assert "forge runtime preflight codex" in " ".join(result.output.split())
+
     def test_review_scope_workspace_reads_official_from_session_root(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -16,20 +16,25 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from forge.core.lanes import Consumer, Lane
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.ops.context import ExecutionContext
 from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+from forge.session.models import LaneRecord
 
 logger = logging.getLogger(__name__)
 
 
-# Consumer-lane identity (epic consumer_lanes, T0). claude-max is the only non-default lane
-# (claude_code runtime, subscription posture); backend_id is load-bearing for billing only.
+# Consumer-lane identity (epic consumer_lanes, T0/T6b). Two non-default lanes: claude-max
+# (claude_code runtime, subscription posture) and codex (the T6b dispatch arm). backend_id is
+# load-bearing for billing only; model is nominal on the codex lane (codex picks its own model).
 SHADOW_CURATION_CONSUMER = Consumer(
     id="shadow_curation",
     capability_floor="tool_agent",
     default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
-    allowed_lanes=(Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),),
+    allowed_lanes=(
+        Lane(runtime_id="claude_code", backend_id="claude-max", model="opus"),
+        Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),
+    ),
 )
 
 
@@ -57,6 +62,9 @@ class CurationResult:
     success: bool
     report_path: Path | None
     stdout: str
+    # Actionable failure hint surfaced by the CLI (human + --json), e.g. a cold-codex-preflight
+    # refresh hint (T6b). stdout stays the human-only zero-schema fallback; error is the carrier.
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -286,13 +294,19 @@ def run_shadow_curation(
     scope: str = "project",
     reasoning_effort: str | None = None,
     backend_id: str | None = None,
+    lane_record: LaneRecord | None = None,
     on_dispatch: Callable[[], None] | None = None,
 ) -> CurationResult:
-    """Build prompt, call LLM, persist report.
+    """Build prompt, validate the bound lane, call the resolved runtime, persist report.
 
-    The caller (CLI) resolves routing via ``resolve_writer_base_url()``
-    and passes ``base_url`` + ``direct``. ``reasoning_effort`` is the
-    ``claude --effort`` level for the curation ``claude -p`` run.
+    The caller (CLI) resolves routing via ``resolve_writer_base_url()`` and passes ``base_url`` +
+    ``direct``. ``reasoning_effort`` is the ``claude --effort`` level for the curation ``claude -p``
+    run. ``lane_record`` is the consumer-lane binding (``read_bound_lane``, epic consumer_lanes T6b);
+    it is validated against ``SHADOW_CURATION_CONSUMER``'s declared candidates and its runtime selects
+    the dispatch arm: ``"claude_code"`` runs ``claude -p``; ``"codex"`` runs ``codex exec`` via
+    ``_dispatch_codex_shadow_curation`` (read-only, blind/inlined prompt, fail-loud on a cold
+    preflight). ``None`` resolves to the default (claude) lane; an invalid/drifted explicit binding
+    fails loud. ``base_url``/``direct``/``reasoning_effort``/``backend_id`` are claude-arm-only.
     """
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.reactive.session_runner import run_claude_session
@@ -303,6 +317,49 @@ def run_shadow_curation(
         official_content=official_content,
         shadow_entries=shadow_entries,
     )
+
+    # Validate the bound lane against the consumer's declared candidates BEFORE selecting an arm
+    # (mirrors the supervisor's LaneRecord -> Lane -> resolve_lane guard, supervisor.py). A
+    # LaneRecord is Forge-owned durable state, so a stale/corrupt explicit binding -- a codex
+    # runtime paired with a non-codex backend, or an unknown runtime -- must fail loud as a no-call,
+    # never silently dispatch the wrong arm or degrade to claude. A None binding (no placement)
+    # resolves to the default claude lane with no error.
+    try:
+        # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not
+        # constructor order (matches consumer_lanes._record_to_lane + the supervisor path).
+        override = (
+            None
+            if lane_record is None
+            else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
+        )
+        runtime_id = resolve_lane(SHADOW_CURATION_CONSUMER, override=override).runtime_id
+    except LaneError as e:
+        logger.warning("Shadow-curation lane binding invalid for %s (session %s): %s", official_path, session_name, e)
+        return CurationResult(
+            success=False,
+            report_path=None,
+            stdout="",
+            error=(
+                f"Shadow-curation is bound to an invalid lane: {e}. Re-pin it with "
+                "'forge session lane set --consumer shadow_curation --runtime <claude_code|codex>' "
+                "or clear it with 'forge session lane clear --consumer shadow_curation'."
+            ),
+        )
+
+    # Runtime-keyed dispatch (epic consumer_lanes T6b): the codex arm is a self-contained early
+    # return that owns its own preflight gate, freeze timing, and (auto) emission, so the claude
+    # path below stays byte-identical to pre-T6b.
+    if runtime_id == "codex":
+        return _dispatch_codex_shadow_curation(
+            prompt=prompt,
+            session_name=session_name,
+            forge_root=forge_root,
+            official_path=official_path,
+            scope=scope,
+            shadow_count=len(shadow_entries),
+            timeout_seconds=timeout_seconds,
+            on_dispatch=on_dispatch,
+        )
 
     tracking_urls = [base_url] if base_url else []
 
@@ -370,4 +427,109 @@ def run_shadow_curation(
     )
 
     logger.info("Curation report written to %s", report_path)
+    return CurationResult(success=True, report_path=report_path, stdout=result.stdout)
+
+
+def _dispatch_codex_shadow_curation(
+    *,
+    prompt: str,
+    session_name: str,
+    forge_root: Path,
+    official_path: str,
+    scope: str,
+    shadow_count: int,
+    timeout_seconds: int,
+    on_dispatch: Callable[[], None] | None,
+) -> CurationResult:
+    """Run shadow curation on the codex-exec lane (epic consumer_lanes T6b).
+
+    Mirrors ``_dispatch_codex_supervisor`` but maps codex failure into shadow-curation's
+    **fail-loud** degrade (D3), not the supervisor's fail-open: this is a user-invoked consumer,
+    so a cold/stale/unready preflight or a failed codex turn returns ``success=False`` with a
+    CLI-visible refresh hint -- it never silently falls back to claude.
+
+    Read-only sandbox: the curation prompt is self-contained (official + shadow content inlined),
+    so codex needs no file access -- ``stdout`` IS the report. Preflight is read from the cache
+    (``forge runtime preflight codex`` writes it); ``codex doctor`` is never spawned in this path.
+
+    Emission: ``CodexHeadlessInvoker`` auto-emits the SOLE usage event AND the upstream row via
+    the request's ``Attribution``. ``operation`` is pinned to ``"memory.shadow_curation"`` (not the
+    ``Attribution`` default ``workflow.worker``, not ``None``) so that row matches the claude arm's
+    ``record_upstream_operation``. Unlike the supervisor arm (``operation=None``, because its engine
+    logs ``policy.evaluate``), shadow-curation has no engine row, so the invoker's row is its only
+    one. This arm therefore must NOT call ``emit_usage_for_session_result`` -- that double-counts.
+
+    Freeze: ``on_dispatch`` (the consumer-lane freeze) fires only *after* the preflight gate passes
+    -- a cold-preflight skip-return never spawns codex, so per ``impl_notes`` (freeze only past
+    every skip-return) it must not freeze. A turn that spawns and then fails still freezes, matching
+    the claude arm where ``on_dispatch`` fires before the run regardless of outcome.
+    """
+    from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
+    from forge.core.invoker.types import Attribution
+    from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+    refresh_hint = "Run 'forge runtime preflight codex' to refresh."
+
+    # Setup (preflight gate + request shaping). A failure here is a skip-return: codex never
+    # spawns, so on_dispatch must NOT fire (no freeze of a lane that did not run).
+    try:
+        preflight = read_fresh_codex_preflight()
+        if preflight is None or not preflight.ready:
+            reason = (preflight.blocking_reason if preflight else None) or "no fresh preflight cached"
+            return CurationResult(
+                success=False,
+                report_path=None,
+                stdout="",
+                error=f"Codex curation unavailable: {reason}. {refresh_hint}",
+            )
+        request = prepare_codex_request(
+            prompt=prompt,
+            preflight=preflight,
+            attribution=Attribution(
+                command="curation",
+                session=session_name,
+                operation="memory.shadow_curation",
+            ),
+            model=None,  # codex picks its own model; the lane's backend_id/model are nominal
+            cwd=str(forge_root),  # parity with the claude arm; prompt is self-contained (read-only)
+            sandbox="read-only",
+            timeout_seconds=timeout_seconds,
+            label="curation",
+        )
+    except Exception as e:  # cache read / request shaping failure -> fail loud, no spawn, no freeze
+        logger.warning("Codex curation setup failed for %s (session %s): %s", official_path, session_name, e)
+        return CurationResult(
+            success=False,
+            report_path=None,
+            stdout="",
+            error=f"Codex curation setup failed: {e}. {refresh_hint}",
+        )
+
+    # Past every skip-return: committed to a real codex dispatch -> freeze the lane now.
+    if on_dispatch is not None:
+        on_dispatch()
+
+    result = CodexHeadlessInvoker().run(request)
+
+    # HeadlessResult.success is returncode-only; fold runtime_is_error so an exit-0-but-failed turn
+    # (codex reported an in-stream error) fails loud instead of persisting an empty report.
+    if not result.success or result.runtime_is_error:
+        reason = result.error or (result.stderr.strip()[:200] if result.stderr.strip() else "codex turn failed")
+        logger.warning("Codex curation failed for %s (session %s): %s", official_path, session_name, reason)
+        return CurationResult(
+            success=False,
+            report_path=None,
+            stdout=result.stdout or "",
+            error=f"Codex curation failed: {reason}",
+        )
+
+    report_path = persist_curation_report(
+        forge_root=forge_root,
+        session_name=session_name,
+        official_path=official_path,
+        scope=scope,
+        shadow_count=shadow_count,
+        content=result.stdout,
+    )
+    logger.info("Codex curation report written to %s", report_path)
     return CurationResult(success=True, report_path=report_path, stdout=result.stdout)

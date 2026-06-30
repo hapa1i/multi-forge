@@ -98,6 +98,16 @@ def test_set_supervisor_via_general_surface(runner: CliRunner, project: Path) ->
     assert lanes.supervisor == _CLAUDE_MAX
 
 
+def test_set_shadow_curation_via_codex_runtime(runner: CliRunner, project: Path) -> None:
+    """T6b: `--consumer shadow_curation --runtime codex` resolves to the codex lane (was LaneError)."""
+    store = _seed(project)
+    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "shadow_curation", "--runtime", "codex"])
+    assert result.exit_code == 0, result.output
+    lanes = store.read().intent.consumer_lanes
+    assert lanes is not None
+    assert lanes.shadow_curation == LaneRecord("codex", "chatgpt", "gpt-5-codex")
+
+
 def test_set_unknown_consumer_rejects(runner: CliRunner, project: Path) -> None:
     _seed(project)
     result = runner.invoke(main, ["session", "lane", "set", "--consumer", "bogus", "--backend", "claude-max"])
