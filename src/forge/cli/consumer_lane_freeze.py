@@ -9,9 +9,9 @@ manifest:
 
 - The caller resolves the lane ONCE (the same read ``backend_id`` came from) and threads it
   in as ``dispatched_lane``, so the frozen lane cannot diverge from the billed lane.
-- The freeze runs from each consumer's ``on_dispatch`` hook -- at the actual
-  ``run_claude_session`` call -- so a skipped/throttled/cached run never freezes a lane it
-  never used.
+- The freeze runs from each consumer's ``on_dispatch`` hook -- at the actual runtime dispatch
+  (the ``run_claude_session`` call, or ``codex exec`` on shadow-curation's codex lane, T6b) --
+  so a skipped/throttled/cached run never freezes a lane it never used.
 - Under the lock it re-checks ``read_bound_lane(m) == dispatched_lane`` (the supervisor's
   equality guard): a concurrent ``forge session lane set/clear`` between dispatch and this
   write drops the stale freeze instead of recording a lane the run did not bill.

@@ -402,11 +402,11 @@ To avoid writer conflicts:
     of recording a lane the run never billed. The *freeze trigger* differs by lifecycle, by design: the supervisor is a
     registered, session-scoped entity (`resume_id`) and freezes eagerly at the **first policy check**
     (`cli/hooks/policy.py`), its commitment point; memory-writer, shadow-curation, and team-supervisor have no
-    registration, so they freeze only on a **real dispatch** -- from an `on_dispatch` hook at the actual
-    `run_claude_session` call (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run, and a
-    skipped/throttled run never freezes). A consumer running on its default lane never freezes, so the default stays
-    re-pinnable. Once frozen it governs dispatch directly (confirmed-first) and the resolving commands refuse to change
-    it to a *different* lane.
+    registration, so they freeze only on a **real dispatch** -- from an `on_dispatch` hook at the actual runtime
+    dispatch (the `run_claude_session` call, or `codex exec` on shadow-curation's codex lane, T6b)
+    (`persist_lane_freeze`, best-effort -- a lock failure never blocks the run, and a skipped/throttled run never
+    freezes). A consumer running on its default lane never freezes, so the default stays re-pinnable. Once frozen it
+    governs dispatch directly (confirmed-first) and the resolving commands refuse to change it to a *different* lane.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`

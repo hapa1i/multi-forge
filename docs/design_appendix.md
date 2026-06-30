@@ -1213,14 +1213,15 @@ same machinery, but **billing-only** -- their sole declared override is the `cla
 `claude_code` runtime as the default, so the `claude-max` binding changes the **billing label, not dispatch** (the
 separate `codex` lane that *does* change dispatch is T6b, below -- shadow-curation only).
 `forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer freezes it
-into `confirmed` from an `on_dispatch` hook at its actual `run_claude_session` call (`persist_lane_freeze`, best-effort
--- a lock failure never blocks the run, and a skipped/throttled run never freezes), threading the dispatched lane with
-the same under-lock `read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard mechanism is
-shared; the *trigger* differs by design -- the supervisor freezes eagerly at registration, these only on a real
-dispatch, because aux consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`, and
-a **keyless + direct** run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run -> `unknown`).
-Billing is honest from the `intent` write alone (the read is confirmed-first **then intent**); the freeze adds
-immutability + a stable observable binding, not the billing label.
+into `confirmed` from an `on_dispatch` hook at its actual runtime dispatch (the `run_claude_session` call, or
+`codex exec` on shadow-curation's codex lane, T6b) (`persist_lane_freeze`, best-effort -- a lock failure never blocks
+the run, and a skipped/throttled run never freezes), threading the dispatched lane with the same under-lock
+`read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard mechanism is shared; the *trigger*
+differs by design -- the supervisor freezes eagerly at registration, these only on a real dispatch, because aux
+consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`, and a **keyless + direct**
+run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from
+the `intent` write alone (the read is confirmed-first **then intent**); the freeze adds immutability + a stable
+observable binding, not the billing label.
 
 **Shadow-curation codex arm (T6b).** Shadow-curation -- the clean mirror-T4 aux consumer (blind, read-only,
 stdout-is-output) -- is the first aux consumer with a real non-claude dispatch arm. Its `allowed_lanes` gain
