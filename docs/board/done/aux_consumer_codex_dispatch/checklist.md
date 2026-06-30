@@ -144,7 +144,9 @@ Three P3 nits from a re-review of the round-1/2 work:
 
 ## Closeout
 
-- [ ] Tick acceptance rows with verification recorded.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Move `doing/aux_consumer_codex_dispatch/` -> `done/`; update epic roster; promote durable lessons to
-  `impl_notes.md` after human review.
+- [x] Tick acceptance rows with verification recorded. (Acceptance + Verification-gate tables above; real-codex
+  E2E green at 19.9s.)
+- [x] `change_log.md` entry (Goal / Key changes / Verification). (2026-06-30, under `consumer_lanes T6b`.)
+- [x] Move `doing/aux_consumer_codex_dispatch/` -> `done/`; update epic roster; promote durable lessons to
+  `impl_notes.md` after human review. (Card moved to `done/`; epic card + checklist roster marked T6b done;
+  impl_notes note "Adding a codex dispatch arm to an aux consumer" added.)

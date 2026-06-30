@@ -6,10 +6,10 @@ spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's l
 The **first wave is complete**; the epic stays in `doing/` coordinating T6 (now T6a active + T6b sketch) and T7 (added
 in `proposed/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
 `done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59,
-`done/aux_consumer_lane_placement/`); **T6b** (codex dispatch) is promoted to `doing/aux_consumer_codex_dispatch/`
-(2026-06-30, active cursor; scope resolved -- shadow-curation only). With T1b, the T0 sibling (PR #58, `b0614325`), and
-T6a (PR #59) all done, **T6b is now the active member**; the epic stays in `doing/` coordinating it plus the T7
-proposal.
+`done/aux_consumer_lane_placement/`); **T6b** (codex dispatch, shadow-curation only) is **done**
+(PR #60, `ca20efcd`, `done/aux_consumer_codex_dispatch/`). With T1b, the T0 sibling (PR #58, `b0614325`), T6a (PR #59),
+and T6b (PR #60) all done, the epic stays in `doing/` coordinating the deferred follow-ons (T6c memory-writer codex
+dispatch; team-supervisor plan-context) plus the T7 proposal.
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -201,7 +201,7 @@ once.
 `docs/board/done/lane_observability/` (done, PR #56); T7 -> `docs/board/proposed/subscription_exhaustion_failopen/`
 (authored 2026-06-26, depends on T4); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28); T6a ->
 `docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
-`docs/board/doing/aux_consumer_codex_dispatch/` (active 2026-06-30, shadow-curation only). The rows above stay the
+`docs/board/done/aux_consumer_codex_dispatch/` (done, PR #60, 2026-06-30, shadow-curation only). The rows above stay the
 durable sketch (except T6b's, updated to its promoted scope); the cards carry verified touchpoints + fixture-grounded
 acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
 validated at import in `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable

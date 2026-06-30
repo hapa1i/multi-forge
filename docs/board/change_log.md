@@ -27,6 +27,41 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-30
 
+### consumer_lanes T6b: Aux-consumer codex dispatch (shadow-curation codex arm)
+
+**Goal**: Give an aux consumer a real `codex exec` dispatch arm -- the one thing T6a skipped (it shipped
+claude-max billing only, no dispatch change). `forge session lane set --consumer shadow_curation --runtime codex`
+now routes to Codex, not just a billing relabel. Narrowed at promotion to shadow-curation only.
+
+**Key changes**:
+
+- **Scope correction (D1)**: a code sweep found the three aux consumers are NOT a uniform "mirror T4" -- only
+  shadow-curation is clean (blind, read-only, stdout-is-output). memory-writer (workspace-write file-editing)
+  deferred to T6c; team-supervisor (plan-blind without snapshot machinery) deferred (D2).
+- **Codex arm** (`session/shadow_curation.py`): `SHADOW_CURATION_CONSUMER` gains `Lane(codex, chatgpt,
+  gpt-5-codex)`; the CLI threads the bound `LaneRecord`, `run_shadow_curation` validates it
+  (`LaneRecord -> Lane -> resolve_lane`, the supervisor's guard) and branches on runtime into
+  `_dispatch_codex_shadow_curation` (read-only `codex exec`, direct to OpenAI). The `claude_code` path is
+  byte-identical.
+- **Three contract divergences from the supervisor arm** (the headline): degrade is **fail-loud not fail-open**
+  (user-invoked -> `CurationResult(success=False)` + a CLI-visible hint via new `CurationResult.error` (D5), never
+  a silent claude fallback); the upstream row pins `operation="memory.shadow_curation"` not `None` (curation has
+  no engine `policy.evaluate` row, so the invoker's auto row IS its only one); freeze fires **past** the preflight
+  skip-gate, with `runtime_is_error` folded so an exit-0-but-failed turn fails loud.
+- Docs synced in-PR: `design_appendix.md` §G (T6b paragraph), `cli_reference.md` lane-set bullet, `design.md`
+  freeze wording broadened to "the actual runtime dispatch".
+
+**Verification**: focused suites green (`test_shadow_curation.py` 35; + memory/session_lane/consumer_lane_freeze/
+lanes/billing = 157); wider sweep (policy/semantic, core/invoker, core/usage, session, codex_preflight_cache) 1318;
+full `tests/src/cli` 2145; `make pre-commit` clean. Real `codex exec` E2E (`test_shadow_curation_codex_smoke.py`)
+green against the host ChatGPT login -- asserts success, report persisted from codex stdout, freeze fired, and
+exactly one `runtime=codex`/`billing_mode=subscription_quota`/`route=codex_exec` usage event. Shipped via PR #60
+(`ca20efcd`).
+
+**Closeout (2026-06-30)**: card moved `doing/ -> done/aux_consumer_codex_dispatch/`; epic roster marked T6b done.
+Durable lesson promoted to `impl_notes.md` ("Adding a codex dispatch arm to an aux consumer"). T6c (memory-writer
+codex dispatch) and the team-supervisor plan-context arm remain deferred follow-ons; T7 stays in `proposed/`.
+
 ### consumer_lanes T6a: Aux-consumer lane placement (claude-max billing for the three non-supervisor consumers)
 
 **Goal**: Pin the memory writer, shadow curation, and team supervisor to `claude-max` so their keyless+direct runs bill

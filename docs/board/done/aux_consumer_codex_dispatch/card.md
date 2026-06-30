@@ -1,6 +1,6 @@
 # T6b -- Aux-consumer codex dispatch (first non-Claude runtime for aux work)
 
-**Epic**: [`docs/board/doing/epic_consumer_lanes/`](../epic_consumer_lanes/card.md) (member T6b). Promoted from the
+**Epic**: `docs/board/doing/epic_consumer_lanes/` (member T6b). Promoted from the
 inline T6b sketch on 2026-06-30; branch `aux_consumer_codex_dispatch`.
 
 **Depends on**: T6a (`done/aux_consumer_lane_placement/`) -- the lane binding, freeze, and billing machinery for the

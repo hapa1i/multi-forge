@@ -36,6 +36,40 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Adding a codex dispatch arm to an aux consumer: validate the lane, map into the consumer's own contract (consumer_lanes T6b, shipped 2026-06-30)
+
+Durable rules from wiring shadow-curation's `codex exec` arm (`session/shadow_curation.py`,
+`_dispatch_codex_shadow_curation`). `_dispatch_codex_supervisor` is the *template*, but a near-verbatim copy is
+wrong -- three axes are per-consumer.
+
+- **The aux consumers are NOT a uniform "mirror T4."** Only shadow-curation is a clean mirror (blind, read-only,
+  stdout-is-output). memory-writer is workspace-write file-editing (-> T6c); team-supervisor is plan-blind under
+  codex because the approved plan rides Claude's `resume_id` and codex has no `--resume` (deferred until
+  plan-snapshot machinery is ported). Sweep output shape / sandbox / context source / degrade path before
+  assuming a consumer is mirror-able.
+- **Validate the bound lane before selecting the arm -- never branch on the raw `LaneRecord.runtime_id`.** A
+  stale/corrupt explicit binding could otherwise dispatch codex on an invalid lane (codex runtime + non-codex
+  backend, bypassing `allowed_lanes`) or fall through to claude on an unknown runtime. Run it through the same
+  `LaneRecord -> Lane -> resolve_lane` guard the supervisor uses; `None` resolves to the default claude lane.
+- **Degrade maps into the consumer's existing contract, not the supervisor's fail-open.** shadow-curation is
+  user-invoked, so a cold/stale preflight or a failed turn **fails loud** (`CurationResult(success=False)` + a
+  CLI-visible hint -- the new `CurationResult.error`, in human + `--json`), never a silent claude fallback ("no
+  fallback" is the epic rule; T7 is the only exception). A policy-hook consumer (team) would degrade to its
+  `(0, "")` allow; a best-effort async one (memory-writer) to `return False`.
+- **`Attribution.operation` is pinned to the consumer's operation, NOT `None`.** The supervisor passes `None` to
+  suppress the invoker's auto upstream row because its engine already logs `policy.evaluate`; curation has no
+  engine row, so the invoker's auto `record_upstream_operation` IS its only upstream outcome and must carry
+  `operation="memory.shadow_curation"` to match the claude path. Pin-vs-suppress is decided by whether an engine
+  row already exists.
+- **`runtime_is_error` must be folded into success.** `HeadlessResult.success` is returncode-only, so an
+  exit-0-but-failed codex turn would otherwise persist an empty report. Fold it so the turn fails loud.
+- **Codex E2E trap: the autouse `isolate_codex_home` fixture masks ChatGPT (`codex_store`) auth.** A real
+  `codex exec` test on the host ChatGPT login must restore the host `CODEX_HOME` captured at import time, and
+  clear `CODEX_API_KEY`/`CODEX_ACCESS_TOKEN` (preflight resolves them before `codex_store`, so a host with both
+  resolves `billing_mode="api"` and fails a `subscription_quota` assertion). The upstream-outcome log is
+  failure-biased, so a *successful* codex run emits the usage event but no outcome row -- assert accordingly
+  (`tests/integration/session/test_shadow_curation_codex_smoke.py`).
+
 ### Consumer-lane freeze: immutability, not billing; per-lifecycle trigger (consumer_lanes T1b/T6a, shipped 2026-06-30)
 
 Durable rules for `confirmed.consumer_lanes` and the two freeze sites: the supervisor in `cli/hooks/policy.py`, and

@@ -30,12 +30,14 @@ bound to `claude-max` (supervisor declaration via `set --backend`; the other thr
 done** (PR #59, 2026-06-30; closed to `done/aux_consumer_lane_placement/`): the supervisor's lane-binding UX + freeze
 now span all four consumers, and the three aux consumers freeze **only on a real dispatch** (an `on_dispatch` hook fired
 past every skip-return, guarded by a `read_bound_lane == dispatched_lane` equality check). With the first wave + T1b +
-T0 + T6a all done, **T6b is the active cursor** (promoted 2026-06-30 to `doing/aux_consumer_codex_dispatch/`; research
-done, scope resolved to shadow-curation only (D1) -- the card's headline finding is that the three aux consumers are NOT
-uniform: shadow-curation is a clean mirror-T4, team-supervisor is plan-blind without new context machinery,
-memory-writer is a different file-editing shape deferred to T6c). **T6b Phase 1 (the codex dispatch arm) is implemented
-and unit-tested in-branch (commit `6869dbaa`); design docs are synced; Phase 2 closeout and merge remain.** The epic
-stays in `doing/` coordinating it and the T7 proposal (authored in `proposed/`). The `core.llm` representation is
+T0 + T6a all done, **T6b is done** (PR #60, `ca20efcd`, 2026-06-30; closed to `done/aux_consumer_codex_dispatch/`):
+shadow-curation gained a real `codex exec` dispatch arm -- scope resolved to shadow-curation only (D1) because the three
+aux consumers are NOT uniform (shadow-curation is a clean mirror-T4; team-supervisor is plan-blind without new context
+machinery, deferred; memory-writer is a different file-editing shape deferred to T6c). The arm diverges from the
+supervisor's on three axes (fail-loud not fail-open, `operation` pinned not `None`, freeze-past-the-skip-gate) and is
+verified by a real-codex E2E. With the first wave + T1b + T0 + T6a + T6b all done, the epic stays in `doing/`
+coordinating the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor plan-context) and the T7
+proposal (authored in `proposed/`). The `core.llm` representation is
 decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
@@ -49,7 +51,7 @@ decided (option 2 -- see Decisions).
 | T5           | `done/lane_observability/`                   | done     | T3,T4      | done (PR #56)             |
 | T1b          | `done/consumer_lane_binding/`                | done     | T4         | done (PR #57)             |
 | T6a          | `done/aux_consumer_lane_placement/`          | done     | T1b,T0     | done (PR #59)             |
-| T6b          | `doing/aux_consumer_codex_dispatch/`         | doing    | T6a        | Phase 1 landed in-branch  |
+| T6b          | `done/aux_consumer_codex_dispatch/`          | done     | T6a        | done (PR #60)             |
 | T7           | `proposed/subscription_exhaustion_failopen/` | proposed | T4         | authored 2026-06-26       |
 | T0 (sibling) | `done/claude_subscription_billing/`          | done     | none       | done (PR #58, `b0614325`) |
 
@@ -106,8 +108,8 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
   workweave discussion) -> `proposed/subscription_exhaustion_failopen/`. **T1b done** -> `done/consumer_lane_binding/`
   (PR #57, 2026-06-28). **T0 done** -> `done/claude_subscription_billing/` (PR #58, `b0614325`, 2026-06-29). **T6a
-  done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); **T6b promoted** ->
-  `doing/aux_consumer_codex_dispatch/` (2026-06-30, active; shadow-curation only).
+  done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); **T6b done** ->
+  `done/aux_consumer_codex_dispatch/` (PR #60, 2026-06-30, shadow-curation only).
 - [x] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flagged them "agent-reported, verify". **Confirmed silent**
   (2026-06-27 T5 surface map): `CheckerStage.check()` (`policy/workflow/stages.py:100`), `ReviewerStage.review()`
