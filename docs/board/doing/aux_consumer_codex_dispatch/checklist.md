@@ -7,8 +7,8 @@
 **Scope resolved (D1): shadow-curation only** -- memory-writer deferred to T6c, team-supervisor deferred (D2). **Phase 1
 (codex arm) is implemented and unit-tested** (2026-06-30): the `codex` arm ships in `shadow_curation.py`, the CLI passes
 the bound lane (validated via `resolve_lane`) + surfaces `CurationResult.error`, and the arm/CLI/lane/validation tests
-pass. Remaining: **Phase 2** (observability check + design-doc sync + epic roster). Integration: a real `codex exec` E2E
-is release-tier (ChatGPT login), gap recorded in the verification gate.
+pass, and a real `codex exec` E2E (`test_shadow_curation_codex_smoke.py`) passes against the host ChatGPT login.
+Remaining: **Phase 2** (observability check + design-doc sync + epic roster).
 
 ## Decisions (resolved 2026-06-30)
 
@@ -81,9 +81,9 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
 ## Phase 2 -- observability + docs (design synced; closeout pending)
 
 - [x] Observability. `forge session lane show` surfaces the bound + frozen codex lane today (T6a/T5 machinery, no new
-  code in T6b). `forge telemetry activity` showing the run on `runtime=codex` / `billing_mode=subscription_quota` rides
-  the invoker's `emit_codex_usage` (shared with T4) and is only exercisable on a real `codex exec` run -- folded into
-  the release-tier E2E gap (verification gate). No T6b-specific observability code was needed.
+  code in T6b). The `runtime=codex` / `billing_mode=subscription_quota` usage event (`forge telemetry activity`) rides
+  the invoker's `emit_codex_usage` (shared with T4) and is now asserted by the real-codex E2E
+  (`test_shadow_curation_codex_smoke.py`). No T6b-specific observability code was needed.
 - [x] Design-doc sync: `design_appendix.md` consumer-lane note extended with a **Shadow-curation codex arm (T6b)**
   paragraph (fail-loud vs fail-open, `operation` pinned vs the supervisor's `None`, freeze-past-the-skip-gate) and the
   T6a `claude-max` paragraph's "no codex arm; that is T6b" forward-ref narrowed. `cli_reference.md` lane-set bullet now
@@ -114,10 +114,15 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   `tests/src/cli` 2145 passed.
 - [x] `make pre-commit` clean on changed files (ruff/black/isort/mypy/pyright/gitleaks all pass; black wrapped one
   ternary, re-staged).
-- [ ] Integration: codex-lane dispatch is a real `codex exec` path. **Gap recorded:** a real-codex E2E needs a
-  ChatGPT-login + a fresh preflight cache, so it is release-tier exactly like T4's codex E2E. The invoker subprocess
-  path is unchanged by T6b and is already covered by `test_codex_invoker.py` + the T4 E2E; the new arm is mocked at the
-  invoker boundary (same strategy as the supervisor codex arm). No new always-on integration test added.
+- [x] Integration: **ran a real `codex exec` E2E and it passes** —
+  `tests/integration/session/test_shadow_curation_codex_smoke.py::test_shadow_curation_codex_arm_real_dispatch` spawns
+  real codex against the host ChatGPT login and asserts success, report persisted from codex stdout, freeze fired, and
+  exactly one `runtime=codex`/`billing_mode=subscription_quota`/`route=codex_exec` usage event. Two real-system findings
+  the mocks hid: (1) ChatGPT (`codex_store`) auth needs the host `CODEX_HOME` restored past the autouse
+  `isolate_codex_home` fixture — the test captures it at import time (the existing `test_codex_exec_smoke.py` lacks
+  this, so it is implicitly CODEX_API_KEY-only); (2) the upstream-outcome log is failure-biased, so a success emits the
+  usage event but no outcome row (asserted). Run:
+  `uv run pytest tests/integration/session/test_shadow_curation_codex_smoke.py`.
 
 ## Closeout
 
