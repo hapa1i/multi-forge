@@ -5,8 +5,8 @@
 ## Current focus
 
 **Scope resolved (D1): shadow-curation only** -- memory-writer deferred to T6c, team-supervisor deferred (D2). **Phase 1
-(codex arm) is implemented and unit-tested** (2026-06-30): the `codex` arm ships in `shadow_curation.py`, the CLI
-threads `runtime_id` + surfaces `CurationResult.error`, and 8 new arm tests + 2 CLI tests + the lane/lane-set tests
+(codex arm) is implemented and unit-tested** (2026-06-30): the `codex` arm ships in `shadow_curation.py`, the CLI passes
+the bound lane (validated via `resolve_lane`) + surfaces `CurationResult.error`, and the arm/CLI/lane/validation tests
 pass. Remaining: **Phase 2** (observability check + design-doc sync + epic roster). Integration: a real `codex exec` E2E
 is release-tier (ChatGPT login), gap recorded in the verification gate.
 
@@ -32,9 +32,9 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   `Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`. Verified:
   `test_shadow_curation_consumer_allows_codex_lane` (codex lane in `valid_lanes`, claude-max preserved);
   `test_set_shadow_curation_via_codex_runtime` (`lane set --runtime codex` resolves, exit 0, was `LaneError`).
-- [x] Threaded `runtime_id` into `run_shadow_curation` (new `runtime_id: str = "claude_code"` param); the CLI passes
-  `dispatched_lane.runtime_id`, falling back to the consumer's default-lane runtime on a `None` binding
-  (`cli/memory.py`). Verified by the dispatch tests selecting the arm through the public entry.
+- [x] Threaded the bound lane into `run_shadow_curation` (the CLI passes the `LaneRecord`; the function validates it and
+  derives the runtime -- the validation hardening landed as a review follow-up, below). Verified by the dispatch tests
+  selecting the arm through the public entry.
 - [x] Inserted the runtime-keyed branch before the claude `on_dispatch`: `codex` -> early return into
   `_dispatch_codex_shadow_curation`; `claude_code` path left byte-identical. Verified:
   `test_claude_runtime_never_touches_codex` (claude path runs, codex preflight never read).
@@ -62,6 +62,21 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   freeze; a turn that spawns and then fails still freezes (claude-arm parity). Verified:
   `test_successful_dispatch_fires_freeze`, `test_failed_turn_fails_loud_but_still_freezes` (freeze fires),
   `test_cold_preflight_fails_loud_no_fallback_no_freeze` (freeze does not fire).
+
+## Review follow-ups (2026-06-30, commits `a5089be3` + `baae7885`)
+
+- [x] **Validate the bound lane before arm selection** (durable-state gap). The arm was selected from the raw
+  `LaneRecord.runtime_id` with no catalog re-validation, so a stale/corrupt explicit binding could dispatch Codex on an
+  invalid lane (codex runtime + non-codex backend, bypassing `allowed_lanes`) or silently fall through to Claude on an
+  unknown runtime. `run_shadow_curation` now takes the `LaneRecord` and runs it through the same
+  `LaneRecord -> Lane -> resolve_lane` guard as the supervisor (`run_supervisor_check`), mapped into shadow-curation's
+  fail-loud contract: no dispatch, no freeze, and a `CurationResult.error` naming the re-pin/clear path; `None` resolves
+  to the default Claude lane. Verified: `test_invalid_explicit_lane_fails_loud_no_dispatch_no_freeze`,
+  `test_unknown_runtime_fails_loud_not_silent_claude`.
+- [x] **Broaden the Claude-specific freeze wording** to runtime dispatch. `design.md`, `design_appendix.md`, and
+  `consumer_lane_freeze.py` described the aux freeze as firing "at the actual `run_claude_session` call" -- stale for
+  the codex arm, which freezes after the preflight gate and before `codex exec`. Reworded to "the actual runtime
+  dispatch (`run_claude_session`, or `codex exec` on shadow-curation's codex lane)".
 
 ## Phase 2 -- observability + docs (design synced; closeout pending)
 
