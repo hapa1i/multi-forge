@@ -78,6 +78,24 @@ D1 resolved to shadow-curation; Phase 1 was the implementation cursor.
   the codex arm, which freezes after the preflight gate and before `codex exec`. Reworded to "the actual runtime
   dispatch (`run_claude_session`, or `codex exec` on shadow-curation's codex lane)".
 
+## Review follow-ups (2026-06-30, commits `f819cfea` + `5ff3f646` + `05cafaf0`)
+
+Three P3 nits from a re-review of the round-1/2 work:
+
+- [x] **Keyword-arg the `LaneRecord -> Lane` override** (`shadow_curation.py`). The validation block built the override
+  positionally; the field-parity test guards field *names*, not constructor order. Switched to
+  `Lane(runtime_id=..., backend_id=..., model=...)`, matching `consumer_lanes._record_to_lane` and the supervisor path.
+  No behavior change; covered by the existing dispatch + invalid-lane tests.
+- [x] **Pin the codex smoke to the ChatGPT subscription lane** (`test_shadow_curation_codex_smoke.py`).
+  `preflight_codex` resolves `CODEX_API_KEY`/`CODEX_ACCESS_TOKEN` before `codex_store`, so a host with both an env key
+  and a ChatGPT login would resolve `billing_mode="api"` and fail the `subscription_quota` assertion. The fixture now
+  clears both env vars, and `_require_codex_ready_cached` fails loud unless the live preflight resolves
+  `auth_source=codex_store` / `subscription_quota` (actionable message instead of a confusing downstream mismatch).
+  Re-ran the real-codex E2E: green (19.9s).
+- [x] **Sync the dispatch wording** (`design_appendix.md`, this card's "What T6b adds" table). Both said the CLI threads
+  `dispatched_lane.runtime_id`; the code threads the full `LaneRecord` and validates it via `resolve_lane` before arm
+  selection. Reworded to match the shipped seam.
+
 ## Phase 2 -- observability + docs (design synced; closeout pending)
 
 - [x] Observability. `forge session lane show` surfaces the bound + frozen codex lane today (T6a/T5 machinery, no new
