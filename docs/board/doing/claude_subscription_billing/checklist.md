@@ -107,7 +107,7 @@ Produces `phase0-results.md` answering, with verbatim evidence:
 - [ ] Phase 0 `phase0-results.md` landed; decision-gate outcome recorded in the epic.
 - [ ] (If "Proceed") Phase 1 acceptance tests green (incl. precedence + all-four-callers); `make pre-commit` clean;
   design §3.14 / appendix §A.8 + §A.13 synced for the new Claude subscription `billing_mode`.
-- [ ] (If "Proceed" + in-scope) Phase 2 `claude-max` source + `BillingPosture` extension + docs.
+- [ ] (If "Proceed" + in-scope) Phase 2 `claude-max` source + docs (no `BillingPosture` extension -- Q3 = `subscription_quota`, already carried).
 - [ ] `change_log.md` entry (Goal / Key changes / Verification).
 - [ ] Promote durable lessons to `impl_notes.md` after human review (or fold into the epic closeout, per the T1a-T5
   pattern).

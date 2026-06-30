@@ -172,7 +172,7 @@ review agrees; otherwise it is the unblocked follow-on.
    `codex doctor` equivalent and every Claude-side artifact signal is brittle (`config get` = no stable JSON / hangs;
    `credentials.json`/keychain = unowned schema; cost-null = doesn't fire, cost is present on Max). **Resolution: don't
    read a Claude-side artifact at all** -- the discriminator is `can_use_bare` (Forge's own predicate): keyless +
-   completing turn => subscription; keyed => api. Preflight, Forge-owned, stable. **(i)** non-TTY OAuth works (a0
+   completing turn => the stored OAuth *path* (a subscription **candidate**; the durable label needs a declared `claude-max`); keyed => api. Preflight, Forge-owned, stable. **(i)** non-TTY OAuth works (a0
    confirmed); **(ii)** the signal is the *input* (is a key resolvable?), not a brittle artifact. The kill #2 risk did
    not materialize.
 2. **Phase 2 (`claude-max` `ModelSource`) -- in T0 or a follow-on?** The epic says T0 "gates" (= *unblocks*) it.
@@ -208,4 +208,4 @@ review agrees; otherwise it is the unblocked follow-on.
 | Headless key hydration                      | `core/reactive/env.py` (`_hydrate_credentials`, `build_claude_env`)                                                                  | injects a credential-file key when resolvable (so `can_use_bare` sees it); no key anywhere -> keyless OAuth path                                      |
 | Status-line billing rule                    | `cli/statusline/context.py:139-151`; design_appendix **§A.8**                                                                        | declarative `cost_mode`; never infers payer from key presence                                                                                         |
 | Reserved subscription modes                 | design_appendix **§A.13**                                                                                                            | lists `subscription_*` `BillingMode` values (enum doc, not the key-presence rule)                                                                     |
-| Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => subscription -- the dependable signal    |
+| Detection signal (Phase 0 resolved)         | `core/reactive/env.py:70` (`can_use_bare`)                                                                                           | no codex-`doctor` equivalent exists, but none is needed: keyless (`can_use_bare` False) + completing turn => the stored OAuth *path* (subscription **candidate**; durable label needs a declared `claude-max`) -- a dependable *gate*, not sufficient proof    |
