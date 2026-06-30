@@ -933,6 +933,28 @@ class TestSupervisorSetRuntimeFlag:
         assert manifest.intent.consumer_lanes is not None
         assert manifest.intent.consumer_lanes.supervisor == LaneRecord("claude_code", "claude-max", "opus")
 
+    def test_backend_set_output_shows_full_lane(self, temp_guard_env: Path) -> None:
+        # The success line must name the chosen backend, not just the runtime: claude-max and
+        # anthropic-direct share the claude_code runtime, so runtime alone hides the user's choice.
+        store = SessionStore(str(temp_guard_env), "test-session")
+        state = create_session_state("test-session", worktree_path=str(temp_guard_env))
+        state.forge_root = str(temp_guard_env)
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--backend", "claude-max"])
+
+        assert result.exit_code == 0, result.output
+        assert "Lane: runtime=claude_code backend=claude-max model=opus" in result.output
+
     def test_runtime_after_bind_rejected(self, temp_guard_env: Path) -> None:
         # Once confirmed.consumer_lanes.supervisor is frozen, --runtime is rejected: dispatch is
         # confirmed-first, so a new intent lane would be recorded-but-ignored (the launch.runtime

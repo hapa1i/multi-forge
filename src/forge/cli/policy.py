@@ -1262,7 +1262,10 @@ def supervisor_set(
         sys.exit(1)
     console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
     if lane_record is not None:
-        console.print(f"  Lane: runtime={lane_record.runtime_id} (freezes on first check)")
+        console.print(
+            f"  Lane: runtime={lane_record.runtime_id} backend={lane_record.backend_id} "
+            f"model={lane_record.model} (freezes on first check)"
+        )
     if routing_display:
         label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
         console.print(f"  Routing ({label}): {routing_display}")
