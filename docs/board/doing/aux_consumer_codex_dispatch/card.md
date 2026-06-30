@@ -15,15 +15,15 @@ shape.
 
 ## What T6b adds (vs what already exists)
 
-| Layer                                                                        | State after T6a                                       | T6b                                                                         |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| Consumer `allowed_lanes`                                                     | claude-max only (no codex lane)                       | **add** `Lane(codex, chatgpt, gpt-5-codex)` to the chosen consumer(s)       |
-| Lane binding / freeze (`persist_lane_freeze`, `on_dispatch`, equality guard) | done                                                  | reused unchanged                                                            |
-| Billing label (`read_bound_backend_id` -> `subscription_quota`)              | done                                                  | reused unchanged                                                            |
-| `forge session lane set --consumer X --runtime codex`                        | raises `LaneError` (codex not allowed)                | resolves once the allowed_lane exists (no CLI code change)                  |
-| **Runtime-keyed dispatch** at the `run_claude_session` call site             | absent (unconditional `claude -p`)                    | **add** -- branch on `dispatched_lane.runtime_id`                           |
-| **`_dispatch_codex_<consumer>` arm**                                         | absent                                                | **add** -- mirror `_dispatch_codex_supervisor`                              |
-| Single usage emitter per path                                                | claude path emits via `emit_usage_for_session_result` | codex path emits via the invoker's `emit_codex_usage`; must not double-emit |
+| Layer                                                                        | State after T6a                                       | T6b                                                                                          |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Consumer `allowed_lanes`                                                     | claude-max only (no codex lane)                       | **add** `Lane(codex, chatgpt, gpt-5-codex)` to the chosen consumer(s)                        |
+| Lane binding / freeze (`persist_lane_freeze`, `on_dispatch`, equality guard) | done                                                  | reused unchanged                                                                             |
+| Billing label (`read_bound_backend_id` -> `subscription_quota`)              | done                                                  | reused unchanged                                                                             |
+| `forge session lane set --consumer X --runtime codex`                        | raises `LaneError` (codex not allowed)                | resolves once the allowed_lane exists (no CLI code change)                                   |
+| **Runtime-keyed dispatch** at the dispatch call site                         | absent (unconditional `claude -p`)                    | **add** -- thread the bound `LaneRecord`, validate via `resolve_lane`, branch on its runtime |
+| **`_dispatch_codex_<consumer>` arm**                                         | absent                                                | **add** -- mirror `_dispatch_codex_supervisor`                                               |
+| Single usage emitter per path                                                | claude path emits via `emit_usage_for_session_result` | codex path emits via the invoker's `emit_codex_usage`; must not double-emit                  |
 
 The lane *contract* already spans four consumers (T6a). T6b proves the *dispatch* generalizes past the supervisor.
 

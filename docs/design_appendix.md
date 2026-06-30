@@ -1225,11 +1225,12 @@ observable binding, not the billing label.
 
 **Shadow-curation codex arm (T6b).** Shadow-curation -- the clean mirror-T4 aux consumer (blind, read-only,
 stdout-is-output) -- is the first aux consumer with a real non-claude dispatch arm. Its `allowed_lanes` gain
-`Lane(codex, chatgpt, gpt-5-codex)`; the curate CLI threads `dispatched_lane.runtime_id` into `run_shadow_curation`,
-which branches before the claude `on_dispatch` into `_dispatch_codex_shadow_curation` (the `claude_code` path stays
-byte-identical). The arm mirrors `_dispatch_codex_supervisor` -- cached preflight, read-only `codex exec` direct to
-OpenAI, self-contained inlined prompt -- but maps into shadow-curation's own contract, which diverges from the
-supervisor's on three axes:
+`Lane(codex, chatgpt, gpt-5-codex)`; the curate CLI threads the bound `LaneRecord` into `run_shadow_curation`, which
+validates it against the consumer's declared candidates (`LaneRecord -> Lane -> resolve_lane`, the supervisor's guard --
+a drifted/invalid explicit binding fails loud, never a wrong-arm dispatch) and branches on the resolved runtime, before
+the claude `on_dispatch`, into `_dispatch_codex_shadow_curation` (the `claude_code` path stays byte-identical). The arm
+mirrors `_dispatch_codex_supervisor` -- cached preflight, read-only `codex exec` direct to OpenAI, self-contained
+inlined prompt -- but maps into shadow-curation's own contract, which diverges from the supervisor's on three axes:
 
 - **Degrade: fail-loud, not fail-open.** User-invoked, so a cold/unready preflight or a failed turn returns
   `CurationResult(success=False)` carrying a refresh hint surfaced by the CLI (human via `print_error` + `--json`, the
