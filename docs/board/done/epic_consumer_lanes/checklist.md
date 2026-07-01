@@ -47,9 +47,11 @@ sticky degrade kept off the write-once `confirmed.consumer_lanes` binding (a `fo
 
 **T6c (memory-writer codex dispatch) is done** (PR #62, `1064b8c8`, 2026-07-01; closed to
 `done/memory_writer_codex_dispatch/`) -- the epic's first write-granting lane (`augment` on `workspace-write`; live
-Phase 0 probe confirmed in-project writes auto-approve and a denial does not set `runtime_is_error`). Only
-team-supervisor (plan-context, pending a context-model change) remains deferred; the epic stays in `doing/` coordinating
-that one follow-on.
+Phase 0 probe confirmed in-project writes auto-approve and a denial does not set `runtime_is_error`). With T6c done,
+**the epic is closed to `done/` (2026-07-01)**: team-supervisor codex dispatch is the one remaining follow-on and is
+**carved out to a standalone card** (`proposed/team_supervisor_plan_context/`) because it depends on runtime-neutral
+plan/context delivery, not the lane substrate -- verified against `policy/team/handlers.py` (no codex `allowed_lane`;
+context rides `claude -p --resume`). So every *live* member is `done/` and the coordinator is no longer load-bearing.
 
 ## Member roster and sequencing
 
@@ -107,8 +109,9 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 
 ## Link and drift control
 
-- [ ] Each member card links this epic at its top via the current board path (`docs/board/doing/epic_consumer_lanes/`).
-  Update both sides if the epic lane moves.
+- [x] Each member card links this epic at its top via the current board path. **Epic moved `doing/ -> done/`
+  2026-07-01**; the 22 member back-links across `done/*/card.md` + `checklist.md` were repointed
+  `doing/epic_consumer_lanes -> done/epic_consumer_lanes` (line-3 `**Epic**:` headers only; no narrative text touched).
 - [x] When T1a opens: branch, `git mv docs/board/todo/consumer_lane_resolver docs/board/doing/`, add its `checklist.md`,
   update this roster. (done -- branch `consumer_lane_resolver`)
 - [x] When T4 opens: branch, `git mv docs/board/todo/codex_exec_supervisor_lane docs/board/doing/`, add its
@@ -146,10 +149,16 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   observability reads the frozen binding, `not executable` on drift); `cli_reference.md` (`--supervisor-runtime` launch
   control + `set --runtime` row + status drift). Done on branch `consumer_lane_binding` (Slice 5).
 
-## Closeout (epic)
+## Closeout (epic) -- DONE 2026-07-01
 
-- [ ] Epic -> `done/` only when every live member is `done/`, or the shared contract is folded into normative design
-  docs (board_contract "Epics"). **All shipped members are `done/` (T7 closed via PR #61, 2026-06-30). T6c
-  (memory-writer codex dispatch) is now promoted to `doing/memory_writer_codex_dispatch/` as the active member;
-  team-supervisor (plan-context) stays deferred.** Close the epic when T6c ships and team-supervisor ships or is
-  re-filed as a fresh card. Add a `change_log.md` entry; promote durable lessons to `impl_notes.md` after human review.
+- [x] Epic -> `done/`. Every *live* member is `done/` (T1a/T2/T3/T4/T5/T1b/T6a/T6b/T6c + sibling T0 + T7) and the shared
+  lane contract is folded into normative design docs (design.md §3.5/§3.6.2, design_appendix.md §G), meeting the
+  board_contract "Epics" close criterion. T6c shipped and closed to `done/memory_writer_codex_dispatch/` (PR #62). The
+  last deferred follow-on -- **team-supervisor codex dispatch** -- is **re-filed as a standalone card**
+  (`docs/board/proposed/team_supervisor_plan_context/`), **not** an outstanding epic member: it is blocked on
+  runtime-neutral plan/context delivery (a team-orchestration / context-design problem), verified against
+  `policy/team/handlers.py` (no codex `allowed_lane`; context rides `claude -p --resume`).
+- [x] `change_log.md` entry added (2026-07-01, epic closeout).
+- [x] Durable lesson proposed to `impl_notes.md` (team-supervisor's `--resume`-bound context model is the boundary a
+  codex lane must cross); flagged for human confirmation.
+- [x] Epic dir `git mv`'d `doing/ -> done/`; 22 member back-links repointed to `done/epic_consumer_lanes`.

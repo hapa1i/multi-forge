@@ -36,6 +36,24 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### consumer_lanes epic closed: context-delivery model, not lane plumbing, gates a consumer's runtime swap (shipped 2026-07-01)
+
+The `consumer_lanes` epic shipped and closed (`done/epic_consumer_lanes/`). The lane contract --
+`(runtime x backend x model)` per consumer, resolved once and frozen, default = current behavior -- is normative in
+design.md §3.5/§3.6.2 + design_appendix §G. Durable takeaways for future runtime/lane work:
+
+- **A consumer's context-delivery model, not its lane plumbing, decides whether a non-claude runtime is addable.** The
+  four wired consumers split cleanly. Supervisor / shadow-curation / memory-writer got codex arms because their context
+  is **blind or in-band** -- `codex exec` has no `--resume`, so the approved plan rides a preamble (or, for the semantic
+  supervisor, a curated transfer body). Team-supervisor is the exception: its context is delivered by
+  `claude -p --resume <resume_id>` (`policy/team/handlers.py:267-269`; `TEAM_SUPERVISOR_CONSUMER.allowed_lanes` carries
+  no codex lane, `:38-43`), so a codex lane there is **not** "one more aux arm" -- it needs runtime-neutral plan/context
+  delivery first (`proposed/team_supervisor_plan_context/`). When adding a runtime to any consumer, classify its context
+  source before assuming the lane substrate suffices.
+- **"Lane-bound" != "can dispatch a different runtime."** claude-max binding across all four consumers (T6a) changed the
+  billing label only -- claude-max shares the `claude_code` runtime. A real runtime swap (the T4/T6b/T6c codex arms) is
+  a further step, gated on the context model above. Keep the two levels distinct.
+
 ### Adding a codex dispatch arm to an aux consumer: validate the lane, map into the consumer's own contract (consumer_lanes T6b, shipped 2026-06-30)
 
 Durable rules from wiring shadow-curation's `codex exec` arm (`session/shadow_curation.py`,

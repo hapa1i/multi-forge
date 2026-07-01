@@ -1,6 +1,6 @@
 # T6a execution checklist: aux-consumer lane placement
 
-**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**:
+**Card**: [`card.md`](card.md). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**:
 `aux_consumer_lane_placement`.
 
 ## Current focus

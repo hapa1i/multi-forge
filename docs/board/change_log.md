@@ -27,6 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-01
 
+### consumer_lanes epic: closeout (team-supervisor codex dispatch carved out)
+
+**Goal**: Close the `consumer_lanes` epic now that its lane contract is shipped and folded into normative design docs.
+The one remaining follow-on -- team-supervisor codex dispatch -- is a different abstraction, so it is re-filed as a
+standalone card rather than held open under the epic.
+
+**Key changes**:
+
+- **Decision**: consumer_lanes is complete at the lane-contract level for team-supervisor (lane placement, `claude-max`
+  billing, freeze-on-real-dispatch, observability). A codex team-supervisor lane is deferred because it needs
+  runtime-neutral plan/context delivery -- a team-orchestration / context-design concern, not the lane substrate.
+- **Verified basis** (`src/forge/policy/team/handlers.py`): `TEAM_SUPERVISOR_CONSUMER.allowed_lanes` has no codex lane
+  (`:38-43`), and supervision context reaches the handler only via `run_claude_session(resume_id=...)` =
+  `claude -p --resume` (`:267-269`). `codex exec` has no `--resume`, so a codex arm would be plan-blind -- unlike the
+  blind / in-band T4/T6b/T6c arms.
+- New follow-on card `docs/board/proposed/team_supervisor_plan_context/` (goal, design decisions owed, constraints).
+- Epic `doing/epic_consumer_lanes/ -> done/`; card + checklist marked closed; the stale checklist closeout note (still
+  describing T6c as active in `doing/`) corrected. 22 member back-links repointed to `done/epic_consumer_lanes` (line-3
+  `**Epic**:` headers only; no narrative touched).
+
+**Verification**: Docs-only closeout, no code change. Code claims re-verified against `handlers.py` before writing;
+back-link repoint confirmed (0 remaining `doing/epic_consumer_lanes` refs in `done/`).
+
 ### consumer_lanes T6c: Memory-writer codex dispatch arm
 
 **Goal**: Bind the memory writer to its resolved lane's runtime so a codex binding dispatches a real `codex exec` arm

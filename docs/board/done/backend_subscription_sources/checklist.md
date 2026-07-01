@@ -1,6 +1,6 @@
 # Checklist: T2 -- Backend: runtime-native subscription sources
 
-**Card**: `card.md` (this dir). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**:
+**Card**: `card.md` (this dir). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**:
 `backend_subscription_sources` (off `main` @ `82076324`, the T3 closeout).
 
 ## Current focus

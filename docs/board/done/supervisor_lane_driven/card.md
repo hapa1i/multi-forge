@@ -1,6 +1,6 @@
 # T3 -- Supervisor becomes lane-driven (Claude default, byte-identical)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract.
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the shared lane contract.
 
 **Lane**: `todo/` (accepted, first wave). No execution branch open yet.
 

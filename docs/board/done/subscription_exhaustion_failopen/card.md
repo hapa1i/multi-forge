@@ -1,6 +1,6 @@
 # T7 -- Subscription-exhaustion fail-open (degrade a spent subscription lane to its default)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the lane contract and the **"No fallback
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the lane contract and the **"No fallback
 (de-scoped)"** decision this card carves the single, deliberate exception into.
 
 **Lane**: `done/` -- shipped via PR #61 (`96e342b1`, merged to `main` 2026-06-30); branch

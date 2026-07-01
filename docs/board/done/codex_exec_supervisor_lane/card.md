@@ -1,6 +1,6 @@
 # T4 -- Codex-exec supervisor lane
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (runtime x backend x
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the shared lane contract (runtime x backend x
 model; resolve once, frozen). This is the **headline capability demo**: the first consumer placed on a *non-Claude*
 runtime, proving the lane abstraction admits a real new lane swappably.
 

@@ -1,6 +1,6 @@
 # T6a -- Aux-consumer lane placement (claude-max billing for memory-writer / shadow-curation / team-supervisor)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (member **T6a**, the first narrow slice of T6 "generalize to other
+**Epic**: `docs/board/done/epic_consumer_lanes/` (member **T6a**, the first narrow slice of T6 "generalize to other
 consumers"). Depends on **T1b** (the supervisor binding pattern to generalize) and **T0** (the `claude-max` source +
 billing label + the three consumers' defs/slots/threading).
 

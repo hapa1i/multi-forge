@@ -1,7 +1,7 @@
 # T1a -- Pure lane/consumer resolver (spine)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (lane = runtime x
-backend x model; consumer; capability floor; binding).
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the shared lane contract (lane = runtime x backend
+x model; consumer; capability floor; binding).
 
 **Lane**: `doing/` (active on branch `consumer_lane_resolver`). Execution plan in `checklist.md`.
 

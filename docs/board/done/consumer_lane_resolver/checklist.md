@@ -1,6 +1,6 @@
 # Checklist: T1a -- Pure lane/consumer resolver
 
-**Card**: `card.md` (this dir). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**: `consumer_lane_resolver`.
+**Card**: `card.md` (this dir). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**: `consumer_lane_resolver`.
 
 ## Current focus
 

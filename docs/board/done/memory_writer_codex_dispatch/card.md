@@ -1,7 +1,7 @@
 # T6c -- Memory-writer codex dispatch (the epic's first write-capable aux lane)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (member T6c). Promoted from the inline T6b sketch on 2026-06-30;
-branch `memory_writer_codex_dispatch`.
+**Epic**: `docs/board/done/epic_consumer_lanes/` (member T6c). Promoted from the inline T6b sketch on 2026-06-30; branch
+`memory_writer_codex_dispatch`.
 
 **Depends on**: T6a (`done/aux_consumer_lane_placement/`) -- lane binding + freeze + billing for the memory writer
 already ship. T6b (`done/aux_consumer_codex_dispatch/`) -- the runtime-keyed codex dispatch seam and the

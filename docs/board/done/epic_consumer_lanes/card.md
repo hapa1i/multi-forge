@@ -11,10 +11,13 @@ The **first wave is complete**; the epic stays in `doing/`. T6 shipped as T6a + 
 `done/aux_consumer_codex_dispatch/`). With T1b, the T0 sibling (PR #58, `b0614325`), T6a (PR #59), and T6b (PR #60) all
 done, the epic stays in `doing/` coordinating the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor
 plan-context). With T7 done (PR #61), the first wave and all follow-ons through T7 are complete; **T6c** (memory-writer
-codex dispatch) is **done** (PR #62, `1064b8c8`, closed to `done/memory_writer_codex_dispatch/`), leaving only
-team-supervisor (plan-context) deferred.
+codex dispatch) is **done** (PR #62, `1064b8c8`, closed to `done/memory_writer_codex_dispatch/`). **Epic closed
+2026-07-01**: the last deferred follow-on -- team-supervisor codex dispatch -- is carved out to a standalone card
+(`docs/board/proposed/team_supervisor_plan_context/`) because it depends on runtime-neutral plan/context delivery, not
+the lane substrate. Every *live* member is `done/`, so the epic moves to `done/` (see Closeout).
 
-**Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
+**Status**: **Done** -- closed to `done/` 2026-07-01 (team-supervisor codex dispatch carved out to `proposed/`; see
+Closeout). Coordinated in `doing/` from 2026-06-25. First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
 #54, runtime-native subscription sources) is **done** in `done/` (2026-06-26); T4 (PR #55, codex-exec supervisor lane,
 the headline capability demo) is **done** in `done/` (2026-06-27); **T5 (PR #56, lane observability) is done in `done/`
@@ -292,3 +295,28 @@ misconfig must not crash the policy hook.
 
 Mid-session failover / capacity forecasting; making *every* consumer configurable on day one; runtime-mixing for the
 interactive session beyond what already exists; supervised Codex *executor* enforcement.
+
+## Closeout (2026-07-01)
+
+**Decision**: consumer_lanes is **complete at the lane-contract level for team-supervisor** -- it has lane placement,
+`claude-max` billing, freeze-on-real-dispatch, and observability. A codex team-supervisor lane is **deferred** because
+it depends on runtime-neutral plan/context delivery, which belongs to team-orchestration / context design, not the lane
+substrate. That deferred work is now a standalone follow-on card, `docs/board/proposed/team_supervisor_plan_context/` --
+**not** an outstanding member of this epic.
+
+**Why it is a different abstraction, not "one more aux codex arm"** (verified in `src/forge/policy/team/handlers.py`,
+2026-07-01):
+
+- `TEAM_SUPERVISOR_CONSUMER.allowed_lanes` is `(Lane("claude_code", "claude-max", "opus"),)` only -- no codex lane;
+  `claude-max` shares the `claude_code` runtime, so it is a billing label, not a dispatch change (`handlers.py:38-43`).
+- The dispatch is `run_claude_session(prompt, resume_id=config.resume_id, ...)` (`handlers.py:267-269`); the plan
+  reaches the supervisor **only** via `claude -p --resume`. The three shipped codex arms (T4/T6b/T6c) are blind /
+  in-band -- `codex exec` has no `--resume` -- so a codex team-supervisor turn would be plan-blind until the context
+  model changes.
+
+**Epic close criterion met** (board_contract "Epics"): every *live* member card is `done/`, and the shared lane contract
+is folded into normative design docs (design.md §3.5/§3.6.2, design_appendix.md §G). The single remaining follow-on is
+re-filed as an independent card, so the coordinator is no longer load-bearing.
+
+**Member outcome**: T1a, T2, T3, T4, T5, T1b, T6a, T6b, T6c all `done/`; T0 (sibling) `done/`; T7 `done/`.
+Team-supervisor codex dispatch -> `proposed/team_supervisor_plan_context/`.

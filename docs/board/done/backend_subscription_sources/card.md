@@ -1,7 +1,7 @@
 # T2 -- Backend: runtime-native subscription sources
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (backend =
-`ModelSource`; billing is a property of the backend).
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the shared lane contract (backend = `ModelSource`;
+billing is a property of the backend).
 
 **Lane**: `done/` (shipped via PR #54, 2026-06-26). Branch `backend_subscription_sources`, squashed to `main` @
 `ff3b96cc`.

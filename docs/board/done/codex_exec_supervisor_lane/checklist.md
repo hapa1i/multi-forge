@@ -1,6 +1,6 @@
 # T4 execution checklist -- Codex-exec supervisor lane
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (lane contract; T3 -> T4 carry-forward seams). **Card**: `card.md`
+**Epic**: `docs/board/done/epic_consumer_lanes/` (lane contract; T3 -> T4 carry-forward seams). **Card**: `card.md`
 (scope, non-goals, acceptance). **Branch**: `codex_exec_supervisor_lane` (opened 2026-06-26; `git mv` from `todo/`).
 
 ## Current focus

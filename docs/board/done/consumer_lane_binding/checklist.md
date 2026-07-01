@@ -1,6 +1,6 @@
 # T1b execution checklist: consumer_lane_binding
 
-**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**: `consumer_lane_binding`.
+**Card**: [`card.md`](card.md). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**: `consumer_lane_binding`.
 
 ## Current focus
 

@@ -1,6 +1,6 @@
 # T7 execution checklist: subscription-exhaustion fail-open
 
-**Lane**: `doing/` (member of `doing/epic_consumer_lanes/`). Branch `subscription_exhaustion_failopen`. Card: `card.md`.
+**Lane**: `doing/` (member of `done/epic_consumer_lanes/`). Branch `subscription_exhaustion_failopen`. Card: `card.md`.
 
 ## Current focus
 

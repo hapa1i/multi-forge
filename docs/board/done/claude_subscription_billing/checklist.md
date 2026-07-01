@@ -1,6 +1,6 @@
 # T0 execution checklist: claude_subscription_billing
 
-**Card**: [`card.md`](card.md). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**:
+**Card**: [`card.md`](card.md). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**:
 `claude_subscription_billing`.
 
 ## Current focus

@@ -1,6 +1,6 @@
 # T0 -- Claude subscription billing signal (does `claude -p` ride Max? + honest `billing_mode`)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (member **T0**, the sibling billing cleanup; independent of the first
+**Epic**: `docs/board/done/epic_consumer_lanes/` (member **T0**, the sibling billing cleanup; independent of the first
 wave, **load-bearing for a future `claude-max` lane**).
 
 **Type**: Member card. Probe-first investigation + (conditional) billing-signal implementation. T0 answers an empirical

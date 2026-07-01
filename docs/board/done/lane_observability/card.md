@@ -1,6 +1,6 @@
 # T5 -- Lane observability (surface the chosen lane + billing; close emission gaps)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (runtime x backend x
+**Epic**: `docs/board/done/epic_consumer_lanes/` -- read the epic for the shared lane contract (runtime x backend x
 model; resolve once, frozen). T5 is the **observability** member: now that a consumer (the supervisor, T4) can run on a
 non-Claude lane, make that choice and its cost *visible and measurable* so a user can see and verify the arbitrage.
 

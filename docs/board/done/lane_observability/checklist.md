@@ -1,6 +1,6 @@
 # T5 execution checklist -- Lane observability
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (lane contract). **Card**: `card.md` (scope, decisions, acceptance,
+**Epic**: `docs/board/done/epic_consumer_lanes/` (lane contract). **Card**: `card.md` (scope, decisions, acceptance,
 non-goals). **Branch**: `lane_observability` (opened 2026-06-27; promoted from the epic's inline T5 sketch).
 
 ## Current focus

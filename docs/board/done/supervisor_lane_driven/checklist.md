@@ -1,6 +1,6 @@
 # Checklist: T3 -- Supervisor becomes lane-driven (Claude default, byte-identical)
 
-**Card**: `card.md` (this dir). **Epic**: `docs/board/doing/epic_consumer_lanes/`. **Branch**: `supervisor_lane_driven`
+**Card**: `card.md` (this dir). **Epic**: `docs/board/done/epic_consumer_lanes/`. **Branch**: `supervisor_lane_driven`
 (off `main` @ `b84e2462`, the T1a merge).
 
 ## Current focus

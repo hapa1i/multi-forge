@@ -1,6 +1,6 @@
 # T6c execution checklist: memory-writer codex dispatch
 
-**Lane**: `doing/` (member of `doing/epic_consumer_lanes/`). Branch `memory_writer_codex_dispatch`. Card: `card.md`.
+**Lane**: `doing/` (member of `done/epic_consumer_lanes/`). Branch `memory_writer_codex_dispatch`. Card: `card.md`.
 
 ## Current focus
 
