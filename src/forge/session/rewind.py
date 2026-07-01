@@ -90,6 +90,12 @@ def write_rewind_transcript_prefix(
         entry_line_by_id=entry_line_by_id,
         kept_turns=kept_turns,
     )
+    _assert_kept_turns_form_raw_prefix(
+        raw_entries=raw_entries,
+        turn_groups=turn_groups,
+        kept_turns=kept_turns,
+        cutoff_line=cutoff_line,
+    )
 
     selected_lines = raw_lines[: cutoff_line + 1] if cutoff_line >= 0 else []
     selected_entry_count = sum(1 for raw in raw_entries if raw.line_index <= cutoff_line)
@@ -161,6 +167,30 @@ def _cutoff_line_for_kept_turns(
             if line_index is not None:
                 line_indexes.append(line_index)
     return max(line_indexes, default=-1)
+
+
+def _assert_kept_turns_form_raw_prefix(
+    *,
+    raw_entries: list[_RawTranscriptEntry],
+    turn_groups: list[list[dict[str, Any]]],
+    kept_turns: int,
+    cutoff_line: int,
+) -> None:
+    # Raw prefixing is only honest when grouped turns are append-contiguous.
+    # If requestIds interleave, a max-line cutoff would leak dropped-turn
+    # entries into the output while the result claims they were removed.
+    grouped_entry_ids = {id(entry) for group in turn_groups for entry in group}
+    expected_entry_ids = {id(entry) for group in turn_groups[:kept_turns] for entry in group}
+    selected_grouped_entry_ids = {
+        id(raw.entry)
+        for raw in raw_entries
+        if raw.line_index <= cutoff_line and id(raw.entry) in grouped_entry_ids
+    }
+
+    if selected_grouped_entry_ids != expected_entry_ids:
+        raise ValueError(
+            "rewind transcript turns are not a contiguous raw prefix; refusing to include dropped-window entries"
+        )
 
 
 def _has_dangling_tool_use(entries: list[dict[str, Any]]) -> bool:

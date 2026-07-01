@@ -143,6 +143,25 @@ def test_drop_last_at_or_beyond_turn_count_writes_empty_prefix(tmp_path: Path) -
     assert result.entries_written == 0
 
 
+def test_interleaved_request_ids_are_rejected_to_preserve_prefix_contract(tmp_path: Path) -> None:
+    source = tmp_path / "parent.jsonl"
+    dest = tmp_path / "rewind.jsonl"
+    _write_jsonl(
+        source,
+        [
+            _entry(role="user", text="u1", request_id="r1"),
+            _entry(role="user", text="u2", request_id="r2"),
+            _entry(role="assistant", text="a1", request_id="r1"),
+            _entry(role="assistant", text="a2", request_id="r2"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="not a contiguous raw prefix"):
+        write_rewind_transcript_prefix(source_path=source, dest_path=dest, drop_last=1)
+
+    assert not dest.exists()
+
+
 def test_negative_drop_last_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "parent.jsonl"
     dest = tmp_path / "rewind.jsonl"

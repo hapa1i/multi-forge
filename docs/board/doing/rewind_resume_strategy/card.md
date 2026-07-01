@@ -1,7 +1,7 @@
 # Rewind Resume Strategy — drop the last N turns, keep an AI code-delta
 
-**Status**: Active (in `doing/`, accepted 2026-07-01). Slice 1 decisions are locked in code/docs and awaiting review
-before Slice 2 (see `checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
+**Status**: Active (in `doing/`, accepted 2026-07-01). Slices 1-2 are locked in code/docs; next implementation slice is
+Slice 3 (see `checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
 `forge session fork|resume --strategy rewind --drop-last N`. `docs/design.md` resume/transfer contracts remain
 normative; this card defers to them on conflict.
 
@@ -37,6 +37,10 @@ document contract.
 **Decided (2026-07-01, Slice 2)**: `--drop-last 0` is a no-op and downgrades to plain native-relocate manifest
 semantics: `strategy=null`, no `dropped_turns`, no `context_file`, and no `rewind_relocated_session_id`. The CLI should
 surface that as a no-op rather than writing a rewind manifest that did not rewind.
+
+The Slice 2 writer also pins `N>=T` at the primitive level: it writes an empty prefix and reports `kept_turns=0`. That
+artifact is metadata for the caller, not a launchable native-resume head; Slice 4 must reject or fall back before any
+`claude --resume` attempt.
 
 **References**: `docs/design.md` "Transfer mode strategies" + "Session derivation tracking", §3.9 (resume across path
 boundaries); `src/forge/session/transfer.py`; `src/forge/session/manager.py`; `src/forge/cli/session_fork.py`;
@@ -201,6 +205,10 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
   `strategy is null ⟺ native`.
 - **Unsafe JSONL truncation.** Cutting mid `tool_use`/`tool_result` pair corrupts `--resume`. Need
   snap-to-last-complete- turn ≤ T−N; test a tool-call straddling the cut.
+- **Empty rewind head.** `N>=T` produces `kept_turns=0` at the writer level; Slice 4 must not launch an empty
+  `<R>.jsonl` as native resume.
+- **Silent extra drop.** Safe-boundary snap can keep fewer turns than requested when the boundary lands in a tool chain;
+  the CLI must say how many additional turns were dropped.
 - **GC mis-count (resolved by design).** Reusing the parent UUID for different bytes would mis-count or overwrite the
   parent's original; the fresh-UUID decision and distinct `rewind_relocated_session_id` make the copy unshared.
 - **Deliberate desync confusion.** Conversation is at T−N, disk at T. If the delta note is weak the agent may redo work
@@ -215,7 +223,8 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
    `dropped_turns` + `rewind_relocated_session_id=R`); run the `sessionId`-match probe; update the design.md
    resume-mode×strategy contract. **Done; awaiting review.**
 2. **Turn window + safe truncation.** Split at T−N on a coherent boundary; truncated-JSONL writer; pin degenerate N=0
-   manifest semantics (plain native-relocate); handle N≥T (→ minimal head + whole-session delta).
+   manifest semantics (plain native-relocate); pin writer-level N≥T semantics as an empty prefix that Slice 4 must
+   reject or route around before launch.
 3. **Code-delta extractor + prompt.** Tool-call delta from the dropped window; net-change reconciliation; narrowed
    prompt; reuse citation grounding + usage emit + injection hardening.
 4. **Wire the strategy.** `ResumeStrategy.REWIND`; `--drop-last` + Choice on fork/resume; co-deliver context file with
@@ -233,6 +242,8 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 | Truncation snaps to safe boundary     | tool_use/result pair straddling T−N        | relocated JSONL ends on a complete turn (resume not corrupted)                                     | same                                        |
 | Delta cites only dropped turns        | edits in the dropped window                | delta lists changed files citing turns T−N+1..T; no head citations                                 | same                                        |
 | Native resume + context file together | `--strategy rewind` worktree fork          | launch carries `--resume --fork-session` AND `--append-system-prompt-file`                         | same                                        |
+| Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
+| Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
 | Resume tolerates fresh UUID           | rewind launch, truncated fresh `<R>.jsonl` | child resumes from clean-prefix `<R>` with embedded parent `sessionId`; no "No conversation found" | same                                        |
 | Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | same                                        |
 | Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_fork.py`        |
@@ -247,7 +258,8 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 2. **Delta source**: tool-calls only (recommended) vs + git-diff cross-check.
 3. **Choosing N**: add a turn-boundary preview (a `forge transfer show --turns`-style view?) so users pick N without
    guessing — possible follow-up.
-4. **Transfer-mode variant**: ever offer a summarized-head form for same-dir, or keep `rewind` strictly native-relocate?
+4. **N≥T UX**: reject with guidance or fall back to a transfer-style path; do not launch an empty native transcript.
+5. **Transfer-mode variant**: ever offer a summarized-head form for same-dir, or keep `rewind` strictly native-relocate?
    (Card says strictly native-relocate.)
 
 **Resolved (2026-06-22)**: N counts turns (old Q2), parent-only (old Q5), fresh-UUID unshared truncated copy (old Q3) —
