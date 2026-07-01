@@ -453,8 +453,10 @@ class Derivation:
             relocates the parent JSONL into the child CWD's encoded dir, then resumes), or
             "transfer" (assembled context). None is treated as transfer (no reader branches on a
             loaded parent's mode token). Authoritative field for how context was transferred.
-        strategy: Context assembly strategy (minimal|structured|full|ai-curated).
-            Only set when resume_mode is "transfer" (or None). Null for native resumes.
+        strategy: Context assembly strategy (minimal|structured|full|ai-curated|rewind).
+            Historically set only when resume_mode is "transfer" (or None), with null for
+            native resumes. "rewind" intentionally combines native-relocate history with a
+            generated context file.
         depth: How many ancestors were traversed (1 = parent only).
         resumed_at: ISO8601 timestamp when resume was executed.
         lineage: Ancestry chain from parent to oldest ancestor traversed.
@@ -462,6 +464,11 @@ class Derivation:
         relocated_parent_session_id: For resume_mode "native-relocate" only -- the parent UUID
             whose transcript was copied into the child's encoded project dir. Lets cleanup remove
             that relocated copy (dir-scoped to the child) without touching the parent's original.
+        dropped_turns: For strategy "rewind", how many tail turns were dropped from the relocated
+            transcript prefix.
+        rewind_relocated_session_id: For strategy "rewind", the fresh UUID used for the truncated
+            relocated transcript copy. Distinct from relocated_parent_session_id because it is not
+            the parent's UUID and is not a shared byte-for-byte native-relocate copy.
     """
 
     parent_session: str
@@ -474,6 +481,8 @@ class Derivation:
     lineage: list[str] = field(default_factory=list)
     context_file: str | None = None
     relocated_parent_session_id: str | None = None  # Set only for resume_mode "native-relocate"
+    dropped_turns: int | None = None
+    rewind_relocated_session_id: str | None = None
     # Project identity fields for cross-project resume (see design.md §3)
     parent_forge_root: str | None = None  # Where to find parent artifacts
     parent_project_root: str | None = None  # Must match child's project_root

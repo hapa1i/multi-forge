@@ -108,13 +108,15 @@ def _tracked_derivation_transcript_session_ids(
 ) -> list[str]:
     """Extract transcript UUIDs a derivation points at, when present.
 
-    Yields UUIDs from ``parent_transcript`` (archived-artifact pointer) AND
-    ``relocated_parent_session_id``. The latter is load-bearing for cleanup: a
-    native-relocate fork copies the parent UUID's transcript into the child's
-    dir, so a co-resident sibling that relocated the same parent UUID must mark
-    that copy as shared -- otherwise deleting one alias destroys the other's
-    baseline. (The parent's own claude_session_id == the relocated UUID, so this
-    also protects the parent's original when the child/parent dirs collide.)
+    Yields UUIDs from ``parent_transcript`` (archived-artifact pointer),
+    ``relocated_parent_session_id`` (native-relocate's shared parent UUID), and
+    ``rewind_relocated_session_id`` (rewind's fresh truncated-copy UUID). The
+    native-relocate UUID is load-bearing for cleanup: a native-relocate fork
+    copies the parent UUID's transcript into the child's dir, so a co-resident
+    sibling that relocated the same parent UUID must mark that copy as shared --
+    otherwise deleting one alias destroys the other's baseline. (The parent's
+    own claude_session_id == the relocated UUID, so this also protects the
+    parent's original when the child/parent dirs collide.)
 
     Accepts ``object``: force-delete and shared-transcript scans pass the raw JSON
     value of ``confirmed.derivation`` from manifests that failed strict validation,
@@ -124,9 +126,11 @@ def _tracked_derivation_transcript_session_ids(
     if isinstance(derivation, Derivation):
         parent_transcript = derivation.parent_transcript
         relocated = derivation.relocated_parent_session_id
+        rewind_relocated = derivation.rewind_relocated_session_id
     elif isinstance(derivation, dict):
         parent_transcript = derivation.get("parent_transcript")
         relocated = derivation.get("relocated_parent_session_id")
+        rewind_relocated = derivation.get("rewind_relocated_session_id")
     else:
         # None, or a malformed raw derivation from a corrupted manifest -> nothing tracked.
         return []
@@ -139,6 +143,8 @@ def _tracked_derivation_transcript_session_ids(
             _append_unique_string(session_ids, match)
     if isinstance(relocated, str):
         _append_unique_string(session_ids, relocated)
+    if isinstance(rewind_relocated, str):
+        _append_unique_string(session_ids, rewind_relocated)
     return session_ids
 
 

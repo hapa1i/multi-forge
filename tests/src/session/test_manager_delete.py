@@ -10,6 +10,8 @@ import forge.session.claude.cleanup as cleanup_mod
 import forge.session.worktree as worktree_pkg
 import forge.session.worktree.cleanup as worktree_cleanup_mod
 from forge.session import ForgeSessionError, IndexStore, SessionManager, SessionStore
+from forge.session.manager import _tracked_derivation_transcript_session_ids
+from forge.session.models import Derivation
 
 
 def _init_project(path: Path) -> None:
@@ -18,6 +20,21 @@ def _init_project(path: Path) -> None:
     (path / ".git").mkdir()
     (path / ".forge").mkdir()
     (path / ".claude").mkdir()
+
+
+def test_tracked_derivation_transcript_ids_include_rewind_relocated_id() -> None:
+    """Shared-transcript scans must see rewind's fresh relocated UUID."""
+    derivation = Derivation(
+        parent_session="parent",
+        rewind_relocated_session_id="296385c3-9753-452b-af3d-e9170233c613",
+    )
+
+    assert _tracked_derivation_transcript_session_ids(derivation) == [
+        "296385c3-9753-452b-af3d-e9170233c613"
+    ]
+    assert _tracked_derivation_transcript_session_ids(
+        {"rewind_relocated_session_id": "296385c3-9753-452b-af3d-e9170233c613"}
+    ) == ["296385c3-9753-452b-af3d-e9170233c613"]
 
 
 def test_delete_preserves_session_when_worktree_cleanup_reports_errors(
