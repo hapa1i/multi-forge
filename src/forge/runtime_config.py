@@ -108,8 +108,8 @@ _CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
 _STATUSLINE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
     "segments": (
         "Ordered segment list. Empty means the default layout.",
-        "Valid names include path, branch, model, cost, cache_hit, supervisor, policy, audit, drift,",
-        "spend_cap, forge_cost, and rate_limits.",
+        "Set with: forge config set statusline.segments=<comma,separated>",
+        "Unknown names are rejected with the full list of valid segments.",
     ),
     "cost_mode": (
         "Cost display mode: auto, api, or subscription.",
@@ -129,6 +129,15 @@ _PROVIDER_TRACE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
         "Only a hashed id is sent, never the raw session name.",
     ),
 }
+
+# Scalar spellings that YAML 1.1 (PyYAML, our loader via yaml.safe_load) resolves
+# to a non-string. ruamel dumps YAML 1.2, where these are plain strings, so it
+# would write `log_level: off` unquoted -- and yaml.safe_load would then read it
+# back as the bool False, not "off". Force-quote them (and the empty string, which
+# YAML reads as null) so the write and the read agree. Matched case-insensitively:
+# over-quoting a value YAML 1.1 would not have resolved is harmless; under-quoting
+# is the round-trip bug.
+_YAML11_AMBIGUOUS_SCALARS = frozenset({"y", "yes", "n", "no", "true", "false", "on", "off", "null", "~"})
 
 
 @dataclass
@@ -667,22 +676,45 @@ def _commented_runtime_config_map(data: Mapping[str, Any]) -> Any:
     return result
 
 
+def _build_runtime_yaml() -> Any:
+    """Build the configured ruamel YAML instance shared by the render/write paths.
+
+    Installs a str representer that quotes YAML 1.1 keyword scalars (see
+    ``_YAML11_AMBIGUOUS_SCALARS``) so the ruamel-dumped file round-trips through
+    the PyYAML loader unchanged. The representer is scoped to a local subclass so
+    it never mutates the process-wide ``RoundTripRepresenter`` other ruamel
+    callers (e.g. proxy config) rely on.
+    """
+    from ruamel.yaml import YAML
+    from ruamel.yaml.representer import RoundTripRepresenter
+
+    def _represent_str(representer: Any, value: str) -> Any:
+        if value == "" or value.lower() in _YAML11_AMBIGUOUS_SCALARS:
+            return representer.represent_scalar("tag:yaml.org,2002:str", value, style="'")
+        return representer.represent_scalar("tag:yaml.org,2002:str", value)
+
+    class _RuntimeConfigRepresenter(RoundTripRepresenter):
+        pass
+
+    _RuntimeConfigRepresenter.add_representer(str, _represent_str)
+
+    ruamel = YAML()
+    ruamel.Representer = _RuntimeConfigRepresenter
+    ruamel.preserve_quotes = True
+    ruamel.default_flow_style = False
+    ruamel.indent(mapping=2, sequence=4, offset=2)
+    return ruamel
+
+
 def render_runtime_config_yaml(config: RuntimeConfig | Mapping[str, Any]) -> str:
     """Render runtime config as parseable YAML with explanatory comments."""
-    from ruamel.yaml import YAML
-
     if isinstance(config, RuntimeConfig):
         data: Mapping[str, Any] = asdict(config)
     else:
         data = config
 
-    ruamel = YAML()
-    ruamel.preserve_quotes = True
-    ruamel.default_flow_style = False
-    ruamel.indent(mapping=2, sequence=4, offset=2)
-
     stream = StringIO()
-    ruamel.dump(_commented_runtime_config_map(data), stream)
+    _build_runtime_yaml().dump(_commented_runtime_config_map(data), stream)
     return stream.getvalue()
 
 
@@ -699,13 +731,9 @@ def write_runtime_config(config_data: Mapping[str, Any], path: Path | None = Non
     config_path = path or get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedMap
 
-    ruamel = YAML()
-    ruamel.preserve_quotes = True
-    ruamel.default_flow_style = False
-    ruamel.indent(mapping=2, sequence=4, offset=2)
+    ruamel = _build_runtime_yaml()
     yaml_data = config_data if isinstance(config_data, CommentedMap) else _commented_runtime_config_map(config_data)
 
     # Atomic write: unique temp file + os.replace (matches proxy config pattern)
@@ -819,10 +847,9 @@ proxy_mode: host
 #              subscription shows quota instead of dollars
 #   palette:   default | earthy
 #   glyphs:    ascii | unicode
-#   segments:  ordered list; empty = default layout. Valid names: path, branch,
-#              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
-#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap,
-#              forge_cost
+#   segments:  ordered list; empty = default layout. Set with
+#              `forge config set statusline.segments=<comma,separated>`; unknown
+#              names are rejected with the full list of valid segments.
 #   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
 #   forge_cost_ttl: <seconds, forge_cost segment throttle window (default 10)>
 # statusline:

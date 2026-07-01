@@ -334,6 +334,33 @@ class TestWriteRuntimeConfig:
         assert "# Custom operator note" in content
         assert "proxy_mode: sidecar" in content
 
+    def test_nested_bool_keyword_value_round_trips(self, tmp_path: Path):
+        """statusline.cache_hit='off' must survive write->load.
+
+        ruamel dumps YAML 1.2 (off = string); the loader reads YAML 1.1 via
+        PyYAML (off = bool False). Without the YAML-1.1-safe representer, the
+        unquoted `cache_hit: off` reloaded as False, failed StatusLineConfig
+        validation, and silently reset the WHOLE statusline section to defaults
+        (wiping segments). Regression for that data loss.
+        """
+        config_path = tmp_path / "config.yaml"
+        write_runtime_config(
+            {"statusline": {"cache_hit": "off", "segments": ["path", "model"]}},
+            path=config_path,
+        )
+        # Written value is quoted so YAML 1.1 keeps it a string.
+        assert "cache_hit: 'off'" in config_path.read_text()
+        reloaded = load_runtime_config(path=config_path)
+        assert reloaded.statusline.cache_hit == "off"
+        assert reloaded.statusline.segments == ["path", "model"]
+
+    def test_top_level_bool_keyword_value_round_trips(self, tmp_path: Path):
+        config_path = tmp_path / "config.yaml"
+        write_runtime_config({"log_level": "off", "policy_summary_feedback": "on"}, path=config_path)
+        reloaded = load_runtime_config(path=config_path)
+        assert reloaded.log_level == "off"
+        assert reloaded.policy_summary_feedback == "on"
+
     def test_creates_parent_directories(self, tmp_path: Path):
         config_path = tmp_path / "subdir" / "config.yaml"
         write_runtime_config({"proxy_mode": "host"}, path=config_path)
@@ -443,6 +470,64 @@ class TestRenderRuntimeConfigYaml:
         assert data["proxy_mode"] == "host"
         assert data["statusline"]["cost_mode"] == "auto"
         assert data["provider_trace"]["inject_provider_user"] is False
+
+    def test_rendered_output_is_copy_paste_safe(self, tmp_path: Path):
+        """`forge config show` output, pasted back into config.yaml, must load unchanged.
+
+        The renderer dumps YAML 1.2 but the loader reads YAML 1.1 (PyYAML). Bool
+        keyword string values (log_level/cache_hit = off) must be quoted so a user
+        copying the shown config back into the file does not silently turn them
+        into booleans (and reset the statusline section).
+        """
+        rc = RuntimeConfig(log_level="off")
+        rc.statusline.cache_hit = "off"
+        rc.statusline.segments = ["path", "model"]
+
+        shown = render_runtime_config_yaml(rc)
+        assert "log_level: 'off'" in shown
+        assert "cache_hit: 'off'" in shown
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(shown)  # paste the shown config back as the file
+        reloaded = load_runtime_config(path=config_path)
+        assert reloaded.log_level == "off"
+        assert reloaded.statusline.cache_hit == "off"
+        assert reloaded.statusline.segments == ["path", "model"]
+
+
+class TestConfigCommentCoverage:
+    """Guard against comment/field drift (review Finding 2).
+
+    Every config field must have a doc comment, so `forge config show` never
+    renders an undocumented field and a new field can't ship without a comment.
+    """
+
+    def test_every_runtime_field_has_a_comment(self):
+        from dataclasses import fields
+
+        from forge.runtime_config import _CONFIG_FIELD_COMMENTS
+
+        missing = [f.name for f in fields(RuntimeConfig) if f.name not in _CONFIG_FIELD_COMMENTS]
+        assert not missing, f"RuntimeConfig fields missing a comment: {missing}"
+
+    def test_every_statusline_field_has_a_comment(self):
+        from dataclasses import fields
+
+        from forge.runtime_config import _STATUSLINE_FIELD_COMMENTS, StatusLineConfig
+
+        missing = [f.name for f in fields(StatusLineConfig) if f.name not in _STATUSLINE_FIELD_COMMENTS]
+        assert not missing, f"StatusLineConfig fields missing a comment: {missing}"
+
+    def test_every_provider_trace_field_has_a_comment(self):
+        from dataclasses import fields
+
+        from forge.runtime_config import (
+            _PROVIDER_TRACE_FIELD_COMMENTS,
+            RuntimeProviderTraceConfig,
+        )
+
+        missing = [f.name for f in fields(RuntimeProviderTraceConfig) if f.name not in _PROVIDER_TRACE_FIELD_COMMENTS]
+        assert not missing, f"RuntimeProviderTraceConfig fields missing a comment: {missing}"
 
 
 # ---------------------------------------------------------------------------
@@ -645,13 +730,10 @@ class TestProviderTraceConfigDefaults:
 
     def test_string_bool_coerced(self):
         """A quoted "true"/"false" in YAML coerces, not silently degrades."""
-        assert (
-            RuntimeConfig(provider_trace={"inject_provider_user": "true"}).provider_trace.inject_provider_user is True
-        )  # type: ignore[arg-type]
-        assert (
-            RuntimeConfig(provider_trace={"inject_provider_user": "off"}).provider_trace.inject_provider_user
-            is False  # type: ignore[arg-type]
-        )
+        rc_true = RuntimeConfig(provider_trace={"inject_provider_user": "true"})  # type: ignore[arg-type]
+        rc_off = RuntimeConfig(provider_trace={"inject_provider_user": "off"})  # type: ignore[arg-type]
+        assert rc_true.provider_trace.inject_provider_user is True
+        assert rc_off.provider_trace.inject_provider_user is False
 
     def test_bad_value_raises_strict(self):
         """Construction is strict so set/edit fail closed."""
@@ -659,9 +741,7 @@ class TestProviderTraceConfigDefaults:
             RuntimeConfig(provider_trace={"inject_provider_user": "maybe"})  # type: ignore[arg-type]  # dict coercion path
 
     def test_unknown_subkey_dropped(self):
-        rc = RuntimeConfig(
-            provider_trace={"inject_provider_user": True, "future_key": 1}
-        )  # type: ignore[arg-type]  # dict coercion path
+        rc = RuntimeConfig(provider_trace={"inject_provider_user": True, "future_key": 1})  # type: ignore[arg-type]
         assert rc.provider_trace.inject_provider_user is True
         assert not hasattr(rc.provider_trace, "future_key")
 
