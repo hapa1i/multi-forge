@@ -78,7 +78,7 @@ def _record_workflow_outcome(command: str, output: Any) -> None:
         status=status,
         session=os.environ.get("FORGE_SESSION"),
         reason_code="worker_failed" if failed else None,
-        message=f"{failed} worker{'s' if failed != 1 else ''} failed" if failed else None,
+        message=(f"{failed} worker{'s' if failed != 1 else ''} failed" if failed else None),
     )
 
 
@@ -378,7 +378,13 @@ def _print_grouped_models(availabilities: list) -> None:
     default=None,
     help="Minimum severity to report",
 )
-@click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
+@click.option(
+    "--proxy",
+    "via",
+    type=str,
+    default=None,
+    help="Route proxy-backed workers through this proxy",
+)
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
 @click.option(
     "--effort",
@@ -425,14 +431,20 @@ def panel(
             ctx.exit(2)
             return
     else:
-        print_error(f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".', console=err_console)
+        print_error(
+            f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".',
+            console=err_console,
+        )
         ctx.exit(2)
         return
 
     # Prompt composition: (1) resolve base prompt/resource
     resolved_prompt = _resolve_panel_prompt(target, prompt, code_mode, review_type)
     if resolved_prompt is None:
-        print_error("No prompt provided. Use target argument, -p, or stdin.", console=err_console)
+        print_error(
+            "No prompt provided. Use target argument, -p, or stdin.",
+            console=err_console,
+        )
         ctx.exit(2)
         return
 
@@ -706,7 +718,12 @@ def _evaluate_consensus_positions(results: list[ReviewResult]) -> tuple[bool, st
             continue
 
         if "position" not in parsed:
-            verdicts.append((False, f"worker {result.model_name} emitted JSON without position field"))
+            verdicts.append(
+                (
+                    False,
+                    f"worker {result.model_name} emitted JSON without position field",
+                )
+            )
             continue
 
         v_str = str(parsed["position"]).upper()
@@ -809,7 +826,13 @@ def _handle_review_output(
     is_flag=True,
     help="Gate on verdict: exit 0 if passed, exit 1 if failed",
 )
-@click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
+@click.option(
+    "--proxy",
+    "via",
+    type=str,
+    default=None,
+    help="Route proxy-backed workers through this proxy",
+)
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
 @click.option(
     "--effort",
@@ -954,207 +977,6 @@ _DEFAULT_CODE_STANCE_PROMPTS = {
 
 _STANCE_CYCLE = ["for", "against", "neutral"]
 
-# Debate evaluation template (canonical copy in src/skills/debate/resources/debate_evaluation.md).
-# Embedded here so the CLI doesn't depend on skill installation.
-_DEBATE_EVALUATION_TEMPLATE = """\
-# Structured Evaluation
-
-```xml
-<role>
-You are a technical evaluator performing a structured assessment.
-{stance_prompt}
-</role>
-
-<behavior>
-- Evaluate strictly on technical merits
-- Support every claim with evidence or reasoning
-- Be specific: cite exact trade-offs, not vague concerns
-- Provide a clear verdict with confidence level
-</behavior>
-```
-
----
-
-## Proposal Under Evaluation
-
-{proposal}
-
----
-
-## Evaluation Framework
-
-### 1. Feasibility
-
-- Can this be implemented with the available technology and resources?
-- What are the key technical dependencies?
-- Are there proven precedents or is this novel?
-
-### 2. Correctness
-
-- Does the proposal solve the stated problem?
-- Are there logical gaps or incorrect assumptions?
-- Does it handle edge cases and failure modes?
-
-### 3. Trade-offs
-
-- What does this approach gain vs alternatives?
-- What does it cost (complexity, performance, maintenance)?
-- Are the trade-offs appropriate for the context?
-
-### 4. Risks
-
-- What could go wrong in implementation?
-- What could go wrong in production?
-- What is the blast radius of failure?
-
-### 5. Completeness
-
-- Are all requirements addressed?
-- Are there missing considerations?
-- What would need to be added before this is production-ready?
-
-### 6. Alternatives
-
-- What other approaches could solve this problem?
-- Why might they be better or worse?
-
-### 7. Recommendation
-
-- Overall verdict: ACCEPT, ACCEPT_WITH_CONDITIONS, or REJECT
-- Confidence level: LOW, MEDIUM, HIGH
-- Key conditions (if ACCEPT_WITH_CONDITIONS)
-
----
-
-## Output Format
-
-````xml
-<output_format>
-Respond with a structured evaluation in JSON:
-
-{
-  "verdict": "ACCEPT" | "ACCEPT_WITH_CONDITIONS" | "REJECT",
-  "confidence": "LOW" | "MEDIUM" | "HIGH",
-  "key_findings": [
-    {"category": "feasibility|correctness|trade-offs|risks|completeness",
-     "finding": "specific finding",
-     "severity": "critical|high|medium|low"}
-  ],
-  "recommendation": "1-2 sentence summary of your recommendation",
-  "conditions": ["condition 1", "condition 2"]
-}
-
-Wrap the JSON in a ```json code fence.
-</output_format>
-````
-"""
-
-# Code debate evaluation template (canonical copy in src/skills/debate/resources/code_debate_evaluation.md).
-# Embedded here so the CLI doesn't depend on skill installation.
-_CODE_DEBATE_EVALUATION_TEMPLATE = """\
-# Adversarial Code Evaluation
-
-```xml
-<role>
-You are a senior code evaluator performing a structured adversarial assessment.
-{stance_prompt}
-You identify bugs, design issues, security concerns, and performance problems.
-You provide actionable feedback with specific code references.
-</role>
-
-<behavior>
-- Read all code in scope before forming opinions
-- Cite specific file:line references for every finding
-- Evaluate strictly on technical merits
-- Support every claim with evidence or reasoning
-- Cover ALL files in ONE pass -- do not present partial results
-- Be specific: "potential null dereference at auth.py:45" not "might have issues"
-- Provide a clear verdict with confidence level
-</behavior>
-
-<scope_constraints>
-- Review only what's in scope
-- Do not expand to adjacent code unless directly affected
-- If tests exist for reviewed code, check them for coverage gaps
-</scope_constraints>
-```
-
----
-
-## Code Under Evaluation
-
-{target}
-
----
-
-## Evaluation Framework
-
-### 1. Quality
-
-- Logic errors and edge cases
-- Error handling: are errors caught, propagated, and surfaced correctly?
-- Type safety: do type annotations match runtime behavior?
-- Test coverage: are critical paths tested?
-
-### 2. Security
-
-- Input validation at trust boundaries
-- Injection vectors (command, SQL, path traversal)
-- Secrets in code or logs
-- Authentication and authorization gaps
-
-### 3. Performance
-
-- Unnecessary allocations or copies in hot paths
-- N+1 query patterns
-- Missing caching where data is reused
-- Blocking calls in async contexts
-
-### 4. Architecture
-
-- Component boundaries: is coupling appropriate?
-- Dependency direction: do imports flow the right way?
-- Abstraction level: is complexity in the right place?
-- Interface contracts: are public APIs stable and well-defined?
-
-### 5. Risks
-
-- What could go wrong in production?
-- What is the blast radius of failure?
-- Missing error recovery or graceful degradation?
-- Deployment or migration risks?
-
-### 6. Recommendation
-
-- Overall verdict: ACCEPT, ACCEPT_WITH_CONDITIONS, or REJECT
-- Confidence level: LOW, MEDIUM, HIGH
-- Key conditions (if ACCEPT_WITH_CONDITIONS)
-
----
-
-## Output Format
-
-````xml
-<output_format>
-Respond with a structured evaluation in JSON:
-
-{
-  "verdict": "ACCEPT" | "ACCEPT_WITH_CONDITIONS" | "REJECT",
-  "confidence": "LOW" | "MEDIUM" | "HIGH",
-  "key_findings": [
-    {"category": "quality|security|performance|architecture|risks",
-     "finding": "specific finding with file:line reference",
-     "severity": "critical|high|medium|low"}
-  ],
-  "recommendation": "1-2 sentence summary of your recommendation",
-  "conditions": ["condition 1", "condition 2"]
-}
-
-Wrap the JSON in a ```json code fence.
-</output_format>
-````
-"""
-
 
 def _resolve_debate_prompt(
     subject: tuple[str, ...],
@@ -1174,8 +996,8 @@ def _resolve_debate_prompt(
         return None
 
     if code_mode:
-        return _CODE_DEBATE_EVALUATION_TEMPLATE.replace("{target}", resolved)
-    return _DEBATE_EVALUATION_TEMPLATE.replace("{proposal}", resolved)
+        return _load_workflow_resource("code_debate_evaluation.md").replace("{target}", resolved)
+    return _load_workflow_resource("debate_evaluation.md").replace("{proposal}", resolved)
 
 
 @workflow_cmd.command(name="debate")
@@ -1211,7 +1033,13 @@ def _resolve_debate_prompt(
     type=str,
     help='Worker spec: model:stance or model:"custom prompt" (repeatable)',
 )
-@click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
+@click.option(
+    "--proxy",
+    "via",
+    type=str,
+    default=None,
+    help="Route proxy-backed workers through this proxy",
+)
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
 @click.option(
     "--effort",
@@ -1512,176 +1340,6 @@ def _print_debate_text(output: AdversarialOutput, resolved_models: dict[str, dic
 _PROPOSAL_ROLE_CYCLE = ["architecture", "security", "correctness"]
 _CODE_ROLE_CYCLE = ["architecture", "security", "maintainability"]
 
-_CONSENSUS_EVALUATION_TEMPLATE = """\
-# Consensus Evaluation
-
-```xml
-<role>
-You are a technical expert participating in a multi-perspective consensus process.
-{role_prompt}
-</role>
-
-<behavior>
-- Evaluate from your assigned perspective
-- Support every claim with evidence or reasoning
-- Be specific about trade-offs and constraints
-- Identify both strengths and weaknesses from your viewpoint
-- Provide a clear position with confidence level
-</behavior>
-```
-
----
-
-## Subject Under Evaluation
-
-{subject}
-
----
-
-## Evaluation Framework
-
-### 1. Assessment from Your Perspective
-
-- What are the key considerations from your assigned viewpoint?
-- What risks or opportunities do you see that others might miss?
-
-### 2. Strengths
-
-- What aspects of this proposal align well with your area of focus?
-
-### 3. Concerns
-
-- What issues or risks do you identify from your perspective?
-- How severe are they? What is the mitigation path?
-
-### 4. Recommendation
-
-- Your position: SUPPORT, SUPPORT_WITH_CONDITIONS, or OPPOSE
-- Confidence level: LOW, MEDIUM, HIGH
-- Key conditions (if SUPPORT_WITH_CONDITIONS)
-
----
-
-## Output Format
-
-````xml
-<output_format>
-Respond with your assessment in JSON:
-
-{
-  "position": "SUPPORT" | "SUPPORT_WITH_CONDITIONS" | "OPPOSE",
-  "confidence": "LOW" | "MEDIUM" | "HIGH",
-  "key_points": [
-    {"category": "strength|concern|risk|opportunity",
-     "point": "specific finding from your perspective",
-     "severity": "critical|high|medium|low"}
-  ],
-  "recommendation": "1-2 sentence summary from your perspective",
-  "conditions": ["condition 1", "condition 2"]
-}
-
-Wrap the JSON in a ```json code fence.
-</output_format>
-````
-"""
-
-_CODE_CONSENSUS_EVALUATION_TEMPLATE = """\
-# Code Consensus Evaluation
-
-```xml
-<role>
-You are a senior code evaluator participating in a multi-perspective consensus process.
-{role_prompt}
-You identify issues and opportunities from your assigned perspective.
-You provide actionable feedback with specific code references.
-</role>
-
-<behavior>
-- Read all code in scope before forming opinions
-- Cite specific file:line references for every finding
-- Evaluate from your assigned perspective
-- Support every claim with evidence or reasoning
-- Cover ALL files in ONE pass -- do not present partial results
-- Be specific: "potential null dereference at auth.py:45" not "might have issues"
-- Provide a clear position with confidence level
-</behavior>
-
-<scope_constraints>
-- Review only what's in scope
-- Do not expand to adjacent code unless directly affected
-- If tests exist for reviewed code, check them for coverage gaps
-</scope_constraints>
-```
-
----
-
-## Code Under Evaluation
-
-{target}
-
----
-
-## Evaluation Framework
-
-### 1. Quality
-
-- Logic errors and edge cases
-- Error handling: are errors caught, propagated, and surfaced correctly?
-- Type safety: do type annotations match runtime behavior?
-- Test coverage: are critical paths tested?
-
-### 2. Security
-
-- Input validation at trust boundaries
-- Injection vectors (command, SQL, path traversal)
-- Secrets in code or logs
-- Authentication and authorization gaps
-
-### 3. Performance
-
-- Unnecessary allocations or copies in hot paths
-- N+1 query patterns
-- Missing caching where data is reused
-- Blocking calls in async contexts
-
-### 4. Architecture
-
-- Component boundaries: is coupling appropriate?
-- Dependency direction: do imports flow the right way?
-- Abstraction level: is complexity in the right place?
-- Interface contracts: are public APIs stable and well-defined?
-
-### 5. Recommendation
-
-- Your position: SUPPORT, SUPPORT_WITH_CONDITIONS, or OPPOSE
-- Confidence level: LOW, MEDIUM, HIGH
-- Key conditions (if SUPPORT_WITH_CONDITIONS)
-
----
-
-## Output Format
-
-````xml
-<output_format>
-Respond with your assessment in JSON:
-
-{
-  "position": "SUPPORT" | "SUPPORT_WITH_CONDITIONS" | "OPPOSE",
-  "confidence": "LOW" | "MEDIUM" | "HIGH",
-  "key_points": [
-    {"category": "quality|security|performance|architecture|maintainability",
-     "point": "specific finding with file:line reference",
-     "severity": "critical|high|medium|low"}
-  ],
-  "recommendation": "1-2 sentence summary from your perspective",
-  "conditions": ["condition 1", "condition 2"]
-}
-
-Wrap the JSON in a ```json code fence.
-</output_format>
-````
-"""
-
 
 def _resolve_consensus_prompt(
     subject: tuple[str, ...],
@@ -1697,8 +1355,8 @@ def _resolve_consensus_prompt(
         return None
 
     if code_mode:
-        return _CODE_CONSENSUS_EVALUATION_TEMPLATE.replace("{target}", resolved)
-    return _CONSENSUS_EVALUATION_TEMPLATE.replace("{subject}", resolved)
+        return _load_workflow_resource("code_consensus_evaluation.md").replace("{target}", resolved)
+    return _load_workflow_resource("consensus_evaluation.md").replace("{subject}", resolved)
 
 
 def _build_consensus_roles(
@@ -1912,7 +1570,13 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     type=str,
     help='Worker spec: model:role or model:"custom prompt" (repeatable)',
 )
-@click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
+@click.option(
+    "--proxy",
+    "via",
+    type=str,
+    default=None,
+    help="Route proxy-backed workers through this proxy",
+)
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
 @click.option(
     "--effort",
