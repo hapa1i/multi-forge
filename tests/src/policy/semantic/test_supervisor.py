@@ -73,6 +73,12 @@ def _codex_result(**overrides: Any) -> Any:
 
 
 _VALID_VERDICT_STDOUT = '```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```'
+# A blocking verdict: divergent + confidence >= 0.8 + a cited violation (verdict.py:161 deny gate).
+_DENY_VERDICT_STDOUT = (
+    '```json\n{"verdict": "divergent", "confidence": 0.95, '
+    '"violations": [{"evidence": "Adds an unapproved endpoint", "severity": "high", '
+    '"citations": ["Section 2: API design"]}]}\n```'
+)
 
 
 def _allow_decision(warnings: list[str] | None = None) -> PolicyDecision:
@@ -1063,6 +1069,25 @@ class TestInjectedLaneBinding:
 
         assert read_usage_events(command="supervisor")[0].billing_mode == "api"
 
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_degraded_default_lane_still_enforces_a_deny(self, mock_claude: MagicMock, _mock_emit: MagicMock) -> None:
+        """T7 'degraded supervisor enforces': lane_record=None (the degraded route) dispatches the
+        default claude lane and produces a REAL verdict -- a high-confidence cited divergence still
+        DENIES, not a fail-open. Degrade restores enforcement on claude; it is not a silent skip."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_claude.return_value = SessionResult(stdout=_DENY_VERDICT_STDOUT, stderr="", returncode=0)
+
+        result = run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True), _make_context(), lane_record=None
+        )
+
+        mock_claude.assert_called_once()  # dispatched the default claude lane, never codex
+        assert result.decision.decision == "deny"
+        assert result.decision.fail_open is False  # a genuine verdict, not a degrade-to-allow
+
 
 class TestCodexSupervisorLane:
     """T4: run_supervisor_check end-to-end on the codex lane override.
@@ -1213,6 +1238,92 @@ class TestCodexSupervisorLane:
         assert result.decision.telemetry_run_id == "r1"
         assert result.decision.telemetry_parent_run_id == "p1"
         assert result.decision.telemetry_root_run_id == "root1"
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_quota_runtime_error_classified_subscription_exhausted(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_plan: MagicMock,
+    ) -> None:
+        """T7: a codex turn that fails on the subscription quota wall classifies as
+        ``subscription_exhausted`` (not the generic ``exit_N``/``subprocess_error``), still
+        fail-open -- the handoff Phase 2 consumes to degrade the spent lane. Models the
+        REALISTIC shape: a failed turn exits **non-zero**, so the fold in
+        ``_headless_to_session_result`` does NOT fire (``error`` stays None) and the provider
+        reason rides ``stderr`` -- the classifier must read ``error or stderr``."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(
+            returncode=1,  # realistic: a failed codex turn exits non-zero (README; test_codex_invoker:100)
+            runtime_is_error=True,
+            stdout="(no final text)",
+            stderr="You've hit your usage limit. Try again later.",  # reason on stderr; error stays None
+        )
+
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "subscription_exhausted"
+        # The quota reason (on stderr) surfaces in the policy warning, not a bare "exit 1".
+        assert any("usage limit" in w.lower() for w in result.decision.warnings)
+
+    @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_quota_at_exit_zero_fold_path_also_classified(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_plan: MagicMock,
+    ) -> None:
+        """Companion to the realistic case: the defensive exit-0 path (codex exits 0 but
+        reports an in-stream error) folds ``stderr`` into ``error``; the classifier must catch
+        the quota there too. Together the two tests cover both branches of the adapter fold."""
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+        mock_invoker_cls.return_value.run.return_value = _codex_result(
+            returncode=0,  # exit-0 fold path: stderr is folded into SessionResult.error
+            runtime_is_error=True,
+            stdout="(no final text)",
+            stderr="Quota exceeded. Check your plan and billing details.",
+        )
+
+        result = run_supervisor_check(
+            _codex_config(plan_override_path="/p"), _make_context(), lane_record=_CODEX_LANE_RECORD
+        )
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "subscription_exhausted"
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_claude_lane_quota_like_error_stays_subprocess_error(self, mock_claude: MagicMock) -> None:
+        """G1 gate: exhaustion classification is codex-runtime-only. A claude-lane failure
+        whose text resembles a quota wall stays ``subprocess_error`` -- the gate requires both
+        ``lane.runtime_id == 'codex'`` and ``runtime_is_error`` (False on the claude path)."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_claude.return_value = SessionResult(
+            stdout="", stderr="", returncode=1, error="You've hit your usage limit. Try again later."
+        )
+
+        result = run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True), _make_context(), lane_record=None
+        )
+
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "subprocess_error"
 
     @patch("forge.core.usage.emit_usage_for_session_result")
     @patch("forge.policy.semantic.supervisor.load_plan_override", return_value="plan")

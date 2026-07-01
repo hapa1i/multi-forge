@@ -158,6 +158,14 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         if current is not None and current != lane_record:
             raise _LaneFrozen(current)
         set_intent_lane(m, consumer, lane_record)
+        # T7: re-pinning the supervisor's lane is the "topped up, retry codex" signal -- clear
+        # any sticky degrade so the next check dispatches the requested lane, not the default.
+        # (Supervisor-only; other consumers have no degrade overlay.)
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
+
+        if consumer.id == SUPERVISOR_CONSUMER.id:
+            clear_supervisor_degrade(m)
 
     try:
         result.store.update(timeout_s=5.0, mutate=_apply)
@@ -201,17 +209,31 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
     state = result.state
     registry = _consumer_registry()
 
+    # T7: the supervisor's bound (frozen) codex lane can be degraded to the default this session --
+    # flag it so `frozen: codex` is not read as "still dispatching codex". Supervisor-only overlay.
+    from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+    from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+    sup_degraded = is_supervisor_degraded(state)
+
     json_rows: list[dict[str, object]] = []
-    table_rows: list[tuple[str, LaneRecord | None, LaneRecord | None, bool]] = []
+    table_rows: list[tuple[str, LaneRecord | None, LaneRecord | None, bool, bool]] = []
     for cid in sorted(registry):
         consumer = registry[cid]
         requested = intent_lane(state, consumer)
         frozen = confirmed_lane(state, consumer)
         drift = requested is not None and frozen is not None and requested != frozen
+        degraded = cid == SUPERVISOR_CONSUMER.id and sup_degraded
         json_rows.append(
-            {"consumer": cid, "requested": _record_dict(requested), "frozen": _record_dict(frozen), "drift": drift}
+            {
+                "consumer": cid,
+                "requested": _record_dict(requested),
+                "frozen": _record_dict(frozen),
+                "drift": drift,
+                "degraded": degraded,
+            }
         )
-        table_rows.append((cid, requested, frozen, drift))
+        table_rows.append((cid, requested, frozen, drift, degraded))
 
     if as_json:
         click.echo(json.dumps({"consumers": json_rows}, indent=2))
@@ -223,10 +245,12 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
     table.add_column("Consumer", style="cyan")
     table.add_column("Requested (intent)")
     table.add_column("Frozen (confirmed)")
-    for cid, requested, frozen, drift in table_rows:
+    for cid, requested, frozen, drift, degraded in table_rows:
         frozen_cell = "[dim](not frozen)[/dim]" if frozen is None else _lane_cell(frozen)
         if drift:
             frozen_cell += " [yellow](drift)[/yellow]"
+        if degraded:
+            frozen_cell += " [yellow](degraded -> default)[/yellow]"
         table.add_row(cid, _lane_cell(requested), frozen_cell)
     console.print(table)
 

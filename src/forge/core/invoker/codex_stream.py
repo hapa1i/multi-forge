@@ -147,6 +147,66 @@ def _extract_error_message(event: dict[str, object]) -> str | None:
     return None
 
 
+# Subscription-exhaustion classification (T7). Codex collapses its structured
+# ``usage_limit_exceeded`` discriminator to human prose at the ``exec`` boundary
+# (``ThreadErrorEvent`` carries only ``message``; no status/``error.type`` survives --
+# see tests/fixtures/codex/README.md), so detection is a conservative string match.
+# Anchors are the stable ``Display`` literals from openai/codex ``protocol/src/error.rs``
+# (main @ db887d0): ``UsageLimitReached`` (every plan branch shares "hit your usage
+# limit"), workspace credits depleted, workspace spend cap, ``QuotaExceeded``,
+# ``UsageNotIncluded``. Casefolded substring -> tolerant of upstream copy drift.
+_EXHAUSTION_MESSAGE_ANCHORS = (
+    "hit your usage limit",
+    "out of credits",
+    "spend cap",
+    "quota exceeded. check your plan",
+    "to use codex with your chatgpt plan, upgrade to plus",
+)
+# Raw-leak path: an untyped provider error reaches ``message`` as a stringified JSON
+# envelope (e.g. the 400 fixture). These nested ``error.type`` values are exhaustion;
+# ``rate_limit_exceeded`` is deliberately absent -- a per-minute RPM throttle is
+# transient and must not trip T7's sticky session-long lane degrade.
+_EXHAUSTION_ERROR_TYPES = frozenset({"usage_limit_reached", "insufficient_quota"})
+
+
+def is_subscription_exhausted(error_message: str) -> bool:
+    """Return True iff a codex error string signals subscription-quota exhaustion.
+
+    Conservative by design: a transient rate limit, a generic API error, or a network
+    blip returns False, so T7's sticky lane degrade never trips on a recoverable
+    failure. Matches both shapes the boundary can produce -- the human prose of the
+    typed ``UsageLimitReached`` path and the stringified-JSON envelope of the raw-leak
+    path (nested ``error.type``). Input is the string ``_extract_error_message``
+    produces; see ``tests/fixtures/codex/README.md`` for why no ``status``/``error.type``
+    survives the ``exec`` boundary.
+    """
+    if not error_message:
+        return False
+    text = error_message.casefold()
+    if any(anchor in text for anchor in _EXHAUSTION_MESSAGE_ANCHORS):
+        return True
+    return _error_type_is_exhaustion(error_message)
+
+
+def _error_type_is_exhaustion(error_message: str) -> bool:
+    """Match the nested ``error.type`` of a stringified-JSON provider error envelope.
+
+    Best-effort: returns False on any non-JSON or non-dict message (the human-prose
+    path is already handled by the message anchors).
+    """
+    try:
+        payload = json.loads(error_message)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return False
+    error_type = error.get("type")
+    return isinstance(error_type, str) and error_type.casefold() in _EXHAUSTION_ERROR_TYPES
+
+
 def _as_int(value: object) -> int | None:
     """Coerce a usage value to int, tolerating absent/non-numeric fields (boundary)."""
     if isinstance(value, bool):  # bool is an int subclass; a usage count is never a bool

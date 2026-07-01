@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from forge.core.invoker.codex_stream import is_subscription_exhausted
 from forge.core.invoker.types import Attribution, HeadlessResult
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
@@ -851,16 +852,29 @@ def run_supervisor_check(
         )
 
     if not result.success:
-        _log.warning(
-            "Supervisor invocation failed: %s",
-            result.error or f"exit {result.returncode}",
-        )
-        failure_type = (
-            "timeout" if result.timed_out else "subprocess_error" if result.error else f"exit_{result.returncode}"
-        )
+        # The provider reason rides `stderr` on a codex runtime failure (codex.py surfaces
+        # it there); `_headless_to_session_result` folds it into `error` only on the exit-0
+        # path, so a realistic non-zero failed turn has `error=None`. Read `error or stderr`
+        # for the warning, the fail-open decision text, AND the T7 classification -- falling
+        # back to `exit N` only when neither field carries a reason (so the quota message is
+        # not hidden behind a bare "exit 1").
+        reason = result.error or result.stderr or ""
+        _log.warning("Supervisor invocation failed: %s", reason or f"exit {result.returncode}")
+        # T7: a codex turn that reports an in-stream quota wall (runtime_is_error) is
+        # classified as `subscription_exhausted` -- ahead of the generic `subprocess_error`/
+        # `exit_N` -- so Phase 2 can degrade the spent codex lane. Gated on the codex runtime
+        # so a claude-lane/subprocess failure is never read as exhaustion.
+        if result.timed_out:
+            failure_type = "timeout"
+        elif lane.runtime_id == "codex" and result.runtime_is_error and is_subscription_exhausted(reason):
+            failure_type = "subscription_exhausted"
+        elif result.error:
+            failure_type = "subprocess_error"
+        else:
+            failure_type = f"exit_{result.returncode}"
         return SupervisorRun(
             _supervisor_fail_open_decision(
-                f"Supervisor error: {result.error or f'exit {result.returncode}'}, failing open",
+                f"Supervisor error: {reason or f'exit {result.returncode}'}, failing open",
                 failure_type=failure_type,
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,

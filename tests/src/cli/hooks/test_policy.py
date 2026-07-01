@@ -320,19 +320,26 @@ class TestSupervisorLaneBindingFreeze:
 
         return SessionState(schema_version=1, name="t", created_at=now_iso(), last_accessed_at=now_iso())
 
-    def _run_mutate(self, state: Any, effective: MagicMock, supervisor_lane: Any = None) -> None:
+    def _run_mutate(self, state: Any, effective: MagicMock, supervisor_lane: Any = None, result: Any = None) -> None:
         engine = MagicMock()
         engine.get_collected_state.return_value = {}
         store = MagicMock()
         _persist_policy_state(
             store=store,
             engine=engine,
-            result=MagicMock(),
+            result=result if result is not None else MagicMock(),
             effective=effective,
             context_summary="ctx",
             supervisor_lane=supervisor_lane,
         )
         store.update.call_args[1]["mutate"](state)
+
+    @staticmethod
+    def _exhausted_result() -> MagicMock:
+        """A composite decision carrying the supervisor subscription-exhaustion failure."""
+        result = MagicMock()
+        result.decisions = [MagicMock(failure_type="subscription_exhausted")]
+        return result
 
     @patch("forge.policy.store.build_policy_state_update")
     def test_configured_supervisor_on_default_does_not_freeze(self, mock_build: MagicMock) -> None:
@@ -448,3 +455,199 @@ class TestSupervisorLaneBindingFreeze:
         registered = engine.register.call_args[0][0]
         assert registered._lane_record == codex  # injected into the policy
         assert returned == codex  # and returned for the caller to thread into the freeze
+
+    # --- T7 sticky degrade (write + read), folded into the same locked _mutate as the freeze ---
+
+    @staticmethod
+    def _fresh_build_return() -> dict[str, Any]:
+        # A NEW dict (with a fresh policy_states) per call: the degrade write mutates
+        # policy_states in place, so a shared class-attribute dict would leak the marker
+        # across tests. Production `build_policy_state_update` already returns a fresh dict.
+        return {"forge_version": "0.1.0", "bundles": [], "rules_active": [], "decisions": [], "policy_states": {}}
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_codex_exhaustion_writes_degrade_marker(self, mock_build: MagicMock) -> None:
+        """A subscription-exhaustion failure on the bound codex lane persists the degrade overlay."""
+        from forge.policy.supervisor_lane_degrade import (
+            is_supervisor_degraded,
+            read_supervisor_degrade,
+        )
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)  # read_bound_lane -> codex
+        self._run_mutate(state, self._effective(), supervisor_lane=codex, result=self._exhausted_result())
+
+        assert is_supervisor_degraded(state) is True
+        marker = read_supervisor_degrade(state)
+        assert marker is not None
+        assert marker["from_lane"] == {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}
+        assert marker["reason"] == "subscription_exhausted"
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_non_exhaustion_failure_writes_no_degrade(self, mock_build: MagicMock) -> None:
+        """A non-exhaustion supervisor failure (e.g. subprocess_error) writes no degrade marker."""
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        result = MagicMock()
+        result.decisions = [MagicMock(failure_type="subprocess_error")]
+        self._run_mutate(state, self._effective(), supervisor_lane=codex, result=result)
+        assert is_supervisor_degraded(state) is False
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_degrade_write_dropped_when_bound_lane_changed(self, mock_build: MagicMock) -> None:
+        """Stale-write guard: exhaustion, but the fresh manifest no longer dispatches codex (a
+        concurrent remove/re-pin) -- the degrade write is dropped, mirroring the freeze guard."""
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session.models import LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()  # no binding -> read_bound_lane is the default (None) != codex
+        self._run_mutate(state, self._effective(), supervisor_lane=codex, result=self._exhausted_result())
+        assert is_supervisor_degraded(state) is False
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_non_codex_lane_never_degrades(self, mock_build: MagicMock) -> None:
+        """Defensive gate: even an (impossible) exhaustion tagged on a claude lane writes no degrade."""
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        claude_max = LaneRecord("claude_code", "claude-max", "opus")
+        state = self._state()
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=claude_max)
+        self._run_mutate(state, self._effective(), supervisor_lane=claude_max, result=self._exhausted_result())
+        assert is_supervisor_degraded(state) is False
+
+    def test_register_injects_default_lane_when_degraded(self) -> None:
+        """Read side: a degraded session overrides the bound codex lane to None (default claude)."""
+        from forge.cli.hooks.policy import register_supervisor_and_restore
+        from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        eff = self._effective()
+        eff.policy.supervisor.cascade = False
+        eff.policy.supervisor.throttle_seconds = 30
+        manifest = self._state()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        set_supervisor_degrade(manifest, from_lane=codex, to_lane=None, reason="subscription_exhausted", at="t")
+
+        engine = MagicMock()
+        returned = register_supervisor_and_restore(engine, eff, manifest)
+
+        assert returned is None  # degraded -> default lane, not the frozen codex binding
+        registered = engine.register.call_args[0][0]
+        assert registered._lane_record is None
+        # The codex binding itself is untouched (still observable in `lane show`).
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        from forge.session.consumer_lanes import read_bound_lane
+
+        assert read_bound_lane(manifest, SUPERVISOR_CONSUMER) == codex
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_exhaustion_write_then_register_injects_default(self, mock_build: MagicMock) -> None:
+        """End-to-end sticky on ONE manifest: write side then read side. An exhausting check persists
+        the marker (the freeze-lock _mutate); the NEXT registration reads it and injects None (default
+        claude), proving the write and read agree on the overlay key + shape -- the cross-seam contract
+        the two separate write/read tests don't exercise."""
+        from forge.cli.hooks.policy import register_supervisor_and_restore
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+
+        # Check N: codex exhausts -> the degrade marker is written.
+        self._run_mutate(state, self._effective(), supervisor_lane=codex, result=self._exhausted_result())
+        assert is_supervisor_degraded(state) is True
+
+        # Check N+1: registration on the same manifest now resolves to the default claude lane.
+        eff = self._effective()
+        eff.policy.supervisor.cascade = False
+        eff.policy.supervisor.throttle_seconds = 30
+        returned = register_supervisor_and_restore(MagicMock(), eff, state)
+        assert returned is None
+
+    @patch("forge.policy.semantic.supervisor.resolve_supervisor_lane", side_effect=RuntimeError("catalog drift"))
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_degrade_write_survives_default_resolution_failure(
+        self, mock_build: MagicMock, _mock_resolve: MagicMock
+    ) -> None:
+        """Fail-open: the only fallible op in the degrade write -- resolving the default lane for the
+        audit-only ``to_lane`` -- is guarded. If it raises (drifted default catalog), the marker is
+        still written with ``to_lane=None`` and the hook never crashes; routing is by None regardless."""
+        from forge.policy.supervisor_lane_degrade import (
+            is_supervisor_degraded,
+            read_supervisor_degrade,
+        )
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        self._run_mutate(state, self._effective(), supervisor_lane=codex, result=self._exhausted_result())
+
+        assert is_supervisor_degraded(state) is True  # degraded despite the resolution failure
+        marker = read_supervisor_degrade(state)
+        assert marker is not None and marker["to_lane"] is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_degrade_emits_one_upstream_lane_degraded_outcome(self, mock_build: MagicMock, tmp_path: Path) -> None:
+        """Phase 3 observability: a degrade records exactly ONE upstream `policy.lane_degraded` outcome
+        (command=supervisor, reason_code=subscription_exhausted, from/to lane in message) -- read by
+        `forge telemetry activity`, NOT a UsageEvent. Uses a REAL store so the post-lock emit fires
+        (the mocked-store `_run_mutate` harness would run the mutate after the emit check)."""
+        from forge.cli.hooks.policy import _persist_policy_decisions
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session import SessionStore
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.name = "worker"  # a real SessionStore validates the name (>= 2 chars); "t" is rejected
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        store = SessionStore(str(tmp_path), "worker")
+        store.write(state)
+
+        # Explicit None run-ids: a bare MagicMock would auto-vivify unserializable ids that the
+        # best-effort emit would silently drop (leaving nothing to assert on).
+        decision = MagicMock(
+            failure_type="subscription_exhausted",
+            telemetry_run_id=None,
+            telemetry_parent_run_id=None,
+            telemetry_root_run_id=None,
+        )
+        exhausted = MagicMock()
+        exhausted.decisions = [decision]
+        engine = MagicMock()
+        engine.registered_policy_ids = ["semantic.supervisor"]
+
+        _persist_policy_decisions(
+            store=store,
+            engine=engine,
+            engine_state={},
+            entries=[(exhausted, "ctx")],
+            effective=self._effective(),
+            supervisor_lane=codex,
+        )
+
+        degraded = [o for o in read_upstream_outcomes(command="supervisor") if o.operation == "policy.lane_degraded"]
+        assert len(degraded) == 1  # exactly one degradation event
+        assert degraded[0].reason_code == "subscription_exhausted"
+        assert degraded[0].status == "warning"
+        assert "codex" in (degraded[0].message or "")
+        assert is_supervisor_degraded(store.read()) is True  # write + emit are consistent

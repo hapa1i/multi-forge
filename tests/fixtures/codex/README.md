@@ -4,6 +4,9 @@ Recorded JSONL event streams from a real `codex exec --json` run. These are **au
 `parse_codex_jsonl_stream` (`src/forge/core/invoker/codex_stream.py`): when the binary's stream shape disagrees with any
 doc, the fixture wins.
 
+One exception is **source-derived** (not a live capture) -- see
+[Synthesized fixtures](#synthesized-fixtures-source-derived).
+
 ## Provenance
 
 - **Binary**: `codex-cli 0.137.0` (`/opt/homebrew/bin/codex`)
@@ -36,10 +39,46 @@ Each line is one event: `{"type": <event>, ...}`.
 
 A failed turn emits **two** terminal events and exits non-zero, with **no** `turn.completed` (so no usage):
 
-- `{"type": "error", "message": <stringified provider error>}`
-- `{"type": "turn.failed", "error": {"message": <stringified provider error>}}`
+- `{"type": "error", "message": <error text>}`
+- `{"type": "turn.failed", "error": {"message": <error text>}}`
 
 `parse_codex_jsonl_stream` maps the presence of either `error` or `turn.failed` to `runtime_is_error=True`.
+
+The `exec --json` error event carries **only `message`** (a string) -- the structured discriminator the internal
+protocol uses (`ErrorEvent.codex_error_info`, e.g. `usage_limit_exceeded`) and the HTTP status are **dropped at the exec
+boundary** (`codex-rs/exec/src/exec_events.rs`: `ThreadErrorEvent { message: String }`). So `message` is the only
+observable, and it takes **two shapes** depending on whether codex recognized the error:
+
+- **Stringified provider JSON** (raw-leak path, e.g. the `400` in `exec_json_error.jsonl`): codex did not type the
+  error, so `message` is the provider envelope `{"type":"error","status":<int>,"error":{"type":<str>,"message":<str>}}`.
+- **Human prose** (typed path, e.g. the quota fixture below): codex mapped the backend error to a `CodexErr` whose
+  `Display` is human text (`codex-rs/protocol/src/error.rs`). A spent ChatGPT subscription
+  (`CodexErr::UsageLimitReached`) reaches exec as `"You've hit your usage limit. ..."` -- **no** `status`/`error.type`
+  to parse.
+
+This two-shape split is why any exhaustion classifier must both (a) substring-match the human prose and (b) fall back to
+JSON-parsing the structured shape; it cannot rely on `status`/`error.type` alone.
+
+## Synthesized fixtures (source-derived)
+
+`exec_json_quota_exhausted.jsonl` is **not** a live capture (a `codex exec` quota hit cannot be triggered on demand
+without spending a real subscription, which this dir avoids). It is **synthesized from the codex source**, and is
+authoritative for the *shape*, not the *co-occurrence*:
+
+- **Envelope** verified from `codex-rs/exec/src/exec_events.rs` (`ThreadErrorEvent { message: String }`,
+  `TurnFailedEvent { error }`) -- byte-identical event structure to the recorded error fixture.
+- **Message content** verified from `codex-rs/protocol/src/error.rs` -- the `UsageLimitReachedError` `Display` for a
+  `Plus` plan with no `resets_at`. The invariant across **all** plan branches (Plus/Pro/Team/Business/Free/Go/
+  Enterprise/Edu/Unknown) is the substring `hit your usage limit`; sibling exhaustion variants are `out of credits`
+  (credits depleted), `spend cap` (workspace usage limit), `Quota exceeded. Check your plan and billing details.`
+  (`QuotaExceeded`), and `To use Codex with your ChatGPT plan, upgrade to Plus` (`UsageNotIncluded`).
+- **Source pin**: `openai/codex` `main` @ `db887d03e1f907467e33271572dffb73bceecd6b` (2026-06-30); runtime is tag
+  `rust-v0.137.0`. The classifier anchors on the version-stable invariant substring, not the full Plus string, to
+  survive copy drift between the read SHA and the installed runtime.
+- `thread_id` is a synthetic all-zero-ish UUID (signals "not a real run"); no secrets.
+
+Used by the T7 exhaustion classifier truth table as the positive wire-shape sample. If a future `codex` major changes
+the `UsageLimitReached` `Display`, re-derive from `error.rs` (no billing needed) and update the anchor set.
 
 ## Secret-free
 

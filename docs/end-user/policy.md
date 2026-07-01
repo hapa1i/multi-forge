@@ -242,6 +242,12 @@ no-op). To use a different lane, start or fork a fresh session, or run `forge po
 clears the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
 `(runtime, backend, model)` lane.
 
+**If your codex subscription runs out mid-session**, Forge degrades the supervisor to the default `claude -p` lane for
+the rest of the session instead of failing every check open — real plan-enforcement keeps working. The codex binding
+itself stays put (it resets next session; clear it now with `forge policy supervisor remove` or re-pin with
+`set --runtime`, and a fresh resume retries codex in case your quota refilled). While it is routed around,
+`forge policy supervisor status` and `forge session lane show` mark the lane `degraded`.
+
 ### Claude Max subscription billing (`--backend claude-max`)
 
 By default the `claude_code` lane uses the `anthropic-direct` backend, so the supervisor's spend is labeled like any API

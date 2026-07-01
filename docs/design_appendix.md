@@ -1258,6 +1258,23 @@ catalog backend id, so the full lane shows only on supervisor status. T5 also cl
 the WorkflowPolicy checker/reviewer and the team event tagger now emit `policy-checker`/`policy-reviewer`/ `team-tagger`
 usage events (`.complete()` captures the tokens `.ask()` discarded).
 
+**Subscription-exhaustion degrade (T7).** A supervisor check that exhausts its bound codex subscription
+(`failure_type="subscription_exhausted"`, classified in `run_supervisor_check` from the codex JSONL message -- no
+structured status survives the `codex exec` boundary) persists a sticky degrade overlay in
+`confirmed.policy.policy_states["forge.supervisor_lane_degrade"]`, deliberately *separate* from the immutable
+`consumer_lanes` binding. The write rides the existing freeze lock behind the same
+`read_bound_lane(m) == dispatched_lane` stale-write guard; the read side (`register_supervisor_and_restore`) injects
+`lane_record=None` when degraded, so later checks dispatch the default claude lane while the frozen codex binding stays
+observable (`lane show` and `supervisor status` annotate it `degraded`, `from`/`to` audit-only -- routing never trusts
+the stored `to_lane`). Reset follows the *binding*, not the command name: `supervisor remove` and a re-pin
+(`set --runtime/--backend`, `session lane set --consumer supervisor`) clear it; `session lane clear` does not (the
+frozen binding still dispatches codex); a fresh process resume (`SessionStart source in {startup, resume}`) clears it so
+a refilled weekly quota is retried, while `compact`/`clear` preserve it (mid-sitting -- re-arming codex would just
+re-exhaust). The degrade emits exactly one upstream `policy.lane_degraded` outcome (`command=supervisor`,
+`reason_code=subscription_exhausted`, from/to lane in `message`), read by `forge telemetry activity` -- not a
+`UsageEvent`. Fail-open throughout (design_workflows §1.2): a degrade-path error still degrades the check to allow, and
+a drifted default catalog still degrades (route by `None`, `to_lane` null).
+
 ### G.1 Core types (from `core.reactive.routing`)
 
 ```python

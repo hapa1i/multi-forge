@@ -417,6 +417,62 @@ class TestHandleSessionStart:
         )
         assert rollover_copy.exists()
 
+    def _seed_supervisor_degrade(self, store: SessionStore) -> None:
+        """Seed a sticky codex degrade marker into the manifest (under the store lock)."""
+        from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
+        from forge.session.models import LaneRecord
+
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda m: set_supervisor_degrade(
+                m, from_lane=codex, to_lane=None, reason="subscription_exhausted", at="2026-06-30T00:00:00Z"
+            ),
+        )
+
+    def test_resume_clears_supervisor_degrade(
+        self, temp_worktree: Path, temp_index: IndexStore, sample_manifest: None
+    ) -> None:
+        """T7: resume is a fresh process re-entry, so the sticky codex degrade is cleared --
+        the weekly quota may have refilled, so let the next check re-probe codex."""
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+        store = SessionStore(str(temp_worktree), "test-session")
+        self._seed_supervisor_degrade(store)
+        assert is_supervisor_degraded(store.read()) is True  # precondition
+
+        hook_input = HookInput(
+            session_id="new-uuid-456",
+            transcript_path="/path/to/transcript.jsonl",
+            source="resume",
+        )
+        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+            result = handle_session_start(hook_input, temp_worktree, temp_index)
+
+        assert result.success
+        assert is_supervisor_degraded(store.read()) is False
+
+    def test_compact_preserves_supervisor_degrade(
+        self, temp_worktree: Path, temp_index: IndexStore, sample_manifest: None
+    ) -> None:
+        """T7: compact fires mid-sitting (quota unchanged), so the degrade stays sticky --
+        re-arming codex here would just exhaust and re-degrade (flap)."""
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+        store = SessionStore(str(temp_worktree), "test-session")
+        self._seed_supervisor_degrade(store)
+
+        hook_input = HookInput(
+            session_id="new-uuid-456",
+            transcript_path="/path/to/new-transcript.jsonl",
+            source="compact",
+        )
+        with patch.dict(os.environ, {"FORGE_SESSION": "test-session"}, clear=True):
+            result = handle_session_start(hook_input, temp_worktree, temp_index)
+
+        assert result.success
+        assert is_supervisor_degraded(store.read()) is True
+
     def test_handle_compact_tracks_rollover_artifact_in_resolved_forge_root(
         self, temp_worktree: Path, temp_index: IndexStore, sample_manifest: None, tmp_path: Path
     ) -> None:

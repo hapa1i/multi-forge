@@ -563,6 +563,7 @@ class TestSupervisorStatus:
         "resolved_uuid",
         "source_model",
         "lane",
+        "degraded",
     }
 
     def test_status_json_configured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
@@ -575,6 +576,7 @@ class TestSupervisorStatus:
         assert sup is not None
         assert sup["resume_id"] == "planner"
         assert set(sup.keys()) == self._SUPERVISOR_JSON_KEYS
+        assert sup["degraded"] is None  # T7: not degraded => null (only set after a codex exhaustion)
 
     def test_status_json_unconfigured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -587,6 +589,66 @@ class TestSupervisorStatus:
         data = json.loads(result.output)
         assert data["session_name"] == "worker"
         assert data["supervisor"] is None
+
+    def test_status_json_shows_degraded_when_degraded(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """T7: `supervisor status --json` surfaces the sticky degrade (reason + from/to lane) while the
+        bound `lane` stays codex -- the operator sees dispatch was routed around without editing it."""
+        from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
+        from forge.session.models import (
+            ConsumerLaneIntent,
+            LaneRecord,
+            SupervisorConfig,
+        )
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        # The realistic state: the supervisor is bound to codex AND degraded -- the binding stays,
+        # the overlay routes around it. `lane` reflects the binding; `degraded` reflects the overlay.
+        manifest.intent.consumer_lanes = ConsumerLaneIntent(supervisor=LaneRecord("codex", "chatgpt", "gpt-5-codex"))
+        set_supervisor_degrade(
+            manifest,
+            from_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+            to_lane=LaneRecord("claude_code", "anthropic-direct", "opus"),
+            reason="subscription_exhausted",
+            at=now_iso(),
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        sup = json.loads(result.output)["supervisor"]
+        assert sup["degraded"] is not None
+        assert sup["degraded"]["reason"] == "subscription_exhausted"
+        assert sup["degraded"]["from_lane"] == {"runtime_id": "codex", "backend_id": "chatgpt", "model": "gpt-5-codex"}
+        # The bound lane is untouched -- still codex, observable alongside the degrade.
+        assert sup["lane"] == {"runtime": "codex", "backend": "chatgpt", "model": "gpt-5-codex"}
+
+    def test_status_table_shows_degraded_line(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T7: the human table calls out the degrade so `Lane: ...codex...` is not misread as live codex."""
+        from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
+        from forge.session.models import LaneRecord, SupervisorConfig
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        set_supervisor_degrade(
+            manifest,
+            from_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+            to_lane=None,
+            reason="subscription_exhausted",
+            at=now_iso(),
+        )
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
+        assert result.exit_code == 0, result.output
+        assert "Degraded" in result.output
+        assert "subscription spent" in result.output
 
     def test_status_json_carries_default_lane(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         """T5/WS3: a default (claude) supervisor reports its full lane (claude_code/anthropic-direct/opus)."""
@@ -764,6 +826,33 @@ class TestSupervisorToggle:
         updated = store.read()
         confirmed = updated.confirmed.consumer_lanes
         assert confirmed is None or confirmed.supervisor is None
+
+    def test_remove_clears_supervisor_degrade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T7: removing the supervisor orphans the codex binding, so the sticky degrade is dropped too."""
+        from forge.policy.supervisor_lane_degrade import (
+            is_supervisor_degraded,
+            set_supervisor_degrade,
+        )
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        set_supervisor_degrade(
+            manifest,
+            from_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+            to_lane=None,
+            reason="subscription_exhausted",
+            at=now_iso(),
+        )
+        store = SessionStore(str(temp_guard_env), "worker")
+        store.write(manifest)
+        assert is_supervisor_degraded(store.read()) is True  # precondition
+
+        result = runner.invoke(main, ["policy", "supervisor", "remove"])
+        assert result.exit_code == 0, result.output
+
+        assert is_supervisor_degraded(store.read()) is False
 
     def test_off_without_supervisor_reports_not_configured(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
