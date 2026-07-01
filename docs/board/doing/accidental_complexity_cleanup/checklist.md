@@ -2,8 +2,10 @@
 
 **Branch**: `cleanup/accidental-complexity-batch-a`
 
-**Current focus**: Batch A **implemented + verified** (full unit suite `7222 passed`; `make pre-commit` clean). Awaiting
-merge; card stays in `doing/` while Batches B/C remain. Batches B/C are stubs below -- populate when picked up.
+**Current focus**: Batches A + B **implemented + verified**. Batch B (#13-#16) shipped in 4 commits; targeted unit
+suites green per item, #15/#16 integration-verified (auth credential resolution 4 passed, proxy commands 27 passed), and
+a 4-way adversarial review came back clean save one stale comment (fixed). Card stays in `doing/` while Batch C remains
+(stub below).
 
 **Scope note**: all anchors re-verified on this branch's HEAD before editing (zero-caller `grep` across `src/` +
 `tests/`). Decisions locked before implementation: **#9 = wire** (read `ActiveSessionStore` at list time; keeps the
@@ -108,7 +110,7 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
 
 ### Tasks
 
-- [ ] **#13** Move the 4 debate/consensus eval templates (359 LOC, verified) out of `cli/workflow.py` into
+- [x] **#13** Move the 4 debate/consensus eval templates (359 LOC, verified) out of `cli/workflow.py` into
   `forge.review.resources` and drop the drift guard. Anchors: `_DEBATE_EVALUATION_TEMPLATE` (`:959`),
   `_CODE_DEBATE_EVALUATION_TEMPLATE` (`:1054`), `_CONSENSUS_EVALUATION_TEMPLATE` (`:1515`),
   `_CODE_CONSENSUS_EVALUATION_TEMPLATE` (`:1588`); consumed by `_resolve_debate_prompt` (`:1177-1178`) /
@@ -127,7 +129,7 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   (pure `(subject, prompt, code_mode) -> str | None`, no network/model/proxy) asserting the loaded template wraps input.
   `git grep _DEBATE_EVALUATION_TEMPLATE` empty; single source in `forge.review.resources` (drift now impossible, not
   merely unguarded).
-- [ ] **#14 (full delete, decided)** Delete the legacy in-memory `search()` (`search/engine.py:202-248`) outright.
+- [x] **#14 (full delete, decided)** Delete the legacy in-memory `search()` (`search/engine.py:202-248`) outright.
   Steps: (1) add a test-local adapter `_search_docs(query, docs, limit=...)` to `test_engine.py` that builds a
   `BM25IndexData` via the existing `_build_index_data` (`:333-352`) + a dict-backed `content_loader`, then calls
   `search_from_index` -- this restores each test's doc-in/results-out ergonomics with a one-token call swap; (2) point
@@ -139,7 +141,7 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   `grep -n "def search(" src/forge/search/engine.py` empty (only `search_from_index` remains);
   `grep -rn "from forge.search import search\b" src tests` empty; the 12 migrated tests pass through `search_from_index`
   with identical scores/snippets (same BM25 + `_best_snippet` on an index built from the same docs).
-- [ ] **#15 (caution -- auth)** Delete `ConfigSecretsProvider` (`core/auth/secrets.py:115-168`) + the **write-only**
+- [x] **#15 (caution -- auth)** Delete `ConfigSecretsProvider` (`core/auth/secrets.py:115-168`) + the **write-only**
   `auth_url` plumbing. Verified: no production chain builds it (`CredentialManager.default = Chain(Env, File)`,
   `credentials.py:240-243`); only non-test ref is a docstring (`secrets.py:214`); `ProviderConfig.auth_url`
   (`schema.py:156`) is written (`loader.py:271-272` from `OPENAI_AUTH_URL`/`GEMINI_AUTH_URL`) but never read. Steps:
@@ -158,7 +160,7 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   round-trips `GEMINI_AUTH_URL` as an arbitrary profile key -- **unaffected**, leave it. Assertion:
   `grep -rn "ConfigSecretsProvider\|OPENAI_AUTH_URL\|GEMINI_AUTH_URL" src tests` returns only the round-trip fixture in
   `test_credentials_file.py`; secrets tests green with Env+File coverage intact.
-- [ ] **#16 (caution -- config)** Narrow proxy providers to `{litellm, openrouter}` with fail-fast. Verified root cause
+- [x] **#16 (caution -- config)** Narrow proxy providers to `{litellm, openrouter}` with fail-fast. Verified root cause
   is **config validation**, not runtime: `ProxyInstanceConfig.__post_init__` accepts
   `{litellm, openai, gemini, openrouter}` (`schema.py:764`) but `ModelProvider` is `{LITELLM, OPENROUTER, UNKNOWN}`
   (`client_factory.py:81`), so `provider: gemini` validates then silently routes to LiteLLM (`loader.py:555-562` ->
