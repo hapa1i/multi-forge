@@ -167,12 +167,18 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
 
 ## Verification gate
 
-- [ ] Focused suites green: `test_supervisor.py`, `test_policy_hooks.py`, the new classifier test, `test_consumer_lanes`
-  / lane-resolution tests, usage emission test.
-- [ ] `make pre-commit` clean.
-- [ ] Integration note: a **real** codex exhaustion E2E is impractical (cannot spend a live subscription on demand), so
-  coverage relies on the Phase-0 fixture + a synthesized exhaustion error driven through the supervisor/hook path. State
-  this explicitly at closeout (mirrors how T0's real-billing path was probe-gated, not E2E-gated).
+- [x] Focused suites green: `test_supervisor.py`, `test_policy.py` (hooks), `test_supervisor_lane_degrade.py`,
+  `test_session_start.py`, `test_session_lane.py`, `test_policy_supervisor.py`, `test_codex_stream.py`. Broader sweep
+  `tests/src/cli tests/src/policy` -> 2660 passed.
+- [x] `make pre-commit` clean (run scoped to the changed files -- ruff/black/isort/mypy/pyright/mdformat all pass; the
+  repo-wide mdformat reflow of unrelated board docs was kept out of the diff).
+- [x] **Integration run (hook/session-start wiring):**
+  `./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py tests/integration/docker/test_supervisor_e2e.py`
+  -> **12 passed** (real Claude in Docker). Validates the SessionStart hook (my cross-resume clear rides its locked
+  mutate) and the policy-check hook's persist path (my degrade write). The **degrade trigger itself stays synthesized**
+  -- a real codex exhaustion E2E is impractical (cannot spend a live subscription on demand), so exhaustion coverage
+  relies on the Phase-0 fixture + a crafted exhaustion driven through `run_supervisor_check`/the hook (mirrors T0's
+  probe-gated real-billing path).
 
 ## Closeout
 

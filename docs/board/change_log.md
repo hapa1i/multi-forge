@@ -27,40 +27,68 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-30
 
+### consumer_lanes T7: Subscription-exhaustion fail-open (sticky degrade)
+
+**Goal**: When the semantic supervisor's bound codex subscription lane exhausts mid-session, degrade once to the default
+`claude -p` lane -- sticky for the session, fail-open, one hop -- so real plan-enforcement resumes instead of a silent
+per-check fail-open for the rest of the session.
+
+**Key changes**:
+
+- **Detection (Phase 1)**: `is_subscription_exhausted` classifier in `codex_stream.py` (conservative source-literal
+  allowlist on the codex JSONL `message` -- no structured status survives the `codex exec` boundary) + a
+  `failure_type="subscription_exhausted"` rung in `run_supervisor_check`, gated on the codex runtime +
+  `runtime_is_error` and read off `result.error or result.stderr` (a realistic quota failure exits non-zero, so the
+  reason rides stderr).
+- **Sticky degrade (Phase 2)**: a degrade overlay in `confirmed.policy.policy_states["forge.supervisor_lane_degrade"]`
+  (new `supervisor_lane_degrade.py`), separate from the immutable `consumer_lanes` binding. The policy hook writes it
+  under the existing freeze lock behind the same stale-write guard; the read side injects `lane_record=None` so later
+  checks run on claude while the frozen codex binding stays observable. Reset follows the binding, not the command name:
+  `supervisor remove`/re-pin clear it, `lane clear` does not; cross-resume clears on SessionStart `startup`/`resume`
+  (refilled-quota retry) but preserves on `compact`/`clear` (mid-sitting, would just re-exhaust).
+- **Observability + surface (Phase 3)**: exactly one `policy.lane_degraded` upstream outcome per degrade
+  (`command=supervisor`, `reason_code=subscription_exhausted`; captured under the lock, emitted after it), read by
+  `forge telemetry activity` (not a `UsageEvent`). `supervisor status` and `lane show` gain a `degraded` field/marker.
+  Docs: design_workflows §1.2 (the one sanctioned fallback), design_appendix §G, cli_reference, end-user policy.md.
+
+**Verification**: Focused suites green (`test_supervisor_lane_degrade`, `test_policy` hooks, `test_session_start`,
+`test_session_lane`, `test_policy_supervisor`, `test_supervisor`, `test_codex_stream`); `tests/src/cli tests/src/policy`
+-> 2660 passed; scoped `pre-commit` clean (mypy + pyright). Integration: `test_real_claude_hooks.py` +
+`test_supervisor_e2e.py` -> 12 passed (real Claude in Docker), validating the SessionStart + policy-check hook wiring.
+The degrade *trigger* stays synthesized (no live subscription to spend on demand).
+
 ### consumer_lanes T6b: Aux-consumer codex dispatch (shadow-curation codex arm)
 
-**Goal**: Give an aux consumer a real `codex exec` dispatch arm -- the one thing T6a skipped (it shipped
-claude-max billing only, no dispatch change). `forge session lane set --consumer shadow_curation --runtime codex`
-now routes to Codex, not just a billing relabel. Narrowed at promotion to shadow-curation only.
+**Goal**: Give an aux consumer a real `codex exec` dispatch arm -- the one thing T6a skipped (it shipped claude-max
+billing only, no dispatch change). `forge session lane set --consumer shadow_curation --runtime codex` now routes to
+Codex, not just a billing relabel. Narrowed at promotion to shadow-curation only.
 
 **Key changes**:
 
 - **Scope correction (D1)**: a code sweep found the three aux consumers are NOT a uniform "mirror T4" -- only
-  shadow-curation is clean (blind, read-only, stdout-is-output). memory-writer (workspace-write file-editing)
-  deferred to T6c; team-supervisor (plan-blind without snapshot machinery) deferred (D2).
-- **Codex arm** (`session/shadow_curation.py`): `SHADOW_CURATION_CONSUMER` gains `Lane(codex, chatgpt,
-  gpt-5-codex)`; the CLI threads the bound `LaneRecord`, `run_shadow_curation` validates it
-  (`LaneRecord -> Lane -> resolve_lane`, the supervisor's guard) and branches on runtime into
-  `_dispatch_codex_shadow_curation` (read-only `codex exec`, direct to OpenAI). The `claude_code` path is
-  byte-identical.
+  shadow-curation is clean (blind, read-only, stdout-is-output). memory-writer (workspace-write file-editing) deferred
+  to T6c; team-supervisor (plan-blind without snapshot machinery) deferred (D2).
+- **Codex arm** (`session/shadow_curation.py`): `SHADOW_CURATION_CONSUMER` gains `Lane(codex, chatgpt, gpt-5-codex)`;
+  the CLI threads the bound `LaneRecord`, `run_shadow_curation` validates it (`LaneRecord -> Lane -> resolve_lane`, the
+  supervisor's guard) and branches on runtime into `_dispatch_codex_shadow_curation` (read-only `codex exec`, direct to
+  OpenAI). The `claude_code` path is byte-identical.
 - **Three contract divergences from the supervisor arm** (the headline): degrade is **fail-loud not fail-open**
-  (user-invoked -> `CurationResult(success=False)` + a CLI-visible hint via new `CurationResult.error` (D5), never
-  a silent claude fallback); the upstream row pins `operation="memory.shadow_curation"` not `None` (curation has
-  no engine `policy.evaluate` row, so the invoker's auto row IS its only one); freeze fires **past** the preflight
-  skip-gate, with `runtime_is_error` folded so an exit-0-but-failed turn fails loud.
-- Docs synced in-PR: `design_appendix.md` §G (T6b paragraph), `cli_reference.md` lane-set bullet, `design.md`
-  freeze wording broadened to "the actual runtime dispatch".
+  (user-invoked -> `CurationResult(success=False)` + a CLI-visible hint via new `CurationResult.error` (D5), never a
+  silent claude fallback); the upstream row pins `operation="memory.shadow_curation"` not `None` (curation has no engine
+  `policy.evaluate` row, so the invoker's auto row IS its only one); freeze fires **past** the preflight skip-gate, with
+  `runtime_is_error` folded so an exit-0-but-failed turn fails loud.
+- Docs synced in-PR: `design_appendix.md` §G (T6b paragraph), `cli_reference.md` lane-set bullet, `design.md` freeze
+  wording broadened to "the actual runtime dispatch".
 
 **Verification**: focused suites green (`test_shadow_curation.py` 35; + memory/session_lane/consumer_lane_freeze/
-lanes/billing = 157); wider sweep (policy/semantic, core/invoker, core/usage, session, codex_preflight_cache) 1318;
-full `tests/src/cli` 2145; `make pre-commit` clean. Real `codex exec` E2E (`test_shadow_curation_codex_smoke.py`)
-green against the host ChatGPT login -- asserts success, report persisted from codex stdout, freeze fired, and
-exactly one `runtime=codex`/`billing_mode=subscription_quota`/`route=codex_exec` usage event. Shipped via PR #60
-(`ca20efcd`).
+lanes/billing = 157); wider sweep (policy/semantic, core/invoker, core/usage, session, codex_preflight_cache) 1318; full
+`tests/src/cli` 2145; `make pre-commit` clean. Real `codex exec` E2E (`test_shadow_curation_codex_smoke.py`) green
+against the host ChatGPT login -- asserts success, report persisted from codex stdout, freeze fired, and exactly one
+`runtime=codex`/`billing_mode=subscription_quota`/`route=codex_exec` usage event. Shipped via PR #60 (`ca20efcd`).
 
 **Closeout (2026-06-30)**: card moved `doing/ -> done/aux_consumer_codex_dispatch/`; epic roster marked T6b done.
-Durable lesson promoted to `impl_notes.md` ("Adding a codex dispatch arm to an aux consumer"). T6c (memory-writer
-codex dispatch) and the team-supervisor plan-context arm remain deferred follow-ons; T7 stays in `proposed/`.
+Durable lesson promoted to `impl_notes.md` ("Adding a codex dispatch arm to an aux consumer"). T6c (memory-writer codex
+dispatch) and the team-supervisor plan-context arm remain deferred follow-ons; T7 stays in `proposed/`.
 
 ### consumer_lanes T6a: Aux-consumer lane placement (claude-max billing for the three non-supervisor consumers)
 
