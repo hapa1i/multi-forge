@@ -33,6 +33,7 @@ from forge.runtime_config import (
     ensure_config,
     get_config_path,
     load_runtime_config,
+    render_runtime_config_yaml,
     reset_runtime_config,
     write_runtime_config,
 )
@@ -82,16 +83,18 @@ def show_cmd(raw: bool = False, as_json: bool = False) -> None:
 
         click.echo(
             json.dumps(
-                {"path": str(config_path), "env_sources": env_sources, "config": effective},
+                {
+                    "path": str(config_path),
+                    "env_sources": env_sources,
+                    "config": effective,
+                },
                 indent=2,
                 default=str,
             )
         )
         return
 
-    import yaml
-
-    content = yaml.dump(effective, default_flow_style=False, sort_keys=False)
+    content = render_runtime_config_yaml(effective)
 
     if raw:
         console.print(content, end="")
@@ -177,7 +180,10 @@ def edit_cmd() -> None:
     editor = os.environ.get("EDITOR", "vim")
 
     if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
+        print_error(
+            f"Editor '{editor}' not found. Set $EDITOR to an available editor.",
+            console=console,
+        )
         sys.exit(1)
 
     # Copy to temp file for safe editing
@@ -232,7 +238,10 @@ def edit_cmd() -> None:
             known_sub = {f.name for f in fields(section_cls)}
             unknown_sub = [k for k in section_block if k not in known_sub]
             if unknown_sub:
-                print_error(f"Unknown {section_name} key(s): {', '.join(map(str, unknown_sub))}", console=console)
+                print_error(
+                    f"Unknown {section_name} key(s): {', '.join(map(str, unknown_sub))}",
+                    console=console,
+                )
                 console.print(f"[dim]Available: {', '.join(sorted(known_sub))}[/dim]")
                 console.print(f"Your changes are saved at: {display_path(tmp_path)}")
                 sys.exit(1)
@@ -246,7 +255,10 @@ def edit_cmd() -> None:
             if unknown_segs:
                 from forge.cli.statusline.names import SEGMENT_NAMES
 
-                print_error(f"Unknown statusline segment(s): {', '.join(map(str, unknown_segs))}", console=console)
+                print_error(
+                    f"Unknown statusline segment(s): {', '.join(map(str, unknown_segs))}",
+                    console=console,
+                )
                 console.print(f"[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
                 console.print(f"Your changes are saved at: {display_path(tmp_path)}")
                 sys.exit(1)

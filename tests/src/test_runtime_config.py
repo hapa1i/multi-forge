@@ -25,6 +25,7 @@ from forge.runtime_config import (
     get_default_config_content,
     get_runtime_config,
     load_runtime_config,
+    render_runtime_config_yaml,
     reset_runtime_config,
     write_runtime_config,
 )
@@ -310,6 +311,27 @@ class TestWriteRuntimeConfig:
         write_runtime_config({"proxy_mode": "sidecar"}, path=config_path)
         assert config_path.exists()
         content = config_path.read_text()
+        assert "# Proxy execution mode." in content
+        assert "proxy_mode: sidecar" in content
+
+    def test_writes_nested_comments(self, tmp_path: Path):
+        config_path = tmp_path / "config.yaml"
+        write_runtime_config({"statusline": {"segments": ["path", "model"]}}, path=config_path)
+        content = config_path.read_text()
+        assert "# Status-line display preferences." in content
+        assert "  # Ordered segment list." in content
+        assert "segments:" in content
+
+    def test_preserves_existing_ruamel_comments(self, tmp_path: Path):
+        from ruamel.yaml import YAML
+
+        config_path = tmp_path / "config.yaml"
+        ruamel = YAML()
+        data = ruamel.load("# Custom operator note\nproxy_mode: host\n")
+        data["proxy_mode"] = "sidecar"
+        write_runtime_config(data, path=config_path)
+        content = config_path.read_text()
+        assert "# Custom operator note" in content
         assert "proxy_mode: sidecar" in content
 
     def test_creates_parent_directories(self, tmp_path: Path):
@@ -404,6 +426,23 @@ class TestGetDefaultConfigContent:
             "auth_ignore_env",
         ]:
             assert key in content, f"Missing key in default content: {key}"
+
+
+class TestRenderRuntimeConfigYaml:
+    def test_renders_effective_config_with_comments(self):
+        content = render_runtime_config_yaml(RuntimeConfig(log_level="debug"))
+        assert "# File logging level: off, debug, info, or warning." in content
+        assert "log_level: debug" in content
+        assert "# Provider-trace observability preferences." in content
+
+    def test_rendered_yaml_is_parseable(self):
+        import yaml
+
+        content = render_runtime_config_yaml(RuntimeConfig())
+        data = yaml.safe_load(content)
+        assert data["proxy_mode"] == "host"
+        assert data["statusline"]["cost_mode"] == "auto"
+        assert data["provider_trace"]["inject_provider_user"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -606,9 +645,12 @@ class TestProviderTraceConfigDefaults:
 
     def test_string_bool_coerced(self):
         """A quoted "true"/"false" in YAML coerces, not silently degrades."""
-        assert RuntimeConfig(provider_trace={"inject_provider_user": "true"}).provider_trace.inject_provider_user is True  # type: ignore[arg-type]
         assert (
-            RuntimeConfig(provider_trace={"inject_provider_user": "off"}).provider_trace.inject_provider_user is False  # type: ignore[arg-type]
+            RuntimeConfig(provider_trace={"inject_provider_user": "true"}).provider_trace.inject_provider_user is True
+        )  # type: ignore[arg-type]
+        assert (
+            RuntimeConfig(provider_trace={"inject_provider_user": "off"}).provider_trace.inject_provider_user
+            is False  # type: ignore[arg-type]
         )
 
     def test_bad_value_raises_strict(self):
@@ -617,7 +659,9 @@ class TestProviderTraceConfigDefaults:
             RuntimeConfig(provider_trace={"inject_provider_user": "maybe"})  # type: ignore[arg-type]  # dict coercion path
 
     def test_unknown_subkey_dropped(self):
-        rc = RuntimeConfig(provider_trace={"inject_provider_user": True, "future_key": 1})  # type: ignore[arg-type]  # dict coercion path
+        rc = RuntimeConfig(
+            provider_trace={"inject_provider_user": True, "future_key": 1}
+        )  # type: ignore[arg-type]  # dict coercion path
         assert rc.provider_trace.inject_provider_user is True
         assert not hasattr(rc.provider_trace, "future_key")
 
