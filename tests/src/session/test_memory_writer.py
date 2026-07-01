@@ -2011,20 +2011,29 @@ class TestCodexMemoryWriter:
         freeze.assert_called_once()
 
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
-    def test_augment_on_codex_degrades_pending_phase0(
-        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, workspace: Path
+    def test_augment_dispatches_workspace_write(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        workspace: Path,
     ) -> None:
-        """augment (workspace-write) is gated on the T6c Phase 0 probe: it degrades and never spawns
-        codex (nor reads the preflight) until that lands."""
-        result = self._run_codex(workspace, mode="augment")
+        """augment on codex edits the docs in place -> workspace-write sandbox (T6c Phase 0 GO: codex
+        auto-approves in-project writes). It spawns, freezes, and records no manual row -- the invoker
+        owns the outcome (Finding 1). review-only stays read-only (the sibling test)."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="Updated docs/state.md")
+        freeze = MagicMock()
 
-        assert result is False
-        mock_read.assert_not_called()
-        mock_invoker_cls.return_value.run.assert_not_called()
-        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
-        assert len(outcomes) == 1
-        assert outcomes[0].reason_code == "codex_augment_pending_phase0"
+        result = self._run_codex(workspace, mode="augment", on_dispatch=freeze)
+
+        assert result is True
+        assert mock_prepare.call_args.kwargs["sandbox"] == "workspace-write"
+        mock_invoker_cls.return_value.run.assert_called_once()
+        freeze.assert_called_once()
+        assert read_upstream_outcomes(session="test", command="memory-writer") == []
 
     @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
     @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")

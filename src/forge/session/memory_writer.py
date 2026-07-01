@@ -677,9 +677,12 @@ def _dispatch_codex_memory_writer(
     shadow-curation's fail-loud: this consumer runs detached from the work-queue (stdout -> DEVNULL),
     so there is no user to fail loud to.
 
-    Sandbox is per mode: ``review-only`` -> ``read-only`` (the prompt reads the transcript + docs and
-    prints proposed changes to stdout). ``augment`` (``workspace-write``) is gated on the T6c Phase 0
-    probe and degrades until it lands -- do not spawn an unverified write-capable codex run.
+    Sandbox is per mode: ``review-only`` -> ``read-only`` (reads the transcript + docs, prints proposed
+    changes to stdout, writes nothing); ``augment`` -> ``workspace-write`` (edits the memory docs in
+    place -- the epic's first repo-write lane). Phase 0 confirmed codex honors workspace-write for
+    in-project writes; an out-of-project write is auto-rejected but rides ``turn.completed`` (NOT
+    ``runtime_is_error``), so no Claude-style permission scan is ported (D4) -- an in-project doc update
+    (cwd=forge_root) never hits that path, and provider/turn failures still fold via ``runtime_is_error``.
 
     Outcome recording (T6c Finding 1): the invoker's ``_emit_codex`` records BOTH the usage event
     AND the upstream outcome row (success + error) via the pinned ``Attribution``. So this arm calls
@@ -690,23 +693,20 @@ def _dispatch_codex_memory_writer(
     skip-return never spawns codex, so it must not freeze; a spawned turn that fails still freezes
     (claude-arm parity).
     """
-    from forge.core.invoker.codex import CodexHeadlessInvoker, prepare_codex_request
+    from forge.core.invoker.codex import (
+        CodexHeadlessInvoker,
+        CodexSandbox,
+        prepare_codex_request,
+    )
     from forge.core.invoker.types import Attribution
     from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
 
     refresh_hint = "Run 'forge runtime preflight codex' to refresh."
 
-    # augment == workspace-write == the epic's first repo-write lane. Gated on the T6c Phase 0 probe
-    # (does codex honor workspace-write and signal a write denial as a runtime error?). Until that is
-    # verified, degrade instead of spawning an unverified write-capable run.
-    if mode == "augment":
-        logger.warning(
-            "Memory writer for %s: the codex augment (workspace-write) arm is pending the T6c Phase 0 "
-            "probe; degrading. Use review-only on codex, or the claude lane for augment.",
-            session_name,
-        )
-        _record_memory_writer_outcome(session_name, "error", reason_code="codex_augment_pending_phase0")
-        return False
+    # Sandbox per mode (T6c Phase 0 GO): augment edits the docs in place -> workspace-write; review-only
+    # only prints proposals -> read-only. A workspace-write run auto-rejects out-of-project writes, but
+    # the docs live under cwd=forge_root so an in-project update is auto-approved (Phase 0 probe).
+    sandbox: CodexSandbox = "workspace-write" if mode == "augment" else "read-only"
 
     # Setup (preflight gate + request shaping). A failure here is a no-spawn skip-return: the invoker
     # never runs, so record the outcome manually (Finding 1) and do NOT freeze.
@@ -728,8 +728,8 @@ def _dispatch_codex_memory_writer(
                 operation="memory_writer.run",
             ),
             model=None,  # codex picks its own model; the lane's backend_id/model are nominal
-            cwd=str(forge_root),  # the prompt reads the transcript + docs under forge_root
-            sandbox="read-only",  # review-only: prints proposed changes, writes nothing
+            cwd=str(forge_root),  # reads the transcript + docs under forge_root; augment writes here too
+            sandbox=sandbox,  # workspace-write (augment) | read-only (review-only) -- see above
             timeout_seconds=timeout_seconds,
             label="memory-writer",
         )
