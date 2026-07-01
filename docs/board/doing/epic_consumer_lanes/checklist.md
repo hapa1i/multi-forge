@@ -47,18 +47,19 @@ sticky degrade kept off the write-once `confirmed.consumer_lanes` binding (a `fo
 
 ## Member roster and sequencing
 
-| Member       | Card                                     | Lane | Depends on | State                     |
-| ------------ | ---------------------------------------- | ---- | ---------- | ------------------------- |
-| T1a          | `done/consumer_lane_resolver/`           | done | --         | done (PR #51)             |
-| T2           | `done/backend_subscription_sources/`     | done | T1a        | done (PR #54)             |
-| T3           | `done/supervisor_lane_driven/`           | done | T1a        | done (PR #52)             |
-| T4           | `done/codex_exec_supervisor_lane/`       | done | T1a,T2,T3  | done (PR #55)             |
-| T5           | `done/lane_observability/`               | done | T3,T4      | done (PR #56)             |
-| T1b          | `done/consumer_lane_binding/`            | done | T4         | done (PR #57)             |
-| T6a          | `done/aux_consumer_lane_placement/`      | done | T1b,T0     | done (PR #59)             |
-| T6b          | `done/aux_consumer_codex_dispatch/`      | done | T6a        | done (PR #60)             |
-| T7           | `done/subscription_exhaustion_failopen/` | done | T4,T6b     | done (PR #61)             |
-| T0 (sibling) | `done/claude_subscription_billing/`      | done | none       | done (PR #58, `b0614325`) |
+| Member       | Card                                     | Lane  | Depends on | State                     |
+| ------------ | ---------------------------------------- | ----- | ---------- | ------------------------- |
+| T1a          | `done/consumer_lane_resolver/`           | done  | --         | done (PR #51)             |
+| T2           | `done/backend_subscription_sources/`     | done  | T1a        | done (PR #54)             |
+| T3           | `done/supervisor_lane_driven/`           | done  | T1a        | done (PR #52)             |
+| T4           | `done/codex_exec_supervisor_lane/`       | done  | T1a,T2,T3  | done (PR #55)             |
+| T5           | `done/lane_observability/`               | done  | T3,T4      | done (PR #56)             |
+| T1b          | `done/consumer_lane_binding/`            | done  | T4         | done (PR #57)             |
+| T6a          | `done/aux_consumer_lane_placement/`      | done  | T1b,T0     | done (PR #59)             |
+| T6b          | `done/aux_consumer_codex_dispatch/`      | done  | T6a        | done (PR #60)             |
+| T7           | `done/subscription_exhaustion_failopen/` | done  | T4,T6b     | done (PR #61)             |
+| T6c          | `doing/memory_writer_codex_dispatch/`    | doing | T6a,T6b    | promoted (2026-06-30)     |
+| T0 (sibling) | `done/claude_subscription_billing/`      | done  | none       | done (PR #58, `b0614325`) |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6a -> T6b. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
@@ -142,7 +143,7 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 ## Closeout (epic)
 
 - [ ] Epic -> `done/` only when every live member is `done/`, or the shared contract is folded into normative design
-  docs (board_contract "Epics"). **All shipped members are `done/` (T7 closed via PR #61, 2026-06-30); the epic stays in
-  `doing/` only to coordinate the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor
-  plan-context).** Close it when those ship or are re-filed as fresh cards. Add a `change_log.md` entry; promote durable
-  lessons to `impl_notes.md` after human review.
+  docs (board_contract "Epics"). **All shipped members are `done/` (T7 closed via PR #61, 2026-06-30). T6c
+  (memory-writer codex dispatch) is now promoted to `doing/memory_writer_codex_dispatch/` as the active member;
+  team-supervisor (plan-context) stays deferred.** Close the epic when T6c ships and team-supervisor ships or is
+  re-filed as a fresh card. Add a `change_log.md` entry; promote durable lessons to `impl_notes.md` after human review.
