@@ -26,7 +26,7 @@ forge config
 
 # Auto-create with commented defaults, then view effective config
 forge config show
-forge config show --raw     # YAML only, no headings or syntax highlighting
+forge config show --raw     # Commented YAML only, no headings or syntax highlighting
 
 # Set a value
 forge config set proxy_mode=sidecar
@@ -42,7 +42,8 @@ forge config reset              # Delete config.yaml and use defaults
 
 Notes:
 
-- `forge config show` displays the effective config: built-in defaults, file values, and any environment overrides.
+- `forge config show` displays commented effective config: built-in defaults, file values, and any environment
+  overrides.
 - `forge config edit` validates the edited YAML before applying it.
 - `forge config reset <key>` removes that key from the file; `forge config reset` removes the whole file.
 - `%config` inside Claude Code is read-only and shows the same effective runtime config.

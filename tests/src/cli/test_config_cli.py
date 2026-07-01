@@ -43,8 +43,18 @@ class TestConfigShow:
         runner = CliRunner()
         result = runner.invoke(config, ["show", "--raw"])
         assert result.exit_code == 0
+        assert "# Proxy execution mode." in result.output
         assert "proxy_mode: host" in result.output
+        assert "# Provider-trace observability preferences." in result.output
         assert "Forge Runtime Config" not in result.output
+
+    def test_show_displays_commented_yaml(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["show"])
+        assert result.exit_code == 0
+        assert "# Status-line display preferences." in result.output
+        assert "# Ordered segment list." in result.output
+        assert "provider_trace:" in result.output
 
     def test_bare_config_prints_help(self):
         """Bare non-leaf prints help to stderr and exits 2 (usage error), like every other group."""
@@ -110,6 +120,7 @@ class TestConfigShowJson:
         runner = CliRunner()
         result = runner.invoke(config, ["show", "--json"])
         assert result.exit_code == 0
+        assert "#" not in result.output
         import json
         from dataclasses import fields
 
@@ -177,7 +188,9 @@ class TestConfigSet:
         result = runner.invoke(config, ["set", "proxy_mode=sidecar"])
         assert result.exit_code == 0
         assert "Set" in result.output
-        assert (get_forge_home() / "config.yaml").exists()
+        content = (get_forge_home() / "config.yaml").read_text()
+        assert "# Proxy execution mode." in content
+        assert "proxy_mode: sidecar" in content
 
     def test_set_updates_existing_file(self):
         home = get_forge_home()
@@ -398,7 +411,10 @@ class TestConfigSetStatusline:
     def test_set_forge_unique_segments_accepted(self):
         # All Forge-unique opt-in segments (Phases 4-5) are in the allowlist.
         runner = CliRunner()
-        result = runner.invoke(config, ["set", "statusline.segments=path,supervisor,policy,audit,drift,spend_cap"])
+        result = runner.invoke(
+            config,
+            ["set", "statusline.segments=path,supervisor,policy,audit,drift,spend_cap"],
+        )
         assert result.exit_code == 0, result.output
 
     def test_set_unknown_subkey_rejected(self):

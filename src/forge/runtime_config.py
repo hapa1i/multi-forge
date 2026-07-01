@@ -19,7 +19,9 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from dataclasses import asdict, dataclass, field, fields
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,102 @@ _VALID_COST_MODES = ("auto", "api", "subscription")
 _VALID_PALETTES = ("default", "earthy")
 _VALID_GLYPHS = ("ascii", "unicode")
 _VALID_CACHE_HIT = ("auto", "off")
+
+
+_CONFIG_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "proxy_mode": (
+        "Proxy execution mode.",
+        "host = proxy runs on host; sidecar = proxy bundled with Claude in Docker.",
+    ),
+    "sidecar_image": ("Docker image for sidecar mode.",),
+    "user_agent_claude_code_version": (
+        "Optional Claude Code version string sent in the User-Agent header to upstream LLM providers.",
+    ),
+    "default_direct_model": (
+        "Optional model override for direct, non-proxy Claude sessions.",
+        "Empty string lets Claude Code choose. Aliases like opus or sonnet also work.",
+    ),
+    "context_limit": (
+        "Fallback auto-compact window for proxy mode when model lookup fails.",
+        "Direct sessions do not use this; Claude Code handles its own context.",
+    ),
+    "status_timeout": ("Status-line timeout for proxy and git calls, in seconds.",),
+    "memory_writer_timeout": ("Memory writer timeout, in seconds.",),
+    "log_level": (
+        "File logging level: off, debug, info, or warning.",
+        "FORGE_DEBUG overrides this field when set.",
+    ),
+    "log_retention_days": (
+        "Auto-delete log files older than N days on CLI startup.",
+        "0 disables automatic log cleanup.",
+    ),
+    "session_retention_days": (
+        "Auto-delete sessions older than N days on CLI startup.",
+        "0 disables automatic session cleanup. Worktrees and branches are kept.",
+    ),
+    "policy_summary_feedback": (
+        "Policy summary feedback after evaluations: on or off.",
+        "Deny messages and substantive warnings stay visible either way.",
+    ),
+    "upstream_event_volume": (
+        "Upstream outcome telemetry volume: non_success or all.",
+        "non_success records failures/exceptions; all also records successful passes and cached allows.",
+    ),
+    "log_tool_failures": (
+        "Log failed tool call inputs and errors for proxied sessions.",
+        "Payloads may include paths, command text, or snippets, so this is opt-in.",
+    ),
+    "auth_ignore_env": (
+        "Ignore environment variables for credential resolution.",
+        "When true, Forge reads credentials only from ~/.forge/credentials.yaml.",
+    ),
+    "interactive_anthropic_api_key": (
+        "ANTHROPIC_API_KEY policy for interactive forge session / forge claude launches.",
+        "inherit keeps normal credential resolution; omit strips the key from the interactive child only.",
+    ),
+    "statusline": (
+        "Status-line display preferences.",
+        "Set nested values with: forge config set statusline.<key>=<value>",
+    ),
+    "provider_trace": (
+        "Provider-trace observability preferences.",
+        "Set nested values with: forge config set provider_trace.<key>=<value>",
+    ),
+}
+
+_STATUSLINE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "segments": (
+        "Ordered segment list. Empty means the default layout.",
+        "Set with: forge config set statusline.segments=<comma,separated>",
+        "Unknown names are rejected with the full list of valid segments.",
+    ),
+    "cost_mode": (
+        "Cost display mode: auto, api, or subscription.",
+        "auto shows quota when present, otherwise a hedged cost; it is never inferred from an API key.",
+    ),
+    "palette": ("Color palette: default or earthy.",),
+    "glyphs": ("Glyph set: ascii or unicode.",),
+    "cache_hit": ("Cache-hit segment behavior: auto or off.",),
+    "cache_hit_ttl": ("Direct-mode cache-hit throttle window, in seconds.",),
+    "forge_cost_ttl": ("forge_cost and supervisor-health throttle window, in seconds.",),
+}
+
+_PROVIDER_TRACE_FIELD_COMMENTS: dict[str, tuple[str, ...]] = {
+    "inject_provider_user": (
+        "When true, send a hashed Forge session id in OpenRouter's top-level user field.",
+        "One global switch governs both proxied OpenRouter traffic and direct core.llm callers.",
+        "Only a hashed id is sent, never the raw session name.",
+    ),
+}
+
+# Scalar spellings that YAML 1.1 (PyYAML, our loader via yaml.safe_load) resolves
+# to a non-string. ruamel dumps YAML 1.2, where these are plain strings, so it
+# would write `log_level: off` unquoted -- and yaml.safe_load would then read it
+# back as the bool False, not "off". Force-quote them (and the empty string, which
+# YAML reads as null) so the write and the read agree. Matched case-insensitively:
+# over-quoting a value YAML 1.1 would not have resolved is harmless; under-quoting
+# is the round-trip bug.
+_YAML11_AMBIGUOUS_SCALARS = frozenset({"y", "yes", "n", "no", "true", "false", "on", "off", "null", "~"})
 
 
 @dataclass
@@ -517,7 +615,110 @@ def reset_runtime_config() -> None:
     _config = None
 
 
-def write_runtime_config(config_data: dict[str, Any], path: Path | None = None) -> Path:
+def _ordered_mapping_items(data: Mapping[str, Any], field_owner: type) -> list[tuple[str, Any]]:
+    """Return mapping items in dataclass-field order, then unknown keys in file order."""
+    ordered_names = [f.name for f in fields(field_owner)]
+    seen: set[str] = set()
+    items: list[tuple[str, Any]] = []
+    for name in ordered_names:
+        if name in data:
+            items.append((name, data[name]))
+            seen.add(name)
+    for name, value in data.items():
+        if name not in seen:
+            items.append((name, value))
+    return items
+
+
+def _commented_section_map(
+    data: Mapping[str, Any],
+    *,
+    field_owner: type,
+    comments: dict[str, tuple[str, ...]],
+    indent: int,
+) -> Any:
+    """Build a ruamel CommentedMap for a nested config section."""
+    from ruamel.yaml.comments import CommentedMap
+
+    result = CommentedMap()
+    for key, value in _ordered_mapping_items(data, field_owner):
+        result[key] = value
+        if key in comments:
+            result.yaml_set_comment_before_after_key(key, before="\n".join(comments[key]), indent=indent)
+    return result
+
+
+def _commented_runtime_config_map(data: Mapping[str, Any]) -> Any:
+    """Build a ruamel CommentedMap with comments for known runtime config keys."""
+    from ruamel.yaml.comments import CommentedMap
+
+    result = CommentedMap()
+    for key, value in _ordered_mapping_items(data, RuntimeConfig):
+        if is_dataclass(value) and not isinstance(value, type):
+            value = asdict(value)
+        if key == "statusline" and isinstance(value, Mapping):
+            value = _commented_section_map(
+                value,
+                field_owner=StatusLineConfig,
+                comments=_STATUSLINE_FIELD_COMMENTS,
+                indent=2,
+            )
+        elif key == "provider_trace" and isinstance(value, Mapping):
+            value = _commented_section_map(
+                value,
+                field_owner=RuntimeProviderTraceConfig,
+                comments=_PROVIDER_TRACE_FIELD_COMMENTS,
+                indent=2,
+            )
+        result[key] = value
+        if key in _CONFIG_FIELD_COMMENTS:
+            result.yaml_set_comment_before_after_key(key, before="\n".join(_CONFIG_FIELD_COMMENTS[key]), indent=0)
+    return result
+
+
+def _build_runtime_yaml() -> Any:
+    """Build the configured ruamel YAML instance shared by the render/write paths.
+
+    Installs a str representer that quotes YAML 1.1 keyword scalars (see
+    ``_YAML11_AMBIGUOUS_SCALARS``) so the ruamel-dumped file round-trips through
+    the PyYAML loader unchanged. The representer is scoped to a local subclass so
+    it never mutates the process-wide ``RoundTripRepresenter`` other ruamel
+    callers (e.g. proxy config) rely on.
+    """
+    from ruamel.yaml import YAML
+    from ruamel.yaml.representer import RoundTripRepresenter
+
+    def _represent_str(representer: Any, value: str) -> Any:
+        if value == "" or value.lower() in _YAML11_AMBIGUOUS_SCALARS:
+            return representer.represent_scalar("tag:yaml.org,2002:str", value, style="'")
+        return representer.represent_scalar("tag:yaml.org,2002:str", value)
+
+    class _RuntimeConfigRepresenter(RoundTripRepresenter):
+        pass
+
+    _RuntimeConfigRepresenter.add_representer(str, _represent_str)
+
+    ruamel = YAML()
+    ruamel.Representer = _RuntimeConfigRepresenter
+    ruamel.preserve_quotes = True
+    ruamel.default_flow_style = False
+    ruamel.indent(mapping=2, sequence=4, offset=2)
+    return ruamel
+
+
+def render_runtime_config_yaml(config: RuntimeConfig | Mapping[str, Any]) -> str:
+    """Render runtime config as parseable YAML with explanatory comments."""
+    if isinstance(config, RuntimeConfig):
+        data: Mapping[str, Any] = asdict(config)
+    else:
+        data = config
+
+    stream = StringIO()
+    _build_runtime_yaml().dump(_commented_runtime_config_map(data), stream)
+    return stream.getvalue()
+
+
+def write_runtime_config(config_data: Mapping[str, Any], path: Path | None = None) -> Path:
     """Write runtime config to YAML file atomically.
 
     Args:
@@ -530,11 +731,10 @@ def write_runtime_config(config_data: dict[str, Any], path: Path | None = None) 
     config_path = path or get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    from ruamel.yaml import YAML
+    from ruamel.yaml.comments import CommentedMap
 
-    ruamel = YAML()
-    ruamel.preserve_quotes = True
-    ruamel.default_flow_style = False
+    ruamel = _build_runtime_yaml()
+    yaml_data = config_data if isinstance(config_data, CommentedMap) else _commented_runtime_config_map(config_data)
 
     # Atomic write: unique temp file + os.replace (matches proxy config pattern)
     fd, tmp_path = tempfile.mkstemp(
@@ -544,7 +744,7 @@ def write_runtime_config(config_data: dict[str, Any], path: Path | None = None) 
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            ruamel.dump(config_data, f)
+            ruamel.dump(yaml_data, f)
         os.chmod(tmp_path, 0o600)
         os.replace(tmp_path, str(config_path))
     except Exception:
@@ -647,10 +847,9 @@ proxy_mode: host
 #              subscription shows quota instead of dollars
 #   palette:   default | earthy
 #   glyphs:    ascii | unicode
-#   segments:  ordered list; empty = default layout. Valid names: path, branch,
-#              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
-#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap,
-#              forge_cost
+#   segments:  ordered list; empty = default layout. Set with
+#              `forge config set statusline.segments=<comma,separated>`; unknown
+#              names are rejected with the full list of valid segments.
 #   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
 #   forge_cost_ttl: <seconds, forge_cost segment throttle window (default 10)>
 # statusline:
