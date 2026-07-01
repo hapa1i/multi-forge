@@ -102,7 +102,7 @@ Forge's own `parse_codex_jsonl_stream` -- the exact `runtime_is_error` the arm s
   `cli_reference.md` -- `--runtime codex` note now lists `memory_writer` (T6c); only `team_supervisor` lacks a codex
   lane. `design.md` -- freeze-trigger line notes the memory-writer codex lane (read-only or workspace-write). end-user
   `memory.md` -- "Runtime: claude or codex" section added.
-- [ ] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T6c done (post-merge closeout step, below).
+- [x] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T6c done (2026-07-01 closeout commit).
 
 ## Acceptance tests
 
@@ -134,9 +134,10 @@ tests in `test_memory_writer.py`; E2E in `test_memory_writer_codex_smoke.py`.
 ## Closeout
 
 - [x] Acceptance rows recorded (table above) + verification gate green.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification) -- **post-merge, on main**.
-- [ ] Move `doing/memory_writer_codex_dispatch/` -> `done/`; update epic roster; promote durable lessons to
-  `impl_notes.md` after human review -- **post-merge, on main** (mirrors T7: implementation via PR, board closeout
-  direct to main after merge).
-- [ ] **Epic closeout check**: with T6c done, only team-supervisor (plan-context) remains deferred -- decide whether the
-  epic closes to `done/` or stays coordinating that one follow-on.
+- [x] `change_log.md` entry added (2026-07-01: goal / key changes / verification).
+- [x] Move `doing/memory_writer_codex_dispatch/` -> `done/`; epic roster updated (card + checklist); durable lesson
+  promoted to `impl_notes.md` (codex `runtime_is_error` does not catch a sandbox write-denial). The failure-biased
+  upstream-ledger lesson was already recorded under the T6b note, so not re-added (no duplicate).
+- [x] **Epic closeout check**: T6c done leaves only team-supervisor (plan-context, pending a context-model change).
+  Decision: the epic **stays in `doing/`** coordinating that one follow-on (matches its stated posture; team-supervisor
+  is not yet an actionable member card).

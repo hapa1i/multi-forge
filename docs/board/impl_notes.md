@@ -43,8 +43,8 @@ Durable rules from wiring shadow-curation's `codex exec` arm (`session/shadow_cu
 three axes are per-consumer.
 
 - **The aux consumers are NOT a uniform "mirror T4."** Only shadow-curation is a clean mirror (blind, read-only,
-  stdout-is-output). memory-writer is workspace-write file-editing (-> T6c); team-supervisor is plan-blind under codex
-  because the approved plan rides Claude's `resume_id` and codex has no `--resume` (deferred until plan-snapshot
+  stdout-is-output). memory-writer is workspace-write file-editing (shipped as T6c); team-supervisor is plan-blind under
+  codex because the approved plan rides Claude's `resume_id` and codex has no `--resume` (deferred until plan-snapshot
   machinery is ported). Sweep output shape / sandbox / context source / degrade path before assuming a consumer is
   mirror-able.
 - **Validate the bound lane before selecting the arm -- never branch on the raw `LaneRecord.runtime_id`.** A
@@ -63,6 +63,12 @@ three axes are per-consumer.
   already exists.
 - **`runtime_is_error` must be folded into success.** `HeadlessResult.success` is returncode-only, so an
   exit-0-but-failed codex turn would otherwise persist an empty report. Fold it so the turn fails loud.
+- **`runtime_is_error` does NOT catch a sandbox write-denial (T6c, write-capable arms).** A live probe showed a codex
+  `--sandbox workspace-write` *denial* (writing outside the project) exits 0 with `is_error=False` -- the rejection
+  rides `turn.completed`, not an `error`/`turn.failed` event. So folding `runtime_is_error` catches provider/turn
+  failures but NOT a thwarted write. Acceptable for memory-writer because its docs live under `cwd=forge_root`
+  (in-project writes auto-approve, never hitting the rejection path), so no Claude-style permission scan is ported; any
+  future arm that writes *outside* its cwd needs a postcondition check, not `runtime_is_error`.
 - **Codex E2E trap: the autouse `isolate_codex_home` fixture masks ChatGPT (`codex_store`) auth.** A real `codex exec`
   test on the host ChatGPT login must restore the host `CODEX_HOME` captured at import time, and clear
   `CODEX_API_KEY`/`CODEX_ACCESS_TOKEN` (preflight resolves them before `codex_store`, so a host with both resolves

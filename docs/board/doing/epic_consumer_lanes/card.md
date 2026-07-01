@@ -11,8 +11,8 @@ The **first wave is complete**; the epic stays in `doing/`. T6 shipped as T6a + 
 `done/aux_consumer_codex_dispatch/`). With T1b, the T0 sibling (PR #58, `b0614325`), T6a (PR #59), and T6b (PR #60) all
 done, the epic stays in `doing/` coordinating the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor
 plan-context). With T7 done (PR #61), the first wave and all follow-ons through T7 are complete; **T6c** (memory-writer
-codex dispatch) is now promoted to `doing/memory_writer_codex_dispatch/` as the active member, leaving only
-team-supervisor deferred.
+codex dispatch) is **done** (PR #62, `1064b8c8`, closed to `done/memory_writer_codex_dispatch/`), leaving only
+team-supervisor (plan-context) deferred.
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -197,7 +197,7 @@ once.
 | **T6a -- Aux-consumer lane placement** (claude-max billing UX)             | Generalize the supervisor's lane-binding UX (CLI + freeze) to memory-writer / shadow-curation / team-supervisor; declare them on `claude-max`. **Level 1: no dispatch change** (claude-max shares the claude_code runtime).                                                                                                                                                                                                                                                                                         | T1b        | the binding contract spans 4 consumers          |
 | **T6b -- Aux-consumer codex dispatch** (done; narrowed to shadow-curation) | Add a real codex-exec dispatch arm (codex in `allowed_lanes` + runtime-keyed dispatch + per-consumer degrade). **Promoted scope 2026-06-30: shadow-curation only** (the clean mirror-T4 -- blind, read-only, stdout-output). **memory-writer deferred to T6c** (workspace-write file-editing shape); **team-supervisor deferred** (plan-blind without new context machinery). Degrade is **fail-loud** on a cold/stale Codex preflight (NOT T4's fail-open); fan-out workers + taggers stay out (different shapes). | T6a        | a non-claude runtime for aux work               |
 | **T7 -- Subscription-exhaustion fail-open** (new, the discussion's ticket) | When the **supervisor's** bound codex/chatgpt subscription lane hits the quota wall, degrade **once** to its default `claude -p` lane (sticky, fail-open) -- supervisor-only (the one repeated-dispatch codex consumer); the single deliberate exception to "no fallback".                                                                                                                                                                                                                                          | T4, T6b    | the "Why now" quota wall is actually handled    |
-| **T6c -- Memory-writer codex dispatch** (active; both modes, D1=A)         | Add the codex-exec dispatch arm to the memory writer (codex in `allowed_lanes` + runtime-keyed dispatch). **Scope: both modes** -- `augment` (`sandbox=workspace-write`, the epic's first write-granting lane) + `review-only` (`read-only`). Degrade is **best-effort async** (`return False` + telemetry); spawned-run outcomes ride the invoker row (no double-record).                                                                                                                                          | T6a, T6b   | a non-claude runtime for write-capable aux work |
+| **T6c -- Memory-writer codex dispatch** (done, PR #62; both modes, D1=A)   | Add the codex-exec dispatch arm to the memory writer (codex in `allowed_lanes` + runtime-keyed dispatch). **Scope: both modes** -- `augment` (`sandbox=workspace-write`, the epic's first write-granting lane) + `review-only` (`read-only`). Degrade is **best-effort async** (`return False` + telemetry); spawned-run outcomes ride the invoker row (no double-record).                                                                                                                                          | T6a, T6b   | a non-claude runtime for write-capable aux work |
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
@@ -206,8 +206,8 @@ once.
 PR #61, `96e342b1`, 2026-06-30; depends on T4 + T6b); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57,
 2026-06-28); T6a -> `docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
 `docs/board/done/aux_consumer_codex_dispatch/` (done, PR #60, 2026-06-30, shadow-curation only); T6c ->
-`docs/board/doing/memory_writer_codex_dispatch/` (active, promoted 2026-06-30, D1=A both modes; depends on T6a + T6b).
-The rows above stay the durable sketch (except T6b's and the added T6c row); the cards carry verified touchpoints +
+`docs/board/done/memory_writer_codex_dispatch/` (done, PR #62, 2026-07-01, D1=A both modes; depends on T6a + T6b). The
+rows above stay the durable sketch (except T6b's and the added T6c row); the cards carry verified touchpoints +
 fixture-grounded acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined
 (`BUILTIN_MODEL_SOURCES`, validated at import in `backend/sources.py`), so T2 is an *internal-surface clean break* --
 **not** Forge-owned durable state. Schema version/strict-deser/reset rules apply only to T1b's session-manifest binding.

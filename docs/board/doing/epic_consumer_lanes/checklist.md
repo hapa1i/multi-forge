@@ -45,21 +45,27 @@ consumer; shadow-curation is one-shot) with post-hoc failure classification, a *
 sticky degrade kept off the write-once `confirmed.consumer_lanes` binding (a `forge.supervisor_lane_degrade` overlay in
 `confirmed.policy.policy_states`). The `core.llm` representation is decided (option 2 -- see Decisions).
 
+**T6c (memory-writer codex dispatch) is done** (PR #62, `1064b8c8`, 2026-07-01; closed to
+`done/memory_writer_codex_dispatch/`) -- the epic's first write-granting lane (`augment` on `workspace-write`; live
+Phase 0 probe confirmed in-project writes auto-approve and a denial does not set `runtime_is_error`). Only
+team-supervisor (plan-context, pending a context-model change) remains deferred; the epic stays in `doing/` coordinating
+that one follow-on.
+
 ## Member roster and sequencing
 
-| Member       | Card                                     | Lane  | Depends on | State                     |
-| ------------ | ---------------------------------------- | ----- | ---------- | ------------------------- |
-| T1a          | `done/consumer_lane_resolver/`           | done  | --         | done (PR #51)             |
-| T2           | `done/backend_subscription_sources/`     | done  | T1a        | done (PR #54)             |
-| T3           | `done/supervisor_lane_driven/`           | done  | T1a        | done (PR #52)             |
-| T4           | `done/codex_exec_supervisor_lane/`       | done  | T1a,T2,T3  | done (PR #55)             |
-| T5           | `done/lane_observability/`               | done  | T3,T4      | done (PR #56)             |
-| T1b          | `done/consumer_lane_binding/`            | done  | T4         | done (PR #57)             |
-| T6a          | `done/aux_consumer_lane_placement/`      | done  | T1b,T0     | done (PR #59)             |
-| T6b          | `done/aux_consumer_codex_dispatch/`      | done  | T6a        | done (PR #60)             |
-| T7           | `done/subscription_exhaustion_failopen/` | done  | T4,T6b     | done (PR #61)             |
-| T6c          | `doing/memory_writer_codex_dispatch/`    | doing | T6a,T6b    | promoted (2026-06-30)     |
-| T0 (sibling) | `done/claude_subscription_billing/`      | done  | none       | done (PR #58, `b0614325`) |
+| Member       | Card                                     | Lane | Depends on | State                     |
+| ------------ | ---------------------------------------- | ---- | ---------- | ------------------------- |
+| T1a          | `done/consumer_lane_resolver/`           | done | --         | done (PR #51)             |
+| T2           | `done/backend_subscription_sources/`     | done | T1a        | done (PR #54)             |
+| T3           | `done/supervisor_lane_driven/`           | done | T1a        | done (PR #52)             |
+| T4           | `done/codex_exec_supervisor_lane/`       | done | T1a,T2,T3  | done (PR #55)             |
+| T5           | `done/lane_observability/`               | done | T3,T4      | done (PR #56)             |
+| T1b          | `done/consumer_lane_binding/`            | done | T4         | done (PR #57)             |
+| T6a          | `done/aux_consumer_lane_placement/`      | done | T1b,T0     | done (PR #59)             |
+| T6b          | `done/aux_consumer_codex_dispatch/`      | done | T6a        | done (PR #60)             |
+| T7           | `done/subscription_exhaustion_failopen/` | done | T4,T6b     | done (PR #61)             |
+| T6c          | `done/memory_writer_codex_dispatch/`     | done | T6a,T6b    | done (PR #62)             |
+| T0 (sibling) | `done/claude_subscription_billing/`      | done | none       | done (PR #58, `b0614325`) |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6a -> T6b. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
