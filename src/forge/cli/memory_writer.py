@@ -119,6 +119,9 @@ def run_cmd(
         timeout_seconds=timeout,
         designated_docs=designated_docs,
         backend_id=backend_id,
+        # The bound lane selects the dispatch arm (claude_code default vs codex); validated in
+        # run_memory_writer and degraded to a no-call on a stale binding (epic consumer_lanes T6c).
+        lane_record=dispatched_lane,
         # Freeze only if the writer actually dispatches (on_dispatch fires at the claude -p
         # call); the threaded lane + under-lock equality guard keep confirmed consistent with
         # the billed backend (epic consumer_lanes T6a).

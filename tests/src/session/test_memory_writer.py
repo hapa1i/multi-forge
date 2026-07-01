@@ -8,14 +8,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.lanes import Lane, valid_lanes
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.core.usage.ledger import read_usage_events
 from forge.session.memory_writer import (
+    MEMORY_WRITER_CONSUMER,
     _dedupe_specs,
     _stdout_indicates_permission_denied,
     _validate_designated_docs,
@@ -24,7 +28,7 @@ from forge.session.memory_writer import (
     resolve_writer_base_url,
     run_memory_writer,
 )
-from forge.session.models import DesignatedDoc, MemoryWriterConfig
+from forge.session.models import DesignatedDoc, LaneRecord, MemoryWriterConfig
 from forge.session.passport import (
     STRATEGY_INSTRUCTIONS,
     Passport,
@@ -1801,3 +1805,241 @@ class TestMemoryWriterEffort:
         mock_run.assert_called_once()
         _, kwargs = mock_run.call_args
         assert kwargs["reasoning_effort"] == "high"
+
+
+# ---------------------------------------------------------------------------
+# Codex dispatch arm (epic consumer_lanes T6c)
+# ---------------------------------------------------------------------------
+
+_CODEX_LANE = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+_CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-lane manifest DTO
+# prepare_codex_request is mocked in these tests, so billing_mode is never read off the preflight.
+_READY_PREFLIGHT = SimpleNamespace(ready=True, blocking_reason=None)
+
+
+def _codex_result(**overrides: Any) -> Any:
+    """A HeadlessResult shaped like ``CodexHeadlessInvoker.run`` returns (T6c codex arm).
+
+    Defaults to a clean exit-0 turn; pass ``returncode``/``runtime_is_error``/``stderr`` to model a
+    failed turn.
+    """
+    from forge.core.invoker.types import HeadlessResult
+
+    defaults: dict[str, Any] = {
+        "label": "memory-writer",
+        "stdout": "## Promote\n- From codex",
+        "stderr": "",
+        "returncode": 0,
+        "duration_seconds": 0.1,
+    }
+    defaults.update(overrides)
+    return HeadlessResult(**defaults)
+
+
+def test_memory_writer_consumer_allows_codex_lane() -> None:
+    """T6c adds (does not replace) the codex lane: both claude-max and codex are valid."""
+    lanes = valid_lanes(MEMORY_WRITER_CONSUMER)
+    assert _CODEX_LANE in lanes
+    assert Lane("claude_code", "claude-max", "opus") in lanes
+
+
+class TestCodexMemoryWriter:
+    """The memory writer's codex-exec dispatch arm (epic consumer_lanes T6c)."""
+
+    TRANSCRIPT_REL = ".forge/artifacts/test/transcripts/uuid-123.jsonl"
+
+    @pytest.fixture
+    def workspace(self, tmp_path: Path) -> Path:
+        """A minimal workspace: transcript (10 turns) + one designated doc."""
+        transcript_abs = tmp_path / self.TRANSCRIPT_REL
+        entries = [_make_newer_entry(f"req-{i}", "user") for i in range(10)] + [
+            _make_newer_entry(f"req-{i}", "assistant") for i in range(10)
+        ]
+        _write_transcript(transcript_abs, entries)
+        (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "docs" / "state.md").write_text("# State\n")
+        return tmp_path
+
+    def _run_codex(self, workspace: Path, *, mode: str = "review-only", **kwargs: Any) -> bool:
+        """Run the memory writer bound to codex, with claude UNAVAILABLE.
+
+        Patching is_claude_available=False proves the codex arm never requires claude (T6c
+        Finding 2) -- every codex test rides this, so the gate fix is exercised throughout.
+        """
+        with patch("forge.session.memory_writer.is_claude_available", return_value=False):
+            return run_memory_writer(
+                session_name="test",
+                forge_root=workspace,
+                transcript_snapshot_rel=self.TRANSCRIPT_REL,
+                config=MemoryWriterConfig(enabled=True, min_turns=1, mode=mode),
+                designated_docs=[DesignatedDoc(path="docs/state.md", strategy="project-state")],
+                lane_record=kwargs.pop("lane_record", _CODEX_LANE_RECORD),
+                **kwargs,
+            )
+
+    @patch("forge.session.memory_writer.run_claude_session")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_review_only_dispatches_read_only_and_persists(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_claude: MagicMock,
+        workspace: Path,
+    ) -> None:
+        """review-only on codex: read-only request, invoker runs once, stdout persisted, claude
+        untouched -- and it works with is_claude_available() False (T6c Finding 2)."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(stdout="## Promote\n- From codex")
+
+        result = self._run_codex(workspace)
+
+        assert result is True
+        mock_read.assert_called_once_with()
+        mock_invoker_cls.return_value.run.assert_called_once()
+        mock_claude.assert_not_called()
+        assert mock_prepare.call_args.kwargs["sandbox"] == "read-only"
+        assert mock_prepare.call_args.kwargs["model"] is None
+        assert mock_prepare.call_args.kwargs["cwd"] == str(workspace)
+        # Spawned success -> the invoker records the upstream outcome; the arm records nothing
+        # manually (T6c Finding 1: no double row). The invoker is mocked, so 0 manual rows here.
+        assert read_upstream_outcomes(session="test", command="memory-writer") == []
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_pins_operation_and_skips_claude_emitter(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        mock_emit: MagicMock,
+        workspace: Path,
+    ) -> None:
+        """Single emitter: the codex path never calls the claude-arm emitter; the Attribution pins
+        command=memory-writer / operation=memory_writer.run so the invoker's auto row matches claude."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result()
+
+        self._run_codex(workspace)
+
+        mock_emit.assert_not_called()
+        attribution = mock_prepare.call_args.kwargs["attribution"]
+        assert attribution.command == "memory-writer"
+        assert attribution.session == "test"
+        assert attribution.operation == "memory_writer.run"
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight", return_value=None)
+    def test_cold_preflight_degrades_no_spawn_no_freeze(
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, workspace: Path
+    ) -> None:
+        """A cold cache degrades (return False + a no-spawn outcome), never spawns codex, never
+        freezes -- and records the outcome manually (the invoker never ran; T6c Finding 1)."""
+        freeze = MagicMock()
+
+        result = self._run_codex(workspace, on_dispatch=freeze)
+
+        assert result is False
+        mock_invoker_cls.return_value.run.assert_not_called()
+        freeze.assert_not_called()
+        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
+        assert len(outcomes) == 1
+        assert outcomes[0].reason_code == "codex_unavailable"
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_failed_turn_degrades_but_still_freezes_no_manual_row(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        workspace: Path,
+    ) -> None:
+        """A non-zero codex turn degrades (return False) but still freezes -- past the preflight gate
+        it genuinely dispatched. It records NO manual outcome row (rely on the invoker's; T6c
+        Finding 1: the double-record the review flagged)."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(returncode=1, stderr="boom")
+        freeze = MagicMock()
+
+        result = self._run_codex(workspace, on_dispatch=freeze)
+
+        assert result is False
+        freeze.assert_called_once()
+        # No manual outcome on the spawned-failure path (the invoker owns that row).
+        assert read_upstream_outcomes(session="test", command="memory-writer") == []
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_exit_zero_runtime_error_degrades(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        workspace: Path,
+    ) -> None:
+        """HeadlessResult.success is returncode-only; an exit-0 turn reporting an in-stream error
+        (runtime_is_error) still degrades instead of persisting an empty report."""
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result(
+            returncode=0, runtime_is_error=True, stderr="refused"
+        )
+
+        assert self._run_codex(workspace) is False
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.invoker.codex.prepare_codex_request")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_successful_dispatch_fires_freeze(
+        self,
+        mock_read: MagicMock,
+        mock_prepare: MagicMock,
+        mock_invoker_cls: MagicMock,
+        workspace: Path,
+    ) -> None:
+        mock_read.return_value = _READY_PREFLIGHT
+        mock_invoker_cls.return_value.run.return_value = _codex_result()
+        freeze = MagicMock()
+
+        assert self._run_codex(workspace, on_dispatch=freeze) is True
+        freeze.assert_called_once()
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_augment_on_codex_degrades_pending_phase0(
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, workspace: Path
+    ) -> None:
+        """augment (workspace-write) is gated on the T6c Phase 0 probe: it degrades and never spawns
+        codex (nor reads the preflight) until that lands."""
+        result = self._run_codex(workspace, mode="augment")
+
+        assert result is False
+        mock_read.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_not_called()
+        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
+        assert len(outcomes) == 1
+        assert outcomes[0].reason_code == "codex_augment_pending_phase0"
+
+    @patch("forge.core.invoker.codex.CodexHeadlessInvoker")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_invalid_explicit_lane_degrades_no_dispatch(
+        self, mock_read: MagicMock, mock_invoker_cls: MagicMock, workspace: Path
+    ) -> None:
+        """A stale/corrupt explicit binding (codex runtime + non-codex backend, not an allowed lane)
+        fails as a no-call degrade -- never a silent wrong-arm dispatch."""
+        bad_lane = LaneRecord("codex", "anthropic-direct", "opus")
+
+        result = self._run_codex(workspace, lane_record=bad_lane)
+
+        assert result is False
+        mock_read.assert_not_called()
+        mock_invoker_cls.return_value.run.assert_not_called()
+        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
+        assert len(outcomes) == 1
+        assert outcomes[0].reason_code == "invalid_lane"

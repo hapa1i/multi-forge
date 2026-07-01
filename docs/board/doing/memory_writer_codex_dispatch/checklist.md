@@ -4,11 +4,12 @@
 
 ## Current focus
 
-**Just promoted (2026-06-30); D1 RESOLVED (user) = Option A, both modes; implementation held for card review.** A
-code-grounded sweep verified the T6b deferral: `augment` (the default mode, `models.py:106`) has the agent write files
-via Write/Edit tools plus a Claude-specific permission scan (`memory_writer.py:115,281,593`), so augment needs
-`sandbox="workspace-write"` (the epic's first write-granting lane) + a codex-native verification. `review-only` is a
-clean `_dispatch_codex_shadow_curation` mirror. **Scope (D1=A): both modes** -- augment (`workspace-write`) +
+**Phase 1 done (2026-06-30): the seam + the review-only codex arm shipped and unit-tested (10 new tests green; mypy +
+pre-commit clean). augment (workspace-write) + the real-codex E2E are gated on Phase 0 (live login). D1 = Option A, both
+modes.** A code-grounded sweep verified the T6b deferral: `augment` (the default mode, `models.py:106`) has the agent
+write files via Write/Edit tools plus a Claude-specific permission scan (`memory_writer.py:115,281,593`), so augment
+needs `sandbox="workspace-write"` (the epic's first write-granting lane) + a codex-native verification. `review-only` is
+a clean `_dispatch_codex_shadow_curation` mirror. **Scope (D1=A): both modes** -- augment (`workspace-write`) +
 review-only (`read-only`); the Phase 0 probe and Phase 2 augment arm are in scope.
 
 ## Decisions owed (resolve in review -- see card "Open decisions")
@@ -35,22 +36,26 @@ Only needed if D1 = A. Resolve with evidence, not a guess.
 
 ## Phase 1 -- Shared seam: allowed_lane + lane validation + runtime branch
 
-- [ ] Add codex `allowed_lane` to `MEMORY_WRITER_CONSUMER` (`memory_writer.py:58`):
+- [x] Add codex `allowed_lane` to `MEMORY_WRITER_CONSUMER` (`memory_writer.py:58`):
   `Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`. Assert `valid_lanes` includes codex, claude-max
   preserved; `lane set --consumer memory_writer --runtime codex` resolves (was `LaneError`).
-- [ ] Thread the bound `LaneRecord` into `run_memory_writer`; validate via
+- [x] Thread the bound `LaneRecord` into `run_memory_writer`; validate via
   `LaneRecord -> Lane -> resolve_lane(MEMORY_WRITER_CONSUMER)` guard (mirror `shadow_curation.py:327-347`, keyword
   args). Invalid/drifted binding -> memory-writer degrade (`return False` + outcome), not silent claude.
-- [ ] **Resolve the runtime early + gate the Claude-availability check on it (Finding 2 -- the codex branch must not
+- [x] **Resolve the runtime early + gate the Claude-availability check on it (Finding 2 -- the codex branch must not
   require Claude).** `is_claude_available()` returns `claude_unavailable` at `memory_writer.py:429`, **before** the
   dispatch at `:530`, so a codex-bound writer is wrongly blocked when Claude is absent (shadow-curation has no such
   gate). Resolve the lane/runtime right after transcript+mode validation; run the `is_claude_available()` guard only
   when `runtime_id == "claude_code"`. **Test:** a codex-bound writer runs when `is_claude_available()` is False; a
   claude/default binding still fails cleanly with `claude_unavailable`.
-- [ ] Insert the runtime-keyed branch before the claude `on_dispatch` (`:530`): `codex` -> early return into
+- [x] Insert the runtime-keyed branch before the claude `on_dispatch` (`:530`): `codex` -> early return into
   `_dispatch_codex_memory_writer`; claude path byte-identical.
 
 ## Phase 2 -- `_dispatch_codex_memory_writer` (sandbox per mode; augment gated on D1)
+
+**Status (2026-06-30): review-only arm shipped + unit-tested** (read-only sandbox, persist stdout, freeze-past-skip,
+single-emitter via the invoker, manual outcome only on no-spawn per Finding 1). **augment (workspace-write) degrades
+pending the Phase 0 probe**; the T6b "failure-biased" E2E check is also Phase-0-gated (live login).
 
 - [ ] Implement mirroring `_dispatch_codex_shadow_curation`: `read_fresh_codex_preflight` ->
   `prepare_codex_request(sandbox=<per D1/mode>, model=None, cwd=forge_root, attribution=Attribution(command="memory-writer", session=..., operation="memory_writer.run"))`
