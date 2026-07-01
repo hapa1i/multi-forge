@@ -241,6 +241,23 @@ Background process:
   → Runs: claude -p (stdin=prompt, cwd=forge_root, timeout=5min)
 ```
 
+### Runtime: claude or codex
+
+By default the writer dispatches `claude -p`. Bind it to a codex subscription lane to run `codex exec` instead (direct
+to OpenAI on your ChatGPT login, no Forge proxy):
+
+```bash
+forge session lane set --consumer memory_writer --runtime codex
+```
+
+- **review-only** runs codex read-only — it prints proposals to the review report and edits nothing.
+- **augment** runs codex with a `workspace-write` sandbox, editing the tracked docs in place under `forge_root`.
+
+The codex lane is **best-effort**: if codex is not installed, authenticated, or its preflight is cold, the writer logs,
+records an outcome, and does nothing for that session — it does **not** fall back to `claude -p`. Run
+`forge runtime preflight codex` to refresh auth. The proxy and effort settings below apply to the `claude -p` lane only;
+codex picks its own model.
+
 ### Proxy routing
 
 The memory writer inherits the session's proxy by default (same model routing). Override with `proxy`:

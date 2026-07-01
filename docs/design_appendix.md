@@ -1243,9 +1243,29 @@ inlined prompt -- but maps into shadow-curation's own contract, which diverges f
   folded (the invoker's `success` is returncode-only) so an exit-0-but-failed turn fails loud instead of persisting an
   empty report.
 
-Memory-writer (workspace-write, transcript-fed) and team-supervisor (plan-blind without snapshot machinery) stay
-billing-only for now -- memory-writer deferred to T6c, team-supervisor pending a context-model change -- because their
-shapes diverge from the mirror-T4 template.
+**Memory-writer codex arm (T6c).** The memory writer -- the first aux consumer whose codex lane can **write the repo**
+-- gains `Lane(codex, chatgpt, gpt-5-codex)`. `forge memory-writer run` threads the bound `LaneRecord` into
+`run_memory_writer`, which resolves the runtime (`LaneRecord -> Lane -> resolve_lane`, the T6b guard) **before** the
+claude-availability check and branches into `_dispatch_codex_memory_writer` ahead of the claude `on_dispatch`. Two
+divergences from the T6b template:
+
+- **Degrade: best-effort async, not fail-loud.** The writer runs detached from the work queue (stdout -> DEVNULL), so
+  every failure logs + records an outcome + `return False` (never raises, never fails-open). Resolving the runtime
+  before the `is_claude_available()` gate -- which now guards only the claude arm -- lets a codex-bound writer run when
+  claude is absent (Finding 2).
+- **Per-mode sandbox; no permission scan (D4).** `review-only` -> `read-only`; `augment` -> `workspace-write`, editing
+  the designated docs in place. A Phase 0 probe confirmed codex auto-approves in-project writes and auto-rejects
+  out-of-project ones -- but a rejection exits 0 with `is_error=False` (it rides `turn.completed`), so
+  `runtime_is_error` does not catch it. Immaterial: an in-project doc update (`cwd=forge_root`) never hits that path, so
+  the Claude `_stdout_indicates_permission_denied` scan is not ported; real provider/turn failures still fold via
+  `runtime_is_error`.
+
+Outcome recording matches T6b (Finding 1): the invoker's `_emit_codex` owns the single upstream row for a spawned run
+(failure-biased, so a success writes none under default volume -- claude parity); the arm records manually only on a
+no-spawn preflight/setup failure.
+
+Team-supervisor (plan-blind without snapshot machinery) stays billing-only for now, pending a context-model change --
+its shape diverges from the mirror-T4 template. (Memory-writer's divergent shape shipped as T6c, above.)
 
 **Observability (T5/T1b).** `forge policy supervisor status` displays the full `(runtime, backend, model)` lane via
 `resolve_supervisor_lane(read_bound_lane(...))`: the **frozen `confirmed` binding** when present (a real dispatch
