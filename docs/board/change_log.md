@@ -27,6 +27,32 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-01
 
+### Sonnet 5 support + default-tier flip
+
+**Goal**: Teach Forge about Claude Sonnet 5 across catalog/templates and promote the newest models to the default tiers.
+
+**Key changes**:
+
+- Catalog: added `claude-sonnet-5` (native 1M, adaptive-only, `token_estimate_multiplier: 1.35`) + aliases
+  (`anthropic/claude-sonnet-5`, `sonnet-5`, `claude-sonnet`). Flipped all four `defaults` — sonnet -> `claude-sonnet-5`,
+  opus -> `claude-opus-4-8` (anthropic + openrouter); `sonnet`/`opus`/`claude-opus` friendly aliases follow. Cleared
+  Opus 4.8's stale `opt-in` tag and the now-wrong "defaults stay on 4.6" comments.
+- Templates: the four anthropic-family templates default sonnet -> Sonnet 5, opus -> Opus 4.8; Fable 5, Opus 4.6, and
+  Sonnet 4.6 moved into `model_alternatives` (still pinnable via `--model`).
+- Passthrough: `_proxy_supports_model_pin` now short-circuits for `wire_shape == "anthropic_passthrough"`, so any Claude
+  `--model` pin is honored (passthrough forwards unchanged). Also fixes a latent inability to pin Opus 4.8/4.6 on
+  passthrough. Covered by `tests/regression/test_bug_passthrough_model_pin.py`.
+- Estimator: `PROXY_CONTEXT_MODEL_DEFAULTS` -> `claude-opus-4-8[1m]` / `claude-sonnet-5[1m]`.
+- Intelligence-score rerank so Sonnet 5 (98) sits between Opus 4.6 and Opus 4.8: Opus 4.6 98 -> 97, Opus 4.7 99 -> 98
+  (was tied with 4.8 at 99), Opus 4.8 99 and Fable 5 100 unchanged. Sonnet 5 = 98, peer of Opus 4.7.
+- Review quorum's `claude-opus` worker now resolves to Opus 4.8 automatically (it tracks `get_default_model`, no
+  review-code change).
+- Docs: proxy / model_selection / session / skills / workflow / cli_reference / README + QA proxy checklist synced.
+
+**Verification**: `make test-unit` (7231 passed); targeted catalog/config/session/proxy suites + new passthrough
+regression (470 passed); scoped Docker integration (`session start --model`, bare `claude start` default model — 2
+passed); `make pre-commit` clean.
+
 ### consumer_lanes epic: closeout (team-supervisor codex dispatch carved out)
 
 **Goal**: Close the `consumer_lanes` epic now that its lane contract is shipped and folded into normative design docs.
@@ -1494,28 +1520,16 @@ ledger + manifest. Additive optional fields only; no durable-schema change.
 - Closeout decisions (keep-current): `--review` stays opt-in; `structured` stays the CLI default (`ai-curated` opt-in).
   `ctx` is prior art/inspiration only, never a dependency (appendix §M.4). Schema stable for Phase 5.
 
-## 2026-05-28 — 2026-05-29 (compacted)
+## 2026-05-22 — 2026-05-29 (compacted)
 
-- **memory_substrate (PR #8)**: split "handoff" into **memory writer** (Stop-time doc curation) and **transfer**
-  (resume/fork context). `handoff_agent.py→memory_writer.py`, `handoff.py→transfer.py`; CLI
-  `forge handoff run→forge memory-writer run`, `forge session handoff show→forge memory report show` (old paths
-  tombstoned). Durable accept-and-tolerate: `--resume-mode handoff→transfer`, `handoff_timeout→memory_writer_timeout`.
-  Intentional `handoff` KEEPs (work-queue `kind="handoff"`, artifact path, `queued_handoff`) recorded in impl_notes.
-- **Add Claude Opus 4.8** (retain 4.6+4.7): `claude-opus-4-8` opt-in ($5/$25/$0.50, 1M ctx, adaptive-only); `opus`
-  defaults stay on 4.6; 4.8 takes over 4.7's review/template role.
-- **Memory strategies 7→4**: removed `debugging`/`patterns`/`suggested` (shadow mode now orthogonal via `--propose`;
-  `suggested_*→shadow_*`); `--as`→`--strategy` (`--as` a hidden tombstone). Stale removed-strategy passports rejected.
-
-## 2026-05-22 — 2026-05-26 (compacted)
-
-- **Memory Enhancement project (PR #1, Phases 0-5)**: passport-authoritative doc ownership replacing manifest
-  `designated_docs[]`; two primitives — passports select docs, session activation decides whether the writer runs.
-  `session/passport.py` (`MemoryStrategy`, YAML frontmatter, `synthesize_passport`, `PassportError`); top-level
-  `forge memory enable/track/untrack/list/status` + `forge memory shadows review`. Removed `.forge/memory.yaml`
-  activation, `MemoryIntent.designated_docs`, the three-tier resolver, `ProjectMemoryConfig`, `--inherit-memory`. design
-  §5.6, appendix §G; card archived to `done/memory_enhancement/`.
-- **CLI hardening**: command-shape invariant (groups orient, leaves act) — `forge config show`,
-  `forge search query <terms>`, `forge proxy metrics` all-proxies. Shared recovery-tip helpers (`cli/output.py`); break:
-  `forge backend create <existing>` errors + exits 1. Auto-start proxies from templates (`ensure_proxy`,
-  liveness-aware). Live-session deletion protection (`forge session delete` refuses a live launch without `--force`).
-  Regressions: supervisor-proxy-autostart, stale-healthy-proxy, delete-live-session.
+- **memory_substrate (PR #8)**: split "handoff" into the **memory writer** (Stop-time doc curation) and **transfer**
+  (resume/fork context); renamed modules/CLI (`forge memory-writer run`, `forge memory report show`) with old paths
+  tombstoned and durable accept-and-tolerate for `--resume-mode` / timeout keys.
+- **Add Claude Opus 4.8** (opt-in; defaults stayed on 4.6 at the time), and **memory strategies 7→4** (`--as`→
+  `--strategy`; shadow mode orthogonal via `--propose`; stale removed-strategy passports rejected).
+- **Memory Enhancement (PR #1, Phases 0-5)**: passport-authoritative doc ownership (passports select docs, session
+  activation decides whether the writer runs); `forge memory enable/track/untrack/list/status` + `shadows review`;
+  removed `.forge/memory.yaml`, `MemoryIntent.designated_docs`, and the three-tier resolver. design §5.6, appendix §G;
+  card archived to `done/memory_enhancement/`.
+- **CLI hardening**: command-shape invariant (groups orient, leaves act), shared recovery-tip helpers (`cli/output.py`),
+  template auto-start proxies, live-session deletion protection. Regressions added for each.

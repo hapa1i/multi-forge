@@ -419,8 +419,8 @@ forge proxy template show openrouter-qwen
 
 - [ ] `forge proxy template list` shows 19 user-facing templates total (8 litellm + 10 openrouter + 1
   anthropic-passthrough)
-- [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-4.6,
-  opus=claude-opus-4.6)
+- [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
+  opus=claude-opus-4.8)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
 - [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.2)
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k2.6)

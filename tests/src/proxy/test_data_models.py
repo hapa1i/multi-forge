@@ -18,7 +18,10 @@ class TestMapModelNameFable:
         loaded = load_config(template="openrouter-anthropic")
         monkeypatch.setattr(config_mod, "proxy", loaded.proxy)
 
-        assert map_model_name("claude-fable-5") == "anthropic/claude-fable-5"
+        # Fable rides the opus tier, so this tier mapper resolves it to whatever the
+        # opus tier is (now Opus 4.8), never sonnet. Explicit Fable selection is honored
+        # separately on the request path via model_alternatives, not this mapper.
+        assert map_model_name("claude-fable-5") == loaded.proxy.openrouter.tiers.opus
         # opus-tier siblings keep their own pass-through / tier mapping
         assert map_model_name("anthropic/claude-opus-4.8") == "anthropic/claude-opus-4.8"
 

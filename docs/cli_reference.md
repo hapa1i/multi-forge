@@ -236,9 +236,9 @@ runners.
 | `forge workflow consensus [subject]` | Two-round multi-model convergence          |
 | `forge workflow list-models`         | Show available workflow models             |
 
-Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
-kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt
-hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
+Workflow model specs support proxy-backed workers and explicit direct Claude workers. The default `claude-opus` worker
+resolves to Claude Opus 4.8; the older `claude-opus-4.6` worker is opt-in, and explicit workers can attach per-worker
+prompt hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
 `--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
 ([design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative)). All four execution commands also accept
 `--effort <level>` (`claude --effort`: `low/medium/high/xhigh/max`), applied to every worker's `claude -p` argv. Direct
