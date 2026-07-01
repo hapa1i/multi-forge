@@ -19,46 +19,46 @@ no-emission gaps closed (checker/reviewer/team-tagger now emit session-tagged us
 `workflow.worker` upstream mislabel T4 carried forward fixed (additive `Attribution.operation`; codex supervisor sets
 `operation=None` for parity). With T5 done the **first wave (T1a/T2/T3/T4/T5) is complete**; the epic stays in `doing/`
 coordinating T6, T7, and the T0 sibling (T1b done). **T7** (subscription-exhaustion fail-open) -- the one new ticket
-from the 2026-06-26 workweave/Avengers-Pro discussion -- originated in `proposed/` and is now active in
-`doing/subscription_exhaustion_failopen/` (depends on T4). **T1b is done** (PR #57, `6ff555f6`, 2026-06-28; closed to
-`done/consumer_lane_binding/`): the supervisor lane is now a persisted, frozen-at-first-policy-check `consumer_lanes`
-binding (`intent` requested + immutable `confirmed`). **T0 is done** (PR #58, `b0614325`): shipped as a member card
-(`done/claude_subscription_billing/`, branch `claude_subscription_billing`, 2026-06-29). Phase 0 proved keyless
-`claude -p` rides Max headlessly; **Phase 1+2 are implemented and verified** -- a `claude-max` `runtime_native` source
-plus `resolve_billing_mode`, threaded through all four consumers, emit `subscription_quota` for a keyless direct run
-bound to `claude-max` (supervisor declaration via `set --backend`; the other three bindable but UX-deferred). **T6a is
-done** (PR #59, 2026-06-30; closed to `done/aux_consumer_lane_placement/`): the supervisor's lane-binding UX + freeze
-now span all four consumers, and the three aux consumers freeze **only on a real dispatch** (an `on_dispatch` hook fired
-past every skip-return, guarded by a `read_bound_lane == dispatched_lane` equality check). With the first wave + T1b +
-T0 + T6a all done, **T6b is done** (PR #60, `ca20efcd`, 2026-06-30; closed to `done/aux_consumer_codex_dispatch/`):
-shadow-curation gained a real `codex exec` dispatch arm -- scope resolved to shadow-curation only (D1) because the three
-aux consumers are NOT uniform (shadow-curation is a clean mirror-T4; team-supervisor is plan-blind without new context
-machinery, deferred; memory-writer is a different file-editing shape deferred to T6c). The arm diverges from the
-supervisor's on three axes (fail-loud not fail-open, `operation` pinned not `None`, freeze-past-the-skip-gate) and is
-verified by a real-codex E2E. With the first wave + T1b + T0 + T6a + T6b all done, the epic stays in `doing/`
-coordinating the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor plan-context). **T7
-(subscription-exhaustion fail-open) is now the active cursor** -- promoted to `doing/subscription_exhaustion_failopen/`
-(2026-06-30, branch `subscription_exhaustion_failopen`). A 2026-06-30 code sweep found **no structured codex exhaustion
-signal** (no headroom field; no HTTP rate-limit headers on the direct `codex exec` path -- it is a subprocess with
-stdout-JSONL only), so T7 is scoped **supervisor-only** (the one repeated-dispatch codex consumer; shadow-curation is
-one-shot) with post-hoc failure classification, a **Phase 0 signal-capture gate**, and a sticky degrade kept off the
-write-once `confirmed.consumer_lanes` binding. It is **awaiting plan review** before implementation. The `core.llm`
-representation is decided (option 2 -- see Decisions).
+from the 2026-06-26 workweave/Avengers-Pro discussion -- originated in `proposed/`, shipped, and is now done in
+`done/subscription_exhaustion_failopen/` (PR #61, `96e342b1`, 2026-06-30; depends on T4). **T1b is done** (PR #57,
+`6ff555f6`, 2026-06-28; closed to `done/consumer_lane_binding/`): the supervisor lane is now a persisted,
+frozen-at-first-policy-check `consumer_lanes` binding (`intent` requested + immutable `confirmed`). **T0 is done** (PR
+#58, `b0614325`): shipped as a member card (`done/claude_subscription_billing/`, branch `claude_subscription_billing`,
+2026-06-29). Phase 0 proved keyless `claude -p` rides Max headlessly; **Phase 1+2 are implemented and verified** -- a
+`claude-max` `runtime_native` source plus `resolve_billing_mode`, threaded through all four consumers, emit
+`subscription_quota` for a keyless direct run bound to `claude-max` (supervisor declaration via `set --backend`; the
+other three bindable but UX-deferred). **T6a is done** (PR #59, 2026-06-30; closed to
+`done/aux_consumer_lane_placement/`): the supervisor's lane-binding UX + freeze now span all four consumers, and the
+three aux consumers freeze **only on a real dispatch** (an `on_dispatch` hook fired past every skip-return, guarded by a
+`read_bound_lane == dispatched_lane` equality check). With the first wave + T1b + T0 + T6a all done, **T6b is done** (PR
+#60, `ca20efcd`, 2026-06-30; closed to `done/aux_consumer_codex_dispatch/`): shadow-curation gained a real `codex exec`
+dispatch arm -- scope resolved to shadow-curation only (D1) because the three aux consumers are NOT uniform
+(shadow-curation is a clean mirror-T4; team-supervisor is plan-blind without new context machinery, deferred;
+memory-writer is a different file-editing shape deferred to T6c). The arm diverges from the supervisor's on three axes
+(fail-loud not fail-open, `operation` pinned not `None`, freeze-past-the-skip-gate) and is verified by a real-codex E2E.
+With the first wave + T1b + T0 + T6a + T6b all done, the epic stays in `doing/` coordinating the deferred follow-ons
+(T6c memory-writer codex dispatch; team-supervisor plan-context). **T7 (subscription-exhaustion fail-open) is done** (PR
+#61, `96e342b1`, 2026-06-30; closed to `done/subscription_exhaustion_failopen/`). A 2026-06-30 code sweep found **no
+structured codex exhaustion signal** (no headroom field; no HTTP rate-limit headers on the direct `codex exec` path --
+it is a subprocess with stdout-JSONL only), so T7 is scoped **supervisor-only** (the one repeated-dispatch codex
+consumer; shadow-curation is one-shot) with post-hoc failure classification, a **Phase 0 signal-capture gate**, and a
+sticky degrade kept off the write-once `confirmed.consumer_lanes` binding (a `forge.supervisor_lane_degrade` overlay in
+`confirmed.policy.policy_states`). The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                      | Lane  | Depends on | State                     |
-| ------------ | ----------------------------------------- | ----- | ---------- | ------------------------- |
-| T1a          | `done/consumer_lane_resolver/`            | done  | --         | done (PR #51)             |
-| T2           | `done/backend_subscription_sources/`      | done  | T1a        | done (PR #54)             |
-| T3           | `done/supervisor_lane_driven/`            | done  | T1a        | done (PR #52)             |
-| T4           | `done/codex_exec_supervisor_lane/`        | done  | T1a,T2,T3  | done (PR #55)             |
-| T5           | `done/lane_observability/`                | done  | T3,T4      | done (PR #56)             |
-| T1b          | `done/consumer_lane_binding/`             | done  | T4         | done (PR #57)             |
-| T6a          | `done/aux_consumer_lane_placement/`       | done  | T1b,T0     | done (PR #59)             |
-| T6b          | `done/aux_consumer_codex_dispatch/`       | done  | T6a        | done (PR #60)             |
-| T7           | `doing/subscription_exhaustion_failopen/` | doing | T4,T6b     | plan review (2026-06-30)  |
-| T0 (sibling) | `done/claude_subscription_billing/`       | done  | none       | done (PR #58, `b0614325`) |
+| Member       | Card                                     | Lane | Depends on | State                     |
+| ------------ | ---------------------------------------- | ---- | ---------- | ------------------------- |
+| T1a          | `done/consumer_lane_resolver/`           | done | --         | done (PR #51)             |
+| T2           | `done/backend_subscription_sources/`     | done | T1a        | done (PR #54)             |
+| T3           | `done/supervisor_lane_driven/`           | done | T1a        | done (PR #52)             |
+| T4           | `done/codex_exec_supervisor_lane/`       | done | T1a,T2,T3  | done (PR #55)             |
+| T5           | `done/lane_observability/`               | done | T3,T4      | done (PR #56)             |
+| T1b          | `done/consumer_lane_binding/`            | done | T4         | done (PR #57)             |
+| T6a          | `done/aux_consumer_lane_placement/`      | done | T1b,T0     | done (PR #59)             |
+| T6b          | `done/aux_consumer_codex_dispatch/`      | done | T6a        | done (PR #60)             |
+| T7           | `done/subscription_exhaustion_failopen/` | done | T4,T6b     | done (PR #61)             |
+| T0 (sibling) | `done/claude_subscription_billing/`      | done | none       | done (PR #58, `b0614325`) |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6a -> T6b. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
@@ -109,9 +109,9 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - [x] When T5 opens: branch `lane_observability`, author `doing/lane_observability/card.md` + `checklist.md` from the
   2026-06-27 surface map, update this roster. (done -- promoted from inline sketch; shipped PR #56 and closed to
   `done/lane_observability/` 2026-06-27)
-- [ ] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
-  `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7** (new, from the
-  workweave discussion) -> promoted to `doing/subscription_exhaustion_failopen/` (2026-06-30, active). **T1b done** ->
+- [x] Promote T1b/T6 from inline sketch to member cards when they become the cursor. **T4 done** ->
+  `done/codex_exec_supervisor_lane/` (PR #55); **T5 done** -> `done/lane_observability/` (PR #56); **T7 done** ->
+  `done/subscription_exhaustion_failopen/` (PR #61, `96e342b1`, 2026-06-30). **T1b done** ->
   `done/consumer_lane_binding/` (PR #57, 2026-06-28). **T0 done** -> `done/claude_subscription_billing/` (PR #58,
   `b0614325`, 2026-06-29). **T6a done** -> `done/aux_consumer_lane_placement/` (PR #59, 2026-06-30); **T6b done** ->
   `done/aux_consumer_codex_dispatch/` (PR #60, 2026-06-30, shadow-curation only).
@@ -142,5 +142,7 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 ## Closeout (epic)
 
 - [ ] Epic -> `done/` only when every live member is `done/`, or the shared contract is folded into normative design
-  docs (board_contract "Epics"). Add a `change_log.md` entry; promote durable lessons to `impl_notes.md` after human
-  review.
+  docs (board_contract "Epics"). **All shipped members are `done/` (T7 closed via PR #61, 2026-06-30); the epic stays in
+  `doing/` only to coordinate the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor
+  plan-context).** Close it when those ship or are re-filed as fresh cards. Add a `change_log.md` entry; promote durable
+  lessons to `impl_notes.md` after human review.

@@ -3,11 +3,12 @@
 **Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the lane contract and the **"No fallback
 (de-scoped)"** decision this card carves the single, deliberate exception into.
 
-**Lane**: `doing/` -- promoted from `proposed/` on 2026-06-30; branch `subscription_exhaustion_failopen`. Depends on T4
-(done, supervisor codex lane) and T6b (done, shadow-curation codex lane). **Phase 0 + Phase 1 shipped (reviewer
-confirmed GO 2026-06-30)** -- a 2026-06-30 code sweep changed this card's premise (no `status`/`error.type` survives the
-`codex exec` boundary; see Research), reshaping detection to a Codex JSONL `message` classifier. All decisions resolved
-(D1-D4); Phase 2 (sticky degrade) is ready to implement.
+**Lane**: `done/` -- shipped via PR #61 (`96e342b1`, merged to `main` 2026-06-30); branch
+`subscription_exhaustion_failopen`. Depends on T4 (done, supervisor codex lane) and T6b (done, shadow-curation codex
+lane). **All phases shipped and closed out (reviewer confirmed GO 2026-06-30)** -- a 2026-06-30 code sweep changed this
+card's premise (no `status`/`error.type` survives the `codex exec` boundary; see Research), reshaping detection to a
+Codex JSONL `message` classifier. All decisions resolved (D1-D4); Phase 1 (detection), Phase 2 (sticky degrade), and
+Phase 3 (observability + docs) all shipped and verified.
 
 **Proves**: the epic's own **"Why now"** scenario (a Claude Max 20x user hits the weekly quota wall) is actually
 *handled*, not merely *motivating* -- closing the loop the epic deliberately deferred.

@@ -4,14 +4,14 @@
 
 ## Current focus
 
-**Phase 1 complete (reviewer confirmed GO 2026-06-30); Phase 2 (sticky degrade) is next.** Phase 0 settled **D1** from
-`openai/codex` source: no `status`/`error.type` survives the `codex exec` boundary (the structured discriminator is
-dropped), so detection classifies the Codex JSONL `message` via a conservative source-literal allowlist (anchor:
-`hit your usage limit`) + a stringified-JSON fallback. Phase 1 shipped the `is_subscription_exhausted` classifier
-(`codex_stream.py`) and a `failure_type="subscription_exhausted"` rung in `run_supervisor_check`, gated on
-`lane.runtime_id == "codex" and result.runtime_is_error` (G1) -- behavior-neutral relabel, still fail-open, for Phase 2
-to consume (G3). **All decisions resolved (D1-D4, reviewer 2026-06-30): D2 = sticky, D3 = `policy_states` overlay +
-binding-follows reset map (Phase 2), D4 = supervisor-only.** Phase 2 (sticky degrade) is ready to implement.
+**Done -- shipped via PR #61 (`96e342b1`, merged to `main` 2026-06-30); closed out.** All three implementation phases
+landed and verified. Phase 0 settled **D1** from `openai/codex` source: no `status`/`error.type` survives the
+`codex exec` boundary (the structured discriminator is dropped), so detection classifies the Codex JSONL `message` via a
+conservative source-literal allowlist (anchor: `hit your usage limit`) + a stringified-JSON fallback. Phase 1 shipped
+the `is_subscription_exhausted` classifier (`codex_stream.py`) and a `failure_type="subscription_exhausted"` rung in
+`run_supervisor_check`, gated on `lane.runtime_id == "codex" and result.runtime_is_error` (G1) -- behavior-neutral
+relabel, still fail-open, for Phase 2 to consume (G3). **All decisions resolved (D1-D4, reviewer 2026-06-30): D2 =
+sticky, D3 = `policy_states` overlay + binding-follows reset map (Phase 2), D4 = supervisor-only.**
 
 ## Decisions owed (resolve in review -- see card "Open decisions")
 
@@ -162,8 +162,8 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
   `design_appendix.md` §G (overlay-vs-binding, reset map, cross-resume, telemetry); `cli_reference.md` (status + lane
   show rows); end-user `policy.md` (mid-session degrade note). `design.md` §3.5/§3.6.2 needed no change -- the overlay
   reuses the existing `confirmed.policy.policy_states` ownership, no new durable field.
-- [ ] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T7 done. **(Closeout step -- done after the branch
-  merges and the card moves `doing/`->`done/`; marking it done while still in `doing/` would misstate the board.)**
+- [x] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T7 done. (Closeout: updated when the card moved
+  `doing/`->`done/`.)
 
 ## Verification gate
 
@@ -182,9 +182,10 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
 
 ## Closeout
 
-- [ ] Tick acceptance rows with verification recorded.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Move `doing/subscription_exhaustion_failopen/` -> `done/`; update epic roster; promote durable lessons to
-  `impl_notes.md` after human review.
-- [ ] **Epic closeout check**: with T7 the last live member, the epic itself can close to `done/` (board_contract
-  "Epics") unless a T6c/team-supervisor follow-on keeps it coordinating.
+- [x] Tick acceptance rows with verification recorded. (Phase 1-3 acceptance rows verified; see phase sections.)
+- [x] `change_log.md` entry (Goal / Key changes / Verification). Landed with PR #61 (commit `22450271`).
+- [x] Move `doing/subscription_exhaustion_failopen/` -> `done/`; update epic roster. Durable-lesson promotion to
+  `impl_notes.md` left for human review (board_contract: "after human review").
+- [ ] **Epic closeout check**: with T7 the last live member, the epic stays in `doing/` coordinating the deferred
+  follow-ons (T6c memory-writer codex dispatch; team-supervisor plan-context). Close it to `done/` only when those ship
+  or are re-filed as fresh cards (board_contract "Epics").

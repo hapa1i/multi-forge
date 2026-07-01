@@ -4,13 +4,14 @@
 first wave is split into member cards (linked beneath the member table): **T1a, T3, T2, T4, and T5 are all done** -- the
 spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's lane observability have landed on `main`.
 The **first wave is complete**; the epic stays in `doing/`. T6 shipped as T6a + T6b (both done); **T7**
-(subscription-exhaustion fail-open) is now the active member in `doing/subscription_exhaustion_failopen/` (awaiting plan
-review). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to `done/consumer_lane_binding/`. **T6 is now
-split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59, `done/aux_consumer_lane_placement/`); **T6b**
-(codex dispatch, shadow-curation only) is **done** (PR #60, `ca20efcd`, `done/aux_consumer_codex_dispatch/`). With T1b,
-the T0 sibling (PR #58, `b0614325`), T6a (PR #59), and T6b (PR #60) all done, the epic stays in `doing/` coordinating
-the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor plan-context) plus the now-active T7
-(`doing/subscription_exhaustion_failopen/`, awaiting plan review).
+(subscription-exhaustion fail-open) is **done** (PR #61, `96e342b1`, 2026-06-30; closed to
+`done/subscription_exhaustion_failopen/`). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
+`done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59,
+`done/aux_consumer_lane_placement/`); **T6b** (codex dispatch, shadow-curation only) is **done** (PR #60, `ca20efcd`,
+`done/aux_consumer_codex_dispatch/`). With T1b, the T0 sibling (PR #58, `b0614325`), T6a (PR #59), and T6b (PR #60) all
+done, the epic stays in `doing/` coordinating the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor
+plan-context). With T7 done (PR #61), the first wave and all follow-ons through T7 are complete; the epic remains only
+to coordinate T6c and team-supervisor.
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -159,8 +160,8 @@ opencode).
 The prior-art review produced exactly one *new* ticket -- validations build confidence, not backlog; a ticket falls out
 only where the comparison **challenged** a recorded decision:
 
-- **T7 (new) -- subscription-exhaustion fail-open** -> `docs/board/doing/subscription_exhaustion_failopen/` (promoted
-  2026-06-30): the narrow, one-hop exception to "No fallback" for the "Why now" quota wall. Depends on T4.
+- **T7 (new) -- subscription-exhaustion fail-open** -> `docs/board/done/subscription_exhaustion_failopen/` (promoted
+  2026-06-30, done PR #61): the narrow, one-hop exception to "No fallback" for the "Why now" quota wall. Depends on T4.
 - **T4 decision resolved**: the unsupported-lane failure mode is **catch + fail-open** (consistent with
   `proxy_not_found`), settling the open T3 -> T4 carry-forward seam.
 - **T5 += two reads**: surface subscription **headroom** (the perishable rate-limit budget workweave reads via
@@ -199,9 +200,9 @@ once.
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
 (done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T5 ->
-`docs/board/done/lane_observability/` (done, PR #56); T7 -> `docs/board/doing/subscription_exhaustion_failopen/`
-(promoted 2026-06-30, depends on T4 + T6b); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28);
-T6a -> `docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
+`docs/board/done/lane_observability/` (done, PR #56); T7 -> `docs/board/done/subscription_exhaustion_failopen/` (done,
+PR #61, `96e342b1`, 2026-06-30; depends on T4 + T6b); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57,
+2026-06-28); T6a -> `docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
 `docs/board/done/aux_consumer_codex_dispatch/` (done, PR #60, 2026-06-30, shadow-curation only). The rows above stay the
 durable sketch (except T6b's, updated to its promoted scope); the cards carry verified touchpoints + fixture-grounded
 acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
