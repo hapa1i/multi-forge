@@ -1,7 +1,7 @@
 # Rewind Resume Strategy — drop the last N turns, keep an AI code-delta
 
-**Status**: Active (in `doing/`, accepted 2026-07-01). Slices 1-2 are locked in code/docs; next implementation slice is
-Slice 3 (see `checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
+**Status**: Active (in `doing/`, accepted 2026-07-01). Slices 1-3 are locked in code/docs; next implementation slice is
+Slice 4 (see `checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
 `forge session fork|resume --strategy rewind --drop-last N`. `docs/design.md` resume/transfer contracts remain
 normative; this card defers to them on conflict.
 
@@ -41,6 +41,12 @@ surface that as a no-op rather than writing a rewind manifest that did not rewin
 The Slice 2 writer also pins `N>=T` at the primitive level: it writes an empty prefix and reports `kept_turns=0`. That
 artifact is metadata for the caller, not a launchable native-resume head; Slice 4 must reject or fall back before any
 `claude --resume` attempt.
+
+**Decided (2026-07-01, Slice 3)**: the code-delta primitive extracts only code-editing tool calls
+(`Edit`/`Write`/`MultiEdit`/`NotebookEdit`) after the actual kept-turn boundary, reconciles them to one net entry per
+file, and uses schema marker `rewind-code-delta` for a successful body. The LLM path reuses the transfer curation
+transport/usage/citation plumbing with command `rewind-code-delta`; unparseable AI output emits usage with
+`status="error"` before falling back to a deterministic tool-call summary.
 
 **References**: `docs/design.md` "Transfer mode strategies" + "Session derivation tracking", §3.9 (resume across path
 boundaries); `src/forge/session/transfer.py`; `src/forge/session/manager.py`; `src/forge/cli/session_fork.py`;
@@ -227,7 +233,7 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
    manifest semantics (plain native-relocate); pin writer-level N≥T semantics as an empty prefix that Slice 4 must
    reject or route around before launch.
 3. **Code-delta extractor + prompt.** Tool-call delta from the dropped window; net-change reconciliation; narrowed
-   prompt; reuse citation grounding + usage emit + injection hardening.
+   prompt; reuse citation grounding + usage emit + injection hardening. **Done.**
 4. **Wire the strategy.** `ResumeStrategy.REWIND`; `--drop-last` + Choice on fork/resume; co-deliver context file with
    the native-relocate launch; populate `Derivation`.
 5. **Identity + cleanup.** Fresh-UUID truncated copy (no envelope rewrite); delete `<R>.jsonl` with the session, no

@@ -29,9 +29,7 @@ def test_tracked_derivation_transcript_ids_include_rewind_relocated_id() -> None
         rewind_relocated_session_id="296385c3-9753-452b-af3d-e9170233c613",
     )
 
-    assert _tracked_derivation_transcript_session_ids(derivation) == [
-        "296385c3-9753-452b-af3d-e9170233c613"
-    ]
+    assert _tracked_derivation_transcript_session_ids(derivation) == ["296385c3-9753-452b-af3d-e9170233c613"]
     assert _tracked_derivation_transcript_session_ids(
         {"rewind_relocated_session_id": "296385c3-9753-452b-af3d-e9170233c613"}
     ) == ["296385c3-9753-452b-af3d-e9170233c613"]
