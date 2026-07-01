@@ -168,7 +168,8 @@ forge session resume <parent> --fresh --strategy rewind --drop-last N
 ```
 
 - `--strategy rewind`: new `ResumeStrategy` value + Choice entry (`session_fork.py:139` and the resume surface).
-- `--drop-last N`: required integer (no default); N counts **turns** (the `[turn N]` grouping), not raw JSONL lines.
+- `--drop-last N`: required non-negative integer (no default); N counts **turns** (the `[turn N]` grouping), not raw
+  JSONL lines.
 - Resolves to `resume_mode = native-relocate` (worktree/`--into` only). Same-dir/sidecar → rejected with the existing
   native-relocate guidance.
 - Manifest for `N>0`: `derivation.resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`,
@@ -244,6 +245,7 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 | Native resume + context file together | `--strategy rewind` worktree fork          | launch carries `--resume --fork-session` AND `--append-system-prompt-file`                         | same                                        |
 | Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
 | Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
+| Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | same                                        |
 | Resume tolerates fresh UUID           | rewind launch, truncated fresh `<R>.jsonl` | child resumes from clean-prefix `<R>` with embedded parent `sessionId`; no "No conversation found" | same                                        |
 | Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | same                                        |
 | Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_fork.py`        |

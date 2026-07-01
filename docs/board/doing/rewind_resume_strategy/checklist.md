@@ -146,8 +146,9 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 **Goal:** Surface `--strategy rewind --drop-last N` and co-deliver a context file with a native-relocate launch.
 
 - [ ] **`ResumeStrategy.REWIND` + Choice.** Add the enum member and the `--strategy` Choice value on fork and resume;
-  add required `--drop-last N` (no default; integer). **Assertion:** `--strategy rewind` without `--drop-last` errors;
-  `rewind` resolves `resume_mode=native-relocate` (worktree/`--into` only).
+  add required `--drop-last N` (no default; non-negative integer). **Assertion:** `--strategy rewind` without
+  `--drop-last` errors, negative values fail validation without reaching the writer, and `rewind` resolves
+  `resume_mode=native-relocate` (worktree/`--into` only).
 - [ ] **Co-deliver context file with native-relocate launch (the convention extension).** Extend the strategy-population
   path (currently `_persist_fork_transfer_derivation` gated by `uses_fresh_transfer`, `session_lifecycle.py:309/947`) so
   a rewind fork writes `strategy="rewind"`, `dropped_turns=N`, `context_file=<delta>` AND the launch emits
@@ -155,8 +156,10 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
   worktree fork contains both flags (unit-assert on the built command).
 - [ ] **Degenerate and snap-back UX.** Handle the writer result before launch: `drop_last=0` uses the plain
   native-relocate no-op, `kept_turns=0` rejects or falls back instead of launching an empty transcript, and
-  `kept_turns < requested_keep_turns` tells the user how many additional turns the safe-boundary snap dropped.
-  **Assertion:** unit coverage proves each branch surfaces the correct user-facing message.
+  `kept_turns < requested_keep_turns` tells the user how many additional turns the safe-boundary snap dropped. Catch
+  defensive writer `ValueError`s (for example, a non-contiguous transcript prefix) and fall back to plain
+  native-relocate with a note rather than surfacing a traceback. **Assertion:** unit coverage proves each branch
+  surfaces the correct user-facing message.
 - [ ] **Same-dir / sidecar rejection.** **Assertion:** `--strategy rewind` on a same-dir or sidecar fork is rejected
   with the existing native-relocate-only guidance (reuse the `session_fork.py:489-556` preflight messages).
 
@@ -195,6 +198,7 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 | Native resume + context file together | `--strategy rewind` worktree fork          | launched argv carries `--resume --fork-session` AND `--append-system-prompt-file`                  | same                                        |
 | Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
 | Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
+| Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | same                                        |
 | Resume tolerates fresh UUID           | rewind launch, truncated fresh `<R>.jsonl` | child resumes from clean-prefix `<R>` with embedded parent `sessionId`; no "No conversation found" | integration (real `claude`)                 |
 | Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | same                                        |
 | Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_fork.py`        |
