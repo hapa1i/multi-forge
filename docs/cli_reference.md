@@ -108,8 +108,9 @@ consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` 
   `--backend claude-max` attributes a keyless+direct run to a Claude Max subscription
   (`billing_mode=subscription_quota`); rejected once a *different* lane is frozen. The general surface for all four
   consumers -- the supervisor also has `forge policy supervisor set --runtime/--backend` (same slot). `--runtime codex`
-  selects a real read-only `codex exec` dispatch arm, but only for consumers that declare a codex lane -- the
-  `supervisor` (T4) and `shadow_curation` (T6b); the other consumers have no codex lane and reject it.
+  selects a real `codex exec` dispatch arm, but only for consumers that declare a codex lane -- the `supervisor` (T4),
+  `shadow_curation` (T6b, read-only), and `memory_writer` (T6c, read-only for review-only / workspace-write for
+  augment); only `team_supervisor` has no codex lane and rejects it.
 - `forge session lane show` (`--session`, `--json`): each consumer's requested (`intent`) and frozen (`confirmed`) lane,
   flagging drift and (supervisor-only) a T7 `degraded` overlay when its spent codex lane is routed to the default.
 - `forge session lane clear --consumer <id>` (`--session`): drop a consumer's requested lane (an already-frozen binding

@@ -20,8 +20,9 @@ official files or Forge-owned shadow proposal files.
 
 ## What the memory writer does
 
-After a session stops, the Stop hook enqueues a work marker. On next CLI startup, Forge spawns a headless `claude -p`
-subprocess that:
+After a session stops, the Stop hook enqueues a work marker. On next CLI startup, Forge spawns a headless writer
+subprocess -- `claude -p` on the default Claude lane, or `codex exec` on the codex lane
+([Runtime: claude or codex](#runtime-claude-or-codex)) -- that:
 
 1. Reads the session transcript
 2. Reads each tracked memory doc
@@ -235,11 +236,28 @@ Next CLI startup (any forge command)
 
 Background process:
   → Reads session manifest → compute effective intent
-  → Checks: enabled? min_turns met? claude available? mode valid?
+  → Checks: enabled? min_turns met? runtime available (claude on PATH, or codex preflight)? mode valid?
   → Validates tracked docs (path safety, passport validity, writer access, file existence)
   → Builds multi-doc prompt with per-doc strategy instructions
-  → Runs: claude -p (stdin=prompt, cwd=forge_root, timeout=5min)
+  → Runs the bound runtime: claude -p (default) or codex exec (codex lane) -- stdin=prompt, cwd=forge_root, timeout=5min
 ```
+
+### Runtime: claude or codex
+
+By default the writer dispatches `claude -p`. Bind it to a codex subscription lane to run `codex exec` instead (direct
+to OpenAI on your ChatGPT login, no Forge proxy):
+
+```bash
+forge session lane set --consumer memory_writer --runtime codex
+```
+
+- **review-only** runs codex read-only — it prints proposals to the review report and edits nothing.
+- **augment** runs codex with a `workspace-write` sandbox, editing the tracked docs in place under `forge_root`.
+
+The codex lane is **best-effort**: if codex is not installed, authenticated, or its preflight is cold, the writer logs,
+records an outcome, and does nothing for that session — it does **not** fall back to `claude -p`. Run
+`forge runtime preflight codex` to refresh auth. The proxy and effort settings below apply to the `claude -p` lane only;
+codex picks its own model.
 
 ### Proxy routing
 
@@ -291,7 +309,7 @@ Checklist:
 
 - `memory.auto_update.enabled` must be `true` in effective intent (`forge session memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
-- `claude` CLI must be on PATH
+- The bound runtime must be available: `claude` on PATH (default lane), or a ready `codex` preflight (codex lane)
 - At least one memory doc must be discoverable: a passported doc under the scan roots
 - At least one doc must exist on disk
 

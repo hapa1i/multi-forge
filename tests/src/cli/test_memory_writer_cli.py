@@ -20,6 +20,7 @@ from forge.session.passport import synthesize_passport, write_passport
 from forge.session.store import SessionStore
 
 _CLAUDE_MAX = LaneRecord("claude_code", "claude-max", "opus")
+_CODEX = LaneRecord("codex", "chatgpt", "gpt-5-codex")
 
 
 def _write_handoff_session(worktree: Path, *, subprocess_proxy: str | None = None) -> None:
@@ -173,10 +174,10 @@ def _dispatching(**kwargs: object) -> bool:
     return True
 
 
-def _declared_handoff_store(root: Path) -> SessionStore:
+def _declared_handoff_store(root: Path, lane: LaneRecord = _CLAUDE_MAX) -> SessionStore:
     manifest = create_session_state("session")
     manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
-    set_intent_lane(manifest, MEMORY_WRITER_CONSUMER, _CLAUDE_MAX)
+    set_intent_lane(manifest, MEMORY_WRITER_CONSUMER, lane)
     store = SessionStore(str(root), "session")
     store.write(manifest)
     return store
@@ -198,6 +199,26 @@ def test_run_cmd_freezes_on_real_dispatch(tmp_path: Path) -> None:
     confirmed = store.read().confirmed.consumer_lanes
     assert confirmed is not None and confirmed.memory_writer is not None
     assert confirmed.memory_writer.lane == _CLAUDE_MAX
+
+
+def test_run_cmd_forwards_codex_lane_record(tmp_path: Path) -> None:
+    """T6c: a codex-bound memory_writer -- the hidden worker reads the manifest lane and forwards the
+    codex LaneRecord (the arm-selecting field, not just backend_id) to run_memory_writer; on a real
+    dispatch the codex lane freezes."""
+    root = tmp_path.resolve()
+    store = _declared_handoff_store(root, _CODEX)
+    with (
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", side_effect=_dispatching) as mock_run,
+    ):
+        result = _run(root)
+
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs["lane_record"] == _CODEX
+    assert mock_run.call_args.kwargs["backend_id"] == "chatgpt"
+    confirmed = store.read().confirmed.consumer_lanes
+    assert confirmed is not None and confirmed.memory_writer is not None
+    assert confirmed.memory_writer.lane == _CODEX
 
 
 def test_run_cmd_no_freeze_when_writer_skips(tmp_path: Path) -> None:

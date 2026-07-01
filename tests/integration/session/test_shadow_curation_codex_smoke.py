@@ -7,7 +7,8 @@ hermetic unit tests can only mock: ``read_fresh_codex_preflight`` (cached) ->
 an integration test for any path that spawns a real subprocess.
 
 Billed: one small inlined curation prompt, ``read-only`` sandbox (no writes). Never skips -- fails
-loudly if codex is not installed/authenticated (the project's no-skip policy).
+loudly if codex is not installed/authenticated (the project's no-skip policy). Shared codex-auth,
+preflight, and git-root fixtures live in ``conftest.py``.
 
 Run via: ``./scripts/test-integration.sh tests/integration/session/test_shadow_curation_codex_smoke.py -v``
 or ``uv run pytest -m slow tests/integration/session/test_shadow_curation_codex_smoke.py``.
@@ -15,14 +16,11 @@ or ``uv run pytest -m slow tests/integration/session/test_shadow_curation_codex_
 
 from __future__ import annotations
 
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from forge.core.runtime.codex_preflight import CodexPreflight, preflight_codex
-from forge.core.runtime.codex_preflight_cache import write_codex_preflight_cache
+from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.core.usage.ledger import read_usage_events
 from forge.session.models import LaneRecord
@@ -32,69 +30,14 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")
 
-# Captured at import time -- BEFORE the autouse ``isolate_codex_home`` fixture overrides CODEX_HOME --
-# so we can restore the host's real codex auth store for the real ``codex exec`` run.
-_REAL_CODEX_HOME = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
 
-
-@pytest.fixture
-def real_codex_home(monkeypatch: pytest.MonkeyPatch) -> str:
-    """Restore the host ChatGPT (``codex_store``) auth and force it to win.
-
-    This E2E exercises the codex/chatgpt **subscription** lane, so it needs the host's ChatGPT
-    login -- not an API key. Two env adjustments:
-
-    - Restore CODEX_HOME (the autouse ``isolate_codex_home`` fixture repoints it at an empty temp
-      dir) so the ``codex doctor`` probe and the spawned ``codex exec`` see ``~/.codex/auth.json``.
-    - Clear CODEX_API_KEY / CODEX_ACCESS_TOKEN, which ``preflight_codex`` resolves *before*
-      ``codex_store`` (codex_preflight.py): on a machine with both an API key and a ChatGPT login
-      they would win and resolve ``billing_mode="api"``, failing the ``subscription_quota`` assertion.
-      The isolated FORGE_HOME already hides any credentials.yaml key.
-    """
-    auth = Path(_REAL_CODEX_HOME) / "auth.json"
-    if not auth.is_file():
-        pytest.fail(f"no codex auth store at {auth}. Run 'codex login --device-auth' (ChatGPT).")
-    monkeypatch.setenv("CODEX_HOME", _REAL_CODEX_HOME)
-    monkeypatch.delenv("CODEX_API_KEY", raising=False)
-    monkeypatch.delenv("CODEX_ACCESS_TOKEN", raising=False)
-    return _REAL_CODEX_HOME
-
-
-def _require_codex_ready_cached() -> CodexPreflight:
-    """Live preflight (must resolve the ChatGPT subscription lane), then seed the cache the arm reads.
-
-    The codex arm reads ``read_fresh_codex_preflight()`` (the cache), not the live probe -- and the
-    autouse ``isolate_forge_home`` fixture points FORGE_HOME at a fresh temp dir, so the cache is
-    empty until we write it here. Fails loud unless auth resolves to ``codex_store`` /
-    ``subscription_quota`` -- the exact lane this E2E asserts -- so an API-key-only machine gets an
-    actionable message instead of a confusing ``billing_mode`` mismatch downstream.
-    """
-    pf = preflight_codex()
-    if not pf.ready:
-        pytest.fail(f"codex not ready ({pf.blocking_reason}). Run 'codex login --device-auth' (ChatGPT).")
-    if pf.auth_source != "codex_store" or pf.billing_mode != "subscription_quota":
-        pytest.fail(
-            "this E2E exercises the codex/chatgpt subscription lane, but preflight resolved "
-            f"auth_source={pf.auth_source!r} billing_mode={pf.billing_mode!r}. "
-            "Log in with 'codex login --device-auth' (ChatGPT)."
-        )
-    write_codex_preflight_cache(pf)
-    return pf
-
-
-def _init_git_repo(path: Path) -> None:
-    """codex exec refuses to run outside a git repo; a real forge_root is always one."""
-    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
-    subprocess.run(["git", "config", "user.email", "smoke@test.local"], cwd=path, check=True)
-    subprocess.run(["git", "config", "user.name", "smoke"], cwd=path, check=True)
-
-
-def test_shadow_curation_codex_arm_real_dispatch(real_codex_home: str, tmp_path: Path) -> None:
+def test_shadow_curation_codex_arm_real_dispatch(
+    codex_ready_cached: CodexPreflight, codex_git_forge_root: Path
+) -> None:
     """run_shadow_curation on the codex lane spawns real codex, persists a report from its stdout,
     fires the freeze hook, and emits exactly one runtime=codex/subscription_quota usage event (and no
     upstream-outcome row, since that log is failure-biased and this run succeeds)."""
-    _require_codex_ready_cached()
-    _init_git_repo(tmp_path)
+    tmp_path = codex_git_forge_root
 
     entries = [
         ShadowEntry(
