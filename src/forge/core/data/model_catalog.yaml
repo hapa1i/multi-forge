@@ -42,12 +42,12 @@ defaults:
     opus: gemini-3.1-pro-preview
   anthropic:
     haiku: claude-haiku-4-5-20251001
-    sonnet: claude-sonnet-4-6
-    opus: claude-opus-4-6
+    sonnet: claude-sonnet-5
+    opus: claude-opus-4-8
   openrouter:
     haiku: claude-haiku-4-5-20251001
-    sonnet: claude-sonnet-4-6
-    opus: claude-opus-4-6
+    sonnet: claude-sonnet-5
+    opus: claude-opus-4-8
   deepseek:
     haiku: deepseek-v4-flash
     sonnet: deepseek-v4-pro
@@ -918,12 +918,11 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 98
+    intelligence_score: 97
     tags: []
 
   # --- Claude 4.7 Series ---
-  # Opus 4.7 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
-  # until this profile is proven safe for resume-heavy and referent-heavy flows.
+  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 4.8.
   claude-opus-4-7:
     friendly_name: Claude Opus 4.7
     context_window_tokens: 1000000
@@ -947,12 +946,12 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 99
+    intelligence_score: 98
     tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
-  # Opus 4.8 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
-  # until this profile is proven safe for resume-heavy and referent-heavy flows.
+  # Opus 4.8 is the catalog opus default (anthropic + openrouter) and the proxy
+  # opus-tier default. Opus 4.6 and Fable 5 remain selectable via --model.
   claude-opus-4-8:
     friendly_name: Claude Opus 4.8
     context_window_tokens: 1000000
@@ -977,14 +976,13 @@ models:
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
     intelligence_score: 99  # Below Fable 5; peer of gpt-5.5 / Gemini 3.1 Pro
-    tags: [bounded-review, opt-in]
+    tags: []  # Default opus tier (anthropic + openrouter)
 
   # --- Claude Fable Series ---
   # Fable 5 is the most capable model (a tier above Opus). Same request surface
-  # as Opus 4.8 -- adaptive thinking only, sampling overrides removed. Used as
-  # the OpenRouter opus-tier default (see templates/openrouter-anthropic.yaml);
-  # Opus 4.8/4.6 stay selectable via --model. Not a catalog default: anthropic
-  # defaults stay on 4.6 until this profile is proven for resume-heavy flows.
+  # as Opus 4.8 -- adaptive thinking only, sampling overrides removed. Not a
+  # catalog or template default: the opus tier defaults to Opus 4.8; Fable 5 and
+  # Opus 4.6 stay selectable via --model (opus model_alternatives).
   claude-fable-5:
     friendly_name: Claude Fable 5
     context_window_tokens: 1000000
@@ -1010,6 +1008,36 @@ models:
     token_estimate_multiplier: 1.35
     intelligence_score: 100
     tags: [opt-in]
+
+  # --- Claude Sonnet 5 ---
+  # Sonnet 5 is the default sonnet tier (anthropic + openrouter) and shares the
+  # Opus 4.8 request surface: adaptive-only thinking, sampling overrides removed,
+  # native 1M context. Single canonical id (no -1m twin).
+  claude-sonnet-5:
+    friendly_name: Claude Sonnet 5
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    token_estimate_multiplier: 1.35
+    intelligence_score: 98  # Between Opus 4.6 (97) and Opus 4.8 (99); peer of Opus 4.7
+    tags: []
 
   claude-sonnet-4-6:
     friendly_name: Claude Sonnet 4.6
@@ -1059,7 +1087,7 @@ models:
     native_thinking_param: output_config.effort
     litellm_reasoning_efforts: [low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 98
+    intelligence_score: 97
     tags: []
 
   claude-sonnet-4-6-1m:
@@ -1584,11 +1612,11 @@ aliases:
   anthropic/claude-opus-4-6: claude-opus-4-6
   anthropic/claude-opus-4-6-1m: claude-opus-4-6-1m
   claude-opus-4.6: claude-opus-4-6
-  claude-opus: claude-opus-4-6
+  claude-opus: claude-opus-4-8
   opus-4-6: claude-opus-4-6
   opus-4.6: claude-opus-4-6
   opus-4-6-1m: claude-opus-4-6-1m
-  opus: claude-opus-4-6
+  opus: claude-opus-4-8
 
   # Opus 4.7 (explicit opt-in only)
   anthropic/claude-opus-4-7: claude-opus-4-7
@@ -1597,25 +1625,30 @@ aliases:
   opus-4-7: claude-opus-4-7
   opus-4.7: claude-opus-4-7
 
-  # Opus 4.8 (explicit opt-in only)
+  # Opus 4.8 (default opus tier)
   anthropic/claude-opus-4-8: claude-opus-4-8
   anthropic/claude-opus-4.8: claude-opus-4-8
   claude-opus-4.8: claude-opus-4-8
   opus-4-8: claude-opus-4-8
   opus-4.8: claude-opus-4-8
 
-  # Fable 5 (most capable; OpenRouter opus-tier default, direct --model fable)
+  # Fable 5 (most capable; opus --model alternative, direct --model fable)
   anthropic/claude-fable-5: claude-fable-5
   claude-fable: claude-fable-5
   fable-5: claude-fable-5
   fable: claude-fable-5
+
+  # Sonnet 5 (default sonnet tier; released on Anthropic + OpenRouter, native 1M)
+  anthropic/claude-sonnet-5: claude-sonnet-5  # also the OpenRouter slug (no dot)
+  claude-sonnet: claude-sonnet-5  # parity with claude-opus friendly alias
+  sonnet-5: claude-sonnet-5
+  sonnet: claude-sonnet-5
 
   # Sonnet 4.6
   anthropic/claude-sonnet-4-6: claude-sonnet-4-6
   anthropic/claude-sonnet-4-6-1m: claude-sonnet-4-6-1m
   sonnet-4-6: claude-sonnet-4-6
   sonnet-4-6-1m: claude-sonnet-4-6-1m
-  sonnet: claude-sonnet-4-6
 
   # Opus 4.5
   anthropic/claude-opus-4-5-20251101: claude-opus-4-5-20251101

@@ -92,11 +92,11 @@ class TestClaudeFable5:
         assert spec.native_thinking_param == "output_config.effort"
 
     def test_fable_is_not_a_catalog_default(self):
-        """Catalog tier defaults stay on Opus 4.6; Fable is opt-in via template/--model."""
+        """Catalog opus defaults are Opus 4.8; Fable 5 is opt-in via template/--model."""
         catalog = load_model_catalog()
 
         for provider in ("anthropic", "openrouter"):
-            assert catalog.defaults[provider]["opus"] == "claude-opus-4-6"
+            assert catalog.defaults[provider]["opus"] == "claude-opus-4-8"
 
     def test_fable_outranks_opus_and_peers_gpt55_pro(self):
         """Fable tops the ladder with gpt-5.5-pro; Opus 4.8 / gpt-5.5 / Gemini 3.1 are one tier below."""
@@ -105,6 +105,45 @@ class TestClaudeFable5:
         assert score("claude-fable-5") == score("gpt-5.5-pro")
         assert score("claude-fable-5") > score("claude-opus-4-8")
         assert score("gpt-5.5") == score("claude-opus-4-8") == score("gemini-3.1-pro-preview")
+
+
+class TestClaudeSonnet5:
+    """Tests for the claude-sonnet-5 catalog entry, aliases, and default status."""
+
+    def test_sonnet_5_is_canonical(self):
+        """claude-sonnet-5 exists as a canonical model, not an alias."""
+        catalog = load_model_catalog()
+
+        assert "claude-sonnet-5" in catalog.models
+        assert "claude-sonnet-5" not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["anthropic/claude-sonnet-5", "claude-sonnet", "sonnet", "sonnet-5"],
+    )
+    def test_aliases_resolve_to_sonnet_5(self, alias):
+        """Provider-prefixed and friendly aliases resolve to claude-sonnet-5."""
+        assert resolve_model_id(alias) == "claude-sonnet-5"
+
+    def test_sonnet_5_intrinsic_properties(self):
+        """Sonnet 5 shares the Opus 4.8 surface: native 1M, adaptive-only, no sampling overrides."""
+        spec = get_model_spec("claude-sonnet-5")
+
+        assert spec.context_window_tokens == 1_000_000
+        assert spec.max_output_tokens == 128_000
+        assert spec.supports_1m_context is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "output_config.effort"
+        assert spec.token_estimate_multiplier == 1.35
+
+    def test_sonnet_5_is_the_sonnet_default_and_opus_is_4_8(self):
+        """Sonnet 5 is the catalog sonnet default; Opus 4.8 is the opus default (both layers)."""
+        catalog = load_model_catalog()
+
+        for provider in ("anthropic", "openrouter"):
+            assert catalog.defaults[provider]["sonnet"] == "claude-sonnet-5"
+            assert catalog.defaults[provider]["opus"] == "claude-opus-4-8"
 
 
 class TestGemini31ProPreviewIsCanonical:

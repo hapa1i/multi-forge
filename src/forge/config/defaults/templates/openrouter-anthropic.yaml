@@ -1,11 +1,11 @@
 # Template: openrouter-anthropic
 # Anthropic Claude models via OpenRouter (direct, no LiteLLM)
 #
-# Access to Claude Fable 5, Opus 4.8/4.6, Sonnet 4.6, and Haiku 4.5.
+# Access to Claude Sonnet 5, Fable 5, Opus 4.8/4.6, Sonnet 4.6, and Haiku 4.5.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 #
-# Opus tier defaults to Fable 5. Use --model claude-opus-4-8 or
-# --model claude-opus-4-6 to select an Opus alternative instead.
+# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 4.8. Use --model to select
+# an alternative (claude-fable-5, claude-opus-4-6, claude-sonnet-4-6).
 
 proxy:
   family: anthropic
@@ -16,10 +16,12 @@ proxy:
   openrouter:
     tiers:
       haiku: anthropic/claude-haiku-4.5
-      sonnet: anthropic/claude-sonnet-4.6
-      opus: anthropic/claude-fable-5
+      sonnet: anthropic/claude-sonnet-5
+      opus: anthropic/claude-opus-4.8
     model_alternatives:
       opus:
-        claude-opus-4-8: anthropic/claude-opus-4.8
+        claude-fable-5: anthropic/claude-fable-5
         claude-opus-4-6: anthropic/claude-opus-4.6
+      sonnet:
+        claude-sonnet-4-6: anthropic/claude-sonnet-4.6
     error_hints: true

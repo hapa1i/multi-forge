@@ -32,6 +32,11 @@ logger = logging.getLogger(__name__)
 
 def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
     """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
+    # Passthrough forwards the client model unchanged, so any resolvable Claude pin
+    # reaches the API as-is; the alternatives/tier-default check does not apply here.
+    # (resolve_direct_model_pin already rejected non-Claude/unknown models upstream.)
+    if proxy_cfg.wire_shape == "anthropic_passthrough":
+        return True
     alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
     if pin.canonical_model in alt_models:
         return True

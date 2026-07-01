@@ -46,7 +46,7 @@ Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
 - `gpt-5.5` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
-- `claude-opus` -- direct Anthropic, pinned to stable Claude Opus 4.6
+- `claude-opus` -- direct Anthropic, pinned to Claude Opus 4.8
 
 Routing is **capability-based**: models declare what they are (family, provider refs), and Forge derives routes at
 runtime from proxy templates and credentials. The preferred proxy is a catalog hint, not a hard requirement -- any
