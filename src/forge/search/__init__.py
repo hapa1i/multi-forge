@@ -2,7 +2,6 @@
 
 Provides:
 - search_from_index(): BM25 search using persistent precomputed index
-- search(): Legacy BM25 search (builds index at query time)
 - extract_document() / decompose_document(): Content extraction and decomposition
 - BM25IndexStore / ContentStore / SearchDocumentStore: Per-project persistence
 - tokenize(): Shared tokenizer for BM25 indexing and querying
@@ -10,7 +9,7 @@ Provides:
 
 from .bm25_store import BM25IndexData, BM25IndexStore
 from .content_store import ContentStore
-from .engine import SearchResult, search, search_from_index
+from .engine import SearchResult, search_from_index
 from .exceptions import (
     BM25IndexCorruptedError,
     ContentStoreCorruptedError,
@@ -30,7 +29,6 @@ from .tokenizer import tokenize
 
 __all__ = [
     # Core API
-    "search",
     "search_from_index",
     "extract_document",
     "decompose_document",

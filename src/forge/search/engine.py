@@ -3,8 +3,7 @@
 Provides BM25Okapi ranking for keyword search over extracted transcript content.
 No external dependencies — hand-rolled BM25 implementation (~30 lines of math).
 
-Two search entry points:
-- search(): Legacy path — builds BM25 from in-memory documents (query-time construction)
+Search entry point:
 - search_from_index(): Persistent index path — loads precomputed BM25 data (scoring only)
 """
 
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .exceptions import BM25IndexCorruptedError, ContentStoreCorruptedError
-from .extractor import SearchDocument, SearchDocumentMeta
+from .extractor import SearchDocumentMeta
 from .tokenizer import TOKEN_RE, tokenize
 
 # Search defaults
@@ -197,55 +196,6 @@ class SearchResult:
     snippet: str
     transcript_path: str
     metadata: dict[str, Any]
-
-
-def search(
-    query: str,
-    documents: list[SearchDocument],
-    *,
-    limit: int = DEFAULT_LIMIT,
-) -> list[SearchResult]:
-    """Search documents using BM25.
-
-    Builds BM25 index at query time from provided documents.
-    Returns top-K results sorted by score descending.
-
-    Args:
-        query: Search query string.
-        documents: List of SearchDocument to search over.
-        limit: Maximum number of results to return.
-
-    Returns:
-        List of SearchResult sorted by score descending.
-    """
-    if not query.strip() or not documents:
-        return []
-
-    query_tokens = tokenize(query)
-    if not query_tokens:
-        return []
-
-    doc_tokens = [doc.tokens if doc.tokens is not None else tokenize(doc.content) for doc in documents]
-    bm25 = BM25(doc_tokens)
-    scores = bm25.score(query_tokens)
-
-    # Pair scores with documents, filter zero scores, sort descending
-    scored = [(s, doc) for s, doc in zip(scores, documents) if s > 0]
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    results: list[SearchResult] = []
-    for s, doc in scored[:limit]:
-        results.append(
-            SearchResult(
-                session_name=doc.session_name,
-                session_id=doc.session_id,
-                score=round(s, 4),
-                snippet=_best_snippet(doc.content, query_tokens, doc_freqs=bm25.doc_freqs),
-                transcript_path=doc.transcript_path,
-                metadata=doc.metadata,
-            )
-        )
-    return results
 
 
 def search_from_index(
