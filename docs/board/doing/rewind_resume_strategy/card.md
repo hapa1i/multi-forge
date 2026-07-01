@@ -212,6 +212,9 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
   `strategy is null ⟺ native`.
 - **Unsafe JSONL truncation.** Cutting mid `tool_use`/`tool_result` pair corrupts `--resume`. Need
   snap-to-last-complete- turn ≤ T−N; test a tool-call straddling the cut.
+- **Prefix/delta window skew.** The prefix writer counts raw JSONL-order turns, while generic transfer transcript
+  parsing sorts by timestamp and skips metadata-only dicts. Slice 4 must thread one shared raw-order turn grouping (or
+  guard/fallback) so the code-delta describes exactly the turns the prefix removed.
 - **Empty rewind head.** `N>=T` produces `kept_turns=0` at the writer level; Slice 4 must not launch an empty
   `<R>.jsonl` as native resume.
 - **Silent extra drop.** Safe-boundary snap can keep fewer turns than requested when the boundary lands in a tool chain;
@@ -249,6 +252,7 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 | Truncation snaps to safe boundary     | tool_use/result pair straddling T−N        | relocated JSONL ends on a complete turn (resume not corrupted)                                     | same                                        |
 | Delta cites only dropped turns        | edits in the dropped window                | delta lists changed files citing turns T−N+1..T; no head citations                                 | same                                        |
 | Native resume + context file together | `--strategy rewind` worktree fork          | launch carries `--resume --fork-session` AND `--append-system-prompt-file`                         | same                                        |
+| Prefix and delta share dropped window | out-of-timestamp-order JSONL + metadata    | code-delta describes exactly the turns removed by the prefix writer                                | same                                        |
 | Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
 | Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
 | Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | same                                        |

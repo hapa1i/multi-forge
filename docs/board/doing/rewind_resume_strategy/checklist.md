@@ -158,6 +158,13 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
   a rewind fork writes `strategy="rewind"`, `dropped_turns=N`, `context_file=<delta>` AND the launch emits
   `--resume --fork-session` together with `--append-system-prompt-file`. **Assertion:** the launched argv for a rewind
   worktree fork contains both flags (unit-assert on the built command).
+- [ ] **Shared dropped-window turn numbering.** Wire the prefix writer and code-delta generator from the same raw-order
+  turn grouping. Do not pass `RewindPrefixResult.kept_turns` into a separately re-parsed timestamp-sorted transcript:
+  `write_rewind_transcript_prefix` currently counts raw JSONL-order dict entries, while `parse_jsonl_transcript` sorts
+  by timestamp and skips entries without `message`/`type`. If the two-parser shape remains temporarily, add a guard that
+  proves both parsers produce the same turn count/order before launch and otherwise falls back with a note.
+  **Assertion:** a fixture with file order != timestamp order, plus a metadata-only dict line, proves the delta window
+  matches the prefix writer's dropped window.
 - [ ] **Degenerate and snap-back UX.** Handle the writer result before launch: `drop_last=0` uses the plain
   native-relocate no-op, `kept_turns=0` rejects or falls back instead of launching an empty transcript, and
   `kept_turns < requested_keep_turns` tells the user how many additional turns the safe-boundary snap dropped. Catch
@@ -200,6 +207,7 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 | Truncation snaps to safe boundary     | tool_use/result pair straddling T−N        | relocated JSONL ends on a complete turn (resume not corrupted)                                     | same                                        |
 | Delta cites only dropped turns        | edits in the dropped window                | delta lists changed files citing turns T−N+1..T; no head citations                                 | same                                        |
 | Native resume + context file together | `--strategy rewind` worktree fork          | launched argv carries `--resume --fork-session` AND `--append-system-prompt-file`                  | same                                        |
+| Prefix and delta share dropped window | out-of-timestamp-order JSONL + metadata    | code-delta describes exactly the turns removed by the prefix writer                                | same                                        |
 | Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
 | Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
 | Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | same                                        |

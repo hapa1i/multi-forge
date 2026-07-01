@@ -340,6 +340,9 @@ def generate_rewind_code_delta_context(
         warnings.append("Dropped rewind window truncated to fit context limit")
 
     if not source.file_deltas:
+        # A valid empty code-delta is still the rewind schema, not a fallback:
+        # the dropped window may simply contain no code-editing tool calls, and
+        # no LLM spend is needed to state that.
         content = _build_rewind_deterministic_output(
             parent_name=parent_name,
             lineage=lineage,
