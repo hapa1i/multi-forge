@@ -2,8 +2,8 @@
 
 **Branch**: `cleanup/accidental-complexity-batch-a`
 
-**Current focus**: Batch A **implemented + verified** (full unit suite `7222 passed`; ruff + mypy clean). Awaiting
-`make pre-commit` + merge. Batches B/C are stubs below -- populate when picked up.
+**Current focus**: Batch A **implemented + verified** (full unit suite `7222 passed`; `make pre-commit` clean). Awaiting
+merge; card stays in `doing/` while Batches B/C remain. Batches B/C are stubs below -- populate when picked up.
 
 **Scope note**: all anchors re-verified on this branch's HEAD before editing (zero-caller `grep` across `src/` +
 `tests/`). Decisions locked before implementation: **#9 = wire** (read `ActiveSessionStore` at list time; keeps the
@@ -61,19 +61,20 @@ Order does not matter functionally; #1 (bug fix) and the trivial deletions lead 
 - [x] **#21** Delete the two stale CLI-alias doc lines (`authentication.md:144` `--provider/-p`; `session.md:871`
   `--template`/`--base-url` deprecated-alias line) and **reword** (not delete) the reachable guard at
   `session_lifecycle.py:868` to name `--proxy`/proxy routing instead of the nonexistent `--template`/`--base-url`.
-  Assertion: `grep -rn "\-\-provider\|deprecated hidden alias" docs/end-user` clean; the guard still fires for
-  `--no-proxy` + routing.
+  Assertion: the removed alias bullets are gone (no "Alias for `--credential`" line in `authentication.md`; no
+  "deprecated hidden alias" line in `session.md`). The historical `--provider` *migration* table at
+  `authentication.md:302` legitimately stays. The guard still fires for `--no-proxy` + routing.
 
 ### Acceptance tests (risky / behavior-touching items)
 
-| Test                             | Fixture                                             | Assertion                                                | Test File                            |
-| -------------------------------- | --------------------------------------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `is_active` truthful             | one live active-session entry + one dormant session | live item `is_active is True`, dormant `False`           | `tests/src/core/ops/test_session.py` |
-| `--json` emits live flag         | `forge session list --json` with a live session     | JSON row `is_active: true`                               | existing `session_manage` CLI test   |
-| backend delete: single "Stopped" | one running instance, `backend delete --port -y`    | exactly one "Stopped" line; no nested exit on stop error | `tests/src/cli/test_backend*.py`     |
-| old passport accept-and-ignore   | YAML `update.inherit_on_fork: false`                | parses without error; round-trips without the key        | `tests/src/session/test_passport.py` |
-| env override still coerces       | `FORGE_DEBUG=1` / bogus value                       | `log_level=debug` / warn-and-ignore                      | `tests/src/test_runtime_config.py`   |
-| upstream suppression holds       | invoker result with `attribution.operation=None`    | no upstream row recorded (usage event still emitted)     | `tests/src/core/invoker/test_*.py`   |
+| Test                             | Fixture                                               | Assertion                                            | Test File                                                                           |
+| -------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `is_active` truthful             | one live active-session entry + one dormant session   | live item `is_active is True`, dormant `False`       | `tests/src/core/ops/test_session_ops.py`                                            |
+| `--json` emits live flag         | `session list --json --scope all` with a live session | JSON row `is_active: true`                           | `tests/src/cli/test_session_commands.py` (`test_list_json_reports_active_liveness`) |
+| backend delete: single "Stopped" | one running instance, `backend delete --port -y`      | exactly one "Stopped" line; no nested exit           | `tests/regression/test_bug_backend_delete_double_stop.py`                           |
+| old passport accept-and-ignore   | YAML `update.inherit_on_fork: false`                  | parses without error; round-trips without the key    | `tests/src/session/test_passport.py`                                                |
+| env override still coerces       | `FORGE_DEBUG=1` / bogus value                         | `log_level=debug` / warn-and-ignore                  | `tests/src/test_runtime_config.py`                                                  |
+| upstream suppression holds       | invoker result with `attribution.operation=None`      | no upstream row recorded (usage event still emitted) | `tests/src/core/invoker/test_*.py`                                                  |
 
 ### Deferred / decisions
 
@@ -96,10 +97,11 @@ emitter audit before deciding if it is a real gap).
 
 ## Closeout (Batch A)
 
-- [ ] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
-- [ ] Unit suite green; targeted integration for memory-writer/session paths where touched (#5, #9, #21).
-- [ ] `change_log.md` entry (feature-completion size) summarizing Batch A.
-- [ ] Design/end-user docs synced: `docs/end-user/authentication.md` + `session.md` (#21 removals); confirm no design
-  doc references the deleted symbols.
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
+- [x] Unit suite green (`7222 passed`). Docker/real-Claude integration tier **not run**: the #5/#9/#21 changes are
+  dead-code/no-op removals + a list-time read that do not alter the `claude -p`/hook/Docker dispatch path.
+- [x] `change_log.md` entry (feature-completion size) summarizing Batch A.
+- [x] Design/end-user docs synced: `authentication.md` + `session.md` (#21 removals); verified no design doc references
+  the deleted symbols (`grep` clean across `docs/design*.md`, `cli_reference.md`).
 - [ ] Card moved `doing/ -> done/` only after merge to `main` (per board contract); this card stays in `doing/` while
   Batches B/C remain open.

@@ -353,6 +353,36 @@ class TestSessionList:
         assert result.exit_code == 0
         assert "test-session" in result.output
 
+    def test_list_json_reports_active_liveness(self, runner: CliRunner, temp_env: Path) -> None:
+        """`session list --json` emits is_active=True for a session the active registry lists as live."""
+        import json
+
+        wt = temp_env  # cwd == project
+        (wt / ".forge" / "sessions" / "live-one").mkdir(parents=True)
+        (wt / ".forge" / "sessions" / "live-one" / "forge.session.json").write_text("{}")
+        IndexStore().add_session(
+            name="live-one",
+            worktree_path=str(wt),
+            project_root=str(wt),
+            forge_root=str(wt),
+            checkout_root=str(wt),
+            relative_path=".",
+        )
+        # Tag with this process's PID so the liveness probe passes.
+        ActiveSessionStore().upsert_session(
+            "live-one",
+            worktree_path=str(wt),
+            launch_mode="host",
+            launcher_pid=os.getpid(),
+            forge_root=str(wt),
+        )
+
+        result = runner.invoke(main, ["session", "list", "--json", "--scope", "all"])
+
+        assert result.exit_code == 0, result.output
+        entry = next(row for row in json.loads(result.output) if row["name"] == "live-one")
+        assert entry["is_active"] is True
+
     def test_list_older_than_filters_by_scoped_identity(self, runner: CliRunner, temp_env: Path) -> None:
         """--older-than should not pull in same-name sessions from a different forge_root."""
         forge_root_a, forge_root_b = _seed_duplicate_list_sessions(temp_env)
