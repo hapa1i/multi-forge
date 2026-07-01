@@ -95,11 +95,15 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   -- removes the public surface cheaply) or **(b) full delete** (migrate/consolidate all 11 `TestSearch` methods onto
   `search_from_index`, then delete `search()`). Recommend (a) now, (b) as a follow-up -- full deletion is a
   test-migration project, not a cleanup.
-- **#16 gate (caution)** -- confirm no **hand-written** `~/.forge/proxies/*/proxy.yaml` uses `provider: gemini|openai`.
-  The `create` flow is safe (templates carry `preferred_provider: litellm|openrouter`, written to `provider` at
-  `loader.py:419/542`), so fail-fast can only reject a user-authored file. Check:
-  `grep -rlE "provider:\s*(gemini|openai)" ~/.forge/proxies/*/proxy.yaml`. If any exist, ship fail-fast with a clear
-  reset/migration message (durable-state boundary, `coding_standards §5`).
+- **#16 gate (caution)** -- validation runs on **read**, not only create: `load_proxy_instance_config_from_dict`
+  (`loader.py:395-440`) constructs `ProxyInstanceConfig`, whose `__post_init__` re-validates `provider`
+  (`schema.py:764`) on every load. So narrowing `valid_providers` rejects **any** persisted
+  `~/.forge/proxies/*/proxy.yaml` with `provider: gemini|openai` regardless of origin -- the create flow being
+  template-safe (`preferred_provider` -> `provider`, `loader.py:419/542`) does not make existing on-disk files safe.
+  Scan all persisted configs first: `grep -rlE "provider:\s*(gemini|openai)" ~/.forge/proxies/*/proxy.yaml` (none on
+  this machine, 2026-07-01). Then decide fail-fast vs migrate-in-place vs print delete/recreate guidance, each with a
+  clear reset/migration message (durable-state boundary, `coding_standards §5`). A clean local scan does not settle the
+  cross-user policy.
 
 ### Tasks
 
@@ -115,8 +119,11 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   `TestConsensusTemplateEquivalence`/`TestDebateTemplateEquivalence` (`test_skill_content.py:438,454`); (5) delete the 4
   `src/skills/{debate,consensus}/resources/*_evaluation.md` copies -- **verified unread** (both skills invoke
   `forge workflow debate/consensus`, `SKILL.md:63/64`; they do not read the eval files). **Keep
-  `consensus/resources/synthesis.md`** -- the consensus skill reads it (`SKILL.md:80`). Assertion:
-  `forge workflow debate` and `consensus` run (template loads via `importlib.resources`);
+  `consensus/resources/synthesis.md`** -- the consensus skill reads it (`SKILL.md:80`). Assertion (direct, no live
+  workflow): mirror the existing `TestLoadWorkflowResource` pattern (`test_run_resources.py:10-28`) -- add 4 unit tests
+  calling `_load_workflow_resource("{debate,code_debate,consensus,code_consensus}_evaluation.md")` and asserting marker
+  strings load from `forge.review.resources`; add direct `_resolve_debate_prompt`/`_resolve_consensus_prompt` unit tests
+  (pure `(subject, prompt, code_mode) -> str | None`, no network/model/proxy) asserting the loaded template wraps input.
   `git grep _DEBATE_EVALUATION_TEMPLATE` empty; single source in `forge.review.resources` (drift now impossible, not
   merely unguarded).
 - [ ] **#14** Privatize the legacy in-memory `search()` (`search/engine.py:202-248`). Steps: drop `"search"` from
@@ -132,10 +139,20 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   `credentials.py:240-243`); only non-test ref is a docstring (`secrets.py:214`); `ProviderConfig.auth_url`
   (`schema.py:156`) is written (`loader.py:271-272` from `OPENAI_AUTH_URL`/`GEMINI_AUTH_URL`) but never read. Steps:
   delete the class + `__init__` export; delete the `auth_url` field; remove the `*_AUTH_URL` mappings + extraction
-  (`loader.py:271-272,521-525,533`); delete the **12** `test_secrets.py` methods (4 direct + 8 chain, `:150-207`); fix
-  the `ChainSecretsProvider` docstring (`:214`). (Card said "~29 tests" -- actual is 12 methods.) Assertion:
-  `grep -rn "ConfigSecretsProvider\|OPENAI_AUTH_URL\|GEMINI_AUTH_URL" src tests` returns only deletions;
-  `test_secrets.py` green with Env+File coverage intact.
+  (`loader.py:271-272,521-525,533`); fix the `ChainSecretsProvider` docstring (`:214`). Test fallout (verified
+  2026-07-01, card's "~29 tests" and my earlier "12 at :150-207" both wrong -- actual is **10** `test_secrets.py`
+  methods spanning `:178-288`): **delete** the 4 direct `TestConfigSecretsProvider` methods (`:178,186,194,201`);
+  **revise** the 6 `TestChainSecretsProvider` methods that construct `ConfigSecretsProvider` in the chain
+  (`:213,229,244,259,274,288`) -- the two config-specific ones (`test_chain_env_overrides_config:229`,
+  `test_chain_falls_through_to_config:244`) lose their premise and should be deleted; the other 4 rewrite to an Env+File
+  chain to keep coverage. Two more files carry the env names: **delete** `test_load_config_with_lease_applies_secrets`
+  (`test_loader.py:777-804`) -- it asserts `config.proxy.gemini.auth_url` from `GEMINI_AUTH_URL`, which this item
+  removes (this is the test #16 wrongly called `test_secret_auth_url`); and **fix**
+  `test_bug_h6_secret_coercion.py:24-27` -- drop the 2 `GEMINI_AUTH_URL` + 2 `OPENAI_AUTH_URL` parametrize cases (or
+  replace with a "no `*_AUTH_URL` mapping remains" negative assertion). `test_credentials_file.py:103,111` merely
+  round-trips `GEMINI_AUTH_URL` as an arbitrary profile key -- **unaffected**, leave it. Assertion:
+  `grep -rn "ConfigSecretsProvider\|OPENAI_AUTH_URL\|GEMINI_AUTH_URL" src tests` returns only the round-trip fixture in
+  `test_credentials_file.py`; secrets tests green with Env+File coverage intact.
 - [ ] **#16 (caution -- config)** Narrow proxy providers to `{litellm, openrouter}` with fail-fast. Verified root cause
   is **config validation**, not runtime: `ProxyInstanceConfig.__post_init__` accepts
   `{litellm, openai, gemini, openrouter}` (`schema.py:764`) but `ModelProvider` is `{LITELLM, OPENROUTER, UNKNOWN}`
@@ -143,20 +160,22 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
   `_detect_provider:144` -> model-name detection). Steps: narrow `valid_providers` + raise a clear `ValueError` naming
   the two (with a migration hint to `litellm-gemini`/`openrouter`); delete the dead gemini/openai branches
   (`loader.py:522-525,555-558`); drop `*_AUTH_URL` from `env_to_dict` (coordinated with #15). **Do NOT touch**
-  `ProviderType`'s `openai` catalog literal (`core/provider_types.py:11`) -- separate concern. Update the failing test
-  `test_loader.py::test_secret_auth_url` (`:779`, currently `provider='gemini'`) to `litellm`. Gate on the **#16 gate**
-  above. Assertion: `ProxyInstanceConfig(provider='gemini')` raises the supported-two message; `litellm`/`openrouter`
-  pass; `forge proxy create litellm-gemini` still works.
+  `ProviderType`'s `openai` catalog literal (`core/provider_types.py:11`) -- separate concern. No `provider='gemini'`
+  test to re-point: the only such test, `test_load_config_with_lease_applies_secrets` (`test_loader.py:777`), is deleted
+  under #15 (it depends on the removed `auth_url` field, so a `litellm` swap would not save it). Grep the two files for
+  a surviving `provider='gemini'` proxy construction before finishing. Gate on the **#16 gate** above. Assertion:
+  `ProxyInstanceConfig(provider='gemini')` raises the supported-two message; `litellm`/`openrouter` pass;
+  `forge proxy create litellm-gemini` still works.
 
 ### Acceptance tests (Batch B)
 
-| Test                                 | Fixture                                  | Assertion                                                      | Test File                             |
-| ------------------------------------ | ---------------------------------------- | -------------------------------------------------------------- | ------------------------------------- |
-| debate/consensus load from resources | `forge workflow debate`/`consensus` run  | template loads via `importlib.resources`; no embedded constant | CLI smoke + `tests/src/review/`       |
-| search characterization (no oracle)  | transient `BM25IndexData`                | `search_from_index` scores/snippets pinned without `search()`  | `tests/src/search/test_engine.py`     |
-| `ConfigSecretsProvider` gone         | Env+File chain only                      | `grep` clean; Env/File secrets tests pass                      | `tests/src/core/auth/test_secrets.py` |
-| provider fail-fast                   | `ProxyInstanceConfig(provider='gemini')` | raises `ValueError` naming litellm/openrouter                  | `tests/src/config/test_schema.py`     |
-| create still works                   | `forge proxy create litellm-gemini`      | proxy created (`provider=litellm` from template)               | `tests/src/config/test_loader.py`     |
+| Test                                | Fixture                                                    | Assertion                                                              | Test File                             |
+| ----------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------- |
+| eval templates load from resources  | `_load_workflow_resource("debate_evaluation.md")` (direct) | 4 loader tests + `_resolve_*_prompt` unit tests pass; no live workflow | `tests/src/cli/test_run_resources.py` |
+| search characterization (no oracle) | transient `BM25IndexData`                                  | `search_from_index` scores/snippets pinned without `search()`          | `tests/src/search/test_engine.py`     |
+| `ConfigSecretsProvider` gone        | Env+File chain only                                        | `grep` clean; Env/File secrets tests pass                              | `tests/src/core/auth/test_secrets.py` |
+| provider fail-fast                  | `ProxyInstanceConfig(provider='gemini')`                   | raises `ValueError` naming litellm/openrouter                          | `tests/src/config/test_schema.py`     |
+| create still works                  | `forge proxy create litellm-gemini`                        | proxy created (`provider=litellm` from template)                       | `tests/src/config/test_loader.py`     |
 
 ## Phase C -- optional / low-value -- STUB
 
