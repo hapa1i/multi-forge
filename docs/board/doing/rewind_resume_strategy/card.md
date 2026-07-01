@@ -1,6 +1,7 @@
 # Rewind Resume Strategy — drop the last N turns, keep an AI code-delta
 
-**Status**: Proposed. Nothing shipped. A new `ResumeStrategy` sibling to `ai-curated`, selected via
+**Status**: Active (in `doing/`, accepted 2026-07-01). Nothing implemented yet — Slice 1 is a hard gate (see
+`checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
 `forge session fork|resume --strategy rewind --drop-last N`. `docs/design.md` resume/transfer contracts remain
 normative; this card defers to them on conflict.
 
@@ -24,7 +25,7 @@ document contract.
 
 **References**: `docs/design.md` "Transfer mode strategies" + "Session derivation tracking", §3.9 (resume across path
 boundaries); `src/forge/session/transfer.py`; `src/forge/session/manager.py`; `src/forge/cli/session_fork.py`;
-`docs/board/proposed/forge_cli_cleanup/card.md` (option-drift findings #4/#5).
+`docs/board/done/forge_cli_cleanup/card.md` (option-drift findings #4/#5).
 
 ## Summary
 
@@ -257,4 +258,4 @@ see the Decided block and "Truncated-copy identity & GC".
 - `src/forge/cli/session_fork.py` — `--strategy` Choice (:139), `--resume-mode` Choice (:161), native-relocate
   preflights (:473-538), `--strategy` ignored under native-relocate (:531)
 - `docs/design.md` — "Transfer mode strategies", "Session derivation tracking", §3.9 resume across path boundaries
-- `docs/board/proposed/forge_cli_cleanup/card.md` — option-drift findings (#4/#5) the `--drop-last` surface must respect
+- `docs/board/done/forge_cli_cleanup/card.md` — option-drift findings (#4/#5) the `--drop-last` surface must respect
