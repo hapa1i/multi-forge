@@ -8,77 +8,70 @@ Visual representations of the Forge unified architecture.
 
 ```mermaid
 flowchart TB
-    subgraph UserLayer["User Layer"]
-        CLI["forge CLI"]
-        CC["Claude Code<br/>(default runtime)"]
-        CX["Codex CLI<br/>(alternate runtime)"]
+    User["User / automation"] --> CLI["forge CLI<br/>(launcher + operator surface)"]
+
+    subgraph RuntimeLayer["Runtime layer"]
+        Claude["Claude Code<br/>(default runtime)"]
+        Codex["Codex CLI<br/>(alternate runtime)"]
     end
 
-    subgraph StateLayer["State + Artifacts"]
-        RC["~/.forge/config.yaml<br/>(runtime config)"]
-        ASP["~/.forge/sessions/active.json<br/>(runtime live-session registry)"]
-        SM["&lt;forge_root&gt;/.forge/sessions/&lt;name&gt;/forge.session.json<br/>(session manifest)"]
-        SI["~/.forge/sessions/index.json<br/>(session index)"]
-        PR["~/.forge/proxies/index.json<br/>(proxy registry)"]
-        WQ["~/.forge/pending-work/*.json<br/>(deferred work markers)"]
-        ART["&lt;forge_root&gt;/.forge/artifacts/<br/>(plans, transcripts)"]
-        SEARCH["&lt;forge_root&gt;/.forge/search-index/<br/>(search stores)"]
-    end
+    CLI -->|"starts / resumes"| Claude
+    CLI -->|"starts / resumes"| Codex
 
-    subgraph Components["Forge Components"]
-        Session["Session CLI<br/>(lifecycle + overrides)"]
-        Orchestrator["Proxy Orchestrator<br/>(create/start/stop)"]
-        Proxy["Proxy Server<br/>(routing + translation)"]
-        Sidecar["Sidecar Runtime<br/>(Docker proxy + Claude)"]
-        Hooks["Hooks<br/>(confirmed facts + artifacts)"]
-        Queue["Work Queue Processor<br/>(CLI startup)"]
-        SearchIdx["Search Indexer"]
-        MemoryWriter["Memory Writer<br/>(background doc updates)"]
-        Status["Status Line"]
-    end
+    Claude -->|"ANTHROPIC_BASE_URL"| Proxy["Forge Proxy<br/>(routing, audit, cost evidence)"]
+    Claude -->|"hook events"| Hooks["Forge Hooks<br/>(confirmed facts + artifacts)"]
+    Codex -->|"hook events / receipts"| Hooks
+    Codex -->|"native-direct by default"| OpenAI["OpenAI Responses API"]
 
-    subgraph External["External Services"]
-        Anthropic["Anthropic API"]
-        LiteLLM["LiteLLM<br/>(TR/Local)"]
-        OpenAI["OpenAI<br/>(Responses API)"]
-    end
+    CLI --> Ops["Session / proxy / policy ops"]
+    Ops --> State["Forge State<br/>(sessions, proxy registry, runtime config)"]
 
-    CLI --> Session
-    CLI --> Orchestrator
-    CLI -->|non-hook startup| Queue
-    CLI -->|host mode| Proxy
-    CLI -->|sidecar mode| Sidecar
-    CC -->|ANTHROPIC_BASE_URL| Proxy
-    CC -->|hook events| Hooks
-    CX -->|hook events| Hooks
-    CX -->|codex exec, native-direct| OpenAI
+    Hooks --> Artifacts["Artifacts + transfer memory<br/>(plans, transcripts, prev_sessions)"]
+    Hooks --> Queue["Work Queue"]
+    Queue --> Workers["Deferred workers<br/>(memory writer + search indexer)"]
 
-    Session -->|writes| ASP
-    Session -->|writes intent/overrides| SM
-    Session -->|writes| SI
-    Hooks -->|writes confirmed.*| SM
-    Hooks -->|copies plans/transcripts| ART
-    Hooks -->|enqueues stop/index/handoff| WQ
-    Queue -->|reads markers| WQ
-    Queue --> SearchIdx
-    Queue --> MemoryWriter
-    SearchIdx -->|writes| SEARCH
-    Orchestrator -->|writes| PR
+    Proxy --> Providers["Model providers<br/>(Anthropic, LiteLLM, OpenRouter)"]
+    Proxy --> Telemetry["Telemetry<br/>(downstream, upstream, caps)"]
+    Hooks --> Telemetry
+    Workers --> Usage["Usage attribution<br/>(usage/events)"]
 
-    Status -->|reads| RC
-    Status -->|reads| SM
-    Status -->|reads| PR
-    Status -->|GET /| Proxy
+    Status["Status line / activity views"] --> State
+    Status --> Telemetry
+    Status --> Usage
+    Status --> Proxy
 
-    Proxy -->|routes to| LiteLLM
-    Proxy -->|routes to| Anthropic
+    classDef runtime fill:#eceff1,stroke:#78909c
+    classDef state fill:#c8e6c9,stroke:#2e7d32
+    classDef artifacts fill:#d1c4e9,stroke:#5e35b1
+    classDef telemetry fill:#b2dfdb,stroke:#00796b
+    classDef proxy fill:#bbdefb,stroke:#1565c0
+    classDef external fill:#fff3e0,stroke:#ef6c00
+
+    class Claude,Codex runtime
+    class State state
+    class Artifacts artifacts
+    class Telemetry,Usage telemetry
+    class Proxy proxy
+    class OpenAI,Providers external
 ```
+
+Color note: white nodes are Forge control-plane components; blue is the proxy/model-traffic boundary; green, purple, and
+teal are durable state/artifact/telemetry stores; orange is external model infrastructure.
 
 **Runtime asymmetry:** Claude Code routes model traffic through the Forge proxy (`ANTHROPIC_BASE_URL`), so Forge sees
 its usage on the wire. Codex runs `codex exec` native-direct to OpenAI's Responses API by default; Forge governs it at
 the session and hook seams, not the wire (`--proxy` is rejected unless that proxy already serves Responses on its
 Codex-facing endpoint — Forge adds no `/v1/responses` route). Both runtimes share the same hooks, state, and artifact
 paths.
+
+**Deployment note:** Sidecar mode is omitted from this overview because it packages proxy/runtime lifecycle without
+changing the data-flow boundaries shown here.
+
+**Telemetry planes:** model traffic and operation outcomes land in two planes joined to sessions by run-tree identity —
+`telemetry/downstream/` (per-attempt model-call evidence + spend caps, written by the proxy and direct runtime emitters)
+and `telemetry/upstream/` (per-operation policy/boundary outcomes). The `usage/events/` attribution ledger is written by
+every Forge subprocess consumer (supervisor, memory writer, workflow verbs, tagger) and read by the status line
+(`forge +$Y`) and `forge telemetry activity`.
 
 ---
 
@@ -90,9 +83,9 @@ proxy-scoped.
 ```mermaid
 flowchart LR
     subgraph SessionScope["Session Scope<br/>(user intent & artifacts)"]
-        Intent["intent<br/>- forge_root / launch<br/>- policy bundles / verification<br/>- memory behavior"]
+        Intent["intent<br/>- forge_root / launch<br/>- policy bundles / verification<br/>- memory behavior<br/>- consumer lanes (requested)"]
         Overrides["overrides<br/>(live toggles)"]
-        Confirmed["confirmed<br/>- artifacts<br/>- started_with_proxy<br/>- runtime facts"]
+        Confirmed["confirmed<br/>- artifacts<br/>- started_with_proxy<br/>- consumer lanes (frozen)<br/>- runtime facts"]
     end
 
     subgraph ProxyScope["Proxy Scope<br/>(routing & defaults)"]
@@ -198,6 +191,13 @@ flowchart TB
             W10["~/.forge/installed.json"]
             W11["extension files + merged settings"]
         end
+
+        subgraph Telemetry["Telemetry + usage emitters write:"]
+            W12["~/.forge/telemetry/downstream/*<br/>(proxy + runtime: model-call evidence)"]
+            W13["~/.forge/telemetry/upstream/*<br/>(operation / policy boundaries)"]
+            W14["~/.forge/telemetry/{caps,audit_state}/*<br/>(proxy spend + drift baselines)"]
+            W15["~/.forge/usage/events/*<br/>(attribution ledger)"]
+        end
     end
 
     W4c --> W6
@@ -209,10 +209,16 @@ flowchart TB
     style Deferred fill:#d1c4e9
     style ForgeProxy fill:#bbdefb
     style ForgeCLI fill:#f8bbd9
+    style Telemetry fill:#b2dfdb
 ```
 
 **Policy split:** `forge policy enable/disable` mutates `intent.policy`; the policy-check hook writes
 `confirmed.policy`; and `%policy ...` direct commands mutate session overrides.
+
+**Telemetry split (by direction, not feature):** the proxy owns `telemetry/downstream/` (per-attempt model-call
+evidence) plus cap/drift state; operation and policy boundaries own `telemetry/upstream/` (per-operation outcomes);
+Forge subprocess consumers append the `usage/events/` attribution ledger. Downstream is session-blind and joins to a
+session only through run-tree identity.
 
 ---
 
