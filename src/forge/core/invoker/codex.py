@@ -21,12 +21,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
-from typing import Literal, cast
+from typing import Literal
 
 from forge.core.invoker._lifecycle import (
     ParseHints,
     _HeadlessLifecycleBase,
     _Identity,
+    _record_worker_upstream,
     _status,
 )
 from forge.core.invoker.codex_stream import parse_codex_jsonl_stream
@@ -242,34 +243,4 @@ def _emit_codex(request: HeadlessRequest, result: HeadlessResult) -> None:
         output_tokens=result.output_tokens,
         cached_tokens=result.cached_tokens,
     )
-    # Opt-out upstream row: operation=None (the codex supervisor) keeps the usage event
-    # above but suppresses this row, so its only upstream outcome is the engine's
-    # policy.evaluate -- no double-count. See Attribution.operation.
-    if attribution.operation is None:
-        return
-    from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
-
-    record_upstream_operation(
-        command=attribution.command,
-        operation=attribution.operation,
-        status=cast(UpstreamStatus, status),
-        session=attribution.session,
-        run_id=result.run_id,
-        parent_run_id=result.parent_run_id,
-        root_run_id=result.root_run_id,
-        reason_code=_worker_reason_code(result),
-        message=None if status == "success" else result.error or result.stderr[:200] or None,
-        latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,
-    )
-
-
-def _worker_reason_code(result: HeadlessResult) -> str | None:
-    if result.timed_out:
-        return "timeout"
-    if result.error:
-        return "subprocess_error"
-    if result.runtime_is_error:
-        return "runtime_reported_error"
-    if result.returncode != 0:
-        return f"exit_{result.returncode}"
-    return None
+    _record_worker_upstream(attribution, result, status)

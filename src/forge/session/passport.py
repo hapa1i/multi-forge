@@ -98,7 +98,6 @@ class PassportUpdate:
     strategy: str = "generic"
     mode: str = "direct"
     writers: str = "all-sessions"
-    inherit_on_fork: bool = True
     compact_when: str | None = None
     shadow_path: str | None = None
     approval: str | None = None
@@ -416,13 +415,6 @@ def _parse_update(data: Any) -> PassportUpdate:
             f"must be a string (got {type(instruction).__name__})",
         )
 
-    inherit_on_fork = data.get("inherit_on_fork", True)
-    if not isinstance(inherit_on_fork, bool):
-        raise PassportError(
-            "forge_memory.update.inherit_on_fork",
-            f"must be a boolean (got {type(inherit_on_fork).__name__})",
-        )
-
     compact_when = data.get("compact_when")
     if compact_when is not None and not isinstance(compact_when, str):
         raise PassportError(
@@ -448,7 +440,6 @@ def _parse_update(data: Any) -> PassportUpdate:
         strategy=strategy,
         mode=mode,
         writers=writers,
-        inherit_on_fork=inherit_on_fork,
         compact_when=compact_when,
         shadow_path=shadow_path,
         approval=approval,
@@ -480,7 +471,6 @@ def _passport_to_dict(passport: Passport) -> dict[str, Any]:
     """Convert a Passport to a dict, omitting None-valued fields."""
     raw = asdict(passport)
     update = raw.get("update", {})
-    update.pop("inherit_on_fork", None)
     raw["update"] = {k: v for k, v in update.items() if v is not None}
     return raw
 

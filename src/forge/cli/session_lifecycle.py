@@ -865,7 +865,7 @@ def launch_new_session(
         print_error("--sidecar and --host-proxy are mutually exclusive", console=console)
         return 1
     if direct and (template or base_url):
-        print_error("--no-proxy cannot be combined with --template or --base-url", console=console)
+        print_error("--no-proxy cannot be combined with proxy routing (--proxy)", console=console)
         return 1
     if direct and sidecar:
         print_error("--no-proxy cannot be combined with --sidecar", console=console)

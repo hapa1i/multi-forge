@@ -1,6 +1,6 @@
 """Credential manager for LLM providers.
 
-Injectable singleton with TTL caching and proactive refresh.
+Injectable singleton with TTL caching and lazy, on-access refresh.
 Per-provider async locks prevent thundering herd on token refresh.
 
 Note: Does NOT call load_dotenv() - that's the responsibility of the
@@ -190,7 +190,7 @@ def resolve_provider_base_url(provider: ProviderType) -> str | None:
 
 
 class CredentialManager:
-    """Injectable credential manager with TTL caching and proactive refresh.
+    """Injectable credential manager with TTL caching and lazy, on-access refresh.
 
     Use CredentialManager.default() to get the global instance,
     or create your own instance for testing.

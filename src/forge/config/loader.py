@@ -81,8 +81,6 @@ def load_yaml(path: Path) -> dict:
     Notes:
         - Missing file: returns {}
         - Invalid YAML: returns {} (best-effort)
-
-    For strict parsing (fail fast), use load_yaml_strict().
     """
     if not path.exists():
         logger.debug(f"Config file not found: {path}")
@@ -95,30 +93,6 @@ def load_yaml(path: Path) -> dict:
     except yaml.YAMLError as e:
         logger.warning(f"Failed to parse {path}: {e}")
         return {}
-
-
-def load_yaml_strict(path: Path) -> dict:
-    """Load YAML file strictly.
-
-    Raises:
-        ValueError: if the file exists but cannot be parsed as a dict.
-    """
-    if not path.exists():
-        return {}
-
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Failed to parse YAML at {path}: {e}")
-
-    if data is None:
-        return {}
-
-    if not isinstance(data, dict):
-        raise ValueError(f"YAML at {path} must be a mapping (dict), got {type(data)}")
-
-    return data
 
 
 def get_defaults_dir() -> Path:

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import list_sessions
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.active import ActiveSessionStore
 
 
 def test_list_sessions_empty(tmp_path: Path, monkeypatch) -> None:
@@ -41,6 +43,40 @@ def test_list_sessions_reads_index(tmp_path: Path, monkeypatch) -> None:
     result = list_sessions(ctx=ctx, include_incognito=True)
 
     assert [s.name for s in result.sessions] == ["alpha"]
+
+
+def test_list_sessions_is_active_reflects_active_store(tmp_path: Path, monkeypatch) -> None:
+    """is_active is True only for sessions the runtime active-session registry lists as live."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    wt = tmp_path / "wt"
+    for name in ("live", "dormant"):
+        session_dir = wt / ".forge" / "sessions" / name
+        session_dir.mkdir(parents=True)
+        (session_dir / "forge.session.json").write_text("{}")
+        IndexStore().add_session(
+            name=name,
+            worktree_path=str(wt),
+            project_root=str(tmp_path),
+            forge_root=str(wt),
+            checkout_root=str(wt),
+            relative_path=".",
+        )
+
+    # Mark only "live" active, tagged with this process's PID so the liveness probe passes.
+    ActiveSessionStore().upsert_session(
+        "live",
+        worktree_path=str(wt),
+        launch_mode="host",
+        launcher_pid=os.getpid(),
+        forge_root=str(wt),
+    )
+
+    ctx = ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path)
+    result = list_sessions(ctx=ctx, include_incognito=True)
+
+    by_name = {s.name: s.is_active for s in result.sessions}
+    assert by_name == {"live": True, "dormant": False}
 
 
 def _seed_sessions(tmp_path: Path) -> None:

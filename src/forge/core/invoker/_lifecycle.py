@@ -32,9 +32,9 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, cast
 
-from forge.core.invoker.types import HeadlessRequest, HeadlessResult
+from forge.core.invoker.types import Attribution, HeadlessRequest, HeadlessResult
 from forge.core.reactive.env import (
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
@@ -84,6 +84,43 @@ def _status(result: HeadlessResult) -> str:
     if not result.success:
         return "error"
     return "error" if result.runtime_is_error else "success"
+
+
+def _worker_reason_code(result: HeadlessResult) -> str | None:
+    """Classify a non-success run for the upstream row's ``reason_code``."""
+    if result.timed_out:
+        return "timeout"
+    if result.error:
+        return "subprocess_error"
+    if result.runtime_is_error:
+        return "runtime_reported_error"
+    if result.returncode != 0:
+        return f"exit_{result.returncode}"
+    return None
+
+
+def _record_worker_upstream(attribution: Attribution, result: HeadlessResult, status: str) -> None:
+    """Record the per-worker upstream operation row (shared by the Claude + Codex invokers).
+
+    ``operation=None`` suppresses the row (parity with arms whose only upstream outcome is
+    the engine's ``policy.evaluate``); the usage event emitted by the caller stays.
+    """
+    if attribution.operation is None:
+        return
+    from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+
+    record_upstream_operation(
+        command=attribution.command,
+        operation=attribution.operation,
+        status=cast(UpstreamStatus, status),
+        session=attribution.session,
+        run_id=result.run_id,
+        parent_run_id=result.parent_run_id,
+        root_run_id=result.root_run_id,
+        reason_code=_worker_reason_code(result),
+        message=None if status == "success" else result.error or result.stderr[:200] or None,
+        latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,
+    )
 
 
 def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:

@@ -27,6 +27,30 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-01
 
+### accidental_complexity_cleanup Batch A: dead-code removal + drift fixes + one CLI bug
+
+**Goal**: Execute Batch A of the 2026-07-01 simplicity-audit card -- remove verified accidental complexity and fix the
+one bug it surfaced (branch `cleanup/accidental-complexity-batch-a`).
+
+**Key changes**:
+
+- Deleted zero-caller dead code: `promotion.py`, `resolve_template_paths`, `load_yaml_strict`,
+  `resolve_subprocess_proxy_url`, `_dedupe_specs` (verified no-op: sole caller feeds one unique-path scan), and the
+  never-run generic `_coerce_env_value` branch.
+- De-duplicated telemetry: `provider_trace_logger` imports `RequestMode`/`LocalUsageStatus` from owner `downstream.py`;
+  hoisted the byte-identical `_worker_reason_code` + upstream-emission block from the Claude/Codex invokers into the
+  shared `_lifecycle` base (`operation=None` suppression preserved). Passport drops the unread `inherit_on_fork` field
+  but keeps the key in `_KNOWN_UPDATE_KEYS` (accept-and-ignore).
+- **Bug fix (#1)**: `backend delete --port` drove `stop_cmd.callback()` (double "Stopped" + a `sys.exit` bypassing
+  delete's error path); both commands now share a silent `_stop_instance`.
+- **Behavior (#9)**: `ListSessionsItem.is_active` wired to the runtime `ActiveSessionStore` (was hardcoded `False`).
+- Docs/UX: reworded the `--no-proxy` guard to name `--proxy`; removed two stale CLI-alias doc lines; fixed the
+  `CredentialManager` "proactive refresh" docstring.
+
+**Verification**: full unit suite `7222 passed`; ruff + mypy + `make pre-commit` clean. New tests: `is_active` liveness,
+legacy-passport accept-and-ignore, backend delete-double-stop regression. Batches B/C + surfaced defects stay open
+(card in `doing/`).
+
 ### consumer_lanes epic: closeout (team-supervisor codex dispatch carved out)
 
 **Goal**: Close the `consumer_lanes` epic now that its lane contract is shipped and folded into normative design docs.

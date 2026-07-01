@@ -879,6 +879,19 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         sys.exit(1)
 
 
+def _stop_instance(adapter: str, port: int) -> None:
+    """Stop a single backend instance. Raises on failure; the caller owns output.
+
+    Shared by ``stop_cmd`` and ``delete_cmd`` so ``delete`` does not re-enter the
+    ``stop`` command (which would double-print "Stopped" and nest a ``sys.exit``).
+    """
+    backend_id = f"{adapter}-{port}"
+    store = BackendRegistryStore()
+    manager = BackendManager(store)
+    manager.register_adapter(adapter, get_adapter(adapter))
+    manager.stop_backend(backend_id)
+
+
 @backend.command("stop")
 @click.argument("source_or_adapter")
 @click.option("--port", "-p", type=int, required=False, help="Port number")
@@ -891,13 +904,8 @@ def stop_cmd(source_or_adapter: str, port: int | None) -> None:
         _exit_click_error(e, console)
 
     backend_id = f"{adapter}-{resolved_port}"
-
-    store = BackendRegistryStore()
-    manager = BackendManager(store)
-    manager.register_adapter(adapter, get_adapter(adapter))
-
     try:
-        manager.stop_backend(backend_id)
+        _stop_instance(adapter, resolved_port)
         console.print(f"[green]Stopped[/green] backend '{backend_id}'")
     except Exception as e:
         print_error(str(e), console=console)
@@ -934,7 +942,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
             return
 
         try:
-            stop_cmd.callback(adapter, port)  # type: ignore[misc]  # click.Command.callback is Optional[Callable]; always set here
+            _stop_instance(adapter, port)
             console.print(f"[green]Stopped[/green] backend instance '{backend_id}'")
         except Exception as e:
             print_error(str(e), console=console)
@@ -962,7 +970,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
                 try:
                     # Use rsplit to handle adapter names with hyphens (e.g., "some-adapter-4000")
                     port_str = backend_id.rsplit("-", 1)[1]
-                    stop_cmd.callback(adapter, int(port_str))  # type: ignore[misc]  # click.Command.callback is Optional[Callable]; always set here
+                    _stop_instance(adapter, int(port_str))
                     stopped.append(backend_id)
                 except Exception:
                     pass
