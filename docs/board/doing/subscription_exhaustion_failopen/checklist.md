@@ -85,31 +85,65 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
 
 ## Phase 2 -- Sticky degrade (hook-owned, fail-open)
 
-- [ ] Degrade-state in `confirmed.policy.policy_states["forge.supervisor_lane_degrade"]` (overlay key, NOT a policy id;
+- [x] Degrade-state in `confirmed.policy.policy_states["forge.supervisor_lane_degrade"]` (overlay key, NOT a policy id;
   no new strict-dataclass field; D3). Shape `{degraded, from_lane, to_lane, reason, at}` -- `from_lane`/`to_lane` are
-  full lane dicts for **audit/display only**.
-- [ ] **Write** (`cli/hooks/policy.py`, under the existing freeze lock): when a check returns
+  full lane dicts for **audit/display only**. Shipped: `policy/supervisor_lane_degrade.py` (set/read/is/clear).
+  **Verified:** `tests/src/policy/test_supervisor_lane_degrade.py` (7 tests incl.
+  `test_marker_survives_policy_state_merge`).
+- [x] **Write** (`cli/hooks/policy.py`, under the existing freeze lock): when a check returns
   `failure_type="subscription_exhausted"` on a codex lane, persist the marker. **Stale-write guard (mirror
   `persist_lane_freeze`, `consumer_lane_freeze.py:60`):** under the lock, write only if the supervisor is still
   configured AND `read_bound_lane(m, SUPERVISOR_CONSUMER) == dispatched_lane` -- else a concurrent remove/re-pin is
-  silently undone by a late hook write. Best-effort (a lock/IO failure never blocks the hook).
-- [ ] **Read** (top of the check, `cli/hooks/policy.py`): if degraded this session, inject `lane_record=None` (the
+  silently undone by a late hook write. Best-effort (a lock/IO failure never blocks the hook). **Verified:**
+  `tests/src/cli/hooks/test_policy.py` -- write-on-exhaustion, non-exhaustion-no-write, stale-guard-drops-write,
+  non-codex-never-degrades.
+- [x] **Read** (top of the check, `cli/hooks/policy.py`): if degraded this session, inject `lane_record=None` (the
   default claude lane) into `run_supervisor_check` instead of the bound codex lane. Route by `None`, **never** by the
   stored `to_lane`. The write-once `confirmed.consumer_lanes` binding is untouched (stays observable in `lane show`).
-- [ ] **Reset map -- follow the *binding*, not the command name** (all seams verified 2026-06-30). Clear via a
+  **Verified:** `test_policy.py::...test_register_injects_default_lane_when_degraded`.
+- [x] **Reset map -- follow the *binding*, not the command name** (all seams verified 2026-06-30). Clear via a
   policy-domain helper (NOT the lane primitives -- layering) at each site:
-  - `policy supervisor remove` (`policy.py:1344`) **and** `%policy supervisor remove` (`direct_commands.py:859`) -- both
+  - `policy supervisor remove` (`policy.py:1348`) **and** `%policy supervisor remove` (`direct_commands.py:862`) -- both
     call `clear_consumer_lane` (tears down confirmed) -> **clear** the marker.
-  - `policy supervisor set --runtime/--backend` (`policy.py:1256`) **and** `session lane set --consumer supervisor`
-    (`session_lane.py:163`) -- both call `set_intent_lane` (re-pin); a same-lane re-pin is the **only** re-pin that
-    succeeds when frozen (`set_cmd` rejects a different lane via `_LaneFrozen`) -> **clear** (the "topped up, retry
-    codex" signal).
-  - **Do NOT clear** on `session lane clear --consumer supervisor` (`clear_intent_lane`, `session_lane.py:184`) -- it
+  - `policy supervisor set --runtime/--backend` (`policy.py:1256`, gated on `lane_record is not None`) **and**
+    `session lane set --consumer supervisor` (`session_lane.py:168`, gated on `consumer.id == SUPERVISOR_CONSUMER.id`)
+    -- both call `set_intent_lane` (re-pin); a same-lane re-pin is the **only** re-pin that succeeds when frozen
+    (`set_cmd` rejects a different lane via `_LaneFrozen`) -> **clear** (the "topped up, retry codex" signal).
+  - **Do NOT clear** on `session lane clear --consumer supervisor` (`clear_intent_lane`, `session_lane.py:192`) -- it
     leaves the frozen confirmed binding, so codex still dispatches and the degrade still applies.
-- [ ] **Cross-resume (per-session):** clear the marker at session start/resume so a fresh resume re-tests codex (the
-  weekly quota may have refilled). Confirm the exact seam in Phase 2.
-- [ ] Fail-open throughout: a degrade-path error degrades the *check* to allow, never raises (design_workflows §1.2).
-- [ ] Acceptance: sticky-degrade, enforces-on-claude-after-degrade, one-hop-only, fail-open (card table).
+  - **Verified:** `tests/src/cli/test_session_lane.py` (set-supervisor-clears, non-supervisor-leaves, lane-clear-leaves)
+    - `tests/src/cli/test_policy_supervisor.py::...test_remove_clears_supervisor_degrade`. Sites B
+      (`policy supervisor set --backend`) and C (`%policy supervisor remove`) route through the *same*
+      `clear_supervisor_degrade` primitive via the *same* re-pin/teardown seam as the tested A/D sites; their gates
+      mirror the tested ones, so they are covered transitively rather than by duplicate CLI tests (recorded here, not
+      silently dropped).
+- [x] **Cross-resume (per-session): seam CONFIRMED = `session/hooks/session_start.py` `handle_session_start._mutate`**
+  (runs under the manifest lock, already branches on `hook_input.source`). Clear on `source in ("startup", "resume")` --
+  a fresh **process re-entry** is the natural retry boundary (the weekly quota may have refilled). **Preserve on
+  `compact`/`clear`:** both fire *mid-sitting* (quota unchanged); clearing there would re-arm codex on the next check
+  and re-exhaust (flap). (This narrows the earlier loose "startup/resume/clear" note -- `/clear` is a same-sitting
+  context reset, not a quota boundary.) **Verified:** `test_session_start.py` -- resume-clears, compact-preserves.
+- [x] Fail-open throughout: every degrade path is non-raising -- the write sits inside the existing freeze-lock mutate
+  (hook already fail-open on lock/IO), and all clears are idempotent `dict.pop` (`clear_supervisor_degrade`); none can
+  raise on normal state (design_workflows §1.2).
+- [x] Acceptance (card table), threaded through `run_supervisor_check` + the hook. Three NEW Phase-2 tests fill the
+  genuine gaps; the classifier/one-hop rows were already covered by Phase 1 (re-verified -- an earlier `grep | head`
+  truncation had hidden them, so the first-draft "keystone"/"one-hop" tests were duplicates and were deleted):
+  - **NEW -- exhausted degrades sticky (write->read on one manifest)**: an exhausting check writes the marker, the NEXT
+    registration reads it and injects None -- proves the two seams agree on the overlay key + shape
+    (`test_policy.py::...test_exhaustion_write_then_register_injects_default`).
+  - **NEW -- degraded supervisor enforces**: `lane_record=None` -> claude dispatch + a real **deny**, not fail-open
+    (`test_supervisor.py::TestInjectedLaneBinding::test_degraded_default_lane_still_enforces_a_deny`).
+  - **NEW -- fail-open preserved**: a drifted-default `resolve_supervisor_lane` raise still writes the marker
+    (`to_lane=None`), no crash (`test_policy.py::...test_degrade_write_survives_default_resolution_failure`).
+  - **Already covered (Phase 1)**: classifier->degrade keystone
+    (`test_codex_quota_runtime_error_classified_subscription_exhausted` + the exit-0 fold companion); **one hop only** /
+    **non-quota no degrade** (`test_claude_lane_quota_like_error_stays_subprocess_error` -- the codex-only G1 gate means
+    a default-claude failure never re-classifies as exhaustion, so no second hop -- plus the hook's
+    `test_non_exhaustion_failure_writes_no_degrade`); **healthy subscription unchanged**
+    (`test_override_dispatches_to_codex_and_parses_verdict`).
+  - **Deferred to Phase 3**: the "one degradation **event**" row asserts exactly one `record_upstream_operation` outcome
+    -- that observability hook is not wired yet (Phase 3 below), so that row lands with it.
 
 ## Phase 3 -- Observability + docs
 

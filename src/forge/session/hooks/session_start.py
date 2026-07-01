@@ -305,6 +305,18 @@ def handle_session_start(
                     new_uuid[:8],
                 )
 
+            # T7: a fresh process re-entry (startup/resume) is the natural retry boundary for the
+            # codex subscription degrade -- the weekly quota may have refilled since it exhausted,
+            # so clear the sticky marker and let the next supervisor check re-probe codex. Preserve
+            # it on compact/clear: those fire mid-sitting, where the quota is unchanged and re-arming
+            # codex would just exhaust and re-degrade (flap).
+            if hook_input.source in ("startup", "resume"):
+                from forge.policy.supervisor_lane_degrade import (
+                    clear_supervisor_degrade,
+                )
+
+                clear_supervisor_degrade(state)
+
             # 1:1 model: overwrite UUID (no accumulation)
             confirmed.claude_session_id = new_uuid
 

@@ -183,12 +183,18 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
             SUPERVISOR_CONSUMER,
             SemanticSupervisorPolicy,
         )
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
         from forge.session.consumer_lanes import read_bound_lane
 
         sup_cfg = effective.policy.supervisor
         # Inject the supervisor's consumer-lane binding (epic consumer_lanes, T1b). The hook holds
         # the manifest; the semantic module never reads the store. None => the default lane.
         lane_record = read_bound_lane(manifest, SUPERVISOR_CONSUMER)
+        # T7 sticky degrade: if the bound codex subscription lane exhausted earlier this session,
+        # route around it to the default claude lane. The frozen codex binding is left intact
+        # (still observable in `lane show`); only this run's dispatch lane is overridden to None.
+        if lane_record is not None and is_supervisor_degraded(manifest):
+            lane_record = None
         if sup_cfg and sup_cfg.cascade:
             # Cascade: the cheap tier-1 plan check runs on every event; the frontier
             # supervisor becomes the needs_review resolver (invoked only on escalation).
@@ -204,6 +210,20 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
         existing_policy_state = manifest.confirmed.policy.policy_states
     engine.restore_state(existing_policy_state)
     return lane_record
+
+
+def _supervisor_exhausted(entries: list[tuple[Any, str]]) -> bool:
+    """True iff any composite decision carries a supervisor subscription-exhaustion failure.
+
+    The signal Phase 1 surfaces (``failure_type="subscription_exhausted"`` on the supervisor's
+    fail-open decision) -- read off ``CompositeDecision.decisions`` so the post-eval write knows
+    a codex lane just exhausted.
+    """
+    return any(
+        getattr(d, "failure_type", None) == "subscription_exhausted"
+        for result, _ in entries
+        for d in getattr(result, "decisions", [])
+    )
 
 
 def _persist_policy_decisions(
@@ -300,6 +320,33 @@ def _persist_policy_decisions(
 
             if read_bound_lane(m, SUPERVISOR_CONSUMER) == supervisor_lane:
                 ensure_consumer_lane_binding(m, SUPERVISOR_CONSUMER, supervisor_lane)
+                # T7 sticky degrade: if a check exhausted the codex subscription this eval,
+                # persist the degrade overlay so subsequent checks route to the default claude
+                # lane (the read side injects lane_record=None). Shares the freeze's stale-write
+                # guard and lock -- a concurrent remove/re-pin already changed read_bound_lane(m),
+                # dropping this write. ``to_lane`` is audit-only; routing never trusts it.
+                if (
+                    supervisor_lane is not None
+                    and supervisor_lane.runtime_id == "codex"
+                    and _supervisor_exhausted(entries)
+                ):
+                    from forge.policy.semantic.supervisor import resolve_supervisor_lane
+                    from forge.policy.supervisor_lane_degrade import (
+                        set_supervisor_degrade,
+                    )
+
+                    try:
+                        default = resolve_supervisor_lane(None)
+                        to_lane: LaneRecord | None = LaneRecord(default.runtime_id, default.backend_id, default.model)
+                    except Exception:  # audit-only; a drifted default still degrades (route by None)
+                        to_lane = None
+                    set_supervisor_degrade(
+                        m,
+                        from_lane=supervisor_lane,
+                        to_lane=to_lane,
+                        reason="subscription_exhausted",
+                        at=now_iso(),
+                    )
 
     store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
 

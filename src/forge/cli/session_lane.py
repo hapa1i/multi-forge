@@ -158,6 +158,14 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         if current is not None and current != lane_record:
             raise _LaneFrozen(current)
         set_intent_lane(m, consumer, lane_record)
+        # T7: re-pinning the supervisor's lane is the "topped up, retry codex" signal -- clear
+        # any sticky degrade so the next check dispatches the requested lane, not the default.
+        # (Supervisor-only; other consumers have no degrade overlay.)
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+        from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
+
+        if consumer.id == SUPERVISOR_CONSUMER.id:
+            clear_supervisor_degrade(m)
 
     try:
         result.store.update(timeout_s=5.0, mutate=_apply)

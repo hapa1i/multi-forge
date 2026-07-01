@@ -849,6 +849,7 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
             from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+            from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
             from forge.session.consumer_lanes import clear_consumer_lane
 
             if m.intent.policy and m.intent.policy.supervisor:
@@ -857,6 +858,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
             # starts from the default lane, not a resurrected binding (matches `policy
             # supervisor remove`).
             clear_consumer_lane(m, SUPERVISOR_CONSUMER)
+            # T7: the codex binding is gone -- drop any stale sticky-degrade overlay too.
+            clear_supervisor_degrade(m)
 
         try:
             store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_remove)

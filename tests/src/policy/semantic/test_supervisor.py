@@ -73,6 +73,12 @@ def _codex_result(**overrides: Any) -> Any:
 
 
 _VALID_VERDICT_STDOUT = '```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```'
+# A blocking verdict: divergent + confidence >= 0.8 + a cited violation (verdict.py:161 deny gate).
+_DENY_VERDICT_STDOUT = (
+    '```json\n{"verdict": "divergent", "confidence": 0.95, '
+    '"violations": [{"evidence": "Adds an unapproved endpoint", "severity": "high", '
+    '"citations": ["Section 2: API design"]}]}\n```'
+)
 
 
 def _allow_decision(warnings: list[str] | None = None) -> PolicyDecision:
@@ -1062,6 +1068,25 @@ class TestInjectedLaneBinding:
         )
 
         assert read_usage_events(command="supervisor")[0].billing_mode == "api"
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_degraded_default_lane_still_enforces_a_deny(self, mock_claude: MagicMock, _mock_emit: MagicMock) -> None:
+        """T7 'degraded supervisor enforces': lane_record=None (the degraded route) dispatches the
+        default claude lane and produces a REAL verdict -- a high-confidence cited divergence still
+        DENIES, not a fail-open. Degrade restores enforcement on claude; it is not a silent skip."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_claude.return_value = SessionResult(stdout=_DENY_VERDICT_STDOUT, stderr="", returncode=0)
+
+        result = run_supervisor_check(
+            _make_config(resume_id=_CODEX_UUID, direct=True), _make_context(), lane_record=None
+        )
+
+        mock_claude.assert_called_once()  # dispatched the default claude lane, never codex
+        assert result.decision.decision == "deny"
+        assert result.decision.fail_open is False  # a genuine verdict, not a degrade-to-allow
 
 
 class TestCodexSupervisorLane:

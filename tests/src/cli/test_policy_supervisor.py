@@ -765,6 +765,33 @@ class TestSupervisorToggle:
         confirmed = updated.confirmed.consumer_lanes
         assert confirmed is None or confirmed.supervisor is None
 
+    def test_remove_clears_supervisor_degrade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """T7: removing the supervisor orphans the codex binding, so the sticky degrade is dropped too."""
+        from forge.policy.supervisor_lane_degrade import (
+            is_supervisor_degraded,
+            set_supervisor_degrade,
+        )
+
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        _apply_supervisor_to_intent(manifest, SupervisorConfig(resume_id="planner", direct=True))
+        set_supervisor_degrade(
+            manifest,
+            from_lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+            to_lane=None,
+            reason="subscription_exhausted",
+            at=now_iso(),
+        )
+        store = SessionStore(str(temp_guard_env), "worker")
+        store.write(manifest)
+        assert is_supervisor_degraded(store.read()) is True  # precondition
+
+        result = runner.invoke(main, ["policy", "supervisor", "remove"])
+        assert result.exit_code == 0, result.output
+
+        assert is_supervisor_degraded(store.read()) is False
+
     def test_off_without_supervisor_reports_not_configured(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:

@@ -69,6 +69,19 @@ def _seed(
     return store
 
 
+def _seed_degrade(store: SessionStore) -> None:
+    """Seed a sticky codex degrade marker (the T7 supervisor overlay) into the manifest."""
+    from forge.policy.supervisor_lane_degrade import set_supervisor_degrade
+
+    codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+    store.update(
+        timeout_s=5.0,
+        mutate=lambda m: set_supervisor_degrade(
+            m, from_lane=codex, to_lane=None, reason="subscription_exhausted", at=now_iso()
+        ),
+    )
+
+
 def test_set_writes_intent_slot(runner: CliRunner, project: Path) -> None:
     store = _seed(project)
     result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "claude-max"])
@@ -182,6 +195,44 @@ def test_clear_removes_intent_only_preserving_frozen(runner: CliRunner, project:
     assert intent is not None and confirmed is not None and confirmed.memory_writer is not None
     assert intent.memory_writer is None
     assert confirmed.memory_writer.lane == _CLAUDE_MAX
+
+
+def test_supervisor_set_clears_degrade(runner: CliRunner, project: Path) -> None:
+    """T7 reset map: re-pinning the supervisor lane ('topped up, retry codex') clears the sticky degrade."""
+    from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+    store = _seed(project)
+    _seed_degrade(store)
+    assert is_supervisor_degraded(store.read()) is True  # precondition
+
+    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "supervisor", "--backend", "claude-max"])
+    assert result.exit_code == 0, result.output
+    assert is_supervisor_degraded(store.read()) is False
+
+
+def test_set_non_supervisor_consumer_leaves_degrade(runner: CliRunner, project: Path) -> None:
+    """The degrade overlay is supervisor-only: setting another consumer's lane must not clear it."""
+    from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+    store = _seed(project)
+    _seed_degrade(store)
+
+    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "claude-max"])
+    assert result.exit_code == 0, result.output
+    assert is_supervisor_degraded(store.read()) is True
+
+
+def test_supervisor_clear_lane_leaves_degrade(runner: CliRunner, project: Path) -> None:
+    """D3 asymmetry: 'lane clear' drops the intent request but is NOT a 'retry codex' signal,
+    so the sticky degrade survives (only remove/re-pin reset it)."""
+    from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+
+    store = _seed(project, intent=ConsumerLaneIntent(supervisor=_CLAUDE_MAX))
+    _seed_degrade(store)
+
+    result = runner.invoke(main, ["session", "lane", "clear", "--consumer", "supervisor"])
+    assert result.exit_code == 0, result.output
+    assert is_supervisor_degraded(store.read()) is True
 
 
 def test_no_session_exits_with_error(runner: CliRunner, tmp_path: Path, monkeypatch) -> None:
