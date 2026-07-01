@@ -21,10 +21,12 @@ pytestmark = pytest.mark.regression
 @pytest.mark.parametrize(
     "env_key,config_path,test_value",
     [
-        ("GEMINI_AUTH_URL", ("proxy", "gemini", "auth_url"), "12345"),
-        ("GEMINI_AUTH_URL", ("proxy", "gemini", "auth_url"), "007"),
-        ("OPENAI_AUTH_URL", ("proxy", "openai", "auth_url"), "true"),
-        ("OPENAI_AUTH_URL", ("proxy", "openai", "auth_url"), "false"),
+        # The *_AUTH_URL mappings were removed in the accidental-complexity cleanup;
+        # FORGE_HOME is the surviving env mapping and still must not be type-coerced.
+        ("FORGE_HOME", ("session", "forge_home"), "12345"),
+        ("FORGE_HOME", ("session", "forge_home"), "007"),
+        ("FORGE_HOME", ("session", "forge_home"), "true"),
+        ("FORGE_HOME", ("session", "forge_home"), "false"),
         ("FORGE_HOME", ("session", "forge_home"), "0"),
     ],
 )
@@ -34,7 +36,7 @@ def test_all_secret_mappings_return_strings(
     config_path: tuple,
     test_value: str,
 ) -> None:
-    """All secret env vars must be preserved as strings, never type-coerced."""
+    """Mapped env vars must be preserved as strings, never type-coerced."""
     from forge.config.loader import env_to_dict
 
     monkeypatch.setenv(env_key, test_value)

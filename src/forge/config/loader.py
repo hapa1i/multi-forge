@@ -259,25 +259,22 @@ def read_template(template: str) -> str:
 
 
 def env_to_dict() -> dict:
-    """Map secret environment variables to config dict.
+    """Map recognized environment variables to a config dict.
 
-    Only maps secrets (API keys, auth URLs). Configuration belongs in
-    templates/proxies, not environment variables.
+    Only maps env-provided overrides (currently FORGE_HOME). Provider
+    configuration belongs in templates/proxies, not environment variables.
     """
-    result: dict = {"proxy": {"gemini": {}, "openai": {}, "litellm": {}}, "session": {}}
+    result: dict = {"session": {}}
 
-    secret_mappings = {
-        # Auth URLs (remote endpoints)
-        "GEMINI_AUTH_URL": ("proxy", "gemini", "auth_url"),
-        "OPENAI_AUTH_URL": ("proxy", "openai", "auth_url"),
+    env_mappings = {
         # Forge home (user-specific path override)
         "FORGE_HOME": ("session", "forge_home"),
     }
 
-    for env_key, config_path in secret_mappings.items():
+    for env_key, config_path in env_mappings.items():
         value = os.environ.get(env_key)
         if value is not None:
-            # Secrets are opaque strings — no type coercion (H6: "007" must not become 7)
+            # Values are opaque strings — no type coercion (H6: "007" must not become 7)
             _set_nested(result, config_path, value)
 
     return result
@@ -513,24 +510,15 @@ def _proxy_instance_to_forge_config(
 
     This is used when loading from the new proxy.yaml format.
     The ProxyInstanceConfig contains everything needed to configure the proxy.
-    Secrets (auth_url) are applied from environment variables.
+    Environment overrides (forge_home) are applied from env_to_dict().
     """
     secrets = env_to_dict()
-
-    provider = proxy_config.provider
-    auth_url: str | None = None
-    if provider == "gemini":
-        auth_url = secrets.get("proxy", {}).get("gemini", {}).get("auth_url")
-    elif provider == "openai":
-        auth_url = secrets.get("proxy", {}).get("openai", {}).get("auth_url")
-    # Note: litellm uses underlying provider auth, not a separate auth_url
 
     provider_config = ProviderConfig(
         tiers=proxy_config.tiers,
         tier_overrides=proxy_config.tier_overrides,
         model_alternatives=proxy_config.model_alternatives,
         base_url=proxy_config.upstream_base_url,
-        auth_url=auth_url or "",  # Empty string if no secret set
         openai_api_mode=proxy_config.provider_settings.get("openai_api_mode", "auto"),
         prompt_caching=proxy_config.prompt_caching,
         auto_cache_min_tokens=proxy_config.auto_cache_min_tokens,
@@ -552,11 +540,7 @@ def _proxy_instance_to_forge_config(
         logging=proxy_config.logging,
     )
 
-    if proxy_config.provider == "gemini":
-        proxy_server_config.gemini = provider_config
-    elif proxy_config.provider == "openai":
-        proxy_server_config.openai = provider_config
-    elif proxy_config.provider == "openrouter":
+    if proxy_config.provider == "openrouter":
         proxy_server_config.openrouter = provider_config
     else:  # litellm is default
         proxy_server_config.litellm = provider_config

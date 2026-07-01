@@ -81,31 +81,27 @@ class TestLoadYaml:
 
 
 class TestEnvToDict:
-    """Tests for environment variable mapping (secrets-only mode)."""
+    """Tests for environment variable mapping (recognized overrides only)."""
 
-    def test_maps_secrets(self, monkeypatch):
-        """Maps secret env vars (secrets-only)."""
-        monkeypatch.setenv("GEMINI_AUTH_URL", "https://auth.example.com")
+    def test_maps_forge_home(self, monkeypatch):
+        """Maps FORGE_HOME to session.forge_home."""
         monkeypatch.setenv("FORGE_HOME", "/custom/forge")
 
         result = env_to_dict()
 
-        assert result["proxy"]["gemini"]["auth_url"] == "https://auth.example.com"
         assert result["session"]["forge_home"] == "/custom/forge"
 
-    def test_only_secrets_mapped(self, monkeypatch):
-        """Only secrets are mapped, config vars are ignored."""
-        # These env vars are NOT in secret_mappings
+    def test_ignores_non_mapped_env(self, monkeypatch):
+        """Provider/config env vars and the removed *_AUTH_URL secrets are not mapped."""
         monkeypatch.setenv("LITELLM_BASE_URL", "http://example.com")
         monkeypatch.setenv("PREFERRED_PROVIDER", "openai")
-        monkeypatch.setenv("ACTIVE_TEMPLATE", "litellm-gemini")
+        monkeypatch.setenv("GEMINI_AUTH_URL", "https://auth.example.com")
+        monkeypatch.setenv("OPENAI_AUTH_URL", "https://auth.example.com")
 
         result = env_to_dict()
 
-        # These should NOT be in result (not secrets)
-        assert result["proxy"]["litellm"].get("base_url") is None
-        assert result["proxy"].get("preferred_provider") is None
-        assert result["proxy"].get("active_template") is None
+        # No proxy/auth_url plumbing remains; only recognized overrides map through
+        assert "proxy" not in result
 
 
 class TestLoadConfig:
@@ -773,35 +769,6 @@ class TestLoadConfigWithProxy:
         # Load with non-existent proxy_id - should raise ValueError
         with pytest.raises(ValueError, match="Proxy not found"):
             load_config(proxy_id="nonexistent")
-
-    def test_load_config_with_lease_applies_secrets(self, tmp_path, monkeypatch):
-        """Secrets (auth_url) are applied when loading proxy config."""
-        from forge.config import load_config
-        from forge.config.loader import write_proxy_instance_config
-        from forge.config.schema import ProxyInstanceConfig, TierModels
-
-        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
-        # Set secret auth_url via environment
-        monkeypatch.setenv("GEMINI_AUTH_URL", "https://secret.auth.example.com")
-
-        # Create proxy.yaml (provider=gemini to trigger auth_url lookup)
-        proxy_config = ProxyInstanceConfig(
-            proxy_format=1,
-            template="litellm-gemini",
-            template_digest="sha256:test123",
-            provider="gemini",  # Important: must be gemini to test GEMINI_AUTH_URL
-            proxy_endpoint="http://localhost:8084",
-            port=8084,
-            upstream_base_url="https://litellm.test.example.com",
-            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
-        )
-        write_proxy_instance_config("secret-test", proxy_config)
-
-        # Load with proxy_id - should apply secrets
-        config = load_config(proxy_id="secret-test")
-
-        # Verify secrets are applied
-        assert config.proxy.gemini.auth_url == "https://secret.auth.example.com"
 
 
 class TestTemplateResolution:

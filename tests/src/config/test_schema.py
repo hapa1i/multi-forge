@@ -425,12 +425,33 @@ class TestProxyInstanceConfigValidation:
         """Invalid provider should be rejected."""
         from forge.config.schema import ProxyInstanceConfig, TierModels
 
-        with pytest.raises(ValueError, match="Invalid provider"):
+        with pytest.raises(ValueError, match="Unsupported proxy provider"):
             ProxyInstanceConfig(
                 proxy_format=1,
                 template="test",
                 template_digest="sha256:test",
                 provider="invalid_provider",  # Invalid
+                proxy_endpoint="http://localhost:8084",
+                port=8084,
+                upstream_base_url="https://litellm.test.example.com",
+                tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            )
+
+    @pytest.mark.parametrize("provider", ["gemini", "openai"])
+    def test_gemini_openai_providers_rejected(self, provider):
+        """gemini/openai are no longer standalone proxy providers (served via LiteLLM).
+
+        Validation runs on every load, so a persisted proxy.yaml with these values
+        fails fast with a message naming the supported providers and a recreate path.
+        """
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        with pytest.raises(ValueError, match="supported: litellm, openrouter"):
+            ProxyInstanceConfig(
+                proxy_format=1,
+                template="test",
+                template_digest="sha256:test",
+                provider=provider,
                 proxy_endpoint="http://localhost:8084",
                 port=8084,
                 upstream_base_url="https://litellm.test.example.com",
