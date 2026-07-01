@@ -173,8 +173,8 @@ def test_proxy_launch_sets_base_url_and_context_limit(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert captured["env_vars"]["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
     assert captured["env_vars"]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "1048576"
-    assert captured["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6[1m]"
-    assert captured["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-4-6[1m]"
+    assert captured["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8[1m]"
+    assert captured["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-5[1m]"
     assert "ANTHROPIC_MODEL" not in captured["env_vars"]
     assert captured["env_vars"]["ACTIVE_TEMPLATE"] == "openrouter-gemini"
     assert captured["env_vars"]["FORGE_PROXY_WIRE_SHAPE"] == "openai_translated"

@@ -153,11 +153,11 @@ those are different jobs that reward different capabilities. The same provider's
 for one role and the wrong pick for another:
 
 ```bash
-# Planner/supervisor source on the proxy default (Fable 5)
+# Planner/supervisor source on the proxy default (Opus 4.8)
 forge session start planner --proxy openrouter-anthropic
 
-# Executor on Opus 4.8, checked against the planner by a read-only supervisor
-forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
+# Executor pinned to the top-tier Fable 5, checked against the planner by a read-only supervisor
+forge session start exec --proxy openrouter-anthropic --model claude-fable-5 --supervise planner
 ```
 
 See [model_selection.md](model_selection.md) for per-role recommendations, the structural reasons context fidelity

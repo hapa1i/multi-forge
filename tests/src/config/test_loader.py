@@ -194,15 +194,18 @@ class TestLoadConfig:
         assert config.proxy.source == "openrouter"
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
-        assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-4.6"
-        # Opus tier defaults to Fable 5; Opus 4.8/4.6 stay selectable via --model.
-        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-fable-5"
+        assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5"
+        # Defaults: sonnet -> Sonnet 5, opus -> Opus 4.8; displaced models stay selectable via --model.
+        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-4.8"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
         assert config.proxy.openrouter.model_alternatives == {
             "opus": {
-                "claude-opus-4-8": "anthropic/claude-opus-4.8",
+                "claude-fable-5": "anthropic/claude-fable-5",
                 "claude-opus-4-6": "anthropic/claude-opus-4.6",
-            }
+            },
+            "sonnet": {
+                "claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
+            },
         }
 
     def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
@@ -257,27 +260,32 @@ class TestLoadConfig:
         assert config.proxy.source == "litellm-remote"
         assert config.proxy.litellm.base_url == ""
 
-    def test_litellm_anthropic_templates_default_opus_to_fable(self):
-        """LiteLLM Anthropic templates default opus to Fable 5 with 4.8/4.6 alternatives."""
+    def test_litellm_anthropic_templates_default_opus_to_4_8(self):
+        """LiteLLM Anthropic templates default opus to Opus 4.8, sonnet to Sonnet 5."""
         for template in ("litellm-anthropic", "litellm-anthropic-local"):
             config = load_config(template=template)
 
             assert config.proxy.preferred_provider == "litellm", template
-            assert config.proxy.litellm.tiers.opus == "anthropic/claude-fable-5", template
+            assert config.proxy.litellm.tiers.sonnet == "anthropic/claude-sonnet-5", template
+            assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-4-8", template
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
-                    "claude-opus-4-8": "anthropic/claude-opus-4-8",
+                    "claude-fable-5": "anthropic/claude-fable-5",
                     "claude-opus-4-6": "anthropic/claude-opus-4-6",
-                }
+                },
+                "sonnet": {
+                    "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
+                },
             }, template
 
-    def test_anthropic_passthrough_opus_tier_is_fable(self):
-        """Passthrough forwards the client model unchanged; opus tier default is Fable 5 (no alternatives map)."""
+    def test_anthropic_passthrough_opus_tier_is_4_8(self):
+        """Passthrough forwards the client model unchanged; opus tier default is Opus 4.8 (no alternatives map)."""
         config = load_config(template="anthropic-passthrough")
 
         assert config.proxy.source == "anthropic-passthrough"
         assert config.proxy.litellm.base_url == "https://api.anthropic.com"
-        assert config.proxy.litellm.tiers.opus == "claude-fable-5"
+        assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5"
+        assert config.proxy.litellm.tiers.opus == "claude-opus-4-8"
         assert config.proxy.litellm.model_alternatives == {}
 
     def test_openrouter_config_placed_on_correct_field(self):

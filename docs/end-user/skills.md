@@ -125,11 +125,12 @@ consensus findings, unique insights, and conflicts.
 | ------------------------ | ----------------------------------- | ----------------------- |
 | `gpt-5.5`                | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
-| `claude-opus`            | Stable Claude Opus 4.6 reasoning    | Direct Anthropic        |
+| `claude-opus`            | Default Claude Opus 4.8 reasoning   | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
-(most capable). Use `--models claude-opus-4.6,claude-opus-4.8` when you want both stable Opus 4.6 and bounded-review
-Opus 4.8 in the panel, or add `claude-fable` for the top-tier model.
+(most capable). The default `claude-opus` worker resolves to Opus 4.8; use `--models claude-opus-4.6,claude-opus-4.8`
+when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
+model.
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
