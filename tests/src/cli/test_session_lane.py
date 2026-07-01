@@ -178,6 +178,29 @@ def test_show_json_reflects_requested_and_frozen(runner: CliRunner, project: Pat
     }
 
 
+def test_show_json_flags_supervisor_degraded(runner: CliRunner, project: Path) -> None:
+    """T7: `lane show --json` marks the supervisor row degraded (its frozen codex lane is routed to
+    the default this session) while leaving the frozen binding itself untouched; other consumers are
+    never flagged (supervisor-only overlay)."""
+    store = _seed(
+        project,
+        confirmed=ConsumerLaneConfirmed(
+            supervisor=ConsumerLaneBinding(
+                lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at=now_iso()
+            )
+        ),
+    )
+    _seed_degrade(store)
+
+    result = runner.invoke(main, ["session", "lane", "show", "--json"])
+    assert result.exit_code == 0, result.output
+    by_id = {row["consumer"]: row for row in json.loads(result.output)["consumers"]}
+    assert by_id["supervisor"]["degraded"] is True
+    assert by_id["memory_writer"]["degraded"] is False  # supervisor-only overlay
+    # Degrade routes around the binding, never rewrites it: frozen is still codex.
+    assert by_id["supervisor"]["frozen"] == {"runtime": "codex", "backend": "chatgpt", "model": "gpt-5-codex"}
+
+
 def test_clear_removes_intent_only_preserving_frozen(runner: CliRunner, project: Path) -> None:
     """`clear` drops the intent request but leaves an already-frozen confirmed binding."""
     store = _seed(

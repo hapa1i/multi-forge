@@ -212,17 +212,45 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
     return lane_record
 
 
-def _supervisor_exhausted(entries: list[tuple[Any, str]]) -> bool:
-    """True iff any composite decision carries a supervisor subscription-exhaustion failure.
+def _exhausted_supervisor_decision(entries: list[tuple[Any, str]]) -> Any | None:
+    """Return the supervisor fail-open decision that hit the codex subscription wall, or None.
 
     The signal Phase 1 surfaces (``failure_type="subscription_exhausted"`` on the supervisor's
-    fail-open decision) -- read off ``CompositeDecision.decisions`` so the post-eval write knows
-    a codex lane just exhausted.
+    fail-open decision) -- read off ``CompositeDecision.decisions`` so the post-eval write knows a
+    codex lane just exhausted, and the degrade telemetry can borrow its run-tree ids.
     """
-    return any(
-        getattr(d, "failure_type", None) == "subscription_exhausted"
-        for result, _ in entries
-        for d in getattr(result, "decisions", [])
+    for result, _ in entries:
+        for d in getattr(result, "decisions", []):
+            if getattr(d, "failure_type", None) == "subscription_exhausted":
+                return d
+    return None
+
+
+def _emit_lane_degraded(payload: dict[str, Any]) -> None:
+    """Record the single upstream ``policy.lane_degraded`` outcome for a T7 degrade (best-effort).
+
+    Fired AFTER the store lock (``store.update`` may retry the mutate; telemetry I/O must not run
+    under the lock). This is an operation-outcome row (read by ``forge telemetry activity``), not a
+    ``UsageEvent`` -- the degrade is a routing decision, not a model call.
+    """
+    from forge.core.telemetry.upstream import record_upstream_operation
+
+    from_lane: LaneRecord = payload["from_lane"]
+    to_lane: LaneRecord | None = payload["to_lane"]
+    to_desc = "claude default" if to_lane is None else f"{to_lane.runtime_id}/{to_lane.backend_id}/{to_lane.model}"
+    record_upstream_operation(
+        command="supervisor",
+        operation="policy.lane_degraded",
+        status="warning",
+        session=payload.get("session"),
+        policy_id="semantic.supervisor",
+        reason_code="subscription_exhausted",
+        message=(
+            f"supervisor lane degraded: {from_lane.runtime_id}/{from_lane.backend_id}/{from_lane.model} -> {to_desc}"
+        ),
+        run_id=payload.get("run_id"),
+        parent_run_id=payload.get("parent_run_id"),
+        root_run_id=payload.get("root_run_id"),
     )
 
 
@@ -255,7 +283,12 @@ def _persist_policy_decisions(
     from forge.policy.store import build_policy_state_update
     from forge.session.models import PolicyConfirmed
 
+    # Captured under the lock, emitted after it: a T7 degrade fires exactly one upstream outcome,
+    # but telemetry I/O must not run inside store.update (which may retry the mutate). None => no degrade.
+    degrade_emit: dict[str, Any] | None = None
+
     def _mutate(m: object) -> None:
+        nonlocal degrade_emit
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
 
@@ -325,11 +358,8 @@ def _persist_policy_decisions(
                 # lane (the read side injects lane_record=None). Shares the freeze's stale-write
                 # guard and lock -- a concurrent remove/re-pin already changed read_bound_lane(m),
                 # dropping this write. ``to_lane`` is audit-only; routing never trusts it.
-                if (
-                    supervisor_lane is not None
-                    and supervisor_lane.runtime_id == "codex"
-                    and _supervisor_exhausted(entries)
-                ):
+                exhausted = _exhausted_supervisor_decision(entries)
+                if supervisor_lane is not None and supervisor_lane.runtime_id == "codex" and exhausted is not None:
                     from forge.policy.semantic.supervisor import resolve_supervisor_lane
                     from forge.policy.supervisor_lane_degrade import (
                         set_supervisor_degrade,
@@ -347,8 +377,18 @@ def _persist_policy_decisions(
                         reason="subscription_exhausted",
                         at=now_iso(),
                     )
+                    degrade_emit = {
+                        "session": m.name,
+                        "from_lane": supervisor_lane,
+                        "to_lane": to_lane,
+                        "run_id": getattr(exhausted, "telemetry_run_id", None),
+                        "parent_run_id": getattr(exhausted, "telemetry_parent_run_id", None),
+                        "root_run_id": getattr(exhausted, "telemetry_root_run_id", None),
+                    }
 
     store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+    if degrade_emit is not None:
+        _emit_lane_degraded(degrade_emit)
 
 
 def _persist_policy_state(

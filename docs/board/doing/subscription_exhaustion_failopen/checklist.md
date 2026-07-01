@@ -147,18 +147,23 @@ Resolved D1 with source evidence, not a guess. Gate passed; Phase 1 implemented 
 
 ## Phase 3 -- Observability + docs
 
-- [ ] One **upstream** operation outcome via `record_upstream_operation` (`command=supervisor`,
+- [x] One **upstream** operation outcome via `record_upstream_operation` (`command=supervisor`,
   `operation=policy.lane_degraded`, `reason_code=subscription_exhausted`, from/to lane in `message`), read by
-  `forge telemetry activity` (Operation outcomes pane). NOT a `UsageEvent` (model-call/cost plane -- wrong shape).
-  Self-contained, no T5 dependency.
-- [ ] Surface "degraded this session" on a read surface (`forge session lane show` and/or
-  `forge policy supervisor status`) so the operator can see the lane was routed around without editing the
-  (still-frozen) binding.
-- [ ] Design-doc sync: `design_workflows.md` §1.2 (name T7 as the one sanctioned fallback exception);
-  `design_appendix.md` §G (consumer-lane layer: the degrade overlay vs the immutable binding); `design.md` §3.5/§3.6.2
-  if the `confirmed.policy` ownership note needs it; `cli_reference.md` if a read surface changes. End-user
-  `policy.md`/`session.md` if the degrade is user-visible.
-- [ ] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T7 done.
+  `forge telemetry activity`. NOT a `UsageEvent`. **Captured under the freeze lock, emitted AFTER it** (a `nonlocal`
+  payload -- telemetry I/O must not run inside `store.update`, which may retry the mutate); exactly one per degrade.
+  **Verified:** `test_policy.py::...test_degrade_emits_one_upstream_lane_degraded_outcome` (real store; asserts one
+  outcome + reason_code + status).
+- [x] Surface "degraded this session": `_supervisor_status_dict` gains a `degraded` field (null unless degraded), shown
+  by `forge policy supervisor status` (JSON + a `Degraded:` table line) and `forge session lane show` (a
+  `(degraded -> default)` marker + `degraded` JSON flag on the supervisor row only). The frozen binding stays
+  observable. **Verified:** `test_policy_supervisor.py` (json-shows-degraded, table-shows-degraded, configured-null) +
+  `test_session_lane.py::test_show_json_flags_supervisor_degraded` (supervisor-only).
+- [x] Design-doc sync: `design_workflows.md` §1.2 (T7 named as the one sanctioned lane-fallback exception);
+  `design_appendix.md` §G (overlay-vs-binding, reset map, cross-resume, telemetry); `cli_reference.md` (status + lane
+  show rows); end-user `policy.md` (mid-session degrade note). `design.md` §3.5/§3.6.2 needed no change -- the overlay
+  reuses the existing `confirmed.policy.policy_states` ownership, no new durable field.
+- [ ] Epic roster: `epic_consumer_lanes/checklist.md` + `card.md` -> T7 done. **(Closeout step -- done after the branch
+  merges and the card moves `doing/`->`done/`; marking it done while still in `doing/` would misstate the board.)**
 
 ## Verification gate
 

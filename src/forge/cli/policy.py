@@ -44,7 +44,10 @@ from forge.policy.semantic.supervisor import (
     supervisor_lane_runtimes,
     validate_checker_model,
 )
-from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
+from forge.policy.supervisor_lane_degrade import (
+    clear_supervisor_degrade,
+    read_supervisor_degrade,
+)
 from forge.session import SessionStore
 from forge.session.consumer_lanes import (
     clear_consumer_lane,
@@ -393,6 +396,19 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
     except Exception as exc:  # drifted/removed catalog entry -> show null, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         data["lane"] = None
+    # T7: a sticky degrade routes dispatch to the default claude lane while the bound codex lane
+    # above stays frozen -- surface it so the operator sees the lane was routed around this session.
+    marker = read_supervisor_degrade(manifest)
+    data["degraded"] = (
+        {
+            "reason": marker.get("reason"),
+            "from_lane": marker.get("from_lane"),
+            "to_lane": marker.get("to_lane"),
+            "at": marker.get("at"),
+        }
+        if marker
+        else None
+    )
     return data
 
 
@@ -990,6 +1006,17 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     except Exception as exc:  # drifted/removed catalog entry -> mark unresolved, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         console.print("  Lane: [yellow]not executable[/yellow] (binding no longer valid)")
+
+    # T7 sticky degrade: the bound lane above is frozen but dispatch routes to the default claude
+    # lane this session (the codex subscription is spent). Surface it so `Lane: ...codex...` is not
+    # read as "still running on codex".
+    marker = read_supervisor_degrade(manifest)
+    if marker:
+        frm = marker.get("from_lane") or {}
+        console.print(
+            f"  Degraded: [yellow]{frm.get('runtime_id', 'codex')} subscription spent[/yellow] this session "
+            f"-> routing to claude default (frozen binding unchanged; re-pin or a new session to retry)"
+        )
 
     if sup.proxy:
         console.print(f"  Routing: proxy: {sup.proxy}")

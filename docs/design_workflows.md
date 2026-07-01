@@ -190,6 +190,12 @@ rerun).
   timeout). Default to **fail-open (warn-only)** for most checks. Fail-open for policy evaluations is a system-boundary
   rule (LLM output is external data), not an exception to coding-standards §5. See coding_standards.md §5 (boundary
   framework) for the general framework.
+- **Subscription-exhaustion degrade (T7)**: the one sanctioned lane-fallback exception. When the supervisor's bound
+  codex subscription lane exhausts mid-session (`failure_type="subscription_exhausted"`), the policy hook persists a
+  sticky degrade overlay and routes subsequent checks to the default `claude -p` lane -- restoring real enforcement
+  instead of a silent per-check fail-open. One hop only (codex -> default; no chains), still fail-open on the degrade
+  path itself, sticky for the session (reset on `supervisor remove`/re-pin or a fresh process resume). This is the
+  *only* general fallback the consumer-lane epic permits; see design_appendix §G for the overlay/reset mechanics.
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
   configured path prefixes) and MAY cache the last verdict for identical diffs.
 

@@ -602,3 +602,52 @@ class TestSupervisorLaneBindingFreeze:
         assert is_supervisor_degraded(state) is True  # degraded despite the resolution failure
         marker = read_supervisor_degrade(state)
         assert marker is not None and marker["to_lane"] is None
+
+    @patch("forge.policy.store.build_policy_state_update")
+    def test_degrade_emits_one_upstream_lane_degraded_outcome(self, mock_build: MagicMock, tmp_path: Path) -> None:
+        """Phase 3 observability: a degrade records exactly ONE upstream `policy.lane_degraded` outcome
+        (command=supervisor, reason_code=subscription_exhausted, from/to lane in message) -- read by
+        `forge telemetry activity`, NOT a UsageEvent. Uses a REAL store so the post-lock emit fires
+        (the mocked-store `_run_mutate` harness would run the mutate after the emit check)."""
+        from forge.cli.hooks.policy import _persist_policy_decisions
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+        from forge.policy.supervisor_lane_degrade import is_supervisor_degraded
+        from forge.session import SessionStore
+        from forge.session.models import ConsumerLaneIntent, LaneRecord
+
+        mock_build.return_value = self._fresh_build_return()
+        codex = LaneRecord("codex", "chatgpt", "gpt-5-codex")
+        state = self._state()
+        state.name = "worker"  # a real SessionStore validates the name (>= 2 chars); "t" is rejected
+        state.intent.consumer_lanes = ConsumerLaneIntent(supervisor=codex)
+        store = SessionStore(str(tmp_path), "worker")
+        store.write(state)
+
+        # Explicit None run-ids: a bare MagicMock would auto-vivify unserializable ids that the
+        # best-effort emit would silently drop (leaving nothing to assert on).
+        decision = MagicMock(
+            failure_type="subscription_exhausted",
+            telemetry_run_id=None,
+            telemetry_parent_run_id=None,
+            telemetry_root_run_id=None,
+        )
+        exhausted = MagicMock()
+        exhausted.decisions = [decision]
+        engine = MagicMock()
+        engine.registered_policy_ids = ["semantic.supervisor"]
+
+        _persist_policy_decisions(
+            store=store,
+            engine=engine,
+            engine_state={},
+            entries=[(exhausted, "ctx")],
+            effective=self._effective(),
+            supervisor_lane=codex,
+        )
+
+        degraded = [o for o in read_upstream_outcomes(command="supervisor") if o.operation == "policy.lane_degraded"]
+        assert len(degraded) == 1  # exactly one degradation event
+        assert degraded[0].reason_code == "subscription_exhausted"
+        assert degraded[0].status == "warning"
+        assert "codex" in (degraded[0].message or "")
+        assert is_supervisor_degraded(store.read()) is True  # write + emit are consistent
