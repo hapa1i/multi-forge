@@ -79,17 +79,19 @@ Not fail-loud, not fail-open -- no user watches a terminal.
 - **Codex lane tuple**: `Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`, model nominal (D2 parity
   with T6b).
 
-## Open decisions (resolve in review)
+## Decisions (all resolved)
 
 - **D1 -- Workspace-write trust. RESOLVED: Option A** (user, 2026-06-30) -- both modes; augment uses
   `sandbox="workspace-write"`, review-only `read-only`. See Scope.
-- **D2 -- Codex lane tuple.** `Lane(codex, chatgpt, gpt-5-codex)`, model nominal (recommended -- T6b parity).
-- **D3 -- Degrade.** best-effort async -> `return False` + telemetry (recommended -- matches the existing path).
-- **D4 -- augment verification.** Drop the Claude `_stdout_indicates_permission_denied` scan for the codex arm; fold
-  `runtime_is_error`. **Verify in Phase 0** that a codex workspace-write denial actually surfaces as a runtime error
-  (not exit-0-silent).
-- **D5 -- transcript read.** Confirm codex reads the absolute `.forge/artifacts/.../transcript.jsonl` path with
-  `cwd=forge_root` in the chosen sandbox.
+- **D2 -- Codex lane tuple. RESOLVED:** `Lane(codex, chatgpt, gpt-5-codex)` shipped, model nominal (T6b parity).
+- **D3 -- Degrade. RESOLVED:** best-effort async -> `return False` + telemetry (never raises, never fails-open).
+- **D4 -- augment verification. RESOLVED (Phase 0 refined the premise):** drop the Claude
+  `_stdout_indicates_permission_denied` scan; fold `runtime_is_error` for provider/turn failures. The Phase 0 probe
+  **falsified** the original premise -- a codex workspace-write *denial* does NOT surface as a runtime error (it exits 0
+  with `is_error=False`, riding `turn.completed`) -- but it is immaterial: in-project doc writes (`cwd=forge_root`)
+  auto-approve and never hit the rejection path.
+- **D5 -- transcript read. RESOLVED:** Phase 0 confirmed codex reads the transcript under `cwd=forge_root` in the
+  sandbox; the augment E2E reads the artifact transcript live.
 
 ## Acceptance (definition of done -- fixture-grounded)
 

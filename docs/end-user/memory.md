@@ -20,8 +20,9 @@ official files or Forge-owned shadow proposal files.
 
 ## What the memory writer does
 
-After a session stops, the Stop hook enqueues a work marker. On next CLI startup, Forge spawns a headless `claude -p`
-subprocess that:
+After a session stops, the Stop hook enqueues a work marker. On next CLI startup, Forge spawns a headless writer
+subprocess -- `claude -p` on the default Claude lane, or `codex exec` on the codex lane
+([Runtime: claude or codex](#runtime-claude-or-codex)) -- that:
 
 1. Reads the session transcript
 2. Reads each tracked memory doc
@@ -235,10 +236,10 @@ Next CLI startup (any forge command)
 
 Background process:
   → Reads session manifest → compute effective intent
-  → Checks: enabled? min_turns met? claude available? mode valid?
+  → Checks: enabled? min_turns met? runtime available (claude on PATH, or codex preflight)? mode valid?
   → Validates tracked docs (path safety, passport validity, writer access, file existence)
   → Builds multi-doc prompt with per-doc strategy instructions
-  → Runs: claude -p (stdin=prompt, cwd=forge_root, timeout=5min)
+  → Runs the bound runtime: claude -p (default) or codex exec (codex lane) -- stdin=prompt, cwd=forge_root, timeout=5min
 ```
 
 ### Runtime: claude or codex
@@ -308,7 +309,7 @@ Checklist:
 
 - `memory.auto_update.enabled` must be `true` in effective intent (`forge session memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
-- `claude` CLI must be on PATH
+- The bound runtime must be available: `claude` on PATH (default lane), or a ready `codex` preflight (codex lane)
 - At least one memory doc must be discoverable: a passported doc under the scan roots
 - At least one doc must exist on disk
 

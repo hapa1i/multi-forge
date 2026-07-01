@@ -4,10 +4,11 @@
 
 ## Current focus
 
-**Phases 0-2 + the real-codex E2E all done (2026-06-30).** Seam + review-only arm (Phase 1) and the augment arm on
-`workspace-write` (Phase 2) shipped and unit-tested; the Phase 0 live probe returned **GO**; a real-codex augment E2E
-proves codex edits the doc in place. Branch `memory_writer_codex_dispatch`: 4 commits (seam, augment, shared conftest,
-E2E). **Remaining: Phase 3 design-doc sync + closeout** (change_log, epic roster T6c->done, lane move to `done/`).
+**Phases 0-3 + the real-codex E2E all done (2026-06-30).** Seam + review-only arm (Phase 1), the augment arm on
+`workspace-write` (Phase 2), and the design-doc sync (Phase 3) shipped and unit-tested; the Phase 0 live probe returned
+**GO**; a real-codex augment E2E proves codex edits the doc in place. Branch `memory_writer_codex_dispatch`: 6 commits
+(seam, augment, shared conftest, E2E, docs sync, review follow-ups: CLI-bridge tests + doc/board fixes). **Remaining:
+push + PR, then post-merge closeout** (change_log, epic roster T6c->done, lane move to `done/`).
 
 **Phase 0 GO -- key finding (refines D4).** The probe (host ChatGPT login, `codex exec --json --sandbox workspace-write`
 reduced through Forge's own `parse_codex_jsonl_stream`) showed: (1) codex writes files under `cwd` and reads the
