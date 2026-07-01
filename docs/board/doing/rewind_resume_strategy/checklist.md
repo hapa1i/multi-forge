@@ -5,9 +5,8 @@ design points, and risks; this file is the ordered execution plan with observabl
 
 ## Current focus
 
-**Slice 1 decisions locked, awaiting review before Slice 2.** The live `sessionId`-match probe passed on Claude Code
-2.1.197, and the additive `Derivation` shape is in code with strict-reader coverage. Do not start Slices 2–6 until this
-Slice 1 outcome is reviewed.
+**Slice 2 complete, awaiting review before Slice 3.** Slice 1 is committed. The turn-window prefix writer is in place
+with focused unit coverage, and `N=0` is pinned as a plain native-relocate no-op for manifest purposes.
 
 ## Verified code anchors (re-checked 2026-07-01, card line numbers had drifted)
 
@@ -32,6 +31,7 @@ These were confirmed against the current tree by read-only verification. Use the
 | native-relocate copy + derivation write; `relocated_parent_session_id = parent.claude_session_id`            | `session/manager.py:1364-1395` (id at `:1382`)                                                                |                                                                                                   |
 | relocate GC / reference-count via `_find_shared_transcript_sessions` (keys on `relocated_parent_session_id`) | `session/manager.py:1818-1855`                                                                                | deletes copy iff no other session references that id                                              |
 | shared-transcript id extraction includes rewind id                                                           | `session/manager.py:106-147`                                                                                  | forward-looking additive support for `rewind_relocated_session_id` until the writer lands         |
+| rewind raw-prefix writer                                                                                     | `session/rewind.py`                                                                                           | preserves raw JSONL lines; snaps positive drops to a complete `tool_use`/`tool_result` boundary   |
 | `relocate_transcript` — **pure byte copy**, `rewrite_paths` raises `NotImplementedError`                     | `session/claude/relocate.py:71-171` (paths `104-108`)                                                         | never touches entries' internal `sessionId`                                                       |
 | `RelocateConflictError` (dest differs, no overwrite) / `RelocateSameDirError` (src==dst dir)                 | `session/claude/relocate.py:34-46`                                                                            |                                                                                                   |
 | Destination path `get_transcript_path(root, uuid)` → `<uuid>.jsonl`                                          | `relocate.py:110-114`, `session/claude/paths.py:79-94`                                                        | stem == UUID today                                                                                |
@@ -109,15 +109,18 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 
 **Goal:** Split the parent transcript at turn `T−N` on a coherent boundary and write a truncated JSONL prefix.
 
-- [ ] **Turn split at `T−N`.** Reuse `_group_entries_into_turns` (`transfer.py`) to define the boundary; `N` counts
+- [x] **Turn split at `T−N`.** Reuse `_group_entries_into_turns` (`transfer.py`) to define the boundary; `N` counts
   turns, not JSONL lines. **Assertion:** given a parent with `T` turns and `--drop-last N`, the writer selects entries
   belonging to turns `1..(T−N)`.
-- [ ] **Safe truncation writer.** Snap the cut to the last complete turn ≤ `T−N` so no `tool_use`/`tool_result` pair is
+- [x] **Safe truncation writer.** Snap the cut to the last complete turn ≤ `T−N` so no `tool_use`/`tool_result` pair is
   split. **Assertion:** a fixture with a tool-call pair straddling the cut produces a JSONL that ends on a complete turn
   (unit-assert the last entries form a closed turn; no dangling `tool_use` without its `tool_result`).
-- [ ] **Degenerate cases.** Pin `N=0` manifest semantics: either downgrade to null-strategy native-relocate, or record
-  `strategy=rewind,dropped_turns=0` while writing a full copy/no delta. `N≥T` → minimal head + whole-session delta.
+- [x] **Degenerate cases.** Pin `N=0` manifest semantics: downgrade to null-strategy native-relocate with no
+  `dropped_turns`, no `context_file`, and no `rewind_relocated_session_id`. `N≥T` → minimal head + whole-session delta.
   **Assertion:** both paths are unit-tested and do not crash or corrupt resume.
+- [x] **Writer-level degenerate behavior:** `drop_last=0` copies the source unchanged and reports no snap/drop;
+  `drop_last>=T` writes an empty prefix and reports `actual_dropped_turns=total_turns`. Slice 4 should bypass the rewind
+  writer for `N=0` and use plain native-relocate.
 
 ## Slice 3 — Code-delta extractor + prompt
 
@@ -198,9 +201,7 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 1. **Strategy value name** — `rewind` (working) vs `tail-curated` / `code-delta` / `rewind-curated`. Card leans
    `rewind`.
 2. **Delta source** — tool-calls only (recommended) vs + `git diff` cross-check.
-3. **N=0 manifest semantics** — downgrade to native-relocate vs record `strategy=rewind,dropped_turns=0`; pin in Slice
-   2/4.
-4. **N-preview UX** — a turn-boundary preview so users pick N without guessing (possible follow-up, out of scope here).
+3. **N-preview UX** — a turn-boundary preview so users pick N without guessing (possible follow-up, out of scope here).
 
 ## Closeout items
 

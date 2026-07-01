@@ -34,6 +34,10 @@ document contract.
 - **GC-id field**: do **not** overload `relocated_parent_session_id`; it remains the parent UUID for byte-for-byte
   native-relocate copies. `rewind_relocated_session_id` records the fresh truncated-copy UUID.
 
+**Decided (2026-07-01, Slice 2)**: `--drop-last 0` is a no-op and downgrades to plain native-relocate manifest
+semantics: `strategy=null`, no `dropped_turns`, no `context_file`, and no `rewind_relocated_session_id`. The CLI should
+surface that as a no-op rather than writing a rewind manifest that did not rewind.
+
 **References**: `docs/design.md` "Transfer mode strategies" + "Session derivation tracking", §3.9 (resume across path
 boundaries); `src/forge/session/transfer.py`; `src/forge/session/manager.py`; `src/forge/cli/session_fork.py`;
 `docs/board/done/forge_cli_cleanup/card.md` (option-drift findings #4/#5).
@@ -163,8 +167,8 @@ forge session resume <parent> --fresh --strategy rewind --drop-last N
 - `--drop-last N`: required integer (no default); N counts **turns** (the `[turn N]` grouping), not raw JSONL lines.
 - Resolves to `resume_mode = native-relocate` (worktree/`--into` only). Same-dir/sidecar → rejected with the existing
   native-relocate guidance.
-- Manifest: `derivation.resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`, `context_file=<delta>`,
-  `rewind_relocated_session_id=R`.
+- Manifest for `N>0`: `derivation.resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`,
+  `context_file=<delta>`, `rewind_relocated_session_id=R`. `N=0` downgrades to plain native-relocate metadata.
 
 ## Code-delta extraction
 
@@ -211,7 +215,7 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
    `dropped_turns` + `rewind_relocated_session_id=R`); run the `sessionId`-match probe; update the design.md
    resume-mode×strategy contract. **Done; awaiting review.**
 2. **Turn window + safe truncation.** Split at T−N on a coherent boundary; truncated-JSONL writer; pin degenerate N=0
-   manifest semantics; handle N≥T (→ minimal head + whole-session delta).
+   manifest semantics (plain native-relocate); handle N≥T (→ minimal head + whole-session delta).
 3. **Code-delta extractor + prompt.** Tool-call delta from the dropped window; net-change reconciliation; narrowed
    prompt; reuse citation grounding + usage emit + injection hardening.
 4. **Wire the strategy.** `ResumeStrategy.REWIND`; `--drop-last` + Choice on fork/resume; co-deliver context file with
@@ -241,11 +245,9 @@ fresh-UUID, unshared truncated copy (no envelope `sessionId` rewrite needed per 
 
 1. **Strategy value name**: `rewind` (working) vs `tail-curated` / `code-delta` / `rewind-curated`.
 2. **Delta source**: tool-calls only (recommended) vs + git-diff cross-check.
-3. **N=0 manifest semantics**: either downgrade to null-strategy native-relocate, or record
-   `strategy=rewind,dropped_turns=0` while writing a full copy/no delta. Pin in Slice 2/4.
-4. **Choosing N**: add a turn-boundary preview (a `forge transfer show --turns`-style view?) so users pick N without
+3. **Choosing N**: add a turn-boundary preview (a `forge transfer show --turns`-style view?) so users pick N without
    guessing — possible follow-up.
-5. **Transfer-mode variant**: ever offer a summarized-head form for same-dir, or keep `rewind` strictly native-relocate?
+4. **Transfer-mode variant**: ever offer a summarized-head form for same-dir, or keep `rewind` strictly native-relocate?
    (Card says strictly native-relocate.)
 
 **Resolved (2026-06-22)**: N counts turns (old Q2), parent-only (old Q5), fresh-UUID unshared truncated copy (old Q3) —
