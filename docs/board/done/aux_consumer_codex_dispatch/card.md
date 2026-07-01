@@ -1,7 +1,7 @@
 # T6b -- Aux-consumer codex dispatch (first non-Claude runtime for aux work)
 
-**Epic**: `docs/board/doing/epic_consumer_lanes/` (member T6b). Promoted from the
-inline T6b sketch on 2026-06-30; branch `aux_consumer_codex_dispatch`.
+**Epic**: `docs/board/doing/epic_consumer_lanes/` (member T6b). Promoted from the inline T6b sketch on 2026-06-30;
+branch `aux_consumer_codex_dispatch`.
 
 **Depends on**: T6a (`done/aux_consumer_lane_placement/`) -- the lane binding, freeze, and billing machinery for the
 three aux consumers already ships. **T6b adds the one thing T6a deliberately skipped: a real runtime-keyed `codex exec`

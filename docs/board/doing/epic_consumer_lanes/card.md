@@ -5,13 +5,12 @@ first wave is split into member cards (linked beneath the member table): **T1a, 
 spine T1a+T3, the T2 backend axis, the T4 codex-exec supervisor lane, and T5's lane observability have landed on `main`.
 The **first wave is complete**; the epic stays in `doing/`. T6 shipped as T6a + T6b (both done); **T7**
 (subscription-exhaustion fail-open) is now the active member in `doing/subscription_exhaustion_failopen/` (awaiting plan
-review). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to
-`done/consumer_lane_binding/`. **T6 is now split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59,
-`done/aux_consumer_lane_placement/`); **T6b** (codex dispatch, shadow-curation only) is **done**
-(PR #60, `ca20efcd`, `done/aux_consumer_codex_dispatch/`). With T1b, the T0 sibling (PR #58, `b0614325`), T6a (PR #59),
-and T6b (PR #60) all done, the epic stays in `doing/` coordinating the deferred follow-ons (T6c memory-writer codex
-dispatch; team-supervisor plan-context) plus the now-active T7 (`doing/subscription_exhaustion_failopen/`, awaiting plan
-review).
+review). T1b shipped (PR #57, `6ff555f6`, 2026-06-28) and is closed to `done/consumer_lane_binding/`. **T6 is now
+split**: **T6a** (aux-consumer claude-max placement UX) is done (PR #59, `done/aux_consumer_lane_placement/`); **T6b**
+(codex dispatch, shadow-curation only) is **done** (PR #60, `ca20efcd`, `done/aux_consumer_codex_dispatch/`). With T1b,
+the T0 sibling (PR #58, `b0614325`), T6a (PR #59), and T6b (PR #60) all done, the epic stays in `doing/` coordinating
+the deferred follow-ons (T6c memory-writer codex dispatch; team-supervisor plan-context) plus the now-active T7
+(`doing/subscription_exhaustion_failopen/`, awaiting plan review).
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave complete on `main`: T1a (PR #51,
 `src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 (PR
@@ -195,14 +194,14 @@ once.
 | **T1b -- Generalize + freeze**                                             | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                                                                                                                                                                                                                   | T4         | a durable contract, shape-proven             |
 | **T6a -- Aux-consumer lane placement** (claude-max billing UX)             | Generalize the supervisor's lane-binding UX (CLI + freeze) to memory-writer / shadow-curation / team-supervisor; declare them on `claude-max`. **Level 1: no dispatch change** (claude-max shares the claude_code runtime).                                                                                                                                                                                                                                                                                         | T1b        | the binding contract spans 4 consumers       |
 | **T6b -- Aux-consumer codex dispatch** (active; narrowed at promotion)     | Add a real codex-exec dispatch arm (codex in `allowed_lanes` + runtime-keyed dispatch + per-consumer degrade). **Promoted scope 2026-06-30: shadow-curation only** (the clean mirror-T4 -- blind, read-only, stdout-output). **memory-writer deferred to T6c** (workspace-write file-editing shape); **team-supervisor deferred** (plan-blind without new context machinery). Degrade is **fail-loud** on a cold/stale Codex preflight (NOT T4's fail-open); fan-out workers + taggers stay out (different shapes). | T6a        | a non-claude runtime for aux work            |
-| **T7 -- Subscription-exhaustion fail-open** (new, the discussion's ticket) | When the **supervisor's** bound codex/chatgpt subscription lane hits the quota wall, degrade **once** to its default `claude -p` lane (sticky, fail-open) -- supervisor-only (the one repeated-dispatch codex consumer); the single deliberate exception to "no fallback".                                                                                                                                                                                                                                                                                                                                              | T4, T6b    | the "Why now" quota wall is actually handled |
+| **T7 -- Subscription-exhaustion fail-open** (new, the discussion's ticket) | When the **supervisor's** bound codex/chatgpt subscription lane hits the quota wall, degrade **once** to its default `claude -p` lane (sticky, fail-open) -- supervisor-only (the one repeated-dispatch codex consumer); the single deliberate exception to "no fallback".                                                                                                                                                                                                                                          | T4, T6b    | the "Why now" quota wall is actually handled |
 
 **Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
 `docs/board/done/backend_subscription_sources/` (done, PR #54); T3 -> `docs/board/done/supervisor_lane_driven/card.md`
 (done, PR #52); T4 -> `docs/board/done/codex_exec_supervisor_lane/` (done, PR #55); T5 ->
 `docs/board/done/lane_observability/` (done, PR #56); T7 -> `docs/board/doing/subscription_exhaustion_failopen/`
-(promoted 2026-06-30, depends on T4 + T6b); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28); T6a ->
-`docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
+(promoted 2026-06-30, depends on T4 + T6b); T1b -> `docs/board/done/consumer_lane_binding/` (done, PR #57, 2026-06-28);
+T6a -> `docs/board/done/aux_consumer_lane_placement/` (done, PR #59, 2026-06-30); T6b ->
 `docs/board/done/aux_consumer_codex_dispatch/` (done, PR #60, 2026-06-30, shadow-curation only). The rows above stay the
 durable sketch (except T6b's, updated to its promoted scope); the cards carry verified touchpoints + fixture-grounded
 acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`,
