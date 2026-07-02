@@ -249,14 +249,15 @@ class TestTemporaryRunEnv:
 
 
 class TestBridgeSessionToCodex:
-    def test_unknown_strategy_raises(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("strategy", ["bogus", "rewind"])
+    def test_unknown_strategy_raises(self, tmp_path: Path, strategy: str) -> None:
         with pytest.raises(ForgeOpError, match="Unknown strategy"):
             bridge_session_to_codex(
                 ctx=_ctx(tmp_path, forge_root=tmp_path),
                 parent="planner",
                 task="t",
                 cwd=str(tmp_path),
-                strategy="bogus",
+                strategy=strategy,
             )
 
     def test_no_forge_root_raises(self, tmp_path: Path) -> None:

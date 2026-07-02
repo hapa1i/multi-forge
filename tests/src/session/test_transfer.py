@@ -1150,7 +1150,7 @@ class TestInlinePlan:
     def test_rewind_strategy_is_not_a_transfer_context_strategy(self, tmp_path: Path) -> None:
         state = self._make_parent_state(tmp_path)
 
-        with pytest.raises(ValueError, match="not a transfer context strategy"):
+        with pytest.raises(ValueError, match="Unknown strategy 'rewind'"):
             assemble_transfer_context(
                 parent_name="parent",
                 parent_state=state,

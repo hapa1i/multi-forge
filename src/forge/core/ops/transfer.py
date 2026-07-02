@@ -33,8 +33,8 @@ from forge.session.prev_sessions import (
 )
 from forge.session.transfer import (
     TRANSFER_TARGET_RUNTIMES,
-    ResumeStrategy,
     assemble_transfer_context,
+    parse_transfer_context_strategy,
     parse_transfer_frontmatter,
 )
 
@@ -238,10 +238,9 @@ def regenerate_transfer(
     eff_target_runtime = eff_target_runtime or "claude"
 
     try:
-        resume_strategy = ResumeStrategy(eff_strategy)
+        resume_strategy = parse_transfer_context_strategy(eff_strategy)
     except ValueError as e:
-        valid = ", ".join(s.value for s in ResumeStrategy)
-        raise ForgeOpError(f"Unknown strategy '{eff_strategy}' (valid: {valid}).") from e
+        raise ForgeOpError(str(e)) from e
 
     if eff_target_runtime not in TRANSFER_TARGET_RUNTIMES:
         valid = ", ".join(TRANSFER_TARGET_RUNTIMES)

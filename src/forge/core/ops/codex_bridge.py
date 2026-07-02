@@ -57,8 +57,8 @@ from forge.core.state.io import atomic_write_text
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.prev_sessions import child_path, compose_child_context
 from forge.session.transfer import (
-    ResumeStrategy,
     assemble_transfer_context,
+    parse_transfer_context_strategy,
     parse_transfer_frontmatter,
 )
 
@@ -168,10 +168,9 @@ def assemble_codex_transfer(
     if forge_root is None:
         raise ForgeOpError("Not inside a Forge project (no .forge/ directory found).")
     try:
-        resume_strategy = ResumeStrategy(strategy)
+        resume_strategy = parse_transfer_context_strategy(strategy)
     except ValueError as e:
-        valid = ", ".join(s.value for s in ResumeStrategy)
-        raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
+        raise ForgeOpError(str(e)) from e
     manager = SessionManager()
     try:
         parent_state = manager.get_session(parent, forge_root=str(forge_root))
@@ -322,10 +321,9 @@ def bridge_session_to_codex(
     # Revalidated inside assemble_codex_transfer; kept here so a bad strategy or
     # missing parent fails BEFORE the ~20s `codex doctor` preflight below.
     try:
-        ResumeStrategy(strategy)
+        parse_transfer_context_strategy(strategy)
     except ValueError as e:
-        valid = ", ".join(s.value for s in ResumeStrategy)
-        raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
+        raise ForgeOpError(str(e)) from e
     try:
         SessionManager().get_session(parent, forge_root=str(forge_root))
     except (StateCorruptedError, StateUnreadableError):

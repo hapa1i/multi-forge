@@ -532,12 +532,15 @@ class TestBridgeInteractiveStart:
         commands = {e.command for e in read_usage_events()}
         assert "transfer-curate" in commands  # the curation event still lands
 
-    def test_bad_strategy_with_parent_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("strategy", ["bogus", "rewind"])
+    def test_bad_strategy_with_parent_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, strategy: str
+    ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         with _interactive_mocks():
             with pytest.raises(ForgeOpError, match="Unknown strategy"):
                 start_interactive_codex_session(
-                    ctx=ctx, name="impl", parent="planner", strategy="bogus", invoke=_FakeInvoke()
+                    ctx=ctx, name="impl", parent="planner", strategy=strategy, invoke=_FakeInvoke()
                 )
         assert not SessionStore(str(proj), "impl").exists()
 
