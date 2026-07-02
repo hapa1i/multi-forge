@@ -1855,6 +1855,18 @@ class SessionManager:
                     except OSError as exc:
                         logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
 
+            if _deriv is not None and _deriv.rewind_relocated_session_id:
+                _rewind_root = _transcript_cleanup_project_root(
+                    state,
+                    entry.forge_root or entry.worktree_path,
+                    _raw_data,
+                )
+                _rewind_path = get_transcript_path(_rewind_root, _deriv.rewind_relocated_session_id)
+                try:
+                    _rewind_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    logger.warning("Failed to remove rewind transcript %s: %s", _rewind_path, exc)
+
         self.index_store.remove_session(name, forge_root=entry_forge_root)
 
         # Delete manifest file (only if worktree still exists or wasn't a worktree)

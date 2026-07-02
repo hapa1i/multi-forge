@@ -178,15 +178,17 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 
 **Goal:** Fresh-UUID unshared truncated copy that GC deletes cleanly without touching parent/siblings.
 
-- [ ] **Fresh rewind-owned UUID `R`.** Write the truncated copy as `<R>.jsonl` in the child's encoded dir; launch
+- [x] **Fresh rewind-owned UUID `R`.** Write the truncated copy as `<R>.jsonl` in the child's encoded dir; launch
   `--resume R --fork-session`. Apply the Slice-1 probe outcome: keep embedded parent `sessionId`; no envelope rewrite.
-  **Assertion:** `R ≠ parent_uuid`; the parent's original `<parent_uuid>.jsonl` is never written or overwritten.
-- [ ] **Unshared cleanup.** Record the relocated id per the Slice-1 GC-field decision so
+  **Assertion:** `tests/src/cli/test_session_rewind_cli.py` proves `R ≠ parent_uuid`, launch uses
+  `--resume R --fork-session`, and the parent transcript is not overwritten.
+- [x] **Unshared cleanup.** Record the relocated id per the Slice-1 GC-field decision so
   `_find_shared_transcript_sessions` finds no siblings sharing `R`. Add the delete-time unlink branch for
   `derivation.rewind_relocated_session_id` in `manager.py` independently of the existing `relocated_parent_session_id`
   branch: it must be dir-scoped to the child's resolved Claude project root, unshared by design, and keyed only on `R`
   so same-directory resume rewind can never touch the parent's original UUID. **Assertion:** deleting the rewind session
-  unlinks `<R>.jsonl`; a fixture with a sibling/parent in the same encoded dir confirms neither is touched.
+  unlinks `<R>.jsonl`; `TestForkNativeRelocate.test_delete_removes_rewind_copy_by_fresh_uuid_only` confirms a
+  sibling/parent in the same encoded dir are untouched.
 
 ## Slice 6 — Fallback + privacy + docs
 

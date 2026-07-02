@@ -9,6 +9,7 @@ import pytest
 
 from forge.session.exceptions import ForgeSessionError, SessionExistsError
 from forge.session.manager import SessionManager
+from forge.session.models import Derivation
 
 
 def _init_git_repo(path: Path) -> None:
@@ -369,3 +370,57 @@ class TestForkNativeRelocate:
 
         assert not relocated.exists(), "relocated parent copy should be removed from the child's dir"
         assert parent_original.exists(), "parent's original transcript must be preserved"
+
+    def test_delete_removes_rewind_copy_by_fresh_uuid_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Deleting a rewind child unlinks only its fresh truncated transcript UUID."""
+        from forge.session.claude.paths import get_transcript_path
+
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        parent_repo = tmp_path / "repo"
+        _init_git_repo(parent_repo)
+        _enable_forge(parent_repo)
+
+        manager = SessionManager()
+        self._parent_with_uuid(manager, parent_repo, "parent-uuid-rewind")
+        manager.fork_session("parent", "rewind-child")
+
+        cstore = manager.get_session_store("rewind-child")
+        child_state = cstore.read()
+        child_state.confirmed.claude_session_id = None
+        child_state.confirmed.claude_project_root = str(parent_repo)
+        child_state.confirmed.derivation = Derivation(
+            parent_session="parent",
+            resume_mode="native-relocate",
+            strategy="rewind",
+            relocated_parent_session_id=None,
+            dropped_turns=1,
+            rewind_relocated_session_id="rewind-fresh-uuid",
+        )
+        cstore.write(child_state)
+
+        manager.fork_session("parent", "sibling")
+        sstore = manager.get_session_store("sibling")
+        sibling_state = sstore.read()
+        sibling_state.confirmed.claude_session_id = "sibling-uuid-rewind"
+        sibling_state.confirmed.claude_project_root = str(parent_repo)
+        sstore.write(sibling_state)
+
+        parent_original = get_transcript_path(str(parent_repo), "parent-uuid-rewind")
+        sibling_original = get_transcript_path(str(parent_repo), "sibling-uuid-rewind")
+        rewind_copy = get_transcript_path(str(parent_repo), "rewind-fresh-uuid")
+        for path, text in [
+            (parent_original, "PARENT\n"),
+            (sibling_original, "SIBLING\n"),
+            (rewind_copy, "TRUNCATED\n"),
+        ]:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+
+        manager.delete_session("rewind-child", delete_transcripts=True, delete_worktree=False, force=True)
+
+        assert not rewind_copy.exists(), "rewind fresh transcript copy should be removed"
+        assert parent_original.exists(), "parent's original transcript must be preserved"
+        assert sibling_original.exists(), "sibling transcript in the same encoded dir must be preserved"
