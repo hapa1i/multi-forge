@@ -63,7 +63,10 @@ The registry is not just a schema -- it needs a full lifecycle, or user-scope ho
 - **Hook/dispatcher path -> fail-open.** The dispatcher reads it on **every** `PreToolUse:Read` and prompt. A corrupt or
   newer registry there must **not** error every hook (that bricks the coding session) -- it degrades to "treat as not
   enrolled" and lets the session proceed, surfacing the corruption via `doctor`/CLI, not the hook. This mirrors the
-  fail-open posture for policy evaluations (`design_workflows` §1.2).
+  fail-open posture for policy evaluations (`design_workflows` §1.2). This ticket tests the **read helper's** fail-open
+  (returns not-enrolled on corrupt/newer input, never raises) in its own suite; the end-to-end
+  **dispatcher-integration** fail-open assertion belongs to `forge_hook_dispatcher` (it owns `test_hook_dispatcher.py`,
+  which does not exist when this ticket closes).
 
 ## Grounding (verified 2026-07-02)
 
@@ -92,12 +95,11 @@ The registry is not just a schema -- it needs a full lifecycle, or user-scope ho
 
 ## Acceptance tests
 
-| Test                    | Fixture                                         | Assertion                                                       | Test File                                          |
-| ----------------------- | ----------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
-| Enroll canonicalizes    | symlinked checkout / moved worktree             | enrollment stores + looks up the canonical registered root      | `tests/src/install/test_project_registry.py` (new) |
-| Registry gates dispatch | enrolled root vs unrelated repo                 | lookup hits inside the root, misses outside                     | same                                               |
-| Worktree auto-enrolls   | `forge session` worktree/fork create            | the new worktree root is enrolled (managed session keeps hooks) | same                                               |
-| Backfill from installed | existing `installed.json` roots, empty registry | migration enrolls those roots without manual steps              | `tests/src/cli/test_extension_enable.py`           |
-| CLI strict read         | `projects.toml` with unknown `schema_version`   | CLI raises a clear unsupported-version error, no silent default | `tests/src/install/test_project_registry.py`       |
-| Hook read fails open    | corrupt/newer `projects.toml`, hook subprocess  | dispatcher degrades to not-enrolled, exits 0, does not error    | `tests/src/install/test_hook_dispatcher.py`        |
-| Stale root reported     | registered root now deleted                     | `doctor` reports/prunes the stale entry                         | `tests/src/cli/test_extension_enable.py` (doctor)  |
+| Test                    | Fixture                                       | Assertion                                                                | Test File                                          |
+| ----------------------- | --------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| Enroll canonicalizes    | symlinked checkout / moved worktree           | enrollment stores + looks up the canonical registered root               | `tests/src/install/test_project_registry.py` (new) |
+| Registry gates dispatch | enrolled root vs unrelated repo               | lookup hits inside the root, misses outside                              | same                                               |
+| Worktree auto-enrolls   | `forge session` worktree/fork create          | the new worktree root is enrolled (managed session keeps hooks)          | same                                               |
+| CLI strict read         | `projects.toml` with unknown `schema_version` | CLI raises a clear unsupported-version error, no silent default          | `tests/src/install/test_project_registry.py`       |
+| Read helper fails open  | corrupt/newer `projects.toml`, read helper    | the enrolled-root read helper returns not-enrolled (empty), never raises | `tests/src/install/test_project_registry.py`       |
+| Stale root reported     | registered root now deleted                   | `doctor` reports/prunes the stale entry                                  | `tests/src/cli/test_extension_enable.py` (doctor)  |

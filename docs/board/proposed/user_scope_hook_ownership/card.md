@@ -20,10 +20,12 @@ registration. Today the hazard is real and unguarded (see grounding).
 
 **In:**
 
-- `forge extension enable --scope user` registers **only** dispatcher hook commands (absolute path), including the
-  `statusLine` command (`preset.py:218-222`) -- the scope rule covers every registered string, not just `hook` entries.
-- `--scope local` / `--scope project` create/update project Forge state and write **no** runtime hook block into
-  `.claude/settings*.json` or `.codex/config.toml`.
+- `forge extension enable --scope user` registers **only** the dispatcher **hook** commands (absolute path).
+  **statusLine is excluded (epic D3):** it is a scalar that cannot double-fire, so the user-scope rationale does not
+  apply -- it stays project-scoped and does **not** move to user scope.
+- `--scope local` / `--scope project` create/update project Forge state and write **no** runtime **hook** block into
+  `.claude/settings*.json` or `.codex/config.toml` -- **but still register the project-scoped `statusLine` scalar**
+  (`preset.py:218-222`), the one runtime string project scope keeps (D3).
 - **Update presence detection to the dispatcher command form (2026-07-02 finding).** `has_forge_hook` matches the
   substring `"forge hook"` (space) (`hooks.py:57,64,69`). If `forge_hook_dispatcher`'s benchmark picks a `forge-hook`
   shim (hyphen), that needle no longer matches, so `session_lifecycle.py:264` and `policy.py:309` (needle
@@ -62,15 +64,18 @@ registration. Today the hazard is real and unguarded (see grounding).
 
 ## Open questions
 
-- Deprecate `forge extension enable --scope user` in favor of `forge hooks install --user`, or keep the name with new
-  dispatcher-only semantics? (Epic-level naming decision, owned here.)
+- Keep `forge extension enable --scope user` with new dispatcher-only semantics, or introduce a distinct
+  `forge extension`-family verb (e.g. `forge extension install-hooks --user`)? **Not** a new top-level `hooks` group --
+  the epic's CLI-surface decision forbids new top-level groups and the existing `hook` group is singular + hidden.
+  (Epic-level naming decision, owned here.)
 - How much project-local Codex hook policy to keep for teams (deferred).
 
 ## Acceptance tests
 
-| Test                            | Fixture                                   | Assertion                                                                                                          | Test File                                |
-| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| Project install skips hooks     | `forge extension enable --scope local`    | project `.codex/config.toml` / `.claude/settings*.json` get **no** Forge hook block                                | `tests/src/install/test_installer.py`    |
-| User install is dispatcher-only | `forge extension enable --scope user`     | user config carries only the dispatcher command (absolute path)                                                    | `tests/src/cli/test_extension_enable.py` |
-| Detection recognizes dispatcher | dispatcher command installed (shim shape) | `has_forge_hook`/`has_forge_hooks` return True; no false "not installed" warning at session launch / policy enable | `tests/src/install/test_hooks.py`        |
-| Cross-scope double-fire warned  | legacy user + project Forge hooks present | doctor/status reports double-fire risk and names the cleanup command                                               | `tests/src/cli/test_extension_enable.py` |
+| Test                             | Fixture                                   | Assertion                                                                                                               | Test File                                |
+| -------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Project install skips hooks      | `forge extension enable --scope local`    | project `.codex/config.toml` / `.claude/settings*.json` get **no** Forge hook block                                     | `tests/src/install/test_installer.py`    |
+| Project install keeps statusLine | `forge extension enable --scope local`    | project `.claude/settings*.json` **still** registers the `statusLine` scalar (D3 exception -- not moved to user scope)  | `tests/src/install/test_installer.py`    |
+| User install is dispatcher-only  | `forge extension enable --scope user`     | user config carries only the dispatcher **hook** command (absolute path); **no** `statusLine` scalar at user scope (D3) | `tests/src/cli/test_extension_enable.py` |
+| Detection recognizes dispatcher  | dispatcher command installed (shim shape) | `has_forge_hook`/`has_forge_hooks` return True; no false "not installed" warning at session launch / policy enable      | `tests/src/install/test_hooks.py`        |
+| Cross-scope double-fire warned   | legacy user + project Forge hooks present | doctor/status reports double-fire risk and names the cleanup command                                                    | `tests/src/cli/test_extension_enable.py` |

@@ -65,9 +65,12 @@ uniformly:
 ## Risks
 
 - **Migration window** with both a failing/duplicate bare hook and the dispatcher active (the core hazard).
-- **Non-atomic install-then-remove.** The sequence is safe only if no session launches between installing the dispatcher
-  and removing the legacy hook. Make the swap atomic, or state the assumption -- a concurrent launch in that window is
-  the one moment double-fire is possible.
+- **Non-atomic remove-then-install (the chosen order).** Scope picks remove-legacy-first, so the transient window is a
+  brief **hooks-off gap** -- a session launching between removing the legacy hook and installing the dispatcher runs
+  with no Forge hooks (tools run, no enforcement), **not** a double-fire. This is deliberately the least-harmful
+  failure: a momentary enforcement gap is preferable to the install-first hazard (double-fire / exit-127 that blocks the
+  tool outright). Where a single file owns both entries, stage it atomically (write-temp + rename); across two files,
+  report the window rather than claim an impossible atomic swap.
 - **Codex trust reset** -- unavoidable when the command bytes change; make it explicit, never silent.
 - **Un-cleanable legacy** (manual edits, lost tracking, broken markers) -- must be reported, not passed over.
 
@@ -81,6 +84,7 @@ uniformly:
 | Test                      | Fixture                                                             | Assertion                                                                                                       | Test File                                |
 | ------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | No persistent double-fire | legacy project hook + new user hook                                 | end state has exactly one active Forge hook source; the transient window is reported, not silently assumed away | `tests/src/cli/test_extension_enable.py` |
+| Backfill from installed   | existing `installed.json` roots, empty `projects.toml`              | migration enrolls those roots into the registry without manual steps (moved from `forge_project_registry`)      | `tests/src/cli/test_extension_enable.py` |
 | Codex marker cleanup      | project `.codex/config.toml` with a Forge block + unrelated entries | only the marker-delimited Forge block is removed                                                                | `tests/src/install/test_codex_hooks.py`  |
 | Claude tracked unmerge    | project `.claude/settings.json` with tracked Forge hooks            | `unmerge` removes only Forge entries by `stable_id`; unrelated entries kept                                     | `tests/src/install/test_installer.py`    |
 | Claude legacy fallback    | Claude hook present with no tracking entry                          | value-based match removes it (or reports it if ambiguous)                                                       | same                                     |

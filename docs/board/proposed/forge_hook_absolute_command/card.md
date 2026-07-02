@@ -71,9 +71,11 @@ not merely a global binary.
   (`container.py`); config destined for the container must keep the bare/image-PATH form. That exemption is owned by
   `forge_hook_sidecar_resolution`; this ticket must defer to it, not write host-absolute bytes into container-bound
   config.
-- **Superseded, not wasted.** When the dispatcher lands it replaces these bytes (a second re-trust). Ship this ticket if
-  the user-scope model is more than a sprint out; otherwise fold reachability into the cutover and accept that the
-  incident stays open until then. (See the epic's "two Codex re-trusts" risk.)
+- **Superseded, not wasted.** When the dispatcher lands it replaces the **hook** bytes (a second re-trust). Ship this
+  ticket if the user-scope model is more than a sprint out; otherwise fold reachability into the cutover and accept that
+  the incident stays open until then. (See the epic's "two Codex re-trusts" risk.) **statusLine is the exception (epic
+  D3):** it stays project-scoped, so its absolute-path rewrite here is **permanent** -- the dispatcher never supersedes
+  it.
 
 ## Grounding (verified 2026-07-02)
 

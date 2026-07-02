@@ -60,6 +60,19 @@ so neither sits on one linear track.
   dispatcher ticket (T4) builds the *mechanism* but does not change what is registered, so it cannot close the incident
   alone -- T2 owns the byte change. The user-scope model (T3-T6) is the larger migration that later supersedes T2's
   bytes.
+- **D3 -- statusLine stays project-scoped (2026-07-02 review; recommended, maintainer ratification pending).** Unlike
+  hooks, `statusLine` is a **scalar** (`set_scalar`, one value) -- it cannot double-fire, so the user-scope-only
+  rationale (T5 "Why": remove double-fire *by construction*) does not apply to it. It also self-gates on `FORGE_SESSION`
+  (design_appendix §A.8: no `FORGE_SESSION` -> no session info, **no CWD fallback**) and Claude tolerates a failing
+  statusLine gracefully. Moving it to user scope would run `forge status-line` at **full Forge import in every repo on
+  every render** -- the exact per-render cost the hook no-op gate exists to avoid, but with **no gate in its path** --
+  and would raise a product question (render in non-enrolled repos at all?). Keeping it project-scoped dissolves both
+  the cost and the question. **Consequence:** statusLine is a *documented exception* to "user scope owns all runtime
+  config" -- it keeps its T2 absolute-path rewrite and T10 container handling **at project scope**; the user-scope
+  migration (T5) covers **hooks only**. **Reversal cost if user-scope is chosen instead:** statusLine needs its own
+  gated entrypoint (fast-exit before heavy import, or a status-line shim mirroring the dispatcher) + the
+  non-enrolled-repo product call + a T4 contract extension for a non-hook command + T5 acceptance rows in both
+  directions.
 
 ## Shared contract (the epic owns this -- drift control)
 
@@ -73,7 +86,9 @@ contract, and byte-identity is the API:
 - **Registered strings:** Claude preset hooks (`preset.py`, 13 event keys incl. `PreToolUse:Read`), the Claude
   `statusLine` command `forge status-line` (`preset.py:218-222`), and the Codex managed block (`codex_hooks.py:84`). The
   command string is part of Codex's `trusted_hash` surface (golden-pinned; `codex_hooks.py:16-19,66-67`,
-  `test_codex_hooks.py:71`). T2 rewrites all of these to absolute paths; the T4/T5 cutover rewrites them again.
+  `test_codex_hooks.py:71`). T2 rewrites all of these to absolute paths; the T4/T5 cutover rewrites the **hook**
+  commands again (to the dispatcher form). **statusLine is the exception (D3):** it stays project-scoped, so it is
+  rewritten **once** (T2 absolute path) and never moves to the dispatcher form or user scope.
 - **Three matchers move in lockstep or they lie:** substring `has_forge_hook` (`"forge hook"`, `hooks.py:69`), the
   specific needle `"forge hook policy-check"` (`policy.py:309`), and the **prefix** matcher `_is_forge_hook_entry`
   (`cmd.strip().startswith("forge hook ")`, `install.py:152`, used by the T9 legacy writer). An absolute path preserves
@@ -97,7 +112,8 @@ managed-session short-circuit is part of the contract (T4). One resolver, one re
 ### 4. Scope-ownership rule: runtime hooks live only at user scope
 
 T5 enforces it, T6 migrates to it, `doctor` (T5/T6) detects violations, and **presence detection must be updated to
-match the new command form** (see Risks). The rule covers `statusLine` too, not just hooks.
+match the new command form** (see Risks). **The rule covers hooks only, not `statusLine` (D3): statusLine stays
+project-scoped** -- it is a scalar that cannot double-fire, so the user-scope rationale does not apply to it.
 
 ### 5. Execution environment (host vs sidecar container)
 
@@ -241,3 +257,14 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 | Sidecar mounts host project `.claude` **read-write** at `/workspace` (`container.py:125`, `session_lifecycle.py:497`); an in-place rewrite mutates host config | T10 redesigned around staging/injection; host-bytes-unchanged assertion added                                              |
 | T6 "no double-fire window" is unachievable across two files                                                                                                    | Weakened to "no *persistent* double-fire"; least-harmful ordering + report the transient window                            |
 | Cards invented `forge install doctor` / `forge hooks cleanup-project`; no `install` group exists and `hook` is singular+hidden                                 | New epic "CLI surface" decision; renamed to `forge extension doctor` / `forge extension cleanup-project`                   |
+
+**Round 5 (2026-07-02, maintainer residual-issues review, verified against member cards):**
+
+| Finding                                                                                                                                                                                                          | Resolution                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| statusLine unspecified under user-scope: T4 dispatcher is `forge hook`-only, T5 conflated statusLine into "dispatcher hook commands", no gate applies; embedded product question (render in non-enrolled repos?) | **D3**: statusLine stays project-scoped (scalar, can't double-fire, self-gates on `FORGE_SESSION`); seams 1/4 + T4/T5 corrected to hooks-only                    |
+| T10 overlay example named only `settings.json`; default scope is LOCAL, so the T2 dead path lives in `settings.local.json`                                                                                       | T10 covers **both** settings files; `--settings` alternative flagged pending Claude-precedence verification; T10 also neutralizes statusLine's mounted dead path |
+| T10 open question "does the container need `projects.toml` enrollment?" is answerable now                                                                                                                        | Resolved: sidecar always sets `FORGE_SESSION` (`container.py:132`) + always a managed session -> "in-sidecar => always active", enrollment moot; T10 OQ2 closed  |
+| T6 risk bullet narrates install-then-remove; T6 scope chose remove-legacy-first                                                                                                                                  | T6 risk realigned to remove-first (transient **hooks-off** window) + one-line least-harmful rationale                                                            |
+| T5 open-question candidate `forge hooks install --user` violates the epic CLI-surface rule (new plural group; `hook` is singular+hidden)                                                                         | T5 open question reshaped to a `forge extension`-family name / drop the rename                                                                                   |
+| Acceptance-row ownership: T3 held T6's backfill row **and** a fail-open row targeting T4's not-yet-existent `test_hook_dispatcher.py` (T3 precedes T4)                                                           | Backfill row moved T3 -> T6; T3 fail-open row retargeted to its own read-helper test (`test_project_registry.py`); dispatcher-integration fail-open left to T4   |

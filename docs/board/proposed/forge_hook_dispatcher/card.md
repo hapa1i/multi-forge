@@ -46,6 +46,11 @@ tilde-expand). The string is part of Codex's `trusted_hash` surface, so it is go
 **Host-oriented contract.** This resolver assumes the host filesystem/PATH. In-container (sidecar) resolution is a
 different environment and is owned by `forge_hook_sidecar_resolution`; this ticket does not handle `FORGE_SIDECAR`.
 
+**statusLine is out of scope (epic D3).** This dispatcher forwards `forge hook <name>` **only**. `forge status-line` is
+not a hook and does **not** route through the dispatcher or its no-op gate; statusLine stays project-scoped and keeps
+its T2 absolute-path form. If the epic later flips statusLine to user scope, a *separate* gated status-line entrypoint
+is required -- it is not this ticket's `forge hook` resolver.
+
 **Metadata home:** record the resolved `forge` binary path durably -- add a field to `~/.forge/installed.json` or a
 dedicated `~/.forge/runtime.json` (decided here). Today `installed.json` tracks extensions, not the binary.
 
@@ -112,11 +117,12 @@ If the shim shape wins, the detection update (`has_forge_hook` + callers) is **r
 
 ## Acceptance tests
 
-| Test                             | Fixture                                 | Assertion                                                            | Test File                                         |
-| -------------------------------- | --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------- |
-| Dispatcher resolves global Forge | dispatcher installed, no venv on `PATH` | hook command exits 0 and dispatches to the global `forge`            | `tests/src/install/test_hook_dispatcher.py` (new) |
-| Outside project no-ops           | cwd outside enrolled roots              | exits 0 without loading project state / importing Forge              | same                                              |
-| Managed session short-circuits   | `FORGE_SESSION` set, cwd not enrolled   | dispatches anyway (managed session keeps hooks)                      | same                                              |
-| Literal absolute path            | user hook install                       | config contains `/abs/home/.forge/bin/...`, not `~`                  | same                                              |
-| Stale target resolved            | recorded `forge` path stale             | tries known tool locations or reports an actionable resolution error | same                                              |
-| No-op path is cheap              | non-Forge repo, per-Read cadence        | no-op exits under the benchmark ceiling; no Forge import             | same (perf assertion)                             |
+| Test                             | Fixture                                 | Assertion                                                                                                                    | Test File                                         |
+| -------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Dispatcher resolves global Forge | dispatcher installed, no venv on `PATH` | hook command exits 0 and dispatches to the global `forge`                                                                    | `tests/src/install/test_hook_dispatcher.py` (new) |
+| Outside project no-ops           | cwd outside enrolled roots              | exits 0 without loading project state / importing Forge                                                                      | same                                              |
+| Managed session short-circuits   | `FORGE_SESSION` set, cwd not enrolled   | dispatches anyway (managed session keeps hooks)                                                                              | same                                              |
+| Corrupt registry fails open      | corrupt/newer `projects.toml`, hook run | dispatcher degrades to not-enrolled, exits 0, does not error (integration; the read-helper unit is `forge_project_registry`) | same                                              |
+| Literal absolute path            | user hook install                       | config contains `/abs/home/.forge/bin/...`, not `~`                                                                          | same                                              |
+| Stale target resolved            | recorded `forge` path stale             | tries known tool locations or reports an actionable resolution error                                                         | same                                              |
+| No-op path is cheap              | non-Forge repo, per-Read cadence        | no-op exits under the benchmark ceiling; no Forge import                                                                     | same (perf assertion)                             |
