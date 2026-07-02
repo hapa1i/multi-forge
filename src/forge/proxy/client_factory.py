@@ -379,7 +379,7 @@ class TierClientFactory:
                 for key in keys_to_remove:
                     del self._cache[key]
 
-            return await self.get_client(model_name, tier=tier)
+        return await self.get_client(model_name, tier=tier)
 
     def _resolve_tier_hyperparams(
         self,

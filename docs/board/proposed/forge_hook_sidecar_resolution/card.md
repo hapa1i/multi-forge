@@ -15,8 +15,8 @@ in-container resolution rule keyed on `FORGE_SIDECAR`.
 The sidecar is a second execution environment the original design did not account for, and both epic tracks regress it:
 
 - The container mounts the **project** at `/workspace` and sets `HOME=/root`, `FORGE_SIDECAR=1`,
-  `FORGE_LAUNCH_MODE=sidecar` (`container.py:125-169`). It does **not** mount host `~/.claude`, `~/.forge/projects.toml`,
-  or `~/.local/bin`.
+  `FORGE_LAUNCH_MODE=sidecar` (`container.py:125-169`). It does **not** mount host `~/.claude`,
+  `~/.forge/projects.toml`, or `~/.local/bin`.
 - In-container Claude reads `/workspace/.claude/settings*` (the project config, which rides in via the mount) and today
   resolves bare `forge` from the **image PATH** -- `forge` is installed globally in the container image.
 
@@ -56,8 +56,8 @@ plumbing (unrelated).
 
 ## Grounding (verified 2026-07-02)
 
-- **Project is bind-mounted read-write**: `-v {project_dir}:/workspace` (`container.py:125`); launch pre-creates the host
-  `<launch_root>/.claude` (`session_lifecycle.py:497`). So `/workspace/.claude/settings*.json` is the host file,
+- **Project is bind-mounted read-write**: `-v {project_dir}:/workspace` (`container.py:125`); launch pre-creates the
+  host `<launch_root>/.claude` (`session_lifecycle.py:497`). So `/workspace/.claude/settings*.json` is the host file,
   writable from inside the container.
 - Env: `FORGE_SESSION`, `FORGE_SIDECAR=1`, `FORGE_LAUNCH_MODE=sidecar` set (`container.py:132-136`); `HOME` is a
   sidecar-specific home, not the host `~` (`:144`).
@@ -67,8 +67,9 @@ plumbing (unrelated).
 
 ## Risks
 
-- **Host-config mutation.** Because `/workspace/.claude` is the live host directory, any in-place rewrite persists to the
-  host after the container exits. The injection mechanism must leave host bytes untouched -- asserted explicitly below.
+- **Host-config mutation.** Because `/workspace/.claude` is the live host directory, any in-place rewrite persists to
+  the host after the container exits. The injection mechanism must leave host bytes untouched -- asserted explicitly
+  below.
 - **Two byte forms** (host-absolute/dispatcher vs in-container bare) -- acceptable because the sidecar is ephemeral
   (`--rm`), but the divergence must be intentional and tested, not accidental.
 - **Codex-in-sidecar** (if used) inherits the trust-byte concern; note whether Codex runs in the container at all before
@@ -82,9 +83,9 @@ plumbing (unrelated).
 
 ## Acceptance tests
 
-| Test                              | Fixture                                              | Assertion                                                                  | Test File                                              |
-| --------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Sidecar hooks fire (T2 world)     | sidecar session, absolute-command track on host      | in-container Claude SessionStart/Stop hooks fire (not exit-127)             | `tests/integration/docker/test_real_claude_hooks.py`   |
-| Sidecar hooks fire (T5 world)     | sidecar session, user-scope-only track on host       | in-container Claude still has working hooks (not hookless)                  | same                                                   |
-| Host config untouched             | run a sidecar session, then diff host `.claude`      | host `.claude/settings*.json` bytes unchanged after the run                 | `tests/src/sidecar/test_container.py`                  |
-| Injected form is image-resolvable | inspect the container-visible hook settings          | injected hook command uses the bare/image-PATH form, not a host path        | same                                                   |
+| Test                              | Fixture                                         | Assertion                                                            | Test File                                            |
+| --------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------- |
+| Sidecar hooks fire (T2 world)     | sidecar session, absolute-command track on host | in-container Claude SessionStart/Stop hooks fire (not exit-127)      | `tests/integration/docker/test_real_claude_hooks.py` |
+| Sidecar hooks fire (T5 world)     | sidecar session, user-scope-only track on host  | in-container Claude still has working hooks (not hookless)           | same                                                 |
+| Host config untouched             | run a sidecar session, then diff host `.claude` | host `.claude/settings*.json` bytes unchanged after the run          | `tests/src/sidecar/test_container.py`                |
+| Injected form is image-resolvable | inspect the container-visible hook settings     | injected hook command uses the bare/image-PATH form, not a host path | same                                                 |
