@@ -16,9 +16,9 @@ incognito-cleanup; the CLI renders via a `ClaudeStartPresenter` (9 hooks). The o
 `invoke=`/`manager=` through the `_sess()` shim, so those patch sites still resolve; the parent count drops when the
 shim is retired, not now.
 
-**Slice 3 landed (2026-07-02):** `resume_claude_session -> ClaudeResumeResult` owns the shared
-routing/model/UUID/launch tail for the six Claude resume dispatch targets. The CLI still owns validation, mode-specific
-creation/prompt assembly, and rendering through `_ClaudeResumeCliPresenter`.
+**Slice 3 landed (2026-07-02):** `resume_claude_session -> ClaudeResumeResult` owns the shared routing/model/UUID/launch
+tail for the six Claude resume dispatch targets. The CLI still owns validation, mode-specific creation/prompt assembly,
+and rendering through `_ClaudeResumeCliPresenter`.
 
 **Slice 4 landed (2026-07-02):** 4a.1 deleted `_launch_claude_for_session` (`83b341fb`); 4a.2 extracted
 `fork_claude_session`, unifying the four host closures (`ddb5648a`, edge-case pins `1e90ba74`); 4b unified fork
@@ -698,15 +698,15 @@ layering + render-free greps; `./scripts/test-integration.sh tests/integration/d
 
 **Re-baseline (verified against current code):**
 
-| Fact | Slice 1 baseline | Current (post-4b) |
-| --- | --- | --- |
-| Lazy parent-module seams | 4 `_sess()` | **5** -- 4 `_sess()` (`session_lifecycle.py:87`, `session_fork.py:65`, `session_manage.py:34`, `session_codex.py:53`) + 1 `_session_cli()` (`session_resume_modes.py:23`); codex `_sess()` uses `import forge.cli.session`, the others use `sys.modules` |
-| `_sess().X` / `_session_cli().X` runtime call sites | ~270 patch-driving | **~33** -- ops extraction collapsed them (`SessionManager` 11, `_resolve_routing_from_cli` 5, `invoke_claude`/`run_with_active_session`/`generate_unique_name` 3 each, tail 1-2) |
-| `patch("forge.cli.session.X")` sites | 270 single + 11 multi | **245 single + 11 multi = 256**, 13 test files |
-| Direct `from forge.cli.session import X` (3rd category) | -- | current **src** imports are all session.py-owned (`console`, `handle_session_error`, the `session` group, `ResolvedRouting`) and **survive**; breakage is confined to **submodule-owned** names -- e.g. `delete` (`test_bug_qa12_orphaned_session_delete.py:40`), across **6 test files**. session.py-defined names (e.g. `_generate_parent_transfer_context`) also survive |
-| Concentration | invoke_claude 146 + SessionManager 54 (74%) | invoke_claude **149** + SessionManager **56** = 205/245 (**84%**) |
-| Test-file concentration | -- | `test_session_commands.py` holds **183/245** (75%) |
-| Re-export tail | `session.py:866-875` | `session.py:619-626` (3 name re-exports + 3 `import *`) |
+| Fact                                                    | Slice 1 baseline                            | Current (post-4b)                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lazy parent-module seams                                | 4 `_sess()`                                 | **5** -- 4 `_sess()` (`session_lifecycle.py:87`, `session_fork.py:65`, `session_manage.py:34`, `session_codex.py:53`) + 1 `_session_cli()` (`session_resume_modes.py:23`); codex `_sess()` uses `import forge.cli.session`, the others use `sys.modules`                                                                                                                    |
+| `_sess().X` / `_session_cli().X` runtime call sites     | ~270 patch-driving                          | **~33** -- ops extraction collapsed them (`SessionManager` 11, `_resolve_routing_from_cli` 5, `invoke_claude`/`run_with_active_session`/`generate_unique_name` 3 each, tail 1-2)                                                                                                                                                                                            |
+| `patch("forge.cli.session.X")` sites                    | 270 single + 11 multi                       | **245 single + 11 multi = 256**, 13 test files                                                                                                                                                                                                                                                                                                                              |
+| Direct `from forge.cli.session import X` (3rd category) | --                                          | current **src** imports are all session.py-owned (`console`, `handle_session_error`, the `session` group, `ResolvedRouting`) and **survive**; breakage is confined to **submodule-owned** names -- e.g. `delete` (`test_bug_qa12_orphaned_session_delete.py:40`), across **6 test files**. session.py-defined names (e.g. `_generate_parent_transfer_context`) also survive |
+| Concentration                                           | invoke_claude 146 + SessionManager 54 (74%) | invoke_claude **149** + SessionManager **56** = 205/245 (**84%**)                                                                                                                                                                                                                                                                                                           |
+| Test-file concentration                                 | --                                          | `test_session_commands.py` holds **183/245** (75%)                                                                                                                                                                                                                                                                                                                          |
+| Re-export tail                                          | `session.py:866-875`                        | `session.py:619-626` (3 name re-exports + 3 `import *`)                                                                                                                                                                                                                                                                                                                     |
 
 **How the shim works (so retirement stays behavior-safe):** `forge.cli.session` (session.py) is a real module -- the
 `session` group at `:604`, helpers defined at `:73/:353/:407/:461`, plus a re-export tail at `:619-626`. `_sess()`
@@ -732,50 +732,69 @@ slice. Sub-sliced below so each step is reviewable and reversible.
 
 **Symbol -> new seam mapping** (confirm each tail symbol's definition site before repointing):
 
-| Symbol (patches) | Real home | New patch seam after retirement |
-| --- | --- | --- |
-| `invoke_claude` (149) + `run_with_active_session` (1) | `forge.session.claude` / `forge.session`; op imports both (`claude_session.py:38`) | `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}` -- **drop the 3 paired `invoke=`/`run_active=_sess()` injections** (`session_lifecycle.py:689/859`, `session_fork.py:1198`) so the op defaults own them |
-| `SessionManager` (56) | `forge.session` | per-CLI-module seam where each command constructs it (`session_lifecycle` / `session_fork` / `session_manage` / `session_codex`) |
-| `_resolve_routing_from_cli` (14) | defined `session.py:73` | caller-module seam (caller imports directly) |
-| `_generate_parent_transfer_context` (10) | defined `session.py:461` | caller-module seam |
-| `_auto_install_extensions` (5), `_get_active_session_entry` (3), `_detect_parent_extensions` (1) | defined `session.py` | caller-module seam |
-| `generate_unique_name` (2) | `forge.core.naming` | caller-module seam (or `forge.core.naming.generate_unique_name`) |
-| `_delete_single_session` (2), `_warn_if_*` (2) | confirm (likely `session_manage` / `session.py`) | caller-module seam |
+| Symbol (patches)                                                                                 | Real home                                                                          | New patch seam after retirement                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invoke_claude` (149) + `run_with_active_session` (1)                                            | `forge.session.claude` / `forge.session`; op imports both (`claude_session.py:38`) | `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}` -- **drop the 3 paired `invoke=`/`run_active=_sess()` injections** (`session_lifecycle.py:689/859`, `session_fork.py:1198`) so the op defaults own them |
+| `SessionManager` (56)                                                                            | `forge.session`                                                                    | per-CLI-module seam where each command constructs it (`session_lifecycle` / `session_fork` / `session_manage` / `session_codex`)                                                                                                |
+| `_resolve_routing_from_cli` (14)                                                                 | defined `session.py:73`                                                            | caller-module seam (caller imports directly)                                                                                                                                                                                    |
+| `_generate_parent_transfer_context` (10)                                                         | defined `session.py:461`                                                           | caller-module seam                                                                                                                                                                                                              |
+| `_auto_install_extensions` (5), `_get_active_session_entry` (3), `_detect_parent_extensions` (1) | defined `session.py`                                                               | caller-module seam for runtime callers; direct tests of `session.py`-defined helpers (notably `_detect_parent_extensions`) stay on `forge.cli.session` unless the helper itself moves                                           |
+| `generate_unique_name` (2)                                                                       | `forge.core.naming`                                                                | caller-module seam (or `forge.core.naming.generate_unique_name`)                                                                                                                                                                |
+| `_delete_single_session` (2), `_warn_if_*` (2)                                                   | confirm (likely `session_manage` / `session.py`)                                   | caller-module seam                                                                                                                                                                                                              |
+| `_session_cli()` local seam (0 parent patches)                                                   | `session_resume_modes.py:23` lazy-imports `forge.cli.session`                      | direct imports from `session_lifecycle`, `session.py`, and `forge.cli.output`; no patch-count effect, but 5d cannot delete the shim until this local-var seam is gone                                                           |
 
 **Sub-slices (easy -> hard; each independently shippable -- the shim degrades symbol-by-symbol):**
 
-- [ ] **5a -- long tail (~40 patches).** For each low-volume symbol, replace `_sess().X` with a direct import + call in
-  the caller module and repoint that symbol's patches to the caller-module seam. Proves the pattern on low-risk symbols.
+- [x] **5a -- long tail (~40 patches).** For each low-volume symbol, replace `_sess().X` with a direct import + call in
+  the caller module and repoint that symbol's patches to the caller-module seam. Done 2026-07-02: migrated routing,
+  transfer-context, extension install, active-session, naming, delete, and warning seams. Remaining runtime `_sess()`
+  calls are only the planned 5b/5c symbols (`SessionManager`, `invoke_claude`, `run_with_active_session`), while the
+  separate `_session_cli()` local-var seam is deferred to 5a.5. Parent patch lines are down to **207**. The stale-parent
+  grep for these 5a symbols is empty. `_detect_parent_extensions` remains a `forge.cli.session` patch seam because the
+  helper is still defined and directly unit-tested in `session.py`.
+- [ ] **5a.5 -- `_session_cli()` resume-mode local seam (0 parent patches).** Replace `session_cli = _session_cli()` in
+  `session_resume_modes.py` with direct imports for the 26 local calls: `_execute_resume_launch_plan`,
+  `_get_effective_proxy_for_session`, `_get_resume_launch_preferences`, `_resolve_manifest_prompt_file`,
+  `_resume_launch_preferences_for_op`, `_resume_routing_for_op`, `console`, `handle_session_error`, and
+  `print_error_with_tip`. This does not change the 207 patch count, but it must land before 5d's `def _session_cli`
+  deletion gate. Run the rewind/native resume tests that exercise both functions.
 - [ ] **5b -- `SessionManager` (56 patches, 11 call sites).** Each CLI module constructs `SessionManager` directly;
   repoint its patches to that module's seam. Fragmented by command (no single seam).
 - [ ] **5c -- `invoke_claude` + `run_active` (149 + 1 patches).** Drop the 3 *paired* injections
-  `invoke=_sess().invoke_claude` + `run_active=_sess().run_with_active_session` (adjacent at `session_lifecycle.py:689/859`,
-  `session_fork.py:1198`); let `launch_claude_session` use its module defaults (`invoke or invoke_claude`,
-  `run_active or run_with_active_session`). Repoint the 149 `invoke_claude` patches and the 1 `run_with_active_session`
-  patch to `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}`. **Atomic:** injection removal and
-  patch repoint must land together (see false-green risk).
-- [ ] **5d -- delete the shim.** Remove all 5 lazy seams (4 `_sess()` + `_session_cli()` at
-  `session_resume_modes.py:23`); convert the `import *` re-export tail (`:624-626`) to **side-effect imports**
-  (`from . import session_fork  # noqa: F401`) so command registration survives; drop the 3 name re-exports (`:619-621`).
-  **Migrate the direct-import category:** repoint every `from forge.cli.session import <submodule-owned-name>` (currently
-  the 6 test files, e.g. `delete`; today's src imports are all session.py-owned and stay) to its owning module. Final gates:
-  `grep -rnE 'def _sess|def _session_cli|sys\.modules\["forge\.cli\.session"\]' src/forge/cli/` -> 0;
-  `grep -rc 'patch("forge.cli.session\.' tests/` -> 0; every surviving `from forge.cli.session import X` imports only a
-  session.py-defined name.
+  `invoke=_sess().invoke_claude` + `run_active=_sess().run_with_active_session` (adjacent at
+  `session_lifecycle.py:689/859`, `session_fork.py:1198`); let `launch_claude_session` use its module defaults
+  (`invoke or invoke_claude`, `run_active or run_with_active_session`). Repoint the 149 `invoke_claude` patches and the
+  1 `run_with_active_session` patch to `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}`.
+  **Atomic:** injection removal and patch repoint must land together (see false-green risk).
+- [ ] **5d -- delete the shim.** Remove the remaining lazy seams (4 `_sess()`, with `_session_cli()` already gone in
+  5a.5); convert the `import *` re-export tail (`:624-626`) to **side-effect imports**
+  (`from . import session_fork  # noqa: F401`) so command registration survives; drop the 3 name re-exports
+  (`:619-621`). **Migrate the direct-import category:** repoint every
+  `from forge.cli.session import <submodule-owned-name>` (currently the 6 test files, e.g. `delete`; today's src imports
+  are all session.py-owned and stay) to its owning module. Final gates:
+  `grep -rnE 'def _sess|def _session_cli|sys\.modules\["forge\.cli\.session"\]' src/forge/cli/` -> 0; no parent-module
+  patches for names owned outside `session.py`; every surviving `patch("forge.cli.session.X")` or
+  `from forge.cli.session import X` targets a `session.py`-defined name.
 
 **Risks:**
 
 - **False green (the #1 risk).** Repointing a patch to a seam the code no longer routes through leaves the mock silently
-  uncalled -- the test still passes but verifies nothing. After each symbol, prove the new seam is live: temporarily make
-  the target raise and confirm the migrated tests now **fail**, or add `assert_called` where practical. This is why 5c
-  couples the injection change with the patch repoint.
+  uncalled -- the test still passes but verifies nothing. After each symbol, prove the new seam is live: temporarily
+  make the target raise and confirm the migrated tests now **fail**, or add `assert_called` where practical. This is why
+  5c couples the injection change with the patch repoint.
+- **5c poison gate.** For the `invoke_claude`/`run_with_active_session` wave, grep-only verification is insufficient.
+  Before declaring 5c done, temporarily poison the **old** parent seam (`forge.cli.session.invoke_claude` and
+  `forge.cli.session.run_with_active_session`) to raise while the new `forge.core.ops.claude_session.*` patches are in
+  place; the migrated tests must still pass. Also make at least one representative new-seam mock assert it was called.
+  Poisoning only the new op seam and expecting patched tests to pass is not enough, because forgotten `_sess()`
+  injection would still bypass it.
 - **Command registration (5d trap).** `from .session_fork import *` doubles as the side-effect import that runs the
   `@session.command()` decorators. Convert it, do not delete it, and verify `forge session --help` still lists
   start/resume/fork/... and a leaf like `forge session fork --help` works.
 - **Direct-import breakage (3rd category).** Converting `import *` also drops submodule-owned names from
-  `forge.cli.session`'s namespace, so `from forge.cli.session import delete` (6 test files) breaks. Current src imports are
-  session.py-owned (`console`, `handle_session_error`) and unaffected. Repoint the submodule-owned imports to the owning
-  module in 5d -- the patch-site sweep alone will not catch them.
+  `forge.cli.session`'s namespace, so `from forge.cli.session import delete` (6 test files) breaks. Current src imports
+  are session.py-owned (`console`, `handle_session_error`) and unaffected. Repoint the submodule-owned imports to the
+  owning module in 5d -- the patch-site sweep alone will not catch them.
 - **Circular import.** Removing the re-export tail shifts load order; a submodule that newly imports `forge.cli.session`
   at top level can break the cycle. Keep such imports function-local or side-effect only, and run
   `python -c "import forge.cli.session"` after 5d.
@@ -789,12 +808,21 @@ slice. Sub-sliced below so each step is reviewable and reversible.
 - `core/ops` + `session/` still import no `forge.cli`; ops stay render-free.
 - CLI command tree unchanged (`forge session --help` identical before/after).
 
+**5a verification (2026-07-02):** stale-parent grep for the migrated tail symbols returned empty;
+`rg -n "_sess\(\)\." src/forge/cli/session_lifecycle.py src/forge/cli/session_fork.py src/forge/cli/session_codex.py src/forge/cli/session_manage.py`
+shows only `SessionManager` / `invoke_claude` / `run_with_active_session`;
+`python -m py_compile src/forge/cli/session_lifecycle.py src/forge/cli/session_fork.py src/forge/cli/session_codex.py src/forge/cli/session_manage.py`;
+`python -c "import forge.cli.session"`; `uv run forge session --help`;
+`uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_model_pins.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_codex.py tests/src/cli/test_session_extensions.py -q`
+-> **338 passed**.
+
 **Verification (per sub-slice + final):** affected test file(s) after each symbol;
 `python -c "import forge.cli.session"` (no cycle error); `forge session --help` + a couple of `--help` leaves; full
 `uv run pytest tests/src/cli tests/regression -q`;
 `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` (real `claude -p` seam -- the
 `invoke_claude` migration touches the launch path); `make pre-commit`. **Final gates (5d):** the three greps above (no
-lazy seam in `src/forge/cli/`, no `patch("forge.cli.session.`, no submodule-owned `from forge.cli.session import`).
+lazy seam in `src/forge/cli/`, no parent-module patch/import for submodule-owned names, and command registration/import
+smokes green).
 
 ## Roadmap
 

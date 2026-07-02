@@ -205,7 +205,7 @@ def test_worktree_rewind_proxy_addendum_injected_once(runner: CliRunner, temp_en
 
     with (
         patch("forge.cli.session.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
+        patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
         patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
     ):

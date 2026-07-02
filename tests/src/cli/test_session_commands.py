@@ -1115,7 +1115,7 @@ class TestSessionStart:
 
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._auto_install_extensions") as mock_auto,
+            patch("forge.cli.session_lifecycle._auto_install_extensions") as mock_auto,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.start_session.return_value = manifest
@@ -1148,7 +1148,7 @@ class TestSessionStart:
     def test_start_with_proxy_injects_model_addendum(self, runner: CliRunner, temp_env: Path) -> None:
         """Proxy-routed managed launches append the model-family prompt addendum."""
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
@@ -1172,7 +1172,7 @@ class TestSessionStart:
             context_limit=1048576,
         )
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
@@ -1270,7 +1270,7 @@ class TestSessionStart:
             proxy_id="test-or-proxy",
         )
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.config.loader.load_proxy_instance_config", return_value=proxy_cfg),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
@@ -1305,7 +1305,7 @@ class TestSessionStart:
             proxy_id="test-or-openai",
         )
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.config.loader.load_proxy_instance_config", return_value=proxy_cfg),
         ):
             result = runner.invoke(
@@ -1333,7 +1333,7 @@ class TestSessionStart:
     def test_start_without_name_auto_generates(self, runner: CliRunner, temp_env: Path) -> None:
         """Should auto-generate a name when none provided."""
         with (
-            patch("forge.cli.session.generate_unique_name", return_value="auto-test-session"),
+            patch("forge.cli.session_lifecycle.generate_unique_name", return_value="auto-test-session"),
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
             result = runner.invoke(main, ["session", "start"])
@@ -1343,7 +1343,7 @@ class TestSessionStart:
 
     def test_start_without_name_direct(self, runner: CliRunner, temp_env: Path) -> None:
         """Auto-name should work with --no-proxy flag."""
-        with patch("forge.cli.session.generate_unique_name", return_value="auto-direct"):
+        with patch("forge.cli.session_lifecycle.generate_unique_name", return_value="auto-direct"):
             result = runner.invoke(main, ["session", "start", "--no-proxy", "--no-launch"])
 
         assert result.exit_code == 0
@@ -1659,7 +1659,7 @@ class TestSessionDelete:
 
     def test_delete_dirty_worktree_shows_force_tip(self, runner: CliRunner, temp_env: Path) -> None:
         """Single-session dirty worktree failures should keep the force guidance."""
-        with patch("forge.cli.session._delete_single_session", side_effect=DirtyWorktreeError("/tmp/wt")):
+        with patch("forge.cli.session_manage._delete_single_session", side_effect=DirtyWorktreeError("/tmp/wt")):
             result = runner.invoke(main, ["session", "delete", "dirty-sess", "--yes"])
 
         assert result.exit_code == 1
@@ -1670,7 +1670,7 @@ class TestSessionDelete:
     def test_delete_single_session_not_found_uses_cli_error_format(self, runner: CliRunner, temp_env: Path) -> None:
         """Single-session ForgeSessionError should preserve standard CLI formatting."""
         with patch(
-            "forge.cli.session._delete_single_session",
+            "forge.cli.session_manage._delete_single_session",
             side_effect=SessionNotFoundError("missing-sess"),
         ):
             result = runner.invoke(main, ["session", "delete", "missing-sess", "--yes"])
@@ -1682,7 +1682,7 @@ class TestSessionDelete:
 
     def test_delete_multi_session_forge_error_uses_per_target_summary(self, runner: CliRunner, temp_env: Path) -> None:
         """Multi-session ForgeSessionError should be reported per target without aborting immediately."""
-        with patch("forge.cli.session._delete_single_session") as mock_delete:
+        with patch("forge.cli.session_manage._delete_single_session") as mock_delete:
             mock_delete.side_effect = [None, SessionNotFoundError("missing-sess")]
             result = runner.invoke(main, ["session", "delete", "ok-sess", "missing-sess", "--yes"])
 
@@ -2184,7 +2184,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -2284,7 +2284,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2459,7 +2459,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2485,7 +2485,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2548,7 +2548,7 @@ class TestSessionFork:
         )
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
             patch("forge.core.ops.claude_session.launch_claude_session", return_value=launch_result) as mock_launch,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2611,7 +2611,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2643,7 +2643,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
-            patch("forge.cli.session._generate_parent_transfer_context", side_effect=_spy),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", side_effect=_spy),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2784,9 +2784,9 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
+            patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0),
@@ -2837,9 +2837,9 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
+            patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2893,8 +2893,8 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session._auto_install_extensions") as mock_auto,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(None, [])),
+            patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2985,7 +2985,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
         ):
@@ -3049,7 +3049,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
         ):
@@ -3232,7 +3232,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -3296,9 +3296,9 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session._auto_install_extensions", return_value=False),
+            patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -3361,11 +3361,11 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._auto_install_extensions", return_value=False),
+            patch("forge.cli.session_lifecycle._warn_if_hooks_missing"),
+            patch("forge.cli.session_lifecycle._warn_if_version_outdated"),
+            patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
             patch(
-                "forge.cli.session._generate_parent_transfer_context",
+                "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -3530,8 +3530,8 @@ class TestSessionForkIntoPreflight:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
-            patch("forge.cli.session._auto_install_extensions") as mock_auto,
-            patch("forge.cli.session._generate_parent_transfer_context", return_value=(None, [])),
+            patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
+            patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),
             patch("forge.install.tracking.TrackingStore") as mock_tracking_cls,
             patch("subprocess.run") as mock_run,
         ):
@@ -3624,7 +3624,7 @@ class TestSessionResumeExtended:
 
     def test_reconnect_proxy_session_injects_model_addendum(self, runner: CliRunner, temp_env: Path) -> None:
         """Reconnecting a proxy-routed session should retain addendum injection."""
-        with patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()):
+        with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_proxy_routing()):
             result = runner.invoke(
                 main,
                 ["session", "start", "reconnect-addendum", "--proxy", "openai-proxy", "--no-launch"],
@@ -3911,7 +3911,7 @@ class TestResumeNativeMode:
         with (
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
-                "forge.cli.session._resolve_routing_from_cli",
+                "forge.cli.session_lifecycle._resolve_routing_from_cli",
                 return_value=type(
                     "R",
                     (),
@@ -4061,7 +4061,7 @@ class TestProxyDirectFlags:
         )
 
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
+            patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=None),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
@@ -4089,7 +4089,7 @@ class TestProxyDirectFlags:
         )
 
         with (
-            patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
+            patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=routing),
             patch("forge.cli.session_fork._resolve_context_limit", return_value=None),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):

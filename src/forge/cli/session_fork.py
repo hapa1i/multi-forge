@@ -69,11 +69,14 @@ def _sess():  # type: ignore[return]
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
+    _auto_install_extensions,
+    _generate_parent_transfer_context,
     _get_effective_proxy_for_session,
     _get_launch_preferences,
     _hint_cross_project_session,
     _persist_routing_override,
     _print_routing_summary,
+    _resolve_routing_from_cli,
     _resolve_session_artifact_root,
     console,
     handle_session_error,
@@ -651,7 +654,7 @@ def fork(
     # Resolve --proxy early for preflight (reuses routing resolved later for launch)
     _preflight_routing: ResolvedRouting | None = None
     if proxy_name:
-        _preflight_routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+        _preflight_routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if direct_model_pin:
         try:
@@ -837,7 +840,7 @@ def fork(
         effective_url = _preflight_routing.base_url
         effective_proxy_id = _preflight_routing.proxy_id
     elif proxy_name:
-        routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
         effective_template = routing.template
         effective_url = routing.base_url
         effective_proxy_id = routing.proxy_id
@@ -1059,7 +1062,7 @@ def fork(
                 blank_before=False,
                 console=console,
             )
-        fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
+        fork_context, prompt_warnings = _generate_parent_transfer_context(
             manager=manager,
             manifest=fork_manifest,
             parent_state=parent_manifest,
@@ -1150,7 +1153,7 @@ def fork(
                 parent_manifest.forge_root
                 or (parent_manifest.worktree.path if parent_manifest.worktree else str(Path.cwd()))
             )
-            _sess()._auto_install_extensions(
+            _auto_install_extensions(
                 install_root=extension_root,
                 parent_project_root=_parent_forge_root,
                 force_extensions=extensions,

@@ -18,6 +18,7 @@ import click
 
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.core.naming import generate_unique_name
 from forge.core.ops.claude_session import (
     ClaudeLaunchPreferences,
     ClaudeResumeAction,
@@ -80,8 +81,8 @@ from forge.session.prev_sessions import (
 from forge.session.transfer import ResumeStrategy
 
 
-# Names that tests patch on forge.cli.session (invoke_claude,
-# run_with_active_session, SessionManager, generate_unique_name) must be
+# Names that tests still patch on forge.cli.session (invoke_claude,
+# run_with_active_session, SessionManager) must be
 # accessed through the parent module at call time. We use _sess() to get
 # the module from sys.modules (already loaded by the time any function runs).
 def _sess():  # type: ignore[return]
@@ -92,11 +93,14 @@ from forge.cli.editor import open_in_editor  # noqa: E402
 from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
+    _auto_install_extensions,
+    _generate_parent_transfer_context,
     _get_active_session_entry,
     _get_effective_proxy_for_session,
     _get_launch_preferences,
     _hint_cross_project_session,
     _print_routing_summary,
+    _resolve_routing_from_cli,
     console,
     handle_session_error,
     logger,
@@ -120,11 +124,6 @@ from forge.cli.session_rewind import (  # noqa: E402
     _persist_rewind_derivation,
     _prepare_rewind_launch_artifacts,
 )
-
-# Functions below are accessed through _sess() because tests patch them
-# on forge.cli.session. Direct imports would bypass those patches.
-# _auto_install_extensions, _detect_parent_extensions,
-# _generate_parent_transfer_context
 
 __all__ = [
     # Public functions
@@ -361,8 +360,8 @@ def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
 
 
 def _warn_before_claude_launch(forge_root: Path) -> None:
-    _sess()._warn_if_hooks_missing(forge_root)
-    _sess()._warn_if_version_outdated()
+    _warn_if_hooks_missing(forge_root)
+    _warn_if_version_outdated()
 
 
 def _render_sidecar_launch(event: ClaudeSidecarLaunch) -> None:
@@ -534,7 +533,7 @@ class _ClaudeStartCliPresenter:
     def on_extensions(self, event: ClaudeStartExtensions) -> None:
         if event.is_worktree:
             if event.extension_root is not None:
-                _sess()._auto_install_extensions(
+                _auto_install_extensions(
                     install_root=event.extension_root,
                     parent_project_root=_resolve_extension_detection_root(Path.cwd()),
                     force_extensions=event.extensions_flag,
@@ -1102,7 +1101,7 @@ def start(
 
     routing: ResolvedRouting | None = None
     if proxy_name:
-        routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     # CWD validation: must be at repo root; --worktree requires main repo
     from forge.cli.guards import require_main_repo_root, require_repo_root
@@ -1115,7 +1114,7 @@ def start(
     if name is None:
         _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
-        name = _sess().generate_unique_name(existing)
+        name = generate_unique_name(existing)
     assert name is not None  # generated above when None
 
     sys.exit(
@@ -1345,7 +1344,7 @@ def resume(
 
     routing: ResolvedRouting | None = None
     if proxy_name:
-        routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     manager = _sess().SessionManager()
 
@@ -1636,9 +1635,7 @@ def _launch_in_place(
                 prompt_files.append(notes_overlay)
             launch_action = ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT
         else:
-            fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
-                manager=manager, manifest=manifest
-            )
+            fork_context, prompt_warnings = _generate_parent_transfer_context(manager=manager, manifest=manifest)
             if fork_context is not None:
                 prompt_files.append(fork_context)
                 launch_action = ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT
@@ -2033,7 +2030,7 @@ def incognito(
 
     routing: ResolvedRouting | None = None
     if proxy_name:
-        routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     from forge.cli.guards import require_repo_root
 
@@ -2042,7 +2039,7 @@ def incognito(
     if name is None:
         _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
-        name = _sess().generate_unique_name(existing)
+        name = generate_unique_name(existing)
     assert name is not None  # generated above when None
 
     # Incognito cleanup is handled inside launch_new_session() so that

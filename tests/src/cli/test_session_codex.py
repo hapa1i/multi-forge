@@ -401,7 +401,7 @@ class TestResumeCodexDispatch:
     def test_bare_resume_reattaches(self, runner: CliRunner, tmp_path: Path) -> None:
         with (
             patch("forge.cli.session.SessionManager") as mgr_cls,
-            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
             patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -420,7 +420,7 @@ class TestResumeCodexDispatch:
         )
         with (
             patch("forge.cli.session.SessionManager") as mgr_cls,
-            patch("forge.cli.session._get_active_session_entry", return_value=entry),
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=entry),
             patch("forge.cli.session_codex.reattach_interactive_codex_session") as reattach,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -470,7 +470,7 @@ class TestResumeCodexDispatch:
 
         monkeypatch.chdir(other_project)
         with (
-            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
             patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
         ):
             result = runner.invoke(main, ["session", "resume", "impl"])

@@ -194,7 +194,7 @@ def test_fork_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp
     store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
 
     with (
-        patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()),
+        patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_anthropic_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
         patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
     ):
@@ -229,7 +229,7 @@ def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Fork matches resume: inherited proxy base_url needs explicit --proxy for --model validation."""
-    with patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
         start_result = runner.invoke(
             main,
             ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],
@@ -273,7 +273,7 @@ def test_resume_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, te
     runner.invoke(main, ["session", "start", "proxy-planner", "--model", "claude-opus-4.8", "--no-launch"])
 
     with (
-        patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()),
+        patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
         patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
     ):
@@ -306,7 +306,7 @@ def test_resume_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Inherited proxy base_url without a proxy_id cannot validate a --model override."""
-    with patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
         start_result = runner.invoke(
             main,
             ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],

@@ -17,9 +17,10 @@ from typing import Any
 import click
 
 from forge.cli.output import print_error, print_error_with_tip, print_tip
-from forge.cli.session import console
+from forge.cli.session import _get_active_session_entry, console
 from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
+from forge.core.naming import generate_unique_name
 from forge.core.ops.codex_interactive import (
     CodexInteractiveLaunch,
     CodexInteractiveResult,
@@ -198,7 +199,7 @@ def run_codex_start(ctx: click.Context) -> int:
     if name is None:
         _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
-        name = _sess().generate_unique_name(existing)
+        name = generate_unique_name(existing)
 
     if interactive:
         return launch_interactive_codex_session(
@@ -270,7 +271,7 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
 
     # Claude reconnect parity: refuse while a launch is still registered. No --force
     # escape -- two TUIs on one thread would interleave a single rollout.
-    active_entry = _sess()._get_active_session_entry(name, forge_root=manifest.forge_root)
+    active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
     if active_entry is not None:
         print_error(f"Cannot reconnect: session [bold]{name}[/bold] appears to still be active.", console=console)
         console.print(f"  Launch mode: {active_entry.launch_mode}")

@@ -234,7 +234,7 @@ def delete(
                     pass
 
         try:
-            _sess()._delete_single_session(
+            _delete_single_session(
                 manager=manager,
                 name=name,
                 yes=yes or delete_all,
