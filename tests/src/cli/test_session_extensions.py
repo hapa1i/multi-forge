@@ -15,9 +15,9 @@ from forge.cli.session import (
     _auto_install_extensions,
     _detect_parent_extensions,
     _generate_parent_transfer_context,
-    _resolve_worktree_extension_root,
 )
 from forge.install.models import Installation
+from forge.session.launch import _resolve_worktree_extension_root
 from forge.session.models import SessionState, create_session_state
 
 

@@ -237,7 +237,7 @@ def start_cmd(
     else:
         console.print("Starting Claude [green]direct[/green] (no proxy)")
 
-    from forge.cli.session_addendum import (
+    from forge.session.addendum import (
         resolve_addendum_content_for_proxy,
         write_bare_addendum,
     )

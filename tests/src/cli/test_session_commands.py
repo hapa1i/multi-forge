@@ -117,7 +117,7 @@ def test_resume_token_estimate_multiplier_uses_direct_pin(temp_env: Path) -> Non
 
 def test_addendum_resolution_mixed_family_uses_claude_default() -> None:
     """Mixed proxy tiers should use the configured default tier, including None for Claude."""
-    from forge.cli import session_lifecycle
+    from forge.session.addendum import resolve_addendum_content_for_proxy
 
     config = _proxy_cfg(
         haiku="openai/gpt-5.4-mini",
@@ -127,12 +127,12 @@ def test_addendum_resolution_mixed_family_uses_claude_default() -> None:
     )
 
     with patch("forge.config.loader.load_proxy_instance_config", return_value=config):
-        assert session_lifecycle.resolve_addendum_content_for_proxy("mixed-proxy") is None
+        assert resolve_addendum_content_for_proxy("mixed-proxy") is None
 
 
 def test_addendum_resolution_mixed_family_uses_openai_default() -> None:
     """Mixed proxy tiers should inject the default tier's addendum when that tier needs one."""
-    from forge.cli import session_lifecycle
+    from forge.session.addendum import resolve_addendum_content_for_proxy
 
     config = _proxy_cfg(
         haiku="anthropic/claude-haiku-4-5-20251001",
@@ -142,7 +142,7 @@ def test_addendum_resolution_mixed_family_uses_openai_default() -> None:
     )
 
     with patch("forge.config.loader.load_proxy_instance_config", return_value=config):
-        content = session_lifecycle.resolve_addendum_content_for_proxy("mixed-proxy")
+        content = resolve_addendum_content_for_proxy("mixed-proxy")
 
     assert content is not None
     assert "Tool Parameter Guidance" in content

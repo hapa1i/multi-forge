@@ -311,42 +311,6 @@ def _print_routing_summary(*, template: str | None, base_url: str | None) -> Non
     console.print(f"  Base URL: {base_url}")
 
 
-def _resolve_extension_detection_root(cwd: Path) -> Path:
-    """Return the Forge project root to use for extension inheritance lookup."""
-    from forge.core.ops.context import find_forge_root
-    from forge.session.claude.paths import find_project_root
-
-    forge_root = find_forge_root(cwd)
-    if forge_root is not None:
-        return forge_root
-    try:
-        return find_project_root(str(cwd))
-    except FileNotFoundError:
-        return cwd.resolve()
-
-
-def _resolve_worktree_extension_root(manifest: SessionState) -> Path | None:
-    """Return where extensions should be installed inside a target worktree.
-
-    Session state may stay anchored at the parent's forge_root for root-level
-    worktree sessions, but extensions must still land inside the new checkout.
-    Nested Forge projects instead install at the equivalent nested forge_root
-    within the worktree.
-    """
-    if not manifest.worktree or not manifest.worktree.is_worktree:
-        return None
-
-    worktree_root = Path(manifest.worktree.path)
-    if manifest.forge_root:
-        forge_root = Path(manifest.forge_root)
-        try:
-            forge_root.relative_to(worktree_root)
-            return forge_root
-        except ValueError:
-            pass
-    return worktree_root
-
-
 def _detect_parent_extensions(parent_project_root: Path) -> tuple[str, str] | None:
     """Detect parent's installed extensions for worktree inheritance.
 
@@ -470,25 +434,6 @@ def _print_active_delete_warning(session_name: str, active_entry: ActiveSessionE
     console.print()
 
 
-def _resolve_launch_mode(*, sidecar: bool, host_proxy: bool) -> str:
-    """Resolve host vs sidecar launch mode from CLI flags and runtime config."""
-    if sidecar:
-        return LAUNCH_MODE_SIDECAR
-    if host_proxy:
-        return LAUNCH_MODE_HOST
-
-    from forge.runtime_config import get_runtime_config
-
-    return LAUNCH_MODE_SIDECAR if get_runtime_config().proxy_mode == LAUNCH_MODE_SIDECAR else LAUNCH_MODE_HOST
-
-
-def _get_runtime_base_url(*, use_sidecar: bool, effective_url: str | None) -> str | None:
-    """Return the base URL Claude should see for this launch."""
-    from forge.session import SIDECAR_RUNTIME_BASE_URL
-
-    return SIDECAR_RUNTIME_BASE_URL if use_sidecar else effective_url
-
-
 def _get_launch_preferences(
     state: SessionState,
 ) -> tuple[bool, tuple[str, ...], str | None]:
@@ -502,32 +447,6 @@ def _get_launch_preferences(
         return use_sidecar, (), None
 
     return use_sidecar, tuple(launch.sidecar.mounts), launch.sidecar.image
-
-
-def _combine_prompt_files(*, worktree_path: Path, session_name: str, prompt_files: list[Path]) -> str | None:
-    """Combine multiple prompt/context files into one appendable prompt file."""
-    existing = [path.resolve() for path in prompt_files if path.is_file()]
-    if not existing:
-        return None
-    if len(existing) == 1:
-        return str(existing[0])
-
-    launch_context_dir = worktree_path / ".forge" / "launch-context"
-    launch_context_dir.mkdir(parents=True, exist_ok=True)
-    combined_path = launch_context_dir / f"{session_name}.md"
-
-    sections: list[str] = []
-    for path in existing:
-        try:
-            content = path.read_text(encoding="utf-8").strip()
-        except FileNotFoundError:
-            continue
-        if not content:
-            continue
-        sections.append(f"<!-- Source: {path.name} -->\n{content}")
-
-    combined_path.write_text("\n\n".join(sections).rstrip() + "\n", encoding="utf-8")
-    return str(combined_path.resolve())
 
 
 def _resolve_session_artifact_root(*, manager: SessionManager, state: SessionState) -> Path:

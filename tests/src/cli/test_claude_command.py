@@ -271,7 +271,7 @@ def test_proxy_launch_by_template_injects_resolved_proxy_addendum(tmp_path, monk
 
     with (
         patch("forge.proxy.proxy_orchestrator.ensure_proxy", return_value=(entry, False)),
-        patch("forge.cli.session_addendum.resolve_addendum_content_for_proxy", side_effect=fake_resolve),
+        patch("forge.session.addendum.resolve_addendum_content_for_proxy", side_effect=fake_resolve),
         patch(_INVOKE, side_effect=fake_invoke),
     ):
         runner = CliRunner()

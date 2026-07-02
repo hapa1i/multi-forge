@@ -15,10 +15,6 @@ from typing import cast
 import click
 
 from forge.cli.output import print_error, print_error_with_tip, print_tip
-from forge.cli.session_addendum import (
-    resolve_addendum_content_for_proxy,
-    write_managed_addendum,
-)
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.ops.context import _cwd_forge_root
@@ -34,6 +30,10 @@ from forge.session import (
     LAUNCH_MODE_SIDECAR,
     ForgeSessionError,
     SessionState,
+)
+from forge.session.addendum import (
+    resolve_addendum_content_for_proxy,
+    write_managed_addendum,
 )
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.direct_model import (
@@ -51,7 +51,12 @@ from forge.session.exceptions import (
     SessionNotFoundError,
     WorktreePathExistsError,
 )
-from forge.session.launch import _build_session_env
+from forge.session.launch import (
+    _build_session_env,
+    _combine_prompt_files,
+    _get_runtime_base_url,
+    _resolve_worktree_extension_root,
+)
 from forge.session.launch_confirmation import (
     _routing_mode_for,
     read_proxy_cost_baseline,
@@ -70,15 +75,12 @@ def _sess():  # type: ignore[return]
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
-    _combine_prompt_files,
     _get_effective_proxy_for_session,
     _get_launch_preferences,
-    _get_runtime_base_url,
     _hint_cross_project_session,
     _persist_routing_override,
     _print_routing_summary,
     _resolve_session_artifact_root,
-    _resolve_worktree_extension_root,
     console,
     handle_session_error,
     logger,

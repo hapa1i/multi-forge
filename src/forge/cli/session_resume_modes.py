@@ -10,6 +10,7 @@ from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
+from forge.session.launch import _combine_prompt_files, _get_runtime_base_url
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -104,7 +105,7 @@ def _resume_fresh_rewind(
         prompt_files.append(configured_prompt)
     if rewind_artifacts.context_path is not None:
         prompt_files.append(rewind_artifacts.context_path)
-    prompt_file = session_cli._combine_prompt_files(
+    prompt_file = _combine_prompt_files(
         worktree_path=child_worktree_path,
         session_name=child_manifest.name,
         prompt_files=prompt_files,
@@ -128,7 +129,7 @@ def _resume_fresh_rewind(
         use_sidecar=use_sidecar,
         surface="resume",
     )
-    runtime_base_url = session_cli._get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
+    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
 
     session_cli._print_routing_summary(template=launch_template, base_url=runtime_base_url)
     session_cli.console.print()
@@ -220,7 +221,7 @@ def _resume_fresh_native(
         use_sidecar=use_sidecar,
         surface="resume",
     )
-    runtime_base_url = session_cli._get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
+    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
 
     session_cli._print_routing_summary(template=launch_template, base_url=runtime_base_url)
     session_cli.console.print()

@@ -9,11 +9,10 @@ extraction of Claude session launch/resume logic out of the CLI layer, mirroring
 `forge.core.ops.claude_session`, and the CLI-free model-pin support cluster moved into `forge.session.model_pin`. This
 slice intentionally did not touch the dangerous `invoke_claude`/launcher seam; the card remains in `doing/` for Slice 2.
 
-**Slice 2 planned (2026-07-02):** detailed plan below, grounded by read-only exploration (anchors verified against the
-current tree). Key outcome: Claude start is **interactive** (blocking child), so `start_claude_session` mirrors the
-existing `core/ops/codex_interactive.py` op — NOT the headless `codex_session.py`, and NOT `core/invoker/`. Slice 2 is
-split into **2a (pure relocations)** and **2b (the op)** because the combined scope is too large for one reviewable PR.
-2a is implemented in the current worktree; next up: **2b**.
+**Slice 2 in progress (2026-07-02):** 2a landed as `ba30b4ea` (`refactor: relocate claude launch helpers`). 2b is split
+once more because the shared launcher bridge is itself a reviewable unit: the render-free launcher body now lives in
+`core/ops/claude_session.py`, while `_launch_claude_for_session` is a CLI adapter for resume/fork compatibility. Next:
+the start-specific `start_claude_session` op and staged created/extensions/no-launch events.
 
 ## Verified Baseline
 
@@ -198,6 +197,9 @@ UI-free relocate (`_build_session_env`, `_prepare_sidecar_prompt_file`, `launch_
 
 ### Sub-slice 2b -- The op
 
+- [x] Bridge carve-out: add frozen `ClaudeSidecarLaunch` + `ClaudeSessionLaunchResult`, extract the shared
+  `_launch_claude_for_session` body into render-free `launch_claude_session(...)`, and keep the old CLI function as an
+  adapter that renders hook/version warnings, sidecar status, warning lines, and post-exit summary.
 - [ ] Add frozen `ClaudeStartLaunch` (announce payload) + `ClaudeSessionStartResult` (`exit_code`, `session`,
   `worktree_path`, `warnings`, `operation_started_at`, plus the confirmed facts the post-exit render needs:
   `routing_mode`, `proxy_id`, `base_url`, `is_sandboxed`, `claude_project_root`, **and `store_exists`** (Nit 3)).
@@ -214,15 +216,15 @@ UI-free relocate (`_build_session_env`, `_prepare_sidecar_prompt_file`, `launch_
   auto-install at `:1103`). Preserve their current pre-launch print timing: split each into a logic core (op) + a render
   the CLI performs (via `announce`/injected hook), rather than collecting into `warnings` (which would move the output
   to after the child exits -- a timing change).
-- [ ] Convert **every** CLI-error exit inside `_launch_claude_for_session` to `raise ForgeOpError` (Nit 2): the direct
+- [x] Convert **every** CLI-error exit inside `_launch_claude_for_session` to `raise ForgeOpError` (Nit 2): the direct
   `sys.exit(1)` sites (`:468/487/495/629`) **and** the `print_error(...) + return 1` paths -- runtime-dispatch backstop
   (`:392`), direct-model env error (`:675`), proxy model-pin error (`:683`). The op cannot `print_error`; the CLI
   renders the `ForgeOpError` message.
-- [ ] **Shared-launcher compatibility (Nit 1):** `_launch_claude_for_session` has **9 callers**, only 2 on the start
+- [x] **Shared-launcher compatibility (Nit 1):** `_launch_claude_for_session` has **9 callers**, only 2 on the start
   path (`:1123`/`:1152`). The rest -- resume/reconnect (`:1986`/`:2066`/`:2136`/`:2363`,
   `session_resume_modes.py:135`/`:227`) and fork (`session_fork.py:1239`) -- migrate in Slices 3/4, not now. 2b extracts
   the body into a core helper that raises `ForgeOpError` and stays render-free; the start op consumes it directly.
-- [ ] **The resume/fork adapter is NOT thin:** the launcher body currently owns a large render/post-exit surface that
+- [x] **The resume/fork adapter is NOT thin:** the launcher body currently owns a large render/post-exit surface that
   resume/fork depend on -- hook/version warns (`:435-436`), the sidecar status block (`:583-600`),
   `record_launch_confirmed` (`:572`/`:657`), `_infer_launch_confirmation` (`:706`), and `_post_exit_render`
   (`:621`/`:708`). A `try/except -> print_error -> return 1` wrapper would force the render-free core to either print
@@ -273,8 +275,14 @@ incognito delete-on-exit `finally`.
 - [x] Focused: `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_model_pins.py -q`.
 - [x] Integration: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`.
 - [x] `make pre-commit` clean.
+- [x] 2b bridge focused:
+  `uv run pytest tests/src/session/test_claude_session_manifest_characterization.py tests/src/cli/test_session_commands.py tests/src/cli/test_session_model_pins.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_resume_review.py tests/regression/test_bug_nested_project_launch.py tests/regression/test_bug_passthrough_model_pin.py -q`
+  -- 264 passed.
+- [x] 2b bridge integration: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -- 21
+  passed.
+- [x] 2b bridge pre-commit: `make pre-commit` -- passed after hooks sorted imports/formatted Markdown.
 
-### Open items to resolve during 2a
+### Open items to resolve during the start-op step
 
 - Staged pre-launch event contract (Nit 1): the exact event set (`on_created`/`on_extensions`/`on_no_launch`) and how
   the 3 UI-tangled render seams (`_warn_if_hooks_missing`, `_warn_if_version_outdated`, `_auto_install_extensions`) hang
