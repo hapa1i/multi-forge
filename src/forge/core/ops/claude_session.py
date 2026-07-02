@@ -8,18 +8,23 @@ errors.
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Protocol
 
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
+    ForgeSessionError,
+    SessionManager,
     SessionState,
     SessionStore,
     run_with_active_session,
@@ -29,14 +34,23 @@ from forge.session.addendum import (
     write_managed_addendum,
 )
 from forge.session.claude import build_claude_args, invoke_claude
+from forge.session.context_limit import _resolve_context_limit
 from forge.session.direct_model import (
     apply_direct_model_env,
     apply_proxy_context_model_defaults,
 )
+from forge.session.exceptions import (
+    BranchExistsError,
+    InvalidBranchNameError,
+    SessionExistsError,
+    WorktreePathExistsError,
+)
 from forge.session.launch import (
     _build_session_env,
     _combine_prompt_files,
+    _get_runtime_base_url,
     _prepare_sidecar_prompt_file,
+    _resolve_worktree_extension_root,
 )
 from forge.session.launch_confirmation import (
     _infer_launch_confirmation,
@@ -69,6 +83,7 @@ class ClaudeSessionLaunchResult:
     session: str
     manifest: SessionState
     worktree_path: str | None
+    # Reserved for start-op reconciliation warnings; the bridge path emits none today.
     warnings: tuple[str, ...]
     operation_started_at: datetime
     routing_mode: str
@@ -77,6 +92,97 @@ class ClaudeSessionLaunchResult:
     is_sandboxed: bool
     claude_project_root: str | None
     store_exists: bool
+
+
+class ClaudeStartError(ForgeOpError):
+    """Session-creation failure carrying a structured recovery tip for the CLI to render.
+
+    The op stays render-free, so the specific ``Tip:`` shown for SessionExists /
+    BranchExists / WorktreePathExists is carried as data and rendered by the caller.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        tip_lines: tuple[str, ...] = (),
+        commands: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.tip_lines = tip_lines
+        self.commands = commands
+
+
+@dataclass(frozen=True)
+class ClaudeStartCreated:
+    """Render payload for the post-create routing/worktree summary."""
+
+    session: str
+    incognito: bool
+    proxy_display: str | None
+    effective_template: str | None
+    runtime_base_url: str | None
+    worktree_path: str | None  # None unless the session owns a worktree
+    worktree_branch: str | None
+    supervise_target: str | None
+
+
+@dataclass(frozen=True)
+class ClaudeStartExtensions:
+    """Render payload for the extension-inheritance decision (install or tip)."""
+
+    is_worktree: bool
+    extension_root: Path | None
+    extensions_flag: bool | None
+
+
+@dataclass(frozen=True)
+class SupervisorWiring:
+    """CLI-validated supervisor inputs threaded into the create transaction (row 4)."""
+
+    target: str
+    source_state: SessionState
+    supervisor_proxy: str | None
+    supervisor_direct: bool
+    cascade: bool
+    checker_model: str | None
+    checker_provider: str | None
+    checker_effort: str | None
+    supervisor_effort: str | None
+    supervisor_runtime: str | None
+
+
+class ClaudeStartPresenter(Protocol):
+    """Render hooks the CLI implements so the op can stay render-free.
+
+    Ordering matters: ``on_created`` -> ``on_extensions`` -> (``on_no_launch`` |
+    launch). On a launch failure ``on_launch_error`` fires BEFORE the incognito
+    cleanup hooks, preserving today's error-then-cleanup output order.
+    """
+
+    def on_created(self, event: ClaudeStartCreated) -> None: ...
+    def on_extensions(self, event: ClaudeStartExtensions) -> None: ...
+    def on_no_launch(self) -> None: ...
+    def before_launch(self, forge_root: Path) -> None: ...
+    def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
+    def on_launch_error(self, error: ForgeOpError) -> None: ...
+    def on_incognito_cleanup_start(self) -> None: ...
+    def on_incognito_cleanup_ok(self) -> None: ...
+    def on_incognito_cleanup_warning(self, message: str) -> None: ...
+
+
+@dataclass(frozen=True)
+class ClaudeSessionStartResult:
+    """Outcome of ``start_claude_session`` (create + optional interactive launch)."""
+
+    exit_code: int
+    session: str
+    manifest: SessionState
+    operation_started_at: datetime
+    did_run: bool  # True only when the child actually launched -> CLI post-exit renders
+    store_exists: bool
+    worktree_path: str | None
+    warnings: tuple[str, ...]
 
 
 def resolve_and_validate_system_prompt(
@@ -220,7 +326,6 @@ def launch_claude_session(
         resume_id=resume_id,
         runtime_base_url=runtime_base_url,
         proxy_id=proxy_id,
-        context_limit=context_limit,
         fork_session=fork_session,
         system_prompt_file=system_prompt_file,
         name=name,
@@ -234,6 +339,331 @@ def launch_claude_session(
         invoke=invoke or invoke_claude,
         warnings=warnings,
     )
+
+
+def start_claude_session(
+    *,
+    manager: SessionManager,
+    name: str,
+    template: str | None,
+    base_url: str | None,
+    direct: bool,
+    incognito: bool,
+    worktree: bool,
+    branch: str | None,
+    launch_mode: str,
+    use_sidecar: bool,
+    mounts: tuple[str, ...],
+    image: str | None,
+    no_launch: bool,
+    extensions: bool | None,
+    extra_args: list[str] | None,
+    context_limit_override: int | None,
+    proxy_display: str | None,
+    proxy_id: str | None,
+    normalized_direct_model: str | None,
+    prompt_file: str | None,
+    memory_flag: bool | None,
+    subprocess_proxy: str | None,
+    supervisor: SupervisorWiring | None,
+    presenter: ClaudeStartPresenter,
+    invoke: Callable[..., int] | None = None,
+    run_active: Callable[..., int] | None = None,
+) -> ClaudeSessionStartResult:
+    """Create a Claude session and (unless ``no_launch``) run it interactively.
+
+    Render-free: the CLI supplies ``presenter`` for all output and injects
+    ``invoke``/``run_active`` (so ``patch("forge.cli.session.invoke_claude")`` and the
+    ``SessionManager`` patch sites still intercept). Raises ``ClaudeStartError`` /
+    ``ForgeOpError`` for create and launch-prep failures; ``StateCorrupted*`` propagate
+    bare to the top-level reset handler.
+    """
+    operation_started_at = datetime.now(timezone.utc)
+    pre_seeded_uuid = str(uuid.uuid4())
+
+    manifest = _create_claude_session(
+        manager,
+        name=name,
+        template=template,
+        base_url=base_url,
+        direct=direct,
+        incognito=incognito,
+        worktree=worktree,
+        branch=branch,
+        launch_mode=launch_mode,
+        use_sidecar=use_sidecar,
+        mounts=mounts,
+        image=image,
+        normalized_direct_model=normalized_direct_model,
+        pre_seeded_uuid=pre_seeded_uuid,
+    )
+
+    # Post-create mutations (rows 2-4): reassign manifest as each store write lands.
+    if memory_flag is True:
+        manifest = _apply_memory_activation(manifest)
+    if subprocess_proxy:
+        manifest = _apply_subprocess_proxy(manifest, subprocess_proxy)
+    if supervisor is not None:
+        manifest = _apply_supervisor_wiring(manifest, supervisor, proxy_id=proxy_id, template=template, direct=direct)
+
+    effective_template = manifest.intent.proxy.template if manifest.intent.proxy else None
+    effective_url = manifest.intent.proxy.base_url if manifest.intent.proxy else None
+    context_limit = (
+        context_limit_override if context_limit_override is not None else _resolve_context_limit(effective_template)
+    )
+    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
+
+    is_worktree = bool(manifest.worktree and manifest.worktree.is_worktree)
+    presenter.on_created(
+        ClaudeStartCreated(
+            session=manifest.name,
+            incognito=incognito,
+            proxy_display=proxy_display,
+            effective_template=effective_template,
+            runtime_base_url=runtime_base_url,
+            worktree_path=manifest.worktree.path if is_worktree and manifest.worktree else None,
+            worktree_branch=manifest.worktree.branch if is_worktree and manifest.worktree else None,
+            supervise_target=supervisor.target if supervisor is not None else None,
+        )
+    )
+    presenter.on_extensions(
+        ClaudeStartExtensions(
+            is_worktree=is_worktree,
+            extension_root=_resolve_worktree_extension_root(manifest) if is_worktree else None,
+            extensions_flag=extensions,
+        )
+    )
+
+    if no_launch:
+        presenter.on_no_launch()
+        return ClaudeSessionStartResult(
+            exit_code=0,
+            session=manifest.name,
+            manifest=manifest,
+            operation_started_at=operation_started_at,
+            did_run=False,
+            store_exists=True,
+            worktree_path=manifest.worktree.path if manifest.worktree else None,
+            warnings=(),
+        )
+
+    launch_result: ClaudeSessionLaunchResult | None = None
+    launch_failed = False
+    try:
+        try:
+            launch_result = launch_claude_session(
+                manifest=manifest,
+                session_id=pre_seeded_uuid,
+                resume_id=None,
+                effective_template=effective_template,
+                runtime_base_url=runtime_base_url,
+                context_limit=context_limit,
+                use_sidecar=use_sidecar,
+                mounts=mounts,
+                image=image,
+                system_prompt_file=prompt_file,
+                name=manifest.name,
+                extra_args=extra_args,
+                proxy_id=proxy_id,
+                before_launch=presenter.before_launch,
+                on_sidecar_launch=presenter.on_sidecar_launch,
+                invoke=invoke or invoke_claude,
+                run_active=run_active or run_with_active_session,
+            )
+        except ForgeOpError as e:
+            # Render the launch error BEFORE the incognito finally so the output order
+            # (error -> "Cleaning up...") matches the pre-op launcher.
+            presenter.on_launch_error(e)
+            launch_failed = True
+    finally:
+        if incognito:
+            _run_incognito_cleanup(manager, manifest, presenter)
+
+    if launch_failed or launch_result is None:
+        return ClaudeSessionStartResult(
+            exit_code=1,
+            session=manifest.name,
+            manifest=manifest,
+            operation_started_at=operation_started_at,
+            did_run=False,
+            store_exists=False,
+            worktree_path=manifest.worktree.path if manifest.worktree else None,
+            warnings=(),
+        )
+
+    return ClaudeSessionStartResult(
+        exit_code=launch_result.exit_code,
+        session=manifest.name,
+        manifest=launch_result.manifest,
+        operation_started_at=operation_started_at,
+        did_run=True,
+        store_exists=launch_result.store_exists,
+        worktree_path=launch_result.worktree_path,
+        warnings=launch_result.warnings,
+    )
+
+
+def _create_claude_session(
+    manager: SessionManager,
+    *,
+    name: str,
+    template: str | None,
+    base_url: str | None,
+    direct: bool,
+    incognito: bool,
+    worktree: bool,
+    branch: str | None,
+    launch_mode: str,
+    use_sidecar: bool,
+    mounts: tuple[str, ...],
+    image: str | None,
+    normalized_direct_model: str | None,
+    pre_seeded_uuid: str,
+) -> SessionState:
+    """Create the session (row 1), mapping create failures to structured op errors."""
+    try:
+        return manager.start_session(
+            name=name,
+            proxy_template=template,
+            proxy_base_url=base_url,
+            direct=direct,
+            is_incognito=incognito,
+            create_worktree=worktree,
+            branch=branch,
+            launch_mode=launch_mode,
+            sidecar_mounts=list(mounts) if use_sidecar else None,
+            sidecar_image=image if use_sidecar else None,
+            direct_model=normalized_direct_model,
+            claude_session_id=pre_seeded_uuid,
+        )
+    except SessionExistsError as e:
+        raise ClaudeStartError(
+            str(e),
+            tip_lines=(
+                f"Run 'forge session resume {name}' to continue, or 'forge session delete {name}' to remove it first.",
+            ),
+        ) from e
+    except BranchExistsError as e:
+        if e.worktree:
+            tip = ("Use --branch to specify a different branch name.",)
+        else:
+            tip = (f"Run 'git branch -d {e.branch}' to delete it, or use --branch to specify a different name.",)
+        raise ClaudeStartError(str(e), tip_lines=tip) from e
+    except WorktreePathExistsError as e:
+        raise ClaudeStartError(
+            str(e),
+            tip_lines=("Remove the directory or use a different session name.",),
+        ) from e
+    except InvalidBranchNameError as e:
+        raise ForgeOpError(str(e)) from e
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt index/manifest -> top-level reset handler
+    except ForgeSessionError as e:
+        raise ForgeOpError(str(e)) from e
+    except FileNotFoundError as e:
+        raise ForgeOpError(str(e)) from e
+
+
+def _apply_memory_activation(manifest: SessionState) -> SessionState:
+    """Row 2: enable ``intent.memory.auto_update`` and return the re-read manifest."""
+    from forge.session.models import MemoryIntent, MemoryWriterConfig
+    from forge.session.store import SessionStore as _MemStore
+
+    forge_root = manifest.forge_root or str(Path.cwd())
+
+    def _set_memory(m: SessionState) -> None:
+        if m.intent.memory is None:
+            m.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
+        elif m.intent.memory.auto_update is None:
+            m.intent.memory.auto_update = MemoryWriterConfig(enabled=True)
+        else:
+            m.intent.memory.auto_update.enabled = True
+
+    return _MemStore(forge_root, manifest.name).update(timeout_s=5.0, mutate=_set_memory)
+
+
+def _apply_subprocess_proxy(manifest: SessionState, subprocess_proxy: str) -> SessionState:
+    """Row 3: persist ``intent.subprocess_proxy`` and return the re-read manifest."""
+    manifest.intent.subprocess_proxy = subprocess_proxy
+    forge_root = manifest.forge_root or str(Path.cwd())
+    from forge.session.store import SessionStore as _SPStore
+
+    _SPStore(forge_root, manifest.name).update(
+        timeout_s=5.0,
+        mutate=lambda m: setattr(m.intent, "subprocess_proxy", subprocess_proxy),
+    )
+    return _SPStore(forge_root, manifest.name).read()
+
+
+def _apply_supervisor_wiring(
+    manifest: SessionState,
+    wiring: SupervisorWiring,
+    *,
+    proxy_id: str | None,
+    template: str | None,
+    direct: bool,
+) -> SessionState:
+    """Row 4: apply supervisor routing + lane and return the re-read manifest."""
+    from forge.policy.semantic.supervisor import (
+        SUPERVISOR_CONSUMER,
+        apply_checker_options,
+        apply_supervisor_and_lane,
+        apply_supervisor_routing,
+    )
+    from forge.session.consumer_lanes import lane_record_for_runtime
+    from forge.session.models import SupervisorConfig
+
+    forge_root = manifest.forge_root or (manifest.worktree.path if manifest.worktree else str(Path.cwd()))
+    sup_config = SupervisorConfig(
+        resume_id=wiring.target,
+        forge_root=wiring.source_state.forge_root or forge_root,
+    )
+    apply_supervisor_routing(
+        sup_config,
+        wiring.source_state,
+        supervisor_proxy=wiring.supervisor_proxy,
+        supervisor_direct=wiring.supervisor_direct,
+        current_proxy_id=proxy_id,
+        current_template=template,
+        current_direct=direct,
+    )
+    # Launch-time --cascade only flips the flag; the runtime hook escalates to the
+    # frontier when no plan exists (see plan_check._needs_review).
+    if wiring.cascade:
+        sup_config.cascade = True
+    apply_checker_options(
+        sup_config,
+        checker_model=wiring.checker_model,
+        checker_provider=wiring.checker_provider,
+        checker_effort=wiring.checker_effort,
+    )
+    if wiring.supervisor_effort is not None:
+        sup_config.supervisor_effort = wiring.supervisor_effort
+    lane = (
+        lane_record_for_runtime(SUPERVISOR_CONSUMER, wiring.supervisor_runtime) if wiring.supervisor_runtime else None
+    )
+    store = SessionStore(forge_root, manifest.name)
+    store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
+    return store.read()
+
+
+def _run_incognito_cleanup(
+    manager: SessionManager,
+    manifest: SessionState,
+    presenter: ClaudeStartPresenter,
+) -> None:
+    """Delete the incognito session on exit; wraps ONLY the launch (never create)."""
+    presenter.on_incognito_cleanup_start()
+    try:
+        manager.delete_session(
+            manifest.name,
+            delete_transcripts=True,
+            force=True,
+            forge_root=manifest.forge_root,
+        )
+        presenter.on_incognito_cleanup_ok()
+    except ForgeSessionError as e:
+        presenter.on_incognito_cleanup_warning(str(e))
 
 
 def _run_sidecar_claude_session(
@@ -416,7 +846,6 @@ def _run_host_claude_session(
     resume_id: str | None,
     runtime_base_url: str | None,
     proxy_id: str | None,
-    context_limit: int,
     fork_session: bool,
     system_prompt_file: str | None,
     name: str | None,
