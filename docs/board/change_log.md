@@ -27,14 +27,33 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### session_op_layer_extraction Slice 1: Claude session preflight split
+
+**Goal**: Start the staged Claude session CLI/core split with the lowest-risk helpers and a manifest characterization
+safety net.
+
+**Key changes**:
+
+- Added a JSON-string manifest characterization test for Claude `start --no-launch` and fresh resume, pinning dataclass
+  field order and normalized volatile values.
+- Added `forge.core.ops.claude_session.resolve_and_validate_system_prompt` and rewired launch prompt resolution through
+  it while keeping the CLI's `Path -> str` launcher boundary explicit.
+- Moved the CLI-free model-pin support cluster into `forge.session.model_pin`; `cli/session_model_pin.py` now only keeps
+  UI-tangled persistence/warning behavior.
+- Accepted `session_op_layer_extraction` into `doing/` with Slice 1 verification recorded. Parent patch count remains
+  270 across 13 files; `session_lifecycle.py` is 2,496 lines after the slice.
+
+**Verification**: characterization test 2 passed; focused units 241 passed; Docker lifecycle integration 21 passed;
+layering/UI-free greps empty; `make pre-commit` clean.
+
 ### Board closeout: rewind_resume_strategy
 
 **Goal**: Close the shipped rewind resume strategy card so `doing/` reflects only active work.
 
 **Key changes**:
 
-- `rewind_resume_strategy` moved `doing/ -> done/` after confirming all implementation slices were already ticked and the
-  docs named in the checklist reflect the shipped `--strategy rewind --drop-last N` behavior.
+- `rewind_resume_strategy` moved `doing/ -> done/` after confirming all implementation slices were already ticked and
+  the docs named in the checklist reflect the shipped `--strategy rewind --drop-last N` behavior.
 - The card/checklist stale "Slice 4 next" focus was corrected to closeout state.
 
 **Verification**: `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q`

@@ -1,7 +1,7 @@
 # session_op_layer_extraction -- mirror the Codex core-ops split for the Claude launch path
 
-**Lane**: `proposed/` -- accepted-candidate **refactor**, not yet scheduled. Behavior-preserving structural extraction;
-not blocking other work.
+**Lane**: `doing/` -- accepted **refactor**, started 2026-07-02. Behavior-preserving structural extraction; Slice 1 is
+in progress.
 
 **Origin**: focused audit, 2026-07-01 (session lifecycle CLI/core boundary), grounded by a parallel read-only mapper
 sweep (Codex template, Claude-path entanglement, `_sess()`/patch-site metrics, design-doc anchors) and re-verified with

@@ -95,7 +95,7 @@ def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> No
     """
     import os
 
-    from forge.cli import session_model_pin
+    from forge.session import model_pin
 
     forge_home = Path(os.environ["FORGE_HOME"])
     proxy_dir = forge_home / "proxies" / "legacy-gemini"
@@ -113,7 +113,7 @@ def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> No
     )
 
     env_vars: dict[str, str] = {}
-    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
+    error = model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
 
     assert error is not None
     assert "Could not load proxy config for 'legacy-gemini'" in error
@@ -130,7 +130,7 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
     """
     import os
 
-    from forge.cli import session_model_pin
+    from forge.session import model_pin
 
     forge_home = Path(os.environ["FORGE_HOME"])
     proxy_dir = forge_home / "proxies" / "bad-shape"
@@ -145,7 +145,7 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
     )
 
     env_vars: dict[str, str] = {}
-    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
+    error = model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
 
     assert error is not None
     assert "Malformed proxy configuration" in error

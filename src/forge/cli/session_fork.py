@@ -49,6 +49,10 @@ from forge.session.exceptions import (
     SessionNotFoundError,
     WorktreePathExistsError,
 )
+from forge.session.model_pin import (
+    _apply_direct_model_env_if_supported,
+    _validate_direct_model_pin_for_routing,
+)
 
 
 def _sess():  # type: ignore[return]
@@ -89,8 +93,6 @@ from forge.cli.session_lifecycle import (  # noqa: E402
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
 from forge.cli.session_model_pin import (  # noqa: E402
     _apply_and_persist_direct_model_override,
-    _apply_direct_model_env_if_supported,
-    _validate_direct_model_pin_for_routing,
 )
 from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
 

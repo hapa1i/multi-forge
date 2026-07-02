@@ -22,14 +22,10 @@ from forge.cli.launch_confirmation import (
     read_proxy_cost_baseline,
     record_launch_confirmed,
 )
-from forge.cli.session_model_pin import (
-    _apply_and_persist_direct_model_override,
-    _apply_direct_model_env_if_supported,
-    _validate_direct_model_pin_for_routing,
-    _validate_proxy_model_pin,
-)
+from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.core.ops.claude_session import resolve_and_validate_system_prompt
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
@@ -65,6 +61,11 @@ from forge.session.exceptions import (
     InvalidBranchNameError,
     SessionNotFoundError,
     WorktreePathExistsError,
+)
+from forge.session.model_pin import (
+    _apply_direct_model_env_if_supported,
+    _validate_direct_model_pin_for_routing,
+    _validate_proxy_model_pin,
 )
 from forge.session.prev_sessions import (
     ensure_notes_overlay,
@@ -921,15 +922,13 @@ def launch_new_session(
 
     # Resolve system prompt to absolute path BEFORE worktree creation
     # (worktree changes cwd so relative paths would break).
-    prompt_file: str | None = None
-    if system_prompt_file:
-        prompt_file = str(Path(system_prompt_file).resolve())
-    elif system_prompt:
-        claude_dir = Path.cwd() / ".claude"
-        claude_dir.mkdir(exist_ok=True)
-        prompt_file_path = claude_dir / "forge.system-prompt.generated.md"
-        prompt_file_path.write_text(system_prompt)
-        prompt_file = str(prompt_file_path)
+    prompt_path = resolve_and_validate_system_prompt(
+        system_prompt=system_prompt,
+        system_prompt_file=system_prompt_file,
+        no_launch=no_launch,
+        cwd=Path.cwd(),
+    )
+    prompt_file = str(prompt_path) if prompt_path is not None else None
 
     # Validate supervisor target and proxy BEFORE creating the session to avoid half-created state
     _supervisor_source_state = None
