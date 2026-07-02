@@ -547,14 +547,17 @@ preserve deliberately.
 - [x] Add `launch_root_override` **only if** a characterization test proves the default resolver is insufficient. No
   override was needed; `launch_claude_session`'s existing resolver matched the old fork cwd behavior.
 - [x] Managed addendum is now launcher-owned for fork: native-relocate/same-dir pass `None`, transfer/rewind pass only
-  user/context/configured prompts, and host + sidecar worktree fork tests assert exactly one managed addendum.
+  user/context/configured prompts; host + sidecar worktree fork tests assert exactly one managed addendum, and host
+  rewind is pinned explicitly. Sidecar rewind is rejected before prompt composition/launch.
+- [x] Confirmed-state writes inside `launch_claude_session` (`claude_project_root`, `is_sandboxed`
+  confirmation/rollback) are intentionally best-effort across start/resume/fork; lock-timeout failures log and do not
+  abort interactive launch.
 - [x] Run integration (`./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`) and
   `make pre-commit`; record results before marking 4a.2 complete.
 - **Assertions:** op render-free + layering clean; fork manifest byte-identical for same-dir, worktree-transfer,
   native-relocate, and **incognito** (mid-launch capture + delete-on-exit assertion, like the incognito start test); the
   launched **system-prompt contains the managed addendum exactly once** for every mode (assert on the combined prompt
-  file, not the manifest); **rewind (sidecar + host) explicitly characterized** to confirm/fix the pre-existing possible
-  duplication.
+  file, not the manifest); host rewind explicitly characterized, with sidecar rewind covered by rejection behavior.
 
 **Recorded verification (4a.2):**
 

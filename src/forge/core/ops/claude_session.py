@@ -1442,7 +1442,7 @@ def _run_host_claude_session(
         claude_session_id=session_id,
         runner=lambda: invoke(**invoke_kwargs),
     )
-    if exit_code == 0 and not fork_session:
+    if exit_code == 0 and fork_session is False:
         _infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
 
     return ClaudeSessionLaunchResult(

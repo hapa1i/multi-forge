@@ -203,6 +203,52 @@ class TestPersistedClaudeProjectRoot:
         updated = store.read()
         assert updated.confirmed.claude_project_root == nested_root
 
+    def test_best_effort_confirmed_write_failure_does_not_abort_launch(self, tmp_path, monkeypatch):
+        """Launch should continue when best-effort confirmed-state writes time out."""
+        from unittest.mock import patch
+
+        from forge.core.state import FileLockTimeoutError
+        from forge.session import SessionStore, create_session_state
+        from forge.session.models import Worktree
+
+        checkout = tmp_path / "repo-executor"
+        checkout.mkdir()
+        state = create_session_state("executor")
+        state.worktree = Worktree(path=str(checkout), branch="executor", is_worktree=True)
+        state.forge_root = str(checkout)
+        store = SessionStore(str(checkout), "executor")
+        store.write(state)
+
+        captured: list[dict] = []
+
+        def _fake_invoke(**kwargs):
+            captured.append(kwargs)
+            return 0
+
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        monkeypatch.chdir(checkout)
+
+        lock_error = FileLockTimeoutError(lock_path=checkout / ".forge" / "sessions" / "executor.lock", timeout_s=5.0)
+        with (
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session.SessionStore.update", side_effect=lock_error),
+        ):
+            result = _launch_for_test(
+                manifest=state,
+                session_id="new-uuid",
+                resume_id=None,
+                effective_template=None,
+                runtime_base_url=None,
+                context_limit=200000,
+                invoke=_fake_invoke,
+            )
+
+        assert result.exit_code == 0
+        assert len(captured) == 1
+        assert store.read().confirmed.claude_project_root is None
+
     def test_no_persisted_root_falls_back_to_computed(self, tmp_path, monkeypatch):
         """Sessions without claude_project_root (pre-field) use the computed root."""
         from unittest.mock import patch
