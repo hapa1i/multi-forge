@@ -27,9 +27,9 @@ preflight plus a session create/rollback before failing, with a message that poi
 
 - Single source of truth in `session/transfer.py`: `TRANSFER_CONTEXT_STRATEGIES` / `TRANSFER_CONTEXT_STRATEGY_VALUES`
   (the four assembly strategies: minimal, structured, full, ai-curated) + `parse_transfer_context_strategy()`.
-- All four codex/transfer ops validate through that parser; both transfer-facing CLI `Choice` lists
-  (`session transfer`, `session start --runtime codex`) source from the constant. `assemble_transfer_context` now
-  rejects any non-transfer strategy (not just `REWIND`) with one uniform message -- a strictly better backstop.
+- All four codex/transfer ops validate through that parser; both transfer-facing CLI `Choice` lists (`session transfer`,
+  `session start --runtime codex`) source from the constant. `assemble_transfer_context` now rejects any non-transfer
+  strategy (not just `REWIND`) with one uniform message -- a strictly better backstop.
 - Rejection fires at the front door, before the codex-doctor preflight and session creation.
 
 **Deliberately untouched**: the `manager.py` / `cli/session.py` transfer-mode branches (the resume/fork CLIs dispatch
@@ -39,11 +39,11 @@ legitimately support rewind, so they cannot source from the transfer-only consta
 
 ## Acceptance
 
-| Assertion                                                              | Verification                                                                                              |
+| Assertion                                                             | Verification                                                                                             |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `strategy="rewind"` rejected before session creation at each codex op  | `test_codex_session.py::test_unknown_strategy_rejected_before_creation[rewind]` + bridge/interactive kin  |
-| `assemble_transfer_context` rejects rewind with the uniform message    | `test_transfer.py::test_rewind_strategy_is_not_a_transfer_context_strategy`                               |
-| Codex CLI `--strategy` choices track the constant (no hardcoded copy)  | `TRANSFER_CONTEXT_STRATEGY_VALUES` sourced in `session_codex.py`; 253 codex/transfer/session_codex green  |
+| `strategy="rewind"` rejected before session creation at each codex op | `test_codex_session.py::test_unknown_strategy_rejected_before_creation[rewind]` + bridge/interactive kin |
+| `assemble_transfer_context` rejects rewind with the uniform message   | `test_transfer.py::test_rewind_strategy_is_not_a_transfer_context_strategy`                              |
+| Codex CLI `--strategy` choices track the constant (no hardcoded copy) | `TRANSFER_CONTEXT_STRATEGY_VALUES` sourced in `session_codex.py`; 253 codex/transfer/session_codex green |
 
 **Verification**: 253 unit tests green (codex ops + transfer + session_codex); `make pre-commit` hooks clean on all
 touched files (mypy, pyright, isort, ruff, black).
