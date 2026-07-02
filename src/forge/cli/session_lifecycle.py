@@ -32,7 +32,6 @@ from forge.core.ops.claude_session import (
     ResumeLaunchPlan,
     ResumePrepared,
     SupervisorWiring,
-    launch_claude_session,
     resolve_and_validate_system_prompt,
     resume_claude_session,
     start_claude_session,
@@ -135,7 +134,6 @@ __all__ = [
     "resume",
     "incognito",
     # Private helpers (needed for re-export to forge.cli.session namespace)
-    "_launch_claude_for_session",
     "_launch_in_place",
     "_reconnect_in_place",
     "_launch_as_child",
@@ -360,53 +358,6 @@ def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
         context_path = forge_root / context_path
 
     return context_path.resolve() if context_path.is_file() else None
-
-
-def _launch_claude_for_session(
-    *,
-    manifest: SessionState,
-    session_id: str | None,
-    resume_id: str | None,
-    effective_template: str | None,
-    runtime_base_url: str | None,
-    context_limit: int,
-    use_sidecar: bool,
-    mounts: tuple[str, ...] = (),
-    image: str | None = None,
-    fork_session: bool = False,
-    register_fork: bool = False,
-    system_prompt_file: str | None = None,
-    name: str | None = None,
-    extra_args: list[str] | None = None,
-    proxy_id: str | None = None,
-) -> int:
-    """Launch Claude for a session, handling sidecar/host split."""
-    try:
-        result = launch_claude_session(
-            manifest=manifest,
-            session_id=session_id,
-            resume_id=resume_id,
-            effective_template=effective_template,
-            runtime_base_url=runtime_base_url,
-            context_limit=context_limit,
-            use_sidecar=use_sidecar,
-            mounts=mounts,
-            image=image,
-            fork_session=fork_session,
-            register_fork=register_fork,
-            system_prompt_file=system_prompt_file,
-            name=name,
-            extra_args=extra_args,
-            proxy_id=proxy_id,
-            before_launch=_warn_before_claude_launch,
-            on_sidecar_launch=_render_sidecar_launch,
-            invoke=_sess().invoke_claude,
-            run_active=_sess().run_with_active_session,
-        )
-    except ForgeOpError as e:
-        print_error(str(e), console=console)
-        return 1
-    return _render_claude_launch_result(result)
 
 
 def _warn_before_claude_launch(forge_root: Path) -> None:

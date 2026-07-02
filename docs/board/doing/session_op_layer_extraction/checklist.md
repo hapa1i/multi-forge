@@ -454,9 +454,11 @@ Current coverage: start `--no-launch`, incognito start, fresh-resume (transfer).
 
 ## Slice 4a -- fork launch migration (`fork_claude_session`)
 
-**Status:** planned; fork surface verified against the current tree (`session_fork.py` = 1,336 lines). **Paused for
-review.** Slice 4 splits into **4a** (fork launch migration -- itself **4a.1** adapter deletion + **4a.2** the
-`fork_claude_session` op, both below) and **4b** (supervisor validation/wiring + sidecar prep extraction).
+**Status:** 4a.1 implemented 2026-07-02; 4a.2 planned. Fork surface was verified against the pre-4a.1 tree
+(`session_fork.py` = 1,336 lines; `session_lifecycle.py` = 2,121 lines). After 4a.1, `session_lifecycle.py` = **2,072
+lines** and `session_fork.py` = **1,350 lines**. Slice 4 splits into **4a** (fork launch migration -- itself **4a.1**
+adapter deletion + **4a.2** the `fork_claude_session` op, both below) and **4b** (supervisor validation/wiring + sidecar
+prep extraction).
 
 ### Scope correction (verified -- the migration is bigger than "one caller")
 
@@ -513,17 +515,28 @@ preserve deliberately.
 
 **4a.1 -- delete the `_launch_claude_for_session` adapter (small, concrete, no behavior change).**
 
-- Inline the adapter's body at its only caller, the sidecar fork (`:1244`): replace `_launch_claude_for_session(...)`
-  with `launch_claude_session(...)` + `_render_claude_launch_result(...)`. The adapter already calls
-  `launch_claude_session`, so this is a mechanical inline, not a rewrite. Keep the incognito `finally` where it is
-  (CLI).
-- Delete `_launch_claude_for_session` (0 callers remain).
-- Migrate its importers: `tests/regression/test_bug_nested_project_launch.py`, `tests/src/cli/test_session_commands.py`,
-  `tests/src/cli/test_session_codex.py` -- repoint patches to `launch_claude_session` (or the inlined seam).
-- Relocate/replace the fork model override (`:839`) **only if** it can be done without changing host launch behavior;
-  otherwise defer to 4a.2.
-- **Assertions:** adapter deleted (grep: 0 callers); those 3 importer files green; host + sidecar fork behavior
+- [x] Inline the adapter's body at its only caller, the sidecar fork (`:1244`): replace
+  `_launch_claude_for_session(...)` with `launch_claude_session(...)` + `_render_claude_launch_result(...)`. The adapter
+  already calls `launch_claude_session`, so this is a mechanical inline, not a rewrite. Keep the incognito `finally`
+  where it is (CLI).
+- [x] Delete `_launch_claude_for_session` (0 callers remain).
+- [x] Migrate its importers: `tests/regression/test_bug_nested_project_launch.py`,
+  `tests/src/cli/test_session_commands.py`, `tests/src/cli/test_session_codex.py` -- repoint patches to
+  `launch_claude_session` (or the inlined seam).
+- [x] Leave the fork model override (`:839`) for 4a.2; moving it in 4a.1 would entangle the host closure behavior this
+  sub-slice is intentionally avoiding.
+- [x] **Assertions:** adapter deleted (grep: 0 callers); those 3 importer files green; host + sidecar fork behavior
   unchanged; existing fork tests + characterization unchanged.
+
+**Recorded verification (4a.1):**
+
+- `rg -n "_launch_claude_for_session" src tests` -> no matches.
+- `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_codex.py tests/regression/test_bug_nested_project_launch.py -q`
+  -> 309 passed.
+- Layering grep (`from forge.cli|import forge.cli` in `core/ops/claude_session.py` + `session/model_pin.py`) -> empty.
+- Op render-free grep (`click|rich|console|sys.exit|print_error|print_tip` in `core/ops/claude_session.py`) -> empty.
+- `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -> 21 passed.
+- `make pre-commit` -> passed.
 
 **4a.2 -- `fork_claude_session` op + host-closure unification (the lift).**
 

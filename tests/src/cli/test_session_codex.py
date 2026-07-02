@@ -2,9 +2,9 @@
 
 Covers ``forge session start --runtime codex`` / ``forge session resume``
 dispatch and flag-matrix validation (``--task`` selects the headless turn;
-omitting it the interactive TUI), the ``_launch_claude_for_session`` runtime
-backstop, the ``session_codex`` rendering layer, and ``session show`` for Codex
-manifests. The ops themselves are covered in
+omitting it the interactive TUI), the Claude launcher runtime backstop, the
+``session_codex`` rendering layer, and ``session show`` for Codex manifests.
+The ops themselves are covered in
 ``tests/src/core/ops/test_codex_session.py`` and ``test_codex_interactive.py``;
 here the ops are mocked and the assertions target Click plumbing (what reaches
 the op, what exits with which code).
@@ -540,22 +540,20 @@ class TestResumeCodexDispatch:
 
 
 class TestLaunchClaudeBackstop:
-    def test_codex_manifest_refused(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        from forge.cli.session_lifecycle import _launch_claude_for_session
+    def test_codex_manifest_refused(self, tmp_path: Path) -> None:
+        from forge.core.ops.claude_session import launch_claude_session
 
         state = create_session_state("impl", worktree_path=str(tmp_path), runtime="codex")
-        code = _launch_claude_for_session(
-            manifest=state,
-            session_id=None,
-            resume_id=None,
-            effective_template=None,
-            runtime_base_url=None,
-            context_limit=200_000,
-            use_sidecar=False,
-        )
-
-        assert code == 1
-        assert "runtime 'codex'" in capsys.readouterr().out
+        with pytest.raises(ForgeOpError, match="runtime 'codex'"):
+            launch_claude_session(
+                manifest=state,
+                session_id=None,
+                resume_id=None,
+                effective_template=None,
+                runtime_base_url=None,
+                context_limit=200_000,
+                use_sidecar=False,
+            )
 
 
 class TestCodexCliRendering:

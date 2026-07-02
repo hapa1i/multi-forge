@@ -2495,15 +2495,31 @@ class TestSessionFork:
         assert mock_manager.fork_session.call_args.kwargs.get("resume_mode") is None
 
     def test_samedir_transfer_sidecar_registers_fork(self, runner: CliRunner, temp_env: Path) -> None:
-        """Sidecar same-dir transfer: _launch_claude_for_session gets a fresh session_id,
+        """Sidecar same-dir transfer: launch_claude_session gets a fresh session_id,
         fork_session=False, register_fork=True (the only thing setting FORGE_FORK_NAME when
         fork_session is False), and a non-None system_prompt_file."""
+        from forge.core.ops.claude_session import ClaudeSessionLaunchResult
+
         parent, fork_state = self._samedir_parent_and_fork(temp_env, fork_launch_mode=LAUNCH_MODE_SIDECAR)
         ctx = self._seed_context_file(temp_env)
+        launch_result = ClaudeSessionLaunchResult(
+            exit_code=0,
+            session=fork_state.name,
+            manifest=fork_state,
+            worktree_path=fork_state.worktree.path if fork_state.worktree else None,
+            warnings=(),
+            operation_started_at=datetime.now(UTC),
+            routing_mode="proxy",
+            proxy_id=None,
+            base_url="http://localhost:8085",
+            is_sandboxed=True,
+            claude_project_root=fork_state.worktree.path if fork_state.worktree else None,
+            store_exists=True,
+        )
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
-            patch("forge.cli.session_fork._launch_claude_for_session", return_value=0) as mock_launch,
+            patch("forge.cli.session_fork.launch_claude_session", return_value=launch_result) as mock_launch,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent

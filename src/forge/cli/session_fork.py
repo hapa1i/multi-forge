@@ -17,7 +17,9 @@ import click
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.core.ops.claude_session import launch_claude_session
 from forge.core.ops.context import _cwd_forge_root
+from forge.core.ops.session import ForgeOpError
 from forge.core.paths import display_path
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
@@ -86,14 +88,16 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
-    _launch_claude_for_session,
     _persist_fork_transfer_derivation,
     _prepare_rewind_launch_artifacts,
     _print_branch_exists_tip,
     _print_post_exit_tip,
     _print_session_activity_summary,
+    _render_claude_launch_result,
+    _render_sidecar_launch,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
+    _warn_before_claude_launch,
 )
 from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
 from forge.cli.session_model_pin import (  # noqa: E402
@@ -1241,22 +1245,32 @@ def fork(
     if use_sidecar:
         exit_code = 0
         try:
-            exit_code = _launch_claude_for_session(
-                manifest=fork_manifest,
-                session_id=_fork_uuid if uses_fresh_transfer else None,
-                resume_id=None if uses_fresh_transfer else (_rewind_resume_id or parent_session_id),
-                effective_template=effective_template,
-                runtime_base_url=runtime_base_url,
-                context_limit=context_limit,
-                use_sidecar=True,
-                mounts=mounts,
-                image=image,
-                fork_session=not uses_fresh_transfer,
-                register_fork=uses_fresh_transfer,
-                system_prompt_file=prompt_file if (uses_fresh_transfer or rewind_active) else None,
-                name=fork_manifest.name,
-                proxy_id=effective_proxy_id,
-            )
+            try:
+                launch_result = launch_claude_session(
+                    manifest=fork_manifest,
+                    session_id=_fork_uuid if uses_fresh_transfer else None,
+                    resume_id=None if uses_fresh_transfer else (_rewind_resume_id or parent_session_id),
+                    effective_template=effective_template,
+                    runtime_base_url=runtime_base_url,
+                    context_limit=context_limit,
+                    use_sidecar=True,
+                    mounts=mounts,
+                    image=image,
+                    fork_session=not uses_fresh_transfer,
+                    register_fork=uses_fresh_transfer,
+                    system_prompt_file=prompt_file if (uses_fresh_transfer or rewind_active) else None,
+                    name=fork_manifest.name,
+                    proxy_id=effective_proxy_id,
+                    before_launch=_warn_before_claude_launch,
+                    on_sidecar_launch=_render_sidecar_launch,
+                    invoke=_sess().invoke_claude,
+                    run_active=_sess().run_with_active_session,
+                )
+            except ForgeOpError as e:
+                print_error(str(e), console=console)
+                exit_code = 1
+            else:
+                exit_code = _render_claude_launch_result(launch_result)
         finally:
             if incognito:
                 console.print(f"\n[dim]Cleaning up incognito fork '{fork_name}'...[/dim]")
@@ -1278,7 +1292,7 @@ def fork(
     _sess()._warn_if_hooks_missing(_fork_forge_root)
     _sess()._warn_if_version_outdated()
 
-    # Host forks launch via the local _invoke_fork closures (not _launch_claude_for_session),
+    # Host forks launch via the local _invoke_fork closures,
     # so record launch facts here. compute mirrors the interactive finalizer's resolution.
     from forge.session.store import SessionStore as _LaunchStore
 
