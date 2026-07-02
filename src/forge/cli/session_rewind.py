@@ -31,6 +31,7 @@ class RewindLaunchArtifacts:
     warnings: list[str]
     prefix_result: RewindPrefixResult | None
     rewind_relocated_session_id: str | None
+    resume_transcript_ready: bool
 
 
 def _persist_rewind_derivation(
@@ -163,6 +164,7 @@ def _prepare_rewind_launch_artifacts(
             warnings=[*privacy_warnings, *fallback.warnings],
             prefix_result=fallback.prefix_result,
             rewind_relocated_session_id=fallback.rewind_relocated_session_id,
+            resume_transcript_ready=fallback.resume_transcript_ready,
         )
     warnings.extend(code_delta_warnings)
 
@@ -198,6 +200,7 @@ def _prepare_rewind_launch_artifacts(
         warnings=warnings,
         prefix_result=prefix_result,
         rewind_relocated_session_id=rewind_uuid,
+        resume_transcript_ready=True,
     )
 
 
@@ -227,19 +230,19 @@ def _plain_native_rewind_fallback(
     warning: str,
 ) -> RewindLaunchArtifacts:
     warnings = [warning]
-    warnings.extend(
-        _relocate_parent_for_plain_native_fallback(
-            session_id=parent_uuid,
-            source_project_root=parent_project_root,
-            dest_project_root=child_project_root,
-        )
+    relocate_warnings, resume_transcript_ready = _relocate_parent_for_plain_native_fallback(
+        session_id=parent_uuid,
+        source_project_root=parent_project_root,
+        dest_project_root=child_project_root,
     )
+    warnings.extend(relocate_warnings)
     return RewindLaunchArtifacts(
         resume_id=parent_uuid,
         context_path=None,
         warnings=warnings,
         prefix_result=None,
         rewind_relocated_session_id=None,
+        resume_transcript_ready=resume_transcript_ready,
     )
 
 
@@ -248,7 +251,7 @@ def _relocate_parent_for_plain_native_fallback(
     session_id: str,
     source_project_root: str,
     dest_project_root: str,
-) -> list[str]:
+) -> tuple[list[str], bool]:
     """Best-effort full transcript relocation for rewind fallback paths."""
     from forge.session.claude import RelocateSameDirError, relocate_transcript
 
@@ -259,7 +262,7 @@ def _relocate_parent_for_plain_native_fallback(
             dest_project_root=dest_project_root,
         )
     except RelocateSameDirError:
-        return []
+        return [], True
     except OSError as exc:
-        return [f"Plain native-relocate fallback could not copy the full parent transcript ({exc})"]
-    return []
+        return [f"Plain native-relocate fallback could not copy the full parent transcript ({exc})"], False
+    return [], True

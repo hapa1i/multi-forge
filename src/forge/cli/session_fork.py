@@ -866,8 +866,8 @@ def fork(
         sys.exit(1)
     # Forks that pre-seed a fresh child UUID and carry a generated transfer doc: worktree transfer
     # OR same-directory transfer. native-relocate is a byte-faithful native resume (not a fresh
-    # transfer), so it is excluded even though is_worktree_fork is True for it.
-    uses_fresh_transfer = (is_worktree_fork and not native_relocate) or same_dir_transfer
+    # transfer), and rewind is a native-relocate variant with its own fresh transcript UUID.
+    uses_fresh_transfer = ((is_worktree_fork and not native_relocate) or same_dir_transfer) and not rewind_active
     if effective_url is None:
         from forge.runtime_config import get_default_direct_model
 
@@ -1013,6 +1013,23 @@ def fork(
             console.print(f"  Context:  {display_path(_rewind_artifacts.context_path)}")
         for warning in _rewind_artifacts.warnings:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
+        if not _rewind_artifacts.resume_transcript_ready:
+            try:
+                manager.delete_session(
+                    fork_name,
+                    delete_worktree=True,
+                    delete_transcripts=False,
+                    force=True,
+                    forge_root=fork_manifest.forge_root,
+                )
+            except Exception:
+                logger.debug("rewind fallback rollback delete failed", exc_info=True)
+            print_error_with_tip(
+                "Rewind fallback could not prepare a resumable transcript in the fork worktree.",
+                "Use the default transfer fork, or retry after fixing Claude transcript store access.",
+                console=console,
+            )
+            sys.exit(1)
 
         _rewind_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
         _rewind_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else _rewind_worktree

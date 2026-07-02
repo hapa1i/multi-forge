@@ -154,6 +154,59 @@ def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner,
     assert persisted.confirmed.derivation.rewind_relocated_session_id == kwargs["resume_id"]
 
 
+def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
+    runner: CliRunner,
+    temp_env: Path,
+) -> None:
+    """A rewind fallback must not launch when the full parent transcript cannot be relocated."""
+    from forge.session.claude.paths import get_transcript_path
+
+    parent, fork_state = _nr_parent_and_fork(temp_env)
+    assert fork_state.worktree is not None
+    fork_worktree = Path(fork_state.worktree.path)
+    parent_transcript = get_transcript_path(str(temp_env), "parent-uuid")
+    _write_code_edit_transcript(parent_transcript)
+    SessionStore(str(fork_worktree), "fork-child").write(fork_state)
+
+    with (
+        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.session.rewind._call_llm_for_curation_prompt", side_effect=RuntimeError("llm unavailable")),
+        patch("forge.session.claude.relocate_transcript", side_effect=OSError("disk full")),
+        patch("forge.cli.session.invoke_claude") as mock_invoke,
+    ):
+        mock_manager = mock_manager_cls.return_value
+        mock_manager.get_session.return_value = parent
+        mock_manager.fork_session.return_value = (parent, fork_state)
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "fork",
+                "fork-parent",
+                "-n",
+                "fork-child",
+                "--worktree",
+                "--strategy",
+                "rewind",
+                "--drop-last",
+                "1",
+            ],
+        )
+
+    assert result.exit_code == 1, result.output
+    assert "Rewind code-delta unavailable; falling back to plain native resume." in result.output
+    assert "Plain native-relocate fallback could not copy the full parent transcript (disk full)" in result.output
+    assert "Rewind fallback could not prepare a resumable transcript in the fork worktree." in result.output
+    mock_invoke.assert_not_called()
+    mock_manager.delete_session.assert_called_once_with(
+        "fork-child",
+        delete_worktree=True,
+        delete_transcripts=False,
+        force=True,
+        forge_root=fork_state.forge_root,
+    )
+
+
 def test_same_directory_rewind_fork_is_rejected(runner: CliRunner, temp_env: Path) -> None:
     result = runner.invoke(
         main,
