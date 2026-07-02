@@ -60,9 +60,9 @@ so neither sits on one linear track.
   dispatcher ticket (T4) builds the *mechanism* but does not change what is registered, so it cannot close the incident
   alone -- T2 owns the byte change. The user-scope model (T3-T6) is the larger migration that later supersedes T2's
   bytes.
-- **D3 -- statusLine stays project-scoped (2026-07-02 review; recommended, maintainer ratification pending).** Unlike
-  hooks, `statusLine` is a **scalar** (`set_scalar`, one value) -- it cannot double-fire, so the user-scope-only
-  rationale (T5 "Why": remove double-fire *by construction*) does not apply to it. It also self-gates on `FORGE_SESSION`
+- **D3 -- statusLine stays project-scoped (2026-07-02 review; maintainer-ratified 2026-07-02).** Unlike hooks,
+  `statusLine` is a **scalar** (`set_scalar`, one value) -- it cannot double-fire, so the user-scope-only rationale (T5
+  "Why": remove double-fire *by construction*) does not apply to it. It also self-gates on `FORGE_SESSION`
   (design_appendix §A.8: no `FORGE_SESSION` -> no session info, **no CWD fallback**) and Claude tolerates a failing
   statusLine gracefully. Moving it to user scope would run `forge status-line` at **full Forge import in every repo on
   every render** -- the exact per-render cost the hook no-op gate exists to avoid, but with **no gate in its path** --
