@@ -61,7 +61,8 @@ sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`
 
 ## Risks
 
-- **Delete breaks callers** if anything scripts `forge hook enable`/`disable` -- clean break, so audit + changelog first.
+- **Delete breaks callers** if anything scripts `forge hook enable`/`disable` -- clean break, so audit + changelog
+  first.
 - **Keep multiplies matchers** -- a third command form to keep in lockstep with seam 1 forever.
 - **Ordering** -- if this lands after T6, T6 must already treat the untracked bare entries as legacy (value-based
   fallback), so the two cards must agree on who owns the leftover entries.
@@ -73,9 +74,9 @@ sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`
 
 ## Acceptance tests
 
-| Test                          | Fixture                                          | Assertion                                                                     | Test File                                    |
-| ----------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------- |
-| Second writer no longer bare  | run the enable path (or its replacement)         | no bare `forge hook <name>` written; entry matches the shipped command form   | `tests/src/cli/test_hooks_install.py`        |
-| Prefix matcher gone or aligned| absolute-path / dispatcher entry present         | detection/cleanup recognizes it (matcher deleted, or updated to shared form)  | same                                         |
-| Delete is a clean break       | `forge hook enable` after removal                | Click reports "no such command"; changelog names the replacement             | same                                         |
-| Tracked if kept               | enable path retained                             | entry is recorded in `installed.json` and removable by tracked `unmerge`      | `tests/src/install/test_installer.py`        |
+| Test                           | Fixture                                  | Assertion                                                                    | Test File                             |
+| ------------------------------ | ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
+| Second writer no longer bare   | run the enable path (or its replacement) | no bare `forge hook <name>` written; entry matches the shipped command form  | `tests/src/cli/test_hooks_install.py` |
+| Prefix matcher gone or aligned | absolute-path / dispatcher entry present | detection/cleanup recognizes it (matcher deleted, or updated to shared form) | same                                  |
+| Delete is a clean break        | `forge hook enable` after removal        | Click reports "no such command"; changelog names the replacement             | same                                  |
+| Tracked if kept                | enable path retained                     | entry is recorded in `installed.json` and removable by tracked `unmerge`     | `tests/src/install/test_installer.py` |
