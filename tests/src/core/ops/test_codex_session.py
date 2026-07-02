@@ -237,10 +237,13 @@ class TestStartCodexSession:
         assert {e.route for e in events} == {"core_llm", "codex_exec"}
         assert {e.session for e in events} == {"impl"}
 
-    def test_unknown_strategy_rejected_before_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("strategy", ["bogus", "rewind"])
+    def test_unknown_strategy_rejected_before_creation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, strategy: str
+    ) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         with pytest.raises(ForgeOpError, match="Unknown strategy"):
-            start_codex_session(ctx=ctx, name="impl", parent="planner", task="t", strategy="bogus")
+            start_codex_session(ctx=ctx, name="impl", parent="planner", task="t", strategy=strategy)
         assert not SessionStore(str(proj), "impl").exists()
 
     def test_missing_parent_rejected_before_creation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
