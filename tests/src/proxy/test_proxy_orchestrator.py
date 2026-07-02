@@ -33,6 +33,36 @@ class _Proc:
 
 
 # ---------------------------------------------------------------------------
+# Template loading
+# ---------------------------------------------------------------------------
+
+
+def test_load_template_for_proxy_wraps_malformed_template(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A malformed template surfaces as ProxyStartError, honoring start_proxy's documented contract.
+
+    Regression: the orchestrator re-loaded templates via load_config, whose shape errors
+    (AttributeError from 'tier_overrides: []') bypassed callers' `except ProxyStartError`
+    guard and tracebacked.
+    """
+    from forge.proxy.proxy_orchestrator import _load_template_for_proxy
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    tpl_dir = tmp_path / "templates"
+    tpl_dir.mkdir()
+    (tpl_dir / "bad-overrides.yaml").write_text(
+        "proxy:\n"
+        "  family: openai\n"
+        "  source: openrouter\n"
+        "  default_port: 9911\n"
+        "  openrouter:\n"
+        "    tier_overrides: []\n"
+    )
+
+    with pytest.raises(ProxyStartError, match="Invalid template 'bad-overrides'"):
+        _load_template_for_proxy("bad-overrides")
+
+
+# ---------------------------------------------------------------------------
 # Reuse / adopt / spawn basics
 # ---------------------------------------------------------------------------
 

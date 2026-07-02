@@ -80,6 +80,13 @@ def dict_to_dataclass(cls: type[Any], data: dict, *, strict: bool = False) -> An
                 kwargs[f.name] = dict_to_dataclass(unwrapped_type, value, strict=strict)
             else:
                 kwargs[f.name] = value
+        elif is_dataclass(unwrapped_type) and value is not None:
+            # A nested-dataclass field must be a mapping. A non-dict, non-None value
+            # (e.g. 'tier_overrides: []' or a scalar) is malformed input; reject it
+            # with a clear ValueError instead of passing the raw value to the
+            # constructor, where it would surface later as an AttributeError/TypeError
+            # in __post_init__ (e.g. overrides.get(...) on a list).
+            raise ValueError(f"{cls.__name__}.{f.name} must be a mapping, got {type(value).__name__}")
         elif _is_union_type(origin):
             kwargs[f.name] = value
         else:

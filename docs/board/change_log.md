@@ -25,6 +25,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-02
+
+### accidental_complexity_cleanup Batch B follow-up: proxy/template config load boundaries
+
+**Goal**: Close the Batch B review findings around newly-invalid proxy providers and malformed proxy/template YAML
+surfacing as raw tracebacks in user-facing CLI paths.
+
+**Key changes**:
+
+- `ProxyInstanceConfig` loading now normalizes malformed proxy-file shape to `ValueError` at the loader boundary, with
+  explicit mapping checks for `tiers`, `tier_overrides`, and each tier override leaf. Empty/null override leaves remain
+  "no override"; falsy non-mappings (`[]`, `false`, `""`, `0`) now fail instead of being ignored.
+- Template loading now rejects non-mapping nested dataclass fields before schema `__post_init__` can raise raw
+  `AttributeError`/`TypeError`; proxy orchestration wraps malformed templates as `ProxyStartError`.
+- CLI boundaries for `proxy start`, `proxy create`, and session model-pin proxy config reads now report clean contextual
+  errors for legacy `provider: gemini/openai` proxy files and malformed YAML sections.
+
+**Verification**: 328 targeted tests green across proxy commands, session model pins, config loader/schema, and proxy
+orchestrator; ruff clean for touched loader/tests. Manual repros now fail cleanly for legacy provider, `tiers: []`,
+malformed template `tier_overrides: []`, and falsy override leaf `tier_overrides.haiku: []`.
+
 ## 2026-07-01
 
 ### accidental_complexity_cleanup Batch B: template move, legacy-search delete, secrets/provider narrowing

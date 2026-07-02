@@ -349,6 +349,103 @@ tiers:
         assert "forge proxy create" in result.output
 
 
+class TestProxyStart:
+    """Tests for `forge proxy start`."""
+
+    def test_start_legacy_provider_fails_cleanly(self, runner: CliRunner, temp_env: Path) -> None:
+        """A legacy `provider: gemini` proxy.yaml fails start with a clean error, not a traceback.
+
+        Regression: `forge proxy start` loaded the proxy config outside any
+        ValueError boundary, so the unsupported-provider ValueError raised by
+        ProxyInstanceConfig.__post_init__ escaped as a full traceback instead of
+        the intended recreate-from-template failure.
+        """
+        proxy_yaml = """\
+template: litellm-gemini
+provider: gemini
+proxy_endpoint: http://localhost:8084
+port: 8084
+upstream_base_url: https://litellm.test.example.com
+tiers:
+  haiku: gemini-2.0-flash
+  sonnet: gemini-2.5-pro
+  opus: gemini-2.5-pro
+"""
+        _create_proxy_file(temp_env, "legacy-gemini", proxy_yaml)
+
+        result = runner.invoke(main, ["proxy", "start", "legacy-gemini"])
+
+        assert result.exit_code == 1
+        # The ValueError must be handled, not propagate as an unhandled traceback.
+        assert not isinstance(result.exception, ValueError)
+        assert "Unsupported proxy provider" in result.output
+        assert "forge proxy create" in result.output
+
+    def test_start_bad_shape_fails_cleanly(self, runner: CliRunner, temp_env: Path) -> None:
+        """A proxy.yaml with a malformed section ('tiers: []') fails start cleanly.
+
+        Regression: a shape error raised AttributeError from the loader's raw
+        extraction before dataclass validation, escaping the start guard's
+        (StateCorruptedError, ValueError) boundary as a traceback. The loader now
+        normalizes shape failures to ValueError so the boundary catches them.
+        """
+        proxy_yaml = """\
+template: litellm-openai
+provider: litellm
+proxy_endpoint: http://localhost:8085
+port: 8085
+upstream_base_url: https://litellm.test.example.com
+tiers: []
+"""
+        _create_proxy_file(temp_env, "bad-shape", proxy_yaml)
+
+        result = runner.invoke(main, ["proxy", "start", "bad-shape"])
+
+        assert result.exit_code == 1
+        # A raw shape error (AttributeError/TypeError) must not escape as a traceback.
+        assert not isinstance(result.exception, (AttributeError, TypeError))
+        assert "Malformed proxy configuration" in result.output
+
+    def test_start_malformed_referenced_template_fails_cleanly(self, runner: CliRunner, temp_env: Path) -> None:
+        """A valid proxy.yaml pointing at a malformed template fails start cleanly, not a traceback.
+
+        Regression: start_cmd guards only the proxy.yaml read; start_proxy re-loads the
+        referenced template via load_config, whose AttributeError was not caught by the
+        surrounding `except ProxyStartError`. The orchestrator now converts template-load
+        failures to ProxyStartError.
+        """
+        proxy_yaml = """\
+template: bad-referenced
+provider: litellm
+proxy_endpoint: http://localhost:8085
+port: 8085
+upstream_base_url: https://litellm.test.example.com
+tiers:
+  haiku: gpt-4o-mini
+  sonnet: gpt-4o
+  opus: gpt-5
+"""
+        _create_proxy_file(temp_env, "p", proxy_yaml)
+
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True, exist_ok=True)
+        (tpl_dir / "bad-referenced.yaml").write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  source: openrouter\n"
+            "  default_port: 8085\n"
+            "  openrouter:\n"
+            "    tier_overrides: []\n"
+        )
+
+        result = runner.invoke(main, ["proxy", "start", "p"])
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, (AttributeError, TypeError))
+        assert "Invalid template 'bad-referenced'" in result.output
+
+
 class TestProxySet:
     """Tests for `forge proxy set`."""
 
@@ -1399,6 +1496,33 @@ class TestProxyCreateNoStart:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+
+    def test_create_malformed_template_fails_cleanly(self, runner: CliRunner, temp_env: Path) -> None:
+        """A malformed hand-edited template ('tier_overrides: []') fails create cleanly, not a traceback.
+
+        Regression: create_cmd's load_config(template=...) on the no-`--port` path was
+        unguarded; a shape error in the template raised AttributeError and escaped as a
+        Click traceback. Shape errors now normalize to ValueError and the load is guarded.
+        """
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True, exist_ok=True)
+        (tpl_dir / "bad-overrides.yaml").write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  source: openrouter\n"
+            "  default_port: 9911\n"
+            "  openrouter:\n"
+            "    tier_overrides: []\n"
+        )
+
+        result = runner.invoke(main, ["proxy", "create", "bad-overrides", "--no-start"])
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, (AttributeError, TypeError))
+        assert "Invalid template 'bad-overrides'" in result.output
+        # Rich may wrap the message across lines; normalize whitespace before matching.
+        assert "must be a mapping" in " ".join(result.output.split())
 
     def test_create_with_custom_port(self, runner: CliRunner, temp_env: Path) -> None:
         """Create --no-start uses custom port when specified."""

@@ -420,6 +420,25 @@ class TestTemplateFamilyMetadata:
         with pytest.raises(ValueError, match="must have a 'proxy' mapping"):
             load_config(template="bad-null")
 
+    def test_template_rejects_nonmapping_tier_overrides(self, user_templates_dir):
+        """A malformed 'tier_overrides: []' template fails with ValueError, not AttributeError.
+
+        Regression: the template path (load_config(template=...) -> dict_to_dataclass ->
+        ProxyConfig.__post_init__) passed a raw list into _validate_static_tier_override_constraints,
+        which did overrides.get(tier) -> AttributeError, escaping callers that guard on ValueError.
+        """
+        bad = user_templates_dir / "bad-overrides.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  source: openrouter\n"
+            "  default_port: 9911\n"
+            "  openrouter:\n"
+            "    tier_overrides: []\n"
+        )
+        with pytest.raises(ValueError, match="must be a mapping"):
+            load_config(template="bad-overrides")
+
     def test_template_source_validation_rejects_non_string(self, user_templates_dir):
         """proxy.source must be a string before strict schema loading."""
         bad = user_templates_dir / "bad-source-shape.yaml"
@@ -655,6 +674,71 @@ class TestProxyFileIO:
 
         result = load_proxy_instance_config("nonexistent")
         assert result is None
+
+    def test_from_dict_normalizes_shape_errors_to_valueerror(self):
+        """Malformed nested shape raises ValueError, not raw AttributeError/TypeError.
+
+        Regression: proxy start / model-pin load guards catch (StateCorruptedError,
+        ValueError). Before normalization, a shape like 'tiers: []' raised
+        AttributeError from the raw .get() extraction and escaped those guards as a
+        traceback. Shape failures are now converted at this single boundary.
+        """
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        base = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        bad_shapes = [
+            {**base, "tiers": []},  # non-mapping section (AttributeError)
+            {**base, "tier_overrides": []},  # non-mapping section (AttributeError)
+            {**base, "tier_overrides": {"haiku": "x"}},  # override not a mapping (TypeError from **)
+            {**base, "tier_overrides": {"haiku": []}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": False}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": ""}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": 0}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": {"nope": 1}}},  # override unknown key (TypeError)
+            [],  # top-level not a mapping (AttributeError)
+        ]
+        for data in bad_shapes:
+            with pytest.raises(ValueError, match="Malformed proxy configuration"):
+                load_proxy_instance_config_from_dict(data)
+
+    def test_from_dict_allows_empty_or_null_tier_override_leaves(self):
+        """Empty mapping/null tier override leaves mean no override; falsy non-mappings do not."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        base = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        for tier_overrides in ({}, {"haiku": None}, {"haiku": {}}):
+            config = load_proxy_instance_config_from_dict({**base, "tier_overrides": tier_overrides})
+
+            assert config.tier_overrides.haiku is None
+
+    def test_from_dict_preserves_semantic_valueerror_verbatim(self):
+        """A semantic violation keeps its own __post_init__ message, not the shape wrapper."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "template": "litellm-gemini",
+            "provider": "gemini",  # unsupported provider: semantic check in __post_init__
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        with pytest.raises(ValueError, match="Unsupported proxy provider"):
+            load_proxy_instance_config_from_dict(data)
 
     def test_write_proxy_instance_config_atomic_and_permissions(self, tmp_path, monkeypatch):
         """write_proxy_instance_config uses atomic write and sets 0600 permissions."""

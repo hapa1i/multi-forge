@@ -187,6 +187,18 @@ class TestDictToDataclass:
         assert result.reasoning_effort == "high"
         assert result.verbosity == "low"
 
+    def test_rejects_non_mapping_for_dataclass_field(self):
+        """A non-dict value for a nested-dataclass field raises a clear ValueError.
+
+        Regression: 'tier_overrides: []' (or a scalar) was passed raw into the
+        constructor and crashed later as an AttributeError in __post_init__
+        (overrides.get(...) on a list). It must be rejected at conversion time.
+        """
+        for bad in ([], "scalar", 3):
+            data = {"tiers": {"sonnet": "s"}, "tier_overrides": bad}
+            with pytest.raises(ValueError, match="tier_overrides must be a mapping"):
+                dict_to_dataclass(ProviderConfig, data)
+
 
 class TestForgeConfigMethods:
     """Tests for ForgeConfig methods."""

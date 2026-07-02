@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import tempfile
+from collections.abc import Mapping
 from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any
@@ -393,48 +394,79 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
     """Parse a dict into a validated ProxyInstanceConfig.
 
     Used by both file loading and edit/set validation (CR-006).
-    Raises ValueError/TypeError on invalid data (__post_init__ validates).
+
+    Raises ValueError on invalid data. Two failure classes are normalized to a
+    single exception type here so callers need only one boundary: malformed shape
+    (a non-mapping section like 'tiers: []', an override that is not a mapping, or
+    an unknown override key) is rejected or normalized as ValueError; semantic
+    violations raise ValueError directly from ProxyInstanceConfig.__post_init__.
     """
-    tiers_data = data.get("tiers", {})
-    tiers = TierModels(
-        haiku=tiers_data.get("haiku", ""),
-        sonnet=tiers_data.get("sonnet", ""),
-        opus=tiers_data.get("opus", ""),
-    )
+    def _require_mapping(value: Any, field: str) -> Mapping[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError(
+                f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}"
+            )
+        return value
 
-    tier_overrides_data = data.get("tier_overrides", {})
-    tier_overrides = TierOverrides(
-        haiku=TierOverride(**tier_overrides_data["haiku"]) if tier_overrides_data.get("haiku") else None,
-        sonnet=TierOverride(**tier_overrides_data["sonnet"]) if tier_overrides_data.get("sonnet") else None,
-        opus=TierOverride(**tier_overrides_data["opus"]) if tier_overrides_data.get("opus") else None,
-    )
+    def _optional_tier_override(value: Any, field: str) -> TierOverride | None:
+        if value is None:
+            return None
+        if not isinstance(value, Mapping):
+            raise ValueError(
+                f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}"
+            )
+        if not value:
+            return None
+        return TierOverride(**value)
 
-    return ProxyInstanceConfig(
-        proxy_format=data.get("proxy_format", 1),
-        template=data.get("template", ""),
-        template_digest=data.get("template_digest", ""),
-        provider=data.get("provider", ""),
-        proxy_endpoint=data.get("proxy_endpoint", ""),
-        port=data.get("port", 0),
-        upstream_base_url=data.get("upstream_base_url", ""),
-        tiers=tiers,
-        source=data.get("source", ""),
-        family=data.get("family", ""),
-        tier_overrides=tier_overrides,
-        model_alternatives=data.get("model_alternatives", {}),
-        default_tier=data.get("default_tier", "sonnet"),
-        provider_settings=data.get("provider_settings", {}),
-        prompt_caching=data.get("prompt_caching", "passthrough"),
-        auto_cache_min_tokens=data.get("auto_cache_min_tokens", 1024),
-        costs=data.get("costs", {}),
-        wire_shape=data.get("wire_shape", "openai_translated"),
-        intercept=data.get("intercept", {}),
-        audit=data.get("audit", {}),
-        provider_trace=data.get("provider_trace", {}),
-        logging=data.get("logging", {}),
-        created_at=data.get("created_at"),
-        updated_at=data.get("updated_at"),
-    )
+    try:
+        data_map = _require_mapping(data, "root")
+        tiers_data = _require_mapping(data_map.get("tiers", {}), "tiers")
+        tiers = TierModels(
+            haiku=tiers_data.get("haiku", ""),
+            sonnet=tiers_data.get("sonnet", ""),
+            opus=tiers_data.get("opus", ""),
+        )
+
+        tier_overrides_data = _require_mapping(data_map.get("tier_overrides", {}), "tier_overrides")
+        tier_overrides = TierOverrides(
+            haiku=_optional_tier_override(tier_overrides_data.get("haiku"), "tier_overrides.haiku"),
+            sonnet=_optional_tier_override(tier_overrides_data.get("sonnet"), "tier_overrides.sonnet"),
+            opus=_optional_tier_override(tier_overrides_data.get("opus"), "tier_overrides.opus"),
+        )
+
+        return ProxyInstanceConfig(
+            proxy_format=data_map.get("proxy_format", 1),
+            template=data_map.get("template", ""),
+            template_digest=data_map.get("template_digest", ""),
+            provider=data_map.get("provider", ""),
+            proxy_endpoint=data_map.get("proxy_endpoint", ""),
+            port=data_map.get("port", 0),
+            upstream_base_url=data_map.get("upstream_base_url", ""),
+            tiers=tiers,
+            source=data_map.get("source", ""),
+            family=data_map.get("family", ""),
+            tier_overrides=tier_overrides,
+            model_alternatives=data_map.get("model_alternatives", {}),
+            default_tier=data_map.get("default_tier", "sonnet"),
+            provider_settings=data_map.get("provider_settings", {}),
+            prompt_caching=data_map.get("prompt_caching", "passthrough"),
+            auto_cache_min_tokens=data_map.get("auto_cache_min_tokens", 1024),
+            costs=data_map.get("costs", {}),
+            wire_shape=data_map.get("wire_shape", "openai_translated"),
+            intercept=data_map.get("intercept", {}),
+            audit=data_map.get("audit", {}),
+            provider_trace=data_map.get("provider_trace", {}),
+            logging=data_map.get("logging", {}),
+            created_at=data_map.get("created_at"),
+            updated_at=data_map.get("updated_at"),
+        )
+    except (AttributeError, KeyError, TypeError) as e:
+        # Normalize malformed-shape failures into ValueError so every caller's
+        # (StateCorruptedError, ValueError) boundary handles them uniformly.
+        # schema.py validates only with ValueError, so this never masks a
+        # deliberate semantic check (those propagate as ValueError untouched).
+        raise ValueError(f"Malformed proxy configuration: {e}") from e
 
 
 def write_proxy_instance_config(proxy_id: str, config: "ProxyInstanceConfig") -> Path:
@@ -662,7 +694,14 @@ def _load_template_config(template: str) -> "ForgeConfig":
     # Set active_template so proxy knows which template is in use
     config_dict.setdefault("proxy", {})["active_template"] = template
 
-    return dict_to_dataclass(ForgeConfig, config_dict, strict=True)
+    try:
+        return dict_to_dataclass(ForgeConfig, config_dict, strict=True)
+    except (AttributeError, KeyError, TypeError) as e:
+        # Normalize residual malformed-shape failures into ValueError so callers
+        # need only a (ValueError) boundary. dict_to_dataclass already raises a
+        # field-specific ValueError for non-mapping dataclass sections; this covers
+        # any other shape error a template's __post_init__ might surface.
+        raise ValueError(f"Malformed template '{template}': {e}") from e
 
 
 def load_config(

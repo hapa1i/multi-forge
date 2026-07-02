@@ -28,7 +28,7 @@ from typing import Any
 import httpx
 from rich.console import Console
 
-from forge.config import TierOverride, load_config
+from forge.config import ForgeConfig, TierOverride, load_config
 from forge.config.loader import (
     compute_template_digest,
     get_proxy_file_path,
@@ -170,7 +170,7 @@ def create_proxy_file(
     Returns:
         Path to the created proxy.yaml file.
     """
-    cfg = load_config(template=template)
+    cfg = _load_template_for_proxy(template)
     provider = cfg.proxy.get_provider()
     provider_name = cfg.proxy.preferred_provider or "litellm"
 
@@ -531,7 +531,7 @@ def start_proxy(
 
     _validate_template_exists(template)
 
-    cfg = load_config(template=template)
+    cfg = _load_template_for_proxy(template)
 
     store = ProxyRegistryStore()
     registry = store.read()  # May raise ProxyRegistryCorruptedError
@@ -805,8 +805,22 @@ def _validate_template_exists(template: str) -> None:
         )
 
 
+def _load_template_for_proxy(template: str) -> ForgeConfig:
+    """Load a template config, converting config errors into ProxyStartError.
+
+    The orchestrator's callers guard on ProxyStartError, so a malformed template
+    (e.g. a hand-edited 'tier_overrides: []') must surface as a start failure, not
+    a raw ValueError/AttributeError traceback. This honors start_proxy's documented
+    "Raises ProxyStartError on invalid template" contract.
+    """
+    try:
+        return load_config(template=template)
+    except ValueError as e:
+        raise ProxyStartError(f"Invalid template '{template}': {e}") from e
+
+
 def _get_template_default_port(template: str) -> int:
-    cfg = load_config(template=template)
+    cfg = _load_template_for_proxy(template)
     default_port = cfg.proxy.default_port
     if not default_port:
         raise ProxyStartError(f"Template '{template}' has no proxy.default_port configured")

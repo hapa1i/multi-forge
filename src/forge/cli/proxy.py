@@ -361,7 +361,14 @@ def create_cmd(
 
     # Get default port from template if not specified
     if port is None:
-        cfg = load_config(template=template)
+        try:
+            cfg = load_config(template=template)
+        except ValueError as e:
+            # A malformed template (e.g. a hand-edited 'tier_overrides: []') fails
+            # shape validation. Report it cleanly instead of tracebacking; this load
+            # is otherwise unguarded (the --port path skips it).
+            print_error(f"Invalid template '{template}': {e}", console=err_console)
+            sys.exit(1)
         port = cfg.proxy.default_port
         if not port:
             print_error("Template has no default_port, use --port", console=err_console)
@@ -660,7 +667,15 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
         console.print(f"  forge proxy create <template> --name {proxy_id}")
         sys.exit(1)
 
-    config = load_proxy_instance_config(proxy_id)
+    try:
+        config = load_proxy_instance_config(proxy_id)
+    except (StateCorruptedError, ValueError) as e:
+        # A stale proxy.yaml (e.g. a legacy 'provider: gemini/openai' file) fails
+        # validation in ProxyInstanceConfig.__post_init__. Report it as a clean
+        # start failure here instead of letting the ValueError surface as a
+        # traceback; the message already names the recreate-from-template path.
+        print_error(f"Cannot start proxy '{proxy_id}': {e}", console=console)
+        sys.exit(1)
     if config is None:
         print_error(f"Failed to load proxy config for '{proxy_id}'", console=console)
         sys.exit(1)
