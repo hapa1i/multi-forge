@@ -36,6 +36,7 @@ from forge.policy.semantic.supervisor import (
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
     ForgeSessionError,
+    SessionManager,
     SessionState,
 )
 from forge.session.context_limit import _resolve_context_limit
@@ -474,7 +475,7 @@ def fork(
     _drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
     _inline_plan_explicit = ctx.get_parameter_source("inline_plan") == click.core.ParameterSource.COMMANDLINE
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
     _fr = _cwd_forge_root()
 
     # Reject a Codex parent BEFORE fork_session() creates orphaned child state. `fork`

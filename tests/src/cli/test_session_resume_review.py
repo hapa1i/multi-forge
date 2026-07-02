@@ -90,13 +90,10 @@ class TestReviewFlagEditorInvocation:
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            # session module also imports SessionManager via its own namespace
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -169,12 +166,10 @@ class TestReviewFlagEditorInvocation:
             patch(
                 "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
             ),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -239,12 +234,10 @@ class TestReviewFlagEditorInvocation:
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -298,12 +291,10 @@ class TestReviewFlagEditorInvocation:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None) as launch_mock,
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -357,12 +348,10 @@ class TestReviewFlagEditorInvocation:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,

@@ -18,24 +18,6 @@ import click
 from rich.table import Table
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
-from forge.core.ops.context import _cwd_forge_root
-from forge.core.ops.session_context import SessionContext
-from forge.core.paths import display_path
-from forge.core.state import parse_iso
-from forge.session import (
-    ForgeSessionError,
-    IndexStore,
-    SessionIndexEntry,
-    SessionManager,
-    SessionState,
-)
-
-
-def _sess():  # type: ignore[return]
-    """Access forge.cli.session at runtime to respect test patches."""
-    return sys.modules["forge.cli.session"]
-
-
 from forge.cli.session import (  # noqa: E402
     _format_relative_time,
     _get_active_session_entry,
@@ -50,6 +32,17 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
+from forge.core.ops.context import _cwd_forge_root
+from forge.core.ops.session_context import SessionContext
+from forge.core.paths import display_path
+from forge.core.state import parse_iso
+from forge.session import (
+    ForgeSessionError,
+    IndexStore,
+    SessionIndexEntry,
+    SessionManager,
+    SessionState,
+)
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -130,7 +123,7 @@ def delete(
         print_error("Provide session name(s) or use --all", console=console)
         sys.exit(1)
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
     _fr = _cwd_forge_root()
 
     if delete_all:
@@ -677,7 +670,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
     """
     from forge.session.active import ActiveSessionStore
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
     all_sessions = manager.list_sessions(include_incognito=True)
 
     # One-pass active lookup -- fail-closed matches cleanup behavior
@@ -797,7 +790,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
     from forge.core.ops.resolution import resolve_session_repo_wide
     from forge.core.ops.session_context import resolve_session_identifier
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
     _fr = _cwd_forge_root()
 
     # get_session_context already resolved the identifier (UUID or name) to
@@ -1002,7 +995,7 @@ def shell(name: str | None) -> None:
     """
     from forge.sidecar import exec_in_container, is_container_running
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
 
     if name is None:
         env_name = os.environ.get("FORGE_SESSION")

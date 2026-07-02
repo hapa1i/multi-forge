@@ -141,7 +141,7 @@ def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner,
     SessionStore(str(fork_worktree), "fork-child").write(fork_state)
 
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
@@ -204,7 +204,7 @@ def test_worktree_rewind_proxy_addendum_injected_once(runner: CliRunner, temp_en
     SessionStore(str(fork_worktree), "fork-child").write(fork_state)
 
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
         patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
@@ -253,7 +253,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
     SessionStore(str(fork_worktree), "fork-child").write(fork_state)
 
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.session.rewind._call_llm_for_curation_prompt", side_effect=RuntimeError("llm unavailable")),
         patch("forge.session.claude.relocate_transcript", side_effect=OSError("disk full")),
         patch("forge.cli.session.invoke_claude") as mock_invoke,
@@ -314,7 +314,7 @@ def test_rewind_fork_requires_drop_last(runner: CliRunner, temp_env: Path) -> No
 def test_rewind_fork_rejects_sidecar_parent(runner: CliRunner, temp_env: Path) -> None:
     parent, _fork_state = _nr_parent_and_fork(temp_env, parent_sidecar=True)
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.cli.session.invoke_claude") as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
@@ -347,7 +347,7 @@ def test_rewind_fork_rejects_sidecar_child_at_launch_seam(runner: CliRunner, tem
         fork_state.intent.launch.mode = LAUNCH_MODE_SIDECAR
 
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.cli.session.invoke_claude") as mock_invoke,
         patch("forge.cli.session_fork._prepare_rewind_launch_artifacts") as mock_prepare,
     ):

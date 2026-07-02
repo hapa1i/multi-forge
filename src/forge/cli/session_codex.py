@@ -38,7 +38,7 @@ from forge.core.ops.codex_session import (
 )
 from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
-from forge.session import SessionState
+from forge.session import SessionManager, SessionState
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +49,6 @@ def _codex_ok(codex: HeadlessResult) -> bool:
     ``turn.failed``/``error`` event riding an exit-0 would otherwise read as success.
     """
     return codex.success and not codex.runtime_is_error
-
-
-def _sess() -> Any:
-    """Access forge.cli.session at runtime so tests can patch its attributes."""
-    import forge.cli.session
-
-    return forge.cli.session
 
 
 def codex_start_options(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -198,7 +191,7 @@ def run_codex_start(ctx: click.Context) -> int:
     name = p["name"]
     if name is None:
         _fr = _cwd_forge_root()
-        existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
+        existing = {n for n, _ in SessionManager().list_sessions(forge_root_filter=_fr)}
         name = generate_unique_name(existing)
 
     if interactive:
@@ -450,7 +443,7 @@ def _render_interactive_post_exit(result: CodexInteractiveResult) -> None:
     try:
         from forge.cli.session_lifecycle import _post_exit_render
 
-        manifest = _sess().SessionManager().get_session(result.session, forge_root=result.forge_root)
+        manifest = SessionManager().get_session(result.session, forge_root=result.forge_root)
         _post_exit_render(
             manifest,
             store_exists=True,

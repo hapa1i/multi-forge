@@ -1114,7 +1114,7 @@ class TestSessionStart:
         manifest.forge_root = str(child_nested_root)
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_lifecycle.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_lifecycle._auto_install_extensions") as mock_auto,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2036,7 +2036,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2131,7 +2131,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2181,7 +2181,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
@@ -2246,7 +2246,7 @@ class TestSessionFork:
 
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2282,7 +2282,7 @@ class TestSessionFork:
         context_file.parent.mkdir(parents=True, exist_ok=True)
         context_file.write_text("# ctx\n")
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
         ):
@@ -2297,7 +2297,7 @@ class TestSessionFork:
     def test_native_relocate_rejects_sidecar(self, runner: CliRunner, temp_env: Path) -> None:
         """A non-direct sidecar parent rejects native-relocate before any fork is created."""
         parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
-        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+        with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2323,7 +2323,7 @@ class TestSessionFork:
         """--no-proxy forces host launch, so a sidecar parent is NOT rejected with --no-proxy."""
         parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2349,7 +2349,7 @@ class TestSessionFork:
 
     def test_native_relocate_rejects_no_launch(self, runner: CliRunner, temp_env: Path) -> None:
         parent, fork_state = self._nr_parent_and_fork(temp_env)
-        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+        with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2374,7 +2374,7 @@ class TestSessionFork:
 
     def test_native_relocate_rejects_missing_parent_transcript(self, runner: CliRunner, temp_env: Path) -> None:
         parent, fork_state = self._nr_parent_and_fork(temp_env, with_transcript=False)
-        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+        with patch("forge.cli.session_fork.SessionManager") as mock_manager_cls:
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2409,7 +2409,7 @@ class TestSessionFork:
         if samedir_fork.worktree is not None:
             samedir_fork.worktree.is_worktree = False
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2457,7 +2457,7 @@ class TestSessionFork:
         parent, fork_state = self._samedir_parent_and_fork(temp_env)
         ctx = self._seed_context_file(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
@@ -2483,7 +2483,7 @@ class TestSessionFork:
         parent, fork_state = self._samedir_parent_and_fork(temp_env)
         ctx = self._seed_context_file(temp_env, "# Parent transfer context\nSENTINEL-CTX\n")
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
@@ -2508,7 +2508,7 @@ class TestSessionFork:
         auto-switch to transfer -- the unset --strategy default must not trigger the switch."""
         parent, fork_state = self._samedir_parent_and_fork(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2547,7 +2547,7 @@ class TestSessionFork:
             store_exists=True,
         )
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
             patch("forge.core.ops.claude_session.launch_claude_session", return_value=launch_result) as mock_launch,
         ):
@@ -2589,7 +2589,7 @@ class TestSessionFork:
         ]
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
             patch("forge.cli.session.invoke_claude") as mock_invoke,
         ):
@@ -2609,7 +2609,7 @@ class TestSessionFork:
         parent, fork_state = self._samedir_parent_and_fork(temp_env)
         ctx = self._seed_context_file(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
@@ -2641,7 +2641,7 @@ class TestSessionFork:
             return ctx, []
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", side_effect=_spy),
         ):
@@ -2662,7 +2662,7 @@ class TestSessionFork:
     def test_native_relocate_warns_strategy_ignored(self, runner: CliRunner, temp_env: Path) -> None:
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2692,7 +2692,7 @@ class TestSessionFork:
 
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.session.claude.relocate_transcript", side_effect=RelocateConflictError("dup")),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2723,7 +2723,7 @@ class TestSessionFork:
         """A non-custom IO failure (e.g. PermissionError) rolls back the fork without a traceback."""
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.session.claude.relocate_transcript", side_effect=PermissionError("denied")),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2783,7 +2783,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n", encoding="utf-8")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
@@ -2836,7 +2836,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n", encoding="utf-8")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
@@ -2891,7 +2891,7 @@ class TestSessionFork:
         fork_state.forge_root = str(child_nested_root)
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),
@@ -2938,7 +2938,7 @@ class TestSessionFork:
         ]
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
             patch("forge.cli.session.invoke_claude") as mock_invoke,
         ):
@@ -2982,7 +2982,7 @@ class TestSessionFork:
         fork_state.worktree.is_worktree = True
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
@@ -3046,7 +3046,7 @@ class TestSessionFork:
         fork.worktree.is_worktree = True
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
@@ -3084,7 +3084,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=1),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3115,7 +3115,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3150,7 +3150,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.runtime_config.get_default_direct_model", return_value="claude-sonnet-4-6"),
         ):
@@ -3187,7 +3187,7 @@ class TestSessionFork:
         )
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3229,7 +3229,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
@@ -3294,7 +3294,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
             patch(
@@ -3358,7 +3358,7 @@ class TestSessionFork:
         context_file.write_text("# Parent context\n")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session_lifecycle._warn_if_hooks_missing"),
@@ -3396,7 +3396,7 @@ class TestSessionForkIntoPreflight:
         into_dir.mkdir()
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             # Simulate --into target resolving to a real git checkout
             patch("subprocess.run") as mock_run,
         ):
@@ -3457,7 +3457,7 @@ class TestSessionForkIntoPreflight:
         common_git = str(temp_env / ".git")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch("subprocess.run") as mock_run,
         ):
@@ -3528,7 +3528,7 @@ class TestSessionForkIntoPreflight:
         common_git = str(temp_env / ".git")
 
         with (
-            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),

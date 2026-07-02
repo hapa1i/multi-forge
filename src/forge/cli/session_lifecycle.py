@@ -82,7 +82,7 @@ from forge.session.transfer import ResumeStrategy
 
 
 # Names that tests still patch on forge.cli.session (invoke_claude,
-# run_with_active_session, SessionManager) must be
+# run_with_active_session) must be
 # accessed through the parent module at call time. We use _sess() to get
 # the module from sys.modules (already loaded by the time any function runs).
 def _sess():  # type: ignore[return]
@@ -764,7 +764,7 @@ def launch_new_session(
 
     launch_mode = LAUNCH_MODE_HOST if direct else _resolve_launch_mode(sidecar=sidecar, host_proxy=host_proxy)
     use_sidecar = launch_mode == LAUNCH_MODE_SIDECAR
-    manager = _sess().SessionManager()
+    manager = SessionManager()
 
     normalized_direct_model: str | None = None
     direct_model_pin = None
@@ -1113,7 +1113,7 @@ def start(
 
     if name is None:
         _fr = _cwd_forge_root()
-        existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
+        existing = {n for n, _ in SessionManager().list_sessions(forge_root_filter=_fr)}
         name = generate_unique_name(existing)
     assert name is not None  # generated above when None
 
@@ -1346,7 +1346,7 @@ def resume(
     if proxy_name:
         routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
-    manager = _sess().SessionManager()
+    manager = SessionManager()
 
     if name is None:
         sessions = manager.list_sessions(include_incognito=True)
@@ -2038,7 +2038,7 @@ def incognito(
 
     if name is None:
         _fr = _cwd_forge_root()
-        existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
+        existing = {n for n, _ in SessionManager().list_sessions(forge_root_filter=_fr)}
         name = generate_unique_name(existing)
     assert name is not None  # generated above when None
 
