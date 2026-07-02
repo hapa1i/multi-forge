@@ -139,3 +139,12 @@ def find_forge_root(start: Path) -> Path | None:
         current = current.parent
 
     return None
+
+
+def _cwd_forge_root() -> str | None:
+    """Resolve forge_root from CWD for project-scoped session lookups."""
+    try:
+        fr = find_forge_root(Path.cwd().resolve())
+        return str(fr) if fr else None
+    except Exception:
+        return None

@@ -16,16 +16,11 @@ from typing import cast
 
 import click
 
-from forge.cli.launch_confirmation import (
-    _infer_launch_confirmation,
-    _routing_mode_for,
-    read_proxy_cost_baseline,
-    record_launch_confirmed,
-)
 from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.ops.claude_session import resolve_and_validate_system_prompt
+from forge.core.ops.context import _cwd_forge_root
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
@@ -49,6 +44,7 @@ from forge.session import (
     SessionStore,
 )
 from forge.session.claude import build_claude_args
+from forge.session.context_limit import _resolve_context_limit
 from forge.session.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
@@ -61,6 +57,13 @@ from forge.session.exceptions import (
     InvalidBranchNameError,
     SessionNotFoundError,
     WorktreePathExistsError,
+)
+from forge.session.launch import _build_session_env, _prepare_sidecar_prompt_file
+from forge.session.launch_confirmation import (
+    _infer_launch_confirmation,
+    _routing_mode_for,
+    read_proxy_cost_baseline,
+    record_launch_confirmed,
 )
 from forge.session.model_pin import (
     _apply_direct_model_env_if_supported,
@@ -129,9 +132,8 @@ from forge.cli.session_rewind import (  # noqa: E402
 
 # Functions below are accessed through _sess() because tests patch them
 # on forge.cli.session. Direct imports would bypass those patches.
-# _auto_install_extensions, _build_session_env, _cwd_forge_root,
-# _detect_parent_extensions, _generate_parent_transfer_context,
-# _prepare_sidecar_prompt_file, _resolve_context_limit
+# _auto_install_extensions, _detect_parent_extensions,
+# _generate_parent_transfer_context
 
 __all__ = [
     # Public functions
@@ -159,7 +161,6 @@ __all__ = [
     "_has_resumable_claude_session",
     "_get_deferred_same_dir_fork_resume_id",
     "_resolve_manifest_prompt_file",
-    "_infer_launch_confirmation",
     "_persist_fork_transfer_derivation",
     "_persist_rewind_derivation",
     "_prepare_rewind_launch_artifacts",
@@ -417,7 +418,7 @@ def _launch_claude_for_session(
     fork_name = manifest.name if register_fork_env else None
     parent_session = manifest.parent_session if register_fork_env else None
 
-    env_vars, unset_env_vars = _sess()._build_session_env(
+    env_vars, unset_env_vars = _build_session_env(
         session_name=manifest.name,
         context_limit=context_limit,
         template=effective_template,
@@ -501,7 +502,7 @@ def _launch_claude_for_session(
         claude_dir.mkdir(parents=True, exist_ok=True)
         forge_dir.mkdir(parents=True, exist_ok=True)
         sidecar_home.mkdir(parents=True, exist_ok=True)
-        sidecar_prompt_file, prompt_mounts = _sess()._prepare_sidecar_prompt_file(
+        sidecar_prompt_file, prompt_mounts = _prepare_sidecar_prompt_file(
             worktree_path=launch_root,
             system_prompt_file=system_prompt_file,
         )
@@ -703,7 +704,7 @@ def _launch_claude_for_session(
         ),
     )
     if exit_code == 0 and not fork_session:
-        _sess()._infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
+        _infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
 
     return _post_exit_render(manifest, store_exists=store.exists(), exit_code=exit_code, since=launch_started_at)
 
@@ -935,9 +936,7 @@ def launch_new_session(
         from forge.policy.semantic.supervisor import validate_supervisor_target
 
         try:
-            _supervisor_source_state = validate_supervisor_target(
-                supervise_target, forge_root=_sess()._cwd_forge_root()
-            )
+            _supervisor_source_state = validate_supervisor_target(supervise_target, forge_root=_cwd_forge_root())
         except ValueError as e:
             print_error(f"{e}", console=console)
             return 1
@@ -1075,9 +1074,7 @@ def launch_new_session(
     effective_url = manifest.intent.proxy.base_url if manifest.intent.proxy else None
 
     context_limit = (
-        context_limit_override
-        if context_limit_override is not None
-        else _sess()._resolve_context_limit(effective_template)
+        context_limit_override if context_limit_override is not None else _resolve_context_limit(effective_template)
     )
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
 
@@ -1401,7 +1398,7 @@ def start(
         require_repo_root()
 
     if name is None:
-        _fr = _sess()._cwd_forge_root()
+        _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
     assert name is not None  # generated above when None
@@ -1649,7 +1646,7 @@ def resume(
             console.print("[dim]Cancelled[/dim]")
             sys.exit(0)
 
-    _fr = _sess()._cwd_forge_root()
+    _fr = _cwd_forge_root()
     # Cross-project resolution happens BEFORE the runtime is knowable (the runtime
     # lives in the manifest), so a scoped miss always tries the unscoped lookup;
     # whether a cross-project hit is usable is decided per-runtime below.
@@ -1906,7 +1903,7 @@ def _launch_in_place(
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
     if routing and routing.proxy_id:
         effective_proxy_id = routing.proxy_id
-    context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
+    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(manifest)
     _apply_and_persist_direct_model_override(
         state=manifest,
@@ -2043,7 +2040,7 @@ def _reconnect_in_place(
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
     if routing and routing.proxy_id:
         effective_proxy_id = routing.proxy_id
-    context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
+    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(manifest)
     _apply_and_persist_direct_model_override(
         state=manifest,
@@ -2111,7 +2108,7 @@ def _launch_as_child(
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(child)
     if routing and routing.proxy_id:
         effective_proxy_id = routing.proxy_id
-    context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
+    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(child)
     _apply_and_persist_direct_model_override(
         state=child,
@@ -2250,7 +2247,7 @@ def _resume_fresh(
         effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(parent_state)
         effective_proxy_ref = effective_proxy_id or effective_template
 
-    context_limit = _sess()._resolve_context_limit(effective_proxy_ref)
+    context_limit = _resolve_context_limit(effective_proxy_ref)
     token_multiplier = _resume_token_estimate_multiplier(
         parent_state=parent_state,
         effective_proxy_ref=effective_proxy_ref,
@@ -2463,7 +2460,7 @@ def incognito(
     require_repo_root()
 
     if name is None:
-        _fr = _sess()._cwd_forge_root()
+        _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
     assert name is not None  # generated above when None

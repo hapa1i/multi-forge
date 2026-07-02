@@ -47,7 +47,7 @@ class TestAutoCompactWindowContract:
 
     def test_proxy_launch_sets_auto_compact_window(self):
         """Proxy mode sets CLAUDE_CODE_AUTO_COMPACT_WINDOW to model's context window."""
-        from forge.cli.session import _build_session_env
+        from forge.session.launch import _build_session_env
 
         env_vars, unset = _build_session_env(
             session_name="test",
@@ -60,7 +60,7 @@ class TestAutoCompactWindowContract:
 
     def test_direct_launch_does_not_touch_auto_compact_window(self):
         """Direct mode neither sets nor unsets CLAUDE_CODE_AUTO_COMPACT_WINDOW."""
-        from forge.cli.session import _build_session_env
+        from forge.session.launch import _build_session_env
 
         env_vars, unset = _build_session_env(
             session_name="test",
@@ -75,12 +75,12 @@ class TestAutoCompactWindowContract:
 
     def test_resolver_derives_context_from_largest_proxy_model(self, tmp_path, monkeypatch):
         """_resolve_context_limit returns the largest catalog-derived tier window."""
-        from forge.cli.session import _resolve_context_limit
         from forge.config.loader import write_proxy_instance_config
         from forge.config.schema import ProxyInstanceConfig, TierModels
         from forge.core.models import get_context_window_tokens
         from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
         from forge.runtime_config import reset_runtime_config
+        from forge.session.context_limit import _resolve_context_limit
 
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
         reset_runtime_config()
@@ -119,10 +119,10 @@ class TestAutoCompactWindowContract:
 
     def test_proxy_context_limit_handles_openrouter_dot_slug(self, tmp_path, monkeypatch):
         """OpenRouter Claude dot slugs use the 1M catalog metadata."""
-        from forge.cli.claude import _get_context_limit_for_proxy
         from forge.config.loader import write_proxy_instance_config
         from forge.config.schema import ProxyInstanceConfig, TierModels
         from forge.runtime_config import reset_runtime_config
+        from forge.session.context_limit import _get_context_limit_for_proxy
 
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
         reset_runtime_config()
@@ -144,10 +144,10 @@ class TestAutoCompactWindowContract:
 
     def test_proxy_context_limit_honors_claude_code_1m_suffix(self, tmp_path, monkeypatch):
         """Proxy tier models with Claude Code's [1m] suffix are counted as 1M variants."""
-        from forge.cli.claude import _get_context_limit_for_proxy
         from forge.config.loader import write_proxy_instance_config
         from forge.config.schema import ProxyInstanceConfig, TierModels
         from forge.runtime_config import reset_runtime_config
+        from forge.session.context_limit import _get_context_limit_for_proxy
 
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
         reset_runtime_config()

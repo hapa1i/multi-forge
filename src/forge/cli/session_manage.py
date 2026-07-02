@@ -18,6 +18,7 @@ import click
 from rich.table import Table
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
+from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
@@ -36,7 +37,6 @@ def _sess():  # type: ignore[return]
 
 
 from forge.cli.session import (  # noqa: E402
-    _cwd_forge_root,
     _format_relative_time,
     _get_active_session_entry,
     _get_session_type,

@@ -410,7 +410,7 @@ class TestReviewRelaunch:
             patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
             patch("forge.cli.session_lifecycle._persist_routing_override"),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session._resolve_context_limit", return_value=200000),
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)
@@ -464,7 +464,7 @@ class TestReviewRelaunch:
             patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
             patch("forge.cli.session_lifecycle._persist_routing_override"),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session._resolve_context_limit", return_value=200000),
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)

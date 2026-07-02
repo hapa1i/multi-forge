@@ -35,7 +35,7 @@ from forge.core.ops.codex_session import (
     continue_codex_session,
     start_codex_session,
 )
-from forge.core.ops.context import ExecutionContext
+from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.session import SessionState
 
@@ -196,7 +196,7 @@ def run_codex_start(ctx: click.Context) -> int:
         require_repo_root()
     name = p["name"]
     if name is None:
-        _fr = _sess()._cwd_forge_root()
+        _fr = _cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
 

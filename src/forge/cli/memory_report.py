@@ -22,7 +22,8 @@ import click
 from rich.syntax import Syntax
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
-from forge.cli.session import _cwd_forge_root, console, handle_session_error
+from forge.cli.session import console, handle_session_error
+from forge.core.ops.context import _cwd_forge_root
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager
 from forge.session.memory_writer import memory_report_dir

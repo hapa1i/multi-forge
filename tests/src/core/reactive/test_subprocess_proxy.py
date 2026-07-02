@@ -170,7 +170,7 @@ class TestBuildSessionEnv:
     """_build_session_env() threads subprocess_proxy into env vars."""
 
     def test_subprocess_proxy_set_in_env(self):
-        from forge.cli.session import _build_session_env
+        from forge.session.launch import _build_session_env
 
         env_vars, _ = _build_session_env(
             session_name="test",
@@ -182,7 +182,7 @@ class TestBuildSessionEnv:
         assert env_vars[FORGE_SUBPROCESS_PROXY_VAR] == "openrouter"
 
     def test_subprocess_proxy_metadata_set_in_env_for_sidecar(self, monkeypatch: pytest.MonkeyPatch):
-        from forge.cli.session import _build_session_env
+        from forge.session.launch import _build_session_env
 
         entry = ProxyEntry(
             proxy_id="openrouter",
@@ -214,7 +214,7 @@ class TestBuildSessionEnv:
         assert env_vars[FORGE_SUBPROCESS_TEMPLATE_VAR] == "openrouter-openai"
 
     def test_no_subprocess_proxy_omits_env_var(self):
-        from forge.cli.session import _build_session_env
+        from forge.session.launch import _build_session_env
 
         env_vars, _ = _build_session_env(
             session_name="test",

@@ -1471,7 +1471,7 @@ class TestSessionDelete:
 
     def test_delete_orphan_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
         """A live session whose index entry is gone (orphan dir) is still blocked unless --force."""
-        from forge.cli.session import _cwd_forge_root
+        from forge.core.ops.context import _cwd_forge_root
         from forge.session.index import IndexStore
 
         runner.invoke(main, ["session", "start", "orphan-live", "--no-launch"])
@@ -1495,7 +1495,7 @@ class TestSessionDelete:
 
     def test_delete_orphan_force_deletes_active_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--force lets orphan cleanup remove a live session's directory."""
-        from forge.cli.session import _cwd_forge_root
+        from forge.core.ops.context import _cwd_forge_root
         from forge.session.index import IndexStore
 
         runner.invoke(main, ["session", "start", "orphan-force", "--no-launch"])
@@ -1734,7 +1734,7 @@ class TestSessionDelete:
         # Patch _cwd_forge_root and os.getcwd so the orphan check
         # (SessionStore at Path.cwd()) doesn't find the session on disk.
         with (
-            patch("forge.cli.session._cwd_forge_root", return_value=str(forge_root_c)),
+            patch("forge.cli.session_manage._cwd_forge_root", return_value=str(forge_root_c)),
             patch("os.getcwd", return_value=str(forge_root_c)),
         ):
             result = runner.invoke(main, ["session", "delete", "shared", "--yes"])
@@ -1969,7 +1969,7 @@ class TestCrossProjectResolution:
         # Must patch CWD too — resolve_session_identifier derives its own
         # forge_root from Path.cwd(), not from session._cwd_forge_root().
         monkeypatch.chdir(forge_root_c)
-        with patch("forge.cli.session._cwd_forge_root", return_value=str(forge_root_c)):
+        with patch("forge.cli.session_manage._cwd_forge_root", return_value=str(forge_root_c)):
             result = runner.invoke(main, ["session", "show", "shared"])
 
         assert result.exit_code == 1
@@ -2544,7 +2544,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._resolve_context_limit", return_value=100),
+            patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
             patch("forge.cli.session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2842,7 +2842,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session._resolve_context_limit", return_value=100),
+            patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
             patch("forge.cli.session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3965,7 +3965,7 @@ class TestProxyDirectFlags:
 
         with (
             patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
-            patch("forge.cli.session._resolve_context_limit", return_value=None),
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=None),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "proxy-resume-parent", "--proxy", "test-proxy"])
@@ -3993,7 +3993,7 @@ class TestProxyDirectFlags:
 
         with (
             patch("forge.cli.session._resolve_routing_from_cli", return_value=routing),
-            patch("forge.cli.session._resolve_context_limit", return_value=None),
+            patch("forge.cli.session_fork._resolve_context_limit", return_value=None),
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(

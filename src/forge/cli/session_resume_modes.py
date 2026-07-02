@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
+from forge.session.context_limit import _resolve_context_limit
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -45,7 +46,7 @@ def _resume_fresh_rewind(
         effective_template, _, effective_proxy_id = session_cli._get_effective_proxy_for_session(parent_state)
         effective_proxy_ref = effective_proxy_id or effective_template
 
-    context_limit = session_cli._resolve_context_limit(effective_proxy_ref)
+    context_limit = _resolve_context_limit(effective_proxy_ref)
 
     try:
         child_manifest, transfer_result = manager.resume_session(
@@ -172,7 +173,7 @@ def _resume_fresh_native(
         effective_template, _, effective_proxy_id = session_cli._get_effective_proxy_for_session(parent_state)
         effective_proxy_ref = effective_proxy_id or effective_template
 
-    context_limit = session_cli._resolve_context_limit(effective_proxy_ref)
+    context_limit = _resolve_context_limit(effective_proxy_ref)
 
     try:
         child_manifest, transfer_result = manager.resume_session(

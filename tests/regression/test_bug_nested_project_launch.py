@@ -118,8 +118,8 @@ class TestPersistedClaudeProjectRoot:
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session._warn_if_hooks_missing"),
             patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.cli.session_lifecycle._build_session_env", return_value=({}, [])),
+            patch("forge.cli.session_lifecycle._infer_launch_confirmation"),
         ):
             from forge.cli.session import _launch_claude_for_session
 
@@ -167,8 +167,8 @@ class TestPersistedClaudeProjectRoot:
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session._warn_if_hooks_missing"),
             patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.cli.session_lifecycle._build_session_env", return_value=({}, [])),
+            patch("forge.cli.session_lifecycle._infer_launch_confirmation"),
         ):
             from forge.cli.session import _launch_claude_for_session
 
@@ -219,8 +219,8 @@ class TestPersistedClaudeProjectRoot:
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session._warn_if_hooks_missing"),
             patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.cli.session_lifecycle._build_session_env", return_value=({}, [])),
+            patch("forge.cli.session_lifecycle._infer_launch_confirmation"),
         ):
             from forge.cli.session import _launch_claude_for_session
 
@@ -302,8 +302,8 @@ class TestLaunchCallsitesUseLaunchRoot:
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session._warn_if_hooks_missing"),
             patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.cli.session_lifecycle._build_session_env", return_value=({}, [])),
+            patch("forge.cli.session_lifecycle._infer_launch_confirmation"),
         ):
             from forge.cli.session import _launch_claude_for_session
 
@@ -351,8 +351,8 @@ class TestLaunchCallsitesUseLaunchRoot:
             patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session._warn_if_hooks_missing"),
             patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.cli.session_lifecycle._build_session_env", return_value=({}, [])),
+            patch("forge.cli.session_lifecycle._infer_launch_confirmation"),
         ):
             from forge.cli.session import _launch_claude_for_session
 

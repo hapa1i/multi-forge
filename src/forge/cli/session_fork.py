@@ -21,6 +21,7 @@ from forge.cli.session_addendum import (
 )
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.core.ops.context import _cwd_forge_root
 from forge.core.paths import display_path
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
@@ -34,6 +35,7 @@ from forge.session import (
     ForgeSessionError,
     SessionState,
 )
+from forge.session.context_limit import _resolve_context_limit
 from forge.session.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
@@ -49,6 +51,12 @@ from forge.session.exceptions import (
     SessionNotFoundError,
     WorktreePathExistsError,
 )
+from forge.session.launch import _build_session_env
+from forge.session.launch_confirmation import (
+    _routing_mode_for,
+    read_proxy_cost_baseline,
+    record_launch_confirmed,
+)
 from forge.session.model_pin import (
     _apply_direct_model_env_if_supported,
     _validate_direct_model_pin_for_routing,
@@ -59,11 +67,6 @@ def _sess():  # type: ignore[return]
     return sys.modules["forge.cli.session"]
 
 
-from forge.cli.launch_confirmation import (  # noqa: E402
-    _routing_mode_for,
-    read_proxy_cost_baseline,
-    record_launch_confirmed,
-)
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
@@ -426,7 +429,7 @@ def fork(
     _inline_plan_explicit = ctx.get_parameter_source("inline_plan") == click.core.ParameterSource.COMMANDLINE
 
     manager = _sess().SessionManager()
-    _fr = _sess()._cwd_forge_root()
+    _fr = _cwd_forge_root()
 
     # Reject a Codex parent BEFORE fork_session() creates orphaned child state. `fork`
     # is Claude-specific: it carries the conversation via --fork-session + the parent's
@@ -643,7 +646,7 @@ def fork(
             else:
                 child_template = parent_state.intent.proxy.template if parent_state.intent.proxy else None
                 preflight_ref = child_template
-            context_limit_preflight = _sess()._resolve_context_limit(preflight_ref)
+            context_limit_preflight = _resolve_context_limit(preflight_ref)
             if context_limit_preflight is not None:
                 from forge.session.transfer import estimate_transcript_tokens
 
@@ -811,7 +814,7 @@ def fork(
         effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(fork_manifest)
 
     # Compute context limit (uses exact proxy_id when available for deterministic result)
-    context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
+    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
 
     console.print(f"Forked [cyan]{parent}[/cyan] -> [green]{fork_manifest.name}[/green]")
     _print_routing_summary(template=effective_template, base_url=effective_url)
@@ -840,7 +843,7 @@ def fork(
     )
 
     # Set env vars for fork registration (hook uses FORGE_FORK_NAME for fork detection)
-    env_vars, unset_env_vars = _sess()._build_session_env(
+    env_vars, unset_env_vars = _build_session_env(
         session_name=fork_manifest.name,
         context_limit=context_limit,
         template=effective_template,
