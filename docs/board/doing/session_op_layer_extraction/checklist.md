@@ -741,7 +741,7 @@ slice. Sub-sliced below so each step is reviewable and reversible.
 | `_auto_install_extensions` (5), `_get_active_session_entry` (3), `_detect_parent_extensions` (1) | defined `session.py`                                                               | caller-module seam for runtime callers; direct tests of `session.py`-defined helpers (notably `_detect_parent_extensions`) stay on `forge.cli.session` unless the helper itself moves                                           |
 | `generate_unique_name` (2)                                                                       | `forge.core.naming`                                                                | caller-module seam (or `forge.core.naming.generate_unique_name`)                                                                                                                                                                |
 | `_delete_single_session` (2), `_warn_if_*` (2)                                                   | confirm (likely `session_manage` / `session.py`)                                   | caller-module seam                                                                                                                                                                                                              |
-| `_session_cli()` local seam (0 parent patches)                                                   | `session_resume_modes.py:23` lazy-imports `forge.cli.session`                      | direct imports from `session_lifecycle`, `session.py`, and `forge.cli.output`; no patch-count effect, but 5d cannot delete the shim until this local-var seam is gone                                                           |
+| `_session_cli()` local seam (0 parent patches)                                                   | `session_resume_modes.py:23` lazy-imported `forge.cli.session`                     | removed in 5a.5; function-local direct imports from `session_lifecycle` preserve import order without keeping the module-object seam                                                                                            |
 
 **Sub-slices (easy -> hard; each independently shippable -- the shim degrades symbol-by-symbol):**
 
@@ -749,15 +749,15 @@ slice. Sub-sliced below so each step is reviewable and reversible.
   the caller module and repoint that symbol's patches to the caller-module seam. Done 2026-07-02: migrated routing,
   transfer-context, extension install, active-session, naming, delete, and warning seams. Remaining runtime `_sess()`
   calls are only the planned 5b/5c symbols (`SessionManager`, `invoke_claude`, `run_with_active_session`), while the
-  separate `_session_cli()` local-var seam is deferred to 5a.5. Parent patch lines are down to **207**. The stale-parent
+  separate `_session_cli()` local-var seam is cleared in 5a.5. Parent patch lines are down to **207**. The stale-parent
   grep for these 5a symbols is empty. `_detect_parent_extensions` remains a `forge.cli.session` patch seam because the
   helper is still defined and directly unit-tested in `session.py`.
-- [ ] **5a.5 -- `_session_cli()` resume-mode local seam (0 parent patches).** Replace `session_cli = _session_cli()` in
+- [x] **5a.5 -- `_session_cli()` resume-mode local seam (0 parent patches).** Replace `session_cli = _session_cli()` in
   `session_resume_modes.py` with direct imports for the 26 local calls: `_execute_resume_launch_plan`,
   `_get_effective_proxy_for_session`, `_get_resume_launch_preferences`, `_resolve_manifest_prompt_file`,
   `_resume_launch_preferences_for_op`, `_resume_routing_for_op`, `console`, `handle_session_error`, and
-  `print_error_with_tip`. This does not change the 207 patch count, but it must land before 5d's `def _session_cli`
-  deletion gate. Run the rewind/native resume tests that exercise both functions.
+  `print_error_with_tip`. Done 2026-07-02 using function-local `session_lifecycle` imports where required by the
+  `session.py` -> `session_lifecycle` -> `session_resume_modes` load order. This does not change the 207 patch count.
 - [ ] **5b -- `SessionManager` (56 patches, 11 call sites).** Each CLI module constructs `SessionManager` directly;
   repoint its patches to that module's seam. Fragmented by command (no single seam).
 - [ ] **5c -- `invoke_claude` + `run_active` (149 + 1 patches).** Drop the 3 *paired* injections
@@ -815,6 +815,12 @@ shows only `SessionManager` / `invoke_claude` / `run_with_active_session`;
 `python -c "import forge.cli.session"`; `uv run forge session --help`;
 `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_model_pins.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_codex.py tests/src/cli/test_session_extensions.py -q`
 -> **338 passed**.
+
+**5a.5 verification (2026-07-02):** `rg -n "def _session_cli|session_cli\.|_session_cli\(" src/forge/cli/` returned
+empty; `python -m py_compile src/forge/cli/session_resume_modes.py src/forge/cli/session_lifecycle.py`;
+`python -c "import forge.cli.session_resume_modes"`;
+`python -c "import forge.cli.session; import forge.cli.session_resume_modes"`;
+`uv run pytest tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_commands.py -q` -> **225 passed**.
 
 **Verification (per sub-slice + final):** affected test file(s) after each symbol;
 `python -c "import forge.cli.session"` (no cycle error); `forge session --help` + a couple of `--help` leaves; full
