@@ -34,7 +34,12 @@ from forge.core.ops.transfer import (
 from forge.core.paths import display_path
 from forge.session.transfer import TRANSFER_TARGET_RUNTIMES, ResumeStrategy
 
-_STRATEGY_CHOICES = [s.value for s in ResumeStrategy]
+_STRATEGY_CHOICES = [
+    ResumeStrategy.MINIMAL.value,
+    ResumeStrategy.STRUCTURED.value,
+    ResumeStrategy.FULL.value,
+    ResumeStrategy.AI_CURATED.value,
+]
 
 
 @click.group("transfer")

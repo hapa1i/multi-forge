@@ -149,29 +149,29 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 
 **Goal:** Surface `--strategy rewind --drop-last N` and co-deliver a context file with a native-relocate launch.
 
-- [ ] **`ResumeStrategy.REWIND` + Choice.** Add the enum member and the `--strategy` Choice value on fork and resume;
+- [x] **`ResumeStrategy.REWIND` + Choice.** Add the enum member and the `--strategy` Choice value on fork and resume;
   add required `--drop-last N` (no default; non-negative integer). **Assertion:** `--strategy rewind` without
   `--drop-last` errors, negative values fail validation without reaching the writer, and `rewind` resolves
   `resume_mode=native-relocate` (worktree/`--into` only).
-- [ ] **Co-deliver context file with native-relocate launch (the convention extension).** Extend the strategy-population
+- [x] **Co-deliver context file with native-relocate launch (the convention extension).** Extend the strategy-population
   path (currently `_persist_fork_transfer_derivation` gated by `uses_fresh_transfer`, `session_lifecycle.py:309/947`) so
   a rewind fork writes `strategy="rewind"`, `dropped_turns=N`, `context_file=<delta>` AND the launch emits
   `--resume --fork-session` together with `--append-system-prompt-file`. **Assertion:** the launched argv for a rewind
   worktree fork contains both flags (unit-assert on the built command).
-- [ ] **Shared dropped-window turn numbering.** Wire the prefix writer and code-delta generator from the same raw-order
+- [x] **Shared dropped-window turn numbering.** Wire the prefix writer and code-delta generator from the same raw-order
   turn grouping. Do not pass `RewindPrefixResult.kept_turns` into a separately re-parsed timestamp-sorted transcript:
   `write_rewind_transcript_prefix` currently counts raw JSONL-order dict entries, while `parse_jsonl_transcript` sorts
   by timestamp and skips entries without `message`/`type`. If the two-parser shape remains temporarily, add a guard that
   proves both parsers produce the same turn count/order before launch and otherwise falls back with a note.
   **Assertion:** a fixture with file order != timestamp order, plus a metadata-only dict line, proves the delta window
   matches the prefix writer's dropped window.
-- [ ] **Degenerate and snap-back UX.** Handle the writer result before launch: `drop_last=0` uses the plain
+- [x] **Degenerate and snap-back UX.** Handle the writer result before launch: `drop_last=0` uses the plain
   native-relocate no-op, `kept_turns=0` rejects or falls back instead of launching an empty transcript, and
   `kept_turns < requested_keep_turns` tells the user how many additional turns the safe-boundary snap dropped. Catch
   defensive writer `ValueError`s (for example, a non-contiguous transcript prefix) and fall back to plain
   native-relocate with a note rather than surfacing a traceback. **Assertion:** unit coverage proves each branch
   surfaces the correct user-facing message.
-- [ ] **Same-dir / sidecar rejection.** **Assertion:** `--strategy rewind` on a same-dir or sidecar fork is rejected
+- [x] **Same-dir / sidecar rejection.** **Assertion:** `--strategy rewind` on a same-dir or sidecar fork is rejected
   with the existing native-relocate-only guidance (reuse the `session_fork.py:489-556` preflight messages).
 
 ## Slice 5 — Identity + cleanup
@@ -182,8 +182,11 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
   `--resume R --fork-session`. Apply the Slice-1 probe outcome: keep embedded parent `sessionId`; no envelope rewrite.
   **Assertion:** `R ≠ parent_uuid`; the parent's original `<parent_uuid>.jsonl` is never written or overwritten.
 - [ ] **Unshared cleanup.** Record the relocated id per the Slice-1 GC-field decision so
-  `_find_shared_transcript_sessions` finds no siblings sharing `R`. **Assertion:** deleting the rewind session unlinks
-  `<R>.jsonl`; a fixture with a sibling/parent in the same encoded dir confirms neither is touched.
+  `_find_shared_transcript_sessions` finds no siblings sharing `R`. Add the delete-time unlink branch for
+  `derivation.rewind_relocated_session_id` in `manager.py` independently of the existing `relocated_parent_session_id`
+  branch: it must be dir-scoped to the child's resolved Claude project root, unshared by design, and keyed only on `R`
+  so same-directory resume rewind can never touch the parent's original UUID. **Assertion:** deleting the rewind session
+  unlinks `<R>.jsonl`; a fixture with a sibling/parent in the same encoded dir confirms neither is touched.
 
 ## Slice 6 — Fallback + privacy + docs
 
@@ -195,7 +198,9 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
   **Assertion:** the warning is emitted on any rewind run.
 - [ ] **Docs.** Update `docs/design.md` §3.9 (matrix from Slice 1 finalized to shipped state), `docs/design_appendix.md`
   §H (schema marker/frontmatter), `docs/cli_reference.md` (fork/resume `--strategy rewind --drop-last`), and
-  `docs/end-user/transfer.md`. **Assertion:** each doc reflects shipped behavior, not aspiration.
+  `docs/end-user/transfer.md`. Make the fork/resume asymmetry explicit: fork rewind is worktree/`--into` only and
+  rejects same-dir/sidecar; `resume --fresh --strategy rewind` is legitimately same-directory because it resumes the
+  fresh truncated UUID `<R>`, not the parent's UUID. **Assertion:** each doc reflects shipped behavior, not aspiration.
 
 ---
 
@@ -206,14 +211,14 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 | Truncated relocate carries head       | parent with T turns, `--drop-last N`       | child JSONL has turns 1..T−N, none of T−N+1..T                                                     | `tests/src/session/test_rewind_strategy.py` |
 | Truncation snaps to safe boundary     | tool_use/result pair straddling T−N        | relocated JSONL ends on a complete turn (resume not corrupted)                                     | same                                        |
 | Delta cites only dropped turns        | edits in the dropped window                | delta lists changed files citing turns T−N+1..T; no head citations                                 | same                                        |
-| Native resume + context file together | `--strategy rewind` worktree fork          | launched argv carries `--resume --fork-session` AND `--append-system-prompt-file`                  | same                                        |
+| Native resume + context file together | `--strategy rewind` worktree fork          | launched argv carries `--resume --fork-session` AND `--append-system-prompt-file`                  | `tests/src/cli/test_session_commands.py`    |
 | Prefix and delta share dropped window | out-of-timestamp-order JSONL + metadata    | code-delta describes exactly the turns removed by the prefix writer                                | same                                        |
-| Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | same                                        |
-| Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | same                                        |
-| Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | same                                        |
+| Empty head is not launched            | `--drop-last >= T`                         | CLI rejects or falls back before running `claude --resume` against an empty `<R>.jsonl`            | `tests/src/cli/test_session_commands.py`    |
+| Safe-boundary snap is disclosed       | snap keeps fewer turns than requested      | user-facing output says how many additional turns the snap dropped                                 | `tests/src/cli/test_session_commands.py`    |
+| Writer failure falls back             | non-contiguous transcript prefix           | plain native-relocate fallback + note; no traceback                                                | `tests/src/cli/test_session_commands.py`    |
 | Resume tolerates fresh UUID           | rewind launch, truncated fresh `<R>.jsonl` | child resumes from clean-prefix `<R>` with embedded parent `sessionId`; no "No conversation found" | integration (real `claude`)                 |
-| Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | same                                        |
-| Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_fork.py`        |
+| Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | `tests/src/cli/test_session_commands.py`    |
+| Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_commands.py`    |
 | AI failure falls back                 | LLM error                                  | plain native-relocate + "code-delta unavailable" note; resume still works                          | `tests/src/session/test_rewind_strategy.py` |
 | Truncated copy is unshared            | sibling/parent in same encoded dir         | `<R>.jsonl` deleted with the session; parent/sibling transcript untouched                          | same                                        |
 | Net-change reconciliation             | file edited twice in the window            | delta shows net change, not both edits                                                             | same                                        |

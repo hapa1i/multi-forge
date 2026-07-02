@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.state.io import atomic_write_text
-from forge.core.transcript import parse_jsonl_transcript, truncate
+from forge.core.transcript import truncate
 from forge.session.transfer import (
     MAX_TRANSCRIPT_CHARS,
     _call_llm_for_curation_prompt,
@@ -203,6 +203,12 @@ def write_rewind_transcript_prefix(
     )
 
 
+def parse_rewind_transcript_entries(transcript_path: Path) -> list[dict[str, Any]]:
+    """Parse transcript entries in the same raw order used by the prefix writer."""
+    raw_lines = transcript_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    return [raw.entry for raw in _parse_raw_transcript_entries(raw_lines)]
+
+
 def extract_rewind_file_deltas(entries: list[dict[str, Any]], *, kept_turns: int) -> list[RewindFileDelta]:
     """Extract net file-level code-edit signals from turns after ``kept_turns``."""
     if kept_turns < 0:
@@ -325,7 +331,7 @@ def generate_rewind_code_delta_context(
         )
         return content, ["No transcript available; using rewind code-delta fallback"], "compatibility-fallback"
 
-    entries = parse_jsonl_transcript(transcript_path)
+    entries = parse_rewind_transcript_entries(transcript_path)
     if not entries:
         content = _build_rewind_deterministic_output(
             parent_name=parent_name,

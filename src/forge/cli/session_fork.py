@@ -79,6 +79,7 @@ from forge.cli.session import (  # noqa: E402
 from forge.cli.session_lifecycle import (  # noqa: E402
     _launch_claude_for_session,
     _persist_fork_transfer_derivation,
+    _prepare_rewind_launch_artifacts,
     _print_branch_exists_tip,
     _print_post_exit_tip,
     _print_session_activity_summary,
@@ -137,10 +138,16 @@ __all__ = ["fork"]
 )
 @click.option(
     "--strategy",
-    type=click.Choice(["minimal", "structured", "full", "ai-curated"]),
+    type=click.Choice(["minimal", "structured", "full", "ai-curated", "rewind"]),
     default="structured",
-    help="Context assembly strategy for transfer forks (worktree, --into, or same-directory transfer). "
-    "On a same-directory fork, setting it switches the fork to transfer mode. Default: structured",
+    help="Context assembly strategy for transfer forks, or rewind for a native-relocate fork with dropped tail turns. "
+    "On a same-directory fork, setting a transfer strategy switches the fork to transfer mode. Default: structured",
+)
+@click.option(
+    "--drop-last",
+    type=int,
+    default=None,
+    help="Required with --strategy rewind: number of tail conversational turns to drop.",
 )
 @click.option(
     "--inline-plan",
@@ -255,6 +262,7 @@ def fork(
     no_launch: bool,
     extensions: bool | None,
     strategy: str,
+    drop_last: int | None,
     inline_plan: bool,
     into_path: str | None,
     resume_mode: str | None,
@@ -412,6 +420,7 @@ def fork(
 
     ctx = click.get_current_context()
     _strategy_explicit = ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
+    _drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
     _inline_plan_explicit = ctx.get_parameter_source("inline_plan") == click.core.ParameterSource.COMMANDLINE
 
     manager = _sess().SessionManager()
@@ -470,13 +479,43 @@ def fork(
     # Budget preflight for --strategy full (before fork_session to avoid orphaned sessions/worktrees)
     # Use the child's effective routing: --no-proxy means no proxy, --proxy overrides parent
     is_cross_dir = worktree or into_resolved is not None
+    rewind_requested = strategy == "rewind"
+    if _drop_last_explicit and not rewind_requested:
+        print_error("--drop-last requires --strategy rewind", console=console)
+        sys.exit(1)
+    if rewind_requested:
+        if drop_last is None:
+            print_error("--strategy rewind requires --drop-last N", console=console)
+            sys.exit(1)
+        if drop_last < 0:
+            print_error("--drop-last must be non-negative", console=console)
+            sys.exit(1)
+        if _inline_plan_explicit:
+            print_error("--inline-plan applies only to transfer forks, not --strategy rewind", console=console)
+            sys.exit(1)
+        if resume_mode == "transfer":
+            print_error("--strategy rewind cannot be combined with --resume-mode transfer", console=console)
+            sys.exit(1)
+        if not is_cross_dir:
+            print_error_with_tip(
+                "--strategy rewind on fork requires --worktree or --into.",
+                "Use 'forge session resume <name> --fresh --strategy rewind --drop-last N' for a same-directory child.",
+                console=console,
+            )
+            sys.exit(1)
+        resume_mode = "native-relocate"
 
     # Auto-switch a same-directory fork into transfer mode when the user explicitly set a
     # transfer-only flag (--strategy/--inline-plan) without an explicit --resume-mode. Resolving
     # resume_mode here keeps every downstream site (notice, budget gate, manager call, launch,
     # derivation) keyed uniformly on "transfer". Gated on `resume_mode is None`, so an explicit
     # --resume-mode native-relocate never auto-switches.
-    if not is_cross_dir and resume_mode is None and (_strategy_explicit or _inline_plan_explicit):
+    if (
+        not is_cross_dir
+        and resume_mode is None
+        and not rewind_requested
+        and (_strategy_explicit or _inline_plan_explicit)
+    ):
         resume_mode = "transfer"
         # Status notice (an action Forge took), not a recovery hint -- per CLAUDE.md UX guidelines,
         # informational output is an unprefixed dim line, distinct from print_tip recovery suggestions.
@@ -541,7 +580,7 @@ def fork(
                 console=console,
             )
             sys.exit(1)
-        if _strategy_explicit or _inline_plan_explicit:
+        if not rewind_requested and (_strategy_explicit or _inline_plan_explicit):
             print_tip(
                 "--strategy/--inline-plan apply only to transfer forks; ignored with --resume-mode native-relocate.",
                 blank_before=False,
@@ -815,8 +854,16 @@ def fork(
         apply_proxy_context_model_defaults(env_vars, context_limit)
     fork_name = fork_manifest.name  # Capture for cleanup
     is_worktree_fork = bool(fork_manifest.worktree and fork_manifest.worktree.is_worktree)
-    native_relocate = is_worktree_fork and resume_mode == "native-relocate"
+    rewind_active = rewind_requested and drop_last is not None and drop_last > 0
+    native_relocate = is_worktree_fork and resume_mode == "native-relocate" and not rewind_active
     same_dir_transfer = not is_worktree_fork and resume_mode == "transfer"
+    if rewind_active and use_sidecar:
+        print_error_with_tip(
+            "--strategy rewind is not supported with sidecar mode.",
+            "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) or use transfer mode.",
+            console=console,
+        )
+        sys.exit(1)
     # Forks that pre-seed a fresh child UUID and carry a generated transfer doc: worktree transfer
     # OR same-directory transfer. native-relocate is a byte-faithful native resume (not a fresh
     # transfer), so it is excluded even though is_worktree_fork is True for it.
@@ -842,7 +889,10 @@ def fork(
     # pre-declared so the same-directory native path leaves them bound (consumed under
     # `uses_fresh_transfer` guards below).
     _fork_uuid: str | None = None
+    _rewind_resume_id: str | None = None
     prompt_file: str | None = None
+    if rewind_requested and drop_last == 0:
+        console.print("[dim]--drop-last 0 uses plain native-relocate; no rewind context generated.[/dim]")
 
     # Worktree forks default to transfer: Claude stores sessions per CWD-encoded project dir
     # (~/.claude/projects/<encoded-cwd>/), so a bare --resume can't cross the boundary (2.1.90
@@ -939,6 +989,57 @@ def fork(
                 name=fork_manifest.name,
                 model=None,
                 system_prompt_file=_nr_prompt,
+                env_vars=env_vars,
+                unset_env_vars=unset_env_vars,
+                cwd=_fork_cwd,
+            )
+
+    elif rewind_active:
+        assert drop_last is not None
+        from forge.session.claude.paths import (
+            resolve_claude_project_root as _resolve_fork_root,
+        )
+
+        _fork_cwd = _resolve_fork_root(fork_manifest)
+        _rewind_artifacts = _prepare_rewind_launch_artifacts(
+            manifest=fork_manifest,
+            parent_name=parent,
+            parent_state=parent_manifest,
+            parent_uuid=parent_session_id,
+            drop_last=drop_last,
+        )
+        _rewind_resume_id = _rewind_artifacts.resume_id
+        if _rewind_artifacts.context_path is not None:
+            console.print(f"  Context:  {display_path(_rewind_artifacts.context_path)}")
+        for warning in _rewind_artifacts.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+        _rewind_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
+        _rewind_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else _rewind_worktree
+        _rewind_prompt_files: list[Path] = []
+        _rewind_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
+        if _rewind_addendum:
+            _rewind_prompt_files.append(
+                write_managed_addendum(_rewind_forge_root, fork_manifest.name, _rewind_addendum)
+            )
+        if _rewind_artifacts.context_path is not None:
+            _rewind_prompt_files.append(_rewind_artifacts.context_path)
+        _rewind_configured_prompt = _resolve_manifest_prompt_file(fork_manifest)
+        if _rewind_configured_prompt is not None:
+            _rewind_prompt_files.append(_rewind_configured_prompt)
+        prompt_file = _combine_prompt_files(
+            worktree_path=_rewind_worktree,
+            session_name=fork_manifest.name,
+            prompt_files=_rewind_prompt_files,
+        )
+
+        def _invoke_fork() -> int:
+            return _sess().invoke_claude(
+                resume_id=_rewind_resume_id,
+                fork_session=True,
+                name=fork_manifest.name,
+                model=None,
+                system_prompt_file=prompt_file,
                 env_vars=env_vars,
                 unset_env_vars=unset_env_vars,
                 cwd=_fork_cwd,
@@ -1119,7 +1220,7 @@ def fork(
             exit_code = _launch_claude_for_session(
                 manifest=fork_manifest,
                 session_id=_fork_uuid if uses_fresh_transfer else None,
-                resume_id=None if uses_fresh_transfer else parent_session_id,
+                resume_id=None if uses_fresh_transfer else (_rewind_resume_id or parent_session_id),
                 effective_template=effective_template,
                 runtime_base_url=runtime_base_url,
                 context_limit=context_limit,
@@ -1128,7 +1229,7 @@ def fork(
                 image=image,
                 fork_session=not uses_fresh_transfer,
                 register_fork=uses_fresh_transfer,
-                system_prompt_file=prompt_file if uses_fresh_transfer else None,
+                system_prompt_file=prompt_file if (uses_fresh_transfer or rewind_active) else None,
                 name=fork_manifest.name,
                 proxy_id=effective_proxy_id,
             )

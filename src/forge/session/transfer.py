@@ -105,6 +105,7 @@ class ResumeStrategy(str, Enum):
     STRUCTURED = "structured"
     FULL = "full"
     AI_CURATED = "ai-curated"
+    REWIND = "rewind"
 
 
 def _build_frontmatter(
@@ -1137,6 +1138,8 @@ def assemble_transfer_context(
     if target_runtime not in TRANSFER_TARGET_RUNTIMES:
         valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
         raise ValueError(f"Unknown target runtime '{target_runtime}' (valid: {valid}).")
+    if strategy == ResumeStrategy.REWIND:
+        raise ValueError("rewind is not a transfer context strategy; use the CLI rewind launch path with --drop-last")
 
     warnings: list[str] = []
 

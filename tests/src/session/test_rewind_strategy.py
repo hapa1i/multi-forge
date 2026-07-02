@@ -32,6 +32,7 @@ def _entry(
     text: str | None = None,
     request_id: str | None = None,
     blocks: list[dict[str, Any]] | None = None,
+    timestamp: str | None = None,
 ) -> dict[str, Any]:
     content: list[dict[str, Any]]
     if blocks is not None:
@@ -42,6 +43,8 @@ def _entry(
     entry: dict[str, Any] = {"message": {"role": role, "content": content}}
     if request_id is not None:
         entry["requestId"] = request_id
+    if timestamp is not None:
+        entry["timestamp"] = timestamp
     return entry
 
 
@@ -291,6 +294,62 @@ def test_code_delta_source_contains_dropped_turns_not_head() -> None:
     assert "src/head.py" not in source.text
     assert source.emitted_turns == {2}
     assert source.file_deltas[0].path == "src/tail.py"
+
+
+def test_code_delta_generator_uses_raw_order_shared_with_prefix_writer(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock, patch
+
+    transcript = tmp_path / "parent.jsonl"
+    _write_jsonl(
+        transcript,
+        [
+            _entry(
+                role="assistant",
+                text="kept head",
+                request_id="r1",
+                timestamp="2026-01-01T00:00:03Z",
+            ),
+            {
+                "requestId": "r2",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "metadataOnly": True,
+            },
+            _entry(
+                role="assistant",
+                request_id="r3",
+                timestamp="2026-01-01T00:00:02Z",
+                blocks=[_tool_use("Write", {"file_path": "src/raw_tail.py", "content": "tail"})],
+            ),
+        ],
+    )
+    mock_adapter = MagicMock()
+    mock_adapter.complete.return_value = _fake_completion(
+        json.dumps(
+            {
+                "changes": [{"text": "src/raw_tail.py - wrote raw tail", "citation": "turn 3"}],
+                "net_effect": "Raw tail exists on disk.",
+                "unfinished": [],
+            }
+        )
+    )
+
+    with (
+        patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+        patch("forge.core.llm.get_client"),
+    ):
+        content, _warnings, schema = generate_rewind_code_delta_context(
+            parent_name="parent",
+            lineage=["parent"],
+            transcript_path=transcript,
+            kept_turns=2,
+        )
+
+    prompt = mock_adapter.complete.call_args.args[0][1].content
+
+    assert schema == REWIND_CODE_DELTA_SCHEMA
+    assert "src/raw_tail.py" in prompt
+    assert "Dropped turns: 3..3" in prompt
+    assert "src/raw_tail.py - wrote raw tail" in content
 
 
 def test_rewind_code_delta_prompt_and_rendering_are_grounded(tmp_path: Path) -> None:
