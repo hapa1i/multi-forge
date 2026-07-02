@@ -375,6 +375,8 @@ def generate_rewind_code_delta_context(
         )
 
     _emit_curation_usage(call, command=REWIND_CODE_DELTA_COMMAND, operation=REWIND_CODE_DELTA_OPERATION)
+    model_used = call.model_used
+    warnings.append(f"Rewind code-delta: dropped-window code/transcript sent to {model_used} for processing")
     if call.curated is None:
         content = _build_rewind_deterministic_output(
             parent_name=parent_name,
@@ -388,8 +390,7 @@ def generate_rewind_code_delta_context(
             "compatibility-fallback",
         )
 
-    curated, model_used = call.curated, call.model_used
-    warnings.append(f"Rewind code-delta: dropped-window code/transcript sent to {model_used} for processing")
+    curated = call.curated
     curated["changes"], cite_warnings = _validate_decision_citations(curated.get("changes"), source.emitted_turns)
     warnings.extend(cite_warnings)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -70,6 +71,24 @@ def _nr_parent_and_fork(
     assert fork_state.worktree is not None
     fork_state.worktree.is_worktree = True
     return parent, fork_state
+
+
+def _write_code_edit_transcript(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                '{"requestId":"r1","message":{"role":"user","content":[{"type":"text","text":"kept"}]}}',
+                (
+                    '{"requestId":"r2","message":{"role":"assistant","content":[{"type":"tool_use",'
+                    '"id":"toolu_1","name":"Edit","input":{"file_path":"src/app.py",'
+                    '"old_string":"old","new_string":"new"}}]}}'
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner, temp_env: Path) -> None:
@@ -444,3 +463,164 @@ def test_resume_fresh_rewind_writer_error_falls_back_native(runner: CliRunner, t
     assert child.confirmed.derivation is not None
     assert child.confirmed.derivation.resume_mode == "native"
     assert child.confirmed.derivation.strategy is None
+
+
+def test_resume_fresh_rewind_code_delta_failure_falls_back_native(runner: CliRunner, temp_env: Path) -> None:
+    """A code-delta LLM failure falls back to plain native resume and removes temporary <R>.jsonl."""
+    from forge.session.claude.paths import get_transcript_path
+
+    runner.invoke(main, ["session", "start", "rewind-code-delta-fail", "--no-launch"])
+    store = SessionStore(str(temp_env), "rewind-code-delta-fail")
+
+    def _confirm_rewind_parent(m: object) -> None:
+        m.confirmed.claude_session_id = "parent-code-delta-fail"  # type: ignore[attr-defined]
+        m.confirmed.confirmed_by = "hook:SessionStart:startup"  # type: ignore[attr-defined]
+
+    store.update(timeout_s=5.0, mutate=_confirm_rewind_parent)
+    parent_transcript = get_transcript_path(str(temp_env), "parent-code-delta-fail")
+    _write_code_edit_transcript(parent_transcript)
+
+    with (
+        patch("forge.session.rewind._call_llm_for_curation_prompt", side_effect=RuntimeError("llm unavailable")),
+        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "resume",
+                "rewind-code-delta-fail",
+                "--fresh",
+                "--child-name",
+                "rewind-code-delta-fail-child",
+                "--strategy",
+                "rewind",
+                "--drop-last",
+                "1",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Rewind code-delta unavailable; falling back to plain native resume." in result.output
+    kwargs = mock_invoke.call_args.kwargs
+    assert kwargs["resume_id"] == "parent-code-delta-fail"
+    assert kwargs["fork_session"] is True
+    assert kwargs["system_prompt_file"] is None
+    assert sorted(path.name for path in parent_transcript.parent.glob("*.jsonl")) == ["parent-code-delta-fail.jsonl"]
+    child = SessionStore(str(temp_env), "rewind-code-delta-fail-child").read()
+    assert child.confirmed.derivation is not None
+    assert child.confirmed.derivation.resume_mode == "native"
+    assert child.confirmed.derivation.strategy is None
+    assert child.confirmed.derivation.rewind_relocated_session_id is None
+
+
+def test_resume_fresh_rewind_parse_failure_falls_back_with_privacy_warning(runner: CliRunner, temp_env: Path) -> None:
+    """Unparseable code-delta output is still an external send, then a native fallback."""
+    from forge.session.claude.paths import get_transcript_path
+
+    runner.invoke(main, ["session", "start", "rewind-parse-fail", "--no-launch"])
+    store = SessionStore(str(temp_env), "rewind-parse-fail")
+
+    def _confirm_rewind_parent(m: object) -> None:
+        m.confirmed.claude_session_id = "parent-parse-fail"  # type: ignore[attr-defined]
+        m.confirmed.confirmed_by = "hook:SessionStart:startup"  # type: ignore[attr-defined]
+
+    store.update(timeout_s=5.0, mutate=_confirm_rewind_parent)
+    parent_transcript = get_transcript_path(str(temp_env), "parent-parse-fail")
+    _write_code_edit_transcript(parent_transcript)
+    curation_call = SimpleNamespace(
+        curated=None,
+        model_used="test-model via test-provider",
+        usage={"prompt_tokens": 10, "completion_tokens": 2},
+        latency_ms=0.0,
+        provider_meta=None,
+    )
+
+    with (
+        patch("forge.session.rewind._call_llm_for_curation_prompt", return_value=curation_call),
+        patch("forge.session.rewind._emit_curation_usage"),
+        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "resume",
+                "rewind-parse-fail",
+                "--fresh",
+                "--child-name",
+                "rewind-parse-fail-child",
+                "--strategy",
+                "rewind",
+                "--drop-last",
+                "1",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert (
+        "Rewind code-delta: dropped-window code/transcript sent to test-model via test-provider for processing"
+        in result.output
+    )
+    assert "Rewind code-delta unavailable; falling back to plain native resume." in result.output
+    kwargs = mock_invoke.call_args.kwargs
+    assert kwargs["resume_id"] == "parent-parse-fail"
+    assert kwargs["system_prompt_file"] is None
+    assert sorted(path.name for path in parent_transcript.parent.glob("*.jsonl")) == ["parent-parse-fail.jsonl"]
+
+
+def test_resume_fresh_rewind_privacy_warning_for_code_delta_llm(runner: CliRunner, temp_env: Path) -> None:
+    """Successful code-delta curation warns that dropped-window content was sent out."""
+    from forge.session.claude.paths import get_transcript_path
+
+    runner.invoke(main, ["session", "start", "rewind-privacy", "--no-launch"])
+    store = SessionStore(str(temp_env), "rewind-privacy")
+
+    def _confirm_rewind_parent(m: object) -> None:
+        m.confirmed.claude_session_id = "parent-privacy-uuid"  # type: ignore[attr-defined]
+        m.confirmed.confirmed_by = "hook:SessionStart:startup"  # type: ignore[attr-defined]
+
+    store.update(timeout_s=5.0, mutate=_confirm_rewind_parent)
+    parent_transcript = get_transcript_path(str(temp_env), "parent-privacy-uuid")
+    _write_code_edit_transcript(parent_transcript)
+    curation_call = SimpleNamespace(
+        curated={
+            "changes": [{"text": "src/app.py - changed old to new", "citation": "turn 2"}],
+            "net_effect": "src/app.py now contains the new state.",
+            "unfinished": [],
+        },
+        model_used="test-model via test-provider",
+        usage=None,
+        latency_ms=0.0,
+        provider_meta=None,
+    )
+
+    with (
+        patch("forge.session.rewind._call_llm_for_curation_prompt", return_value=curation_call),
+        patch("forge.session.rewind._emit_curation_usage"),
+        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "resume",
+                "rewind-privacy",
+                "--fresh",
+                "--child-name",
+                "rewind-privacy-child",
+                "--strategy",
+                "rewind",
+                "--drop-last",
+                "1",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert (
+        "Rewind code-delta: dropped-window code/transcript sent to test-model via test-provider for processing"
+        in result.output
+    )
+    kwargs = mock_invoke.call_args.kwargs
+    assert kwargs["resume_id"] != "parent-privacy-uuid"
+    assert kwargs["system_prompt_file"] is not None

@@ -47,6 +47,13 @@ Note: `session resume --fresh --review` opens the per-child user-notes overlay (
 `forge session memory` (enable/disable/status/report); top-level `forge memory` keeps the project-doc passport verbs.
 Session transfer context lives under `forge session transfer`.
 
+Rewind resume is available on Claude sessions with `--strategy rewind --drop-last N`.
+`forge session resume <parent> --fresh --strategy rewind --drop-last N` may create a same-directory child: Forge writes
+a fresh truncated transcript UUID and resumes that UUID, not the parent's.
+`forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N` is cross-directory only;
+same-directory and sidecar rewind forks are rejected. If the code-delta curation step fails, Forge falls back to plain
+native resume/native-relocate and prints a code-delta-unavailable note.
+
 `fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
 `--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), `--supervisor-effort`
 (`low/medium/high/xhigh/max`), and `--supervisor-runtime` (`claude_code/codex` -- the supervisor's consumer lane, frozen

@@ -194,11 +194,13 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 
 **Goal:** Degrade safely on AI failure, warn on external send, and sync all normative docs.
 
-- [ ] **Fallback.** On code-delta LLM failure, fall back to plain native-relocate + a "code-delta unavailable" note;
-  resume still works. **Assertion:** LLM-error fixture yields a working native-relocate resume with the note.
-- [ ] **Privacy warning.** Surface "dropped-window code/transcript sent to `<model>`" (same posture as `ai-curated`).
-  **Assertion:** the warning is emitted on any rewind run.
-- [ ] **Docs.** Update `docs/design.md` §3.9 (matrix from Slice 1 finalized to shipped state), `docs/design_appendix.md`
+- [x] **Fallback.** On code-delta LLM failure, fall back to plain native-relocate + a "code-delta unavailable" note;
+  resume still works. **Assertion:** `test_resume_fresh_rewind_code_delta_failure_falls_back_native` yields a working
+  native resume with the note and removes the temporary `<R>.jsonl`.
+- [x] **Privacy warning.** Surface "dropped-window code/transcript sent to `<model>`" (same posture as `ai-curated`)
+  when rewind sends the dropped window to the curation model. **Assertion:**
+  `test_resume_fresh_rewind_privacy_warning_for_code_delta_llm` emits the warning.
+- [x] **Docs.** Update `docs/design.md` §3.9 (matrix from Slice 1 finalized to shipped state), `docs/design_appendix.md`
   §H (schema marker/frontmatter), `docs/cli_reference.md` (fork/resume `--strategy rewind --drop-last`), and
   `docs/end-user/transfer.md`. Make the fork/resume asymmetry explicit: fork rewind is worktree/`--into` only and
   rejects same-dir/sidecar; `resume --fresh --strategy rewind` is legitimately same-directory because it resumes the
@@ -221,10 +223,10 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 | Resume tolerates fresh UUID           | rewind launch, truncated fresh `<R>.jsonl` | child resumes from clean-prefix `<R>` with embedded parent `sessionId`; no "No conversation found" | integration (real `claude`)                 |
 | Manifest records rewind               | `--drop-last N`                            | `resume_mode=native-relocate`, `strategy=rewind`, `dropped_turns=N`                                | `tests/src/cli/test_session_rewind_cli.py`  |
 | Same-dir/sidecar rejected             | same-dir or sidecar fork + `rewind`        | rejected with native-relocate-only guidance                                                        | `tests/src/cli/test_session_rewind_cli.py`  |
-| AI failure falls back                 | LLM error                                  | plain native-relocate + "code-delta unavailable" note; resume still works                          | `tests/src/session/test_rewind_strategy.py` |
+| AI failure falls back                 | LLM error                                  | plain native-relocate + "code-delta unavailable" note; resume still works                          | `tests/src/cli/test_session_rewind_cli.py`  |
 | Truncated copy is unshared            | sibling/parent in same encoded dir         | `<R>.jsonl` deleted with the session; parent/sibling transcript untouched                          | `tests/src/session/test_fork_into.py`       |
 | Net-change reconciliation             | file edited twice in the window            | delta shows net change, not both edits                                                             | same                                        |
-| Privacy warning                       | any rewind run                             | "code/transcript sent to <model>" surfaced                                                         | same                                        |
+| Privacy warning                       | LLM-backed rewind run                      | "code/transcript sent to <model>" surfaced                                                         | `tests/src/cli/test_session_rewind_cli.py`  |
 
 > The "Resume tolerates fresh UUID" row is an **integration** test (real `claude --resume`), not a unit test. It extends
 > the Slice-1 stem probe by adding clean-prefix truncation. Per `testing_guidelines.md`, session fork/resume changes

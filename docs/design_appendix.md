@@ -742,17 +742,18 @@ The per-call ledger carries **no** catalog backend id, so the full `(runtime, ba
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
-| Emitter                                                              | Tags `session`? | Notes                                                                                        |
-| -------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`)                | Yes             | `session=context.session_name` (= manifest name)                                             |
-| Supervisor shadow (`emit_usage_for_session_result` + upstream)       | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session |
-| Memory writer (`emit_usage_for_session_result`)                      | Yes             | `session=session_name`                                                                       |
-| Workflow verbs panel/analyze/debate/consensus                        | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                              |
-| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`)       | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`     |
-| Plan check (`emit_direct_llm_usage`, `plan-check`)                   | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                             |
-| Action tagger (`emit_direct_llm_usage` + upstream outcome)           | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial       |
-| WorkflowPolicy checker/reviewer (`policy-checker`/`policy-reviewer`) | Yes             | `session=context.session_name`; success + parse-fail/exception (`status="error"`)            |
-| Team event tagger (`emit_direct_llm_usage`, `team-tagger`)           | Partially       | `session=$FORGE_SESSION` best-effort, else ambient (the handler carries no Forge session)    |
+| Emitter                                                                   | Tags `session`? | Notes                                                                                          |
+| ------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`)                     | Yes             | `session=context.session_name` (= manifest name)                                               |
+| Supervisor shadow (`emit_usage_for_session_result` + upstream)            | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session   |
+| Memory writer (`emit_usage_for_session_result`)                           | Yes             | `session=session_name`                                                                         |
+| Workflow verbs panel/analyze/debate/consensus                             | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                                |
+| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`)            | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`       |
+| Rewind code-delta curation (`emit_direct_llm_usage`, `rewind-code-delta`) | Yes             | `session=$FORGE_SESSION`; rewind dropped-window curation; `route=core_llm`/`runtime=forge_cli` |
+| Plan check (`emit_direct_llm_usage`, `plan-check`)                        | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                               |
+| Action tagger (`emit_direct_llm_usage` + upstream outcome)                | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial         |
+| WorkflowPolicy checker/reviewer (`policy-checker`/`policy-reviewer`)      | Yes             | `session=context.session_name`; success + parse-fail/exception (`status="error"`)              |
+| Team event tagger (`emit_direct_llm_usage`, `team-tagger`)                | Partially       | `session=$FORGE_SESSION` best-effort, else ambient (the handler carries no Forge session)      |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/`, `costs/`, and `telemetry/` (§7), so the in-container supervisor/verb events, downstream/upstream telemetry,
@@ -1435,8 +1436,8 @@ byte-compare in `manager.py` both depend on this).
 forge_transfer:
   schema_version: 1
   parent: <parent-session-name>
-  strategy: ai-curated | structured | full | minimal
-  schema: full | compatibility-fallback   # "full" only for a successful ai-curated body
+  strategy: ai-curated | structured | full | minimal | rewind
+  schema: full | compatibility-fallback | rewind-code-delta
   depth: <int>                              # lineage depth (regenerate restores this)
   generated_at: <ISO8601>
   lineage: [<parent>, <grandparent>, ...]
@@ -1466,7 +1467,10 @@ snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers
 7. `## Runtime Hints`
 8. `## User Notes` (overlay)
 
-`minimal | structured | full` keep their existing bodies and set `schema: compatibility-fallback`.
+`minimal | structured | full` keep their existing bodies and set `schema: compatibility-fallback`. `rewind` is written
+only for resume/fork launches, not `transfer regenerate`: a successful rewind context sets `schema: rewind-code-delta`
+and contains the dropped-window code delta. If code-delta curation fails, Forge falls back to plain native resume /
+native-relocate and does not write a rewind context snapshot.
 
 ### H.3 File layout and overlay
 

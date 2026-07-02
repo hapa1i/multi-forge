@@ -748,21 +748,24 @@ moves.
 **Native mode** (`--resume-mode native`): no context assembly; the full conversation history is carried over via
 Claude's `--fork-session`.
 
-**Resume-mode / strategy contract** (current behavior plus accepted extension):
+**Resume-mode / strategy contract**:
 
-| Surface                  | `resume_mode`     | `strategy`     | Real conversation carried | `context_file`  |
-| ------------------------ | ----------------- | -------------- | ------------------------- | --------------- |
-| Native same-CWD resume   | `native`          | null           | yes, full                 | no              |
-| Native relocate fork     | `native-relocate` | null           | yes, full                 | no              |
-| Transfer                 | `transfer`        | selected value | no, generated context     | yes             |
-| Rewind (accepted design) | `native-relocate` | `rewind`       | yes, prefix `1..T-N`      | yes, code-delta |
+| Surface                | `resume_mode`     | `strategy`     | Real conversation carried | `context_file`  |
+| ---------------------- | ----------------- | -------------- | ------------------------- | --------------- |
+| Native same-CWD resume | `native`          | null           | yes, full                 | no              |
+| Native relocate fork   | `native-relocate` | null           | yes, full                 | no              |
+| Transfer               | `transfer`        | selected value | no, generated context     | yes             |
+| Rewind                 | `native-relocate` | `rewind`       | yes, prefix `1..T-N`      | yes, code-delta |
 
 The null-strategy native rows are a writer convention, not a schema guard: strict manifest reads tolerate
-`native-relocate` with non-null `strategy` and `context_file`. The accepted `rewind` strategy uses that extension point:
+`native-relocate` with non-null `strategy` and `context_file`. The shipped `rewind` strategy uses that extension point:
 it writes a fresh truncated Claude JSONL under a rewind-owned UUID and launches `--resume <R> --fork-session` together
 with a generated code-delta prompt file. A live Slice-1 probe on Claude Code 2.1.197 confirmed the filename stem may be
 `R` while embedded JSONL `sessionId` remains the parent UUID; no envelope rewrite is required. That probe isolated stem
-tolerance; clean-prefix truncated resume remains an integration assertion for the rewind implementation.
+tolerance; clean-prefix truncated resume remains an integration assertion for the rewind implementation. If code-delta
+curation fails or returns unusable output, Forge removes the temporary `<R>.jsonl`, falls back to plain native resume /
+native-relocate, and tells the user that the code delta is unavailable. When rewind does send dropped-window content to
+the curation model, Forge emits the same style of privacy warning as `ai-curated`.
 
 **Context budget enforcement:** Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails
 fast** before spawning Claude when the parent transcript exceeds the proxy context window, naming
@@ -813,8 +816,10 @@ same-directory fork to transfer with an info line -- instead yields a same-direc
 `resume_mode: transfer`, a fresh child Claude session (no parent `--resume --fork-session`), and a generated
 `context_file`. Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and
 `context_file` when it generates a transfer context file. `--resume-mode native-relocate` stays worktree/`--into`-only.
-The accepted `rewind` extension is also worktree/`--into`-only: it records `resume_mode: native-relocate`,
+`fork --strategy rewind --drop-last N` is also worktree/`--into`-only: it records `resume_mode: native-relocate`,
 `strategy: rewind`, `context_file`, `dropped_turns`, and `rewind_relocated_session_id` for the fresh truncated copy.
+`resume --fresh --strategy rewind --drop-last N` may be a same-directory child because it resumes the fresh truncated
+UUID `<R>`, not the parent's UUID.
 
 **Cross-project resume:** `parent_forge_root` locates the parent's artifacts (may differ from the child's `forge_root`);
 `parent_project_root` must equal the child's `project_root` -- cross-repo resume is not supported.

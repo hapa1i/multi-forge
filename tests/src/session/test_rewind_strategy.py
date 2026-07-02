@@ -443,6 +443,7 @@ def test_rewind_code_delta_parse_failure_emits_error_event(tmp_path: Path, monke
     assert schema == "compatibility-fallback"
     assert "deterministic tool-call summary" in content
     assert any("parseable JSON" in warning for warning in warnings)
+    assert any("dropped-window code/transcript sent to" in warning for warning in warnings)
     events = [event for event in read_usage_events() if event.command == REWIND_CODE_DELTA_COMMAND]
     assert len(events) == 1
     assert events[0].status == "error"

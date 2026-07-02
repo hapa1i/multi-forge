@@ -11,6 +11,7 @@ from forge.core.state.io import atomic_write_text
 from forge.session import SessionState, SessionStore
 from forge.session.prev_sessions import child_path
 from forge.session.rewind import (
+    REWIND_CODE_DELTA_SCHEMA,
     RewindPrefixResult,
     generate_rewind_code_delta_context,
     write_rewind_transcript_prefix,
@@ -140,6 +141,24 @@ def _prepare_rewind_launch_artifacts(
         transcript_path=source_path,
         kept_turns=prefix_result.kept_turns,
     )
+    if schema_marker != REWIND_CODE_DELTA_SCHEMA:
+        _remove_rewind_transcript(dest_path)
+        fallback = _plain_native_rewind_fallback(
+            parent_uuid=parent_uuid,
+            parent_project_root=parent_project_root,
+            child_project_root=child_project_root,
+            warning="Rewind code-delta unavailable; falling back to plain native resume.",
+        )
+        privacy_warnings = [warning for warning in code_delta_warnings if "code/transcript sent to" in warning]
+        if not privacy_warnings:
+            return fallback
+        return RewindLaunchArtifacts(
+            resume_id=fallback.resume_id,
+            context_path=fallback.context_path,
+            warnings=[*privacy_warnings, *fallback.warnings],
+            prefix_result=fallback.prefix_result,
+            rewind_relocated_session_id=fallback.rewind_relocated_session_id,
+        )
     warnings.extend(code_delta_warnings)
 
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
@@ -186,6 +205,13 @@ def _preseed_rewind_project_root(*, manifest: SessionState, project_root: str) -
         timeout_s=5.0,
         mutate=lambda m: setattr(m.confirmed, "claude_project_root", project_root),
     )
+
+
+def _remove_rewind_transcript(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.debug("rewind fallback transcript cleanup failed: %s", path, exc_info=True)
 
 
 def _plain_native_rewind_fallback(
