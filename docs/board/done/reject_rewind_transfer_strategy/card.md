@@ -48,6 +48,6 @@ legitimately support rewind, so they cannot source from the transfer-only consta
 **Verification**: 253 unit tests green (codex ops + transfer + session_codex); `make pre-commit` hooks clean on all
 touched files (mypy, pyright, isort, ruff, black).
 
-## Closeout (after merge)
+## Closeout
 
-- Move `doing/ -> done/`; add a `change_log.md` entry (Goal / Key changes / Verification).
+- **Merged** via PR #68 (`016e9d0a`), 2026-07-02. Moved `doing/ -> done/`; `change_log.md` entry added (2026-07-02).

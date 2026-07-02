@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### reject_rewind_transfer_strategy: rewind is not a transfer-context strategy (PR #68)
+
+**Goal**: Fix the follow-up bug from #66 -- adding `ResumeStrategy.REWIND` made the codex/transfer ops accept
+`strategy="rewind"` at the front door even though transfer assembly rejects it (rewind is a Claude-only `--drop-last`
+launch path, not a context-assembly strategy).
+
+**Key changes**:
+
+- Single source of truth in `session/transfer.py`: `TRANSFER_CONTEXT_STRATEGIES` / `TRANSFER_CONTEXT_STRATEGY_VALUES` +
+  `parse_transfer_context_strategy()` (the four assembly strategies; excludes rewind). The four codex/transfer ops and
+  both transfer-facing CLI `Choice` lists source from it; `assemble_transfer_context` now rejects any non-transfer
+  strategy (not just `REWIND`) with one uniform message, fired before the ~20s `codex doctor` preflight + session
+  create/rollback.
+- Deliberately untouched: the `manager.py`/`cli/session.py` transfer-mode branches (rewind dispatches to its own launch
+  path before they see it; their `assemble` backstop still fires) and the fork/resume `Choice` lists (rewind-inclusive
+  superset).
+
+**Verification**: 253 unit tests green (codex ops + transfer + session_codex, incl. parametrized `[bogus, rewind]`
+rejection); `make pre-commit` clean. Merged via PR #68 (`016e9d0a`).
+
 ### rewind_resume_strategy closeout: drop-last-N resume with an AI code-delta
 
 **Goal**: Ship `--strategy rewind --drop-last N` -- resume/fork a session that carries turns `1..(T-N)` as *real*
