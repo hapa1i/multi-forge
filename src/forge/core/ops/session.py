@@ -27,6 +27,7 @@ from forge.session import (
     delete_override,
     set_override,
 )
+from forge.session.active import ActiveSessionStore
 from forge.session.exceptions import (
     InvalidOverrideKeyError,
     InvalidOverrideValueError,
@@ -117,6 +118,8 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
 
+    active_store = ActiveSessionStore()
+
     items: list[ListSessionsItem] = []
     for name, entry in sessions:
         proxy_template: str | None = None
@@ -131,12 +134,19 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
             # Best-effort: listing should not fail if a manifest is missing/corrupt.
             _log.debug("Failed to read manifest for session %r: %s", name, e)
 
+        is_active = False
+        try:
+            is_active = active_store.is_session_active(name, forge_root=entry.forge_root or entry.worktree_path)
+        except Exception:
+            # Best-effort: a runtime-registry probe failure must not fail the listing.
+            _log.debug("Active-session liveness probe failed for %r", name, exc_info=True)
+
         items.append(
             ListSessionsItem(
                 name=name,
                 entry=entry,
                 proxy_template=proxy_template,
-                is_active=False,
+                is_active=is_active,
             )
         )
 

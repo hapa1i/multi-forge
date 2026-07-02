@@ -81,31 +81,27 @@ class TestLoadYaml:
 
 
 class TestEnvToDict:
-    """Tests for environment variable mapping (secrets-only mode)."""
+    """Tests for environment variable mapping (recognized overrides only)."""
 
-    def test_maps_secrets(self, monkeypatch):
-        """Maps secret env vars (secrets-only)."""
-        monkeypatch.setenv("GEMINI_AUTH_URL", "https://auth.example.com")
+    def test_maps_forge_home(self, monkeypatch):
+        """Maps FORGE_HOME to session.forge_home."""
         monkeypatch.setenv("FORGE_HOME", "/custom/forge")
 
         result = env_to_dict()
 
-        assert result["proxy"]["gemini"]["auth_url"] == "https://auth.example.com"
         assert result["session"]["forge_home"] == "/custom/forge"
 
-    def test_only_secrets_mapped(self, monkeypatch):
-        """Only secrets are mapped, config vars are ignored."""
-        # These env vars are NOT in secret_mappings
+    def test_ignores_non_mapped_env(self, monkeypatch):
+        """Provider/config env vars and the removed *_AUTH_URL secrets are not mapped."""
         monkeypatch.setenv("LITELLM_BASE_URL", "http://example.com")
         monkeypatch.setenv("PREFERRED_PROVIDER", "openai")
-        monkeypatch.setenv("ACTIVE_TEMPLATE", "litellm-gemini")
+        monkeypatch.setenv("GEMINI_AUTH_URL", "https://auth.example.com")
+        monkeypatch.setenv("OPENAI_AUTH_URL", "https://auth.example.com")
 
         result = env_to_dict()
 
-        # These should NOT be in result (not secrets)
-        assert result["proxy"]["litellm"].get("base_url") is None
-        assert result["proxy"].get("preferred_provider") is None
-        assert result["proxy"].get("active_template") is None
+        # No proxy/auth_url plumbing remains; only recognized overrides map through
+        assert "proxy" not in result
 
 
 class TestLoadConfig:
@@ -424,6 +420,25 @@ class TestTemplateFamilyMetadata:
         with pytest.raises(ValueError, match="must have a 'proxy' mapping"):
             load_config(template="bad-null")
 
+    def test_template_rejects_nonmapping_tier_overrides(self, user_templates_dir):
+        """A malformed 'tier_overrides: []' template fails with ValueError, not AttributeError.
+
+        Regression: the template path (load_config(template=...) -> dict_to_dataclass ->
+        ProxyConfig.__post_init__) passed a raw list into _validate_static_tier_override_constraints,
+        which did overrides.get(tier) -> AttributeError, escaping callers that guard on ValueError.
+        """
+        bad = user_templates_dir / "bad-overrides.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  source: openrouter\n"
+            "  default_port: 9911\n"
+            "  openrouter:\n"
+            "    tier_overrides: []\n"
+        )
+        with pytest.raises(ValueError, match="must be a mapping"):
+            load_config(template="bad-overrides")
+
     def test_template_source_validation_rejects_non_string(self, user_templates_dir):
         """proxy.source must be a string before strict schema loading."""
         bad = user_templates_dir / "bad-source-shape.yaml"
@@ -660,6 +675,71 @@ class TestProxyFileIO:
         result = load_proxy_instance_config("nonexistent")
         assert result is None
 
+    def test_from_dict_normalizes_shape_errors_to_valueerror(self):
+        """Malformed nested shape raises ValueError, not raw AttributeError/TypeError.
+
+        Regression: proxy start / model-pin load guards catch (StateCorruptedError,
+        ValueError). Before normalization, a shape like 'tiers: []' raised
+        AttributeError from the raw .get() extraction and escaped those guards as a
+        traceback. Shape failures are now converted at this single boundary.
+        """
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        base = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        bad_shapes = [
+            {**base, "tiers": []},  # non-mapping section (AttributeError)
+            {**base, "tier_overrides": []},  # non-mapping section (AttributeError)
+            {**base, "tier_overrides": {"haiku": "x"}},  # override not a mapping (TypeError from **)
+            {**base, "tier_overrides": {"haiku": []}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": False}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": ""}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": 0}},  # falsy non-mapping must not be ignored
+            {**base, "tier_overrides": {"haiku": {"nope": 1}}},  # override unknown key (TypeError)
+            [],  # top-level not a mapping (AttributeError)
+        ]
+        for data in bad_shapes:
+            with pytest.raises(ValueError, match="Malformed proxy configuration"):
+                load_proxy_instance_config_from_dict(data)
+
+    def test_from_dict_allows_empty_or_null_tier_override_leaves(self):
+        """Empty mapping/null tier override leaves mean no override; falsy non-mappings do not."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        base = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        for tier_overrides in ({}, {"haiku": None}, {"haiku": {}}):
+            config = load_proxy_instance_config_from_dict({**base, "tier_overrides": tier_overrides})
+
+            assert config.tier_overrides.haiku is None
+
+    def test_from_dict_preserves_semantic_valueerror_verbatim(self):
+        """A semantic violation keeps its own __post_init__ message, not the shape wrapper."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "template": "litellm-gemini",
+            "provider": "gemini",  # unsupported provider: semantic check in __post_init__
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+        }
+        with pytest.raises(ValueError, match="Unsupported proxy provider"):
+            load_proxy_instance_config_from_dict(data)
+
     def test_write_proxy_instance_config_atomic_and_permissions(self, tmp_path, monkeypatch):
         """write_proxy_instance_config uses atomic write and sets 0600 permissions."""
 
@@ -781,35 +861,6 @@ class TestLoadConfigWithProxy:
         # Load with non-existent proxy_id - should raise ValueError
         with pytest.raises(ValueError, match="Proxy not found"):
             load_config(proxy_id="nonexistent")
-
-    def test_load_config_with_lease_applies_secrets(self, tmp_path, monkeypatch):
-        """Secrets (auth_url) are applied when loading proxy config."""
-        from forge.config import load_config
-        from forge.config.loader import write_proxy_instance_config
-        from forge.config.schema import ProxyInstanceConfig, TierModels
-
-        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
-        # Set secret auth_url via environment
-        monkeypatch.setenv("GEMINI_AUTH_URL", "https://secret.auth.example.com")
-
-        # Create proxy.yaml (provider=gemini to trigger auth_url lookup)
-        proxy_config = ProxyInstanceConfig(
-            proxy_format=1,
-            template="litellm-gemini",
-            template_digest="sha256:test123",
-            provider="gemini",  # Important: must be gemini to test GEMINI_AUTH_URL
-            proxy_endpoint="http://localhost:8084",
-            port=8084,
-            upstream_base_url="https://litellm.test.example.com",
-            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
-        )
-        write_proxy_instance_config("secret-test", proxy_config)
-
-        # Load with proxy_id - should apply secrets
-        config = load_config(proxy_id="secret-test")
-
-        # Verify secrets are applied
-        assert config.proxy.gemini.auth_url == "https://secret.auth.example.com"
 
 
 class TestTemplateResolution:

@@ -153,7 +153,6 @@ class ProviderConfig:
     tiers: TierModels = field(default_factory=TierModels)
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)
-    auth_url: str = ""
     base_url: str = ""
     cache_ttl: float = 3600.0
     top_p: float | None = None
@@ -728,7 +727,7 @@ class ProxyInstanceConfig:
     template: str  # e.g., "litellm-gemini"
     template_digest: str  # SHA256 at creation time
 
-    provider: str  # litellm | openai | gemini | openrouter
+    provider: str  # litellm | openrouter (gemini/openai run through a LiteLLM proxy)
     proxy_endpoint: str  # e.g., http://localhost:8085
     port: int
     upstream_base_url: str  # e.g., https://litellm.corp.com
@@ -761,10 +760,12 @@ class ProxyInstanceConfig:
         if self.proxy_format != 1:
             raise ValueError(f"Unsupported proxy_format: {self.proxy_format} (expected 1)")
 
-        valid_providers = {"litellm", "openai", "gemini", "openrouter"}
+        valid_providers = {"litellm", "openrouter"}
         if self.provider not in valid_providers:
             raise ValueError(
-                f"Invalid provider: '{self.provider}' (must be one of: {', '.join(sorted(valid_providers))})"
+                f"Unsupported proxy provider: '{self.provider}' (supported: litellm, openrouter). "
+                "Gemini and OpenAI backends are served through a LiteLLM proxy, not as standalone "
+                "providers. Recreate this proxy from a template, e.g. 'forge proxy create litellm-gemini'."
             )
 
         if not self.proxy_endpoint:

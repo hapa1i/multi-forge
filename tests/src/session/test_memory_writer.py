@@ -20,7 +20,6 @@ from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.core.usage.ledger import read_usage_events
 from forge.session.memory_writer import (
     MEMORY_WRITER_CONSUMER,
-    _dedupe_specs,
     _stdout_indicates_permission_denied,
     _validate_designated_docs,
     build_multi_doc_prompt,
@@ -1720,34 +1719,6 @@ class TestPassportLessDocsWork:
             prompt = mock_run.call_args[0][0]
             assert "accomplishments" in prompt
             assert "changelog.md" in prompt
-
-
-# ---------------------------------------------------------------------------
-# _dedupe_specs
-# ---------------------------------------------------------------------------
-
-
-class TestDedupeSpecs:
-    """A doc that enters the run twice and resolves to the same write path must
-    collapse to one spec (no duplicate prompt sections / double-write)."""
-
-    def _shadow_only_passport(self) -> Passport:
-        return Passport(
-            version=1,
-            intent="x",
-            update=PassportUpdate(
-                strategy="generic",
-                mode="shadow-only",
-                writers="all-sessions",
-                inherit_on_fork=True,
-                shadow_path=".forge/memory/sug_x.md",
-            ),
-        )
-
-    def test_distinct_targets_kept(self) -> None:
-        a = resolve_doc_spec(DesignatedDoc(path="docs/a.md", strategy="generic"), None)
-        b = resolve_doc_spec(DesignatedDoc(path="docs/b.md", strategy="generic"), None)
-        assert len(_dedupe_specs([a, b])) == 2
 
 
 # ---------------------------------------------------------------------------

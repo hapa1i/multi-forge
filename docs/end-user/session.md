@@ -868,8 +868,6 @@ the order above, auto-starts from a matching template when no proxy is running, 
 neither a running proxy nor a template fails with a `forge proxy template list` hint. `--supervisor-proxy` resolves the
 same way.
 
-`--template` and `--base-url` are deprecated hidden aliases for `--proxy` (warn on use).
-
 ### Sidecar specifics
 
 - Sidecar sessions use a container-local proxy at `http://localhost:8085`

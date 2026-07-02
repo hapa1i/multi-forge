@@ -24,7 +24,8 @@ from typing import Any
 import httpx
 from fastapi.responses import Response, StreamingResponse
 
-from forge.proxy.provider_trace_logger import RequestMode, record_provider_trace
+from forge.core.telemetry.downstream import RequestMode
+from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 

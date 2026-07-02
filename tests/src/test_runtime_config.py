@@ -591,6 +591,20 @@ class TestEnvVarOverrides:
         rc = load_runtime_config(tmp_path / "nonexistent.yaml")
         assert rc.log_level == "warning"
 
+    def test_forge_debug_invalid_warns_and_ignores(self, monkeypatch, tmp_path: Path, caplog):
+        """A bogus FORGE_DEBUG warns and degrades to the default (fail-open per field).
+
+        Guards the _apply_env_overrides warn-and-ignore path: an uncoercible value
+        must not raise, must leave log_level at the default, and must register no env
+        source. Asserting the warning too catches a refactor that silently drops it.
+        """
+        monkeypatch.setenv("FORGE_DEBUG", "banana")
+        with caplog.at_level(logging.WARNING, logger="forge.runtime_config"):
+            rc = load_runtime_config(tmp_path / "nonexistent.yaml")
+        assert rc.log_level == "off"  # default preserved; bogus override ignored
+        assert getattr(rc, "_env_sources", {}) == {}
+        assert any("FORGE_DEBUG" in r.getMessage() and "banana" in r.getMessage() for r in caplog.records)
+
     def test_env_overrides_mapping_targets_valid_fields(self):
         """Invariant: every _ENV_OVERRIDES target must be a real RuntimeConfig field."""
         from forge.runtime_config import _ENV_OVERRIDES

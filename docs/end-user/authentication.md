@@ -141,7 +141,6 @@ Prompts for API keys and stores them in `~/.forge/credentials.yaml`.
 
 - `--credential`, `-c` — Configure a single credential (e.g., `anthropic-api`, `openrouter`). Omit for the selection
   menu.
-- `--provider`, `-p` — Alias for `--credential` (backward compatible).
 - `--profile` — Profile name to store credentials in. Defaults to `"default"` (or `FORGE_PROFILE` env var).
 
 When no `--credential` is given, an interactive numbered menu shows all credentials with their configuration state and

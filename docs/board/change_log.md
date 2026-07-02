@@ -25,7 +25,80 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-02
+
+### accidental_complexity_cleanup Batch B follow-up: proxy/template config load boundaries
+
+**Goal**: Close the Batch B review findings around newly-invalid proxy providers and malformed proxy/template YAML
+surfacing as raw tracebacks in user-facing CLI paths.
+
+**Key changes**:
+
+- `ProxyInstanceConfig` loading now normalizes malformed proxy-file shape to `ValueError` at the loader boundary, with
+  explicit mapping checks for `tiers`, `tier_overrides`, and each tier override leaf. Empty/null override leaves remain
+  "no override"; falsy non-mappings (`[]`, `false`, `""`, `0`) now fail instead of being ignored.
+- Template loading now rejects non-mapping nested dataclass fields before schema `__post_init__` can raise raw
+  `AttributeError`/`TypeError`; proxy orchestration wraps malformed templates as `ProxyStartError`.
+- CLI boundaries for `proxy start`, `proxy create`, and session model-pin proxy config reads now report clean contextual
+  errors for legacy `provider: gemini/openai` proxy files and malformed YAML sections.
+
+**Verification**: 328 targeted tests green across proxy commands, session model pins, config loader/schema, and proxy
+orchestrator; ruff clean for touched loader/tests. Manual repros now fail cleanly for legacy provider, `tiers: []`,
+malformed template `tier_overrides: []`, and falsy override leaf `tier_overrides.haiku: []`.
+
 ## 2026-07-01
+
+### accidental_complexity_cleanup Batch B: template move, legacy-search delete, secrets/provider narrowing
+
+**Goal**: Execute Batch B (#13-#16) of the 2026-07-01 simplicity-audit card -- remove the remaining medium-effort
+accidental complexity behind clean seams (same branch).
+
+**Key changes**:
+
+- **#13**: The 4 debate/consensus evaluation templates existed twice (constants in `cli/workflow.py` + copies under
+  `src/skills/*/resources/`, kept in sync by drift-guard tests). `git mv`'d the copies into `forge.review.resources`
+  (byte-identical); resolvers load them via the existing `_load_workflow_resource`. Single source now, so both drift
+  guards are deleted; placeholder/vocabulary invariants + direct `_resolve_*_prompt` tests move to `test_run_resources`.
+  Net -336 LOC in `workflow.py`.
+- **#14 (full delete)**: Removed the legacy in-memory `search()` -- a second BM25 scorer with no production callers,
+  used only as a test oracle. The 12 `TestSearch` cases now run through a `_search_docs` adapter over the real
+  `search_from_index`; the score-equivalence oracle is retired. `SearchDocument.tokens` kept (rebuild-index reads it).
+- **#15**: Deleted `ConfigSecretsProvider` + `ProviderConfig.auth_url` + the `GEMINI_AUTH_URL`/`OPENAI_AUTH_URL` env
+  mappings -- write-only plumbing never wired into the production Env+File credential chain. Chain tests moved onto the
+  real Env+File chain; the h6 no-coercion guard now covers the surviving `FORGE_HOME` mapping.
+- **#16**: Narrowed `ProxyInstanceConfig` providers to `{litellm, openrouter}`. `gemini`/`openai` previously validated
+  then silently routed to LiteLLM; since validation runs on every read, they now fail fast with a message naming the
+  supported providers + recreate path (durable-state clean break). Shipped templates write `provider=litellm`, so create
+  flows are unaffected; gemini/openai model-name detection is untouched.
+
+**Verification**: targeted unit suites green per item (search 153; config/auth/proxy/backend 1143; run_resources +
+skill_content 84); #15/#16 integration-verified (auth credential resolution 4 passed, proxy commands 27 passed);
+per-file `make pre-commit` clean. A 4-way adversarial review over the committed diff returned one low finding (a stale
+provider comment), fixed. Batch C + surfaced defects stay open (card in `doing/`).
+
+### accidental_complexity_cleanup Batch A: dead-code removal + drift fixes + one CLI bug
+
+**Goal**: Execute Batch A of the 2026-07-01 simplicity-audit card -- remove verified accidental complexity and fix the
+one bug it surfaced (branch `cleanup/accidental-complexity-batch-a`).
+
+**Key changes**:
+
+- Deleted zero-caller dead code: `promotion.py`, `resolve_template_paths`, `load_yaml_strict`,
+  `resolve_subprocess_proxy_url`, `_dedupe_specs` (verified no-op: sole caller feeds one unique-path scan), and the
+  never-run generic `_coerce_env_value` branch.
+- De-duplicated telemetry: `provider_trace_logger` imports `RequestMode`/`LocalUsageStatus` from owner `downstream.py`;
+  hoisted the byte-identical `_worker_reason_code` + upstream-emission block from the Claude/Codex invokers into the
+  shared `_lifecycle` base (`operation=None` suppression preserved). Passport drops the unread `inherit_on_fork` field
+  but keeps the key in `_KNOWN_UPDATE_KEYS` (accept-and-ignore).
+- **Bug fix (#1)**: `backend delete --port` drove `stop_cmd.callback()` (double "Stopped" + a `sys.exit` bypassing
+  delete's error path); both commands now share a silent `_stop_instance`.
+- **Behavior (#9)**: `ListSessionsItem.is_active` wired to the runtime `ActiveSessionStore` (was hardcoded `False`).
+- Docs/UX: reworded the `--no-proxy` guard to name `--proxy`; removed two stale CLI-alias doc lines; fixed the
+  `CredentialManager` "proactive refresh" docstring.
+
+**Verification**: full unit suite `7222 passed`; ruff + mypy + `make pre-commit` clean. New tests: `is_active` liveness,
+legacy-passport accept-and-ignore, backend delete-double-stop regression. Batches B/C + surfaced defects stay open (card
+in `doing/`).
 
 ### Sonnet 5 support + default-tier flip
 
@@ -1202,194 +1275,59 @@ silently resetting spend caps during the path move.
 regression suite green (32 tests), direct/provider metadata regression coverage added, ruff clean on touched Python and
 tests.
 
-## 2026-06-16
+## 2026-06-16 (compacted)
 
-### proxy_log_hygiene: reviewer follow-ups (no-plaintext leaks + CLI/create completeness)
+### proxy_log_hygiene (slices 0-5 + reviewer follow-ups)
 
-**Goal**: Close five defects a reviewer found against the shipped card, all verified against code before fixing.
+**Goal**: Cut low-value proxy log volume (poll spam, per-chunk dumps), add bounded redacted request diagnostics aligned
+with the audit no-plaintext policy, and close reviewer-found leaks.
 
-**Key changes**:
+**Key changes**: Folded loader bug fixed -- both proxy-config hops now carry `provider_trace` + `logging` (was silently
+dropped; `test_bug_provider_trace_loader_dropped.py`). Successful completions log at DEBUG, INFO reserved for `>=400` /
+slow polls; per-chunk stream dumps require opt-in AND DEBUG; shared `format_stream_lifecycle_summary` replaces
+per-stream INFO bookends. Per-proxy `logging.requests` (`RequestLogConfig`, strict coercers, `body_capture=full`
+rejected) reuses the audit body redactor -- no second sanitizer. New shared `proxy/retention.py::prune_jsonl_shards`
+(age-then-size) backs audit/provider-trace/request planes. Reviewer round: 8 converter log sites reduced to
+metadata-only, `stop_sequences` plaintext leak redacted in `_redact_body_for_log`, CLI int coercion for
+`max_file_mb`/`stream_chunk_max_bytes`, third `create_proxy_file` template-block drop fixed.
 
-- **No caller content in stream logs** (`proxy/converters.py`): 8 log sites that emitted completion text, tool args,
-  file paths (buffered `Read` close-event `partial_json`), or dumped whole malformed chunks/deltas now log metadata only
-  (lengths / key-names / indices). Full content stays behind the `stream_chunks` opt-in dump.
-- **stop_sequences plaintext leak** (`proxy/utils.py`): `_redact_body_for_log` listed `stop_sequences` (arbitrary caller
-  text) in `_SAFE_KEYS` and copied it verbatim -> now `{"redacted": True, "count": N}`. Fixes BOTH the
-  request-diagnostics and the shared audit plane.
-- **CLI int coercion** (`cli/proxy.py`): `forge proxy set` now int-casts `logging.requests.max_file_mb` and
-  `stream_chunk_max_bytes` (previously stayed strings and failed schema validation).
-- **Third construction site** (`proxy/proxy_orchestrator.py`): `create_proxy_file` now copies template-defined
-  `provider_trace` + `logging` onto the new `ProxyInstanceConfig` (was the same drop-the-block bug as Slice 0, latent
-  since no shipped template carries them).
+**Verification**: 6401 unit + 438 regression green; live-proxy integration (`test_proxy_local_litellm_e2e`,
+`test_provider_trace_e2e` incl. cancelled-stream) pass; two adversarial review rounds (0 production defects; nits fixed
+incl. 0600-owner assertion). Docs: design §7.x/§3.14, appendix §A.11, `proxy.md`, `cli_reference.md`.
 
-**Verification**: 4 new/extended regression tests (converter content-free logs incl. buffered-tool close event;
-stop_sequences canary on redactor + on-disk shard; CLI int round-trip; template-block survival at create). Full unit +
-regression green; `make pre-commit` clean. Two adversarial review rounds (verify-each-finding): round 1 found the four
-above; round 2 found the 8th converter leak site; a third exhaustive enumeration of every converter log call confirmed
-no remaining caller-content interpolation.
+### openrouter_observability Phases 3-5
 
-### proxy_log_hygiene: quiet defaults + bounded redacted request diagnostics (slices 0-5)
+**Goal**: Persist metadata-only, owner-only provider-trace records at the shared stream seam and give them a read
+surface (answer "what happened to this OpenRouter request?" after a timeout), then close the loop upstream via opt-in
+`user`-field injection.
 
-**Goal**: Cut low-value proxy log volume (poll spam, per-chunk dumps) while adding bounded, redacted request diagnostics
-aligned with the audit no-plaintext policy — and fix a folded-in loader bug that silently dropped `provider_trace`.
+**Key changes**: **P3** -- new `proxy/provider_trace_logger.py` plane (versioned, `0600` shards, strict-dacite read,
+retention prune; modeled on the audit log); shared `record_provider_trace` at the one SSE seam gates
+direct-OpenRouter-only and tracks four lifecycle flags (records `client_disconnected` on cancel); `ProviderTraceConfig`
+nested into `ProxyConfig`/`ProxyInstanceConfig`. **P4** -- `core/ops/provider_trace.py` UI-agnostic `list/show/explain`
+(explain is route-only/trace-derived, no credential read) behind `forge provider trace` + `%provider trace`, shared
+plain-text renderer. **P5** -- opt-in `inject_openrouter_user` writes the Forge session grouping id into the OpenAI
+`user` field on proxied direct-OpenRouter requests (top-level kwarg, verified channel); direct callers deferred to
+`todo/openrouter_user_direct_callers/`.
 
-**Key changes**:
+**Verification**: full unit (6161->6191) + integration (393) green across phases; live-OpenRouter E2E proves a real
+`gen-` id surfaces and a cancelled stream records `client_disconnected=True` / `local_usage_status="unavailable"`;
+metadata-only regression (no body/prompt/completion). Docs: design §3.14, appendix §A.14.
 
-- **Slice 0 (folded loader bug)** — `config/loader.py`: both proxy-config hops (`load_proxy_instance_config_from_dict`,
-  `_proxy_instance_to_forge_config`) silently dropped the `provider_trace` block (and would have dropped the new
-  `logging` block). Now wired through both. Regression: `test_bug_provider_trace_loader_dropped.py`.
-- **Slice 1 (quiet polls)** — `proxy/server.py`: successful completions log at DEBUG; INFO reserved for `status >= 400`
-  or slow polls (`elapsed > _SLOW_POLL_LOG_S = 1.0s`). Slow-poll visibility is new behavior (none existed).
-- **Slices 2-3 (stream logging)** — `proxy/converters.py` + `proxy/passthrough.py`: per-chunk dumps now require opt-in
-  AND DEBUG (off even at `log_level=debug`), truncated via `smart_format_str`. Shared `format_stream_lifecycle_summary`
-  (metadata-only: outcome + chunk count + flags) replaces the per-stream INFO bookends — clean stream = one DEBUG line +
-  zero converter INFO; error/disconnect = one INFO. Passthrough now surfaces client disconnects (previously logged
-  nowhere).
-- **Slice 4 (config)** — `config/schema.py`: per-proxy `logging.requests` (`RequestLogConfig` under `LoggingConfig`),
-  strict `__post_init__` + coercers (`body_capture=full` rejected with audit pointer; bool-vs-int; unknown-key reject).
-  `proxy/utils.log_request_response` gains a `request_log` param: `metadata` omits bodies, `redacted` reuses the audit
-  body redactor (no second sanitizer, no plaintext). `server.py` reads it via a tolerant `_request_log_config()` helper
-  (best-effort telemetry; degrades to defaults on a partial config).
-- **Slice 5 (retention)** — new `proxy/retention.py::prune_jsonl_shards` (age-then-size, 0 = disable) now backs audit,
-  provider-trace, AND request planes (one shared pruner; two byte-identical copies removed). `_active_request_log_shard`
-  rotates at `max_file_mb`; per-process startup prune wired into `_ensure_runtime_state`. `cli/logs.py` notes capture
-  mode.
+### supervisor_statusline_health: surface frontier-supervisor fail-open
 
-**Verification**: 6401 unit + 438 regression green; `make pre-commit` clean. Integration:
-`test_proxy_local_litellm_e2e.py` (3, incl. streaming SSE) + `test_provider_trace_e2e.py` (2, incl. cancelled-stream
-disconnect) pass on the live-proxy path. Adversarial review (9 agents, 7 dimensions + refute-by-default verify): 0
-production defects; 1 confirmed nit (missing direct 0600 assertion) fixed via `test_written_shard_is_owner_only_0600`.
-Docs: design.md §7.x, appendix §A.11, end-user `proxy.md`, `cli_reference.md`.
+**Goal**: Make a silently-failing supervisor visible (incident: supervisor timed out 24/24, failed open to `allow` while
+the status line still showed a healthy `SUP`) -- surface the fail-open the usage ledger already records, no new durable
+state.
 
-### openrouter_observability Phase 5: OpenRouter `user`-field injection (opt-in, proxied-only)
+**Key changes**: `read_supervisor_health` over the ledger (newest-first contiguous error/timeout streak) via the
+`forge_cost` throttle; status-line `SUP!N <kind>` suffix (YELLOW 1-2, RED `>=3`, byte-identical when 0);
+`forge activity` gains generic `CommandUsage.error_kinds` + `format_failing_open` ("failing open: N timeout, N error")
+and `--json` carries it. Scope: "failing open" is the supervisor formatter's read only; parse/auth fail-opens deferred
+to `upstream_downstream_ledgers`.
 
-**Goal**: Close the incident loop upstream — when enabled, proxied direct-OpenRouter requests carry the Forge session
-grouping id in the OpenAI-standard `user` field, so a session/fork is recorded in OpenRouter's indexed `/generation`
-record for account-side lookup (probe 3: `user` is retained, a custom `session_id` is ignored).
-
-**Key changes**:
-
-- **Config flag** (`config/schema.py`): `ProviderTraceConfig.inject_openrouter_user: bool = False` — field +
-  `__post_init__` bool-reject + `_coerce_provider_trace_config` allowlist/constructor (all three durable-state touch
-  points, so an existing proxy.yaml carrying the key is not rejected as corruption).
-- **Proxied path** (`proxy/server.py`, `proxy/client_adapter.py`): a pure, testable `_openrouter_user_value` helper
-  gates on `provider == "openrouter"` + the flag, prefers the already-validated `X-Forge-Session` id, and falls back to
-  `forge_run_<hash>` (via `derive_provider_session_id`) when only run identity exists. It sets a `_forge_user` carrier
-  (mirroring `_user_agent`); the adapter forwards it into `extra["openai"]["user"]` on both stream + non-stream, which
-  `build_chat_completion_kwargs` merges to a **top-level** `user` kwarg — the verified channel, not `extra_body`.
-- **Tagger gap** (`core/reactive/tagger.py`): documented (not silently no-op'd) — it routes via local LiteLLM and cannot
-  reach OpenRouter, so injection is N/A.
-- **Scope decision**: proxied-only. The flag is per-proxy because upstream proxy behavior belongs in per-proxy config
-  (`runtime_config`/`~/.forge/config.yaml` owns runtime prefs, not this). The direct-client helper + direct callers
-  (plan-check, curation) are deferred to a new `todo/openrouter_user_direct_callers/` card to avoid a second opt-in
-  source; no direct-call behavior changes this release.
-- **Docs**: `proxy.md` (flag + `/generation` framing), `design.md §3.14` config block + sentence,
-  `design_appendix §A.14` injection bullet. No CLI/`%` surface change, so `cli_reference.md` is untouched.
-
-**Verification**: 16 new unit tests (3 config + 4 adapter + 5 server-helper + 2 channel-proof + 2 create_message
-wiring), incl. an end-to-end proof that `extra["openai"]["user"]` survives the hyperparam merge to a top-level `user`
-kwarg, and a `create_message`-level test that config-ON inserts `_forge_user` before the adapter handoff;
-`make test-unit` + scoped proxy integration; `make pre-commit` clean. Last shipped phase of the card.
-
-### openrouter_observability Phase 4: `forge provider trace` read surfaces
-
-**Goal**: Give the metadata-only provider-trace plane (shipped Phase 3) a user-facing read surface so an operator can
-run `forge provider trace explain <req>` after a timeout and get a local provenance narrative instead of grepping
-shards.
-
-**Key changes**:
-
-- **Command-core op** (`core/ops/provider_trace.py`): UI-agnostic `list`/`show`/`explain` returning frozen DTOs, raising
-  `ForgeOpError`, taking `ExecutionContext` — no Click/print, no remote call. `explain` builds
-  `ProviderTraceExplanation` from local trace records and answers the incident's five questions (left Forge? route?
-  generation/session id? stream lifecycle? cost). Cost provenance is a **bounded** `read_cost_logs(trace_ts ±5m)` lookup
-  keyed by `request_id` for the cost record's `confidence` — additive only; the trace already carries
-  `reported_cost_micros`. The pure `render_explanation_lines` plain-text contract is shared verbatim by the terminal and
-  `%` surfaces (no drift).
-- **Terminal CLI** (`cli/provider.py`, `cli/main.py`): `provider` group orients; `trace list|show|explain` leaves;
-  `--json` shapes are bare-array / single-dict / `asdict(exp)` via `dataclasses.asdict()`; errors via
-  `print_error_with_tip`. `list` filters: `--session` (session-*label*, documented as imprecise), `--root-run-id`
-  (exact), `--period today|week|month|all`, `--limit` (50).
-- **Direct commands** (`cli/hooks/{direct_commands,commands}.py`): `%provider trace list|show|explain` mirror
-  `%proxy audit` — read-only, `list` capped at 10, reusing the same ops + renderer.
-- **Decision (card Q1 unanswered)**: `explain` is **route-only / trace-derived** — no credential-source resolution. The
-  "never print a key" guardrail holds trivially (no credential field is read). Credential provenance remains an additive
-  extension via `proxy_id → template → TEMPLATE_ENV_VARS → resolve_env_or_credential_with_source`.
-- **Docs**: `cli_reference.md` (Provider-trace table + `%` scope/commands), `end-user/proxy.md` (new "Provider trace"
-  section, board-contract Day-1 rule), `design.md §3.14` + `design_appendix.md §A.14` read-surface note.
-
-**Verification**: 28 new unit tests (11 op + 11 CLI + 6 direct-command), incl. a no-secret-printed assertion and
-identical terminal/`%` narratives; full `make test-unit` 6191 passed; `make pre-commit` clean (ruff/black/isort/mypy/
-pyright/mdformat/gitleaks). Read-only over existing shards — no new Docker path, so unit coverage is the gate.
-
-### openrouter_observability Phase 3: provider-trace plane + shared SSE lifecycle seam
-
-**Goal**: Persist metadata-only, owner-only provider-trace records at the one shared stream seam so Forge can answer
-"what happened to this OpenRouter request?" after a timeout — the incident this card exists for.
-
-**Key changes**:
-
-- **New plane** `src/forge/proxy/provider_trace_logger.py`: versioned (`PROVIDER_TRACE_SCHEMA_VERSION=1`), owner-only
-  `0600` shards under `0700` three-level dirs (`~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`),
-  strict-dacite read, retention prune — modeled on the audit log, not the unversioned cost log. The shared
-  `record_provider_trace` helper lives here (the neutral leaf) so `server.py` and `passthrough.py` both call it without
-  an import cycle; it gates **direct-OpenRouter-only** and derives `local_usage_status` (probe 2 `[REMOTE-ABSENT]` →
-  local evidence only). `write_provider_trace` **re-applies** the Phase 2 header allowlist as defense-in-depth.
-- **Converter seam** (`converters.py`): intercepts the `_provider_meta` carrier chunk (consumed, never yielded — kills a
-  spurious WARNING), tracks four lifecycle flags, catches `(asyncio.CancelledError, GeneratorExit)` to record
-  `client_disconnected` and re-raise, and packs all of it under one reserved `final_usage["_provider_trace"]` key
-  (carrier = widen `Dict[str,int]`→`Dict[str,Any]`, mirroring `reported_cost_micros`; callback arity unchanged).
-  `first_chunk_seen` flips at the first user-visible text **or** tool `content_block_start` — including the delayed
-  id-then-name tool path (a provider that streams the tool id before its name); the id-only buffer chunk emits nothing,
-  so it correctly leaves the flag unset.
-- **Proxy write sites** (`server.py`): both streaming and non-streaming `on_complete` paths write after cost logging,
-  carrying `proxy_id`/`mapped_model`/`request_mode` + run-tree/session/command join keys; `timeout_seen=False` always
-  (the proxy sees its own disconnect, never the parent `subprocess.run` timeout).
-- **Passthrough mirror** (`passthrough.py`): same four flags + the one shared helper, **latent today** (the gate
-  suppresses the write — passthrough never carries OpenRouter); forward-wiring for a future provider.
-- **Config** (`schema.py`): `ProviderTraceConfig` (`retention_days=14`, `max_total_mb=512`, bool-rejecting) nested into
-  both `ProxyConfig` and `ProxyInstanceConfig`; prune wired into `_ensure_runtime_state` (once per process).
-- **Docs**: design.md §3.14 now names the **fourth** plane; design_appendix §A.14 adds the `ProviderTraceRecord` schema.
-
-**Verification**: full `make test-unit` 6161 passed; `make test-integration` 393 passed; 2 live-OpenRouter E2E pass —
-the clean stream surfaces a real `gen-` id via the carrier and the **cancelled stream** records
-`client_disconnected=True, final_usage_seen=False, local_usage_status="unavailable"` with the gen id intact (the
-incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) + run-tree
-join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
-
-### supervisor_statusline_health: surface frontier-supervisor fail-open (status line + `forge activity`)
-
-**Goal**: Make a silently-failing supervisor visible. In the motivating incident a session's supervisor timed out 24/24
-times and failed open to `allow` while the always-on status line still rendered a healthy `SUP`. Surface the fail-open
-outcome the usage ledger already records — no new durable-state field.
-
-**Key changes** (whole card, Phases 1–3):
-
-- **Phase 1 (read, throttled)**: `read_supervisor_health(session, since) -> SupervisorHealth` over the usage ledger
-  (`command="supervisor"`, newest-first contiguous `status in {error,timeout}` streak, reset on first `success`),
-  surfaced via the `forge_cost` throttle (`read_or_compute_session_health`, distinct `fhealth-` cache) and exposed as a
-  lazy `RenderContext.supervisor_health`. `forge proxy costs reset` also clears `fhealth-*.json`.
-- **Phase 2 (status-line suffix)**: `format_supervisor` appends a posture-preserving ASCII `SUP!N <kind>` suffix
-  (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`); YELLOW 1–2, RED `>=3` (mirrors `format_spend_cap`).
-  `recent_failures==0` is byte-identical to today; a raising reader degrades to posture-only.
-- **Phase 3 (`forge activity` detail + closeout)**: generic `CommandUsage.error_kinds` (per-display-kind split of
-  `errors`, populated uniformly in `_aggregate_ledger`); shared `_failure_kind` maps `failure_type` to `timeout`/`error`
-  (single source with `read_supervisor_health`). `format_failing_open` renders `failing open: N timeout, N error`; the
-  `forge activity` Supervisor render appends it (ledger-driven, independent of the decision log) and `--json` carries
-  `error_kinds`. `render_summary_line` shows the same breakdown with an explicit `error_kinds`-gated fallback to the
-  legacy `"{errors} errors"` so hand-built summaries never drop the count.
-- **Scope boundary**: "failing open" is the supervisor formatter's interpretation only — `error_kinds` is generic ledger
-  data; a memory-writer/panel error is not relabeled. v1 covers timeout/subprocess fail-opens (the ledger's `status`);
-  parse fail-opens (logged `success`), auth fail-opens (no event), and exact cached-allow reset are deferred to
-  `upstream_downstream_ledgers`. Docs note the streak-vs-window distinction (`SUP!N` consecutive vs `forge activity`
-  window total).
-
-**Verification**: 191 (Phase 1) + 112 (Phase 2) + new Phase 3 cases green — `test_usage_summary.py` (error_kinds
-aggregation, `_failure_kind`/`format_failing_open` units, render both policy-present/absent branches, the three
-pre-existing hand-built `errors`-only tests stay green via the fallback) and `test_activity.py` (human
-`failing open: 2 timeout, 1 error` + `--json` `error_kinds`); status-line suites unchanged. `make pre-commit` clean
-(ruff/black/isort/mypy/pyright/mdformat/gitleaks). No integration tier — `forge activity` is a read-only render over the
-ledger + manifest. Additive optional fields only; no durable-schema change.
+**Verification**: 191 + 112 + Phase 3 cases green (`test_usage_summary.py`, `test_activity.py`); status-line suites
+unchanged; `make pre-commit` clean. Read-only render -- no integration tier.
 
 ## 2026-06-15 (compacted)
 

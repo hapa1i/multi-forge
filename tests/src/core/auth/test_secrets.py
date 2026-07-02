@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,6 @@ import yaml
 
 from forge.core.auth.secrets import (
     ChainSecretsProvider,
-    ConfigSecretsProvider,
     EnvSecretsProvider,
     FileSecretsProvider,
 )
@@ -147,169 +145,92 @@ class TestEnvSecretsProviderIgnoreEnv:
         assert provider.get("TEST_KEY") == "from-env"
 
 
-class TestConfigSecretsProvider:
-    """Tests for ConfigSecretsProvider."""
-
-    @dataclass
-    class MockProviderConfig:
-        """Minimal mock for ProviderConfig."""
-
-        auth_url: str = ""
-
-    @dataclass
-    class MockProxyConfig:
-        """Minimal mock for ProxyConfig."""
-
-        openai: "TestConfigSecretsProvider.MockProviderConfig" = field(
-            default_factory=lambda: TestConfigSecretsProvider.MockProviderConfig()
-        )
-        gemini: "TestConfigSecretsProvider.MockProviderConfig" = field(
-            default_factory=lambda: TestConfigSecretsProvider.MockProviderConfig()
-        )
-
-    @dataclass
-    class MockForgeConfig:
-        """Minimal mock for ForgeConfig."""
-
-        proxy: "TestConfigSecretsProvider.MockProxyConfig" = field(
-            default_factory=lambda: TestConfigSecretsProvider.MockProxyConfig()
-        )
-
-    def test_get_maps_openai_auth_url(self) -> None:
-        """ConfigSecretsProvider maps OPENAI_AUTH_URL to config.proxy.openai.auth_url."""
-        config = self.MockForgeConfig()
-        config.proxy.openai.auth_url = "https://auth.example.com"
-
-        provider = ConfigSecretsProvider(config)  # type: ignore[arg-type]
-        assert provider.get("OPENAI_AUTH_URL") == "https://auth.example.com"
-
-    def test_get_maps_gemini_auth_url(self) -> None:
-        """ConfigSecretsProvider maps GEMINI_AUTH_URL to config.proxy.gemini.auth_url."""
-        config = self.MockForgeConfig()
-        config.proxy.gemini.auth_url = "https://gemini-auth.example.com"
-
-        provider = ConfigSecretsProvider(config)  # type: ignore[arg-type]
-        assert provider.get("GEMINI_AUTH_URL") == "https://gemini-auth.example.com"
-
-    def test_get_returns_default_for_unknown_key(self) -> None:
-        """ConfigSecretsProvider returns default for unmapped keys."""
-        config = self.MockForgeConfig()
-
-        provider = ConfigSecretsProvider(config)  # type: ignore[arg-type]
-        assert provider.get("UNKNOWN_KEY", "default") == "default"
-
-    def test_get_returns_default_when_config_value_empty(self) -> None:
-        """ConfigSecretsProvider treats empty string as not-set."""
-        config = self.MockForgeConfig()
-        config.proxy.openai.auth_url = ""
-
-        provider = ConfigSecretsProvider(config)  # type: ignore[arg-type]
-        assert provider.get("OPENAI_AUTH_URL", "fallback") == "fallback"
-
-
 class TestChainSecretsProvider:
-    """Tests for ChainSecretsProvider."""
+    """Tests for ChainSecretsProvider (production chain: Env wins, File fallback)."""
 
-    def test_chain_returns_first_truthy_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """ChainSecretsProvider returns first truthy value found."""
+    def test_chain_returns_first_truthy_value(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Chain returns the first truthy value found (env before file)."""
         monkeypatch.setenv("TEST_KEY", "env-value")
-
-        # Env has value, config has a different mapped value
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = "https://config-auth.example.com"
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"TEST_KEY": "file-value"}})
 
         provider = ChainSecretsProvider(
             EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
+            FileSecretsProvider(profile="default", path=creds),
         )
-
-        # For TEST_KEY (not in config mapping), should return env value
         assert provider.get("TEST_KEY") == "env-value"
 
-    def test_chain_env_overrides_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Env values take precedence over config-injected values."""
-        monkeypatch.setenv("OPENAI_AUTH_URL", "https://env-auth.example.com")
-
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = "https://config-auth.example.com"
-
-        provider = ChainSecretsProvider(
-            EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
-        )
-
-        # Env wins
-        assert provider.get("OPENAI_AUTH_URL") == "https://env-auth.example.com"
-
-    def test_chain_falls_through_to_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Chain falls through to config when env is not set."""
-        monkeypatch.delenv("OPENAI_AUTH_URL", raising=False)
-
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = "https://config-auth.example.com"
+    def test_chain_env_overrides_file(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Env values take precedence over file-based values."""
+        monkeypatch.setenv("SECRET_KEY", "env-value")
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"SECRET_KEY": "file-value"}})
 
         provider = ChainSecretsProvider(
             EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
+            FileSecretsProvider(profile="default", path=creds),
         )
+        assert provider.get("SECRET_KEY") == "env-value"
 
-        # Falls through to config
-        assert provider.get("OPENAI_AUTH_URL") == "https://config-auth.example.com"
-
-    def test_chain_treats_empty_string_as_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Empty string "" is treated as not-set, falls through to next provider."""
-        monkeypatch.setenv("OPENAI_AUTH_URL", "")
-
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = "https://config-auth.example.com"
+    def test_chain_falls_through_to_file(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Chain falls through to file when env is not set."""
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"SECRET_KEY": "file-value"}})
 
         provider = ChainSecretsProvider(
             EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
+            FileSecretsProvider(profile="default", path=creds),
         )
+        assert provider.get("SECRET_KEY") == "file-value"
 
-        # Env has "", so falls through to config
-        assert provider.get("OPENAI_AUTH_URL") == "https://config-auth.example.com"
-
-    def test_chain_returns_default_when_all_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Chain returns default when all providers return empty/None."""
-        monkeypatch.delenv("OPENAI_AUTH_URL", raising=False)
-
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = ""
+    def test_chain_treats_empty_string_as_missing(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Empty string is treated as not-set; chain falls through to the next provider."""
+        monkeypatch.setenv("SECRET_KEY", "")
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"SECRET_KEY": "file-value"}})
 
         provider = ChainSecretsProvider(
             EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
+            FileSecretsProvider(profile="default", path=creds),
         )
+        assert provider.get("SECRET_KEY") == "file-value"
 
-        assert provider.get("OPENAI_AUTH_URL", "final-default") == "final-default"
+    def test_chain_returns_default_when_all_empty(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Chain returns the default when no provider has a value."""
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"OTHER": "value"}})
 
-    def test_chain_require_raises_when_all_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        provider = ChainSecretsProvider(
+            EnvSecretsProvider(),
+            FileSecretsProvider(profile="default", path=creds),
+        )
+        assert provider.get("SECRET_KEY", "final-default") == "final-default"
+
+    def test_chain_require_raises_when_all_missing(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         """Chain.require() raises NoApiKeyError when no provider has a value."""
-        monkeypatch.delenv("OPENAI_AUTH_URL", raising=False)
-
-        config = TestConfigSecretsProvider.MockForgeConfig()
-        config.proxy.openai.auth_url = ""
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        creds = tmp_path / "credentials.yaml"
+        _write_creds(creds, {"default": {"OTHER": "value"}})
 
         provider = ChainSecretsProvider(
             EnvSecretsProvider(),
-            ConfigSecretsProvider(config),  # type: ignore[arg-type]
+            FileSecretsProvider(profile="default", path=creds),
         )
-
         with pytest.raises(NoApiKeyError) as exc_info:
-            provider.require("OPENAI_AUTH_URL")
+            provider.require("SECRET_KEY")
 
         assert exc_info.value.provider == "chain"
-        assert exc_info.value.env_var == "OPENAI_AUTH_URL"
+        assert exc_info.value.env_var == "SECRET_KEY"
 
     def test_chain_require_returns_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Chain.require() returns value when found."""
-        monkeypatch.setenv("OPENAI_AUTH_URL", "https://valid-auth.example.com")
+        monkeypatch.setenv("SECRET_KEY", "valid-value")
 
         provider = ChainSecretsProvider(EnvSecretsProvider())
 
-        assert provider.require("OPENAI_AUTH_URL") == "https://valid-auth.example.com"
+        assert provider.require("SECRET_KEY") == "valid-value"
 
     def test_chain_requires_at_least_one_provider(self) -> None:
         """ChainSecretsProvider requires at least one provider."""

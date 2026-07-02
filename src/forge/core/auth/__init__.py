@@ -1,7 +1,7 @@
 """Consolidated authentication module for Multi-Forge.
 
 This package provides:
-1. SecretsProvider - unified interface for accessing secrets from env/config
+1. SecretsProvider - unified interface for accessing secrets from env/file
 2. Error types - re-exported from core.llm.errors for convenience
 
 Usage:
@@ -29,7 +29,6 @@ from forge.core.auth.credentials_file import CredentialVersionError
 from forge.core.auth.protocols import SecretsProvider
 from forge.core.auth.secrets import (
     ChainSecretsProvider,
-    ConfigSecretsProvider,
     EnvSecretsProvider,
     FileSecretsProvider,
 )
@@ -53,7 +52,6 @@ __all__ = [
     # SecretsProvider protocol and implementations
     "SecretsProvider",
     "EnvSecretsProvider",
-    "ConfigSecretsProvider",
     "FileSecretsProvider",
     "ChainSecretsProvider",
     # Template credential resolution

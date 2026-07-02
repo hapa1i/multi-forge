@@ -103,28 +103,6 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any], base_url: str)
     )
 
 
-def resolve_subprocess_proxy_url() -> str | None:
-    """Resolve the current FORGE_SUBPROCESS_PROXY to a base URL, if configured."""
-    from forge.core.reactive.env import (
-        FORGE_SUBPROCESS_BASE_URL_VAR,
-        FORGE_SUBPROCESS_PROXY_VAR,
-    )
-    from forge.core.reactive.proxy import lookup_proxy_base_url
-
-    injected_url = os.environ.get(FORGE_SUBPROCESS_BASE_URL_VAR)
-    if injected_url:
-        return injected_url
-
-    proxy = os.environ.get(FORGE_SUBPROCESS_PROXY_VAR)
-    if not proxy:
-        return None
-
-    try:
-        return lookup_proxy_base_url(proxy)
-    except Exception:
-        return None
-
-
 def resolve_proxy_urls(specs: list[Any]) -> list[str]:
     """Extract unique proxy base URLs from a list of ModelSpecs.
 

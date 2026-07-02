@@ -236,28 +236,6 @@ class TestDebateSkill:
         content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
         assert "disable-model-invocation: true" in content
 
-    def test_resource_exists(self):
-        assert (SKILLS_DIR / "debate" / "resources" / "debate_evaluation.md").exists()
-
-    def test_resource_contains_stance_marker(self):
-        content = (SKILLS_DIR / "debate" / "resources" / "debate_evaluation.md").read_text()
-        assert "{stance_prompt}" in content
-
-    def test_resource_contains_proposal_placeholder(self):
-        content = (SKILLS_DIR / "debate" / "resources" / "debate_evaluation.md").read_text()
-        assert "{proposal}" in content
-
-    def test_code_resource_exists(self):
-        assert (SKILLS_DIR / "debate" / "resources" / "code_debate_evaluation.md").exists()
-
-    def test_code_resource_contains_stance_marker(self):
-        content = (SKILLS_DIR / "debate" / "resources" / "code_debate_evaluation.md").read_text()
-        assert "{stance_prompt}" in content
-
-    def test_code_resource_contains_target_placeholder(self):
-        content = (SKILLS_DIR / "debate" / "resources" / "code_debate_evaluation.md").read_text()
-        assert "{target}" in content
-
     def test_step1_parses_worker_flag(self):
         content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
         assert "--worker" in content.split("### Step 2")[0]
@@ -386,28 +364,6 @@ class TestConsensusSkill:
         content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
         assert "disable-model-invocation: true" in content
 
-    def test_resource_exists(self):
-        assert (SKILLS_DIR / "consensus" / "resources" / "consensus_evaluation.md").exists()
-
-    def test_resource_contains_role_marker(self):
-        content = (SKILLS_DIR / "consensus" / "resources" / "consensus_evaluation.md").read_text()
-        assert "{role_prompt}" in content
-
-    def test_resource_contains_subject_placeholder(self):
-        content = (SKILLS_DIR / "consensus" / "resources" / "consensus_evaluation.md").read_text()
-        assert "{subject}" in content
-
-    def test_code_resource_exists(self):
-        assert (SKILLS_DIR / "consensus" / "resources" / "code_consensus_evaluation.md").exists()
-
-    def test_code_resource_contains_role_marker(self):
-        content = (SKILLS_DIR / "consensus" / "resources" / "code_consensus_evaluation.md").read_text()
-        assert "{role_prompt}" in content
-
-    def test_code_resource_contains_target_placeholder(self):
-        content = (SKILLS_DIR / "consensus" / "resources" / "code_consensus_evaluation.md").read_text()
-        assert "{target}" in content
-
     def test_synthesis_resource_exists(self):
         assert (SKILLS_DIR / "consensus" / "resources" / "synthesis.md").exists()
 
@@ -424,47 +380,6 @@ class TestConsensusSkill:
         content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
         frontmatter = content.split("---")[1]
         assert "--worker" in frontmatter
-
-    def test_uses_support_not_accept_vocabulary(self):
-        """Consensus templates must use SUPPORT/OPPOSE, not ACCEPT/REJECT."""
-        for name in ("consensus_evaluation.md", "code_consensus_evaluation.md"):
-            content = (SKILLS_DIR / "consensus" / "resources" / name).read_text()
-            assert "SUPPORT" in content
-            assert "OPPOSE" in content
-            assert '"ACCEPT"' not in content
-            assert '"REJECT"' not in content
-
-
-class TestConsensusTemplateEquivalence:
-    """CLI-embedded templates must match canonical skill resource copies."""
-
-    def test_proposal_template_matches(self):
-        from forge.cli.workflow import _CONSENSUS_EVALUATION_TEMPLATE
-
-        canonical = (SKILLS_DIR / "consensus" / "resources" / "consensus_evaluation.md").read_text()
-        assert _CONSENSUS_EVALUATION_TEMPLATE == canonical
-
-    def test_code_template_matches(self):
-        from forge.cli.workflow import _CODE_CONSENSUS_EVALUATION_TEMPLATE
-
-        canonical = (SKILLS_DIR / "consensus" / "resources" / "code_consensus_evaluation.md").read_text()
-        assert _CODE_CONSENSUS_EVALUATION_TEMPLATE == canonical
-
-
-class TestDebateTemplateEquivalence:
-    """CLI-embedded templates must match canonical skill resource copies."""
-
-    def test_proposal_template_matches(self):
-        from forge.cli.workflow import _DEBATE_EVALUATION_TEMPLATE
-
-        canonical = (SKILLS_DIR / "debate" / "resources" / "debate_evaluation.md").read_text()
-        assert _DEBATE_EVALUATION_TEMPLATE == canonical
-
-    def test_code_template_matches(self):
-        from forge.cli.workflow import _CODE_DEBATE_EVALUATION_TEMPLATE
-
-        canonical = (SKILLS_DIR / "debate" / "resources" / "code_debate_evaluation.md").read_text()
-        assert _CODE_DEBATE_EVALUATION_TEMPLATE == canonical
 
 
 class TestQaMemoryWriterChecklist:

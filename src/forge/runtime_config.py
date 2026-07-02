@@ -410,25 +410,6 @@ def _coerce_debug_to_log_level(raw: str) -> str:
     raise ValueError(f"Cannot coerce FORGE_DEBUG={raw!r} to log level")
 
 
-def _coerce_env_value(raw: str, field_info: Any) -> Any:
-    """Coerce a raw env var string to the field's expected Python type."""
-    ftype = field_info.type
-    if ftype is int or ftype == "int":
-        val = int(raw)
-        if val < 1:
-            raise ValueError(f"must be >= 1, got {val}")
-        return val
-    if ftype is float or ftype == "float":
-        return float(raw)
-    if ftype is bool or ftype == "bool":
-        if raw.lower() in ("1", "true", "yes"):
-            return True
-        if raw.lower() in ("0", "false", "no"):
-            return False
-        raise ValueError(f"Cannot coerce {raw!r} to bool")
-    return raw
-
-
 def _apply_env_overrides(config: RuntimeConfig) -> RuntimeConfig:
     """Apply environment variable overrides to config values.
 
@@ -436,7 +417,6 @@ def _apply_env_overrides(config: RuntimeConfig) -> RuntimeConfig:
     others still apply (fail-open per field, not all-or-nothing).
     Attaches _env_sources dict for display annotation by %config.
     """
-    field_map = {f.name: f for f in fields(RuntimeConfig)}
     overrides: dict[str, Any] = {}
     env_sources: dict[str, str] = {}
 
@@ -444,12 +424,13 @@ def _apply_env_overrides(config: RuntimeConfig) -> RuntimeConfig:
         raw = os.environ.get(env_var, "").strip()
         if not raw:
             continue
+        # Only FORGE_DEBUG -> log_level is wired. A future non-log_level override needs its
+        # own coercion here rather than silently misrouting through the debug coercion.
+        if field_name != "log_level":
+            logger.warning("Ignoring env %s: no coercion registered for field %r", env_var, field_name)
+            continue
         try:
-            if field_name == "log_level":
-                coerced = _coerce_debug_to_log_level(raw)
-            else:
-                coerced = _coerce_env_value(raw, field_map[field_name])
-            overrides[field_name] = coerced
+            overrides[field_name] = _coerce_debug_to_log_level(raw)
             env_sources[field_name] = env_var
         except (ValueError, TypeError) as e:
             logger.warning("Ignoring env %s=%r: %s", env_var, raw, e)

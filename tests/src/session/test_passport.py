@@ -175,7 +175,6 @@ class TestParsePassport:
         assert p.update.strategy == "generic"
         assert p.update.mode == "direct"
         assert p.update.writers == "all-sessions"
-        assert p.update.inherit_on_fork is True
 
     def test_unknown_strategy_raises(self) -> None:
         data = {"version": 1, "intent": "Test", "update": {"strategy": "changelg"}}
@@ -383,7 +382,6 @@ class TestWritePassport:
                 strategy="changelog",
                 mode="direct",
                 writers="planner",
-                inherit_on_fork=False,
             ),
         )
         doc = tmp_path / "doc.md"
@@ -397,23 +395,18 @@ class TestWritePassport:
         assert restored.excludes == original.excludes
         assert restored.update.strategy == original.update.strategy
         assert restored.update.writers == original.update.writers
-        # inherit_on_fork is no longer serialized (retired in Slice 3);
-        # writing a passport with inherit_on_fork=False and reading it back
-        # yields the default True because the field is absent from the YAML.
-        assert restored.update.inherit_on_fork is True
 
-    def test_inherit_on_fork_not_serialized(self, tmp_path: Path) -> None:
-        """inherit_on_fork is parsed but never written back to new passports."""
-        doc = tmp_path / "doc.md"
-        doc.write_text("# Doc\n")
-        p = Passport(
-            version=1,
-            intent="Test",
-            update=PassportUpdate(inherit_on_fork=False),
+    def test_legacy_inherit_on_fork_accepted_and_ignored(self) -> None:
+        """An old passport carrying update.inherit_on_fork still parses (accept-and-ignore)."""
+        passport = parse_passport(
+            {
+                "version": 1,
+                "intent": "Test",
+                "update": {"writers": "all-sessions", "inherit_on_fork": False},
+            }
         )
-        write_passport(doc, p)
-        content = doc.read_text()
-        assert "inherit_on_fork" not in content
+        assert passport.update.writers == "all-sessions"
+        assert not hasattr(passport.update, "inherit_on_fork")
 
     def test_none_fields_omitted_from_output(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"

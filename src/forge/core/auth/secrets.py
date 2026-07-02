@@ -1,7 +1,7 @@
 """SecretsProvider protocol and implementations.
 
-This module provides a unified interface for accessing secrets (API keys,
-auth URLs) from multiple sources with explicit precedence.
+This module provides a unified interface for accessing secrets (API keys)
+from multiple sources with explicit precedence.
 
 Usage:
     from forge.core.auth import EnvSecretsProvider, ChainSecretsProvider
@@ -25,7 +25,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from forge.config.schema import ForgeConfig
 from forge.core.auth.protocols import SecretsProvider
 from forge.core.llm.errors import NoApiKeyError
 
@@ -112,62 +111,6 @@ class EnvSecretsProvider:
         return value
 
 
-class ConfigSecretsProvider:
-    """Reads secrets injected into ForgeConfig by the config loader.
-
-    The config loader maps certain env vars into ForgeConfig fields:
-    - OPENAI_AUTH_URL -> config.proxy.openai.auth_url
-    - GEMINI_AUTH_URL -> config.proxy.gemini.auth_url
-
-    This provider reads those config paths, allowing env vars to be the
-    primary source while config-injected values serve as fallbacks.
-
-    Args:
-        config: ForgeConfig instance (explicitly injected to avoid circular deps)
-    """
-
-    # Mapping of secret keys to config accessor lambdas
-    _KEY_MAPPING: dict[str, str] = {
-        "OPENAI_AUTH_URL": "proxy.openai.auth_url",
-        "GEMINI_AUTH_URL": "proxy.gemini.auth_url",
-    }
-
-    def __init__(self, config: ForgeConfig) -> None:
-        self._config = config
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get secret from config-injected value, returning default if not found."""
-        if key not in self._KEY_MAPPING:
-            return default
-
-        # Navigate the config path
-        path = self._KEY_MAPPING[key]
-        value = self._get_nested_attr(path)
-
-        # Treat empty string as not-set
-        return value if value else default
-
-    def require(self, key: str) -> str:
-        """Get required secret from config, raising if not found or empty."""
-        value = self.get(key)
-        if not value:
-            raise NoApiKeyError(
-                provider="config",
-                env_var=key,
-                detail=_format_missing_credential_detail(key),
-            )
-        return value
-
-    def _get_nested_attr(self, path: str) -> Any:
-        """Navigate dotted path on config object."""
-        obj: Any = self._config
-        for part in path.split("."):
-            obj = getattr(obj, part, None)
-            if obj is None:
-                return None
-        return obj
-
-
 class FileSecretsProvider:
     """Read secrets from ~/.forge/credentials.yaml for a named profile.
 
@@ -210,8 +153,8 @@ class ChainSecretsProvider:
 
     Typical usage:
         secrets = ChainSecretsProvider(
-            EnvSecretsProvider(),           # Env wins
-            ConfigSecretsProvider(config),  # Config fallback
+            EnvSecretsProvider(),   # Env wins
+            FileSecretsProvider(),  # File-based fallback
         )
 
     Args:

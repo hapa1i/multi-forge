@@ -22,11 +22,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
+    LocalUsageStatus,
+    RequestMode,
     mint_downstream_event_id,
     read_downstream_records,
     write_downstream_record,
@@ -38,9 +40,6 @@ PROVIDER_TRACE_SCHEMA_VERSION = 1
 
 # One-time warning latch for records written by a newer Forge (own latch, not audit's).
 _warned_newer_schema = False
-
-RequestMode = Literal["streaming", "non_streaming"]
-LocalUsageStatus = Literal["available", "unavailable"]
 
 
 @dataclass

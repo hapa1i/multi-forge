@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from forge.search.engine import BM25, SNIPPET_LENGTH, search, search_from_index
+from forge.search.engine import (
+    BM25,
+    DEFAULT_LIMIT,
+    SNIPPET_LENGTH,
+    SearchResult,
+    search_from_index,
+)
 from forge.search.exceptions import BM25IndexCorruptedError, ContentStoreCorruptedError
 from forge.search.extractor import SearchDocument, SearchDocumentMeta
 from forge.search.tokenizer import tokenize
@@ -174,31 +180,31 @@ class TestSearch:
             _make_doc("timeout timeout timeout config", session_name="high"),
             _make_doc("timeout config setting", session_name="medium"),
         ]
-        results = search("timeout", docs)
+        results = _search_docs("timeout", docs)
         assert len(results) >= 2
         assert results[0].score >= results[1].score
 
     def test_respects_limit(self) -> None:
         """Results are capped at the limit."""
         docs = [_make_doc(f"keyword match document {i}", session_id=f"id-{i}") for i in range(20)]
-        results = search("keyword", docs, limit=3)
+        results = _search_docs("keyword", docs, limit=3)
         assert len(results) <= 3
 
     def test_empty_query(self) -> None:
         """Empty query returns empty results."""
         docs = [_make_doc("some content")]
-        assert search("", docs) == []
-        assert search("   ", docs) == []
+        assert _search_docs("", docs) == []
+        assert _search_docs("   ", docs) == []
 
     def test_empty_documents(self) -> None:
         """Empty document list returns empty results."""
-        assert search("hello", []) == []
+        assert _search_docs("hello", []) == []
 
     def test_snippet_truncation(self) -> None:
         """Snippet is truncated to approximately SNIPPET_LENGTH."""
         long_content = "keyword " * 200
         docs = [_make_doc(long_content)]
-        results = search("keyword", docs)
+        results = _search_docs("keyword", docs)
         assert len(results) == 1
         # Snippet may include "..." markers, but the core window is <= SNIPPET_LENGTH
         assert len(results[0].snippet) <= SNIPPET_LENGTH + 6  # "..." + "..."
@@ -210,7 +216,7 @@ class TestSearch:
         target = "the authentication middleware was added successfully"
         content = filler + target + " " + filler
         docs = [_make_doc(content)]
-        results = search("authentication", docs)
+        results = _search_docs("authentication", docs)
         assert len(results) == 1
         assert "authentication" in results[0].snippet
         # Should NOT just be the first 300 chars (filler)
@@ -221,7 +227,7 @@ class TestSearch:
         filler = "padding words here " * 100
         content = filler + "target keyword here" + filler
         docs = [_make_doc(content)]
-        results = search("target", docs)
+        results = _search_docs("target", docs)
         assert len(results) == 1
         assert results[0].snippet.startswith("...")
         assert results[0].snippet.endswith("...")
@@ -241,7 +247,7 @@ class TestSearch:
                 session_id="s2",
             ),
         ]
-        results = search("the authentication", docs)
+        results = _search_docs("the authentication", docs)
         target_results = [r for r in results if r.session_name == "target"]
         assert len(target_results) == 1
         # Snippet should center on "authentication" (rare), not "the" (common)
@@ -259,10 +265,10 @@ class TestSearch:
         target = "Read(path=/workspace/config.yaml) Edit(path=/workspace/main.py)"
         content = filler + target + " " + filler
         docs = [_make_doc(content)]
-        results = search("readfile", docs)
+        results = _search_docs("readfile", docs)
         # "readfile" won't match (it's "Read" and "path" as separate tokens)
         # but searching for "read" should anchor on the capitalized "Read"
-        results = search("read", docs)
+        results = _search_docs("read", docs)
         assert len(results) == 1
         assert "Read(path=" in results[0].snippet
 
@@ -270,7 +276,7 @@ class TestSearch:
         """Content shorter than SNIPPET_LENGTH returned as-is."""
         short = "brief keyword mention"
         docs = [_make_doc(short)]
-        results = search("keyword", docs)
+        results = _search_docs("keyword", docs)
         assert len(results) == 1
         assert results[0].snippet == short
 
@@ -293,7 +299,7 @@ class TestSearch:
                 session_id="s3",
             ),
         ]
-        results = search("timeout", docs)
+        results = _search_docs("timeout", docs)
         session_names = [r.session_name for r in results]
         # Both sessions mentioning "timeout" should be in results
         assert "db-config" in session_names
@@ -304,7 +310,7 @@ class TestSearch:
     def test_result_contains_metadata(self) -> None:
         """SearchResult includes metadata from the source document."""
         docs = [_make_doc("keyword match", session_name="my-session", session_id="my-id")]
-        results = search("keyword", docs)
+        results = _search_docs("keyword", docs)
         assert len(results) == 1
         assert results[0].session_name == "my-session"
         assert results[0].session_id == "my-id"
@@ -350,6 +356,45 @@ def _build_index_data(
             doc_freqs[term] = doc_freqs.get(term, 0) + 1
     avgdl = sum(doc_lens) / max(len(doc_lens), 1)
     return keys, term_freqs, doc_freqs, doc_lens, avgdl
+
+
+def _search_docs(
+    query: str,
+    docs: list[SearchDocument],
+    *,
+    limit: int = DEFAULT_LIMIT,
+) -> list[SearchResult]:
+    """Search in-memory SearchDocuments through the persistent-index path.
+
+    Test docs share a default transcript_path, so the index is keyed by synthetic
+    positional keys; a dict content_loader feeds snippet extraction. Restores the
+    old search() ergonomics so the SearchDocument cases exercise the real path.
+    """
+    keys = [f"__mem_{i}__" for i in range(len(docs))]
+    texts = [d.content for d in docs]
+    keys, term_freqs, doc_freqs, doc_lens, avgdl = _build_index_data(texts, keys)
+    doc_metadata = {
+        keys[i]: SearchDocumentMeta(
+            transcript_path=d.transcript_path,
+            session_name=d.session_name,
+            session_id=d.session_id,
+            extracted_at=d.extracted_at,
+            metadata=d.metadata,
+        )
+        for i, d in enumerate(docs)
+    }
+    content_map = dict(zip(keys, texts))
+    return search_from_index(
+        query,
+        doc_keys=keys,
+        term_freqs=term_freqs,
+        doc_freqs=doc_freqs,
+        doc_lens=doc_lens,
+        avgdl=avgdl,
+        content_loader=lambda ks: {k: content_map[k] for k in ks},
+        doc_metadata=doc_metadata,
+        limit=limit,
+    )
 
 
 class TestSearchFromIndex:
@@ -506,45 +551,3 @@ class TestSearchFromIndex:
         )
         assert len(results) == 1
         assert "authentication" in results[0].snippet
-
-    def test_scores_match_legacy_search(self) -> None:
-        """search_from_index produces same scores as legacy search() for identical data."""
-        texts = [
-            "python programming fast",
-            "java enterprise system",
-            "python scripting automation",
-        ]
-        # Build legacy search
-        docs = [
-            _make_doc(
-                t,
-                session_name=f"s{i}",
-                session_id=f"id{i}",
-                transcript_path=f"/tmp/d{i}.jsonl",
-            )
-            for i, t in enumerate(texts)
-        ]
-        legacy_results = search("python", docs)
-
-        # Build index search
-        keys = [f"/tmp/d{i}.jsonl" for i in range(len(texts))]
-        keys_data, term_freqs, doc_freqs, doc_lens, avgdl = _build_index_data(texts, keys)
-        meta_map = {k: _make_meta(k, session_name=f"s{i}", session_id=f"id{i}") for i, k in enumerate(keys_data)}
-        content_map = dict(zip(keys_data, texts))
-
-        index_results = search_from_index(
-            "python",
-            doc_keys=keys_data,
-            term_freqs=term_freqs,
-            doc_freqs=doc_freqs,
-            doc_lens=doc_lens,
-            avgdl=avgdl,
-            content_loader=lambda ks: {k: content_map[k] for k in ks},
-            doc_metadata=meta_map,
-        )
-
-        # Same number of results with same scores
-        assert len(legacy_results) == len(index_results)
-        for lr, ir in zip(legacy_results, index_results):
-            assert lr.score == ir.score
-            assert lr.session_name == ir.session_name

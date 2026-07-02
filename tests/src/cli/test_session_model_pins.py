@@ -85,6 +85,73 @@ def test_persist_direct_model_override_warns_on_lock_failure(
     assert "future resumes may use the previous stored model" in output
 
 
+def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> None:
+    """A legacy 'provider: gemini' proxy yields a clean error, not a load traceback.
+
+    Regression: _apply_direct_model_env_if_supported loaded the proxy config
+    outside a ValueError boundary, so resume/fork paths that reach the apply
+    without the _validate_proxy_model_pin gate (persisted --model, no fresh pin)
+    surfaced the unsupported-provider ValueError as an unhandled traceback.
+    """
+    import os
+
+    from forge.cli import session_model_pin
+
+    forge_home = Path(os.environ["FORGE_HOME"])
+    proxy_dir = forge_home / "proxies" / "legacy-gemini"
+    proxy_dir.mkdir(parents=True, exist_ok=True)
+    (proxy_dir / "proxy.yaml").write_text(
+        "template: litellm-gemini\n"
+        "provider: gemini\n"
+        "proxy_endpoint: http://localhost:8084\n"
+        "port: 8084\n"
+        "upstream_base_url: https://litellm.test.example.com\n"
+        "tiers:\n"
+        "  haiku: gemini-2.0-flash\n"
+        "  sonnet: gemini-2.5-pro\n"
+        "  opus: gemini-2.5-pro\n"
+    )
+
+    env_vars: dict[str, str] = {}
+    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
+
+    assert error is not None
+    assert "Could not load proxy config for 'legacy-gemini'" in error
+    assert "Unsupported proxy provider" in error
+    assert env_vars == {}  # No env applied for an unloadable proxy
+
+
+def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
+    """A malformed proxy.yaml ('tiers: []') yields a clean error, not a shape traceback.
+
+    Companion to the legacy-provider case: the shape failure raises AttributeError
+    from the loader's raw extraction, which the load guard only catches because the
+    loader now normalizes shape failures to ValueError.
+    """
+    import os
+
+    from forge.cli import session_model_pin
+
+    forge_home = Path(os.environ["FORGE_HOME"])
+    proxy_dir = forge_home / "proxies" / "bad-shape"
+    proxy_dir.mkdir(parents=True, exist_ok=True)
+    (proxy_dir / "proxy.yaml").write_text(
+        "template: litellm-openai\n"
+        "provider: litellm\n"
+        "proxy_endpoint: http://localhost:8085\n"
+        "port: 8085\n"
+        "upstream_base_url: https://litellm.test.example.com\n"
+        "tiers: []\n"
+    )
+
+    env_vars: dict[str, str] = {}
+    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
+
+    assert error is not None
+    assert "Malformed proxy configuration" in error
+    assert env_vars == {}
+
+
 def test_incognito_with_model(runner: CliRunner, temp_env: Path) -> None:
     """The incognito shortcut should expose the same --model pin as session start."""
     with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:

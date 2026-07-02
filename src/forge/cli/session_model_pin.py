@@ -62,11 +62,20 @@ def _apply_direct_model_env_if_supported(
     """Apply --model env vars when the proxy can honor the pin.
 
     No-op (returns None) when the proxy is missing or cannot honor the pin.
-    Returns an error message only when env application itself fails.
+    Returns an error message when the proxy config cannot be loaded (e.g. a
+    legacy 'provider: gemini' file) or when env application itself fails.
     """
     from forge.config.loader import load_proxy_instance_config
+    from forge.core.state.exceptions import StateCorruptedError
 
-    proxy_cfg = load_proxy_instance_config(proxy_id)
+    try:
+        proxy_cfg = load_proxy_instance_config(proxy_id)
+    except (StateCorruptedError, FileNotFoundError, TypeError, ValueError) as e:
+        # Load boundary: a stale/unsupported proxy.yaml fails validation in
+        # ProxyInstanceConfig.__post_init__. Surface it as a contextual error
+        # (mirrors _validate_proxy_model_pin) instead of an unhandled traceback,
+        # since resume/fork can reach this apply without the validation gate.
+        return f"Could not load proxy config for '{proxy_id}': {e}"
     if proxy_cfg is None:
         return None
     if not _proxy_supports_model_pin(proxy_cfg, resolve_direct_model_pin(direct_model)):

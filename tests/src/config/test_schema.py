@@ -187,6 +187,18 @@ class TestDictToDataclass:
         assert result.reasoning_effort == "high"
         assert result.verbosity == "low"
 
+    def test_rejects_non_mapping_for_dataclass_field(self):
+        """A non-dict value for a nested-dataclass field raises a clear ValueError.
+
+        Regression: 'tier_overrides: []' (or a scalar) was passed raw into the
+        constructor and crashed later as an AttributeError in __post_init__
+        (overrides.get(...) on a list). It must be rejected at conversion time.
+        """
+        for bad in ([], "scalar", 3):
+            data = {"tiers": {"sonnet": "s"}, "tier_overrides": bad}
+            with pytest.raises(ValueError, match="tier_overrides must be a mapping"):
+                dict_to_dataclass(ProviderConfig, data)
+
 
 class TestForgeConfigMethods:
     """Tests for ForgeConfig methods."""
@@ -425,12 +437,33 @@ class TestProxyInstanceConfigValidation:
         """Invalid provider should be rejected."""
         from forge.config.schema import ProxyInstanceConfig, TierModels
 
-        with pytest.raises(ValueError, match="Invalid provider"):
+        with pytest.raises(ValueError, match="Unsupported proxy provider"):
             ProxyInstanceConfig(
                 proxy_format=1,
                 template="test",
                 template_digest="sha256:test",
                 provider="invalid_provider",  # Invalid
+                proxy_endpoint="http://localhost:8084",
+                port=8084,
+                upstream_base_url="https://litellm.test.example.com",
+                tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            )
+
+    @pytest.mark.parametrize("provider", ["gemini", "openai"])
+    def test_gemini_openai_providers_rejected(self, provider):
+        """gemini/openai are no longer standalone proxy providers (served via LiteLLM).
+
+        Validation runs on every load, so a persisted proxy.yaml with these values
+        fails fast with a message naming the supported providers and a recreate path.
+        """
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        with pytest.raises(ValueError, match="supported: litellm, openrouter"):
+            ProxyInstanceConfig(
+                proxy_format=1,
+                template="test",
+                template_digest="sha256:test",
+                provider=provider,
                 proxy_endpoint="http://localhost:8084",
                 port=8084,
                 upstream_base_url="https://litellm.test.example.com",
