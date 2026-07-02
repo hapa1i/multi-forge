@@ -27,6 +27,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### rewind_resume_strategy closeout: drop-last-N resume with an AI code-delta
+
+**Goal**: Ship `--strategy rewind --drop-last N` -- resume/fork a session that carries turns `1..(T-N)` as *real*
+relocated Claude history plus an AI-generated code-delta of the dropped window -- and close the card after PR #66 merged
+to `main`.
+
+**Key changes** (shipped via PR #66, `107b9251`):
+
+- New `session/rewind.py` primitive: writes a truncated raw-JSONL prefix under a **fresh** rewind-owned UUID `<R>`
+  (snapped to a complete `tool_use`/`tool_result` turn boundary), and builds a grounded net-change code-delta over only
+  the dropped window `(T-N)..T`. Launches `--resume <R> --fork-session` co-delivered with an
+  `--append-system-prompt-file` code-delta context.
+- Deliberate break of the `native-relocate => no context file` convention: `Derivation` gains additive `dropped_turns` +
+  `rewind_relocated_session_id` (no `SCHEMA_VERSION` bump); design.md §3.9 documents the new matrix row and flags it
+  convention-not-guard.
+- Fail-closed contiguity guard (`_assert_kept_turns_form_raw_prefix`) rejects requestId-interleaved transcripts;
+  code-delta LLM failure falls back to plain native-relocate + a "code-delta unavailable" note; a privacy warning fires
+  when the dropped window is sent to the curation model. Fork rewind is worktree/`--into`-only (same-dir/sidecar
+  rejected); `resume --fresh --strategy rewind` is legitimately same-dir because it resumes `<R>`, not the parent UUID.
+- Docs synced in-PR: design.md §3.9, design_appendix.md §H (frontmatter enum + `rewind-code-delta` schema marker),
+  cli_reference.md, end-user/transfer.md.
+
+**Verification**: unit green on merged `main` -- 26 rewind tests (`test_rewind_strategy.py` +
+`test_session_rewind_cli.py`) and 30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`); PR #66
+landed after an 8-dimension adversarial review (verdict: mergeable, no blocking defects). **Disclosed gap**: the
+real-`claude` resume against a truncated `<R>` prefix is unit-covered only -- the `@pytest.mark.slow` integration test
+is not yet written (design.md:765 records the same caveat). The Slice-1 stem probe proved stem-tolerance live on Claude
+Code 2.1.197.
+
 ### Board closeout: Sonnet 5 done; accidental_complexity A/B merged + paused
 
 **Goal**: Reconcile the board after PR #65 merged -- close the shipped Sonnet 5 card and pause the accidental-complexity

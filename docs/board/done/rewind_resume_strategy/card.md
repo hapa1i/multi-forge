@@ -1,9 +1,10 @@
 # Rewind Resume Strategy — drop the last N turns, keep an AI code-delta
 
-**Status**: Active (in `doing/`, accepted 2026-07-01). Slices 1-3 are locked in code/docs; next implementation slice is
-Slice 4 (see `checklist.md`). A new `ResumeStrategy` sibling to `ai-curated`, selected via
-`forge session fork|resume --strategy rewind --drop-last N`. `docs/design.md` resume/transfer contracts remain
-normative; this card defers to them on conflict.
+**Status**: **DONE** (2026-07-02). Shipped and merged to `main` via PR #66 (`107b9251`); card moved `doing/ -> done/`.
+All six slices are implemented and unit-verified; see `checklist.md` for the per-slice record and the one disclosed
+integration gap (real-`claude` resume against a truncated `<R>` is not yet a `@pytest.mark.slow` test). A new
+`ResumeStrategy` sibling to `ai-curated`, selected via `forge session fork|resume --strategy rewind --drop-last N`.
+`docs/design.md` resume/transfer contracts remain normative; this card defers to them on conflict.
 
 **Type**: Single active card. Larger than a flag because it is the **first resume path that carries real Claude history
 *and* a generated context file** — a deliberate break of the current `native ⟹ no context file` invariant. Treat the
