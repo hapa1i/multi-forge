@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
@@ -158,7 +158,15 @@ class SupervisorWiring:
     supervisor_runtime: str | None
 
 
-class ClaudeStartPresenter(Protocol):
+class ClaudeIncognitoCleanupPresenter(Protocol):
+    """Render hooks for incognito cleanup owned by interactive ops."""
+
+    def on_incognito_cleanup_start(self) -> None: ...
+    def on_incognito_cleanup_ok(self) -> None: ...
+    def on_incognito_cleanup_warning(self, message: str) -> None: ...
+
+
+class ClaudeStartPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
     """Render hooks the CLI implements so the op can stay render-free.
 
     Ordering matters: ``on_created`` -> ``on_extensions`` -> (``on_no_launch`` |
@@ -172,9 +180,6 @@ class ClaudeStartPresenter(Protocol):
     def before_launch(self, forge_root: Path) -> None: ...
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
     def on_launch_error(self, error: ForgeOpError) -> None: ...
-    def on_incognito_cleanup_start(self) -> None: ...
-    def on_incognito_cleanup_ok(self) -> None: ...
-    def on_incognito_cleanup_warning(self, message: str) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -240,6 +245,25 @@ class ResumeLaunchPlan:
 
 
 @dataclass(frozen=True)
+class ForkLaunchPlan:
+    """Prepared fork launch facts passed from the CLI into the render-free op."""
+
+    manifest: SessionState
+    session_id: str | None
+    resume_id: str | None
+    fork_session: bool | None
+    register_fork: bool
+    prompt_file: Path | None
+    context_limit: int
+    launch_preferences: ClaudeLaunchPreferences
+    effective_template: str | None
+    runtime_base_url: str | None
+    proxy_id: str | None
+    incognito: bool
+    render_post_exit: bool
+
+
+@dataclass(frozen=True)
 class ResumePrepared:
     """Render payload emitted after shared resume mutations and before launch."""
 
@@ -274,6 +298,14 @@ class ClaudeResumePresenter(Protocol):
     def on_launch_error(self, error: ForgeOpError) -> None: ...
 
 
+class ClaudeForkPresenter(ClaudeIncognitoCleanupPresenter, Protocol):
+    """Render hooks the CLI implements for fork launches."""
+
+    def before_launch(self, forge_root: Path) -> None: ...
+    def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
+    def on_launch_error(self, error: ForgeOpError) -> None: ...
+
+
 @dataclass(frozen=True)
 class ClaudeResumeResult:
     """Outcome of ``resume_claude_session`` shared launch tail."""
@@ -286,6 +318,21 @@ class ClaudeResumeResult:
     store_exists: bool
     worktree_path: str | None
     warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ClaudeForkResult:
+    """Outcome of ``fork_claude_session`` shared launch tail."""
+
+    exit_code: int
+    session: str
+    manifest: SessionState
+    operation_started_at: datetime
+    did_run: bool
+    store_exists: bool
+    worktree_path: str | None
+    warnings: tuple[str, ...]
+    render_post_exit: bool
 
 
 def resolve_and_validate_system_prompt(
@@ -322,7 +369,7 @@ def launch_claude_session(
     use_sidecar: bool,
     mounts: tuple[str, ...] = (),
     image: str | None = None,
-    fork_session: bool = False,
+    fork_session: bool | None = False,
     register_fork: bool = False,
     system_prompt_file: str | None = None,
     name: str | None = None,
@@ -350,7 +397,7 @@ def launch_claude_session(
     if manifest.confirmed.claude_project_root:
         launch_root = Path(manifest.confirmed.claude_project_root)
 
-    register_fork_env = fork_session or register_fork
+    register_fork_env = bool(fork_session) or register_fork
     fork_name = manifest.name if register_fork_env else None
     parent_session = manifest.parent_session if register_fork_env else None
 
@@ -388,9 +435,10 @@ def launch_claude_session(
 
     if not manifest.confirmed.claude_project_root:
         _lr = str(launch_root)
-        store.update(
-            timeout_s=5.0,
+        _update_manifest_best_effort(
+            store,
             mutate=lambda m: setattr(m.confirmed, "claude_project_root", _lr),
+            label="claude_project_root preseed",
         )
 
     launch_started_at = datetime.now(timezone.utc)
@@ -715,6 +763,81 @@ def resume_claude_session(
     )
 
 
+def fork_claude_session(
+    *,
+    manager: SessionManager,
+    plan: ForkLaunchPlan,
+    presenter: ClaudeForkPresenter,
+    invoke: Callable[..., int] | None = None,
+    run_active: Callable[..., int] | None = None,
+) -> ClaudeForkResult:
+    """Run a prepared Claude fork launch without rendering."""
+    operation_started_at = datetime.now(timezone.utc)
+    manifest = plan.manifest
+    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
+    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
+    store = SessionStore(str(forge_root), manifest.name)
+    preferences = plan.launch_preferences
+
+    try:
+        launch_result = launch_claude_session(
+            manifest=manifest,
+            session_id=plan.session_id,
+            resume_id=plan.resume_id,
+            effective_template=plan.effective_template,
+            runtime_base_url=plan.runtime_base_url,
+            context_limit=plan.context_limit,
+            use_sidecar=preferences.use_sidecar,
+            mounts=preferences.mounts,
+            image=preferences.image,
+            fork_session=plan.fork_session,
+            register_fork=plan.register_fork,
+            system_prompt_file=str(plan.prompt_file) if plan.prompt_file is not None else None,
+            name=manifest.name,
+            proxy_id=plan.proxy_id,
+            before_launch=presenter.before_launch,
+            on_sidecar_launch=presenter.on_sidecar_launch,
+            invoke=invoke or invoke_claude,
+            run_active=run_active or run_with_active_session,
+        )
+    except ForgeOpError as e:
+        presenter.on_launch_error(e)
+        if plan.incognito and preferences.use_sidecar:
+            _run_incognito_cleanup(manager, manifest, presenter)
+        return ClaudeForkResult(
+            exit_code=1,
+            session=manifest.name,
+            manifest=manifest,
+            operation_started_at=operation_started_at,
+            did_run=False,
+            store_exists=store.exists(),
+            worktree_path=str(worktree_path),
+            warnings=(),
+            render_post_exit=False,
+        )
+    except Exception:
+        if plan.incognito:
+            _run_incognito_cleanup(manager, manifest, presenter)
+        raise
+
+    if plan.incognito:
+        _run_incognito_cleanup(manager, manifest, presenter)
+
+    return ClaudeForkResult(
+        exit_code=launch_result.exit_code,
+        session=manifest.name,
+        manifest=launch_result.manifest,
+        operation_started_at=operation_started_at,
+        did_run=True,
+        # The old host fork branch always printed the reconnect tip after launch;
+        # sidecar forks already used the shared store-aware launch renderer.
+        store_exists=launch_result.store_exists if preferences.use_sidecar else True,
+        worktree_path=launch_result.worktree_path,
+        warnings=launch_result.warnings,
+        render_post_exit=plan.render_post_exit,
+    )
+
+
 def _apply_resume_routing_override_to_state(
     *,
     state: SessionState,
@@ -779,7 +902,9 @@ def _persist_resume_routing_override(
         logger.debug("Failed to persist routing override to manifest", exc_info=True)
 
 
-def _get_effective_proxy_for_resume(state: SessionState) -> tuple[str | None, str | None, str | None]:
+def _get_effective_proxy_for_resume(
+    state: SessionState,
+) -> tuple[str | None, str | None, str | None]:
     """Resolve template/base_url/proxy_id without depending on the CLI module."""
     if state.confirmed.started_with_proxy:
         return (
@@ -1017,7 +1142,7 @@ def _apply_supervisor_wiring(
 def _run_incognito_cleanup(
     manager: SessionManager,
     manifest: SessionState,
-    presenter: ClaudeStartPresenter,
+    presenter: ClaudeIncognitoCleanupPresenter,
 ) -> None:
     """Delete the incognito session on exit; wraps ONLY the launch (never create)."""
     presenter.on_incognito_cleanup_start()
@@ -1033,6 +1158,22 @@ def _run_incognito_cleanup(
         presenter.on_incognito_cleanup_warning(str(e))
 
 
+def _update_manifest_best_effort(
+    store: SessionStore,
+    *,
+    mutate: Callable[[SessionState], None],
+    label: str,
+) -> None:
+    """Best-effort manifest write that must never block interactive launch."""
+    if not store.exists():
+        logger.debug("%s: session manifest missing; skipping", label)
+        return
+    try:
+        store.update(timeout_s=5.0, mutate=mutate)
+    except Exception:
+        logger.debug("%s: manifest update failed", label, exc_info=True)
+
+
 def _run_sidecar_claude_session(
     *,
     manifest: SessionState,
@@ -1044,7 +1185,7 @@ def _run_sidecar_claude_session(
     context_limit: int,
     mounts: tuple[str, ...],
     image: str | None,
-    fork_session: bool,
+    fork_session: bool | None,
     system_prompt_file: str | None,
     name: str | None,
     extra_args: list[str] | None,
@@ -1077,7 +1218,11 @@ def _run_sidecar_claude_session(
     if not is_docker_available():
         raise ForgeOpError("Docker is not available or not running")
 
-    store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True))
+    _update_manifest_best_effort(
+        store,
+        mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True),
+        label="sidecar sandbox confirmation",
+    )
 
     try:
         extra_mounts = parse_mounts(mounts) if mounts else []
@@ -1103,7 +1248,7 @@ def _run_sidecar_claude_session(
     claude_args = build_claude_args(
         session_id=session_id,
         resume_id=resume_id,
-        fork_session=fork_session,
+        fork_session=bool(fork_session),
         name=name,
         model=None,
         system_prompt_file=sidecar_prompt_file,
@@ -1183,10 +1328,18 @@ def _run_sidecar_claude_session(
             ),
         )
     except ContainerExistsError as e:
-        store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False))
+        _update_manifest_best_effort(
+            store,
+            mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False),
+            label="sidecar sandbox rollback",
+        )
         raise ForgeOpError(str(e)) from e
     except Exception:
-        store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False))
+        _update_manifest_best_effort(
+            store,
+            mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False),
+            label="sidecar sandbox rollback",
+        )
         raise
 
     return ClaudeSessionLaunchResult(
@@ -1213,7 +1366,7 @@ def _run_host_claude_session(
     resume_id: str | None,
     runtime_base_url: str | None,
     proxy_id: str | None,
-    fork_session: bool,
+    fork_session: bool | None,
     system_prompt_file: str | None,
     name: str | None,
     extra_args: list[str] | None,
@@ -1226,7 +1379,11 @@ def _run_host_claude_session(
     invoke: Callable[..., int],
     warnings: list[str],
 ) -> ClaudeSessionLaunchResult:
-    store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False))
+    _update_manifest_best_effort(
+        store,
+        mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False),
+        label="host sandbox confirmation",
+    )
 
     if proxy_id is None and runtime_base_url is not None:
         try:
@@ -1263,24 +1420,27 @@ def _run_host_claude_session(
         if error:
             raise ForgeOpError(error)
 
+    invoke_kwargs: dict[str, Any] = {
+        "session_id": session_id,
+        "resume_id": resume_id,
+        "name": name,
+        "model": None,
+        "system_prompt_file": system_prompt_file,
+        "env_vars": env_vars,
+        "unset_env_vars": unset_env_vars,
+        "extra_args": extra_args,
+        "cwd": str(launch_root),
+    }
+    if fork_session is not None:
+        invoke_kwargs["fork_session"] = fork_session
+
     exit_code = active_runner(
         session_name=manifest.name,
         worktree_path=worktree_path,
         launch_mode=LAUNCH_MODE_HOST,
         forge_root=manifest.forge_root,
         claude_session_id=session_id,
-        runner=lambda: invoke(
-            session_id=session_id,
-            resume_id=resume_id,
-            fork_session=fork_session,
-            name=name,
-            model=None,
-            system_prompt_file=system_prompt_file,
-            env_vars=env_vars,
-            unset_env_vars=unset_env_vars,
-            extra_args=extra_args,
-            cwd=str(launch_root),
-        ),
+        runner=lambda: invoke(**invoke_kwargs),
     )
     if exit_code == 0 and not fork_session:
         _infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)

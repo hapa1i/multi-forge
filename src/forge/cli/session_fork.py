@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import sys
 import uuid as _uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -17,7 +16,13 @@ import click
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
-from forge.core.ops.claude_session import launch_claude_session
+from forge.core.ops.claude_session import (
+    ClaudeForkResult,
+    ClaudeLaunchPreferences,
+    ClaudeSidecarLaunch,
+    ForkLaunchPlan,
+    fork_claude_session,
+)
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.core.paths import display_path
@@ -28,20 +33,13 @@ from forge.policy.semantic.supervisor import (
     validate_checker_model,
 )
 from forge.session import (
-    LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
     ForgeSessionError,
     SessionState,
 )
-from forge.session.addendum import (
-    resolve_addendum_content_for_proxy,
-    write_managed_addendum,
-)
 from forge.session.context_limit import _resolve_context_limit
 from forge.session.direct_model import (
     DirectModelPin,
-    apply_direct_model_env,
-    apply_proxy_context_model_defaults,
     resolve_direct_model_pin,
 )
 from forge.session.exceptions import (
@@ -54,18 +52,11 @@ from forge.session.exceptions import (
     WorktreePathExistsError,
 )
 from forge.session.launch import (
-    _build_session_env,
     _combine_prompt_files,
     _get_runtime_base_url,
     _resolve_worktree_extension_root,
 )
-from forge.session.launch_confirmation import (
-    _routing_mode_for,
-    read_proxy_cost_baseline,
-    record_launch_confirmed,
-)
 from forge.session.model_pin import (
-    _apply_direct_model_env_if_supported,
     _validate_direct_model_pin_for_routing,
 )
 
@@ -89,11 +80,9 @@ from forge.cli.session import (  # noqa: E402
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
     _persist_fork_transfer_derivation,
+    _post_exit_render,
     _prepare_rewind_launch_artifacts,
     _print_branch_exists_tip,
-    _print_post_exit_tip,
-    _print_session_activity_summary,
-    _render_claude_launch_result,
     _render_sidecar_launch,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
@@ -103,11 +92,48 @@ from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E40
 from forge.cli.session_model_pin import (  # noqa: E402
     _apply_and_persist_direct_model_override,
 )
-from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
 __all__ = ["fork"]
+
+
+class _ClaudeForkCliPresenter:
+    """CLI-side renderer for ``fork_claude_session`` events."""
+
+    def __init__(self, *, session_name: str) -> None:
+        self._session_name = session_name
+
+    def before_launch(self, forge_root: Path) -> None:
+        _warn_before_claude_launch(forge_root)
+
+    def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
+        _render_sidecar_launch(event)
+
+    def on_launch_error(self, error: ForgeOpError) -> None:
+        print_error(str(error), console=console)
+
+    def on_incognito_cleanup_start(self) -> None:
+        console.print(f"\n[dim]Cleaning up incognito fork '{self._session_name}'...[/dim]")
+
+    def on_incognito_cleanup_ok(self) -> None:
+        console.print("[green]Cleanup complete.[/green]")
+
+    def on_incognito_cleanup_warning(self, message: str) -> None:
+        console.print(f"[yellow]Cleanup warning:[/yellow] {message}")
+
+
+def _render_claude_fork_result(result: ClaudeForkResult) -> int:
+    for warning in result.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+    if not result.did_run or not result.render_post_exit:
+        return result.exit_code
+    return _post_exit_render(
+        result.manifest,
+        store_exists=result.store_exists,
+        exit_code=result.exit_code,
+        since=result.operation_started_at,
+    )
 
 
 @session.command()
@@ -315,16 +341,23 @@ def fork(
         print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
     if supervisor_proxy and supervisor_direct:
-        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
+        print_error(
+            "--supervisor-proxy and --no-supervisor-proxy are mutually exclusive",
+            console=console,
+        )
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
+        print_error(
+            "--supervisor-proxy/--no-supervisor-proxy require --supervise",
+            console=console,
+        )
         sys.exit(1)
     if (
         cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
     ) and not supervise_target:
         print_error(
-            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise", console=console
+            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise",
+            console=console,
         )
         sys.exit(1)
     try:
@@ -368,7 +401,10 @@ def fork(
                 check=True,
             ).stdout.strip()
         except _sp.CalledProcessError:
-            print_error(f"'{display_path(into_path)}' is not inside a git repository", console=console)
+            print_error(
+                f"'{display_path(into_path)}' is not inside a git repository",
+                console=console,
+            )
             sys.exit(1)
 
         # Resolve git-common-dir for the target (absolute, to avoid .git relative path bug)
@@ -403,7 +439,7 @@ def fork(
             main_repo_root = main_git_dir_abs.parent if main_git_dir_abs.name == ".git" else main_git_dir_abs
             if Path(into_resolved).resolve() == main_repo_root:
                 print_error(
-                    "--into targets existing worktrees, not the main checkout. " "Use a same-directory fork instead.",
+                    "--into targets existing worktrees, not the main checkout. Use a same-directory fork instead.",
                     console=console,
                 )
                 sys.exit(1)
@@ -502,10 +538,16 @@ def fork(
             print_error("--drop-last must be non-negative", console=console)
             sys.exit(1)
         if _inline_plan_explicit:
-            print_error("--inline-plan applies only to transfer forks, not --strategy rewind", console=console)
+            print_error(
+                "--inline-plan applies only to transfer forks, not --strategy rewind",
+                console=console,
+            )
             sys.exit(1)
         if resume_mode == "transfer":
-            print_error("--strategy rewind cannot be combined with --resume-mode transfer", console=console)
+            print_error(
+                "--strategy rewind cannot be combined with --resume-mode transfer",
+                console=console,
+            )
             sys.exit(1)
         if not is_cross_dir:
             print_error_with_tip(
@@ -727,10 +769,18 @@ def fork(
         )
         sys.exit(1)
     except BranchNotMergedError as e:
-        print_error_with_tip(str(e), "Merge or delete the branch manually before using --force.", console=console)
+        print_error_with_tip(
+            str(e),
+            "Merge or delete the branch manually before using --force.",
+            console=console,
+        )
         sys.exit(1)
     except WorktreePathExistsError as e:
-        print_error_with_tip(str(e), "Remove the directory or use a different fork name.", console=console)
+        print_error_with_tip(
+            str(e),
+            "Remove the directory or use a different fork name.",
+            console=console,
+        )
         sys.exit(1)
     except InvalidBranchNameError as e:
         print_error(f"{e}", console=console)
@@ -804,7 +854,10 @@ def fork(
         lane = lane_record_for_runtime(SUPERVISOR_CONSUMER, supervisor_runtime) if supervisor_runtime else None
 
         fork_store = SessionStore(fork_forge_root, fork_manifest.name)
-        fork_store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane))
+        fork_store.update(
+            timeout_s=5.0,
+            mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane),
+        )
         fork_manifest = fork_store.read()
 
     if _preflight_routing:
@@ -848,21 +901,6 @@ def fork(
         surface="fork",
     )
 
-    # Set env vars for fork registration (hook uses FORGE_FORK_NAME for fork detection)
-    env_vars, unset_env_vars = _build_session_env(
-        session_name=fork_manifest.name,
-        context_limit=context_limit,
-        template=effective_template,
-        base_url=effective_url,
-        proxy_id=effective_proxy_id,
-        fork_name=fork_manifest.name,
-        parent_session=parent,
-        forge_root=fork_manifest.forge_root,
-        subprocess_proxy=fork_manifest.intent.subprocess_proxy,
-        sidecar=use_sidecar,
-    )
-    if effective_url is not None:
-        apply_proxy_context_model_defaults(env_vars, context_limit)
     fork_name = fork_manifest.name  # Capture for cleanup
     is_worktree_fork = bool(fork_manifest.worktree and fork_manifest.worktree.is_worktree)
     rewind_active = rewind_requested and drop_last is not None and drop_last > 0
@@ -879,29 +917,17 @@ def fork(
     # OR same-directory transfer. native-relocate is a byte-faithful native resume (not a fresh
     # transfer), and rewind is a native-relocate variant with its own fresh transcript UUID.
     uses_fresh_transfer = ((is_worktree_fork and not native_relocate) or same_dir_transfer) and not rewind_active
-    if effective_url is None:
-        from forge.runtime_config import get_default_direct_model
-
-        fork_direct_model = fork_manifest.intent.launch.direct_model if fork_manifest.intent.launch else None
-        fork_direct_model = fork_direct_model or get_default_direct_model()
-        error = apply_direct_model_env(env_vars, fork_direct_model)
-        if error:
-            print_error(f"{error}", console=console)
-            sys.exit(1)
-    elif fork_manifest.intent.launch and fork_manifest.intent.launch.direct_model and effective_proxy_id:
-        error = _apply_direct_model_env_if_supported(
-            env_vars, effective_proxy_id, fork_manifest.intent.launch.direct_model
-        )
-        if error:
-            print_error(f"{error}", console=console)
-            sys.exit(1)
 
     # Assigned only in the fresh-transfer branch (worktree transfer or same-dir transfer);
     # pre-declared so the same-directory native path leaves them bound (consumed under
     # `uses_fresh_transfer` guards below).
     _fork_uuid: str | None = None
     _rewind_resume_id: str | None = None
-    prompt_file: str | None = None
+    launch_prompt_file: str | None = None
+    launch_session_id: str | None = None
+    launch_resume_id: str | None = parent_session_id
+    launch_fork_session: bool | None = True
+    launch_register_fork = False
     if rewind_requested and drop_last == 0:
         console.print("[dim]--drop-last 0 uses plain native-relocate; no rewind context generated.[/dim]")
 
@@ -985,25 +1011,13 @@ def fork(
 
             _nr_store.update(timeout_s=5.0, mutate=_preseed_cpr)
         except Exception:
-            logger.debug("native-relocate claude_project_root pre-seed failed (hook will reconcile)", exc_info=True)
-
-        _nr_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
-        _nr_prompt: str | None = None
-        if _nr_addendum:
-            _nr_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path(_fork_cwd)
-            _nr_prompt = str(write_managed_addendum(_nr_forge_root, fork_manifest.name, _nr_addendum))
-
-        def _invoke_fork() -> int:
-            return _sess().invoke_claude(
-                resume_id=parent_session_id,
-                fork_session=True,
-                name=fork_manifest.name,
-                model=None,
-                system_prompt_file=_nr_prompt,
-                env_vars=env_vars,
-                unset_env_vars=unset_env_vars,
-                cwd=_fork_cwd,
+            logger.debug(
+                "native-relocate claude_project_root pre-seed failed (hook will reconcile)",
+                exc_info=True,
             )
+
+        launch_resume_id = parent_session_id
+        launch_fork_session = True
 
     elif rewind_active:
         assert drop_last is not None
@@ -1043,35 +1057,19 @@ def fork(
             sys.exit(1)
 
         _rewind_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
-        _rewind_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else _rewind_worktree
         _rewind_prompt_files: list[Path] = []
-        _rewind_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
-        if _rewind_addendum:
-            _rewind_prompt_files.append(
-                write_managed_addendum(_rewind_forge_root, fork_manifest.name, _rewind_addendum)
-            )
         if _rewind_artifacts.context_path is not None:
             _rewind_prompt_files.append(_rewind_artifacts.context_path)
         _rewind_configured_prompt = _resolve_manifest_prompt_file(fork_manifest)
         if _rewind_configured_prompt is not None:
             _rewind_prompt_files.append(_rewind_configured_prompt)
-        prompt_file = _combine_prompt_files(
+        launch_prompt_file = _combine_prompt_files(
             worktree_path=_rewind_worktree,
             session_name=fork_manifest.name,
             prompt_files=_rewind_prompt_files,
         )
-
-        def _invoke_fork() -> int:
-            return _sess().invoke_claude(
-                resume_id=_rewind_resume_id,
-                fork_session=True,
-                name=fork_manifest.name,
-                model=None,
-                system_prompt_file=prompt_file,
-                env_vars=env_vars,
-                unset_env_vars=unset_env_vars,
-                cwd=_fork_cwd,
-            )
+        launch_resume_id = _rewind_resume_id
+        launch_fork_session = True
 
     elif uses_fresh_transfer:
         # Shared transfer-launch path: worktree transfer AND same-directory transfer. The only
@@ -1102,13 +1100,13 @@ def fork(
         configured_prompt = _resolve_manifest_prompt_file(fork_manifest)
         if configured_prompt is not None:
             prompt_files.append(configured_prompt)
-        prompt_file = _combine_prompt_files(
+        launch_prompt_file = _combine_prompt_files(
             worktree_path=worktree_path,
             session_name=fork_manifest.name,
             prompt_files=prompt_files,
         )
-        if prompt_file:
-            prompt_path = Path(prompt_file)
+        if launch_prompt_file:
+            prompt_path = Path(launch_prompt_file)
             try:
                 console.print(f"  Context:  {prompt_path.relative_to(worktree_path)}")
             except ValueError:
@@ -1147,61 +1145,15 @@ def fork(
         except Exception:
             logger.debug("Pre-seed UUID write failed (hook will reconcile)", exc_info=True)
 
-        from forge.session.claude.paths import (
-            resolve_claude_project_root as _resolve_fork_root,
-        )
-
-        _fork_cwd = _resolve_fork_root(fork_manifest)
-
-        _wt_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
-        _wt_prompt = prompt_file
-        if _wt_addendum:
-            _wt_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path.cwd()
-            _wt_addendum_path = write_managed_addendum(_wt_forge_root, fork_manifest.name, _wt_addendum)
-            _wt_files: list[Path] = [_wt_addendum_path]
-            if _wt_prompt:
-                _wt_files.append(Path(_wt_prompt))
-            _wt_prompt = _combine_prompt_files(
-                worktree_path=worktree_path,
-                session_name=fork_manifest.name,
-                prompt_files=_wt_files,
-            )
-
-        def _invoke_fork() -> int:
-            return _sess().invoke_claude(
-                session_id=_fork_uuid,
-                name=fork_manifest.name,
-                model=None,
-                system_prompt_file=_wt_prompt,
-                env_vars=env_vars,
-                unset_env_vars=unset_env_vars,
-                cwd=_fork_cwd,
-            )
+        launch_session_id = _fork_uuid
+        launch_resume_id = None
+        launch_fork_session = False if use_sidecar else None
+        launch_register_fork = True
 
     # Same-directory forks: --resume --fork-session works natively.
     else:
-        from forge.session.claude.paths import (
-            resolve_claude_project_root as _resolve_fork_root,
-        )
-
-        _fork_cwd = _resolve_fork_root(fork_manifest)
-        _samedir_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
-        _samedir_prompt: str | None = None
-        if _samedir_addendum:
-            _samedir_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path.cwd()
-            _samedir_prompt = str(write_managed_addendum(_samedir_forge_root, fork_manifest.name, _samedir_addendum))
-
-        def _invoke_fork() -> int:
-            return _sess().invoke_claude(
-                resume_id=parent_session_id,
-                fork_session=True,
-                name=fork_manifest.name,
-                model=None,
-                system_prompt_file=_samedir_prompt,
-                env_vars=env_vars,
-                unset_env_vars=unset_env_vars,
-                cwd=_fork_cwd,
-            )
+        launch_resume_id = parent_session_id
+        launch_fork_session = True
 
     # Auto-install extensions in worktree forks (before no_launch check so --no-launch still prepares the worktree)
     if is_worktree_fork:
@@ -1232,119 +1184,46 @@ def fork(
                 force_extensions=extensions,
             )
     elif extensions is True:
-        print_tip("--extensions only applies with --worktree.", blank_before=False, console=console)
+        print_tip(
+            "--extensions only applies with --worktree.",
+            blank_before=False,
+            console=console,
+        )
 
     if no_launch:
         console.print("[dim]Fork created (--no-launch: Claude not started)[/dim]")
         if is_worktree_fork or same_dir_transfer:
-            print_tip("Resume this fork with:", commands=[_resume_tip_command(fork_manifest)], console=console)
+            print_tip(
+                "Resume this fork with:",
+                commands=[_resume_tip_command(fork_manifest)],
+                console=console,
+            )
         sys.exit(0)
 
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
-
-    if use_sidecar:
-        exit_code = 0
-        try:
-            try:
-                launch_result = launch_claude_session(
-                    manifest=fork_manifest,
-                    session_id=_fork_uuid if uses_fresh_transfer else None,
-                    resume_id=None if uses_fresh_transfer else (_rewind_resume_id or parent_session_id),
-                    effective_template=effective_template,
-                    runtime_base_url=runtime_base_url,
-                    context_limit=context_limit,
-                    use_sidecar=True,
-                    mounts=mounts,
-                    image=image,
-                    fork_session=not uses_fresh_transfer,
-                    register_fork=uses_fresh_transfer,
-                    system_prompt_file=prompt_file if (uses_fresh_transfer or rewind_active) else None,
-                    name=fork_manifest.name,
-                    proxy_id=effective_proxy_id,
-                    before_launch=_warn_before_claude_launch,
-                    on_sidecar_launch=_render_sidecar_launch,
-                    invoke=_sess().invoke_claude,
-                    run_active=_sess().run_with_active_session,
-                )
-            except ForgeOpError as e:
-                print_error(str(e), console=console)
-                exit_code = 1
-            else:
-                exit_code = _render_claude_launch_result(launch_result)
-        finally:
-            if incognito:
-                console.print(f"\n[dim]Cleaning up incognito fork '{fork_name}'...[/dim]")
-                try:
-                    manager.delete_session(
-                        fork_name,
-                        delete_transcripts=True,
-                        force=True,
-                        forge_root=fork_manifest.forge_root,
-                    )
-                    console.print("[green]Cleanup complete.[/green]")
-                except ForgeSessionError as e:
-                    console.print(f"[yellow]Cleanup warning:[/yellow] {e}")
-        sys.exit(exit_code)
-
-    fork_worktree = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
-    # Check hooks from forge_root (where .claude/ lives), not checkout root
-    _fork_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree
-    _sess()._warn_if_hooks_missing(_fork_forge_root)
-    _sess()._warn_if_version_outdated()
-
-    # Host forks launch via the local _invoke_fork closures,
-    # so record launch facts here. compute mirrors the interactive finalizer's resolution.
-    from forge.session.store import SessionStore as _LaunchStore
-
-    _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
-    record_launch_confirmed(
-        _LaunchStore(str(_fork_forge_root), fork_manifest.name),
-        routing_mode=_routing_mode_for(runtime_base_url, effective_proxy_id),
-        proxy_id=effective_proxy_id,
-        base_url=runtime_base_url,
-        decision=compute_interactive_api_key_decision(interactive=True),
-        proxy_cost_baseline_micros=_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None,
-        proxy_cost_baseline_started_at=_proxy_cost_baseline.started_at if _proxy_cost_baseline else None,
+    result = fork_claude_session(
+        manager=manager,
+        plan=ForkLaunchPlan(
+            manifest=fork_manifest,
+            session_id=launch_session_id,
+            resume_id=launch_resume_id,
+            fork_session=launch_fork_session,
+            register_fork=launch_register_fork,
+            prompt_file=Path(launch_prompt_file) if launch_prompt_file is not None else None,
+            context_limit=context_limit,
+            launch_preferences=ClaudeLaunchPreferences(
+                use_sidecar=use_sidecar,
+                mounts=mounts,
+                image=image,
+            ),
+            effective_template=effective_template,
+            runtime_base_url=runtime_base_url,
+            proxy_id=effective_proxy_id,
+            incognito=incognito,
+            render_post_exit=(not incognito or use_sidecar),
+        ),
+        presenter=_ClaudeForkCliPresenter(session_name=fork_name),
+        invoke=_sess().invoke_claude,
+        run_active=_sess().run_with_active_session,
     )
-
-    active_claude_session_id = _fork_uuid if uses_fresh_transfer else None
-
-    # Scope the post-exit summary to this run (hooks write during the session).
-    launch_started_at = datetime.now(timezone.utc)
-
-    if incognito:
-        exit_code = 0
-        try:
-            exit_code = _sess().run_with_active_session(
-                session_name=fork_name,
-                worktree_path=fork_worktree,
-                launch_mode=LAUNCH_MODE_HOST,
-                forge_root=fork_manifest.forge_root,
-                claude_session_id=active_claude_session_id,
-                runner=_invoke_fork,
-            )
-        finally:
-            console.print(f"\n[dim]Cleaning up incognito fork '{fork_name}'...[/dim]")
-            try:
-                manager.delete_session(
-                    fork_name,
-                    delete_transcripts=True,
-                    force=True,
-                    forge_root=fork_manifest.forge_root,
-                )
-                console.print("[green]Cleanup complete.[/green]")
-            except ForgeSessionError as e:
-                console.print(f"[yellow]Cleanup warning:[/yellow] {e}")
-        sys.exit(exit_code)
-    else:
-        exit_code = _sess().run_with_active_session(
-            session_name=fork_name,
-            worktree_path=fork_worktree,
-            launch_mode=LAUNCH_MODE_HOST,
-            forge_root=fork_manifest.forge_root,
-            claude_session_id=active_claude_session_id,
-            runner=_invoke_fork,
-        )
-        _print_session_activity_summary(fork_manifest, since=launch_started_at)
-        _print_post_exit_tip(fork_manifest)
-        sys.exit(exit_code)
+    sys.exit(_render_claude_fork_result(result))

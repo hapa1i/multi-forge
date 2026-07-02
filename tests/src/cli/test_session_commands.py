@@ -2519,7 +2519,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
-            patch("forge.cli.session_fork.launch_claude_session", return_value=launch_result) as mock_launch,
+            patch("forge.core.ops.claude_session.launch_claude_session", return_value=launch_result) as mock_launch,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2772,6 +2772,57 @@ class TestSessionFork:
         assert result.exit_code == 0, result.output
         combined = fork_worktree / ".forge" / "launch-context" / "fork-child.md"
         content = combined.read_text(encoding="utf-8")
+        assert "# Parent context" in content
+        assert content.count("# Tool Parameter Guidance") == 1
+
+    def test_host_worktree_fork_injects_addendum_once(self, runner: CliRunner, temp_env: Path) -> None:
+        """Host worktree forks should let the shared launcher own managed addendum composition."""
+        parent = create_session_state(
+            "fork-parent",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(temp_env),
+            worktree_branch="main",
+        )
+        parent.confirmed.claude_session_id = "parent-uuid"
+
+        fork_worktree = temp_env / "fork-child"
+        fork_worktree.mkdir()
+        fork_state = create_session_state(
+            "fork-child",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            parent_session="fork-parent",
+            is_fork=True,
+            worktree_path=str(fork_worktree),
+            worktree_branch="fork-child",
+        )
+        assert fork_state.worktree is not None
+        fork_state.worktree.is_worktree = True
+        fork_state.forge_root = str(fork_worktree)
+
+        context_file = fork_worktree / ".forge" / "prev_sessions" / "fork-parent" / "children" / "fork-child.md"
+        context_file.parent.mkdir(parents=True)
+        context_file.write_text("# Parent context\n", encoding="utf-8")
+
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
+            patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.fork_session.return_value = (parent, fork_state)
+
+            result = runner.invoke(
+                main,
+                ["session", "fork", "fork-parent", "--name", "fork-child", "--worktree", "--proxy", "openai-proxy"],
+            )
+
+        assert result.exit_code == 0, result.output
+        prompt_file = mock_invoke.call_args.kwargs["system_prompt_file"]
+        content = Path(prompt_file).read_text(encoding="utf-8")
         assert "# Parent context" in content
         assert content.count("# Tool Parameter Guidance") == 1
 

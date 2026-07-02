@@ -454,11 +454,12 @@ Current coverage: start `--no-launch`, incognito start, fresh-resume (transfer).
 
 ## Slice 4a -- fork launch migration (`fork_claude_session`)
 
-**Status:** 4a.1 implemented 2026-07-02; 4a.2 planned. Fork surface was verified against the pre-4a.1 tree
-(`session_fork.py` = 1,336 lines; `session_lifecycle.py` = 2,121 lines). After 4a.1, `session_lifecycle.py` = **2,072
-lines** and `session_fork.py` = **1,350 lines**. Slice 4 splits into **4a** (fork launch migration -- itself **4a.1**
-adapter deletion + **4a.2** the `fork_claude_session` op, both below) and **4b** (supervisor validation/wiring + sidecar
-prep extraction).
+**Status:** 4a.1 committed 2026-07-02; 4a.2 implemented locally 2026-07-02 and verified. Fork surface was verified
+against the pre-4a.1 tree (`session_fork.py` = 1,336 lines; `session_lifecycle.py` = 2,121 lines). After 4a.1,
+`session_lifecycle.py` = **2,072 lines** and `session_fork.py` = **1,350 lines**. After 4a.2, `session_lifecycle.py` =
+**2,072 lines** and `session_fork.py` = **1,229 lines**. Slice 4 splits into **4a** (fork launch migration -- itself
+**4a.1** adapter deletion + **4a.2** the `fork_claude_session` op, both below) and **4b** (supervisor validation/wiring
+\+ sidecar prep extraction).
 
 ### Scope correction (verified -- the migration is bigger than "one caller")
 
@@ -540,15 +541,34 @@ preserve deliberately.
 
 **4a.2 -- `fork_claude_session` op + host-closure unification (the lift).**
 
-- Introduce `fork_claude_session` mirroring `start_claude_session` (owns incognito). Unify the 4 host closures into one
-  parameterized launch (discriminators above); render via a `ForkPresenter`. Preserve the incognito boundary from fact
-  1\.
-- Add `launch_root_override` **only if** a characterization test proves the default resolver is insufficient.
+- [x] Introduce `fork_claude_session` mirroring `start_claude_session` (owns incognito). Unify the 4 host closures into
+  one parameterized launch (discriminators above); render via a `ForkPresenter`. Preserve the incognito boundary from
+  fact 1.
+- [x] Add `launch_root_override` **only if** a characterization test proves the default resolver is insufficient. No
+  override was needed; `launch_claude_session`'s existing resolver matched the old fork cwd behavior.
+- [x] Managed addendum is now launcher-owned for fork: native-relocate/same-dir pass `None`, transfer/rewind pass only
+  user/context/configured prompts, and host + sidecar worktree fork tests assert exactly one managed addendum.
+- [x] Run integration (`./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`) and
+  `make pre-commit`; record results before marking 4a.2 complete.
 - **Assertions:** op render-free + layering clean; fork manifest byte-identical for same-dir, worktree-transfer,
   native-relocate, and **incognito** (mid-launch capture + delete-on-exit assertion, like the incognito start test); the
   launched **system-prompt contains the managed addendum exactly once** for every mode (assert on the combined prompt
   file, not the manifest); **rewind (sidecar + host) explicitly characterized** to confirm/fix the pre-existing possible
   duplication.
+
+**Recorded verification (4a.2):**
+
+- `uv run pytest tests/src/cli/test_session_commands.py::TestSessionFork tests/src/cli/test_session_rewind_cli.py tests/regression/test_bug_21x_fork_launch_handoff.py -q`
+  -> 54 passed.
+- `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_rewind_cli.py tests/regression/test_bug_21x_fork_launch_handoff.py tests/regression/test_bug_codex_fork_orphan.py tests/regression/test_bug_passthrough_model_pin.py tests/src/session/test_claude_session_manifest_characterization.py -q`
+  -> 245 passed.
+- Layering grep (`from forge.cli|import forge.cli` in `core/ops/` + `session/model_pin.py`) -> empty.
+- Op render-free grep (`click|rich|console|sys.exit|print_error|print_tip` in `core/ops/claude_session.py` +
+  `session/model_pin.py`) -> empty.
+- `wc -l src/forge/cli/session_fork.py src/forge/cli/session_lifecycle.py src/forge/core/ops/claude_session.py` ->
+  `session_fork.py` 1,229; `session_lifecycle.py` 2,072; `core/ops/claude_session.py` 1,485.
+- `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -> 21 passed.
+- `make pre-commit` -> passed.
 
 ### Boundary (4a.2)
 
