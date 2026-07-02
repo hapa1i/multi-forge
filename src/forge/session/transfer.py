@@ -105,6 +105,7 @@ class ResumeStrategy(str, Enum):
     STRUCTURED = "structured"
     FULL = "full"
     AI_CURATED = "ai-curated"
+    REWIND = "rewind"
 
 
 def _build_frontmatter(
@@ -668,23 +669,12 @@ class _CurationCall:
     provider_meta: Any | None = None
 
 
-def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
-    """Call the curation LLM and parse its structured JSON response.
+def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str = "transfer-curate") -> _CurationCall:
+    """Call the curation LLM with a prepared user prompt and parse JSON output.
 
-    Args:
-        transcript_text: Formatted transcript text (already bounded, turn-anchored).
-
-    Returns:
-        A ``_CurationCall``: the parsed fields (``goal``, ``decisions``,
-        ``current_state``, ``files``, ``open_questions``) plus the provider ``usage``
-        and wall-clock latency, so the caller can attribute this real spend to the
-        usage ledger. Unparseable output returns ``curated=None`` rather than raising
-        -- the tokens were spent and must still reach the ledger (the caller emits
-        with ``status="error"``, then falls back).
-
-    Raises:
-        Exception: On any LLM/transport error (no response, so nothing measurable
-            to attribute; caller falls back to a deterministic strategy).
+    The caller owns the schema instructions in ``user_prompt``. This helper owns
+    the shared curation transport contract: untrusted-transcript system prompt,
+    OpenRouter routing, provider-user grouping, parse-as-JSON, and usage metadata.
     """
     # Lazy import to avoid circular dependencies and startup cost
     import time
@@ -700,7 +690,7 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     # internally, so model input is unchanged. Mirrors core/reactive/tagger.py.
     messages = [
         Message(role="system", content=AI_CURATION_SYSTEM_PROMPT),
-        Message(role="user", content=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text)),
+        Message(role="user", content=user_prompt),
     ]
     hp = ModelHyperparameters(
         max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
@@ -709,7 +699,7 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     # Curation always routes through OpenRouter (AI_CURATION_PROVIDER), so the only gate
     # is the global toggle (resolved inside). Groups this spend account-side with the
     # rest of the run's OpenRouter calls under one opaque `user` id.
-    provider_user = resolve_direct_provider_user("transfer-curate")
+    provider_user = resolve_direct_provider_user(provider_user_role)
     if provider_user:
         hp = with_openrouter_user(hp, provider_user)
     start = time.monotonic()
@@ -728,8 +718,37 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     )
 
 
-def _emit_curation_usage(call: _CurationCall) -> None:
-    """Attribute the ai-curated transfer's ``core.llm`` call to the usage ledger.
+def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
+    """Call the transfer curation LLM and parse its structured JSON response.
+
+    Args:
+        transcript_text: Formatted transcript text (already bounded, turn-anchored).
+
+    Returns:
+        A ``_CurationCall``: the parsed fields (``goal``, ``decisions``,
+        ``current_state``, ``files``, ``open_questions``) plus the provider ``usage``
+        and wall-clock latency, so the caller can attribute this real spend to the
+        usage ledger. Unparseable output returns ``curated=None`` rather than raising
+        -- the tokens were spent and must still reach the ledger (the caller emits
+        with ``status="error"``, then falls back).
+
+    Raises:
+        Exception: On any LLM/transport error (no response, so nothing measurable
+            to attribute; caller falls back to a deterministic strategy).
+    """
+    return _call_llm_for_curation_prompt(
+        AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text),
+        provider_user_role="transfer-curate",
+    )
+
+
+def _emit_curation_usage(
+    call: _CurationCall,
+    *,
+    command: str = "transfer-curate",
+    operation: str = "transfer.curate",
+) -> None:
+    """Attribute a curation ``core.llm`` call to the usage ledger.
 
     Best-effort, and no-ops without an ambient run identity -- a normal
     ``resume --fresh --strategy ai-curated`` outside a Forge run tree stays silent.
@@ -747,7 +766,7 @@ def _emit_curation_usage(call: _CurationCall) -> None:
     parse_failed = call.curated is None
     session = os.environ.get("FORGE_SESSION")
     emit_direct_llm_usage(
-        command="transfer-curate",
+        command=command,
         model=AI_CURATION_MODEL,
         provider=AI_CURATION_PROVIDER,
         usage=call.usage,
@@ -762,8 +781,8 @@ def _emit_curation_usage(call: _CurationCall) -> None:
         from forge.core.telemetry.upstream import record_upstream_operation
 
         record_upstream_operation(
-            command="transfer-curate",
-            operation="transfer.curate",
+            command=command,
+            operation=operation,
             status="error" if parse_failed else "success",
             session=session,
             reason_code="unparseable_output" if parse_failed else None,
@@ -1119,6 +1138,8 @@ def assemble_transfer_context(
     if target_runtime not in TRANSFER_TARGET_RUNTIMES:
         valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
         raise ValueError(f"Unknown target runtime '{target_runtime}' (valid: {valid}).")
+    if strategy == ResumeStrategy.REWIND:
+        raise ValueError("rewind is not a transfer context strategy; use the CLI rewind launch path with --drop-last")
 
     warnings: list[str] = []
 

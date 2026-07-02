@@ -541,6 +541,7 @@ class TestResumeStrategy:
         assert ResumeStrategy.STRUCTURED.value == "structured"
         assert ResumeStrategy.FULL.value == "full"
         assert ResumeStrategy.AI_CURATED.value == "ai-curated"
+        assert ResumeStrategy.REWIND.value == "rewind"
 
     def test_from_string(self) -> None:
         """Should be constructible from string."""
@@ -548,6 +549,7 @@ class TestResumeStrategy:
         assert ResumeStrategy("structured") == ResumeStrategy.STRUCTURED
         assert ResumeStrategy("full") == ResumeStrategy.FULL
         assert ResumeStrategy("ai-curated") == ResumeStrategy.AI_CURATED
+        assert ResumeStrategy("rewind") == ResumeStrategy.REWIND
 
     def test_invalid_raises(self) -> None:
         """Invalid values should raise ValueError."""
@@ -1144,6 +1146,19 @@ class TestInlinePlan:
                 {"kind": "approved", "snapshot_path": ".forge/artifacts/parent/plans/plan_test.md"}
             ]
         return state
+
+    def test_rewind_strategy_is_not_a_transfer_context_strategy(self, tmp_path: Path) -> None:
+        state = self._make_parent_state(tmp_path)
+
+        with pytest.raises(ValueError, match="not a transfer context strategy"):
+            assemble_transfer_context(
+                parent_name="parent",
+                parent_state=state,
+                forge_root=tmp_path,
+                strategy=ResumeStrategy.REWIND,
+                depth=1,
+                get_session=lambda _: None,
+            )
 
     def test_inline_plan_false_shows_path_only(self, tmp_path: Path) -> None:
         """Default inline_plan=False shows path reference, not content."""

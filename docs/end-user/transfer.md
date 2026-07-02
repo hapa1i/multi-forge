@@ -62,6 +62,14 @@ forge session transfer diff <parent> --child <c>           # how the cache has d
 model — it distils the transcript into the full schema; the others are deterministic. `ai-curated` needs
 `OPENROUTER_API_KEY` (see [authentication.md](authentication.md)); without it, curation falls back to `structured`.
 
+`rewind` is a resume/fork launch strategy, not a `forge session transfer regenerate` strategy. Use
+`forge session resume <parent> --fresh --strategy rewind --drop-last N` to resume a fresh child from a truncated native
+transcript plus a code-delta prompt for the dropped tail. Same-directory resume is allowed because Forge resumes a fresh
+truncated UUID `<R>`, not the parent's UUID. For `forge session fork`, rewind requires `--worktree` or `--into`;
+same-dir and sidecar rewind forks are rejected. If code-delta curation fails, Forge falls back to plain native
+resume/native-relocate with a note. If the dropped window has no code-edit tool calls, Forge writes a deterministic
+no-code-delta context and does not call the curation model.
+
 ## Hand a plan to Codex (cross-runtime)
 
 Reasoning state is **not** portable across agent runtimes, so the cross-runtime hop is the **curated transfer**, not a
@@ -129,4 +137,6 @@ ledger row (no ambient run tree).
   `forge session transfer regenerate <parent>` (or `forge session resume <parent> --fresh`) to create it.
 - **`ai-curated` produced a plain (structured) body** — no `OPENROUTER_API_KEY`, or the parent has no transcript.
   Curation is best-effort; the deterministic body still ships.
+- **`rewind` printed "code-delta unavailable"** — the truncated transcript was not launched. Forge fell back to plain
+  native resume/native-relocate so the child still starts with the full parent conversation.
 - **Codex isn't ready** — run `forge runtime preflight codex` for the blocking reason (install / authenticate `codex`).

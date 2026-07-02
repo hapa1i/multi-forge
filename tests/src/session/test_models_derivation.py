@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from pathlib import Path
 
 import dacite
 import pytest
@@ -17,7 +18,9 @@ from forge.session.models import (
     SessionConfirmed,
     SessionState,
     StartedWithProxy,
+    create_session_state,
 )
+from forge.session.store import SessionStore
 
 
 class TestDerivationDataclass:
@@ -39,6 +42,8 @@ class TestDerivationDataclass:
         assert d.resumed_at is None
         assert d.lineage == []
         assert d.context_file is None
+        assert d.dropped_turns is None
+        assert d.rewind_relocated_session_id is None
 
     def test_all_fields(self) -> None:
         """Should accept all fields."""
@@ -60,6 +65,37 @@ class TestDerivationDataclass:
         assert d.resumed_at == "2025-01-15T10:00:00+00:00"
         assert d.lineage == ["parent", "grandparent", "great-grandparent"]
         assert d.context_file == ".forge/prev_sessions/parent/children/child.md"
+
+    def test_rewind_derivation_strict_store_roundtrip(self, tmp_path: Path) -> None:
+        """Rewind's additive derivation fields survive the strict SessionStore reader."""
+        state = create_session_state(
+            "rewind-child",
+            parent_session="parent",
+            is_fork=True,
+        )
+        state.confirmed.derivation = Derivation(
+            parent_session="parent",
+            parent_transcript=".forge/artifacts/parent/transcript.jsonl",
+            resume_mode="native-relocate",
+            strategy="rewind",
+            depth=1,
+            lineage=["parent"],
+            context_file=".forge/prev_sessions/parent/children/rewind-child.md",
+            dropped_turns=3,
+            rewind_relocated_session_id="296385c3-9753-452b-af3d-e9170233c613",
+        )
+
+        store = SessionStore(str(tmp_path), "rewind-child")
+        store.write(state)
+
+        parsed = store.read()
+        derivation = parsed.confirmed.derivation
+        assert derivation is not None
+        assert derivation.resume_mode == "native-relocate"
+        assert derivation.strategy == "rewind"
+        assert derivation.context_file == ".forge/prev_sessions/parent/children/rewind-child.md"
+        assert derivation.dropped_turns == 3
+        assert derivation.rewind_relocated_session_id == "296385c3-9753-452b-af3d-e9170233c613"
 
 
 class TestSessionConfirmedWithDerivation:

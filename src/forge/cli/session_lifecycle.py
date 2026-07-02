@@ -71,6 +71,7 @@ from forge.session.prev_sessions import (
     notes_for_snapshot,
     notes_has_user_content,
 )
+from forge.session.transfer import ResumeStrategy
 
 
 # Names that tests patch on forge.cli.session (invoke_claude,
@@ -116,6 +117,14 @@ from forge.cli.session_codex import (  # noqa: E402
     run_codex_resume,
     run_codex_start,
 )
+from forge.cli.session_resume_modes import (  # noqa: E402
+    _resume_fresh_native,
+    _resume_fresh_rewind,
+)
+from forge.cli.session_rewind import (  # noqa: E402
+    _persist_rewind_derivation,
+    _prepare_rewind_launch_artifacts,
+)
 
 # Functions below are accessed through _sess() because tests patch them
 # on forge.cli.session. Direct imports would bypass those patches.
@@ -136,6 +145,7 @@ __all__ = [
     "_reconnect_in_place",
     "_launch_as_child",
     "_resume_fresh",
+    "_resume_fresh_rewind",
     "_resume_fresh_native",
     "_pick_session",
     "_print_context_path",
@@ -150,6 +160,8 @@ __all__ = [
     "_resolve_manifest_prompt_file",
     "_infer_launch_confirmation",
     "_persist_fork_transfer_derivation",
+    "_persist_rewind_derivation",
+    "_prepare_rewind_launch_artifacts",
     "_warn_if_hooks_missing",
     "_warn_if_version_outdated",
 ]
@@ -1470,9 +1482,15 @@ def start(
 @click.option(
     "--strategy",
     "-s",
-    type=click.Choice(["minimal", "structured", "full", "ai-curated"]),
+    type=click.Choice(["minimal", "structured", "full", "ai-curated", "rewind"]),
     default="structured",
     help="Context assembly strategy (only with --fresh, default: structured)",
+)
+@click.option(
+    "--drop-last",
+    type=int,
+    default=None,
+    help="Required with --strategy rewind: number of tail conversational turns to drop.",
 )
 @click.option(
     "--depth",
@@ -1521,6 +1539,7 @@ def resume(
     fresh: bool,
     child_name: str | None,
     strategy: str,
+    drop_last: int | None,
     depth: int,
     resume_mode: str | None,
     review: bool,
@@ -1552,6 +1571,30 @@ def resume(
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
+
+    _drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
+    rewind_requested = strategy == ResumeStrategy.REWIND.value
+    if _drop_last_explicit and not rewind_requested:
+        print_error("--drop-last requires --strategy rewind", console=console)
+        sys.exit(1)
+    if rewind_requested:
+        if not fresh:
+            print_error("--strategy rewind requires --fresh", console=console)
+            sys.exit(1)
+        if drop_last is None:
+            print_error("--strategy rewind requires --drop-last N", console=console)
+            sys.exit(1)
+        if drop_last < 0:
+            print_error("--drop-last must be non-negative", console=console)
+            sys.exit(1)
+        if resume_mode == "transfer":
+            print_error("--strategy rewind cannot be combined with --resume-mode transfer", console=console)
+            sys.exit(1)
+        if review:
+            print_error(
+                "--review is only supported for transfer-mode fresh resumes, not --strategy rewind", console=console
+            )
+            sys.exit(1)
 
     normalized_direct_model: str | None = None
     direct_model_pin: DirectModelPin | None = None
@@ -1683,17 +1726,70 @@ def resume(
             sys.exit(1)
 
     if fresh:
-        effective_resume_mode = resume_mode or "transfer"
+        effective_resume_mode = ResumeStrategy.REWIND.value if rewind_requested else resume_mode or "transfer"
 
         # Warn about transfer-only flags with native mode
-        if effective_resume_mode == "native":
+        if effective_resume_mode in {"native", ResumeStrategy.REWIND.value}:
             ctx = click.get_current_context()
-            if ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE:
+            if (
+                effective_resume_mode == "native"
+                and ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
+            ):
                 print_tip("--strategy is ignored with --resume-mode native.", blank_before=False, console=console)
             if ctx.get_parameter_source("depth") == click.core.ParameterSource.COMMANDLINE:
-                print_tip("--depth is ignored with --resume-mode native.", blank_before=False, console=console)
+                depth_surface = (
+                    "--strategy rewind"
+                    if effective_resume_mode == ResumeStrategy.REWIND.value
+                    else "--resume-mode native"
+                )
+                print_tip(f"--depth is ignored with {depth_surface}.", blank_before=False, console=console)
 
-        if effective_resume_mode == "native":
+        if effective_resume_mode == ResumeStrategy.REWIND.value:
+            if not _is_resumable_session(manifest):
+                print_error(
+                    "--strategy rewind requires a parent with a confirmed Claude session "
+                    "(hook-confirmed or transcript-backed).",
+                    console=console,
+                )
+                sys.exit(1)
+            _parent_launch = manifest.intent.launch
+            _parent_is_sidecar = manifest.confirmed.is_sandboxed or (
+                _parent_launch is not None and _parent_launch.mode == LAUNCH_MODE_SIDECAR
+            )
+            if not direct and _parent_is_sidecar:
+                print_error_with_tip(
+                    "--strategy rewind is not supported with sidecar mode.",
+                    "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) "
+                    "or use transfer mode.",
+                    console=console,
+                )
+                sys.exit(1)
+            if drop_last == 0:
+                console.print("[dim]--drop-last 0 uses plain native resume; no rewind context generated.[/dim]")
+                _resume_fresh_native(
+                    manager=manager,
+                    parent=name,
+                    parent_state=manifest,
+                    child_name=child_name,
+                    routing=routing,
+                    direct=direct,
+                    direct_model_override=normalized_direct_model,
+                    memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+                )
+                return
+            assert drop_last is not None
+            _resume_fresh_rewind(
+                manager=manager,
+                parent=name,
+                parent_state=manifest,
+                child_name=child_name,
+                drop_last=drop_last,
+                routing=routing,
+                direct=direct,
+                direct_model_override=normalized_direct_model,
+                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+            )
+        elif effective_resume_mode == "native":
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
             # A pre-seeded UUID alone is not enough — there must be a real conversation to resume.
             if not _is_resumable_session(manifest):
@@ -2278,101 +2374,6 @@ def _resume_fresh(
         image=image,
         fork_session=False,
         system_prompt_file=prompt_file,
-        name=child_manifest.name,
-        proxy_id=launch_proxy_id,
-    )
-
-    sys.exit(exit_code)
-
-
-def _resume_fresh_native(
-    *,
-    manager: SessionManager,
-    parent: str,
-    parent_state: SessionState,
-    child_name: str | None,
-    routing: ResolvedRouting | None,
-    direct: bool,
-    direct_model_override: str | None = None,
-    memory_flag: bool | None = None,
-) -> None:
-    """Create a child session with native conversation resume.
-
-    Uses --resume --fork-session to carry full conversation history into a new
-    Forge session. No context assembly or system_prompt_file generation.
-
-    Requires the parent to have a confirmed claude_session_id (caller validates).
-    """
-    # Routing for context limit: --proxy/--no-proxy override > parent's effective routing.
-    if routing:
-        effective_proxy_ref = routing.proxy_id
-    elif direct:
-        effective_proxy_ref = None
-    else:
-        effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(parent_state)
-        effective_proxy_ref = effective_proxy_id or effective_template
-
-    context_limit = _sess()._resolve_context_limit(effective_proxy_ref)
-
-    try:
-        child_manifest, transfer_result = manager.resume_session(
-            parent,
-            child_name=child_name,
-            resume_mode="native",
-            forge_root=parent_state.forge_root,
-            memory_flag=memory_flag,
-        )
-    except ForgeSessionError as e:
-        handle_session_error(e)
-        return
-
-    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    _persist_routing_override(
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        session_name=child_manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    _apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
-
-    if transfer_result.warnings:
-        for warning in transfer_result.warnings:
-            console.print(f"[yellow]Warning:[/yellow] {warning}")
-
-    parent_uuid = parent_state.confirmed.claude_session_id
-    assert parent_uuid is not None  # caller validated
-
-    console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
-    console.print("[dim]Mode: Native resume (full conversation history via --fork-session)[/dim]")
-    console.print()
-
-    launch_template, launch_base_url, launch_proxy_id = _get_effective_proxy_for_session(child_manifest)
-    if routing and routing.proxy_id:
-        launch_proxy_id = routing.proxy_id
-    use_sidecar, mounts, image = _get_launch_preferences(child_manifest)
-    _apply_and_persist_direct_model_override(
-        state=child_manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
-    )
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
-
-    _print_routing_summary(template=launch_template, base_url=runtime_base_url)
-    console.print()
-
-    exit_code = _launch_claude_for_session(
-        manifest=child_manifest,
-        session_id=None,
-        resume_id=parent_uuid,
-        effective_template=launch_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=True,
         name=child_manifest.name,
         proxy_id=launch_proxy_id,
     )
