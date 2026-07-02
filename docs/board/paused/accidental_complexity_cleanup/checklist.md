@@ -1,11 +1,13 @@
 # checklist -- accidental_complexity_cleanup
 
-**Branch**: `cleanup/accidental-complexity-batch-a`
+**Branch**: `cleanup/accidental-complexity-batch-a-b` (merged)
 
-**Current focus**: Batches A + B **implemented + verified**. Batch B (#13-#16) shipped in 4 commits; targeted unit
-suites green per item, #15/#16 integration-verified (auth credential resolution 4 passed, proxy commands 27 passed), and
-a 4-way adversarial review came back clean save one stale comment (fixed). Card stays in `doing/` while Batch C remains
-(stub below).
+**Status**: **PAUSED** (2026-07-02). Batches A + B shipped and **merged to `main` via PR #65** (`584aa2a1`), including
+two pre-merge review follow-ups folded into the squash: a `FORGE_DEBUG` fail-open regression test
+(`test_forge_debug_invalid_warns_and_ignores`) and a black-format fix to `loader.py`. An 8-dimension adversarial review
+plus an independent `make pre-commit` + full touched-suite run came back clean before merge. **Paused with Batch C
+(#17-#20) and the two surfaced defects (Defect B: auth-retry provider-trace gap; Gap A: policy fail-open prose-only
+check) still open** -- see the Phase C stub below. To resume: move this card back to `doing/` and start from Phase C.
 
 **Scope note**: all anchors re-verified on this branch's HEAD before editing (zero-caller `grep` across `src/` +
 `tests/`). Decisions locked before implementation: **#9 = wire** (read `ActiveSessionStore` at list time; keeps the
@@ -200,5 +202,5 @@ emitter audit before deciding if it is a real gap).
 - [x] `change_log.md` entry (feature-completion size) summarizing Batch A.
 - [x] Design/end-user docs synced: `authentication.md` + `session.md` (#21 removals); verified no design doc references
   the deleted symbols (`grep` clean across `docs/design*.md`, `cli_reference.md`).
-- [ ] Card moved `doing/ -> done/` only after merge to `main` (per board contract); this card stays in `doing/` while
-  Batches B/C remain open.
+- [x] Batches A + B merged to `main` via PR #65 (`584aa2a1`). Card moved `doing/ -> paused/` (not `done/`): Batch C
+  (#17-#20) + Defect B + Gap A remain open. Resume from the Phase C stub.

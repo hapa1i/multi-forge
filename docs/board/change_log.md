@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### Board closeout: Sonnet 5 done; accidental_complexity A/B merged + paused
+
+**Goal**: Reconcile the board after PR #65 merged -- close the shipped Sonnet 5 card and pause the accidental-complexity
+cleanup with Batch C still open.
+
+**Key changes**:
+
+- `sonnet_5_default` moved `doing/ -> done/`: Sonnet 5 catalog/template support + the sonnet/opus default-tier flip
+  shipped via PR #64 (`75cd28b5`). Final closeout item ticked.
+- `accidental_complexity_cleanup` moved `doing/ -> paused/`: Batches A + B merged via PR #65 (`584aa2a1`), including two
+  pre-merge review follow-ups (a `FORGE_DEBUG` fail-open regression test and a `loader.py` black-format fix). Paused
+  with Batch C (#17-#20) and the two surfaced defects (Defect B auth-retry provider-trace gap, Gap A policy fail-open
+  prose-only check) still open.
+
+**Verification**: Board/docs-only commit. PR #65 landed green (8-dimension adversarial review + independent
+`make pre-commit` and full touched-suite run clean); no code change here.
+
 ### accidental_complexity_cleanup Batch B follow-up: proxy/template config load boundaries
 
 **Goal**: Close the Batch B review findings around newly-invalid proxy providers and malformed proxy/template YAML

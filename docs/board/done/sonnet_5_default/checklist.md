@@ -4,7 +4,8 @@
 
 ## Current focus
 
-Implementation complete and verified. Remaining: merge to `main`, then move card `doing/ -> done/`.
+**DONE** (2026-07-02). Shipped and merged to `main` via PR #64 (`75cd28b5`); card closed out and moved
+`doing/ -> done/`.
 
 ## Phase A — catalog spec
 
@@ -68,4 +69,4 @@ Implementation complete and verified. Remaining: merge to `main`, then move card
 - [x] `make test-unit` (7231 passed); targeted pytest (470 passed); scoped integration (2 passed); `make pre-commit`
   clean.
 - [x] `change_log.md` entry (newest-first).
-- [ ] Merge to `main`, then move card `doing/ -> done/`.
+- [x] Merged to `main` via PR #64 (`75cd28b5`); card moved `doing/ -> done/`.
