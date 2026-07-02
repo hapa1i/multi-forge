@@ -608,16 +608,16 @@ of its named CLI->core extractions no longer describe the code.
 
 **Re-baseline (verified against current code):**
 
-| Card claim | Post-4a.2 reality | Evidence |
-| --- | --- | --- |
-| Extract `prepare_sidecar_session` (Docker preflight + env) from the CLI | Already core-owned; no CLI sidecar prep remains | `_run_sidecar_claude_session` owns Docker check, mount parse, `build_claude_args`, secrets, container env, `is_sandboxed` + `ContainerExistsError` rollback (`core/ops/claude_session.py:1177-1461`); CLI only reads `(use_sidecar, mounts, image)` off the manifest (`session.py:449`) |
-| Extract `validate_and_setup_supervisor` from the CLI | Op name never created; the shipped primitive is `SupervisorWiring` + `_apply_supervisor_wiring` | `core/ops/claude_session.py:146`, `:1090`; start builds the wiring and routes through the op (`session_lifecycle.py:818-830`, `:857`) |
-| (not in card) | Fork still hand-rolls the identical wiring persistence in the CLI | `session_fork.py:812-861` repeats `SupervisorConfig` -> `apply_supervisor_routing` -> cascade -> `apply_checker_options` -> effort -> lane -> `store.update(apply_supervisor_and_lane)` |
+| Card claim                                                              | Post-4a.2 reality                                                                               | Evidence                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extract `prepare_sidecar_session` (Docker preflight + env) from the CLI | Already core-owned; no CLI sidecar prep remains                                                 | `_run_sidecar_claude_session` owns Docker check, mount parse, `build_claude_args`, secrets, container env, `is_sandboxed` + `ContainerExistsError` rollback (`core/ops/claude_session.py:1177-1461`); CLI only reads `(use_sidecar, mounts, image)` off the manifest (`session.py:449`) |
+| Extract `validate_and_setup_supervisor` from the CLI                    | Op name never created; the shipped primitive is `SupervisorWiring` + `_apply_supervisor_wiring` | `core/ops/claude_session.py:146`, `:1090`; start builds the wiring and routes through the op (`session_lifecycle.py:818-830`, `:857`)                                                                                                                                                   |
+| (not in card)                                                           | Fork still hand-rolls the identical wiring persistence in the CLI                               | `session_fork.py:812-861` repeats `SupervisorConfig` -> `apply_supervisor_routing` -> cascade -> `apply_checker_options` -> effort -> lane -> `store.update(apply_supervisor_and_lane)`                                                                                                 |
 
 **Scope answers:**
 
-1. **What 4b is now:** collapse fork's supervisor **persistence** block onto the existing core `_apply_supervisor_wiring`.
-   Sidecar prep needs no extraction.
+1. **What 4b is now:** collapse fork's supervisor **persistence** block onto the existing core
+   `_apply_supervisor_wiring`. Sidecar prep needs no extraction.
 2. **Split:** yes. **4b.1** supervisor wiring dedup (the real work). **4b.2** sidecar-internal testability --
    **conditional**, only if `_run_sidecar_claude_session` failure paths lack unit coverage; may close as a no-op.
 3. **Invariants:** table below.
@@ -632,71 +632,67 @@ of its named CLI->core extractions no longer describe the code.
 
 **4b.1 -- unify fork supervisor wiring onto the core primitive.**
 
-- [ ] Replace the persistence block (`session_fork.py:812-861`) with: build
-  `SupervisorWiring(target=parent, source_state=parent_manifest, supervisor_proxy=<ensured>, supervisor_direct=...,
-  cascade=cascade_flag, checker_model/provider/effort=..., supervisor_effort=..., supervisor_runtime=...)` and call
-  `_apply_supervisor_wiring(fork_manifest, wiring, proxy_id=_preflight_routing.proxy_id if _preflight_routing else None,
-  template=_preflight_routing.template if _preflight_routing else None, direct=direct)`, reassigning `fork_manifest`
-  from its return. Guard `_preflight_routing` exactly as the current block does (`session_fork.py:833`) -- it is optional
-  (assigned only under the routing branch at `:653`). The two sequences are otherwise byte-identical -- verified
-  field-by-field (SupervisorConfig args, routing, cascade, checker, effort, lane, store/forge_root).
-- [ ] If the fork mapping needs a wiring field `SupervisorWiring` lacks, add it to the dataclass -- do not branch in the
-  op or push flag parsing into core.
-- [ ] Verify supervisor patch sites still resolve after the move -- no migration expected. Current tests patch
+- [x] Replace the persistence block (`session_fork.py:812-861`) with: build
+  `SupervisorWiring(target=parent, source_state=parent_manifest, supervisor_proxy=<ensured>, supervisor_direct=..., cascade=cascade_flag, checker_model/provider/effort=..., supervisor_effort=..., supervisor_runtime=...)`
+  and call
+  `_apply_supervisor_wiring(fork_manifest, wiring, proxy_id=_preflight_routing.proxy_id if _preflight_routing else None, template=_preflight_routing.template if _preflight_routing else None, direct=direct)`,
+  reassigning `fork_manifest` from its return. Guard `_preflight_routing` exactly as the current block does
+  (`session_fork.py:833`) -- it is optional (assigned only under the routing branch at `:653`). The two sequences are
+  otherwise byte-identical -- verified field-by-field (SupervisorConfig args, routing, cascade, checker, effort, lane,
+  store/forge_root).
+- [x] No new `SupervisorWiring` field was needed; the existing dataclass matched the fork mapping.
+- [x] Verify supervisor patch sites still resolve after the move -- no migration expected. Current tests patch
   `forge.policy.semantic.supervisor.apply_supervisor_routing` (e.g. `test_session_commands.py:4386`,
-  `test_policy_supervisor.py:912`), which `_apply_supervisor_wiring` imports at call time (`:1099`), so they keep working
-  through the op. No test patches `forge.cli.session_fork.apply_supervisor_*` / `lane_record_for_runtime` (verified: zero
-  hits).
+  `test_policy_supervisor.py:912`), which `_apply_supervisor_wiring` imports at call time (`:1099`), so they keep
+  working through the op. No test patches `forge.cli.session_fork.apply_supervisor_*` / `lane_record_for_runtime`
+  (verified: zero hits).
 - **Assertions:** fork supervisor manifest byte-identical across `--supervise` alone and with `--cascade` /
   `--checker-*` / `--supervisor-effort` / `--supervisor-runtime`; op + `session/` layering clean; supervisor and
   flag-validation error text unchanged.
 
 **4b.2 -- sidecar-internal testability (CONDITIONAL; decide during 4b.1).**
 
-- [ ] Audit `_run_sidecar_claude_session` (`:1177-1461`) failure-path coverage: Docker unavailable -> `ForgeOpError`; bad
-  `--mount`; `ContainerExistsError` -> `is_sandboxed` rollback; secret resolution. If `test_supervisor_e2e.py` + existing
-  units already cover them, **close 4b with no code change** and record that.
-- [ ] **Decide the stale `is_sandboxed` window** (caveat above): either accept-and-document, or fix by moving the
+- [x] Audit `_run_sidecar_claude_session` (`:1177-1461`) failure-path coverage: Docker unavailable -> `ForgeOpError`;
+  bad `--mount`; `ContainerExistsError` -> `is_sandboxed` rollback; secret resolution. Existing sidecar/container tests
+  cover parser and container primitives, but the launcher-level bad-mount `is_sandboxed` state was unpinned.
+- [x] **Decide the stale `is_sandboxed` window** (caveat above): either accept-and-document, or fix by moving the
   `is_sandboxed=True` write to just before the runner (after mount/secret prep) so a mount-parse failure never sets it,
-  with a regression test (`forge session fork ... --mount <bad>` leaves `is_sandboxed` false). This is the one behavior
-  fix 4b.2 might carry -- if taken, 4b.2 stops being a pure no-op.
-- [ ] Only if untested branching remains: extract a small render-free helper for unit tests. No CLI move -- it is already
-  core.
+  with a regression test (`forge session fork ... --mount <bad>` leaves `is_sandboxed` false). **Decision:** fixed in
+  4b.2; this sub-slice is not a no-op.
+- [x] No helper extracted. The needed coverage fits through the existing launcher path.
 
 **Invariants (both sub-slices):**
 
-| Invariant | Anchor | Must survive |
-| --- | --- | --- |
-| Cascade-at-launch flips the flag only; runtime hook escalates when no plan exists | `session_fork.py:837`, core `:1122` | comment + behavior |
-| Child gets its own consumer lane; parent's confirmed lane stays true | `session_fork.py:851` | `apply_supervisor_and_lane` + `lane_record_for_runtime` |
-| `--supervisor-runtime` -> full lane frozen at first policy check | `session_fork.py:852` | lane record shape |
-| Supervisor flag mutual-exclusivity errors | `session_fork.py:341-360` | exact strings |
-| Sidecar `is_sandboxed` rollback fires only on `ContainerExistsError` / runner exception | `core/ops/claude_session.py:1330`, `:1337` | current failure modes (caveat below) |
-| Wiring runs after routing-override persist, before template/proxy resolution; reads `_preflight_routing` | `session_fork.py:802-863` | ordering |
-| `core/ops` + `session/` import no `forge.cli`; op render-free | grep gates | layering |
+| Invariant                                                                                                | Anchor                                                       | Must survive                                            |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| Cascade-at-launch flips the flag only; runtime hook escalates when no plan exists                        | core `:1122`                                                 | comment + behavior                                      |
+| Child gets its own consumer lane; parent's confirmed lane stays true                                     | core `:1134`                                                 | `apply_supervisor_and_lane` + `lane_record_for_runtime` |
+| `--supervisor-runtime` -> full lane frozen at first policy check                                         | core `:1134`                                                 | lane record shape                                       |
+| Supervisor flag mutual-exclusivity errors                                                                | `session_fork.py:341-360`                                    | exact strings                                           |
+| Sidecar validation/prep failures do not set `is_sandboxed`; runner failures roll back                    | `core/ops/claude_session.py:1221`, `:1305`, `:1330`, `:1337` | exact failure modes                                     |
+| Wiring runs after routing-override persist, before template/proxy resolution; reads `_preflight_routing` | `session_fork.py:802-833`                                    | ordering                                                |
+| `core/ops` + `session/` import no `forge.cli`; op render-free                                            | grep gates                                                   | layering                                                |
 
-> **Sidecar rollback caveat (feeds the 4b.2 decision):** `is_sandboxed=True` is written at `:1221`, before the rollback
-> try opens (`:1311`); anything that raises in that window strands a stale `True` until the next launch rewrites it.
-> Mount parse (`:1227`) is the concrete case -- a bad `--mount` raises `ForgeOpError` without rollback. Secret gathering
-> (`:1258`) is also in the window but is best-effort/non-raising today (`template_secrets.py:140`, `:75`, `:84`), so it
-> does not strand the flag. Docker-unavailable (`:1218`) raises before the write, so it is safe. Do not claim a blanket
-> "mount/secret failure rolls back" invariant.
+> **Sidecar rollback decision:** 4b.2 moved `is_sandboxed=True` to after mount/secret/env prep and immediately before
+> the runner. Docker-unavailable still raises before the write, bad `--mount` now leaves `is_sandboxed` false, and
+> `ContainerExistsError` / runner exceptions still roll the flag back. Secret gathering remains best-effort/non-raising
+> today (`template_secrets.py:140`, `:75`, `:84`).
 
-**Verification:** `uv run pytest tests/src/cli/test_policy_supervisor.py tests/src/cli/test_session_commands.py
-tests/regression/test_bug_supervisor_proxy_autostart.py tests/regression/test_bug_consumer_lane_fork_resume_inherit.py
-tests/regression/test_bug_supervisor_fork_uuid_drift.py -q`; layering + render-free greps;
-`./scripts/test-integration.sh tests/integration/docker/test_supervisor_e2e.py -v`; `make pre-commit`.
+**Verification:**
+`uv run pytest tests/src/cli/test_policy_supervisor.py tests/src/cli/test_session_commands.py tests/regression/test_bug_supervisor_proxy_autostart.py tests/regression/test_bug_consumer_lane_fork_resume_inherit.py tests/regression/test_bug_supervisor_fork_uuid_drift.py -q`;
+layering + render-free greps; `./scripts/test-integration.sh tests/integration/docker/test_supervisor_e2e.py -v`;
+`make pre-commit`.
 
 ## Roadmap
 
-| Slice | Scope                                                                   | Crux                                                                                                             |
-| ----- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 1     | system-prompt op + model-pin cluster relocation + characterization test | Low-risk pattern and harness                                                                                     |
-| 2     | `start_claude_session -> ClaudeSessionStartResult`                      | Relocate launcher/invoker seams out of CLI-safe wrappers                                                         |
-| 3     | `resume_claude_session -> ClaudeResumeResult`                           | Collapse repeated launch/resume routing/model/preference logic                                                   |
-| 4a    | fork launch migration (`fork_claude_session`)                           | 4a.1 delete `_launch_claude_for_session`; 4a.2 unify 4 host closures into the op (launcher already resolves cwd) |
-| 4b    | 4b.1 unify fork supervisor wiring onto core `_apply_supervisor_wiring`; 4b.2 (conditional) sidecar-internal tests | Sidecar prep already core-owned; only fork supervisor persistence still duplicated in CLI |
-| 5     | Retire the shim                                                         | Delete all 4 `_sess()` defs and the parent `session.py` re-export                                                |
+| Slice | Scope                                                                                                             | Crux                                                                                                             |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 1     | system-prompt op + model-pin cluster relocation + characterization test                                           | Low-risk pattern and harness                                                                                     |
+| 2     | `start_claude_session -> ClaudeSessionStartResult`                                                                | Relocate launcher/invoker seams out of CLI-safe wrappers                                                         |
+| 3     | `resume_claude_session -> ClaudeResumeResult`                                                                     | Collapse repeated launch/resume routing/model/preference logic                                                   |
+| 4a    | fork launch migration (`fork_claude_session`)                                                                     | 4a.1 delete `_launch_claude_for_session`; 4a.2 unify 4 host closures into the op (launcher already resolves cwd) |
+| 4b    | 4b.1 unify fork supervisor wiring onto core `_apply_supervisor_wiring`; 4b.2 (conditional) sidecar-internal tests | Sidecar prep already core-owned; only fork supervisor persistence still duplicated in CLI                        |
+| 5     | Retire the shim                                                                                                   | Delete all 4 `_sess()` defs and the parent `session.py` re-export                                                |
 
 ## Closeout Items
 

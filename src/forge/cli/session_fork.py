@@ -21,6 +21,8 @@ from forge.core.ops.claude_session import (
     ClaudeLaunchPreferences,
     ClaudeSidecarLaunch,
     ForkLaunchPlan,
+    SupervisorWiring,
+    _apply_supervisor_wiring,
     fork_claude_session,
 )
 from forge.core.ops.context import _cwd_forge_root
@@ -28,7 +30,6 @@ from forge.core.ops.session import ForgeOpError
 from forge.core.paths import display_path
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
-    apply_checker_options,
     supervisor_lane_runtimes,
     validate_checker_model,
 )
@@ -811,54 +812,25 @@ def fork(
 
     # --- wire supervisor (if --supervise flag set) ---
     if supervise_target:
-        from forge.policy.semantic.supervisor import (
-            SUPERVISOR_CONSUMER,
-            apply_supervisor_and_lane,
-            apply_supervisor_routing,
-        )
-        from forge.session.consumer_lanes import lane_record_for_runtime
-        from forge.session.models import SupervisorConfig
-        from forge.session.store import SessionStore
-
-        fork_forge_root = fork_manifest.forge_root or str(fork_worktree_path)
-        sup_config = SupervisorConfig(
-            resume_id=parent,
-            forge_root=parent_manifest.forge_root or fork_forge_root,
-        )
-        apply_supervisor_routing(
-            sup_config,
-            parent_manifest,
+        wiring = SupervisorWiring(
+            target=parent,
+            source_state=parent_manifest,
             supervisor_proxy=supervisor_proxy,
             supervisor_direct=supervisor_direct,
-            current_proxy_id=_preflight_routing.proxy_id if _preflight_routing else None,
-            current_template=_preflight_routing.template if _preflight_routing else None,
-            current_direct=direct,
-        )
-        # Cascade-at-launch sets the flag only; the runtime hook resolves the plan at
-        # eval time (a fresh child has no approved snapshot yet -- it safely escalates
-        # to the frontier supervisor until a plan is approved).
-        if cascade_flag:
-            sup_config.cascade = True
-        apply_checker_options(
-            sup_config,
+            cascade=cascade_flag,
             checker_model=checker_model,
             checker_provider=checker_provider,
             checker_effort=checker_effort,
+            supervisor_effort=supervisor_effort,
+            supervisor_runtime=supervisor_runtime,
         )
-        if supervisor_effort is not None:
-            sup_config.supervisor_effort = supervisor_effort
-
-        # The child gets its own consumer-lane binding (the parent's confirmed lane stays true):
-        # --supervisor-runtime expands to a full lane written into the fork's intent, frozen at
-        # the child's first policy check.
-        lane = lane_record_for_runtime(SUPERVISOR_CONSUMER, supervisor_runtime) if supervisor_runtime else None
-
-        fork_store = SessionStore(fork_forge_root, fork_manifest.name)
-        fork_store.update(
-            timeout_s=5.0,
-            mutate=lambda m: apply_supervisor_and_lane(m, sup_config, lane),
+        fork_manifest = _apply_supervisor_wiring(
+            fork_manifest,
+            wiring,
+            proxy_id=_preflight_routing.proxy_id if _preflight_routing else None,
+            template=_preflight_routing.template if _preflight_routing else None,
+            direct=direct,
         )
-        fork_manifest = fork_store.read()
 
     if _preflight_routing:
         effective_template = _preflight_routing.template

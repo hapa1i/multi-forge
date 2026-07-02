@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### session_op_layer_extraction Slice 4b: Fork supervisor wiring
+
+**Goal**: Finish the post-fork cleanup by collapsing fork supervisor persistence onto the core wiring primitive and
+settling the remaining sidecar testability question.
+
+**Key changes**:
+
+- Replaced `session_fork.py`'s hand-rolled `SupervisorConfig` / lane persistence block with `SupervisorWiring` +
+  `_apply_supervisor_wiring`, preserving the existing `_preflight_routing` guards and CLI-owned validation.
+- Moved sidecar `is_sandboxed=True` confirmation to after mount/secret/env prep, immediately before the runner, so
+  launcher validation failures such as a bad `--mount` do not strand a stale sandbox flag.
+- Added a fork-sidecar bad-mount regression that asserts clean launch failure, no sidecar runner invocation, and
+  `confirmed.is_sandboxed == false`.
+
+**Verification**: focused supervisor/session/regression suite 293 passed; Docker supervisor integration 10 passed;
+layering/UI-free greps empty; `make pre-commit` clean.
+
 ### session_op_layer_extraction Slice 1: Claude session preflight split
 
 **Goal**: Start the staged Claude session CLI/core split with the lowest-risk helpers and a manifest characterization

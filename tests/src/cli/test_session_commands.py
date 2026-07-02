@@ -2080,6 +2080,36 @@ class TestSessionFork:
         assert mock_run_sidecar.called is True
         assert mock_invoke.called is False
 
+    def test_bad_sidecar_mount_fork_does_not_confirm_sandbox(self, runner: CliRunner, temp_env: Path) -> None:
+        """Sidecar validation failures before the runner should not mark the child sandboxed."""
+        start_result = runner.invoke(
+            main,
+            ["session", "start", "fork-bad-mount-parent", "--sidecar", "--mount", "/host/only", "--no-launch"],
+        )
+        assert start_result.exit_code == 0, start_result.output
+
+        store = SessionStore(str(temp_env), "fork-bad-mount-parent")
+
+        def _confirm_parent(m: object) -> None:
+            m.confirmed.claude_session_id = "parent-sidecar-uuid"  # type: ignore[attr-defined]
+
+        store.update(timeout_s=5.0, mutate=_confirm_parent)
+
+        with (
+            patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "fork", "fork-bad-mount-parent", "--name", "fork-bad-mount-child"],
+            )
+
+        assert result.exit_code == 1, result.output
+        assert "Invalid mount specification" in result.output
+        assert mock_run_sidecar.called is False
+        child = SessionStore(str(temp_env), "fork-bad-mount-child").read()
+        assert child.confirmed.is_sandboxed is False
+
     def test_fork_default_no_worktree(self, runner: CliRunner, temp_env: Path) -> None:
         """Default fork stays in parent's directory (no worktree)."""
         parent = create_session_state(

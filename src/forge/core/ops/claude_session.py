@@ -1218,12 +1218,6 @@ def _run_sidecar_claude_session(
     if not is_docker_available():
         raise ForgeOpError("Docker is not available or not running")
 
-    _update_manifest_best_effort(
-        store,
-        mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True),
-        label="sidecar sandbox confirmation",
-    )
-
     try:
         extra_mounts = parse_mounts(mounts) if mounts else []
     except ValueError as e:
@@ -1307,6 +1301,12 @@ def _run_sidecar_claude_session(
     sidecar_image = image or _runtime_config.sidecar_image
     if on_sidecar_launch is not None:
         on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id))
+
+    _update_manifest_best_effort(
+        store,
+        mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True),
+        label="sidecar sandbox confirmation",
+    )
 
     try:
         sidecar_exit = active_runner(
