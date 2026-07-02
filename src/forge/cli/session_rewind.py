@@ -11,6 +11,7 @@ from forge.core.state.io import atomic_write_text
 from forge.session import SessionState, SessionStore
 from forge.session.prev_sessions import child_path
 from forge.session.rewind import (
+    REWIND_CODE_DELTA_PRIVACY_WARNING_PREFIX,
     REWIND_CODE_DELTA_SCHEMA,
     RewindPrefixResult,
     generate_rewind_code_delta_context,
@@ -142,6 +143,8 @@ def _prepare_rewind_launch_artifacts(
         kept_turns=prefix_result.kept_turns,
     )
     if schema_marker != REWIND_CODE_DELTA_SCHEMA:
+        # The generator's compatibility body is useful for primitive callers,
+        # but a launched rewind child must not rely on a degraded code delta.
         _remove_rewind_transcript(dest_path)
         fallback = _plain_native_rewind_fallback(
             parent_uuid=parent_uuid,
@@ -149,7 +152,9 @@ def _prepare_rewind_launch_artifacts(
             child_project_root=child_project_root,
             warning="Rewind code-delta unavailable; falling back to plain native resume.",
         )
-        privacy_warnings = [warning for warning in code_delta_warnings if "code/transcript sent to" in warning]
+        privacy_warnings = [
+            warning for warning in code_delta_warnings if warning.startswith(REWIND_CODE_DELTA_PRIVACY_WARNING_PREFIX)
+        ]
         if not privacy_warnings:
             return fallback
         return RewindLaunchArtifacts(

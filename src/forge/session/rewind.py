@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 REWIND_CODE_DELTA_SCHEMA = "rewind-code-delta"
 REWIND_CODE_DELTA_COMMAND = "rewind-code-delta"
 REWIND_CODE_DELTA_OPERATION = "rewind.code_delta"
+REWIND_CODE_DELTA_PRIVACY_WARNING_PREFIX = "Rewind code-delta: dropped-window code/transcript sent to "
 _CODE_DELTA_TOOL_NAMES = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 _CODE_DELTA_FIELD_CHARS = 900
 
@@ -376,7 +377,7 @@ def generate_rewind_code_delta_context(
 
     _emit_curation_usage(call, command=REWIND_CODE_DELTA_COMMAND, operation=REWIND_CODE_DELTA_OPERATION)
     model_used = call.model_used
-    warnings.append(f"Rewind code-delta: dropped-window code/transcript sent to {model_used} for processing")
+    warnings.append(f"{REWIND_CODE_DELTA_PRIVACY_WARNING_PREFIX}{model_used} for processing")
     if call.curated is None:
         content = _build_rewind_deterministic_output(
             parent_name=parent_name,
