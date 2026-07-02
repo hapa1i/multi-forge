@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.paths import display_path
-from forge.session import ForgeSessionError
+from forge.session import ForgeSessionError, SessionManager, SessionState
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
-if TYPE_CHECKING:
-    from forge.cli.session import ResolvedRouting
-    from forge.session import SessionManager, SessionState
+
+class _ResolvedRoutingLike(Protocol):
+    @property
+    def proxy_id(self) -> str | None: ...
 
 
 def _session_cli() -> Any:
@@ -29,7 +30,7 @@ def _resume_fresh_rewind(
     parent_state: SessionState,
     child_name: str | None,
     drop_last: int,
-    routing: ResolvedRouting | None,
+    routing: _ResolvedRoutingLike | None,
     direct: bool,
     direct_model_override: str | None = None,
     memory_flag: bool | None = None,
@@ -156,7 +157,7 @@ def _resume_fresh_native(
     parent: str,
     parent_state: SessionState,
     child_name: str | None,
-    routing: ResolvedRouting | None,
+    routing: _ResolvedRoutingLike | None,
     direct: bool,
     direct_model_override: str | None = None,
     memory_flag: bool | None = None,
