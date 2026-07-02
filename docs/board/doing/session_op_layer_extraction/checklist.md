@@ -452,15 +452,129 @@ Current coverage: start `--no-launch`, incognito start, fresh-resume (transfer).
 - `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -> 21 passed.
 - `make pre-commit` -> passed.
 
+## Slice 4a -- fork launch migration (`fork_claude_session`)
+
+**Status:** planned; fork surface verified against the current tree (`session_fork.py` = 1,336 lines). **Paused for
+review.** Slice 4 splits into **4a** (fork launch migration -- itself **4a.1** adapter deletion + **4a.2** the
+`fork_claude_session` op, both below) and **4b** (supervisor validation/wiring + sidecar prep extraction).
+
+### Scope correction (verified -- the migration is bigger than "one caller")
+
+"Eliminate the last `_launch_claude_for_session` caller + the fork model-override" is the **small** half. That caller is
+the **sidecar** fork path (`:1244`). The **host** fork path is the bulk: **four `_invoke_fork` closures** that call
+`invoke_claude` **directly** and hand-roll `launch_claude_session`'s entire host branch -- hook/version warns (`:1278`),
+`record_launch_confirmed` (`:1286`), `run_with_active_session` (`:1304`/`:1326`), post-exit render (`:1334`), and
+incognito cleanup (`:1301`). Migrating fork onto the render-free path means unifying those, not just deleting one call.
+
+### Two facts that shape 4a
+
+1. **Fork has incognito cleanup** (`:1261` sidecar, `:1301` host) -- the delete-on-exit `finally` that Slice 3
+   deliberately kept OUT of `resume_claude_session`. So fork **cannot** reuse the resume op; it mirrors
+   `start_claude_session`. **Boundary to preserve:** the incognito `finally` wraps **only** the launch/run section, not
+   the pre-launch model override (`:839`). Today a `--model` validation error exits **before** cleanup (no delete). The
+   op must keep that -- the incognito finally wraps launch only; a pre-launch error propagates uncleaned. Expanding the
+   cleanup scope is a behavior change and must be called out, not slipped in.
+2. **No launcher `cwd`/env gap** (verified -- my earlier claim was wrong). `launch_claude_session` already resolves
+   `launch_root = resolve_claude_project_root(manifest)` (`:349`, honoring `confirmed.claude_project_root` at `:351`),
+   passes `cwd=str(launch_root)` to `invoke_claude` (`:1282`), and builds fork env (`fork_name`/`parent_session`) via
+   `fork_session or register_fork` (`:353-363`). The host closures' `_fork_cwd` **equals** that `launch_root`, so
+   routing them through the launcher needs **no new param**. If a characterization test later proves an override is
+   required, add `launch_root_override` (coherent across store update, sidecar project dir, prompt paths, and host cwd
+   -- `:1087` /`:1094`/`:1177`/`:1203`/`:1282`), never an invoke-only `cwd`.
+
+### The 4 host closures collapse to launch params
+
+All four share `env_vars`/`unset_env_vars` and the same `cwd` (= the launcher's `launch_root`); they differ only in the
+launch discriminators:
+
+| Mode                    | Anchor  | id                      | fork_session | system_prompt     |
+| ----------------------- | ------- | ----------------------- | ------------ | ----------------- |
+| native-relocate         | `:992`  | `resume_id=parent`      | True         | `_nr_prompt`      |
+| rewind                  | `:1060` | `resume_id=_rewind`     | True         | `prompt_file`     |
+| worktree fresh-transfer | `:1166` | `session_id=_fork_uuid` | False        | `_wt_prompt`      |
+| same-dir                | `:1190` | `resume_id=parent`      | True         | `_samedir_prompt` |
+
+Sidecar (`:1244`) already carries the same discriminators: `session_id=_fork_uuid if uses_fresh_transfer else None`,
+`resume_id = None if uses_fresh_transfer else (_rewind_resume_id or parent)`, `fork_session=not uses_fresh_transfer`,
+`register_fork=uses_fresh_transfer`. So one parameterized launch replaces four closures + the sidecar branch (4a.2).
+
+**Addendum ownership (must-fix in 4a.2 -- the `system_prompt` column above is addendum-composed, not launcher-ready).**
+Each host closure folds the managed addendum into its prompt itself (`resolve_addendum_content_for_proxy` +
+`write_managed_addendum`): `_nr_prompt`/`_samedir_prompt` are addendum-only, `_wt_prompt` is `addendum + prompt_file`,
+and rewind's `_rewind_prompt_files` prepend addendum (`:1044-1048`). But `launch_claude_session` **already injects the
+same managed addendum** (`:375-385`, same two functions). Routing a composed prompt through the launcher **doubles** it.
+So 4a.2 must hand the launcher only the **user/context/configured** prompt and let it own addendum:
+native-relocate/same-dir -> `None`, worktree -> raw `prompt_file`, rewind -> context+configured **minus** addendum.
+**Rewind needs explicit characterization first:** the current sidecar path (`:1244`) already passes the
+addendum-composed `prompt_file` into the launcher, so it may double the addendum **today** -- confirm, then fix or
+preserve deliberately.
+
+### Sub-slice split (resolved with reviewer)
+
+**4a.1 -- delete the `_launch_claude_for_session` adapter (small, concrete, no behavior change).**
+
+- Inline the adapter's body at its only caller, the sidecar fork (`:1244`): replace `_launch_claude_for_session(...)`
+  with `launch_claude_session(...)` + `_render_claude_launch_result(...)`. The adapter already calls
+  `launch_claude_session`, so this is a mechanical inline, not a rewrite. Keep the incognito `finally` where it is
+  (CLI).
+- Delete `_launch_claude_for_session` (0 callers remain).
+- Migrate its importers: `tests/regression/test_bug_nested_project_launch.py`, `tests/src/cli/test_session_commands.py`,
+  `tests/src/cli/test_session_codex.py` -- repoint patches to `launch_claude_session` (or the inlined seam).
+- Relocate/replace the fork model override (`:839`) **only if** it can be done without changing host launch behavior;
+  otherwise defer to 4a.2.
+- **Assertions:** adapter deleted (grep: 0 callers); those 3 importer files green; host + sidecar fork behavior
+  unchanged; existing fork tests + characterization unchanged.
+
+**4a.2 -- `fork_claude_session` op + host-closure unification (the lift).**
+
+- Introduce `fork_claude_session` mirroring `start_claude_session` (owns incognito). Unify the 4 host closures into one
+  parameterized launch (discriminators above); render via a `ForkPresenter`. Preserve the incognito boundary from fact
+  1\.
+- Add `launch_root_override` **only if** a characterization test proves the default resolver is insufficient.
+- **Assertions:** op render-free + layering clean; fork manifest byte-identical for same-dir, worktree-transfer,
+  native-relocate, and **incognito** (mid-launch capture + delete-on-exit assertion, like the incognito start test); the
+  launched **system-prompt contains the managed addendum exactly once** for every mode (assert on the combined prompt
+  file, not the manifest); **rewind (sidecar + host) explicitly characterized** to confirm/fix the pre-existing possible
+  duplication.
+
+### Boundary (4a.2)
+
+- **CLI owns:** fork validation, name/worktree/`--into` creation, per-mode prompt assembly, the model override (or
+  delegate to a core helper), and all rendering via a `ForkPresenter`.
+- **Op owns:** `record_launch_confirmed` (host), `run_with_active_session`/`launch_claude_session`, incognito cleanup
+  (launch-only scope), post-exit facts returned in `ForkLaunchResult`.
+
+### Invariants that MUST survive (pin with existing tests first)
+
+- Incognito fork deletes on exit (`:1261` sidecar, `:1301` host); the `finally` wraps **launch only** -- a pre-launch
+  `--model` error exits before cleanup (fact 1); error hook fires before the finally (output order).
+- native-relocate resumes the relocated JSONL from `launch_root = resolve_claude_project_root` (`:992`).
+- rewind fork rolls back (delete worktree) when the transcript is unpreparable, then errors (`:1023-1039`).
+- worktree fresh-transfer uses `session_id=_fork_uuid` + `register_fork`; same-dir uses `resume_id=parent` +
+  `fork_session` (`:1166`/`:1190`).
+- **Managed addendum is launcher-owned** (`launch_claude_session:375`): CLI fork prompt assembly passes only
+  user/context/configured prompt files, never the addendum, so it lands in the child system-prompt exactly once.
+- `_build_session_env` sets `FORGE_FORK_NAME` (hook fork detection, `:854`).
+- Host forks fire `record_launch_confirmed` (`:1286`); sidecar forks get it inside `launch_claude_session`.
+- `core/ops/` + `forge/session/` import nothing from `forge.cli`.
+
+### Focused tests (real files -- no `test_session_fork*.py` exists)
+
+`tests/src/cli/test_session_commands.py` (fork cases + the `_launch_claude_for_session` importer),
+`tests/src/cli/test_session_rewind_cli.py`, `tests/src/cli/test_session_codex.py`,
+`tests/regression/test_bug_nested_project_launch.py`, plus the fork rewind/worktree/`--into` coverage; then
+`./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` and `make pre-commit`.
+
 ## Roadmap
 
-| Slice | Scope                                                                   | Crux                                                              |
-| ----- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 1     | system-prompt op + model-pin cluster relocation + characterization test | Low-risk pattern and harness                                      |
-| 2     | `start_claude_session -> ClaudeSessionStartResult`                      | Relocate launcher/invoker seams out of CLI-safe wrappers          |
-| 3     | `resume_claude_session -> ClaudeResumeResult`                           | Collapse repeated launch/resume routing/model/preference logic    |
-| 4     | `validate_and_setup_supervisor` + `prepare_sidecar_session`             | Test supervisor/sidecar without CLI module                        |
-| 5     | Retire the shim                                                         | Delete all 4 `_sess()` defs and the parent `session.py` re-export |
+| Slice | Scope                                                                   | Crux                                                                                                             |
+| ----- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 1     | system-prompt op + model-pin cluster relocation + characterization test | Low-risk pattern and harness                                                                                     |
+| 2     | `start_claude_session -> ClaudeSessionStartResult`                      | Relocate launcher/invoker seams out of CLI-safe wrappers                                                         |
+| 3     | `resume_claude_session -> ClaudeResumeResult`                           | Collapse repeated launch/resume routing/model/preference logic                                                   |
+| 4a    | fork launch migration (`fork_claude_session`)                           | 4a.1 delete `_launch_claude_for_session`; 4a.2 unify 4 host closures into the op (launcher already resolves cwd) |
+| 4b    | `validate_and_setup_supervisor` + `prepare_sidecar_session`             | Test supervisor/sidecar without CLI module                                                                       |
+| 5     | Retire the shim                                                         | Delete all 4 `_sess()` defs and the parent `session.py` re-export                                                |
 
 ## Closeout Items
 
