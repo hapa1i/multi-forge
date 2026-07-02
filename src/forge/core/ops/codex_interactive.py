@@ -78,7 +78,7 @@ from forge.session.exceptions import SessionFileNotFoundError
 from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import MANIFEST_FILENAME, SessionStore
-from forge.session.transfer import ResumeStrategy
+from forge.session.transfer import parse_transfer_context_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +157,10 @@ def start_interactive_codex_session(
     manager = SessionManager()
     parent_entry: SessionIndexEntry | None = None
     if parent is not None:
-        valid_strategies = {s.value for s in ResumeStrategy}
-        if strategy not in valid_strategies:
-            raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {', '.join(sorted(valid_strategies))}).")
+        try:
+            parse_transfer_context_strategy(strategy)
+        except ValueError as e:
+            raise ForgeOpError(str(e)) from e
         try:
             parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
             manager.get_session(parent, forge_root=str(forge_root))
