@@ -925,7 +925,6 @@ def launch_new_session(
     prompt_path = resolve_and_validate_system_prompt(
         system_prompt=system_prompt,
         system_prompt_file=system_prompt_file,
-        no_launch=no_launch,
         cwd=Path.cwd(),
     )
     prompt_file = str(prompt_path) if prompt_path is not None else None

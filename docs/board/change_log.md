@@ -37,7 +37,8 @@ safety net.
 - Added a JSON-string manifest characterization test for Claude `start --no-launch` and fresh resume, pinning dataclass
   field order and normalized volatile values.
 - Added `forge.core.ops.claude_session.resolve_and_validate_system_prompt` and rewired launch prompt resolution through
-  it while keeping the CLI's `Path -> str` launcher boundary explicit.
+  it while keeping the CLI's `Path -> str` launcher boundary explicit. Follow-up cleanup kept `--no-launch` prompt
+  validation CLI-owned, avoiding a dead op-level `ForgeOpError` path.
 - Moved the CLI-free model-pin support cluster into `forge.session.model_pin`; `cli/session_model_pin.py` now only keeps
   UI-tangled persistence/warning behavior.
 - Accepted `session_op_layer_extraction` into `doing/` with Slice 1 verification recorded. Parent patch count remains
