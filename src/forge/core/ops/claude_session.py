@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Protocol
 
@@ -19,6 +20,7 @@ from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
+from forge.core.state import FileLockTimeoutError
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     LAUNCH_MODE_HOST,
@@ -42,7 +44,11 @@ from forge.session.direct_model import (
 from forge.session.exceptions import (
     BranchExistsError,
     InvalidBranchNameError,
+    InvalidSessionNameError,
+    ManifestCorruptedError,
+    ManifestValidationError,
     SessionExistsError,
+    SessionFileNotFoundError,
     WorktreePathExistsError,
 )
 from forge.session.launch import (
@@ -180,6 +186,103 @@ class ClaudeSessionStartResult:
     manifest: SessionState
     operation_started_at: datetime
     did_run: bool  # True only when the child actually launched -> CLI post-exit renders
+    store_exists: bool
+    worktree_path: str | None
+    warnings: tuple[str, ...]
+
+
+class ClaudeResumeAction(Enum):
+    """Structured resume actions the CLI maps to existing display text."""
+
+    FORK_PARENT_CONVERSATION = "fork_parent_conversation"
+    START_FRESH = "start_fresh"
+    START_FRESH_WITH_PARENT_CONTEXT = "start_fresh_with_parent_context"
+    RECONNECT = "reconnect"
+    RELAUNCH_AS_CHILD = "relaunch_as_child"
+    FRESH_DERIVED = "fresh_derived"
+
+
+@dataclass(frozen=True)
+class ClaudeResumeRouting:
+    """CLI-resolved routing override carried into the render-free resume op."""
+
+    template: str | None = None
+    base_url: str | None = None
+    proxy_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ClaudeLaunchPreferences:
+    """CLI-computed launch preferences for resume paths."""
+
+    use_sidecar: bool
+    mounts: tuple[str, ...]
+    image: str | None
+
+
+@dataclass(frozen=True)
+class ResumeLaunchPlan:
+    """Mode-specific resume facts prepared by the CLI before the shared launch tail."""
+
+    manifest: SessionState
+    routing: ClaudeResumeRouting | None
+    direct: bool
+    resume_id: str | None
+    session_id: str | None
+    fork_session: bool
+    prompt_file: Path | None
+    action: ClaudeResumeAction
+    context_limit: int
+    launch_preferences: ClaudeLaunchPreferences
+    direct_model_override: str | None = None
+    parent_name: str | None = None
+    prompt_warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ResumePrepared:
+    """Render payload emitted after shared resume mutations and before launch."""
+
+    session: str
+    action: ClaudeResumeAction
+    parent_name: str | None
+    resume_id: str | None
+    effective_template: str | None
+    runtime_base_url: str | None
+    worktree_path: Path
+    worktree_branch: str | None
+    is_worktree: bool
+    context_path: Path | None
+    prompt_warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ClaudeResumeWarning:
+    """Pre-launch warning emitted by the resume op without carrying UI formatting."""
+
+    message: str
+    tip: str | None = None
+
+
+class ClaudeResumePresenter(Protocol):
+    """Render hooks the CLI implements for resume launches."""
+
+    def on_warning(self, warning: ClaudeResumeWarning) -> None: ...
+    def on_resume_prepared(self, event: ResumePrepared) -> None: ...
+    def before_launch(self, forge_root: Path) -> None: ...
+    def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None: ...
+    def on_launch_error(self, error: ForgeOpError) -> None: ...
+
+
+@dataclass(frozen=True)
+class ClaudeResumeResult:
+    """Outcome of ``resume_claude_session`` shared launch tail."""
+
+    exit_code: int
+    session: str
+    manifest: SessionState
+    operation_started_at: datetime
+    did_run: bool
     store_exists: bool
     worktree_path: str | None
     warnings: tuple[str, ...]
@@ -501,6 +604,270 @@ def start_claude_session(
         worktree_path=launch_result.worktree_path,
         warnings=launch_result.warnings,
     )
+
+
+def resume_claude_session(
+    *,
+    manager: SessionManager,
+    plan: ResumeLaunchPlan,
+    presenter: ClaudeResumePresenter,
+    invoke: Callable[..., int] | None = None,
+    run_active: Callable[..., int] | None = None,
+) -> ClaudeResumeResult:
+    """Run the shared Claude resume mutation/launch tail without rendering."""
+    operation_started_at = datetime.now(timezone.utc)
+    manifest = plan.manifest
+    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
+    forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
+    store = SessionStore(str(forge_root), manifest.name)
+
+    try:
+        _persist_resume_routing_override(
+            forge_root=forge_root,
+            session_name=manifest.name,
+            routing=plan.routing,
+            direct=plan.direct,
+        )
+        _apply_resume_routing_override_to_state(state=manifest, routing=plan.routing, direct=plan.direct)
+
+        effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_resume(manifest)
+        if plan.routing and plan.routing.proxy_id:
+            effective_proxy_id = plan.routing.proxy_id
+
+        preferences = plan.launch_preferences
+        _apply_resume_direct_model_override(
+            state=manifest,
+            direct_model=plan.direct_model_override,
+            forge_root=forge_root,
+            use_sidecar=preferences.use_sidecar,
+            presenter=presenter,
+        )
+        runtime_base_url = _get_runtime_base_url(
+            use_sidecar=preferences.use_sidecar,
+            effective_url=effective_url,
+        )
+
+        if plan.session_id is not None:
+            _preseed_resume_session_uuid(
+                manager=manager,
+                store=store,
+                session_name=manifest.name,
+                session_id=plan.session_id,
+            )
+
+        presenter.on_resume_prepared(
+            ResumePrepared(
+                session=manifest.name,
+                action=plan.action,
+                parent_name=plan.parent_name,
+                resume_id=plan.resume_id,
+                effective_template=effective_template,
+                runtime_base_url=runtime_base_url,
+                worktree_path=worktree_path,
+                worktree_branch=manifest.worktree.branch if manifest.worktree else None,
+                is_worktree=bool(manifest.worktree and manifest.worktree.is_worktree),
+                context_path=plan.prompt_file,
+                prompt_warnings=plan.prompt_warnings,
+            )
+        )
+
+        launch_result = launch_claude_session(
+            manifest=manifest,
+            session_id=plan.session_id,
+            resume_id=plan.resume_id,
+            effective_template=effective_template,
+            runtime_base_url=runtime_base_url,
+            context_limit=plan.context_limit,
+            use_sidecar=preferences.use_sidecar,
+            mounts=preferences.mounts,
+            image=preferences.image,
+            fork_session=plan.fork_session,
+            system_prompt_file=str(plan.prompt_file) if plan.prompt_file is not None else None,
+            name=manifest.name,
+            proxy_id=effective_proxy_id,
+            before_launch=presenter.before_launch,
+            on_sidecar_launch=presenter.on_sidecar_launch,
+            invoke=invoke or invoke_claude,
+            run_active=run_active or run_with_active_session,
+        )
+    except ForgeOpError as e:
+        presenter.on_launch_error(e)
+        return ClaudeResumeResult(
+            exit_code=1,
+            session=manifest.name,
+            manifest=manifest,
+            operation_started_at=operation_started_at,
+            did_run=False,
+            store_exists=store.exists(),
+            worktree_path=str(worktree_path),
+            warnings=(),
+        )
+
+    return ClaudeResumeResult(
+        exit_code=launch_result.exit_code,
+        session=manifest.name,
+        manifest=launch_result.manifest,
+        operation_started_at=operation_started_at,
+        did_run=True,
+        store_exists=launch_result.store_exists,
+        worktree_path=launch_result.worktree_path,
+        warnings=launch_result.warnings,
+    )
+
+
+def _apply_resume_routing_override_to_state(
+    *,
+    state: SessionState,
+    routing: ClaudeResumeRouting | None,
+    direct: bool,
+) -> None:
+    """Apply a CLI routing override to the in-memory state used for launch."""
+    if not routing and not direct:
+        return
+
+    from forge.session.models import LaunchIntent, ProxyIntent
+
+    state.confirmed.started_with_proxy = None
+    if direct:
+        state.intent.proxy = None
+        if state.intent.launch is None:
+            state.intent.launch = LaunchIntent(mode=LAUNCH_MODE_HOST)
+        else:
+            state.intent.launch.mode = LAUNCH_MODE_HOST
+            state.intent.launch.sidecar = None
+        return
+
+    assert routing is not None
+    state.intent.proxy = ProxyIntent(
+        template=routing.template or "",
+        base_url=routing.base_url or "",
+    )
+
+
+def _persist_resume_routing_override(
+    *,
+    forge_root: Path,
+    session_name: str,
+    routing: ClaudeResumeRouting | None,
+    direct: bool,
+) -> None:
+    """Persist resume routing intent without touching hook-owned confirmation."""
+    if not routing and not direct:
+        return
+
+    from forge.session.models import LaunchIntent, ProxyIntent
+
+    store = SessionStore(str(forge_root), session_name)
+
+    def _mutate(manifest: SessionState) -> None:
+        if direct:
+            manifest.intent.proxy = None
+            if manifest.intent.launch is None:
+                manifest.intent.launch = LaunchIntent(mode=LAUNCH_MODE_HOST)
+            else:
+                manifest.intent.launch.mode = LAUNCH_MODE_HOST
+                manifest.intent.launch.sidecar = None
+        elif routing is not None:
+            manifest.intent.proxy = ProxyIntent(
+                template=routing.template or "",
+                base_url=routing.base_url or "",
+            )
+
+    try:
+        store.update(timeout_s=5.0, mutate=_mutate)
+    except Exception:
+        logger.debug("Failed to persist routing override to manifest", exc_info=True)
+
+
+def _get_effective_proxy_for_resume(state: SessionState) -> tuple[str | None, str | None, str | None]:
+    """Resolve template/base_url/proxy_id without depending on the CLI module."""
+    if state.confirmed.started_with_proxy:
+        return (
+            state.confirmed.started_with_proxy.template,
+            state.confirmed.started_with_proxy.base_url,
+            state.confirmed.started_with_proxy.proxy_id,
+        )
+    if state.intent.proxy:
+        return state.intent.proxy.template, state.intent.proxy.base_url, None
+    return None, None, None
+
+
+def _apply_resume_direct_model_override(
+    *,
+    state: SessionState,
+    direct_model: str | None,
+    forge_root: Path,
+    use_sidecar: bool,
+    presenter: ClaudeResumePresenter,
+) -> None:
+    """Apply and persist a resume ``--model`` override with render-free warnings."""
+    if direct_model is None:
+        return
+    if use_sidecar:
+        raise ForgeOpError("--model cannot be combined with sidecar resume")
+
+    from forge.session.models import LaunchIntent
+
+    if state.intent.launch is None:
+        state.intent.launch = LaunchIntent()
+    state.intent.launch.direct_model = direct_model
+
+    store = SessionStore(str(forge_root), state.name)
+
+    def _mutate(manifest: SessionState) -> None:
+        if manifest.intent.launch is None:
+            manifest.intent.launch = LaunchIntent()
+        manifest.intent.launch.direct_model = direct_model
+
+    try:
+        store.update(timeout_s=5.0, mutate=_mutate)
+    except FileLockTimeoutError as e:
+        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
+        presenter.on_warning(
+            ClaudeResumeWarning(
+                message=f"Could not persist --model override for session {state.name}: {e}",
+                tip=(
+                    "If this command launches Claude, it will use the requested model for this run, "
+                    "but future resumes may use the previous stored model. Retry after current Forge state updates finish."
+                ),
+            )
+        )
+    except (
+        InvalidSessionNameError,
+        ManifestCorruptedError,
+        ManifestValidationError,
+        OSError,
+        SessionFileNotFoundError,
+        ValueError,
+    ) as e:
+        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
+        presenter.on_warning(
+            ClaudeResumeWarning(
+                message=f"Could not persist --model override for session {state.name}: {e}",
+                tip=(
+                    "If this command launches Claude, it will use the requested model for this run, "
+                    "but future resumes may use the previous stored model. Check the session manifest before relying on this pin."
+                ),
+            )
+        )
+
+
+def _preseed_resume_session_uuid(
+    *,
+    manager: SessionManager,
+    store: SessionStore,
+    session_name: str,
+    session_id: str,
+) -> None:
+    """Best-effort write of a fresh Claude UUID before launching a resume child."""
+    try:
+        store.update(
+            timeout_s=5.0,
+            mutate=lambda manifest: setattr(manifest.confirmed, "claude_session_id", session_id),
+        )
+        manager.index_store.sync_uuid_from_state(session_name, store.read())
+    except Exception:
+        logger.debug("Pre-seed UUID write failed (hook will reconcile)", exc_info=True)
 
 
 def _create_claude_session(

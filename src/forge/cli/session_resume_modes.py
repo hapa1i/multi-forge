@@ -6,11 +6,11 @@ import sys
 from pathlib import Path
 from typing import Any, Protocol
 
-from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
+from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.context_limit import _resolve_context_limit
-from forge.session.launch import _combine_prompt_files, _get_runtime_base_url
+from forge.session.launch import _combine_prompt_files
 
 from .session_rewind import _prepare_rewind_launch_artifacts
 
@@ -61,15 +61,6 @@ def _resume_fresh_rewind(
         session_cli.handle_session_error(e)
         return
 
-    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    session_cli._persist_routing_override(
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        session_name=child_manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    session_cli._apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
-
     parent_uuid = parent_state.confirmed.claude_session_id
     assert parent_uuid is not None  # caller validated
     rewind_artifacts = _prepare_rewind_launch_artifacts(
@@ -100,6 +91,7 @@ def _resume_fresh_rewind(
     session_cli.console.print()
 
     prompt_files: list[Path] = []
+    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
     configured_prompt = session_cli._resolve_manifest_prompt_file(child_manifest)
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
@@ -111,10 +103,7 @@ def _resume_fresh_rewind(
         prompt_files=prompt_files,
     )
 
-    launch_template, launch_base_url, launch_proxy_id = session_cli._get_effective_proxy_for_session(child_manifest)
-    if routing and routing.proxy_id:
-        launch_proxy_id = routing.proxy_id
-    use_sidecar, mounts, image = session_cli._get_launch_preferences(child_manifest)
+    use_sidecar, mounts, image = session_cli._get_resume_launch_preferences(child_manifest, direct=direct)
     if use_sidecar:
         session_cli.print_error_with_tip(
             "--strategy rewind is not supported with sidecar mode.",
@@ -122,35 +111,23 @@ def _resume_fresh_rewind(
             console=session_cli.console,
         )
         sys.exit(1)
-    _apply_and_persist_direct_model_override(
-        state=child_manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
+    session_cli._execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=child_manifest,
+            routing=session_cli._resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=rewind_artifacts.resume_id,
+            session_id=None,
+            fork_session=True,
+            prompt_file=Path(prompt_file) if prompt_file else None,
+            action=ClaudeResumeAction.FRESH_DERIVED,
+            context_limit=context_limit,
+            launch_preferences=session_cli._resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+            parent_name=parent,
+        ),
     )
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
-
-    session_cli._print_routing_summary(template=launch_template, base_url=runtime_base_url)
-    session_cli.console.print()
-
-    exit_code = session_cli._launch_claude_for_session(
-        manifest=child_manifest,
-        session_id=None,
-        resume_id=rewind_artifacts.resume_id,
-        effective_template=launch_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=True,
-        system_prompt_file=prompt_file,
-        name=child_manifest.name,
-        proxy_id=launch_proxy_id,
-    )
-
-    sys.exit(exit_code)
 
 
 def _resume_fresh_native(
@@ -188,15 +165,6 @@ def _resume_fresh_native(
         session_cli.handle_session_error(e)
         return
 
-    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    session_cli._persist_routing_override(
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        session_name=child_manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    session_cli._apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
-
     if transfer_result.warnings:
         for warning in transfer_result.warnings:
             session_cli.console.print(f"[yellow]Warning:[/yellow] {warning}")
@@ -210,35 +178,21 @@ def _resume_fresh_native(
     session_cli.console.print("[dim]Mode: Native resume (full conversation history via --fork-session)[/dim]")
     session_cli.console.print()
 
-    launch_template, launch_base_url, launch_proxy_id = session_cli._get_effective_proxy_for_session(child_manifest)
-    if routing and routing.proxy_id:
-        launch_proxy_id = routing.proxy_id
-    use_sidecar, mounts, image = session_cli._get_launch_preferences(child_manifest)
-    _apply_and_persist_direct_model_override(
-        state=child_manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
+    use_sidecar, mounts, image = session_cli._get_resume_launch_preferences(child_manifest, direct=direct)
+    session_cli._execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=child_manifest,
+            routing=session_cli._resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=parent_uuid,
+            session_id=None,
+            fork_session=True,
+            prompt_file=None,
+            action=ClaudeResumeAction.FRESH_DERIVED,
+            context_limit=context_limit,
+            launch_preferences=session_cli._resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+            parent_name=parent,
+        ),
     )
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
-
-    session_cli._print_routing_summary(template=launch_template, base_url=runtime_base_url)
-    session_cli.console.print()
-
-    exit_code = session_cli._launch_claude_for_session(
-        manifest=child_manifest,
-        session_id=None,
-        resume_id=parent_uuid,
-        effective_template=launch_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=True,
-        name=child_manifest.name,
-        proxy_id=launch_proxy_id,
-    )
-
-    sys.exit(exit_code)

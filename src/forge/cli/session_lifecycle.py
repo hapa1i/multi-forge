@@ -16,18 +16,25 @@ from typing import cast
 
 import click
 
-from forge.cli.session_model_pin import _apply_and_persist_direct_model_override
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.ops.claude_session import (
+    ClaudeLaunchPreferences,
+    ClaudeResumeAction,
+    ClaudeResumeResult,
+    ClaudeResumeRouting,
+    ClaudeResumeWarning,
     ClaudeSessionLaunchResult,
     ClaudeSidecarLaunch,
     ClaudeStartCreated,
     ClaudeStartError,
     ClaudeStartExtensions,
+    ResumeLaunchPlan,
+    ResumePrepared,
     SupervisorWiring,
     launch_claude_session,
     resolve_and_validate_system_prompt,
+    resume_claude_session,
     start_claude_session,
 )
 from forge.core.ops.context import _cwd_forge_root
@@ -59,7 +66,6 @@ from forge.session.exceptions import (
 )
 from forge.session.launch import (
     _combine_prompt_files,
-    _get_runtime_base_url,
     _resolve_extension_detection_root,
     _resolve_launch_mode,
 )
@@ -87,12 +93,10 @@ from forge.cli.editor import open_in_editor  # noqa: E402
 from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
-    _apply_routing_override_to_state,
     _get_active_session_entry,
     _get_effective_proxy_for_session,
     _get_launch_preferences,
     _hint_cross_project_session,
-    _persist_routing_override,
     _print_routing_summary,
     console,
     handle_session_error,
@@ -143,6 +147,10 @@ __all__ = [
     "_print_post_exit_tip",
     "_resume_tip_command",
     "_print_branch_exists_tip",
+    "_execute_resume_launch_plan",
+    "_get_resume_launch_preferences",
+    "_resume_launch_preferences_for_op",
+    "_resume_routing_for_op",
     "_has_confirmed_claude_session",
     "_is_resumable_session",
     "_has_resumable_transcript",
@@ -604,6 +612,133 @@ class _ClaudeStartCliPresenter:
 
     def on_incognito_cleanup_warning(self, message: str) -> None:
         console.print(f"[yellow]Cleanup warning:[/yellow] {message}")
+
+
+class _ClaudeResumeCliPresenter:
+    """CLI-side renderer for ``resume_claude_session`` events."""
+
+    def on_warning(self, warning: ClaudeResumeWarning) -> None:
+        console.print(f"[yellow]Warning:[/yellow] {warning.message}")
+        if warning.tip:
+            print_tip(warning.tip, blank_before=False, console=console)
+
+    def on_resume_prepared(self, event: ResumePrepared) -> None:
+        if event.action in {
+            ClaudeResumeAction.FORK_PARENT_CONVERSATION,
+            ClaudeResumeAction.START_FRESH,
+            ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT,
+        }:
+            console.print(f"Launching session [green]{event.session}[/green]")
+        elif event.action is ClaudeResumeAction.RECONNECT:
+            console.print(f"Reconnecting to session [green]{event.session}[/green]")
+        elif event.action is ClaudeResumeAction.RELAUNCH_AS_CHILD:
+            console.print(f"Relaunching [green]{event.parent_name}[/green] as [green]{event.session}[/green]")
+
+        _print_routing_summary(template=event.effective_template, base_url=event.runtime_base_url)
+
+        if event.action is ClaudeResumeAction.FORK_PARENT_CONVERSATION:
+            console.print("  Action:   Fork parent Claude conversation")
+        elif event.action is ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT:
+            console.print("  Action:   Start fresh Claude session with parent context")
+        elif event.action is ClaudeResumeAction.START_FRESH:
+            console.print("  Action:   Start fresh Claude session")
+        elif event.action is ClaudeResumeAction.RECONNECT:
+            console.print("  Action:   Reconnect to existing Claude conversation")
+            if event.resume_id is not None:
+                console.print(f"  UUID:     {event.resume_id[:8]}...")
+        elif event.action is ClaudeResumeAction.RELAUNCH_AS_CHILD:
+            console.print("  Action:   Resume parent conversation in new session")
+            if event.parent_name is not None:
+                console.print(f"  Parent:   {event.parent_name}")
+
+        if event.is_worktree and event.action is not ClaudeResumeAction.FRESH_DERIVED:
+            console.print(f"  Worktree: {display_path(event.worktree_path)}")
+            console.print(f"  Branch:   {event.worktree_branch}")
+        if event.context_path is not None and event.action in {
+            ClaudeResumeAction.FORK_PARENT_CONVERSATION,
+            ClaudeResumeAction.START_FRESH,
+            ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT,
+        }:
+            _print_context_path(str(event.context_path), event.worktree_path)
+        for warning in event.prompt_warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+        console.print()
+
+    def before_launch(self, forge_root: Path) -> None:
+        _warn_before_claude_launch(forge_root)
+
+    def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
+        _render_sidecar_launch(event)
+
+    def on_launch_error(self, error: ForgeOpError) -> None:
+        print_error(str(error), console=console)
+
+
+def _resume_routing_for_op(routing: ResolvedRouting | None) -> ClaudeResumeRouting | None:
+    if routing is None:
+        return None
+
+    return ClaudeResumeRouting(
+        template=routing.template,
+        base_url=routing.base_url,
+        proxy_id=routing.proxy_id,
+    )
+
+
+def _resume_context_ref(
+    *,
+    state: SessionState,
+    routing: ResolvedRouting | None,
+    direct: bool,
+) -> str | None:
+    if routing:
+        return routing.proxy_id or routing.template
+    if direct:
+        return None
+    effective_template, _, effective_proxy_id = _get_effective_proxy_for_session(state)
+    return effective_proxy_id or effective_template
+
+
+def _get_resume_launch_preferences(
+    state: SessionState,
+    *,
+    direct: bool,
+) -> tuple[bool, tuple[str, ...], str | None]:
+    if direct:
+        return False, (), None
+    return _get_launch_preferences(state)
+
+
+def _resume_launch_preferences_for_op(
+    use_sidecar: bool,
+    mounts: tuple[str, ...],
+    image: str | None,
+) -> ClaudeLaunchPreferences:
+    return ClaudeLaunchPreferences(use_sidecar=use_sidecar, mounts=mounts, image=image)
+
+
+def _render_claude_resume_result(result: ClaudeResumeResult) -> int:
+    for warning in result.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+    if not result.did_run:
+        return result.exit_code
+    return _post_exit_render(
+        result.manifest,
+        store_exists=result.store_exists,
+        exit_code=result.exit_code,
+        since=result.operation_started_at,
+    )
+
+
+def _execute_resume_launch_plan(*, manager: SessionManager, plan: ResumeLaunchPlan) -> None:
+    result = resume_claude_session(
+        manager=manager,
+        plan=plan,
+        presenter=_ClaudeResumeCliPresenter(),
+        invoke=_sess().invoke_claude,
+        run_active=_sess().run_with_active_session,
+    )
+    sys.exit(_render_claude_resume_result(result))
 
 
 def launch_new_session(
@@ -1522,25 +1657,8 @@ def _launch_in_place(
     manager.switch_session(name, forge_root=manifest.forge_root)
 
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    _apply_routing_override_to_state(state=manifest, routing=routing, direct=direct)
-    _persist_routing_override(
-        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
-        session_name=manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
-    if routing and routing.proxy_id:
-        effective_proxy_id = routing.proxy_id
-    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
-    use_sidecar, mounts, image = _get_launch_preferences(manifest)
-    _apply_and_persist_direct_model_override(
-        state=manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
-    )
+    context_limit = _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    use_sidecar, mounts, image = _get_resume_launch_preferences(manifest, direct=direct)
     prompt_files: list[Path] = []
 
     configured_prompt = _resolve_manifest_prompt_file(manifest)
@@ -1556,7 +1674,7 @@ def _launch_in_place(
     if parent_resume_id is not None:
         resume_id = parent_resume_id
         fork_session = True
-        launch_action = "Fork parent Claude conversation"
+        launch_action = ClaudeResumeAction.FORK_PARENT_CONVERSATION
     else:
         session_id = str(_uuid.uuid4())
         persisted_context = _resolve_derivation_context_file(manifest)
@@ -1565,66 +1683,40 @@ def _launch_in_place(
             notes_overlay = notes_for_snapshot(persisted_context)
             if notes_has_user_content(notes_overlay):
                 prompt_files.append(notes_overlay)
-            launch_action = "Start fresh Claude session with parent context"
+            launch_action = ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT
         else:
             fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
                 manager=manager, manifest=manifest
             )
             if fork_context is not None:
                 prompt_files.append(fork_context)
-                launch_action = "Start fresh Claude session with parent context"
+                launch_action = ClaudeResumeAction.START_FRESH_WITH_PARENT_CONTEXT
             else:
-                launch_action = "Start fresh Claude session"
+                launch_action = ClaudeResumeAction.START_FRESH
 
-    # Write pre-seeded UUID to manifest + index (after worktree_path is resolved)
-    forge_root_path = Path(manifest.forge_root) if manifest.forge_root else worktree_path
-    if session_id is not None:
-        try:
-            from forge.session import SessionStore
-
-            store = SessionStore(str(forge_root_path), manifest.name)
-            store.update(
-                timeout_s=5.0,
-                mutate=lambda m: setattr(m.confirmed, "claude_session_id", session_id),
-            )
-            manager.index_store.sync_uuid_from_state(manifest.name, store.read())
-        except Exception:
-            logger.debug("Pre-seed UUID write failed (hook will reconcile)", exc_info=True)
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
     prompt_file = _combine_prompt_files(
         worktree_path=worktree_path,
         session_name=manifest.name,
         prompt_files=prompt_files,
     )
 
-    console.print(f"Launching session [green]{manifest.name}[/green]")
-    _print_routing_summary(template=effective_template, base_url=runtime_base_url)
-    console.print(f"  Action:   {launch_action}")
-    if manifest.worktree and manifest.worktree.is_worktree:
-        console.print(f"  Worktree: {display_path(worktree_path)}")
-        console.print(f"  Branch:   {manifest.worktree.branch}")
-    if prompt_file:
-        _print_context_path(prompt_file, worktree_path)
-    for w in prompt_warnings:
-        console.print(f"[yellow]Warning:[/yellow] {w}")
-    console.print()
-
-    exit_code = _launch_claude_for_session(
-        manifest=manifest,
-        session_id=session_id,
-        resume_id=resume_id,
-        effective_template=effective_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=fork_session,
-        system_prompt_file=prompt_file,
-        name=manifest.name,
-        proxy_id=effective_proxy_id,
+    _execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=manifest,
+            routing=_resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=resume_id,
+            session_id=session_id,
+            fork_session=fork_session,
+            prompt_file=Path(prompt_file) if prompt_file else None,
+            action=launch_action,
+            context_limit=context_limit,
+            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+            prompt_warnings=tuple(prompt_warnings),
+        ),
     )
-    sys.exit(exit_code)
 
 
 def _reconnect_in_place(
@@ -1658,52 +1750,25 @@ def _reconnect_in_place(
 
     manager.switch_session(name, forge_root=manifest.forge_root)
 
-    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
-    _apply_routing_override_to_state(state=manifest, routing=routing, direct=direct)
-    _persist_routing_override(
-        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
-        session_name=manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
-    if routing and routing.proxy_id:
-        effective_proxy_id = routing.proxy_id
-    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
-    use_sidecar, mounts, image = _get_launch_preferences(manifest)
-    _apply_and_persist_direct_model_override(
-        state=manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
-    )
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
+    context_limit = _resolve_context_limit(_resume_context_ref(state=manifest, routing=routing, direct=direct))
+    use_sidecar, mounts, image = _get_resume_launch_preferences(manifest, direct=direct)
 
-    console.print(f"Reconnecting to session [green]{name}[/green]")
-    _print_routing_summary(template=effective_template, base_url=runtime_base_url)
-    console.print("  Action:   Reconnect to existing Claude conversation")
-    console.print(f"  UUID:     {claude_session_id[:8]}...")
-    if manifest.worktree and manifest.worktree.is_worktree:
-        console.print(f"  Worktree: {display_path(worktree_path)}")
-        console.print(f"  Branch:   {manifest.worktree.branch}")
-    console.print()
-
-    exit_code = _launch_claude_for_session(
-        manifest=manifest,
-        session_id=None,
-        resume_id=claude_session_id,
-        effective_template=effective_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=False,
-        name=manifest.name,
-        proxy_id=effective_proxy_id,
+    _execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=manifest,
+            routing=_resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=claude_session_id,
+            session_id=None,
+            fork_session=False,
+            prompt_file=None,
+            action=ClaudeResumeAction.RECONNECT,
+            context_limit=context_limit,
+            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+        ),
     )
-    sys.exit(exit_code)
 
 
 def _launch_as_child(
@@ -1717,8 +1782,8 @@ def _launch_as_child(
 ) -> None:
     """Create a child session and resume the parent's Claude conversation.
 
-    Routes through _launch_claude_for_session() so sidecar sessions relaunch
-    through the sidecar path with stored mounts/image settings.
+    Routes through the resume op so sidecar sessions relaunch through the
+    sidecar path with stored mounts/image settings.
     """
     try:
         parent, child = manager.relaunch_session(parent_name, forge_root=parent.forge_root)
@@ -1726,54 +1791,27 @@ def _launch_as_child(
         handle_session_error(e)
         return
 
-    worktree_path = Path(child.worktree.path) if child.worktree else Path.cwd()
-    _apply_routing_override_to_state(state=child, routing=routing, direct=direct)
-    _persist_routing_override(
-        forge_root=Path(child.forge_root) if child.forge_root else worktree_path,
-        session_name=child.name,
-        routing=routing,
-        direct=direct,
-    )
-    effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(child)
-    if routing and routing.proxy_id:
-        effective_proxy_id = routing.proxy_id
-    context_limit = _resolve_context_limit(effective_proxy_id or effective_template)
-    use_sidecar, mounts, image = _get_launch_preferences(child)
-    _apply_and_persist_direct_model_override(
-        state=child,
-        direct_model=direct_model_override,
-        forge_root=Path(child.forge_root) if child.forge_root else worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
-    )
-
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
-
-    console.print(f"Relaunching [green]{parent_name}[/green] as [green]{child.name}[/green]")
-    _print_routing_summary(template=effective_template, base_url=runtime_base_url)
-    console.print("  Action:   Resume parent conversation in new session")
-    console.print(f"  Parent:   {parent_name}")
-    if child.worktree and child.worktree.is_worktree:
-        console.print(f"  Worktree: {display_path(worktree_path)}")
-        console.print(f"  Branch:   {child.worktree.branch}")
-    console.print()
+    context_limit = _resolve_context_limit(_resume_context_ref(state=child, routing=routing, direct=direct))
+    use_sidecar, mounts, image = _get_resume_launch_preferences(child, direct=direct)
 
     # Child is a same-dir fork: use --resume --fork-session with parent's UUID
-    exit_code = _launch_claude_for_session(
-        manifest=child,
-        session_id=None,
-        resume_id=parent.confirmed.claude_session_id,
-        effective_template=effective_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=True,
-        name=child.name,
-        proxy_id=effective_proxy_id,
+    _execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=child,
+            routing=_resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=parent.confirmed.claude_session_id,
+            session_id=None,
+            fork_session=True,
+            prompt_file=None,
+            action=ClaudeResumeAction.RELAUNCH_AS_CHILD,
+            context_limit=context_limit,
+            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+            parent_name=parent_name,
+        ),
     )
-    sys.exit(exit_code)
 
 
 def _print_context_path(prompt_file: str, worktree_path: Path) -> None:
@@ -1898,15 +1936,6 @@ def _resume_fresh(
         handle_session_error(e)
         return
 
-    child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
-    _persist_routing_override(
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        session_name=child_manifest.name,
-        routing=routing,
-        direct=direct,
-    )
-    _apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
-
     console.print(f"[dim]Context assembled: {transfer_result.context_file_rel}[/dim]")
     if transfer_result.warnings:
         for warning in transfer_result.warnings:
@@ -1955,54 +1984,25 @@ def _resume_fresh(
         prompt_files=prompt_files,
     )
 
-    launch_template, launch_base_url, launch_proxy_id = _get_effective_proxy_for_session(child_manifest)
-    if routing and routing.proxy_id:
-        launch_proxy_id = routing.proxy_id
+    use_sidecar, mounts, image = _get_resume_launch_preferences(child_manifest, direct=direct)
 
-    use_sidecar, mounts, image = _get_launch_preferences(child_manifest)
-    _apply_and_persist_direct_model_override(
-        state=child_manifest,
-        direct_model=direct_model_override,
-        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
-        use_sidecar=use_sidecar,
-        surface="resume",
+    _execute_resume_launch_plan(
+        manager=manager,
+        plan=ResumeLaunchPlan(
+            manifest=child_manifest,
+            routing=_resume_routing_for_op(routing),
+            direct=direct,
+            resume_id=None,
+            session_id=str(_uuid.uuid4()),
+            fork_session=False,
+            prompt_file=Path(prompt_file) if prompt_file else None,
+            action=ClaudeResumeAction.FRESH_DERIVED,
+            context_limit=context_limit,
+            launch_preferences=_resume_launch_preferences_for_op(use_sidecar, mounts, image),
+            direct_model_override=direct_model_override,
+            parent_name=parent,
+        ),
     )
-    runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
-
-    pre_seeded_uuid = str(_uuid.uuid4())
-    try:
-        from forge.session import SessionStore
-
-        _store_root = Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path
-        _store = SessionStore(str(_store_root), child_manifest.name)
-        _store.update(
-            timeout_s=5.0,
-            mutate=lambda m: setattr(m.confirmed, "claude_session_id", pre_seeded_uuid),
-        )
-        manager.index_store.sync_uuid_from_state(child_manifest.name, _store.read())
-    except Exception:
-        logger.debug("Pre-seed UUID write failed (hook will reconcile)", exc_info=True)
-
-    _print_routing_summary(template=launch_template, base_url=runtime_base_url)
-    console.print()
-
-    exit_code = _launch_claude_for_session(
-        manifest=child_manifest,
-        session_id=pre_seeded_uuid,
-        resume_id=None,
-        effective_template=launch_template,
-        runtime_base_url=runtime_base_url,
-        context_limit=context_limit,
-        use_sidecar=use_sidecar,
-        mounts=mounts,
-        image=image,
-        fork_session=False,
-        system_prompt_file=prompt_file,
-        name=child_manifest.name,
-        proxy_id=launch_proxy_id,
-    )
-
-    sys.exit(exit_code)
 
 
 @session.command()

@@ -16,9 +16,9 @@ incognito-cleanup; the CLI renders via a `ClaudeStartPresenter` (9 hooks). The o
 `invoke=`/`manager=` through the `_sess()` shim, so those patch sites still resolve; the parent count drops when the
 shim is retired, not now.
 
-**Slice 3 planned (2026-07-02):** `resume_claude_session -> ClaudeResumeResult`. Collapse the identical
-routing/model/preference/launch tail shared by the six Claude resume dispatch targets. Full plan below; **design
-decisions resolved with reviewer; ready to implement on go-ahead.**
+**Slice 3 implemented (2026-07-02):** `resume_claude_session -> ClaudeResumeResult` now owns the shared
+routing/model/UUID/launch tail for the six Claude resume dispatch targets. The CLI still owns validation, mode-specific
+creation/prompt assembly, and rendering through `_ClaudeResumeCliPresenter`. Verification is green; awaiting review.
 
 ## Verified Baseline
 
@@ -305,8 +305,8 @@ incognito delete-on-exit `finally`.
 
 ## Slice 3 -- `resume_claude_session` (interactive-resume op)
 
-**Status:** planned; design decisions resolved with reviewer 2026-07-02 (see below). Anchors verified against the
-post-start-op tree (`session_lifecycle.py` = 2,121 lines). **Ready to implement on go-ahead.**
+**Status:** implemented 2026-07-02; review pending. Anchors verified against the post-start-op tree
+(`session_lifecycle.py` = 2,121 lines before Slice 3; **2,121 after Slice 3**).
 
 ### Design decision (resolved by precedent -- mirrors the landed start op)
 
@@ -412,6 +412,10 @@ pre-step session creation / prompt assembly vary per mode and stay CLI-side.
 - Deferred same-dir fork resumes the parent conversation (`_get_deferred_same_dir_fork_resume_id`,
   `_launch_in_place:1555`).
 - `--review` edits the notes overlay, never the AI snapshot (`_resume_fresh:1916-1931`).
+- `--no-proxy` resume preserves the pre-extraction override ordering: direct clears the effective proxy before
+  context-limit lookup and launch preferences, so a sidecar-preferring session launches on host with direct env.
+- Fresh-derived resume keeps the pre-extraction render text: no Worktree/Branch lines in the derived-session pre-launch
+  block.
 - `core/ops/` + `forge/session/` import nothing from `forge.cli`.
 
 ### Characterization extensions (write FIRST, green before + after)
@@ -425,16 +429,28 @@ Current coverage: start `--no-launch`, incognito start, fresh-resume (transfer).
 
 ### Acceptance tests (Slice 3)
 
-- [ ] Layering: `grep -rn "from forge.cli\|import forge.cli" src/forge/core/ops/claude_session.py` -> empty.
-- [ ] Op render-free: no Click/Rich/`console`/`sys.exit`/`print_error` in the resume op.
-- [ ] Characterization green before + after (start/incognito/transfer + new reconnect/child/native snapshots).
-- [ ] The 6 in-scope `_apply_and_persist_direct_model_override` + 6 resume-path `_launch_claude_for_session` sites
+- [x] Layering: `grep -rn "from forge.cli\|import forge.cli" src/forge/core/ops/claude_session.py` -> empty.
+- [x] Op render-free: no Click/Rich/`console`/`sys.exit`/`print_error`/`print_tip` in `core/ops/claude_session.py`.
+- [x] Characterization green before + after (start/incognito/transfer + new reconnect/child/native snapshots).
+- [x] The 6 in-scope `_apply_and_persist_direct_model_override` + 6 resume-path `_launch_claude_for_session` sites
   collapse to one op path; `_launch_claude_for_session` left with only the fork caller (`session_fork.py:1244`), and the
   fork model-override (`session_fork.py:839`) stays for Slice 4.
-- [ ] Focused (resume CLI + model-pin + passthrough regression):
+- [x] Focused (resume CLI + model-pin + passthrough regression):
   `tests/src/cli/test_session_commands.py tests/src/cli/test_session_resume_review.py tests/src/cli/test_session_rewind_cli.py tests/regression/test_bug_nested_project_launch.py tests/regression/test_bug_passthrough_model_pin.py`.
-- [ ] Integration: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`.
-- [ ] `make pre-commit` clean.
+- [x] Integration: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`.
+- [x] `make pre-commit` clean.
+- [x] Review follow-up: direct launch-in-place resume on a sidecar-preferring session asserts
+  `_resolve_context_limit(None)`, host launch, scrubbed proxy env, and no `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+
+**Recorded verification (Slice 3):**
+
+- `uv run pytest tests/src/session/test_claude_session_manifest_characterization.py -q` -> 6 passed before and after.
+- `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_resume_review.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_model_pins.py tests/regression/test_bug_nested_project_launch.py tests/regression/test_bug_passthrough_model_pin.py -q`
+  -> 263 passed.
+- `uv run pytest tests/src/cli/test_session_commands.py -q -k "resume or model or passthrough"` -> 42 passed, 166
+  deselected.
+- `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -> 21 passed.
+- `make pre-commit` -> passed.
 
 ## Roadmap
 

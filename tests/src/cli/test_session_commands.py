@@ -4048,6 +4048,56 @@ class TestProxyDirectFlags:
         assert child_state.intent.launch.mode == LAUNCH_MODE_HOST
         assert child_state.intent.launch.sidecar is None
 
+    def test_resume_direct_on_sidecar_launch_in_place_uses_host_env(self, runner: CliRunner, temp_env: Path) -> None:
+        """--no-proxy on a never-started sidecar session should launch on host with direct env."""
+        runner.invoke(
+            main,
+            [
+                "session",
+                "start",
+                "resume-sidecar-direct",
+                "--sidecar",
+                "--no-launch",
+            ],
+        )
+
+        with (
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=1048576) as mock_context_limit,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "resume",
+                    "resume-sidecar-direct",
+                    "--no-proxy",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        mock_context_limit.assert_called_once_with(None)
+        assert mock_invoke.called is True
+        assert mock_run_sidecar.called is False
+
+        kwargs = mock_invoke.call_args.kwargs
+        assert "ANTHROPIC_BASE_URL" not in kwargs["env_vars"]
+        assert "ACTIVE_TEMPLATE" not in kwargs["env_vars"]
+        assert "FORGE_PROXY_WIRE_SHAPE" not in kwargs["env_vars"]
+        assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in kwargs["env_vars"]
+        assert sorted(kwargs["unset_env_vars"]) == [
+            "ACTIVE_TEMPLATE",
+            "ANTHROPIC_BASE_URL",
+            "FORGE_PROXY_WIRE_SHAPE",
+        ]
+
+        state = SessionManager().get_session("resume-sidecar-direct")
+        assert state.intent.proxy is None
+        assert state.intent.launch is not None
+        assert state.intent.launch.mode == LAUNCH_MODE_HOST
+        assert state.intent.launch.sidecar is None
+
     def test_fork_proxy_no_launch_persists_intent(self, runner: CliRunner, temp_env: Path) -> None:
         """--proxy on fork --no-launch should persist routing to manifest."""
         import json

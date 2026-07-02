@@ -88,7 +88,7 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
@@ -159,15 +159,16 @@ class TestReviewFlagEditorInvocation:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
 
         # subprocess.run is NOT patched here: the fake editor must really execute
         # so it appends to the notes file, exercising the launch-merge wiring.
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
@@ -236,7 +237,7 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
@@ -296,7 +297,7 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0) as launch_mock,
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None) as launch_mock,
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
@@ -355,7 +356,7 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
@@ -402,13 +403,14 @@ class TestReviewRelaunch:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
+            raise SystemExit(0)
 
         with (
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
-            patch("forge.cli.session_lifecycle._persist_routing_override"),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
             patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
@@ -456,13 +458,14 @@ class TestReviewRelaunch:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
+            raise SystemExit(0)
 
         with (
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
-            patch("forge.cli.session_lifecycle._persist_routing_override"),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
             patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
