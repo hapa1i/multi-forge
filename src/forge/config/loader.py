@@ -401,20 +401,17 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
     an unknown override key) is rejected or normalized as ValueError; semantic
     violations raise ValueError directly from ProxyInstanceConfig.__post_init__.
     """
+
     def _require_mapping(value: Any, field: str) -> Mapping[str, Any]:
         if not isinstance(value, Mapping):
-            raise ValueError(
-                f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}"
-            )
+            raise ValueError(f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}")
         return value
 
     def _optional_tier_override(value: Any, field: str) -> TierOverride | None:
         if value is None:
             return None
         if not isinstance(value, Mapping):
-            raise ValueError(
-                f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}"
-            )
+            raise ValueError(f"Malformed proxy configuration: {field} must be a mapping, got {type(value).__name__}")
         if not value:
             return None
         return TierOverride(**value)
