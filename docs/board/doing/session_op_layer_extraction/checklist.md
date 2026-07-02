@@ -271,7 +271,9 @@ incognito delete-on-exit `finally`.
 - [x] Layering: `grep -rn "from forge.cli\|import forge.cli" src/forge/core/ops/ src/forge/session/` -> empty for new
   modules.
 - [x] Characterization: `uv run pytest tests/src/session/test_claude_session_manifest_characterization.py -q` green
-  before and after each sub-slice (extend with an incognito-start snapshot in 2b).
+  before and after each sub-slice; extended with `test_incognito_start_manifest_shape_and_cleanup`, which captures the
+  incognito manifest mid-launch (the only window it exists) and asserts the op-owned `finally` deletes it on exit -- 3
+  passed.
 - [x] Focused: `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_model_pins.py -q`.
 - [x] Integration: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v`.
 - [x] `make pre-commit` clean.
@@ -282,12 +284,16 @@ incognito delete-on-exit `finally`.
   passed.
 - [x] 2b bridge pre-commit: `make pre-commit` -- passed after hooks sorted imports/formatted Markdown.
 
-### Open items to resolve during the start-op step
+### Open items resolved by the start-op step
 
-- Staged pre-launch event contract (Nit 1): the exact event set (`on_created`/`on_extensions`/`on_no_launch`) and how
-  the 3 UI-tangled render seams (`_warn_if_hooks_missing`, `_warn_if_version_outdated`, `_auto_install_extensions`) hang
-  off it. (`_prepare_sidecar_prompt_file` is resolved -- UI-free, relocates.)
-- Incognito `finally` ownership (op vs CLI wrapper).
+- **Staged pre-launch event contract (Nit 1)** -- resolved as a `ClaudeStartPresenter` Protocol (9 hooks). The op owns
+  *timing*; the CLI presenter owns *content*. The 3 UI-tangled render seams hang off `before_launch(forge_root)`
+  (`_ClaudeStartCliPresenter.before_launch` -> `_warn_before_claude_launch`, which does the hooks/version warnings);
+  `on_extensions` carries the auto-install decision.
+- **Incognito `finally` ownership** -- resolved **op-owned**. `start_claude_session` wraps the launch in
+  `try/except ForgeOpError -> on_launch_error` then `finally -> _run_incognito_cleanup(...)`; the error hook fires
+  before the finally so the "error -> Cleaning up..." output order is preserved. Cleanup render goes through the
+  `on_incognito_cleanup_{start,ok,warning}` hooks. Pinned by `test_incognito_start_manifest_shape_and_cleanup`.
 - Whether the 3 render seams stay inline in the CLI event handlers (preserves current timing) or move to
   `result.warnings` (moves output to after the child exits -- a timing change). Behavior-preservation favors inline
   unless deliberately changed.

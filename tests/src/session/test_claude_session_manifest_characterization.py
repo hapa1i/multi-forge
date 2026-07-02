@@ -1,8 +1,8 @@
 """Manifest characterization tests for the Claude session CLI path.
 
-These snapshots deliberately exercise the current CLI entrypoints before the
-Claude session op extraction. They pin key order as well as values by comparing
-JSON rendered without ``sort_keys``.
+These snapshots exercise the CLI session entrypoints and pin manifest behavior
+across the Claude session op extraction (a behavior-preserving refactor). They pin
+key order as well as values by comparing JSON rendered without ``sort_keys``.
 """
 
 from __future__ import annotations
@@ -124,6 +124,92 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
   },
   "forge_root": "<project>"
 }"""
+
+
+def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env: Path) -> None:
+    """Pin the incognito manifest shape mid-launch and the op-owned delete-on-exit.
+
+    Incognito rejects ``--no-launch`` (auto-delete-on-exit is its contract), so the
+    manifest only exists during the launch window. Capture it from inside a mocked
+    ``invoke_claude`` -- which the op reaches only after ``record_launch_confirmed``,
+    so ``confirmed.launch`` and ``claude_project_root`` are populated here (both stay
+    null in the ``--no-launch`` snapshots). Then assert the op's ``finally`` removed
+    the manifest, guarding the incognito cleanup ownership that moved into
+    ``start_claude_session``.
+    """
+    captured: dict[str, str] = {}
+
+    def _capture_manifest(*_args: object, **_kwargs: object) -> int:
+        captured["json"] = _manifest_json(SessionStore(str(temp_env), "char-incognito").read(), project=temp_env)
+        return 0
+
+    with patch("forge.cli.session.invoke_claude", side_effect=_capture_manifest):
+        result = runner.invoke(main, ["session", "start", "char-incognito", "--incognito"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["json"] == """{
+  "schema_version": 1,
+  "name": "char-incognito",
+  "created_at": "<timestamp>",
+  "last_accessed_at": "<timestamp>",
+  "parent_session": null,
+  "is_fork": false,
+  "is_incognito": true,
+  "worktree": {
+    "path": "<project>",
+    "branch": "char-incognito",
+    "is_worktree": false,
+    "owns_worktree": true
+  },
+  "intent": {
+    "agent": "claude-code",
+    "proxy": null,
+    "subprocess_proxy": null,
+    "launch": {
+      "mode": "host",
+      "sidecar": null,
+      "direct_model": null,
+      "runtime": "claude_code"
+    },
+    "system_prompt": null,
+    "memory": null,
+    "policy": null,
+    "verification": null,
+    "consumer_lanes": null
+  },
+  "overrides": {},
+  "confirmed": {
+    "claude_session_id": "<uuid>",
+    "transcript_path": null,
+    "started_with_proxy": null,
+    "latest_plan_path": null,
+    "artifacts": {},
+    "policy": null,
+    "verification": null,
+    "compaction": null,
+    "subagents": null,
+    "is_sandboxed": false,
+    "launch": {
+      "routing_mode": "direct",
+      "proxy_id": null,
+      "base_url": null,
+      "proxy_cost_baseline_micros": null,
+      "proxy_cost_baseline_started_at": null,
+      "api_key_available_to_child": true,
+      "api_key_source": "env"
+    },
+    "codex": null,
+    "derivation": null,
+    "claude_project_root": "<project>",
+    "consumer_lanes": null,
+    "confirmed_at": null,
+    "confirmed_by": null
+  },
+  "forge_root": "<project>"
+}"""
+
+    manifest_path = temp_env / ".forge" / "sessions" / "char-incognito" / "forge.session.json"
+    assert not manifest_path.exists(), "incognito finally should delete the manifest on exit"
 
 
 def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
