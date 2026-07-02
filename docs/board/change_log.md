@@ -27,6 +27,19 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### Board closeout: rewind_resume_strategy
+
+**Goal**: Close the shipped rewind resume strategy card so `doing/` reflects only active work.
+
+**Key changes**:
+
+- `rewind_resume_strategy` moved `doing/ -> done/` after confirming all implementation slices were already ticked and the
+  docs named in the checklist reflect the shipped `--strategy rewind --drop-last N` behavior.
+- The card/checklist stale "Slice 4 next" focus was corrected to closeout state.
+
+**Verification**: `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q`
+(26 passed); `make pre-commit` clean.
+
 ### Board closeout: Sonnet 5 done; accidental_complexity A/B merged + paused
 
 **Goal**: Reconcile the board after PR #65 merged -- close the shipped Sonnet 5 card and pause the accidental-complexity

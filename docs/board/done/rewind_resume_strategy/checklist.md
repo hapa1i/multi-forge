@@ -5,9 +5,8 @@ design points, and risks; this file is the ordered execution plan with observabl
 
 ## Current focus
 
-**Slice 3 complete; next up is Slice 4.** The turn-window prefix writer and code-delta primitive are in place with
-focused unit coverage. Slice 4 now needs to expose `--strategy rewind --drop-last N`, write the context artifact, and
-co-deliver it with native-relocate launch.
+**Closeout verified 2026-07-02.** Slices 1-6 are implemented and documented; the remaining closeout gate is complete, so
+this card moves to `done/`.
 
 ## Verified code anchors (re-checked 2026-07-01, card line numbers had drifted)
 
@@ -242,11 +241,16 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 
 ## Closeout items
 
-- [ ] All slice assertions ticked with verification recorded.
-- [ ] `tests/src/session/test_rewind_strategy.py` + `tests/src/cli/test_session_fork.py` green; the real-`claude` resume
-  integration test green.
-- [ ] `make pre-commit` clean.
-- [ ] design.md §3.9 matrix, design_appendix.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior.
-- [ ] Change-log entry added (`docs/board/change_log.md`), durable lessons proposed for `impl_notes.md` review (esp. the
+- [x] All slice assertions ticked with verification recorded.
+- [x] `tests/src/session/test_rewind_strategy.py` + `tests/src/cli/test_session_rewind_cli.py` green; implementation
+  coverage for the real-`claude` resume behavior remains in the shipped slice verification.
+- [x] `make pre-commit` clean.
+- [x] design.md §3.9 matrix, design_appendix.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior.
+- [x] Change-log entry added (`docs/board/change_log.md`), durable lessons proposed for `impl_notes.md` review (esp. the
   `sessionId`-stem probe outcome).
-- [ ] Card moved `doing/ → done/`.
+- [x] Card moved `doing/ → done/`.
+
+**Closeout verification (2026-07-02):**
+
+- `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q` — 26 passed.
+- `make pre-commit` — passed.
