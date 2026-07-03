@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from forge.cli.launch_confirmation import (
+from forge.core.reactive.env import InteractiveApiKeyDecision
+from forge.session import SessionStore, create_session_state
+from forge.session.launch_confirmation import (
     _routing_mode_for,
     read_proxy_cost_baseline,
     read_proxy_cost_baseline_micros,
     record_launch_confirmed,
 )
-from forge.core.reactive.env import InteractiveApiKeyDecision
-from forge.session import SessionStore, create_session_state
 
 
 def _store_with_manifest(tmp_path: Path) -> SessionStore:
@@ -138,7 +138,7 @@ class TestReadProxyCostBaselineMicros:
             assert timeout == 0.5
             return _Response()
 
-        monkeypatch.setattr("forge.cli.launch_confirmation.urlopen", _urlopen)
+        monkeypatch.setattr("forge.session.launch_confirmation.urlopen", _urlopen)
 
         baseline = read_proxy_cost_baseline("http://localhost:8085/v1/messages")
         assert baseline is not None
@@ -157,7 +157,7 @@ class TestReadProxyCostBaselineMicros:
             def read(self, _limit: int) -> bytes:
                 return b'{"is_proxy": true, "metrics": {"costs": {"total_usd": 0.769651}}}'
 
-        monkeypatch.setattr("forge.cli.launch_confirmation.urlopen", lambda *_args, **_kwargs: _Response())
+        monkeypatch.setattr("forge.session.launch_confirmation.urlopen", lambda *_args, **_kwargs: _Response())
 
         assert read_proxy_cost_baseline_micros("http://localhost:8085") == 769_651
 
@@ -172,7 +172,7 @@ class TestReadProxyCostBaselineMicros:
             def read(self, _limit: int) -> bytes:
                 return b'{"is_proxy": false}'
 
-        monkeypatch.setattr("forge.cli.launch_confirmation.urlopen", lambda *_args, **_kwargs: _Response())
+        monkeypatch.setattr("forge.session.launch_confirmation.urlopen", lambda *_args, **_kwargs: _Response())
 
         assert read_proxy_cost_baseline_micros("http://localhost:8085") is None
 

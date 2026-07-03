@@ -27,6 +27,60 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### session_op_layer_extraction Slice 5: Session shim retirement
+
+**Goal**: Remove the `forge.cli.session` compatibility shim that kept tests patching parent-module re-exports after the
+Claude session path was split into focused CLI/core modules.
+
+**Key changes**:
+
+- Repointed parent-module test patches to the real seams by sub-slice: low-volume helpers, resume-mode local imports,
+  `SessionManager`, and the Claude launcher seam in `forge.core.ops.claude_session`.
+- Deleted the `_sess()` / `_session_cli()` lazy module seams and replaced the `session.py` wildcard re-export tail with
+  side-effect imports that preserve Click command registration.
+- Repointed direct test imports for submodule-owned commands/helpers while leaving `session.py`-defined helper tests on
+  the parent module.
+
+**Verification**: CLI/regression suite 2681 passed; Docker lifecycle integration 21 passed; stale shim greps clean
+except for helpers still defined in `session.py`; `make pre-commit` clean.
+
+### session_op_layer_extraction Slice 4b: Fork supervisor wiring
+
+**Goal**: Finish the post-fork cleanup by collapsing fork supervisor persistence onto the core wiring primitive and
+settling the remaining sidecar testability question.
+
+**Key changes**:
+
+- Replaced `session_fork.py`'s hand-rolled `SupervisorConfig` / lane persistence block with `SupervisorWiring` +
+  `_apply_supervisor_wiring`, preserving the existing `_preflight_routing` guards and CLI-owned validation.
+- Moved sidecar `is_sandboxed=True` confirmation to after mount/secret/env prep, immediately before the runner, so
+  launcher validation failures such as a bad `--mount` do not strand a stale sandbox flag.
+- Added a fork-sidecar bad-mount regression that asserts clean launch failure, no sidecar runner invocation, and
+  `confirmed.is_sandboxed == false`.
+
+**Verification**: focused supervisor/session/regression suite 293 passed; Docker supervisor integration 10 passed;
+layering/UI-free greps empty; `make pre-commit` clean.
+
+### session_op_layer_extraction Slice 1: Claude session preflight split
+
+**Goal**: Start the staged Claude session CLI/core split with the lowest-risk helpers and a manifest characterization
+safety net.
+
+**Key changes**:
+
+- Added a JSON-string manifest characterization test for Claude `start --no-launch` and fresh resume, pinning dataclass
+  field order and normalized volatile values.
+- Added `forge.core.ops.claude_session.resolve_and_validate_system_prompt` and rewired launch prompt resolution through
+  it while keeping the CLI's `Path -> str` launcher boundary explicit. Follow-up cleanup kept `--no-launch` prompt
+  validation CLI-owned, avoiding a dead op-level `ForgeOpError` path.
+- Moved the CLI-free model-pin support cluster into `forge.session.model_pin`; `cli/session_model_pin.py` now only keeps
+  UI-tangled persistence/warning behavior.
+- Accepted `session_op_layer_extraction` into `doing/` with Slice 1 verification recorded. Parent patch count remains
+  270 across 13 files; `session_lifecycle.py` is 2,496 lines after the slice.
+
+**Verification**: characterization test 2 passed; focused units 241 passed; Docker lifecycle integration 21 passed;
+layering/UI-free greps empty; `make pre-commit` clean.
+
 ### reject_rewind_transfer_strategy: rewind is not a transfer-context strategy (PR #68)
 
 **Goal**: Fix the follow-up bug from #66 -- adding `ResumeStrategy.REWIND` made the codex/transfer ops accept

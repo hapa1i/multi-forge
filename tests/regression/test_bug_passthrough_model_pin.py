@@ -10,7 +10,7 @@ rejected pre-launch even though passthrough would have forwarded it unchanged.
 Fix: `_proxy_supports_model_pin` short-circuits to True for
 `wire_shape == "anthropic_passthrough"`.
 
-Affected: src/forge/cli/session_model_pin.py
+Affected: src/forge/session/model_pin.py
 """
 
 from __future__ import annotations
@@ -19,13 +19,13 @@ from unittest.mock import patch
 
 import pytest
 
-from forge.cli.session_model_pin import (
+from forge.config.schema import ProxyInstanceConfig, TierModels
+from forge.session.direct_model import resolve_direct_model_pin
+from forge.session.model_pin import (
     _apply_direct_model_env_if_supported,
     _proxy_supports_model_pin,
     _validate_proxy_model_pin,
 )
-from forge.config.schema import ProxyInstanceConfig, TierModels
-from forge.session.direct_model import resolve_direct_model_pin
 
 pytestmark = pytest.mark.regression
 

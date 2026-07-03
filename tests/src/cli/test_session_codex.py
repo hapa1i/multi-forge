@@ -2,9 +2,9 @@
 
 Covers ``forge session start --runtime codex`` / ``forge session resume``
 dispatch and flag-matrix validation (``--task`` selects the headless turn;
-omitting it the interactive TUI), the ``_launch_claude_for_session`` runtime
-backstop, the ``session_codex`` rendering layer, and ``session show`` for Codex
-manifests. The ops themselves are covered in
+omitting it the interactive TUI), the Claude launcher runtime backstop, the
+``session_codex`` rendering layer, and ``session show`` for Codex manifests.
+The ops themselves are covered in
 ``tests/src/core/ops/test_codex_session.py`` and ``test_codex_interactive.py``;
 here the ops are mocked and the assertions target Click plumbing (what reaches
 the op, what exits with which code).
@@ -348,7 +348,7 @@ class TestResumeCodexDispatch:
 
     def test_dispatch_with_task(self, runner: CliRunner, tmp_path: Path) -> None:
         with (
-            patch("forge.cli.session.SessionManager") as mgr_cls,
+            patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
             patch("forge.cli.session_codex.resume_codex_session", return_value=0) as resume,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -391,7 +391,7 @@ class TestResumeCodexDispatch:
 
     def test_exit_code_propagates(self, runner: CliRunner, tmp_path: Path) -> None:
         with (
-            patch("forge.cli.session.SessionManager") as mgr_cls,
+            patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
             patch("forge.cli.session_codex.resume_codex_session", return_value=2),
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -400,8 +400,8 @@ class TestResumeCodexDispatch:
 
     def test_bare_resume_reattaches(self, runner: CliRunner, tmp_path: Path) -> None:
         with (
-            patch("forge.cli.session.SessionManager") as mgr_cls,
-            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
             patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -419,8 +419,8 @@ class TestResumeCodexDispatch:
             launcher_pid=4242,
         )
         with (
-            patch("forge.cli.session.SessionManager") as mgr_cls,
-            patch("forge.cli.session._get_active_session_entry", return_value=entry),
+            patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=entry),
             patch("forge.cli.session_codex.reattach_interactive_codex_session") as reattach,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
@@ -435,7 +435,7 @@ class TestResumeCodexDispatch:
 
     def test_force_rejected_for_bare_resume(self, runner: CliRunner, tmp_path: Path) -> None:
         """--force is Claude-only; it must not become an active-gate escape for codex."""
-        with patch("forge.cli.session.SessionManager") as mgr_cls:
+        with patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls:
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
             result = runner.invoke(main, ["session", "resume", "impl", "--force"])
 
@@ -470,7 +470,7 @@ class TestResumeCodexDispatch:
 
         monkeypatch.chdir(other_project)
         with (
-            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
             patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
         ):
             result = runner.invoke(main, ["session", "resume", "impl"])
@@ -522,7 +522,7 @@ class TestResumeCodexDispatch:
     def test_claude_only_flags_rejected(
         self, runner: CliRunner, tmp_path: Path, extra_args: list[str], flag_label: str
     ) -> None:
-        with patch("forge.cli.session.SessionManager") as mgr_cls:
+        with patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls:
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
             result = runner.invoke(main, ["session", "resume", "impl", "--task", "t"] + extra_args)
 
@@ -531,7 +531,7 @@ class TestResumeCodexDispatch:
 
     def test_task_rejected_for_claude_sessions(self, runner: CliRunner, tmp_path: Path) -> None:
         claude_state = create_session_state("cl", worktree_path=str(tmp_path))
-        with patch("forge.cli.session.SessionManager") as mgr_cls:
+        with patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls:
             mgr_cls.return_value.get_session.return_value = claude_state
             result = runner.invoke(main, ["session", "resume", "cl", "--task", "t"])
 
@@ -540,22 +540,20 @@ class TestResumeCodexDispatch:
 
 
 class TestLaunchClaudeBackstop:
-    def test_codex_manifest_refused(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        from forge.cli.session_lifecycle import _launch_claude_for_session
+    def test_codex_manifest_refused(self, tmp_path: Path) -> None:
+        from forge.core.ops.claude_session import launch_claude_session
 
         state = create_session_state("impl", worktree_path=str(tmp_path), runtime="codex")
-        code = _launch_claude_for_session(
-            manifest=state,
-            session_id=None,
-            resume_id=None,
-            effective_template=None,
-            runtime_base_url=None,
-            context_limit=200_000,
-            use_sidecar=False,
-        )
-
-        assert code == 1
-        assert "runtime 'codex'" in capsys.readouterr().out
+        with pytest.raises(ForgeOpError, match="runtime 'codex'"):
+            launch_claude_session(
+                manifest=state,
+                session_id=None,
+                resume_id=None,
+                effective_template=None,
+                runtime_base_url=None,
+                context_limit=200_000,
+                use_sidecar=False,
+            )
 
 
 class TestCodexCliRendering:

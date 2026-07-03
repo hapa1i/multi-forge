@@ -88,15 +88,12 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            # session module also imports SessionManager via its own namespace
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -159,21 +156,20 @@ class TestReviewFlagEditorInvocation:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
 
         # subprocess.run is NOT patched here: the fake editor must really execute
         # so it appends to the notes file, exercising the launch-merge wiring.
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -236,14 +232,12 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -296,13 +290,11 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0) as launch_mock,
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None) as launch_mock,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -355,13 +347,11 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
-            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
+            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
             mgr.resume_session.return_value = (child_manifest, handoff_result)
-            mock_mgr_cls_sess.return_value = mgr
 
             result = runner.invoke(
                 main,
@@ -402,15 +392,16 @@ class TestReviewRelaunch:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
+            raise SystemExit(0)
 
         with (
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
-            patch("forge.cli.session_lifecycle._persist_routing_override"),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session._resolve_context_limit", return_value=200000),
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)
@@ -456,15 +447,16 @@ class TestReviewRelaunch:
 
         launch_calls: list[str | None] = []
 
-        def fake_launch(**kwargs):
-            launch_calls.append(kwargs["system_prompt_file"])
-            return 0
+        def fake_execute_resume_launch_plan(*, manager, plan):
+            launch_calls.append(str(plan.prompt_file) if plan.prompt_file is not None else None)
+            raise SystemExit(0)
 
         with (
-            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
-            patch("forge.cli.session_lifecycle._persist_routing_override"),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+            ),
             patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session._resolve_context_limit", return_value=200000),
+            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)

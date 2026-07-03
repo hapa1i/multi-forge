@@ -95,7 +95,7 @@ def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> No
     """
     import os
 
-    from forge.cli import session_model_pin
+    from forge.session import model_pin
 
     forge_home = Path(os.environ["FORGE_HOME"])
     proxy_dir = forge_home / "proxies" / "legacy-gemini"
@@ -113,7 +113,7 @@ def test_apply_direct_model_env_legacy_proxy_returns_error_not_traceback() -> No
     )
 
     env_vars: dict[str, str] = {}
-    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
+    error = model_pin._apply_direct_model_env_if_supported(env_vars, "legacy-gemini", "claude-opus-4.6")
 
     assert error is not None
     assert "Could not load proxy config for 'legacy-gemini'" in error
@@ -130,7 +130,7 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
     """
     import os
 
-    from forge.cli import session_model_pin
+    from forge.session import model_pin
 
     forge_home = Path(os.environ["FORGE_HOME"])
     proxy_dir = forge_home / "proxies" / "bad-shape"
@@ -145,7 +145,7 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
     )
 
     env_vars: dict[str, str] = {}
-    error = session_model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
+    error = model_pin._apply_direct_model_env_if_supported(env_vars, "bad-shape", "claude-opus-4.6")
 
     assert error is not None
     assert "Malformed proxy configuration" in error
@@ -154,7 +154,7 @@ def test_apply_direct_model_env_bad_shape_returns_error_not_traceback() -> None:
 
 def test_incognito_with_model(runner: CliRunner, temp_env: Path) -> None:
     """The incognito shortcut should expose the same --model pin as session start."""
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(main, ["session", "incognito", "incog-model", "--model", "sonnet-4-6"])
 
     assert result.exit_code == 0, result.output
@@ -170,7 +170,7 @@ def test_fork_with_model_overrides_persisted_model_pin(runner: CliRunner, temp_e
     store = SessionStore(str(temp_env), "planner")
     store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(
             main,
             ["session", "fork", "planner", "--name", "executor", "--model", "claude-opus-4.6"],
@@ -194,9 +194,9 @@ def test_fork_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, temp
     store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
 
     with (
-        patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()),
+        patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_anthropic_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,
@@ -229,7 +229,7 @@ def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Fork matches resume: inherited proxy base_url needs explicit --proxy for --model validation."""
-    with patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
         start_result = runner.invoke(
             main,
             ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],
@@ -237,7 +237,7 @@ def test_fork_with_model_requires_proxy_id_for_inherited_proxy_routing(
 
     assert start_result.exit_code == 0, start_result.output
 
-    with patch("forge.cli.session.invoke_claude") as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke:
         result = runner.invoke(
             main,
             ["session", "fork", "proxy-planner", "--name", "proxy-executor", "--model", "claude-opus-4.6"],
@@ -254,7 +254,7 @@ def test_resume_with_model_overrides_persisted_model_pin(runner: CliRunner, temp
     """--model on resume should let a session move between Claude versions."""
     runner.invoke(main, ["session", "start", "planner", "--model", "claude-opus-4.8", "--no-launch"])
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(main, ["session", "resume", "planner", "--model", "claude-opus-4.6"])
 
     assert result.exit_code == 0, result.output
@@ -273,9 +273,9 @@ def test_resume_with_proxy_model_allows_proxy_default_tier(runner: CliRunner, te
     runner.invoke(main, ["session", "start", "proxy-planner", "--model", "claude-opus-4.8", "--no-launch"])
 
     with (
-        patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()),
+        patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_anthropic_proxy_cfg()),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,
@@ -306,7 +306,7 @@ def test_resume_with_model_requires_proxy_id_for_inherited_proxy_routing(
     temp_env: Path,
 ) -> None:
     """Inherited proxy base_url without a proxy_id cannot validate a --model override."""
-    with patch("forge.cli.session._resolve_routing_from_cli", return_value=_anthropic_routing()):
+    with patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_anthropic_routing()):
         start_result = runner.invoke(
             main,
             ["session", "start", "proxy-planner", "--proxy", "test-or-proxy", "--no-launch"],
@@ -314,7 +314,7 @@ def test_resume_with_model_requires_proxy_id_for_inherited_proxy_routing(
 
     assert start_result.exit_code == 0, start_result.output
 
-    with patch("forge.cli.session.invoke_claude") as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke:
         result = runner.invoke(
             main,
             ["session", "resume", "proxy-planner", "--model", "claude-opus-4.6"],

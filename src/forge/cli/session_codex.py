@@ -17,9 +17,10 @@ from typing import Any
 import click
 
 from forge.cli.output import print_error, print_error_with_tip, print_tip
-from forge.cli.session import console
+from forge.cli.session import _get_active_session_entry, console
 from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
+from forge.core.naming import generate_unique_name
 from forge.core.ops.codex_interactive import (
     CodexInteractiveLaunch,
     CodexInteractiveResult,
@@ -35,9 +36,9 @@ from forge.core.ops.codex_session import (
     continue_codex_session,
     start_codex_session,
 )
-from forge.core.ops.context import ExecutionContext
+from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
-from forge.session import SessionState
+from forge.session import SessionManager, SessionState
 from forge.session.transfer import TRANSFER_CONTEXT_STRATEGY_VALUES
 
 logger = logging.getLogger(__name__)
@@ -49,13 +50,6 @@ def _codex_ok(codex: HeadlessResult) -> bool:
     ``turn.failed``/``error`` event riding an exit-0 would otherwise read as success.
     """
     return codex.success and not codex.runtime_is_error
-
-
-def _sess() -> Any:
-    """Access forge.cli.session at runtime so tests can patch its attributes."""
-    import forge.cli.session
-
-    return forge.cli.session
 
 
 def codex_start_options(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -197,9 +191,9 @@ def run_codex_start(ctx: click.Context) -> int:
         require_repo_root()
     name = p["name"]
     if name is None:
-        _fr = _sess()._cwd_forge_root()
-        existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
-        name = _sess().generate_unique_name(existing)
+        _fr = _cwd_forge_root()
+        existing = {n for n, _ in SessionManager().list_sessions(forge_root_filter=_fr)}
+        name = generate_unique_name(existing)
 
     if interactive:
         return launch_interactive_codex_session(
@@ -271,7 +265,7 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
 
     # Claude reconnect parity: refuse while a launch is still registered. No --force
     # escape -- two TUIs on one thread would interleave a single rollout.
-    active_entry = _sess()._get_active_session_entry(name, forge_root=manifest.forge_root)
+    active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
     if active_entry is not None:
         print_error(f"Cannot reconnect: session [bold]{name}[/bold] appears to still be active.", console=console)
         console.print(f"  Launch mode: {active_entry.launch_mode}")
@@ -450,7 +444,7 @@ def _render_interactive_post_exit(result: CodexInteractiveResult) -> None:
     try:
         from forge.cli.session_lifecycle import _post_exit_render
 
-        manifest = _sess().SessionManager().get_session(result.session, forge_root=result.forge_root)
+        manifest = SessionManager().get_session(result.session, forge_root=result.forge_root)
         _post_exit_render(
             manifest,
             store_exists=True,

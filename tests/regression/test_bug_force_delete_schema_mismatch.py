@@ -75,7 +75,7 @@ def test_delete_without_force_fails_on_schema_mismatch(forge_env):
     """delete without --force should raise on unsupported schema version."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     runner = CliRunner()
     result = runner.invoke(delete, ["stale-session"], input="y\n")
@@ -88,7 +88,7 @@ def test_delete_with_force_succeeds_on_schema_mismatch(forge_env):
     """delete --yes --force should succeed even with unsupported schema version."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     runner = CliRunner()
     result = runner.invoke(delete, ["stale-session", "--yes", "--force"])
@@ -105,7 +105,7 @@ def test_delete_with_force_succeeds_on_missing_required_fields(forge_env):
     """--yes --force should succeed even with structurally incomplete manifest."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     # Rewrite manifest with missing required fields (triggers ManifestValidationError)
     worktree = forge_env / "workspace"
@@ -124,7 +124,7 @@ def test_delete_force_still_works_with_valid_schema(forge_env, monkeypatch):
     """Sanity check: --yes --force with a valid schema still works normally."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     # Rewrite manifest with valid schema
     worktree = forge_env / "workspace"

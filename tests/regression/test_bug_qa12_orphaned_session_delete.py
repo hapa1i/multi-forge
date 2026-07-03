@@ -37,7 +37,7 @@ def test_delete_cleans_orphaned_manifest(forge_env, monkeypatch):
     """delete removes orphaned .forge/sessions/<name>/ when not in index."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     worktree = forge_env / "workspace"
     worktree.mkdir()
@@ -86,7 +86,7 @@ def test_delete_orphan_prompts_without_force(forge_env, monkeypatch):
     """delete prompts for confirmation when no --force on orphaned session."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     _, session_dir = _create_orphan(forge_env, monkeypatch)
     assert session_dir.is_dir()
@@ -103,7 +103,7 @@ def test_delete_orphan_cancelled_without_force(forge_env, monkeypatch):
     """delete respects user cancellation on orphan without --force."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     _, session_dir = _create_orphan(forge_env, monkeypatch)
     assert session_dir.is_dir()
@@ -119,7 +119,7 @@ def test_delete_orphan_yes_flag_skips_prompt(forge_env, monkeypatch):
     """--yes flag skips confirmation for orphaned sessions."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     _, session_dir = _create_orphan(forge_env, monkeypatch)
     assert session_dir.is_dir()
@@ -136,7 +136,7 @@ def test_delete_still_errors_when_truly_missing(forge_env, monkeypatch):
     """delete reports 'not found' when session is in neither index nor disk."""
     from click.testing import CliRunner
 
-    from forge.cli.session import delete
+    from forge.cli.session_manage import delete
 
     worktree = forge_env / "workspace"
     worktree.mkdir()

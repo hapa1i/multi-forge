@@ -42,7 +42,7 @@ def _install_hook(project: Path, hook_type: str, command: str) -> None:
 
 class TestSessionStartWarning:
     def test_start_warns_when_no_hooks(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "start", "warn-test"])
 
         assert result.exit_code == 0
@@ -51,7 +51,7 @@ class TestSessionStartWarning:
     def test_start_no_warning_when_hooks_present(self, runner: CliRunner, temp_env: Path) -> None:
         _install_hook(temp_env, "SessionStart", "forge hook session-start")
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "start", "clean-test"])
 
         assert result.exit_code == 0

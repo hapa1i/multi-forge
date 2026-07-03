@@ -74,7 +74,7 @@ def test_native_fork_stop_reconciles_child_uuid_in_manifest_and_index(
     assert child_manifest.parent_session == "policy-planner"
     assert child_manifest.confirmed.claude_session_id is None
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         resume_result = runner.invoke(main, ["session", "resume", "policy-supervisor"])
 
     assert resume_result.exit_code == 0

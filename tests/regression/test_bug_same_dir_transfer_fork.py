@@ -106,7 +106,7 @@ def test_samedir_transfer_no_launch_then_resume(tmp_path: Path, monkeypatch: pyt
 
     runner = CliRunner()
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         start = runner.invoke(main, ["session", "start", "parent", "--no-launch"])
     assert start.exit_code == 0, start.output
 
@@ -117,7 +117,7 @@ def test_samedir_transfer_no_launch_then_resume(tmp_path: Path, monkeypatch: pyt
     fork = runner.invoke(main, ["session", "fork", "parent", "-n", "child", "--resume-mode", "transfer", "--no-launch"])
     assert fork.exit_code == 0, fork.output
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         resume = runner.invoke(main, ["session", "resume", "child"])
     assert resume.exit_code == 0, resume.output
 
@@ -150,7 +150,7 @@ def test_cleared_uuid_transfer_fork_resumes_fresh_not_native(tmp_path: Path, mon
 
     runner = CliRunner()
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         start = runner.invoke(main, ["session", "start", "parent", "--no-launch"])
     assert start.exit_code == 0, start.output
 
@@ -168,7 +168,7 @@ def test_cleared_uuid_transfer_fork_resumes_fresh_not_native(tmp_path: Path, mon
     assert cleared.confirmed.derivation is not None
     assert cleared.confirmed.derivation.resume_mode == "transfer"
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         resume = runner.invoke(main, ["session", "resume", "child"])
     assert resume.exit_code == 0, resume.output
 

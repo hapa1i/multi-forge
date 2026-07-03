@@ -1,0 +1,109 @@
+"""CLI-free Claude model pin support for session launch routing."""
+
+from __future__ import annotations
+
+from forge.config.schema import ProxyInstanceConfig
+from forge.session.direct_model import (
+    DirectModelPin,
+    apply_direct_model_env,
+    resolve_direct_model_pin,
+)
+
+
+def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
+    """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
+    # Passthrough forwards the client model unchanged, so any resolvable Claude pin
+    # reaches the API as-is; the alternatives/tier-default check does not apply here.
+    # (resolve_direct_model_pin already rejected non-Claude/unknown models upstream.)
+    if proxy_cfg.wire_shape == "anthropic_passthrough":
+        return True
+    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
+    if pin.canonical_model in alt_models:
+        return True
+
+    tier_model = proxy_cfg.tiers.get(pin.tier)
+    if not tier_model:
+        return False
+
+    from forge.core.models.catalog import ModelCatalogError, resolve_model_id
+
+    try:
+        default_model = resolve_model_id(str(tier_model)).removesuffix("-1m")
+    except ModelCatalogError:
+        return False
+    return default_model == pin.canonical_model
+
+
+def _apply_direct_model_env_if_supported(
+    env_vars: dict[str, str],
+    proxy_id: str,
+    direct_model: str,
+) -> str | None:
+    """Apply --model env vars when the proxy can honor the pin.
+
+    No-op (returns None) when the proxy is missing or cannot honor the pin.
+    Returns an error message when the proxy config cannot be loaded (e.g. a
+    legacy 'provider: gemini' file) or when env application itself fails.
+    """
+    from forge.config.loader import load_proxy_instance_config
+    from forge.core.state.exceptions import StateCorruptedError
+
+    try:
+        proxy_cfg = load_proxy_instance_config(proxy_id)
+    except (StateCorruptedError, FileNotFoundError, TypeError, ValueError) as e:
+        # Load boundary: a stale/unsupported proxy.yaml fails validation in
+        # ProxyInstanceConfig.__post_init__. Surface it as a contextual error
+        # (mirrors _validate_proxy_model_pin) instead of an unhandled traceback,
+        # since resume/fork can reach this apply without the validation gate.
+        return f"Could not load proxy config for '{proxy_id}': {e}"
+    if proxy_cfg is None:
+        return None
+    if not _proxy_supports_model_pin(proxy_cfg, resolve_direct_model_pin(direct_model)):
+        return None
+    return apply_direct_model_env(env_vars, direct_model)
+
+
+def _validate_proxy_model_pin(proxy_id: str, pin: DirectModelPin) -> str | None:
+    """Return a user-facing error if a proxy cannot honor a Claude model pin."""
+    from forge.config.loader import load_proxy_instance_config
+    from forge.core.state.exceptions import StateCorruptedError
+
+    try:
+        proxy_cfg = load_proxy_instance_config(proxy_id)
+    except (StateCorruptedError, FileNotFoundError, TypeError, ValueError) as e:
+        # Validation boundary: report a corrupt/unreadable proxy.yaml as a contextual
+        # error instead of bubbling to the corrupt-state reset handler.
+        return f"Could not load proxy config for '{proxy_id}': {e}"
+
+    if proxy_cfg is None:
+        return f"Could not load proxy config for '{proxy_id}'"
+
+    if _proxy_supports_model_pin(proxy_cfg, pin):
+        return None
+
+    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
+    available = ", ".join(sorted(alt_models.keys())) if alt_models else "(none configured)"
+    return (
+        f"Proxy '{proxy_id}' does not configure model alternative or tier default "
+        f"for '{pin.canonical_model}' in tier '{pin.tier}'. Available alternatives: {available}"
+    )
+
+
+def _validate_direct_model_pin_for_routing(
+    *,
+    pin: DirectModelPin | None,
+    proxy_id: str | None,
+    base_url: str | None,
+    surface: str,
+) -> str | None:
+    """Validate a --model pin against explicit or inherited routing."""
+    if pin is None:
+        return None
+    if proxy_id:
+        return _validate_proxy_model_pin(proxy_id, pin)
+    if base_url is not None:
+        return (
+            f"--model with inherited proxy routing requires an active proxy id for {surface}. "
+            "Pass --proxy <proxy_id> to select the proxy explicitly."
+        )
+    return None

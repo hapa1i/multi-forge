@@ -13,13 +13,42 @@ supervisor.py (2 sites), handoff.py (1 site).
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
+from forge.core.ops.claude_session import (
+    ClaudeSessionLaunchResult,
+    launch_claude_session,
+)
 from forge.session import create_session_state
 from forge.session.claude.paths import resolve_claude_project_root
-from forge.session.models import Worktree
+from forge.session.models import SessionState, Worktree
 
 pytestmark = pytest.mark.regression
+
+
+def _launch_for_test(
+    *,
+    manifest: SessionState,
+    session_id: str | None,
+    resume_id: str | None,
+    effective_template: str | None,
+    runtime_base_url: str | None,
+    context_limit: int,
+    invoke: Callable[..., int],
+) -> ClaudeSessionLaunchResult:
+    return launch_claude_session(
+        manifest=manifest,
+        session_id=session_id,
+        resume_id=resume_id,
+        effective_template=effective_template,
+        runtime_base_url=runtime_base_url,
+        context_limit=context_limit,
+        use_sidecar=False,
+        invoke=invoke,
+        run_active=lambda runner, **_kwargs: runner(),
+    )
 
 
 class TestResolveClaudeProjectRoot:
@@ -114,23 +143,17 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.cli.session.invoke_claude", side_effect=_fake_invoke),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
-            from forge.cli.session import _launch_claude_for_session
-
-            _launch_claude_for_session(
+            _launch_for_test(
                 manifest=state,
                 session_id=None,
                 resume_id=resume_uuid,
                 effective_template=None,
                 runtime_base_url=None,
                 context_limit=200000,
-                use_sidecar=False,
+                invoke=_fake_invoke,
             )
 
         assert len(captured_cwd) == 1
@@ -163,28 +186,68 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.cli.session.invoke_claude", side_effect=_fake_invoke),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
-            from forge.cli.session import _launch_claude_for_session
-
-            _launch_claude_for_session(
+            _launch_for_test(
                 manifest=state,
                 session_id="new-uuid",
                 resume_id=None,
                 effective_template=None,
                 runtime_base_url=None,
                 context_limit=200000,
-                use_sidecar=False,
+                invoke=_fake_invoke,
             )
 
         # Verify persisted
         updated = store.read()
         assert updated.confirmed.claude_project_root == nested_root
+
+    def test_best_effort_confirmed_write_failure_does_not_abort_launch(self, tmp_path, monkeypatch):
+        """Launch should continue when best-effort confirmed-state writes time out."""
+        from unittest.mock import patch
+
+        from forge.core.state import FileLockTimeoutError
+        from forge.session import SessionStore, create_session_state
+        from forge.session.models import Worktree
+
+        checkout = tmp_path / "repo-executor"
+        checkout.mkdir()
+        state = create_session_state("executor")
+        state.worktree = Worktree(path=str(checkout), branch="executor", is_worktree=True)
+        state.forge_root = str(checkout)
+        store = SessionStore(str(checkout), "executor")
+        store.write(state)
+
+        captured: list[dict] = []
+
+        def _fake_invoke(**kwargs):
+            captured.append(kwargs)
+            return 0
+
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        monkeypatch.chdir(checkout)
+
+        lock_error = FileLockTimeoutError(lock_path=checkout / ".forge" / "sessions" / "executor.lock", timeout_s=5.0)
+        with (
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session.SessionStore.update", side_effect=lock_error),
+        ):
+            result = _launch_for_test(
+                manifest=state,
+                session_id="new-uuid",
+                resume_id=None,
+                effective_template=None,
+                runtime_base_url=None,
+                context_limit=200000,
+                invoke=_fake_invoke,
+            )
+
+        assert result.exit_code == 0
+        assert len(captured) == 1
+        assert store.read().confirmed.claude_project_root is None
 
     def test_no_persisted_root_falls_back_to_computed(self, tmp_path, monkeypatch):
         """Sessions without claude_project_root (pre-field) use the computed root."""
@@ -215,23 +278,17 @@ class TestPersistedClaudeProjectRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.cli.session.invoke_claude", side_effect=_fake_invoke),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
-            from forge.cli.session import _launch_claude_for_session
-
-            _launch_claude_for_session(
+            _launch_for_test(
                 manifest=state,
                 session_id=None,
                 resume_id=resume_uuid,
                 effective_template=None,
                 runtime_base_url=None,
                 context_limit=200000,
-                use_sidecar=False,
+                invoke=_fake_invoke,
             )
 
         assert len(captured_cwd) == 1
@@ -265,7 +322,7 @@ class TestPersistedClaudeProjectRoot:
         old_dir.mkdir(parents=True)
         (old_dir / f"{uuid}.jsonl").write_text("{}")
 
-        from forge.cli.session import _has_resumable_transcript
+        from forge.cli.session_lifecycle import _has_resumable_transcript
 
         assert _has_resumable_transcript(state) is True
 
@@ -274,7 +331,7 @@ class TestLaunchCallsitesUseLaunchRoot:
     """Verify the actual launch callsites pass the resolved launch root, not worktree.path."""
 
     def test_host_launch_uses_launch_root(self, tmp_path, monkeypatch):
-        """_launch_claude_for_session host path passes forge_root CWD for nested projects."""
+        """Host launch path passes forge_root CWD for nested projects."""
         from unittest.mock import patch
 
         from forge.session import SessionStore, create_session_state
@@ -298,23 +355,17 @@ class TestLaunchCallsitesUseLaunchRoot:
         monkeypatch.chdir(tmp_path / "checkout")
 
         with (
-            patch("forge.cli.session.invoke_claude", side_effect=_fake_invoke),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
-            from forge.cli.session import _launch_claude_for_session
-
-            _launch_claude_for_session(
+            _launch_for_test(
                 manifest=state,
                 session_id=None,
                 resume_id=None,
                 effective_template=None,
                 runtime_base_url=None,
                 context_limit=200000,
-                use_sidecar=False,
+                invoke=_fake_invoke,
             )
 
         assert len(captured_cwd) == 1
@@ -347,23 +398,17 @@ class TestLaunchCallsitesUseLaunchRoot:
         monkeypatch.chdir(checkout)
 
         with (
-            patch("forge.cli.session.invoke_claude", side_effect=_fake_invoke),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
-            patch("forge.cli.session._warn_if_hooks_missing"),
-            patch("forge.cli.session._warn_if_version_outdated"),
-            patch("forge.cli.session._build_session_env", return_value=({}, [])),
-            patch("forge.cli.session._infer_launch_confirmation"),
+            patch("forge.core.ops.claude_session._build_session_env", return_value=({}, [])),
+            patch("forge.core.ops.claude_session._infer_launch_confirmation"),
         ):
-            from forge.cli.session import _launch_claude_for_session
-
-            _launch_claude_for_session(
+            _launch_for_test(
                 manifest=state,
                 session_id=None,
                 resume_id=None,
                 effective_template=None,
                 runtime_base_url=None,
                 context_limit=200000,
-                use_sidecar=False,
+                invoke=_fake_invoke,
             )
 
         assert len(captured_cwd) == 1

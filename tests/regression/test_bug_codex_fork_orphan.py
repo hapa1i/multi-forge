@@ -48,8 +48,8 @@ def test_fork_rejects_codex_parent_before_creating_state(monkeypatch) -> None:
 
     # Patch the seams the guard reaches before fork_session(): the manager, the forge-root
     # resolver, and the cwd guard (so the command runs outside a real repo).
-    monkeypatch.setattr("forge.cli.session.SessionManager", lambda: manager)
-    monkeypatch.setattr("forge.cli.session._cwd_forge_root", lambda: "/fake/forge/root")
+    monkeypatch.setattr("forge.cli.session_fork.SessionManager", lambda: manager)
+    monkeypatch.setattr("forge.cli.session_fork._cwd_forge_root", lambda: "/fake/forge/root")
     monkeypatch.setattr("forge.cli.guards.require_repo_root", lambda: None)
 
     result = CliRunner().invoke(main, ["session", "fork", "planner"])

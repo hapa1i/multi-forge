@@ -1,7 +1,7 @@
 # session_op_layer_extraction -- mirror the Codex core-ops split for the Claude launch path
 
-**Lane**: `proposed/` -- accepted-candidate **refactor**, not yet scheduled. Behavior-preserving structural extraction;
-not blocking other work.
+**Lane**: `done/` -- accepted **refactor**, started and completed 2026-07-02. Behavior-preserving structural extraction;
+all five slices landed.
 
 **Origin**: focused audit, 2026-07-01 (session lifecycle CLI/core boundary), grounded by a parallel read-only mapper
 sweep (Codex template, Claude-path entanglement, `_sess()`/patch-site metrics, design-doc anchors) and re-verified with
@@ -94,13 +94,13 @@ replace the current tuple-unpacking and the 50+ inline `store.update()` mutation
 
 ## Phased plan (each slice independently landable; patch sites migrate incrementally)
 
-| Phase | Scope                                                                                                                                                                                                              | Exit signal                                                            |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| 1     | Scaffold `core/ops/claude_session.py`; extract the two lowest-risk pure helpers first: `resolve_and_validate_system_prompt`, `validate_and_resolve_direct_model`. Migrate their patch sites off the parent module. | Parent patch-count strictly drops; new ops import no Click/console     |
-| 2     | Extract `start_claude_session -> ClaudeSessionStartResult`; `launch_new_session` becomes dispatch+render. Migrate start-path patches.                                                                              | `launch_new_session` holds only validation-dispatch + rendering        |
-| 3     | Extract `resume_claude_session -> ClaudeResumeResult`, collapsing the five `_launch_*`/`_resume_*` helpers' repeated routing/model/preference logic. Migrate resume-path patches.                                  | 5x `_apply_and_persist_direct_model_override` collapses to one op call |
-| 4     | Extract `validate_and_setup_supervisor` + `prepare_sidecar_session`. Migrate their patches.                                                                                                                        | Supervisor/sidecar logic testable without the CLI module               |
-| 5     | **Retire the shim.** Delete `_sess()` in all 4 modules (incl. `session_codex.py:53`) and the `session.py:17` re-export comment.                                                                                    | `def _sess` count = 0; parent patch-count = 0                          |
+| Phase | Scope                                                                                                                                                                                                              | Exit signal                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1     | Scaffold `core/ops/claude_session.py`; extract the two lowest-risk pure helpers first: `resolve_and_validate_system_prompt`, `validate_and_resolve_direct_model`. Migrate their patch sites off the parent module. | Parent patch-count strictly drops; new ops import no Click/console               |
+| 2     | Extract `start_claude_session -> ClaudeSessionStartResult`; `launch_new_session` becomes dispatch+render. Migrate start-path patches.                                                                              | `launch_new_session` holds only validation-dispatch + rendering                  |
+| 3     | Extract `resume_claude_session -> ClaudeResumeResult`, collapsing the five `_launch_*`/`_resume_*` helpers' repeated routing/model/preference logic. Migrate resume-path patches.                                  | 5x `_apply_and_persist_direct_model_override` collapses to one op call           |
+| 4     | Extract `validate_and_setup_supervisor` + `prepare_sidecar_session`. Migrate their patches.                                                                                                                        | Supervisor/sidecar logic testable without the CLI module                         |
+| 5     | **Retire the shim.** Delete `_sess()` in all 4 modules (incl. `session_codex.py:53`) and the `session.py:17` re-export comment.                                                                                    | `def _sess` count = 0; parent patches remain only for `session.py`-owned helpers |
 
 Phase 5 is **gated on the entire session-family test surface**, so the payoff is back-loaded: `_sess()` cannot be
 removed until every parent-module patch site (across all 4 modules) has migrated. Do not expect the shim to vanish after
@@ -117,8 +117,9 @@ grep -rEno 'patch\(["'"'"']forge\.cli\.session\.[A-Za-z_]+' tests/ | wc -l   # 2
 grep -rn 'def _sess' src/forge/cli/                                          # 4: session_lifecycle:80, session_fork:54, session_codex:53, session_manage:33
 ```
 
-- **255** parent-module patch-call sites across **13** test files = the burden. The refactor is **done** when this
-  reaches 0 and all four `def _sess` are deleted.
+- **255** parent-module patch-call sites across **13** test files = the original shim burden. The refactor is **done**
+  when shim-artifact patches reach 0 and all four `def _sess` definitions are deleted. A parent patch may remain for a
+  helper still defined and called inside `session.py` itself.
 - **47** split-module patch-calls (`patch("forge.cli.session_<mod>...")`) already target the correct module and are
   unaffected.
 - `_sess()` is defined in exactly **4** modules (the session-command cluster). It is **not** in `policy.py` or
@@ -153,5 +154,13 @@ A slice's checklist item is ticked only when:
 4. No behavior change: a manifest-diff test confirms the same confirmed/intent fields are written in the same order for
    `start` and at least one resume branch.
 
-Phase 5 ticks only when `grep -rn 'def _sess' src/forge/cli/` returns nothing and the `session.py:17` shim comment is
-gone.
+Phase 5 ticks only when `grep -rn 'def _sess' src/forge/cli/` returns nothing, the `session.py` wildcard re-export shim
+is gone, and any surviving `forge.cli.session.*` test patches target helpers still defined in `session.py`.
+
+---
+
+## Closeout
+
+Completed on 2026-07-02. Final verification is recorded in `checklist.md`: CLI/regression suite 2681 passed, Docker
+lifecycle integration 21 passed, stale shim greps clean except `session.py`-defined helper tests, and `make pre-commit`
+clean.

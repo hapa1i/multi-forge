@@ -3,7 +3,7 @@
 Bug: ``forge session delete <name>`` run from another terminal while the session
 is still open in Claude Code removes the manifest. When Claude later exits, the
 launcher's post-launch backfill ``_infer_launch_confirmation``
-(src/forge/cli/session_lifecycle.py) calls ``store.update()`` -> ``store.read()``,
+(src/forge/session/launch_confirmation.py) calls ``store.update()`` -> ``store.read()``,
 which raised an unhandled ``SessionFileNotFoundError`` and dumped a traceback to
 the user's terminal.
 
@@ -13,7 +13,7 @@ session dir), so the ``is_file()`` guard passes and the code reaches the
 ``store.update()`` that crashed.
 
 Fix: catch ``SessionFileNotFoundError`` around the backfill write and degrade
-quietly (src/forge/cli/session_lifecycle.py).
+quietly (src/forge/session/launch_confirmation.py).
 """
 
 from __future__ import annotations
@@ -22,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from forge.cli.session_lifecycle import _infer_launch_confirmation
 from forge.core.state import now_iso
 from forge.session.claude.paths import get_transcript_path
 from forge.session.exceptions import SessionFileNotFoundError
+from forge.session.launch_confirmation import _infer_launch_confirmation
 from forge.session.models import SessionState
 from forge.session.store import SessionStore
 

@@ -45,8 +45,8 @@ def test_fork_threads_subprocess_proxy_env(temp_project: Path) -> None:
     fork_state.intent.subprocess_proxy = "openrouter"
 
     with (
-        patch("forge.cli.session.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.fork_session.return_value = (parent, fork_state)

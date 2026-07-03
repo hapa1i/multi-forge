@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from forge.cli.session import (
-    _persist_fork_transfer_derivation,
-    _persist_rewind_derivation,
-)
+from forge.cli.session_lifecycle import _persist_fork_transfer_derivation
+from forge.cli.session_rewind import _persist_rewind_derivation
 from forge.session.models import Derivation, create_session_state
 from forge.session.store import SessionStore
 
