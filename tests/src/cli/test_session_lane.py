@@ -144,10 +144,38 @@ def test_set_requires_a_constraint(runner: CliRunner, project: Path) -> None:
     assert result.exit_code != 0
 
 
+def test_set_help_lists_valid_lanes(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["session", "lane", "set", "--help"])
+    output = " ".join(result.output.split())
+
+    assert result.exit_code == 0, result.output
+    assert "Valid lanes" in output
+    assert "Provide --runtime and/or --backend" in output
+    assert "memory_writer" in output
+    assert "team_supervisor" in output
+    assert "runtime=claude_code backend=anthropic-direct model=opus" in output
+    assert "forge session lane set --consumer memory_writer --backend claude-max" in output
+
+
 def test_set_invalid_backend_rejects(runner: CliRunner, project: Path) -> None:
     _seed(project)
     result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "nope"])
+    output = " ".join(result.output.split())
     assert result.exit_code != 0
+    assert "Valid lanes for memory_writer" in output
+    assert "runtime=claude_code backend=anthropic-direct model=opus" in output
+    assert "runtime=claude_code backend=claude-max model=opus" in output
+
+
+def test_set_invalid_team_supervisor_runtime_lists_valid_lanes(runner: CliRunner, project: Path) -> None:
+    _seed(project)
+    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "team_supervisor", "--runtime", "codex"])
+    output = " ".join(result.output.split())
+
+    assert result.exit_code != 0
+    assert "Valid lanes for team_supervisor" in output
+    assert "runtime=claude_code backend=anthropic-direct model=opus" in output
+    assert "runtime=claude_code backend=claude-max model=opus" in output
 
 
 def test_set_rejects_change_to_a_frozen_lane(runner: CliRunner, project: Path) -> None:

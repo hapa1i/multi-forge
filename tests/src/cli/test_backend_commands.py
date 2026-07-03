@@ -655,6 +655,7 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     show_help = runner.invoke(main, _backend_args("show", "--help"))
     test_auth_help = runner.invoke(main, _backend_args("test-auth", "--help"))
     reconcile_help = runner.invoke(main, _backend_args("reconcile", "--help"))
+    start_help = runner.invoke(main, _backend_args("start", "--help"))
     stop_help = runner.invoke(main, _backend_args("stop", "--help"))
     delete_help = runner.invoke(main, _backend_args("delete", "--help"))
 
@@ -668,8 +669,13 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     reconcile_text = _normalized_output(reconcile_help)
     assert "forge model backend list" in reconcile_text
     assert "source ids" in reconcile_text
+    assert start_help.exit_code == 0
+    assert "forge model backend start litellm-openai-local" in start_help.output
+    assert "forge model backend start litellm --port 4000" in start_help.output
+    assert "source ids use their default port unless overridden" in start_help.output
     assert stop_help.exit_code == 0
     assert "RUNTIME_ID..." in stop_help.output
+    assert "forge model backend list" in stop_help.output
     assert "--port" not in stop_help.output
     assert delete_help.exit_code == 0
     assert "--port" not in delete_help.output

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-03
 
+### cli_style_ux_compliance S4: Help And Lane Errors
+
+**Goal**: Finish the Batch B CLI help/error-message pass and the planned `telemetry activity --json` tip shape.
+
+**Key changes**:
+
+- Normalized generic `--json`, workflow `--check`, Codex sandbox, extension scope, memory shadow, backend reconcile,
+  config, search, runtime, and backend help wording; added examples for thin surfaces.
+- Added `telemetry activity --json` `tip` in the stderr JSON object while keeping stdout empty on errors.
+- Made `session lane set --help` and invalid-lane errors enumerate live `valid_lanes(consumer)`, including default
+  lanes, so invalid lane choices are recoverable.
+
+**Verification**: Focused CLI suite covering touched help/error paths passed (171 tests); `make pre-commit` clean.
+
 ### cli_style_ux_compliance S2: Logs Group Redesign
 
 **Goal**: Split `forge logs` into a scriptable read surface and a preview-default cleanup surface that follows the CLI

@@ -29,6 +29,7 @@ from forge.core.ops.usage_summary import (
 )
 
 console = Console()
+_SESSION_LIST_TIP = "Run 'forge session list' to see sessions."
 
 
 @click.command("activity")
@@ -55,11 +56,11 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
         session_name, forge_root = resolve_session_identifier(session)
     except SessionContextError as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e)}), err=True)
+            click.echo(json.dumps({"error": str(e), "tip": _SESSION_LIST_TIP}), err=True)
         else:
             print_error_with_tip(
                 str(e),
-                "Run 'forge session list' to see sessions.",
+                _SESSION_LIST_TIP,
             )
         sys.exit(1)
 

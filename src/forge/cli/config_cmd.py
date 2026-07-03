@@ -62,6 +62,7 @@ def show_cmd(raw: bool = False, as_json: bool = False) -> None:
     """Show effective runtime configuration.
 
     Displays current values (from file + defaults + env var overrides).
+    With --json, emits {path, env_sources, config}.
     """
     console = Console(width=200)
     config_path = ensure_config()
@@ -119,6 +120,8 @@ def set_cmd(key_value: str) -> None:
         forge config set proxy_mode=sidecar
         forge config set status_timeout=0.5
         forge config set context_limit=1000000
+        forge config set statusline.cost_mode=actual
+        forge config set provider_trace.inject_provider_user=true
     """
     console = Console(width=200)
 

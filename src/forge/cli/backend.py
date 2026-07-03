@@ -921,9 +921,21 @@ def create_cmd(adapter: str, config: Path | None) -> None:
 
 @backend.command("start")
 @click.argument("source_or_adapter")
-@click.option("--port", "-p", type=int, required=False, help="Port number")
+@click.option(
+    "--port",
+    "-p",
+    type=int,
+    required=False,
+    help="Port number (required for adapter names like litellm; source ids use their default port unless overridden)",
+)
 def start_cmd(source_or_adapter: str, port: int | None) -> None:
-    """Start a local backend instance from a source id or adapter config."""
+    """Start a local backend instance from a source id or adapter config.
+
+    \b
+    Examples:
+        forge model backend start litellm-openai-local
+        forge model backend start litellm --port 4000
+    """
     console = Console(width=200)
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
@@ -977,6 +989,8 @@ def _stop_runtime_instance(instance: BackendInstance) -> None:
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
     """Stop live local backend runtime instance(s).
+
+    Runtime ids are shown in `forge model backend list` (for example, litellm-4000).
 
     \b
     Examples:
@@ -1154,7 +1168,7 @@ def reconcile_cmd(
     if not request_id and not remote_id:
         print_error_with_tip(
             "Provide a local request id or a remote record id to reconcile.",
-            "Use --request-id <id> (local) or --remote-id <id> (the backend's own record id).",
+            "Use --request-id <id> for a local request, or use --remote-id <id> for the backend's own record id.",
             console=err_console,
         )
         sys.exit(1)

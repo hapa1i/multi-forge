@@ -301,7 +301,7 @@ def status_cmd(scope: str | None, show_all: bool, as_json: bool) -> None:
     type=click.Choice(["read-only", "workspace-write", "danger-full-access"]),
     default="workspace-write",
     show_default=True,
-    help="Codex sandbox policy for the launched TUI",
+    help="Codex sandbox mode for the launched TUI",
 )
 @click.argument("codex_args", nargs=-1, type=click.UNPROCESSED)
 def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:

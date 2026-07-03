@@ -54,7 +54,7 @@ def search_cmd() -> None:
 
     \b
     Examples:
-      forge search query "timeout config"  Search for "timeout config"
+      forge search query "timeout config"  Search with a multi-word query
       forge search rebuild-index           Rebuild the search index
       forge search status                  Show index statistics
     """
@@ -73,6 +73,7 @@ def search_cmd() -> None:
 def query_cmd(terms: tuple[str, ...], limit: int, scope: str, as_json: bool) -> None:
     """Search indexed session transcripts.
 
+    Quote multi-word queries in the shell, e.g. ``forge search query "timeout config"``.
     Prints a result table by default; pass --json for the machine-readable shape
     (stable scripting contract: query / total_results / results[]).
     """

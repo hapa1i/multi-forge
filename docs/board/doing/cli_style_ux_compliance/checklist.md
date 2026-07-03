@@ -5,8 +5,8 @@
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
 (PR #71), **S1/A2+A4**, and **S2/A5** are done; what remains is **A3, B2-B5, C1-C3**, executed as **focused slices
 grouped by review concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out
-individually; this checklist stays the durable index. **Status: S2 IMPLEMENTED (A5 logs group redesign; verification
-passed 2026-07-03).**
+individually; this checklist stays the durable index. **Status: S4 IMPLEMENTED (Batch B help/error-message pass;
+verification passed 2026-07-03).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -16,16 +16,16 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 ## Grounded Base
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
-resolved A2/A4; S2 resolved A5; A3/B5/C1 remain live anchors.
+resolved A2/A4; S2 resolved A5; S4 resolved B5; A3/C1 remain live anchors.
 
-| Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                                                                                |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A2   | `session_lifecycle.py:909`                                                                                                           | `:1189`                 | `--model` help literal ends `...claude-sonnet-4-6[1m])` (stray ANSI) -> delete `[1m]`                                                                                                                                                                           |
-| A3   | `policy.py:282` (`enable`), warn `:291`, `return` `:293`                                                                             | `:275-278`              | bare `enable` prints `[yellow]Warning:[/yellow] No bundles specified` then `return` (exit 0) -> fail loud OR restore-from-intent (**gated**)                                                                                                                    |
-| A4   | `search.py:383` (`clean_cmd(yes)`), preview `:401-402`, tip `:408`                                                                   | `:381`                  | no `as_json`; `find_missing()` preview + `print_tip("Use --yes to prune.")` -> add `--json` (dest `as_json`), shape matching `forge clean`                                                                                                                      |
-| A5   | `logs.py:260` (`logs_cmd(clean, older_than)`); `--clean` `:252`; `_clean_logs` `:280`; `_show_logs` `:283`                           | `:247,265,270,275`      | `--clean` is_flag deletes immediately (no `--yes`, no preview); no `--json` on the read surface -> split into `logs show [--json]` + `logs clean [--older-than N] --yes`                                                                                        |
-| B5   | `session_lane.py` `--runtime` `:122` / `--backend` `:123`, `set_cmd` `:125`, raw re-print `:144`; origin `consumer_lanes.py:115,137` | `:100,115,141` / `:102` | `--runtime`/`--backend` are free `default=None` strings (no `Choice`, no enum, no discovery); invalid **lane** re-prints raw `LaneError` while invalid **consumer** gets a tip (`:65`) -> enumerate `valid_lanes(consumer)` (default + allowed) in help + error |
-| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | `--days` diverges from sibling telemetry `--period` -> align to `--period [today\|week\|month\|all]`                                                                                                                                                            |
+| Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A2   | `session_lifecycle.py:909`                                                                                                           | `:1189`                 | `--model` help literal ends `...claude-sonnet-4-6[1m])` (stray ANSI) -> delete `[1m]`                                                                                    |
+| A3   | `policy.py:282` (`enable`), warn `:291`, `return` `:293`                                                                             | `:275-278`              | bare `enable` prints `[yellow]Warning:[/yellow] No bundles specified` then `return` (exit 0) -> fail loud OR restore-from-intent (**gated**)                             |
+| A4   | `search.py:383` (`clean_cmd(yes)`), preview `:401-402`, tip `:408`                                                                   | `:381`                  | no `as_json`; `find_missing()` preview + `print_tip("Use --yes to prune.")` -> add `--json` (dest `as_json`), shape matching `forge clean`                               |
+| A5   | `logs.py:260` (`logs_cmd(clean, older_than)`); `--clean` `:252`; `_clean_logs` `:280`; `_show_logs` `:283`                           | `:247,265,270,275`      | `--clean` is_flag deletes immediately (no `--yes`, no preview); no `--json` on the read surface -> split into `logs show [--json]` + `logs clean [--older-than N] --yes` |
+| B5   | `session_lane.py` `--runtime` `:122` / `--backend` `:123`, `set_cmd` `:125`, raw re-print `:144`; origin `consumer_lanes.py:115,137` | `:100,115,141` / `:102` | **Resolved in S4**: `session lane set --help` and invalid-lane errors enumerate `valid_lanes(consumer)` (default + allowed, gate-filtered), including the default lane.  |
+| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | `--days` diverges from sibling telemetry `--period` -> align to `--period [today\|week\|month\|all]`                                                                     |
 
 **Streams already correct** (do not touch): B5's routing goes through `err_console` (`session_lane.py:144`); the A1
 sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/message quality only, zero stream change.
@@ -139,36 +139,36 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 > `telemetry activity --json` tip (B4-json below) touches machine output and its pinning test -- it is *not* help-only.
 > The card's B2/B3/B4 tables are already file:line-cited -- re-confirm each anchor at edit time.
 
-- [ ] **B2** -- normalize wording drift where the format genuinely matches: one canonical `--json` help form (>=5
+- [x] **B2** -- normalize wording drift where the format genuinely matches: one canonical `--json` help form (>=5
   variants today); unify `workflow --check` verdict terminology; add the missing `(alternative to positional)` on
   `workflow panel --prompt` (`workflow.py`); align `codex start` vs `session start` `--sandbox` wording; unify
   `memory shadows` scope help; reuse the detailed `--scope` text on `extension sync/disable/status`; reword the
   `model backend reconcile` tip to `Use --flag` form; document `config show --json` shape. **Assertion:** each edited
   `--help` renders the canonical text; help-snapshot tests updated.
-- [ ] **B3** -- fill thin one-liners / hidden enums / undocumented options: `model backend start/stop` `--port`
+- [x] **B3** -- fill thin one-liners / hidden enums / undocumented options: `model backend start/stop` `--port`
   source-vs-adapter hint; `search query` phrase-syntax note; `config set` nested-key examples
   (`statusline.cost_mode=...`); `session lane set` required-ness; `memory shadows --for` format;
   `workflow list-models --available` "ready" definition; `runtime preflight` enum + `runtime list` cross-ref;
   `memory track --writers/--intent` format. **Assertion:** each option's semantics are visible in `--help`.
-- [ ] **B4** -- add examples + next-step tips (help-only): `model backend start/stop`, `search query` (phrase),
+- [x] **B4** -- add examples + next-step tips (help-only): `model backend start/stop`, `search query` (phrase),
   `workflow panel --context resume:<uuid>` (Forge name vs Claude UUID), `session lane set/clear`. (The
   `telemetry activity --json` tip is split into B4-json below; the `logs --older-than` tip moved to S2.) **Assertion:**
   each cited leaf shows a valid example in `--help`.
-- [ ] **B4-json (machine-output, NOT help-only)** -- `telemetry activity --json` drops the human-mode
+- [x] **B4-json (machine-output, NOT help-only)** -- `telemetry activity --json` drops the human-mode
   `Run 'forge session list'` tip. The error object is `{"error": str(e)}` on **stderr** (already `err=True`,
   `activity.py:58`), pinned by `test_activity.py::test_not_found_json`. Restoring the tip is a machine-output decision:
   add a `tip` field to the JSON object (shape change) vs a separate stderr line (risks mixing non-JSON into a stderr
   JSON reader). **Either way, update `test_not_found_json`.** Couples with C1 (same `activity.py` output) -- sequence
   together. **Assertion:** the tip is reachable in `--json` mode; stdout stays clean for a `jq` consumer; the pinning
   test reflects the chosen shape.
-- [ ] **B5** -- `session lane set` lane discovery + actionable invalid-lane error. Enumerate `valid_lanes(consumer)`
+- [x] **B5** -- `session lane set` lane discovery + actionable invalid-lane error. Enumerate `valid_lanes(consumer)`
   (`core/lanes.py:111` -- `default_lane` + `allowed_lanes`, gate-filtered; **not** bare `allowed_lanes`, which drops the
   default lane the user is most likely on) in the `set` help (or a `--list`); make the `LaneError` say
   `valid lanes for <consumer>: <runtime/backend/model>, ...`. `session_lane.py` already imports from `forge.core.lanes`,
   so add `valid_lanes` to that import. **Assertion:** `session lane set --consumer team_supervisor --runtime codex` (no
   codex lane) errors on stderr naming the valid lanes **including the default**, not a raw `LaneError`; streams
   unchanged (still `err_console`).
-- [ ] S4 verification: `tests/src/cli/test_session_lane.py` + touched help tests; `make pre-commit` clean.
+- [x] S4 verification: focused CLI suite passed (171 tests) on 2026-07-03; `make pre-commit` passed.
 
 ## Phase 6 -- Slice S5: Batch C (research-preview clean breaks) -- C2/C3 gated
 

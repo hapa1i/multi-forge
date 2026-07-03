@@ -90,6 +90,13 @@ _NOT_READY = CodexPreflight(
 
 
 class TestPreflightCmd:
+    def test_preflight_help_names_supported_runtime_and_list_cross_ref(self) -> None:
+        result = CliRunner().invoke(runtime, ["preflight", "--help"])
+
+        assert result.exit_code == 0
+        assert "Supported runtime: codex" in result.output
+        assert "forge runtime list" in result.output
+
     def test_renders_ready_and_exits_zero(self, monkeypatch) -> None:
         monkeypatch.setattr("forge.cli.runtime.preflight_codex", lambda **_kw: _READY)
         result = CliRunner().invoke(runtime, ["preflight", "codex"])

@@ -149,6 +149,13 @@ class TestSearchCommand:
         assert "query" in result.stderr
         assert "rebuild-index" in result.stderr
 
+    def test_query_help_mentions_multi_word_quoting(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["search", "query", "--help"])
+        output = " ".join(result.output.split())
+
+        assert result.exit_code == 0
+        assert 'forge search query "timeout config"' in output
+
     def test_search_default_renders_table(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Default (no --json) renders a human table with a result-count footer, not JSON."""
         result = runner.invoke(main, ["search", "query", "timeout"])

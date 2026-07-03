@@ -22,7 +22,7 @@ from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run
 )
 @click.option("--yes", "-y", is_flag=True, help="Actually delete (default is dry-run)")
 @click.option("--verbose", "-v", is_flag=True, help="Show individual items")
-@click.option("--json", "as_json", is_flag=True, help="JSON output")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def clean_cmd(scope: str, yes: bool, verbose: bool, as_json: bool) -> None:
     """Remove orphaned Forge state (sessions, transfer files, stale entries).
 

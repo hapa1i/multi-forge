@@ -616,7 +616,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
     "--json",
     "as_json",
     is_flag=True,
-    help="Output structured JSON",
+    help="Output as JSON",
 )
 def check(
     bundles: tuple[str, ...],
@@ -831,7 +831,7 @@ def _resolve_supervisor_session(
     "--json",
     "as_json",
     is_flag=True,
-    help="Output structured JSON",
+    help="Output as JSON",
 )
 def supervisor_evaluate(
     file_path: str,

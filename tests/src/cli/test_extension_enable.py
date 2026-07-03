@@ -7,6 +7,7 @@ from typing import Any
 
 import click
 import pytest
+from click.testing import CliRunner
 
 from forge.cli.extensions import (
     _create_claude_dir,
@@ -14,9 +15,21 @@ from forge.cli.extensions import (
     _find_git_root,
     _resolve_project_root,
     _validate_anchor,
+    extensions,
 )
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallScope
+
+
+def test_scope_help_is_shared_across_extension_commands() -> None:
+    expected = "Installation scope: local (gitignored), project (committed), user (global)"
+    runner = CliRunner()
+
+    for command in ("enable", "sync", "disable", "status"):
+        result = runner.invoke(extensions, [command, "--help"])
+        output = " ".join(result.output.split())
+        assert result.exit_code == 0, result.output
+        assert expected in output
 
 
 class TestFindGitRoot:

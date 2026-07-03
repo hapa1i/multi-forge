@@ -65,7 +65,10 @@ def test_not_found_json(monkeypatch) -> None:
     monkeypatch.setattr("forge.cli.activity.resolve_session_identifier", _raise)
     result = CliRunner().invoke(main, _activity_args("ghost", "--json"))
     assert result.exit_code == 1
-    assert json.loads(result.output)["error"] == "nope"
+    assert result.stdout == ""
+    payload = json.loads(result.stderr)
+    assert payload["error"] == "nope"
+    assert "forge session list" in payload["tip"]
 
 
 def test_human_render_shows_supervisor(monkeypatch) -> None:

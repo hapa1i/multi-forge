@@ -95,7 +95,10 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     result = CliRunner().invoke(main, ["telemetry", "activity", "--json"])
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert json.loads(result.stderr) == {"error": "no session"}
+    assert json.loads(result.stderr) == {
+        "error": "no session",
+        "tip": "Run 'forge session list' to see sessions.",
+    }
 
 
 def _seed_audit_logs(monkeypatch: pytest.MonkeyPatch, records: list[dict]) -> None:
