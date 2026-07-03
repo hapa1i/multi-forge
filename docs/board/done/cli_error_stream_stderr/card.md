@@ -1,7 +1,7 @@
 # CLI error-stream fix (stdout -> stderr) -- cli_style A1
 
 **Graduated slice** of
-[`docs/board/proposed/cli_style_ux_compliance/card.md`](../../proposed/cli_style_ux_compliance/card.md) item **A1** (the
+[`docs/board/doing/cli_style_ux_compliance/card.md`](../../doing/cli_style_ux_compliance/card.md) item **A1** (the
 audit headline). The index stays in `proposed/`; this card owns the A1 execution unit only.
 
 **Lane**: `done/`. **Branch**: `fix/cli-error-stream-stderr`. **Merged**: PR #70 on 2026-07-03. **Interleave**: Step 1

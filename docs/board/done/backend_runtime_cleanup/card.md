@@ -4,7 +4,7 @@
 ergonomics/ops card, not an architecture rewrite. Execution plan in [`checklist.md`](checklist.md).
 
 **Scheduling status (2026-07-03)**: **Shipped as Step 2** of the agreed interleave after
-[`cli_style_ux_compliance`](../../proposed/cli_style_ux_compliance/card.md) **A1** shipped in PR #70
+[`cli_style_ux_compliance`](../../doing/cli_style_ux_compliance/card.md) **A1** shipped in PR #70
 ([done card](../../done/cli_error_stream_stderr/card.md)). This card also folded in **cli_style B1 backend-help** in the
 same PR (defined source-id vs runtime-instance-id vs adapter in the `backend` group help; fixed B1's 3 verified traps;
 **help-only, no metavar rename**) because both edit `backend.py` help. The remaining cli_style rows resume at Step 3.
@@ -18,7 +18,7 @@ runtime object is a process/registry entry rather than durable config, so the cl
 **Relationship to existing work**:
 
 - Builds on `unified_backend`: catalog source ids and runtime instance ids are intentionally separate value-spaces.
-- Distinct from, but coupled to, `proposed/cli_style_ux_compliance` B1/C2, which improves help/metavar clarity for the
+- Distinct from, but coupled to, `doing/cli_style_ux_compliance` B1/C2, which improves help/metavar clarity for the
   same id-space split. This card adds the missing operator behavior.
 - Does not make remote backend sources lifecycle-managed. Remote sources remain built-in/static definitions with no
   local process to delete.
@@ -65,7 +65,7 @@ config).
 
 ## Vocabulary dependency
 
-The broader `source id` wording problem belongs to `proposed/cli_style_ux_compliance` B1/C2: `ModelSource.id` is real
+The broader `source id` wording problem belongs to `doing/cli_style_ux_compliance` B1/C2: `ModelSource.id` is real
 internally, but `source` is not a first-class CLI noun. This card should not settle that naming decision; it should only
 ensure the new stop/delete help follows it. In this card's scope, call `litellm-4000` a **runtime instance id** and
 avoid adding new unexplained `SOURCE_ID` wording.

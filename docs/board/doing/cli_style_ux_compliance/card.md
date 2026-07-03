@@ -1,14 +1,13 @@
 # cli_style_ux_compliance -- fix CLI style-guide violations + close help/consistency UX gaps
 
-**Lane**: `proposed/` -- accepted-candidate **index**, not yet scheduled. The items are **independently shippable** and
-span different review risk, so this card is **not** meant to move wholesale to `doing/`: when scheduled, split selected
-rows into their own execution card(s)/`checklist.md` grouped by review concern (see
-[Sequencing & coupling](#sequencing--coupling)). Not blocking other work.
+**Lane**: `doing/` -- active Step 3 coordinator/index on branch `feat/cli-style-ux-compliance`. The items are
+**independently shippable** and span different review risk, so this card is not one monolithic implementation unit:
+execute selected rows as focused slices grouped by review concern in [`checklist.md`](checklist.md).
 
 **Scheduling status (2026-07-03)**: **A1 shipped in PR #70** and is archived at
 [`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). **Step 2** shipped in PR #71
 and is archived at [`docs/board/done/backend_runtime_cleanup/`](../../done/backend_runtime_cleanup/card.md), including
-the backend-help slice of B1. Next cursor: **Step 3** -- resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
+the backend-help slice of B1. **Step 3 is active**: resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
 (AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls** (so the
 default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
 overrides, and a missed **handler-default** gap (`handle_session_error` resolved to stdout at `output.py:108`, 11 bare
@@ -273,12 +272,12 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 
 ## Sequencing & coupling
 
-- **This card is a proposed *index*, not one execution unit -- do NOT move it wholesale to `doing/`.** The rows span
-  very different review risk: auth/config output routing, telemetry/money-path-adjacent commands, a `session --json`
-  shape change (A4/B), the `logs` group redesign (A5), pure docs (B2), and clean-break removals (C). When scheduled,
-  split the selected rows into their own execution card(s)/`checklist.md` grouped by review concern (e.g. "A1
-  error-stream root fix", "A5 logs group", "Batch B help-text pass", "Batch C breaks") -- each with its own PR and
-  guard. The batch card stays the durable index; individual slices graduate out of it.
+- **This card is the active Step 3 coordinator, not one execution unit.** The rows span very different review risk:
+  auth/config output routing, telemetry/money-path-adjacent commands, a `session --json` shape change (A4/B), the
+  `logs` group redesign (A5), pure docs (B2), and clean-break removals (C). Execute selected rows as focused slices in
+  the checklist grouped by review concern (for example, "A5 logs group", "Batch B help-text pass", "Batch C breaks") --
+  each with its own verification guard. The batch card stays the durable index while individual slices graduate out of
+  it.
 - **Batch A is independent and high-value.** A1 shipped with the guard-test extension in PR #70. A2/A4 are trivial
   single-file changes; A3 is gated on its Open question.
 - **A3 \<-> the `accidental_complexity_cleanup` "WorkflowPolicy product boundary" item.** Both touch `policy enable`:

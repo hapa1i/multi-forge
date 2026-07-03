@@ -189,7 +189,7 @@ re-raises `SystemExit` only when a single target (`:1154`).
   runtime-instance JSON already carries `source_id: None` -- removing the key is a contract change.
 - **Open question (card, deferred):** an `--unhealthy` filter for `stop`. MVP is `--all` only (operator case = "flush
   local runtime state"), not fault classification. Out of scope; leave the open question in the card.
-- **Out of scope (stays in `proposed/cli_style_ux_compliance` index):** the B1 metavar *standardization* (row 1) + C2
+- **Out of scope (stays in `doing/cli_style_ux_compliance` index):** the B1 metavar *standardization* (row 1) + C2
   rename; B2 tip-form/`--json`-wording; B3/B4/B5. Only B1's id-space definition + 3 traps fold in here.
 
 ## Closeout items
