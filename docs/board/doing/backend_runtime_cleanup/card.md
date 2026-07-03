@@ -1,9 +1,10 @@
 # Backend runtime cleanup -- stop backend instances by id or all at once
 
-**Lane**: `proposed/`. Focused CLI ergonomics/ops card, not an architecture rewrite.
+**Lane**: `doing/`. **Branch**: `feat/backend-runtime-cleanup`. Focused CLI ergonomics/ops card, not an architecture
+rewrite. Execution plan in [`checklist.md`](checklist.md).
 
-**Scheduling status (2026-07-03)**: **Next cursor / Step 2** of the agreed interleave after
-[`cli_style_ux_compliance`](../cli_style_ux_compliance/card.md) **A1** shipped in PR #70
+**Scheduling status (2026-07-03)**: **Step 2** of the agreed interleave after
+[`cli_style_ux_compliance`](../../proposed/cli_style_ux_compliance/card.md) **A1** shipped in PR #70
 ([done card](../../done/cli_error_stream_stderr/card.md)). When this card starts, **fold in cli_style B1 backend-help**
 in the same PR (define source-id vs runtime-instance-id vs adapter in the `backend` group help; fix B1's 3 verified
 traps; **help-only, no metavar rename**), since both edit `backend.py` help.
