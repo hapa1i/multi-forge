@@ -7,9 +7,11 @@ resolver so the tests focus on the command's rendering / JSON contract / error t
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone, tzinfo
 
 from click.testing import CliRunner
 
+from forge.cli import activity as activity_module
 from forge.cli.main import main
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
@@ -81,6 +83,24 @@ def test_help_shows_period_clean_break() -> None:
     assert "all" in result.output
     assert "--days" not in result.output
     assert "--all" not in result.output
+
+
+def test_period_start_uses_local_calendar_boundaries(monkeypatch) -> None:
+    fixed_local = datetime(2026, 7, 3, 15, 30, tzinfo=timezone(timedelta(hours=-4)))
+
+    class FrozenDateTime:
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            if tz is None:
+                return fixed_local
+            return fixed_local.astimezone(tz)
+
+    monkeypatch.setattr(activity_module, "datetime", FrozenDateTime)
+
+    assert activity_module._period_start("all") is None
+    assert activity_module._period_start("today") == datetime(2026, 7, 3, 4, tzinfo=timezone.utc)
+    assert activity_module._period_start("week") == datetime(2026, 6, 29, 4, tzinfo=timezone.utc)
+    assert activity_module._period_start("month") == datetime(2026, 7, 1, 4, tzinfo=timezone.utc)
 
 
 def test_old_days_flag_is_clean_break() -> None:

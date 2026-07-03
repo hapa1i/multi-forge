@@ -190,7 +190,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   first). Lowest value; do last. **Assertion:** only *arbitrary ordering* is normalized; documented divergences
   (workspace vs user scope) preserved.
 - [x] Changelog entry per shipped break (`coding_standards.md §5`).
-- [x] S5/C1 verification: focused activity/stream tests passed (22 tests), command-tree invariants passed (9 tests),
+- [x] S5/C1 verification: focused activity/stream tests passed (23 tests), command-tree invariants passed (9 tests),
   targeted activity integration passed (1 test), and `make pre-commit` passed on 2026-07-03.
 
 ## Open questions (need human input -- from card)

@@ -36,7 +36,7 @@ wc -l docs/board/change_log.md
 - Replaced `--days`/`--all` with `--period today|week|month|all` (default `today`), and updated tests, docs, QA, and
   integration references.
 
-**Verification**: 22 focused tests, 9 invariants, 1 targeted integration test, and `make pre-commit` clean.
+**Verification**: 23 focused tests, 9 invariants, 1 targeted integration test, and `make pre-commit` clean.
 
 ### cli_style_ux_compliance S4: Help And Lane Errors
 
