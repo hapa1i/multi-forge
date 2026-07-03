@@ -253,12 +253,12 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### Search
 
-| Command                      | Purpose                                       |
-| ---------------------------- | --------------------------------------------- |
-| `forge search query <query>` | Search transcripts (table; `--json` for JSON) |
-| `forge search rebuild-index` | Full index rebuild from artifacts             |
-| `forge search status`        | Show index statistics                         |
-| `forge search clean`         | Preview orphaned documents; `--yes` to prune  |
+| Command                      | Purpose                                                         |
+| ---------------------------- | --------------------------------------------------------------- |
+| `forge search query <query>` | Search transcripts (table; `--json` for JSON)                   |
+| `forge search rebuild-index` | Full index rebuild from artifacts                               |
+| `forge search status`        | Show index statistics                                           |
+| `forge search clean`         | Preview orphaned documents; `--yes` to prune; `--json` for JSON |
 
 ### System
 

@@ -22,13 +22,14 @@ from rich.console import Console
 
 from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.paths import display_path
-from forge.core.state import SchemaVersionError
+from forge.core.state import FileLockTimeoutError, SchemaVersionError
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
 from forge.search.content_store import ContentStore
 from forge.search.engine import search_from_index
 from forge.search.exceptions import (
     BM25IndexCorruptedError,
     ContentStoreCorruptedError,
+    IndexStateCorruptedError,
     SearchDocumentStoreCorruptedError,
 )
 from forge.search.store import SearchDocumentStore
@@ -380,13 +381,31 @@ def rebuild_index_cmd() -> None:
 
 @search_cmd.command("clean")
 @click.option("--yes", "-y", is_flag=True, help="Actually prune (default is a preview)")
-def clean_cmd(yes: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def clean_cmd(yes: bool, as_json: bool) -> None:
     """Remove orphaned documents whose transcript files no longer exist.
 
     Scans all three stores and index state for entries that point to transcript
     files that have been deleted or moved. Previews by default; pass --yes to
     actually prune.
     """
+    try:
+        _run_clean(yes=yes, as_json=as_json)
+    except (
+        BM25IndexCorruptedError,
+        ContentStoreCorruptedError,
+        FileLockTimeoutError,
+        IndexStateCorruptedError,
+        SchemaVersionError,
+        SearchDocumentStoreCorruptedError,
+    ) as e:
+        if as_json:
+            click.echo(json.dumps({"error": str(e)}), err=True)
+            raise SystemExit(1) from e
+        raise
+
+
+def _run_clean(*, yes: bool, as_json: bool) -> None:
     console = Console()
 
     from forge.search.index_state import IndexStateStore
@@ -400,6 +419,9 @@ def clean_cmd(yes: bool) -> None:
     if not yes:
         missing_docs = doc_store.find_missing()
         missing_index = index_store.find_missing()
+        if as_json:
+            _output_clean_preview(missing_docs, missing_index)
+            return
         if missing_docs or missing_index:
             console.print(
                 f"Would prune [cyan]{len(missing_docs)}[/cyan] orphaned document(s)"
@@ -419,6 +441,10 @@ def clean_cmd(yes: bool) -> None:
 
     removed_index = index_store.prune_missing()
 
+    if as_json:
+        _output_clean_result(removed_docs, removed_index)
+        return
+
     if removed_docs or removed_index:
         console.print(
             f"Pruned [cyan]{len(removed_docs)}[/cyan] orphaned documents"
@@ -426,6 +452,49 @@ def clean_cmd(yes: bool) -> None:
         )
     else:
         console.print("[dim]No orphaned entries found.[/dim]")
+
+
+def _clean_categories(document_paths: list[str], index_paths: list[str]) -> list[dict[str, object]]:
+    return [
+        {
+            "category": "orphaned_documents",
+            "description": "Documents whose transcript files no longer exist",
+            "count": len(document_paths),
+            "items": document_paths,
+        },
+        {
+            "category": "stale_index_entries",
+            "description": "Index-state entries whose transcript files no longer exist",
+            "count": len(index_paths),
+            "items": index_paths,
+        },
+    ]
+
+
+def _output_clean_preview(missing_docs: list[str], missing_index: list[str]) -> None:
+    data = {
+        "scope": "project",
+        "dry_run": True,
+        "total": len(missing_docs) + len(missing_index),
+        "categories": _clean_categories(missing_docs, missing_index),
+    }
+    click.echo(json.dumps(data, indent=2))
+
+
+def _output_clean_result(removed_docs: list[str], removed_index: list[str]) -> None:
+    # Search cleanup is all-or-raise, so no per-item failure payload exists here.
+    data = {
+        "scope": "project",
+        "dry_run": False,
+        "total": len(removed_docs) + len(removed_index),
+        "deleted": len(removed_docs) + len(removed_index),
+        "failed": [],
+        "categories_cleaned": {
+            "orphaned_documents": len(removed_docs),
+            "stale_index_entries": len(removed_index),
+        },
+    }
+    click.echo(json.dumps(data, indent=2))
 
 
 @search_cmd.command("status")

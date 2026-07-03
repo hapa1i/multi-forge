@@ -2,17 +2,20 @@
 
 **Branch**: `feat/cli-style-ux-compliance` - **Card**: [`card.md`](card.md)
 
-**Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70) and the B1 backend
-slice (PR #71) already shipped; what remains is **A2-A5, B2-B5, C1-C3**, executed as **focused slices grouped by review
-concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out individually; this checklist
-stays the durable index. **Status: PLAN FOR REVIEW (re-grounded on `main` 2026-07-03; no code written yet).**
+**Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
+(PR #71), and **S1/A2+A4** are done; what remains is **A3, A5, B2-B5, C1-C3**, executed as **focused slices grouped by
+review concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out individually; this
+checklist stays the durable index. **Status: S1 IMPLEMENTED (A2/A4 code + tests; verification passed 2026-07-03).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
 research-preview clean breaks (removed flags rely on Click's native "No such option", named in the changelog);
 `docs/developer/board_contract.md` governs lane semantics.
 
-## Grounded base (re-verified on `main`, 2026-07-03 -- the card's line numbers predate PR #69/#70/#71 and have drifted)
+## Grounded Base
+
+Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
+resolved A2/A4; A3/A5/B5/C1 remain live anchors.
 
 | Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                                                                                |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -71,16 +74,20 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Phase 2 -- Slice S1: A2 + A4 (trivial correctness)
 
-- [ ] **A2** -- delete `[1m]` from the `--model` help string (`session_lifecycle.py:909`). **Assertion:**
+- [x] **A2** -- delete `[1m]` from the `--model` help string (`session_lifecycle.py:909`). **Assertion:**
   `forge session start --help` renders `...claude-sonnet-4-6)` with no `[1m]`; a help-render test asserts `[1m]` absent.
   **Coupling:** `session_op_layer_extraction` will refactor this file -- land A2 first as a one-char fix; do not block
   on that card (card [Sequencing](card.md#sequencing--coupling)).
-- [ ] **A4** -- add `--json` (dest `as_json`) to `search clean_cmd` (`search.py:383`); emit a stable
+- [x] **A4** -- add `--json` (dest `as_json`) to `search clean_cmd` (`search.py:383`); emit a stable
   preview/pruned-count shape matching `forge clean --json`, human path unchanged. **Assertion:** `search clean --json`
   prints parseable JSON on **stdout**, diagnostics on **stderr**, and a preview run reports the orphan count without
   pruning; new stable-shape test added (no guard forces this -- see A4 gap above).
-- [ ] S1 verification: `uv run pytest tests/src/cli/test_search.py tests/src/cli/test_command_tree_invariants.py -q`;
-  `make pre-commit` clean.
+- [x] S1 verification:
+  `uv run pytest tests/src/cli/test_search.py tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_session_commands.py::TestSessionStart::test_start_help_shows_optional_name -q`
+  passed (39 tests, including `search clean --json` error-to-stderr coverage); `make pre-commit` passed. The first
+  pre-commit run surfaced and fixed a narrow mypy package-export issue for `forge.core.runtime.codex_preflight_cache`
+  (committed separately as `152a053a`); `docs/cli_reference.md` + `docs/end-user/search.md` synced for
+  `search clean --json`; mdformat also reflowed board prose.
 
 ## Phase 3 -- Slice S2: A5 (`logs` group redesign)
 
