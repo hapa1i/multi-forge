@@ -145,11 +145,12 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   `memory shadows` scope help; reuse the detailed `--scope` text on `extension sync/disable/status`; reword the
   `model backend reconcile` tip to `Use --flag` form; document `config show --json` shape. **Assertion:** each edited
   `--help` renders the canonical text; help-snapshot tests updated.
-- [x] **B3** -- fill thin one-liners / hidden enums / undocumented options: `model backend start/stop` `--port`
-  source-vs-adapter hint; `search query` phrase-syntax note; `config set` nested-key examples
-  (`statusline.cost_mode=...`); `session lane set` required-ness; `memory shadows --for` format;
-  `workflow list-models --available` "ready" definition; `runtime preflight` enum + `runtime list` cross-ref;
-  `memory track --writers/--intent` format. **Assertion:** each option's semantics are visible in `--help`.
+- [x] **B3** -- fill thin one-liners / hidden enums / undocumented options: `model backend start --port`
+  source-vs-adapter hint plus `model backend stop` runtime-id discovery note; `search query` phrase-syntax note;
+  `config set` nested-key examples (`statusline.cost_mode=...`); `session lane set` required-ness;
+  `memory shadows --for` format; `workflow list-models --available` "ready" definition; `runtime preflight` enum +
+  `runtime list` cross-ref; `memory track --writers/--intent` format. **Assertion:** each option's semantics are visible
+  in `--help`.
 - [x] **B4** -- add examples + next-step tips (help-only): `model backend start/stop`, `search query` (phrase),
   `workflow panel --context resume:<uuid>` (Forge name vs Claude UUID), `session lane set/clear`. (The
   `telemetry activity --json` tip is split into B4-json below; the `logs --older-than` tip moved to S2.) **Assertion:**
@@ -169,6 +170,10 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   codex lane) errors on stderr naming the valid lanes **including the default**, not a raw `LaneError`; streams
   unchanged (still `err_console`).
 - [x] S4 verification: focused CLI suite passed (171 tests) on 2026-07-03; `make pre-commit` passed.
+- **S4 review decisions:** keep `telemetry activity --json`'s `tip` field activity-specific for now; promoting
+  machine-readable recovery tips would be a separate convention/doc sweep across JSON error surfaces. Leave command
+  references in help prose as existing Click docstring literals; recovery tips still follow the `Run '<cmd>'`
+  convention.
 
 ## Phase 6 -- Slice S5: Batch C (research-preview clean breaks) -- C2/C3 gated
 
