@@ -1,13 +1,13 @@
 # Backend runtime cleanup -- stop backend instances by id or all at once
 
-**Lane**: `doing/`. **Branch**: `feat/backend-runtime-cleanup`. Focused CLI ergonomics/ops card, not an architecture
-rewrite. Execution plan in [`checklist.md`](checklist.md).
+**Lane**: `done/`. **Branch**: `feat/backend-runtime-cleanup`. **Merged**: PR #71 on 2026-07-03. Focused CLI
+ergonomics/ops card, not an architecture rewrite. Execution plan in [`checklist.md`](checklist.md).
 
-**Scheduling status (2026-07-03)**: **Step 2** of the agreed interleave after
+**Scheduling status (2026-07-03)**: **Shipped as Step 2** of the agreed interleave after
 [`cli_style_ux_compliance`](../../proposed/cli_style_ux_compliance/card.md) **A1** shipped in PR #70
-([done card](../../done/cli_error_stream_stderr/card.md)). When this card starts, **fold in cli_style B1 backend-help**
-in the same PR (define source-id vs runtime-instance-id vs adapter in the `backend` group help; fix B1's 3 verified
-traps; **help-only, no metavar rename**), since both edit `backend.py` help.
+([done card](../../done/cli_error_stream_stderr/card.md)). This card also folded in **cli_style B1 backend-help** in the
+same PR (defined source-id vs runtime-instance-id vs adapter in the `backend` group help; fixed B1's 3 verified traps;
+**help-only, no metavar rename**) because both edit `backend.py` help. The remaining cli_style rows resume at Step 3.
 
 **Origin**: stale local backend/proxy debugging, 2026-07-02. The proxy incident made the operator gap visible: when a
 local LiteLLM backend is suspected of carrying stale credentials or other bad process state, Forge has a clean

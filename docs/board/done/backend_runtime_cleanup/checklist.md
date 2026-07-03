@@ -4,7 +4,7 @@
 
 **Current focus**: Make local backend **runtime instances** first-class `stop` targets (by id, and `--all`), turn
 `delete` into a config-only command, and keep `start` config-oriented -- then fold in the cli_style **B1** backend-help
-pass (same PR, both edit `backend.py`). **Status: PLAN FOR REVIEW (no code written yet).**
+pass (same PR, both edit `backend.py`). **Status: SHIPPED in PR #71; board closeout complete.**
 
 **Guiding rules**: card [Proposal](card.md) + [Start/stop asymmetry](card.md); `coding_standards.md` §5
 (research-preview clean break -- removed options rely on Click's native "No such option", named in the changelog);
@@ -203,4 +203,4 @@ re-raises `SystemExit` only when a single target (`:1154`).
 - [x] Docs synced: `cli_reference.md`, `design_appendix.md` §A.2.1, `end-user/proxy.md`.
 - [x] cli_style index annotated: **B1 shipped** (strike the group-help rows folded here); note the remaining B1 metavar
   \+ B2-B5 rows stay in `proposed/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
-- [ ] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).
+- [x] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).

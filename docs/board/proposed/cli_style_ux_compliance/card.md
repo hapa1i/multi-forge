@@ -6,9 +6,9 @@ rows into their own execution card(s)/`checklist.md` grouped by review concern (
 [Sequencing & coupling](#sequencing--coupling)). Not blocking other work.
 
 **Scheduling status (2026-07-03)**: **A1 shipped in PR #70** and is archived at
-[`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). cli_style is paused after the
-A1 step. Next cursor: **Step 2** [`backend_runtime_cleanup`](../backend_runtime_cleanup/card.md) (full) **+ fold in B1
-backend-help** (help-only, no metavar rename), then **Step 3** resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
+[`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). **Step 2** shipped in PR #71
+and is archived at [`docs/board/done/backend_runtime_cleanup/`](../../done/backend_runtime_cleanup/card.md), including
+the backend-help slice of B1. Next cursor: **Step 3** -- resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
 (AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls** (so the
 default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
 overrides, and a missed **handler-default** gap (`handle_session_error` resolved to stdout at `output.py:108`, 11 bare
@@ -150,10 +150,11 @@ group.)
 
 ### B1 -- Undefined identifiers (the "source_id needed but source not defined" archetype)
 
-**Status (2026-07-03)**: `doing/backend_runtime_cleanup` folds in the backend help/definition slice: the `model backend`
-group defines source id vs runtime instance id vs adapter, the backend examples use valid id spaces, `reconcile`
-mentions `forge model backend list` for source ids, and the source-row `backend_id == source_id` JSON shape is
-documented at the emitters. The broader backend metavar/C2 rename question stays open.
+**Status (2026-07-03)**: the backend help/definition slice shipped via
+[`done/backend_runtime_cleanup`](../../done/backend_runtime_cleanup/card.md): the `model backend` group defines source
+id vs runtime instance id vs adapter, the backend examples use valid id spaces, `reconcile` mentions
+`forge model backend list` for source ids, and the source-row `backend_id == source_id` JSON shape is documented at the
+emitters. The broader backend metavar/C2 rename question stays open.
 
 | Command(s)                                                                                      | Problem                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Action                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -168,7 +169,7 @@ documented at the emitters. The broader backend metavar/C2 rename question stays
 encounter these ids through `forge model backend list`, `test-auth`, `start`, `stop`, and `reconcile`. Treat bare
 `SOURCE_ID` / "source id" wording as an internal vocabulary leak unless the help defines "source" inline as the upstream
 model endpoint/capacity unit shown by `forge model backend list`. The wording decision belongs here, not in individual
-behavior cards such as `proposed/backend_runtime_cleanup`, which should follow whatever naming this batch chooses.
+behavior cards such as `backend_runtime_cleanup`, which should follow whatever naming this batch chooses.
 
 **Verified backend traps (sharper than the table row -- these actively fail, not just confuse):**
 
