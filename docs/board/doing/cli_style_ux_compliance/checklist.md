@@ -5,9 +5,9 @@
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
 (PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, **S5/C1**, **S3/A3**, and **S5/C2** are done. **C2/OQ-2** is resolved:
 the public backend wording pass shipped here, while the deeper backend instance identity migration is split to
-[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). C3 is a record-only "do
-not globally normalize scope order" decision. Slices graduate out individually; this checklist stays the durable index.
-**Status: C2 IMPLEMENTED (public wording only; no storage/JSON rename).**
+[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). **C3/OQ-3** is resolved as
+record-only: do not globally normalize semantic `--scope` families. Slices graduate out individually; this checklist
+stays the durable index. **Status: READY FOR PR (card moves to `done/` after merge).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -18,7 +18,7 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
 resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; S3 resolved A3; S5/C2 resolved the public backend
-wording pass. Every A/B anchor and C1/C2 is shipped; C3 is now decision-recorded for review.
+wording pass. Every A/B anchor and C1/C2 is shipped; C3 is resolved record-only.
 
 | Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                     |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -71,9 +71,9 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 | **S2** | A5             | `logs` group redesign (behavior + clean break)     | After S1; needs docs + changelog                                      |
 | **S3** | A3             | `policy enable` fail-loud (clean break)            | **Done** -- OQ-1 resolved: fail loud; `%` dispatcher restore deferred |
 | **S4** | B2, B3, B4, B5 | Help & error-message pass (+1 machine-output item) | Ship anytime; mostly help-snapshot; B4-json updates a pinning test    |
-| **S5** | C1, C2, C3     | Research-preview clean breaks                      | C1/C2 shipped; C3 decision drafted for review                         |
+| **S5** | C1, C2, C3     | Research-preview clean breaks                      | C1/C2 shipped; C3 resolved record-only                                |
 
-- [ ] Confirm the slice split with the maintainer (or proceed S1 -> S2 -> S4, holding S3/S5 on their gates).
+- [x] Confirm the slice split with the maintainer (or proceed S1 -> S2 -> S4, holding S3/S5 on their gates).
 
 ## Phase 2 -- Slice S1: A2 + A4 (trivial correctness)
 
@@ -200,12 +200,11 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   `uv run pytest tests/src/cli/test_backend_commands.py tests/src/cli/test_command_tree_invariants.py -q` passed (51
   tests); live help/table smoke checked `backend --help`, `show --help`, `test-auth --help`, `start --help`,
   `stop --help`, `reconcile --help`, and `backend list`; `make pre-commit` passed.
-- [ ] **C3** -- `--scope` value-set/ordering canonicalization -- **OQ-3 draft decision recorded; likely no code**. Do
-  not globally canonicalize scope value order. The observed families are semantic: session/cleanup uses
-  `workspace|project|all`; memory/shadows/session-memory uses `project|workspace|all`; search has no workspace scope
-  (`project|all`); extension install uses `local|project|user`; Codex status reports `user|project|local` to mirror
-  runtime-install reporting. **Assertion (if actioned):** only local help drift inside a semantic family is normalized;
-  no arbitrary cross-family reorder.
+- [x] **C3** -- `--scope` value-set/ordering canonicalization -- **OQ-3 resolved record-only**. Do not globally
+  canonicalize scope value order. The observed families are semantic: session/cleanup uses `workspace|project|all`;
+  memory/shadows/session-memory uses `project|workspace|all`; search has no workspace scope (`project|all`); extension
+  install uses `local|project|user`; Codex status reports `user|project|local` to mirror runtime-install reporting.
+  **Assertion satisfied:** no arbitrary cross-family reorder; no code change needed.
 - [x] C2/C3 decision split recorded in this checklist and in [`card.md`](card.md); follow-up domain card created in
   `todo/`.
 - [x] Changelog entry per shipped break (`coding_standards.md §5`).
@@ -222,8 +221,8 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   instances (remote singleton names may be instance ids for now; managed local LiteLLM instances already have ids like
   `litellm-4000`), and that migration is split to
   [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
-- **OQ-3 (gates C3) -- DRAFT RESOLUTION 2026-07-03:** the observed `--scope` divergences are semantic families, not one
-  accidental enum. Do not globally reorder; only normalize local drift inside a family.
+- **OQ-3 (C3) -- RESOLVED 2026-07-03:** the observed `--scope` divergences are semantic families, not one accidental
+  enum. Do not globally reorder; only normalize local drift inside a family.
 
 ## Acceptance tests
 
@@ -244,14 +243,16 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Closeout items
 
-- [ ] All selected slices ticked with verification recorded (each slice: focused suite + `make pre-commit` clean).
+- [x] All selected slices ticked with verification recorded (each slice: focused suite + `make pre-commit` clean).
 - [x] C2 has a closure state before moving this card to `done/`: either the public wording pass shipped here, or it was
   explicitly deferred to a named follow-up separate from `backend_instance_identity_model`.
-- [ ] Integration: none expected (host CLI + help rendering; no `claude -p`/Docker path). Confirm and record.
-- [ ] Docs synced for behavior changes: `cli_reference.md` (A5 logs group, C1 `--period`), `design_appendix.md` /
+- [x] Integration: none expected (host CLI + help rendering; no `claude -p`/Docker path). Confirm and record.
+- [x] Docs synced for behavior changes: `cli_reference.md` (A5 logs group, C1 `--period`), `design_appendix.md` /
   `end-user/*` where the changed surface is documented.
-- [ ] `docs/board/change_log.md` updated per shipped slice (S2/S3/S5 name their clean breaks; B pass is one polish
+- [x] `docs/board/change_log.md` updated per shipped slice (S2/S3/S5 name their clean breaks; B pass is one polish
   entry).
-- [ ] cli_style index (this card) annotated per shipped slice; refuted-candidate list in `card.md` preserved.
-- [ ] Durable lessons promoted to `docs/board/impl_notes.md` only after human review.
+- [x] cli_style index (this card) annotated per shipped slice; refuted-candidate list in `card.md` preserved.
+- [x] Durable lessons promoted to `docs/board/impl_notes.md` only after human review. **Decision:** no new
+  `impl_notes.md` promotion for this card. Existing impl notes already preserve the internal source-id/runtime-instance
+  invariant; the future-facing abstraction lives in `todo/backend_instance_identity_model` until it ships.
 - [ ] Move card `doing/ -> done/` when the resumed cli_style scope ships or is deliberately split into new active cards.

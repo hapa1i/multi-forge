@@ -252,10 +252,10 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 | --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C1  | `telemetry activity --days N` -> `--period [today\|week\|month\|all]` | Sibling telemetry commands (`trace list`, `costs show`, `proxy audit`) all use `--period`. Align, or add `--period` and deprecate `--days`.                                                                                                                                               |
 | C2  | `model backend` positional metavar standardization                    | **Shipped in S5/C2:** public terminology says backend/backend instance/adapter and avoids unexplained `source` or overloaded `runtime`; implementation stayed help/metavar/table/prose-only. Storage/JSON/domain migration is separately split to `todo/backend_instance_identity_model`. |
-| C3  | `--scope` value-set/ordering canonicalization                         | **Draft decision:** no global reorder. The observed value sets are semantic families (`workspace\|project\|all`, `project\|workspace\|all`, `project\|all`, `local\|project\|user`, `user\|project\|local`), not one accidental enum. Only normalize local drift inside a family.         |
+| C3  | `--scope` value-set/ordering canonicalization                         | **Resolved record-only:** no global reorder. The observed value sets are semantic families (`workspace\|project\|all`, `project\|workspace\|all`, `project\|all`, `local\|project\|user`, `user\|project\|local`), not one accidental enum. Only normalize local drift inside a family.   |
 
-**C3 draft decision (2026-07-03):** do not force one canonical `--scope` order across the CLI. The verified orderings
-map to different objects:
+**C3 decision (2026-07-03):** do not force one canonical `--scope` order across the CLI. The verified orderings map to
+different objects:
 
 - `session list` / `forge clean`: `workspace|project|all` (workspace-default session/state cleanup).
 - `memory shadows` / `session memory status`: `project|workspace|all` (project-default memory discovery).
@@ -263,7 +263,8 @@ map to different objects:
 - `extension enable|sync|disable|status`: `local|project|user` (installation specificity).
 - `codex status`: `user|project|local` (runtime-install reporting order, matching install tracking).
 
-So C3 is likely record-only for this card unless a local help string drifts from its own family.
+So C3 is record-only for this card; no code change is needed unless future review identifies local drift inside a
+semantic family.
 
 ---
 
@@ -289,7 +290,7 @@ So C3 is likely record-only for this card unless a local help string drifts from
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | A3: make `policy enable --bundle` **required** (fail loud) or implement **restore-configured-bundles-from-intent** (the `design_workflows.md §3.6` "planned" behavior)? | policy        | Resolved 2026-07-03: fail loud in the terminal CLI; restore-from-intent stays with the `%policy enable` dispatcher.                        |
 | B1/C2: is the `model backend` metavar variance worth a rename at all, given it encodes a real source/adapter/instance distinction?                                      | model backend | Resolved 2026-07-03: yes for public backend/backend-instance wording; no for opportunistic internal/storage/JSON renames in this UX slice. |
-| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope         | Draft resolved 2026-07-03: semantic families; do not globally canonicalize. Only fix local drift inside a family if review finds any.      |
+| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope         | Resolved 2026-07-03: semantic families; do not globally canonicalize. Only fix local drift inside a family if review finds any.            |
 
 ---
 
@@ -311,8 +312,8 @@ So C3 is likely record-only for this card unless a local help string drifts from
 - **Batch B is pure help/docstring edits.** Zero behavior change, no test risk beyond help-snapshot updates; ship
   anytime, in any order.
 - **Batch C are breaking changes where code changes ship.** C1 shipped as a clean break. C2 shipped as a public
-  help/metavar/table cleanup, while the deeper backend-instance abstraction is a separate todo card. C3 is likely
-  record-only unless review identifies local drift inside a semantic scope family.
+  help/metavar/table cleanup, while the deeper backend-instance abstraction is a separate todo card. C3 is record-only:
+  semantic scope families stay as-is.
 
 ---
 
