@@ -769,7 +769,7 @@ slice. Sub-sliced below so each step is reviewable and reversible.
   (`invoke or invoke_claude`, `run_active or run_with_active_session`). Repoint the 149 `invoke_claude` patches and the
   1 `run_with_active_session` patch to `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}`. Done
   2026-07-02: parent patch lines are down to **1**, the expected `session.py`-owned `_detect_parent_extensions` seam.
-- [ ] **5d -- delete the shim.** With all lazy seams already gone (`_sess()` removed in 5c; `_session_cli()` removed in
+- [x] **5d -- delete the shim.** With all lazy seams already gone (`_sess()` removed in 5c; `_session_cli()` removed in
   5a.5), convert the `import *` re-export tail (`:624-626`) to **side-effect imports**
   (`from . import session_fork  # noqa: F401`) so command registration survives; drop the 3 name re-exports
   (`:619-621`). **Migrate the direct-import category:** repoint every
@@ -777,7 +777,11 @@ slice. Sub-sliced below so each step is reviewable and reversible.
   are all session.py-owned and stay) to its owning module. Final gates:
   `grep -rnE 'def _sess|def _session_cli|sys\.modules\["forge\.cli\.session"\]' src/forge/cli/` -> 0; no parent-module
   patches for names owned outside `session.py`; every surviving `patch("forge.cli.session.X")` or
-  `from forge.cli.session import X` targets a `session.py`-defined name.
+  `from forge.cli.session import X` targets a `session.py`-defined name. Done 2026-07-02: the wildcard re-export tail
+  and obsolete `generate_unique_name`/`invoke_claude`/`run_with_active_session` aliases are gone; command modules are
+  imported only for Click registration side effects. Submodule-owned direct imports were repointed (`delete`,
+  `_persist_fork_transfer_derivation`, `_persist_rewind_derivation`, `_has_resumable_transcript`); remaining
+  `forge.cli.session` imports/patches target helpers still defined in `session.py`.
 
 **Risks:**
 
@@ -844,6 +848,18 @@ returned no launcher/shim hits; parent patch lines are **1** (`_detect_parent_ex
 `uv run pytest tests/src/session/test_claude_session_manifest_characterization.py tests/src/cli/test_session_subprocess_proxy.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_commands.py tests/src/cli/test_hook_warnings.py tests/src/cli/test_session_model_pins.py tests/regression/test_bug_supervisor_fork_uuid_drift.py tests/regression/test_bug_fork_session_exists_tip.py tests/regression/test_bug_21x_fork_launch_handoff.py tests/regression/test_bug_same_dir_transfer_fork.py -q`
 -> **265 passed**. Old parent-seam poison and new core `invoke_claude` poison each ran against the same set -> **265
 passed** each (pytest emitted one expected already-imported warning in each poison run).
+
+**5d verification (2026-07-02):** no wildcard re-export tail or obsolete launcher/name aliases in `session.py`;
+`python -c "import forge.cli.session"`; `uv run forge session --help`; `uv run forge session start --help`;
+`uv run forge session fork --help`; `uv run forge session delete --help`; stale lazy-seam grep
+`rg -n 'def _sess\(|_sess\(\)|sys\.modules\["forge\.cli\.session"\]' src/forge/cli tests` -> empty; parent patch/import
+grep shows only `session.py`-defined helpers (`_detect_parent_extensions`, `_auto_install_extensions`,
+`_generate_parent_transfer_context`). Focused 5d tests
+`uv run pytest tests/src/cli/test_session_derivation.py tests/src/cli/test_session_extensions.py tests/regression/test_bug_qa12_orphaned_session_delete.py tests/regression/test_bug_force_delete_schema_mismatch.py tests/regression/test_bug_nested_project_launch.py tests/regression/test_bug_21x_fork_launch_handoff.py -q`
+-> **57 passed**. The first full CLI/regression run exposed one stale parent `SessionManager` monkeypatch in
+`test_bug_codex_fork_orphan.py`; after repointing it to `session_fork`,
+`uv run pytest tests/src/cli tests/regression -q` -> **2681 passed**. `make pre-commit` clean;
+`./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py -v` -> **21 passed**.
 
 **Verification (per sub-slice + final):** affected test file(s) after each symbol;
 `python -c "import forge.cli.session"` (no cycle error); `forge session --help` + a couple of `--help` leaves; full

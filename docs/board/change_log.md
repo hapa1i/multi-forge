@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-02
 
+### session_op_layer_extraction Slice 5: Session shim retirement
+
+**Goal**: Remove the `forge.cli.session` compatibility shim that kept tests patching parent-module re-exports after the
+Claude session path was split into focused CLI/core modules.
+
+**Key changes**:
+
+- Repointed parent-module test patches to the real seams by sub-slice: low-volume helpers, resume-mode local imports,
+  `SessionManager`, and the Claude launcher seam in `forge.core.ops.claude_session`.
+- Deleted the `_sess()` / `_session_cli()` lazy module seams and replaced the `session.py` wildcard re-export tail with
+  side-effect imports that preserve Click command registration.
+- Repointed direct test imports for submodule-owned commands/helpers while leaving `session.py`-defined helper tests on
+  the parent module.
+
+**Verification**: CLI/regression suite 2681 passed; Docker lifecycle integration 21 passed; stale shim greps clean
+except for helpers still defined in `session.py`; `make pre-commit` clean.
+
 ### session_op_layer_extraction Slice 4b: Fork supervisor wiring
 
 **Goal**: Finish the post-fork cleanup by collapsing fork supervisor persistence onto the core wiring primitive and

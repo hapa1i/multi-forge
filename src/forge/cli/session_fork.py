@@ -1,8 +1,4 @@
-"""Session fork command.
-
-Extracted from session_lifecycle.py for file-size compliance.
-Re-exported via session.py so patch("forge.cli.session.fork") works.
-"""
+"""Session fork command."""
 
 from __future__ import annotations
 

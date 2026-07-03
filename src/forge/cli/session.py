@@ -614,13 +614,7 @@ def session() -> None:
     pass
 
 
-# Re-export names that tests patch on forge.cli.session (originally top-level imports).
-# These must be in this module's namespace for patch("forge.cli.session.XXX") to work.
-from forge.core.naming import generate_unique_name as generate_unique_name  # noqa: E402,F401
-from forge.session import run_with_active_session as run_with_active_session  # noqa: E402,F401
-from forge.session.claude import invoke_claude as invoke_claude  # noqa: E402,F401
-
-# Re-export for backward compatibility (204 test references patch "forge.cli.session.XXX")
-from .session_fork import *  # noqa: E402,F401,F403
-from .session_lifecycle import *  # noqa: E402,F401,F403
-from .session_manage import *  # noqa: E402,F401,F403
+# Import command modules for their Click registration side effects.
+from . import session_fork as session_fork  # noqa: E402,F401
+from . import session_lifecycle as session_lifecycle  # noqa: E402,F401
+from . import session_manage as session_manage  # noqa: E402,F401

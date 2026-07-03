@@ -322,7 +322,7 @@ class TestPersistedClaudeProjectRoot:
         old_dir.mkdir(parents=True)
         (old_dir / f"{uuid}.jsonl").write_text("{}")
 
-        from forge.cli.session import _has_resumable_transcript
+        from forge.cli.session_lifecycle import _has_resumable_transcript
 
         assert _has_resumable_transcript(state) is True
 
