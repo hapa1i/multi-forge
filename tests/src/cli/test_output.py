@@ -78,6 +78,14 @@ def test_print_error() -> None:
     assert "Error: something broke" in buf.getvalue()
 
 
+def test_print_error_default_writes_stderr(capsys: pytest.CaptureFixture[str]) -> None:
+    print_error("something broke")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: something broke" in captured.err
+
+
 def test_print_error_with_tip_orders_error_then_tip() -> None:
     c, buf = _console()
     print_error_with_tip("bad thing happened", "try the other thing", console=c)
@@ -99,6 +107,19 @@ def test_handle_session_error_exists_emits_generic_tip_and_exits() -> None:
     assert "forge session delete my-sess" in out
     # Must NOT suggest resume: meaningless for a fork name collision.
     assert "resume" not in out
+
+
+def test_handle_session_error_default_writes_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        handle_session_error(SessionExistsError("my-sess"))
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: session 'my-sess' already exists" in captured.err
+    assert "Tip:" in captured.err
 
 
 def test_handle_session_error_context_sensitive_has_no_generic_tip() -> None:

@@ -97,7 +97,7 @@ def _apply_and_persist_direct_model_override(
     if direct_model is None:
         return
     if use_sidecar:
-        print_error(f"--model cannot be combined with sidecar {surface}", console=console)
+        print_error(f"--model cannot be combined with sidecar {surface}")
         sys.exit(1)
 
     _apply_direct_model_override_to_state(state, direct_model)

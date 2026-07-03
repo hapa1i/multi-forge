@@ -335,7 +335,7 @@ def preset_edit() -> None:
 
     editor = os.environ.get("EDITOR", "vim")
     if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
@@ -346,21 +346,21 @@ def preset_edit() -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            print_error(f"Editor exited with code {result.returncode}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Editor exited with code {result.returncode}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         try:
             with open(tmp_path, encoding="utf-8") as f:
                 edited_data = json.load(f)
         except json.JSONDecodeError as e:
-            print_error(f"Invalid JSON: {e}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Invalid JSON: {e}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         if not isinstance(edited_data, dict):
-            print_error("Preset must be a JSON object", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error("Preset must be a JSON object")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         from forge.core.state import atomic_write_text

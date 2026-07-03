@@ -22,7 +22,7 @@ import os
 
 import click
 
-from forge.cli.output import print_tip
+from forge.cli.output import err_console, print_tip
 from forge.core.auth.capabilities import (
     CREDENTIALS,
     RETIRED_NAMES,
@@ -188,7 +188,7 @@ def login(credential: str | None, profile: str | None) -> None:
     try:
         existing = load_profile(profile_name)
     except CredentialVersionError as e:
-        click.secho(f"✗ {e}", fg="red")
+        click.secho(f"✗ {e}", fg="red", err=True)
         raise SystemExit(1)
     except ValueError:
         existing = {}
@@ -355,7 +355,7 @@ def status(profile: str | None, as_json: bool) -> None:
         try:
             json_secrets = load_profile(profile_name)
         except CredentialVersionError as e:
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
             raise SystemExit(1)
         except ValueError:
             json_secrets = {}
@@ -370,7 +370,7 @@ def status(profile: str | None, as_json: bool) -> None:
                     {
                         "name": ev.name,
                         "configured": bool(value),
-                        "source": f"file:{profile_name}" if source == "file" else source,
+                        "source": (f"file:{profile_name}" if source == "file" else source),
                         "is_secret": ev.secret,
                         "is_default": bool(ev.default_value and source == "not configured"),
                         "value": value if (value and not ev.secret) else None,
@@ -387,17 +387,25 @@ def status(profile: str | None, as_json: bool) -> None:
                     "env_vars": env_vars,
                 }
             )
-        click.echo(json.dumps({"profile": profile_name, "credentials": creds, "warning": warning}, indent=2))
+        click.echo(
+            json.dumps(
+                {"profile": profile_name, "credentials": creds, "warning": warning},
+                indent=2,
+            )
+        )
         return
 
     try:
         file_secrets = load_profile(profile_name)
     except CredentialVersionError as e:
-        click.secho(f"✗ {e}", fg="red")
+        click.secho(f"✗ {e}", fg="red", err=True)
         raise SystemExit(1)
     except ValueError:
         file_secrets = {}
-        click.secho("⚠︎ Credentials file is corrupt -- file-based values unavailable.", fg="yellow")
+        click.secho(
+            "⚠︎ Credentials file is corrupt -- file-based values unavailable.",
+            fg="yellow",
+        )
         print_tip("Run 'forge auth login' to recreate the file.", blank_before=False)
 
     click.echo(f"\nCredential status (profile: {profile_name})")
@@ -492,7 +500,7 @@ def profiles_cmd(as_json: bool) -> None:
         try:
             names = list_profiles()
         except (CredentialVersionError, ValueError) as e:
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
             raise SystemExit(1)
         active = resolve_profile()
         profiles = [{"name": n, "key_count": len(load_profile(n)), "is_active": n == active} for n in names]
@@ -502,11 +510,11 @@ def profiles_cmd(as_json: bool) -> None:
     try:
         profile_names = list_profiles()
     except CredentialVersionError as e:
-        click.secho(f"✗ {e}", fg="red")
+        click.secho(f"✗ {e}", fg="red", err=True)
         raise SystemExit(1)
     except ValueError as e:
-        click.secho(f"Error reading credentials file: {e}", fg="red")
-        print_tip("Run 'forge auth login' to recreate the file.")
+        click.secho(f"Error reading credentials file: {e}", fg="red", err=True)
+        print_tip("Run 'forge auth login' to recreate the file.", console=err_console)
         raise SystemExit(1)
 
     if not profile_names:

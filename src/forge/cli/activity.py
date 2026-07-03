@@ -55,12 +55,11 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
         session_name, forge_root = resolve_session_identifier(session)
     except SessionContextError as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
         else:
             print_error_with_tip(
                 str(e),
                 "Run 'forge session list' to see sessions.",
-                console=console,
             )
         sys.exit(1)
 
@@ -177,7 +176,14 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
             if show_workers:
                 values.append(str(model_row.workers) if model_row.workers else "-")
             errors = f"[red]{model_row.errors}[/red]" if model_row.errors else "0"
-            values += [str(model_row.attempts), errors, model_row.join_state.replace("_", "-"), lane, tokens, cost]
+            values += [
+                str(model_row.attempts),
+                errors,
+                model_row.join_state.replace("_", "-"),
+                lane,
+                tokens,
+                cost,
+            ]
             table.add_row(*values)
         console.print(table)
 

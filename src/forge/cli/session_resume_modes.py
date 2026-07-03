@@ -103,7 +103,6 @@ def _resume_fresh_rewind(
         print_error_with_tip(
             "--strategy rewind is not supported with sidecar mode.",
             "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) or use transfer mode.",
-            console=console,
         )
         sys.exit(1)
     _execute_resume_launch_plan(

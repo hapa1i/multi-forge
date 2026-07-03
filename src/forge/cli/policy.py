@@ -156,9 +156,15 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         try:
             return _resolve_session_for_display(explicit, cwd)
         except AmbiguousSessionError as exc:
-            print_error(f"Session '{explicit}' exists in multiple projects:", console=err_console)
+            print_error(
+                f"Session '{explicit}' exists in multiple projects:",
+                console=err_console,
+            )
             for root in exc.forge_roots:
-                err_console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
+                err_console.print(
+                    Text(f"  - {display_path(root)}", style="dim", no_wrap=True),
+                    soft_wrap=True,
+                )
             err_console.print("[dim]Run the command from the target project directory.[/dim]")
             sys.exit(1)
         except (StateCorruptedError, StateUnreadableError):
@@ -177,10 +183,15 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
             err_console.print("  Run 'forge session start' first to create a session.")
             sys.exit(1)
         else:
-            print_error(f"Multiple sessions in {display_path(cwd)}; specify one with --session.", console=err_console)
+            print_error(
+                f"Multiple sessions in {display_path(cwd)}; specify one with --session.",
+                console=err_console,
+            )
             err_console.print("  Sessions: " + ", ".join(candidates))
             print_tip(
-                f"Run 'forge policy <command> --session {candidates[0]}'.", blank_before=False, console=err_console
+                f"Run 'forge policy <command> --session {candidates[0]}'.",
+                blank_before=False,
+                console=err_console,
             )
             sys.exit(1)
 
@@ -225,7 +236,11 @@ def list_bundles(as_json: bool) -> None:
                 {
                     "name": bundle_name,
                     "policies": [
-                        {"policy_id": p.policy_id, "description": getattr(p, "description", None)} for p in policies
+                        {
+                            "policy_id": p.policy_id,
+                            "description": getattr(p, "description", None),
+                        }
+                        for p in policies
                     ],
                 }
             )
@@ -298,7 +313,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        print_error(f"Failed to update session: {e}", console=console)
+        print_error(f"Failed to update session: {e}")
         sys.exit(1)
 
     console.print(f"[green]Policy enabled[/green] with bundles: {', '.join(bundles)}")
@@ -311,7 +326,11 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             "\n[yellow]Warning:[/yellow] Policy configured but PreToolUse hook is not installed. "
             "Enforcement will not be active."
         )
-        print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
+        print_tip(
+            "Run 'forge extension enable' to install hooks.",
+            blank_before=False,
+            console=console,
+        )
     if bundle_config:
         for bundle, cfg in bundle_config.items():
             cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
@@ -348,7 +367,7 @@ def disable(session_name: str | None) -> None:
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        print_error(f"Failed to update session: {e}", console=console)
+        print_error(f"Failed to update session: {e}")
         sys.exit(1)
 
     console.print("[green]Policy enforcement disabled[/green]")
@@ -392,7 +411,11 @@ def _supervisor_status_dict(sup: SupervisorConfig | None, manifest: SessionState
     # else default. The per-call usage event carries no backend id, so this is where it shows.
     try:
         lane = resolve_supervisor_lane(read_bound_lane(manifest, SUPERVISOR_CONSUMER))
-        data["lane"] = {"runtime": lane.runtime_id, "backend": lane.backend_id, "model": lane.model}
+        data["lane"] = {
+            "runtime": lane.runtime_id,
+            "backend": lane.backend_id,
+            "model": lane.model,
+        }
     except Exception as exc:  # drifted/removed catalog entry -> show null, never crash status
         _log.debug("supervisor lane resolution for status failed: %s", exc)
         data["lane"] = None
@@ -624,7 +647,10 @@ def check(
 
     if use_diff:
         if sys.stdin.isatty():
-            print_error("--diff requires input on stdin (e.g., git diff | forge policy check ...)", console=err_console)
+            print_error(
+                "--diff requires input on stdin (e.g., git diff | forge policy check ...)",
+                console=err_console,
+            )
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
@@ -662,9 +688,9 @@ def check(
         result = engine.evaluate(context)
     except Exception as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e), "passed": False}))
+            click.echo(json.dumps({"error": str(e), "passed": False}), err=True)
         else:
-            print_error(f"Policy evaluation failed: {e}", console=console)
+            print_error(f"Policy evaluation failed: {e}")
         sys.exit(2)
 
     # Determine exit code: allow and warn both exit 0 (warn = advisory)
@@ -749,7 +775,9 @@ def _session_option(f: Any) -> Any:
     return click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")(f)
 
 
-def _resolve_supervisor_session(session_name: str | None) -> tuple[SessionStore, str, SessionState]:
+def _resolve_supervisor_session(
+    session_name: str | None,
+) -> tuple[SessionStore, str, SessionState]:
     """Resolve the policy session; return (store, display_name, fresh manifest)."""
     cwd = Path.cwd().resolve()
     store, state = _resolve_policy_session(cwd, session_name)
@@ -778,7 +806,13 @@ def _resolve_supervisor_session(session_name: str | None) -> tuple[SessionStore,
     default=None,
     help="Proxy (proxy_id or template name) for base_url resolution",
 )
-@click.option("--no-proxy", "direct", is_flag=True, default=False, help="Force direct Anthropic routing (bypass proxy)")
+@click.option(
+    "--no-proxy",
+    "direct",
+    is_flag=True,
+    default=False,
+    help="Force direct Anthropic routing (bypass proxy)",
+)
 @click.option(
     "--timeout",
     "-t",
@@ -834,9 +868,9 @@ def supervisor_evaluate(
         file_content = target.read_text()
     except Exception as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e), "passed": False}))
+            click.echo(json.dumps({"error": str(e), "passed": False}), err=True)
         else:
-            print_error(f"Failed to read {display_path(file_path)}: {e}", console=console)
+            print_error(f"Failed to read {display_path(file_path)}: {e}")
         sys.exit(2)
 
     cwd = Path.cwd().resolve()
@@ -869,9 +903,9 @@ def supervisor_evaluate(
         decision = invoke_supervisor(config, context, intent=SUPERVISOR_INTENT)
     except Exception as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e), "passed": False}))
+            click.echo(json.dumps({"error": str(e), "passed": False}), err=True)
         else:
-            print_error(f"Supervisor invocation failed: {e}", console=console)
+            print_error(f"Supervisor invocation failed: {e}")
         sys.exit(2)
 
     # Detect infra failures hidden behind fail-open allow decisions
@@ -945,7 +979,6 @@ def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) 
             "No approved plan snapshot found for the cascade's tier-1 checker.",
             "Approve a plan (ExitPlanMode) in the planning session, or run "
             "'forge policy supervisor reload --from <path>' to set one explicitly, then retry.",
-            console=console,
         )
         sys.exit(1)
     source_map = {
@@ -974,7 +1007,10 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     if as_json:
         click.echo(
             json.dumps(
-                {"session_name": manifest.name, "supervisor": _supervisor_status_dict(sup, manifest)},
+                {
+                    "session_name": manifest.name,
+                    "supervisor": _supervisor_status_dict(sup, manifest),
+                },
                 indent=2,
                 default=str,
             )
@@ -1059,14 +1095,18 @@ def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
         "Cannot change the supervisor lane for an already-bound session.",
         f"This session is frozen on {frozen.runtime_id}/{frozen.backend_id}/{frozen.model}.",
         "Start or fork a fresh session to use a different lane.",
-        console=console,
     )
 
 
 @supervisor.command(name="set")
 @click.argument("target")
 @_session_option
-@click.option("--supervisor-proxy", type=str, default=None, help="Proxy for supervisor routing (proxy_id or template)")
+@click.option(
+    "--supervisor-proxy",
+    type=str,
+    default=None,
+    help="Proxy for supervisor routing (proxy_id or template)",
+)
 @click.option(
     "--no-supervisor-proxy",
     "supervisor_direct",
@@ -1160,15 +1200,15 @@ def supervisor_set(
     )
 
     if supervisor_proxy and supervisor_direct:
-        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
+        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
         sys.exit(1)
     if cascade_flag is False:
-        print_error("--no-cascade is redundant on set (cascade defaults to off)", console=console)
+        print_error("--no-cascade is redundant on set (cascade defaults to off)")
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
         sys.exit(1)
     checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
@@ -1195,7 +1235,7 @@ def supervisor_set(
             elif runtime is not None:
                 lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
         except LaneError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             sys.exit(1)
         # Reject only a genuine *change*: re-pinning the already-frozen lane is an
         # idempotent no-op (the user re-runs `set --runtime <same>` to also retarget
@@ -1211,7 +1251,7 @@ def supervisor_set(
     try:
         source_state = validate_supervisor_target(target, forge_root=_policy_fr)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     # Resolve/auto-start the supervisor proxy only after the target validates, so a bad
@@ -1220,7 +1260,7 @@ def supervisor_set(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             sys.exit(1)
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -1395,7 +1435,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
     manifest = store.read()
     effective = compute_effective_intent(manifest)
     if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.resume_id:
-        print_error("No supervisor configured.", console=console)
+        print_error("No supervisor configured.")
         sys.exit(1)
 
     if reload_path:
@@ -1403,7 +1443,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
         if not resolved.is_absolute():
             resolved = (cwd / resolved).resolve()
         if not resolved.is_file():
-            print_error(f"Plan file not found: {resolved}", console=console)
+            print_error(f"Plan file not found: {resolved}")
             sys.exit(1)
         plan_path = str(resolved)
         source_desc = str(resolved)
@@ -1414,7 +1454,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
 
         result = resolve_supervisor_reload_plan_path(effective.policy.supervisor, manifest)
         if result is None:
-            print_error("No approved plan found for supervisor target or related sessions.", console=console)
+            print_error("No approved plan found for supervisor target or related sessions.")
             sys.exit(1)
         plan_path = result.path
         source_map = {
@@ -1471,12 +1511,12 @@ def supervisor_cascade(
     """
     cascade_on = state == "on"
     if not cascade_on and (checker_model or checker_provider or checker_effort):
-        print_error("Checker options only apply when enabling cascade (state 'on')", console=console)
+        print_error("Checker options only apply when enabling cascade (state 'on')")
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
         sys.exit(1)
 
@@ -1554,8 +1594,17 @@ def shadow_group() -> None:
 
 
 @shadow_group.command(name="run", hidden=True)
-@click.option("--session-name", required=True, help="Forge session whose shadow candidates to drain")
-@click.option("--root", "forge_root", default=None, help="Forge project root (defaults to cwd resolution)")
+@click.option(
+    "--session-name",
+    required=True,
+    help="Forge session whose shadow candidates to drain",
+)
+@click.option(
+    "--root",
+    "forge_root",
+    default=None,
+    help="Forge project root (defaults to cwd resolution)",
+)
 def shadow_run_cmd(session_name: str, forge_root: str | None) -> None:
     """Drain a session's pending shadow candidates (detached worker; not user-facing).
 
@@ -1577,7 +1626,12 @@ def shadow_run_cmd(session_name: str, forge_root: str | None) -> None:
 
 @shadow_group.command(name="show")
 @click.argument("session", required=False)
-@click.option("--all", "show_all", is_flag=True, help="Show every audited candidate, not just disagreements")
+@click.option(
+    "--all",
+    "show_all",
+    is_flag=True,
+    help="Show every audited candidate, not just disagreements",
+)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
     """Show shadow-audit disagreements for a session (the cascade's false-aligned cases).
@@ -1603,9 +1657,9 @@ def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
         session_name, forge_root = resolve_session_identifier(session)
     except SessionContextError as e:
         if as_json:
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
         else:
-            print_error_with_tip(str(e), "Run 'forge session list' to see sessions.", console=console)
+            print_error_with_tip(str(e), "Run 'forge session list' to see sessions.")
         sys.exit(1)
 
     records = read_done_records(forge_root, session_name)
@@ -1668,7 +1722,12 @@ def shadow_status_cmd(session: str | None, as_json: bool) -> None:
 
     pending = count_pending_candidates(forge_root, session_name)
     # Seed every status so the shape is stable with zero records.
-    done = {STATUS_AGREE: 0, STATUS_DISAGREE: 0, STATUS_INCONCLUSIVE: 0, STATUS_ERROR: 0}
+    done = {
+        STATUS_AGREE: 0,
+        STATUS_DISAGREE: 0,
+        STATUS_INCONCLUSIVE: 0,
+        STATUS_ERROR: 0,
+    }
     for record in read_done_records(forge_root, session_name):
         status = record.get("status")
         if status in done:
@@ -1677,7 +1736,12 @@ def shadow_status_cmd(session: str | None, as_json: bool) -> None:
     if as_json:
         click.echo(
             json.dumps(
-                {"session": session_name, "sample_rate": sample_rate, "pending": pending, "done": done},
+                {
+                    "session": session_name,
+                    "sample_rate": sample_rate,
+                    "pending": pending,
+                    "done": done,
+                },
                 indent=2,
             )
         )

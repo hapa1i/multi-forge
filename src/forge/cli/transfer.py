@@ -64,7 +64,13 @@ def transfer() -> None:
     default=None,
     help="Show a child's composed transfer view (snapshot + notes; approximates launch).",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON (frontmatter + sections + content).")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit JSON (frontmatter + sections + content).",
+)
 def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
     """Show the parent cache, or a child's composed transfer view with --child."""
     ctx = ExecutionContext.from_cwd()
@@ -115,7 +121,12 @@ def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
     default=None,
     help="Override strategy (default: the cache's current strategy).",
 )
-@click.option("--depth", type=int, default=None, help="Override lineage depth (default: the cache's current depth).")
+@click.option(
+    "--depth",
+    type=int,
+    default=None,
+    help="Override lineage depth (default: the cache's current depth).",
+)
 @click.option(
     "--target-runtime",
     type=click.Choice(list(TRANSFER_TARGET_RUNTIMES)),
@@ -127,13 +138,16 @@ def regenerate_cmd(parent: str, strategy: str | None, depth: int | None, target_
     ctx = ExecutionContext.from_cwd()
     try:
         result = regenerate_transfer(
-            ctx=ctx, parent=parent, strategy=strategy, depth=depth, target_runtime=target_runtime
+            ctx=ctx,
+            parent=parent,
+            strategy=strategy,
+            depth=depth,
+            target_runtime=target_runtime,
         )
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
             f"Run 'forge session resume {parent} --fresh' to create transfer context.",
-            console=console,
         )
         raise SystemExit(1) from e
 
@@ -148,7 +162,11 @@ def regenerate_cmd(parent: str, strategy: str | None, depth: int | None, target_
 
 @transfer.command("edit")
 @click.argument("parent")
-@click.option("--child", default=None, help="Child to edit notes for (inferred when the parent has exactly one).")
+@click.option(
+    "--child",
+    default=None,
+    help="Child to edit notes for (inferred when the parent has exactly one).",
+)
 def edit_cmd(parent: str, child: str | None) -> None:
     """Edit a child's user-notes overlay in $EDITOR (created if absent)."""
     ctx = ExecutionContext.from_cwd()
@@ -159,7 +177,6 @@ def edit_cmd(parent: str, child: str | None) -> None:
         print_error_with_tip(
             str(e),
             f"Run 'forge session transfer show {parent}' to list available transfer context.",
-            console=console,
         )
         raise SystemExit(1) from e
 
@@ -177,9 +194,17 @@ def edit_cmd(parent: str, child: str | None) -> None:
 
 @transfer.command("diff")
 @click.argument("parent")
-@click.option("--child", default=None, help="Child to diff (inferred when the parent has exactly one).")
 @click.option(
-    "--json", "as_json", is_flag=True, default=False, help="Emit JSON (parent/child + drift flag + diff text)."
+    "--child",
+    default=None,
+    help="Child to diff (inferred when the parent has exactly one).",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit JSON (parent/child + drift flag + diff text).",
 )
 def diff_cmd(parent: str, child: str | None, as_json: bool) -> None:
     """Show how the parent cache has drifted from a child's frozen snapshot."""

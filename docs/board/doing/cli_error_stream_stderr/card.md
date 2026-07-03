@@ -1,7 +1,8 @@
 # CLI error-stream fix (stdout -> stderr) -- cli_style A1
 
-**Graduated slice** of [`docs/board/proposed/cli_style_ux_compliance/card.md`](../../proposed/cli_style_ux_compliance/card.md)
-item **A1** (the audit headline). The index stays in `proposed/`; this card owns the A1 execution unit only.
+**Graduated slice** of
+[`docs/board/proposed/cli_style_ux_compliance/card.md`](../../proposed/cli_style_ux_compliance/card.md) item **A1** (the
+audit headline). The index stays in `proposed/`; this card owns the A1 execution unit only.
 
 **Lane**: `doing/`. **Branch**: `fix/cli-error-stream-stderr`. **Interleave**: Step 1 of the agreed backend/cli
 sequencing (below).
@@ -12,20 +13,20 @@ sequencing (below).
 stderr. Today most CLI error paths route to **stdout**, so `forge ... --json | jq` chokes when an error object lands in
 the data stream.
 
-**AST-verified model** (scope = top-level `src/forge/cli/*.py`, the terminal CLI; `cli/hooks/` uses a separate
-hook-JSON output contract and is out of scope). Base commit of `fix/cli-error-stream-stderr`, 2026-07-02:
+**AST-verified model** (scope = top-level `src/forge/cli/*.py`, the terminal CLI; `cli/hooks/` uses a separate hook-JSON
+output contract and is out of scope). Base commit of `fix/cli-error-stream-stderr`, 2026-07-02:
 
-| Surface                                       | Shape                                      | Count | Fix                                                     |
-| --------------------------------------------- | ------------------------------------------ | ----- | ------------------------------------------------------- |
-| `print_error*`                                | `console=console` (module `console` = stdout) | 240   | Phase 2: AST sweep, drop the arg (use new stderr default) |
-| `print_error*`                                | `console=err_console`                      | 90    | already stderr -- leave                                 |
-| `print_error*`                                | `console=out` (handler-internal)           | 4     | leave                                                   |
-| `print_error*`                                | `console=<expr>`                           | 1     | Phase 2: audit individually                             |
-| `print_error*`                                | bare (no `console=`)                       | **0** | none today -- Phase 1 default flip is a forward guard   |
-| `handle_session_error(e)`                     | bare -> `_resolve` -> **stdout** (`output.py:108`) | 11 | Phase 1: fix the handler default                        |
-| `handle_corrupt/unreadable_state_error(e)`    | bare -> `err_console` (`:124`,`:143`)      | 2     | already stderr -- leave                                 |
-| `click.echo(json.dumps({"error"\|"routing_error": ...}))` | no `err=True`                  | 13    | Phase 3: add `err=True`                                 |
-| `click.secho(..., fg="red")`                  | no `err=True`                              | 4     | Phase 3: add `err=True`                                 |
+| Surface                                                   | Shape                                              | Count | Fix                                                       |
+| --------------------------------------------------------- | -------------------------------------------------- | ----- | --------------------------------------------------------- |
+| `print_error*`                                            | `console=console` (module `console` = stdout)      | 240   | Phase 2: AST sweep, drop the arg (use new stderr default) |
+| `print_error*`                                            | `console=err_console`                              | 90    | already stderr -- leave                                   |
+| `print_error*`                                            | `console=out` (handler-internal)                   | 4     | leave                                                     |
+| `print_error*`                                            | `console=<expr>`                                   | 1     | Phase 2: audit individually                               |
+| `print_error*`                                            | bare (no `console=`)                               | **0** | none today -- Phase 1 default flip is a forward guard     |
+| `handle_session_error(e)`                                 | bare -> `_resolve` -> **stdout** (`output.py:108`) | 11    | Phase 1: fix the handler default                          |
+| `handle_corrupt/unreadable_state_error(e)`                | bare -> `err_console` (`:124`,`:143`)              | 2     | already stderr -- leave                                   |
+| `click.echo(json.dumps({"error"\|"routing_error": ...}))` | no `err=True`                                      | 13    | Phase 3: add `err=True`                                   |
+| `click.secho(..., fg="red")`                              | no `err=True`                                      | 4     | Phase 3: add `err=True`                                   |
 
 Module/func `console = Console(...)` in `cli/*.py`: **44 stdout, 2 stderr**. So `console=console` == stdout.
 
@@ -33,8 +34,8 @@ Module/func `console = Console(...)` in `cli/*.py`: **44 stdout, 2 stderr**. So 
 
 The index's grep-derived "~253 sites; flip the `print_error` default = one change closes 1b" is wrong on two counts:
 
-1. **There are 0 bare `print_error*` calls today**, so flipping the default fixes **no current site** -- it is a *forward
-   guard* against future bare calls. The real bulk is **240** `console=console` explicit-stdout overrides (grep
+1. **There are 0 bare `print_error*` calls today**, so flipping the default fixes **no current site** -- it is a
+   *forward guard* against future bare calls. The real bulk is **240** `console=console` explicit-stdout overrides (grep
    undercounted at 173 by missing multiline calls; a same-line `grep -v console=` also miscounted those multiline calls
    as "bare"). These are neutralized by dropping the arg *after* the default flip -- an AST/semantic sweep, not a grep
    count.

@@ -9,7 +9,7 @@ from typing import cast
 
 import click
 
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
@@ -106,7 +106,7 @@ class _ClaudeForkCliPresenter:
         _render_sidecar_launch(event)
 
     def on_launch_error(self, error: ForgeOpError) -> None:
-        print_error(str(error), console=console)
+        print_error(str(error))
 
     def on_incognito_cleanup_start(self) -> None:
         console.print(f"\n[dim]Cleaning up incognito fork '{self._session_name}'...[/dim]")
@@ -333,18 +333,16 @@ def fork(
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
     """
     if direct and proxy_name:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
     if supervisor_proxy and supervisor_direct:
         print_error(
             "--supervisor-proxy and --no-supervisor-proxy are mutually exclusive",
-            console=console,
         )
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
         print_error(
             "--supervisor-proxy/--no-supervisor-proxy require --supervise",
-            console=console,
         )
         sys.exit(1)
     if (
@@ -352,13 +350,12 @@ def fork(
     ) and not supervise_target:
         print_error(
             "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise",
-            console=console,
         )
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -368,7 +365,7 @@ def fork(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             sys.exit(1)
 
     if branch:
@@ -380,10 +377,10 @@ def fork(
     into_target_common: str | None = None
     if into_path is not None:
         if worktree:
-            print_error("--into and --worktree are mutually exclusive", console=console)
+            print_error("--into and --worktree are mutually exclusive")
             sys.exit(1)
         if branch:
-            print_error("--into and --branch are mutually exclusive", console=console)
+            print_error("--into and --branch are mutually exclusive")
             sys.exit(1)
 
         import subprocess as _sp
@@ -398,7 +395,6 @@ def fork(
         except _sp.CalledProcessError:
             print_error(
                 f"'{display_path(into_path)}' is not inside a git repository",
-                console=console,
             )
             sys.exit(1)
 
@@ -413,7 +409,7 @@ def fork(
             # git returns relative paths from the checkout root; resolve against it
             target_common = str((Path(into_resolved) / target_common_raw).resolve())
         except _sp.CalledProcessError:
-            print_error("Failed to resolve git repository for --into target", console=console)
+            print_error("Failed to resolve git repository for --into target")
             sys.exit(1)
 
         # Store for deferred comparison after parent session is loaded
@@ -435,7 +431,6 @@ def fork(
             if Path(into_resolved).resolve() == main_repo_root:
                 print_error(
                     "--into targets existing worktrees, not the main checkout. Use a same-directory fork instead.",
-                    console=console,
                 )
                 sys.exit(1)
         except _sp.CalledProcessError:
@@ -488,7 +483,6 @@ def fork(
                     f"forge session resume {parent} --task <next step>",
                     f"forge session start <name> --runtime codex --resume-from {parent} --task <task>",
                 ],
-                console=console,
             )
             sys.exit(1)
 
@@ -510,7 +504,6 @@ def fork(
                 if into_target_common != parent_common:
                     print_error(
                         "--into target is not part of the same repository as the parent session",
-                        console=console,
                     )
                     sys.exit(1)
         except _sp2.CalledProcessError:
@@ -523,32 +516,29 @@ def fork(
     is_cross_dir = worktree or into_resolved is not None
     rewind_requested = strategy == "rewind"
     if _drop_last_explicit and not rewind_requested:
-        print_error("--drop-last requires --strategy rewind", console=console)
+        print_error("--drop-last requires --strategy rewind")
         sys.exit(1)
     if rewind_requested:
         if drop_last is None:
-            print_error("--strategy rewind requires --drop-last N", console=console)
+            print_error("--strategy rewind requires --drop-last N")
             sys.exit(1)
         if drop_last < 0:
-            print_error("--drop-last must be non-negative", console=console)
+            print_error("--drop-last must be non-negative")
             sys.exit(1)
         if _inline_plan_explicit:
             print_error(
                 "--inline-plan applies only to transfer forks, not --strategy rewind",
-                console=console,
             )
             sys.exit(1)
         if resume_mode == "transfer":
             print_error(
                 "--strategy rewind cannot be combined with --resume-mode transfer",
-                console=console,
             )
             sys.exit(1)
         if not is_cross_dir:
             print_error_with_tip(
                 "--strategy rewind on fork requires --worktree or --into.",
                 "Use 'forge session resume <name> --fresh --strategy rewind --drop-last N' for a same-directory child.",
-                console=console,
             )
             sys.exit(1)
         resume_mode = "native-relocate"
@@ -578,7 +568,6 @@ def fork(
             print_error_with_tip(
                 "--resume-mode native-relocate cannot be combined with --no-launch.",
                 "Native-relocate relocates and resumes at launch; omit --no-launch.",
-                console=console,
             )
             sys.exit(1)
         try:
@@ -597,7 +586,6 @@ def fork(
                 "--resume-mode native-relocate is not supported with sidecar mode.",
                 "Relocation writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) "
                 "or use the default transfer mode.",
-                console=console,
             )
             sys.exit(1)
         from forge.session.claude.paths import (
@@ -612,7 +600,6 @@ def fork(
             print_error_with_tip(
                 f"Parent session '{parent}' has no Claude transcript to relocate.",
                 "Start the parent session so it has a conversation to fork, or use the default transfer mode.",
-                console=console,
             )
             sys.exit(1)
         # Reject a fork whose CWD encodes to the parent's OWN Claude dir: relocation would be a
@@ -625,7 +612,6 @@ def fork(
                 "--resume-mode native-relocate requires a different CWD than the parent; "
                 "the --into target resolves to the parent's own Claude project dir.",
                 "Fork into a fresh --worktree, or use the default transfer mode.",
-                console=console,
             )
             sys.exit(1)
         if not rewind_requested and (_strategy_explicit or _inline_plan_explicit):
@@ -652,7 +638,7 @@ def fork(
             parent_state_for_model = manager.get_session(parent, forge_root=_fr)
         except SessionNotFoundError:
             if not _hint_cross_project_session(parent, _fr):
-                print_error(f"session '{parent}' not found", console=console)
+                print_error(f"session '{parent}' not found")
             sys.exit(1)
         except ForgeSessionError as e:
             handle_session_error(e)
@@ -664,18 +650,18 @@ def fork(
                 inherited_launch is not None and inherited_launch.mode == LAUNCH_MODE_SIDECAR
             )
             if inherited_sidecar:
-                print_error("--model cannot be combined with sidecar fork", console=console)
+                print_error("--model cannot be combined with sidecar fork")
                 sys.exit(1)
 
             _, inherited_base_url, inherited_proxy_id = _get_effective_proxy_for_session(parent_state_for_model)
             error = _validate_direct_model_pin_for_routing(
                 pin=direct_model_pin,
-                proxy_id=_preflight_routing.proxy_id if _preflight_routing else inherited_proxy_id,
-                base_url=_preflight_routing.base_url if _preflight_routing else inherited_base_url,
+                proxy_id=(_preflight_routing.proxy_id if _preflight_routing else inherited_proxy_id),
+                base_url=(_preflight_routing.base_url if _preflight_routing else inherited_base_url),
                 surface="fork",
             )
             if error:
-                print_error(f"{error}", console=console)
+                print_error(f"{error}")
                 sys.exit(1)
 
     if (is_cross_dir or resume_mode == "transfer") and strategy == "full" and not direct:
@@ -715,7 +701,6 @@ def fork(
                                             f"Parent transcript ({token_est:,} tokens) exceeds "
                                             f"context limit ({context_limit_preflight:,}).",
                                             "Use --strategy structured or --strategy ai-curated instead.",
-                                            console=console,
                                         )
                                         sys.exit(1)
         except ForgeSessionError:
@@ -728,7 +713,7 @@ def fork(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             sys.exit(1)
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -746,12 +731,12 @@ def fork(
             into_path=into_resolved,
             forge_root=_fr,
             force=force,
-            memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+            memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             resume_mode=resume_mode,
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
-        print_error_with_tip(str(e), "Incognito sessions cannot be forked.", console=console)
+        print_error_with_tip(str(e), "Incognito sessions cannot be forked.")
         sys.exit(1)
     except BranchExistsError as e:
         _print_branch_exists_tip(e)
@@ -760,29 +745,26 @@ def fork(
         print_error_with_tip(
             str(e),
             "The branch is checked out in another worktree. Remove that worktree first.",
-            console=console,
         )
         sys.exit(1)
     except BranchNotMergedError as e:
         print_error_with_tip(
             str(e),
             "Merge or delete the branch manually before using --force.",
-            console=console,
         )
         sys.exit(1)
     except WorktreePathExistsError as e:
         print_error_with_tip(
             str(e),
             "Remove the directory or use a different fork name.",
-            console=console,
         )
         sys.exit(1)
     except InvalidBranchNameError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
     except SessionNotFoundError:
         if not _hint_cross_project_session(parent, _fr):
-            print_error(f"session '{parent}' not found", console=console)
+            print_error(f"session '{parent}' not found")
         sys.exit(1)
     except ForgeSessionError as e:
         handle_session_error(e)
@@ -797,7 +779,7 @@ def fork(
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
     fork_worktree_path = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
     _persist_routing_override(
-        forge_root=Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path,
+        forge_root=(Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path),
         session_name=fork_manifest.name,
         routing=_preflight_routing,
         direct=direct,
@@ -854,15 +836,15 @@ def fork(
 
     parent_session_id = parent_manifest.confirmed.claude_session_id
     if not parent_session_id:
-        print_error("Parent session has no UUID", console=console)
-        console.print("The parent session may not have been started yet.")
+        print_error("Parent session has no UUID")
+        err_console.print("The parent session may not have been started yet.")
         sys.exit(1)
 
     use_sidecar, mounts, image = _get_launch_preferences(fork_manifest)
     _apply_and_persist_direct_model_override(
         state=fork_manifest,
         direct_model=normalized_direct_model,
-        forge_root=Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path,
+        forge_root=(Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path),
         use_sidecar=use_sidecar,
         surface="fork",
     )
@@ -876,7 +858,6 @@ def fork(
         print_error_with_tip(
             "--strategy rewind is not supported with sidecar mode.",
             "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) or use transfer mode.",
-            console=console,
         )
         sys.exit(1)
     # Forks that pre-seed a fresh child UUID and carry a generated transfer doc: worktree transfer
@@ -943,19 +924,16 @@ def fork(
                     "--resume-mode native-relocate requires a different CWD than the parent; "
                     "the fork resolves to the parent's own Claude project dir.",
                     "Fork into a fresh --worktree, or use the default transfer mode.",
-                    console=console,
                 )
             elif isinstance(exc, RelocateConflictError):
                 print_error_with_tip(
                     f"The destination worktree already holds a different transcript for parent '{parent}'.",
                     "Fork into a fresh worktree, or use the default transfer mode.",
-                    console=console,
                 )
             else:
                 print_error_with_tip(
                     f"Could not relocate the parent transcript for native resume: {exc}",
                     "Use the default transfer mode, or fork into a fresh worktree.",
-                    console=console,
                 )
             sys.exit(1)
 
@@ -1018,7 +996,6 @@ def fork(
             print_error_with_tip(
                 "Rewind fallback could not prepare a resumable transcript in the fork worktree.",
                 "Use the default transfer fork, or retry after fixing Claude transcript store access.",
-                console=console,
             )
             sys.exit(1)
 
@@ -1175,7 +1152,7 @@ def fork(
             resume_id=launch_resume_id,
             fork_session=launch_fork_session,
             register_fork=launch_register_fork,
-            prompt_file=Path(launch_prompt_file) if launch_prompt_file is not None else None,
+            prompt_file=(Path(launch_prompt_file) if launch_prompt_file is not None else None),
             context_limit=context_limit,
             launch_preferences=ClaudeLaunchPreferences(
                 use_sidecar=use_sidecar,

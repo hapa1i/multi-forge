@@ -131,7 +131,9 @@ def _runtime_instance_for_source(
     return instance
 
 
-def _instance_source_map(runtime_instances: dict[str, BackendInstance]) -> dict[str, list[str]]:
+def _instance_source_map(
+    runtime_instances: dict[str, BackendInstance],
+) -> dict[str, list[str]]:
     """Map each running instance backend_id to the local source ids it backs.
 
     Local LiteLLM sources share one adapter+port, so a single process can back
@@ -208,7 +210,11 @@ def _auth_record(source: ModelSource) -> dict[str, Any]:
     # runtime (e.g. chatgpt via codex login). Report that explicitly instead of
     # letting the empty credential loop fall through to a misleading "configured".
     if source.endpoint.kind == "runtime_native":
-        return {"status": "runtime_native", "credentials": [], "missing_required_env_vars": []}
+        return {
+            "status": "runtime_native",
+            "credentials": [],
+            "missing_required_env_vars": [],
+        }
 
     credentials: list[dict[str, Any]] = []
     missing_required: list[str] = []
@@ -251,7 +257,7 @@ def _endpoint_record(source: ModelSource, instance: BackendInstance | None = Non
             "kind": endpoint.kind,
             "adapter": lifecycle.adapter if lifecycle else None,
             "default_port": lifecycle.default_port if lifecycle else None,
-            "url": f"http://localhost:{instance.port if instance else lifecycle.default_port}" if lifecycle else None,
+            "url": (f"http://localhost:{instance.port if instance else lifecycle.default_port}" if lifecycle else None),
         }
     if endpoint.kind == "connection_value":
         _, provenance = resolve_env_or_credential_with_source(endpoint.value or "")
@@ -395,8 +401,8 @@ def _resolve_local_adapter_operand(operand: str) -> str:
     )
 
 
-def _exit_click_error(error: click.ClickException, console: Console) -> NoReturn:
-    print_error(error.message, console=console)
+def _exit_click_error(error: click.ClickException) -> NoReturn:
+    print_error(error.message)
     sys.exit(1)
 
 
@@ -637,7 +643,13 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
         if as_json:
             runtime_instances = _load_runtime_instances()
             instance_sources = _instance_source_map(runtime_instances)
-            click.echo(json.dumps(_source_record(source, runtime_instances, instance_sources), indent=2, default=str))
+            click.echo(
+                json.dumps(
+                    _source_record(source, runtime_instances, instance_sources),
+                    indent=2,
+                    default=str,
+                )
+            )
             return
         _show_source(source, raw, console)
         return
@@ -675,7 +687,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
                     "found": json_instance is not None,
                     "adapter_type": adapter_type,
                     "runtime_instance": runtime_record,
-                    "config_path": str(json_config_path) if json_config_path.exists() else None,
+                    "config_path": (str(json_config_path) if json_config_path.exists() else None),
                 },
                 indent=2,
                 default=str,
@@ -814,7 +826,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
     try:
         adapter = _resolve_local_adapter_operand(adapter)
     except click.ClickException as e:
-        _exit_click_error(e, console)
+        _exit_click_error(e)
 
     config_path = get_backend_config_path(adapter)
     if config_path.exists():
@@ -822,7 +834,6 @@ def create_cmd(adapter: str, config: Path | None) -> None:
             f"Backend config already exists: {display_path(config_path)}",
             "Start an instance with:",
             commands=[f"{_BACKEND_COMMAND} start {adapter} --port 4000"],
-            console=console,
         )
         sys.exit(1)
 
@@ -836,7 +847,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
         console.print("\n[dim]Start an instance with:[/dim]")
         console.print(f"  {_BACKEND_COMMAND} start {adapter} --port 4000")
     except Exception as e:
-        print_error(str(e), console=console)
+        print_error(str(e))
         sys.exit(1)
 
 
@@ -849,7 +860,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
     except click.ClickException as e:
-        _exit_click_error(e, console)
+        _exit_click_error(e)
 
     config_path = get_backend_config_path(adapter)
     if not config_path.exists():
@@ -857,7 +868,6 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
             f"Backend config not found for '{adapter}'",
             "Create it first:",
             commands=[f"{_BACKEND_COMMAND} create {adapter}"],
-            console=console,
         )
         sys.exit(1)
 
@@ -875,7 +885,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         else:
             console.print(f"Backend '{backend_id}' already running on port {resolved_port}")
     except Exception as e:
-        print_error(str(e), console=console)
+        print_error(str(e))
         sys.exit(1)
 
 
@@ -901,14 +911,14 @@ def stop_cmd(source_or_adapter: str, port: int | None) -> None:
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
     except click.ClickException as e:
-        _exit_click_error(e, console)
+        _exit_click_error(e)
 
     backend_id = f"{adapter}-{resolved_port}"
     try:
         _stop_instance(adapter, resolved_port)
         console.print(f"[green]Stopped[/green] backend '{backend_id}'")
     except Exception as e:
-        print_error(str(e), console=console)
+        print_error(str(e))
         sys.exit(1)
 
 
@@ -933,7 +943,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
     try:
         adapter = _resolve_local_adapter_operand(adapter)
     except click.ClickException as e:
-        _exit_click_error(e, console)
+        _exit_click_error(e)
 
     if port is not None:
         backend_id = f"{adapter}-{port}"
@@ -945,7 +955,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
             _stop_instance(adapter, port)
             console.print(f"[green]Stopped[/green] backend instance '{backend_id}'")
         except Exception as e:
-            print_error(str(e), console=console)
+            print_error(str(e))
             sys.exit(1)
     else:
         backend_dir = get_forge_home() / "backends" / adapter
@@ -954,7 +964,6 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
                 f"Backend config not found for '{adapter}'",
                 "Create it first:",
                 commands=[f"{_BACKEND_COMMAND} create {adapter}"],
-                console=console,
             )
             sys.exit(1)
 
@@ -997,15 +1006,30 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
     help="The backend's own record id (e.g. an OpenRouter gen-... id); remote-only.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--timeout", type=float, default=5.0, show_default=True, help="Remote lookup timeout (seconds).")
-def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None, as_json: bool, timeout: float) -> None:
+@click.option(
+    "--timeout",
+    type=float,
+    default=5.0,
+    show_default=True,
+    help="Remote lookup timeout (seconds).",
+)
+def reconcile_cmd(
+    source_id: str,
+    request_id: str | None,
+    remote_id: str | None,
+    as_json: bool,
+    timeout: float,
+) -> None:
     """Reconcile local telemetry against a backend's remote account-side record.
 
     Provide exactly one of --request-id (local-anchored: local trace -> remote record) or
     --remote-id (remote-only: the backend's own record id, no local side).
     """
     if request_id and remote_id:
-        print_error("Use only one of --request-id or --remote-id, not both.", console=err_console)
+        print_error(
+            "Use only one of --request-id or --remote-id, not both.",
+            console=err_console,
+        )
         sys.exit(1)
     if not request_id and not remote_id:
         print_error_with_tip(
@@ -1024,7 +1048,11 @@ def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None,
             timeout_s=timeout,
         )
     except ForgeOpError as e:
-        print_error_with_tip(str(e), f"Run '{_BACKEND_COMMAND} list' to see source ids.", console=err_console)
+        print_error_with_tip(
+            str(e),
+            f"Run '{_BACKEND_COMMAND} list' to see source ids.",
+            console=err_console,
+        )
         sys.exit(1)
     except RemoteAdapterError as e:
         # Adapter bug / config fault (e.g. no base URL) -- a clean CLI error, not a traceback.

@@ -203,7 +203,10 @@ def _print_completion_message(
     if gated:
         skill_list = ", ".join(f"/forge:{name}" for name, _ in gated)
         required = gated[0][1].value
-        print_tip(f"Additional skills available with --profile {required}: {skill_list}", console=console)
+        print_tip(
+            f"Additional skills available with --profile {required}: {skill_list}",
+            console=console,
+        )
 
     _print_codex_completion(plan, scope)
 
@@ -559,7 +562,7 @@ def enable_cmd(
 
         version_check = check_minimum_version()
         if not version_check.ok:
-            print_error(f"{version_check.reason}", console=console)
+            print_error(f"{version_check.reason}")
             print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
@@ -649,9 +652,10 @@ def enable_cmd(
     except click.UsageError:
         raise
     except NoClaudeDirectoryError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         print_tip(
-            "Use --scope user to enable globally, or --root <dir> to target a specific directory.", console=console
+            "Use --scope user to enable globally, or --root <dir> to target a specific directory.",
+            console=console,
         )
         sys.exit(1)
     except SettingsConflictError as e:
@@ -661,7 +665,7 @@ def enable_cmd(
     except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
 
@@ -700,7 +704,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
 
         version_check = check_minimum_version()
         if not version_check.ok:
-            print_error(f"{version_check.reason}", console=console)
+            print_error(f"{version_check.reason}")
             print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
@@ -740,16 +744,16 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             _print_codex_completion(plan, install_scope)
 
     except NoForgeInstallationError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
     except NotInstalledError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         print_tip("Run 'forge extension enable' first.", console=console)
         sys.exit(1)
     except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
 
@@ -871,14 +875,14 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
         console.print("\n[green]Extensions disabled.[/green]")
 
     except NoForgeInstallationError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
     except (StateCorruptedError, StateUnreadableError):
         # Includes TrackingCorruptedError -- defers to the unified top-level handler
         # (uniform reset tip) instead of printing a raw parse error.
         raise
     except ForgeInstallError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
 

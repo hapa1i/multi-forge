@@ -134,7 +134,7 @@ def list_cmd(as_json: bool) -> None:
 
             click.echo(json.dumps({"error": str(e)}, indent=2), err=True)
         else:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
         sys.exit(1)
 
     if as_json:
@@ -159,7 +159,10 @@ def list_cmd(as_json: bool) -> None:
 
     if not result.proxies:
         console.print("No proxies found.")
-        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
+        print_tip(
+            "Run 'forge proxy template list' to see available templates.",
+            console=console,
+        )
         return
 
     table = Table(title="Forge Proxies")
@@ -302,7 +305,12 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
 @click.option("--no-start", is_flag=True, help="Create config only, don't start the server")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--host", type=str, default="localhost", help="Host to bind server to")
-@click.option("--base-url", "upstream_url", type=str, help="Upstream LiteLLM base URL (overrides env var)")
+@click.option(
+    "--base-url",
+    "upstream_url",
+    type=str,
+    help="Upstream LiteLLM base URL (overrides env var)",
+)
 # Per-tier reasoning effort overrides
 @click.option("--haiku-reasoning", type=str, help="Override reasoning_effort for haiku tier")
 @click.option("--sonnet-reasoning", type=str, help="Override reasoning_effort for sonnet tier")
@@ -311,7 +319,11 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
 @click.option("--haiku-temperature", type=float, help="Override temperature for haiku tier")
 @click.option("--sonnet-temperature", type=float, help="Override temperature for sonnet tier")
 @click.option("--opus-temperature", type=float, help="Override temperature for opus tier")
-@click.option("--smoke-test", is_flag=True, help="Send a test LLM request after start to verify upstream")
+@click.option(
+    "--smoke-test",
+    is_flag=True,
+    help="Send a test LLM request after start to verify upstream",
+)
 def create_cmd(
     template: str,
     name: str | None,
@@ -348,7 +360,10 @@ def create_cmd(
         sys.exit(1)
     if not exists:
         print_error(f"Template '{template}' not found", console=err_console)
-        print_tip("Run 'forge proxy template list' to see available templates.", console=err_console)
+        print_tip(
+            "Run 'forge proxy template list' to see available templates.",
+            console=err_console,
+        )
         sys.exit(1)
 
     proxy_name = name or template
@@ -649,7 +664,11 @@ def _stop_proxy_process(console: Console, entry: ProxyEntry, *, kill_adopted: bo
 
 @proxy.command("start")
 @click.argument("proxy_id")
-@click.option("--smoke-test", is_flag=True, help="Send a test LLM request after start to verify upstream")
+@click.option(
+    "--smoke-test",
+    is_flag=True,
+    help="Send a test LLM request after start to verify upstream",
+)
 def start_cmd(proxy_id: str, smoke_test: bool) -> None:
     """Start server for an existing proxy.
 
@@ -662,9 +681,9 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
 
     proxy_path = get_proxy_file_path(proxy_id)
     if not proxy_path.exists():
-        print_error(f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}", console=console)
-        console.print("\n[dim]Create one first:[/dim]")
-        console.print(f"  forge proxy create <template> --name {proxy_id}")
+        print_error(f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}")
+        err_console.print("\n[dim]Create one first:[/dim]")
+        err_console.print(f"  forge proxy create <template> --name {proxy_id}")
         sys.exit(1)
 
     try:
@@ -674,10 +693,10 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
         # validation in ProxyInstanceConfig.__post_init__. Report it as a clean
         # start failure here instead of letting the ValueError surface as a
         # traceback; the message already names the recreate-from-template path.
-        print_error(f"Cannot start proxy '{proxy_id}': {e}", console=console)
+        print_error(f"Cannot start proxy '{proxy_id}': {e}")
         sys.exit(1)
     if config is None:
-        print_error(f"Failed to load proxy config for '{proxy_id}'", console=console)
+        print_error(f"Failed to load proxy config for '{proxy_id}'")
         sys.exit(1)
 
     try:
@@ -690,7 +709,7 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
             skip_proxy_file=True,
         )
     except ProxyStartError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     proxy_entry = result.proxy
@@ -716,7 +735,11 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
 @proxy.command("stop")
 @click.argument("proxy_id")
 @click.option("--force", "-f", is_flag=True, help="Stop even if other proxies share the port")
-@click.option("--kill-adopted", is_flag=True, help="Terminate adopted processes (not started by Forge)")
+@click.option(
+    "--kill-adopted",
+    is_flag=True,
+    help="Terminate adopted processes (not started by Forge)",
+)
 def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     """Stop server for a proxy (keeps the proxy config).
 
@@ -737,7 +760,6 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
             f"Proxy '{proxy_id}' not found in registry",
             "The proxy may not be running.",
             "Run 'forge proxy list' to see configured proxies.",
-            console=console,
         )
         sys.exit(1)
 
@@ -749,7 +771,6 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
             print_error_with_tip(
                 f"Cannot stop: other proxies share port {entry.port}: {names}",
                 "Use --force to stop anyway, or delete individual proxies.",
-                console=console,
             )
             sys.exit(1)
 
@@ -819,14 +840,13 @@ def edit_cmd(proxy_id: str) -> None:
         print_error_with_tip(
             f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
             f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
-            console=console,
         )
         sys.exit(1)
 
     editor = os.environ.get("EDITOR", "vim")
 
     if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
         sys.exit(1)
 
     # Copy to temp file for safe editing
@@ -838,8 +858,8 @@ def edit_cmd(proxy_id: str) -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            print_error(f"Editor exited with code {result.returncode}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Editor exited with code {result.returncode}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         from ruamel.yaml import YAML
@@ -849,8 +869,8 @@ def edit_cmd(proxy_id: str) -> None:
             with open(tmp_path) as f:
                 edited_data = yaml.load(f)
         except Exception as e:
-            print_error(f"Invalid YAML: {e}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Invalid YAML: {e}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         # Validate through ProxyInstanceConfig (catches type errors, invalid values)
@@ -859,8 +879,8 @@ def edit_cmd(proxy_id: str) -> None:
 
             load_proxy_instance_config_from_dict(edited_data)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
-            print_error(f"Invalid proxy configuration: {e}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Invalid proxy configuration: {e}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         from forge.core.state import atomic_write_text
@@ -898,7 +918,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     console = Console(width=200)
 
     if "=" not in key_value:
-        print_error(f"Expected format: key=value (got: {key_value})", console=console)
+        print_error(f"Expected format: key=value (got: {key_value})")
         sys.exit(1)
 
     key, value = key_value.split("=", 1)
@@ -908,7 +928,6 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
         print_error_with_tip(
             f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
             f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
-            console=console,
         )
         sys.exit(1)
 
@@ -941,7 +960,10 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
             "stream_chunk_max_bytes",
         ):
             coerced_value = int(value)
-        elif final_key in ("temperature",) or key in ("costs.caps.per_day", "costs.caps.per_month"):
+        elif final_key in ("temperature",) or key in (
+            "costs.caps.per_day",
+            "costs.caps.per_month",
+        ):
             coerced_value = float(value)
         elif value.lower() == "true":
             coerced_value = True
@@ -950,7 +972,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
         else:
             coerced_value = value
     except ValueError as e:
-        print_error(f"Invalid value for '{final_key}': {e}", console=console)
+        print_error(f"Invalid value for '{final_key}': {e}")
         sys.exit(1)
 
     current[final_key] = coerced_value
@@ -961,7 +983,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
 
         load_proxy_instance_config_from_dict(data)
     except (ValueError, TypeError, KeyError, AttributeError) as e:
-        print_error(f"Invalid value — {e}", console=console)
+        print_error(f"Invalid value — {e}")
         sys.exit(1)
 
     import io
@@ -1079,7 +1101,13 @@ def _restore_proxy_registry_entry(store: ProxyRegistryStore, entry: ProxyEntry) 
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 @click.option("--kill-adopted", is_flag=True, help="Terminate adopted processes during deletion")
 @click.option("--no-kill", is_flag=True, help="Remove from registry without killing the process")
-def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_adopted: bool, no_kill: bool) -> None:
+def delete_cmd(
+    proxy_ids: tuple[str, ...],
+    delete_all: bool,
+    yes: bool,
+    kill_adopted: bool,
+    no_kill: bool,
+) -> None:
     """Delete one or more proxies and stop their servers if running.
 
     \b
@@ -1092,11 +1120,11 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
     console = Console(width=200)
 
     if delete_all and proxy_ids:
-        print_error("Cannot combine --all with explicit proxy IDs", console=console)
+        print_error("Cannot combine --all with explicit proxy IDs")
         sys.exit(1)
 
     if not delete_all and not proxy_ids:
-        print_error("Provide proxy ID(s) or use --all", console=console)
+        print_error("Provide proxy ID(s) or use --all")
         sys.exit(1)
 
     store = ProxyRegistryStore()
@@ -1140,7 +1168,7 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
             if e.code not in (0, None):
                 failed += 1
         except Exception as e:
-            print_error(f"{proxy_id}: {e}", console=console)
+            print_error(f"{proxy_id}: {e}")
             failed += 1
 
     if len(targets) > 1:
@@ -1181,7 +1209,6 @@ def _delete_single_proxy(
         print_error_with_tip(
             f"Proxy '{proxy_id}' not found",
             "Run 'forge proxy list' to see configured proxies.",
-            console=console,
         )
         raise SystemExit(1)
 
@@ -1261,7 +1288,7 @@ def _delete_single_proxy(
         try:
             store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=remove_and_check)
         except Exception as e:
-            print_error(f"Could not update registry: {e}", console=console)
+            print_error(f"Could not update registry: {e}")
             raise SystemExit(1)
 
     # Post-lock summary: show authoritative remaining aliases
@@ -1281,7 +1308,7 @@ def _delete_single_proxy(
                         f"[yellow]Warning:[/yellow] Could not restore registry entry after delete failure: "
                         f"{restore_error}"
                     )
-            print_error(f"Could not delete proxy directory: {e}", console=console)
+            print_error(f"Could not delete proxy directory: {e}")
             raise SystemExit(1)
 
     # Kill server only if the locked check confirmed we're the last reference
@@ -1307,14 +1334,13 @@ def validate_cmd(proxy_id: str) -> None:
         print_error_with_tip(
             f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
             f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
-            console=console,
         )
         sys.exit(1)
 
     try:
         config = load_proxy_instance_config(proxy_id)
         if config is None:
-            print_error(f"Failed to load proxy '{proxy_id}'", console=console)
+            print_error(f"Failed to load proxy '{proxy_id}'")
             sys.exit(1)
 
         console.print(f"[green]✓[/green] Proxy '{proxy_id}' is valid")
@@ -1712,19 +1738,22 @@ def template_show_cmd(name: str, raw: bool, as_json: bool) -> None:
         if as_json:
             import json
 
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
             sys.exit(1)
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     if not exists:
         if as_json:
             import json
 
-            click.echo(json.dumps({"error": f"Template '{name}' not found"}))
+            click.echo(json.dumps({"error": f"Template '{name}' not found"}), err=True)
             sys.exit(1)
-        print_error(f"Template '{name}' not found", console=console)
-        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
+        print_error(f"Template '{name}' not found")
+        print_tip(
+            "Run 'forge proxy template list' to see available templates.",
+            console=console,
+        )
         sys.exit(1)
 
     content = read_template(name)
@@ -1744,7 +1773,12 @@ def template_show_cmd(name: str, raw: bool, as_json: bool) -> None:
 
         click.echo(
             json.dumps(
-                {"name": name, "source": source_label, "path": str(path), "content": content},
+                {
+                    "name": name,
+                    "source": source_label,
+                    "path": str(path),
+                    "content": content,
+                },
                 indent=2,
             )
         )
@@ -1778,13 +1812,16 @@ def template_edit_cmd(name: str) -> None:
     try:
         validate_template_name(name)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     # edit requires a shipped template to seed from
     if not shipped_template_exists(name):
-        print_error(f"No built-in template '{name}' to customize", console=console)
-        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
+        print_error(f"No built-in template '{name}' to customize")
+        print_tip(
+            "Run 'forge proxy template list' to see available templates.",
+            console=console,
+        )
         sys.exit(1)
 
     user_path = get_user_template_path(name)
@@ -1796,7 +1833,7 @@ def template_edit_cmd(name: str) -> None:
 
     editor = os.environ.get("EDITOR", "vim")
     if not shutil.which(editor):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -1807,8 +1844,8 @@ def template_edit_cmd(name: str) -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            print_error(f"Editor exited with code {result.returncode}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Editor exited with code {result.returncode}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         import yaml as pyyaml
@@ -1817,13 +1854,13 @@ def template_edit_cmd(name: str) -> None:
             with open(tmp_path, encoding="utf-8") as f:
                 edited_data = pyyaml.safe_load(f)
         except Exception as e:
-            print_error(f"Invalid YAML: {e}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Invalid YAML: {e}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         if not isinstance(edited_data, dict):
-            print_error("Template must be a YAML mapping", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error("Template must be a YAML mapping")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         # proxy.family is required for a template (mirrors _load_template_config, the create path).
@@ -1834,9 +1871,8 @@ def template_edit_cmd(name: str) -> None:
         if not isinstance(_family, str) or not _family.strip():
             print_error(
                 "Invalid template configuration: " "proxy.family is required (must be a non-blank string)",
-                console=console,
             )
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         # Validate template shape (ForgeConfig, not ProxyInstanceConfig)
@@ -1846,8 +1882,8 @@ def template_edit_cmd(name: str) -> None:
 
             dict_to_dataclass(ForgeConfig, edited_data, strict=True)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
-            print_error(f"Invalid template configuration: {e}", console=console)
-            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            print_error(f"Invalid template configuration: {e}")
+            err_console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         # Write back atomically (create user dir on first edit)
@@ -1889,7 +1925,7 @@ def template_reset_cmd(name: str, yes: bool) -> None:
     try:
         user_path = get_user_template_path(name)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     if not user_path.is_file():

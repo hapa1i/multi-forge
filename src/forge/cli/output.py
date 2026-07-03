@@ -27,11 +27,15 @@ console = Console()
 # results stream, per cli_style_guidelines.md "Output Streams") pass this via
 # ``console=`` -- e.g. failures that previously raised ``click.ClickException``,
 # which Click renders to stderr.
-err_console = Console(stderr=True)
+err_console = Console(stderr=True, width=200)
 
 
 def _resolve(console_arg: Console | None) -> Console:
     return console_arg if console_arg is not None else console
+
+
+def _resolve_error_console(console_arg: Console | None) -> Console:
+    return console_arg if console_arg is not None else err_console
 
 
 def print_tip(
@@ -63,7 +67,7 @@ def print_tip(
 
 def print_error(msg: str, *, console: Console | None = None) -> None:
     """Print a red ``Error:`` label followed by the message."""
-    _resolve(console).print(f"[red]Error:[/red] {msg}")
+    _resolve_error_console(console).print(f"[red]Error:[/red] {msg}")
 
 
 def print_error_with_tip(
@@ -73,7 +77,7 @@ def print_error_with_tip(
     console: Console | None = None,
 ) -> None:
     """Print an ``Error:`` line then a ``Tip:`` block. Does not exit — the caller controls the exit code."""
-    out = _resolve(console)
+    out = _resolve_error_console(console)
     print_error(error_msg, console=out)
     print_tip(*tip_lines, commands=commands, console=out)
 
@@ -105,7 +109,7 @@ def handle_session_error(e: ForgeSessionError, *, console: Console | None = None
     if isinstance(e, StateUnreadableError):
         handle_unreadable_state_error(e, console=console)
         return
-    out = _resolve(console)
+    out = _resolve_error_console(console)
     print_error(str(e), console=out)
     tip_fn = _SESSION_ERROR_TIPS.get(type(e))
     if tip_fn is not None:

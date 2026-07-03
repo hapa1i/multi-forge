@@ -104,7 +104,7 @@ def _run_preflight(
             data["routing_warnings"] = warnings
         click.echo(json.dumps(data))
     else:
-        print_error("Workflow preflight failed:", console=console)
+        print_error("Workflow preflight failed:")
         for err in errors:
             console.print(f"  - {err}")
         print_tip(
@@ -194,9 +194,9 @@ def _handle_routing_error(error: Exception, *, as_json: bool = False) -> None:
     """Handle routing resolution errors with clean CLI output. Calls sys.exit(1)."""
     msg = str(error)
     if as_json:
-        click.echo(json.dumps({"routing_error": msg}))
+        click.echo(json.dumps({"routing_error": msg}), err=True)
     else:
-        print_error(f"Routing failed: {msg}", console=console)
+        print_error(f"Routing failed: {msg}")
     sys.exit(1)
 
 

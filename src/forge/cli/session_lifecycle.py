@@ -17,7 +17,12 @@ from typing import cast
 import click
 
 from forge.cli.editor import open_in_editor  # noqa: E402
-from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
+from forge.cli.output import (  # noqa: E402
+    err_console,
+    print_error,
+    print_error_with_tip,
+    print_tip,
+)
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _auto_install_extensions,
@@ -254,7 +259,11 @@ def _warn_if_hooks_missing(project_path: Path) -> None:
         "State tracking, policy enforcement, verification, and search indexing "
         "will not be active."
     )
-    print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
+    print_tip(
+        "Run 'forge extension enable' to install hooks.",
+        blank_before=False,
+        console=console,
+    )
 
 
 def _warn_if_version_outdated() -> None:
@@ -338,7 +347,6 @@ def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
         print_error_with_tip(
             f"Legacy transfer artifact format is no longer supported: {display_path(context_path)}",
             f"Run 'forge session resume {parent} --fresh' to regenerate a per-child transfer artifact.",
-            console=console,
         )
         sys.exit(1)
     if not context_path.is_absolute():
@@ -457,12 +465,11 @@ def _resume_tip_command(manifest: SessionState) -> str:
 def _print_branch_exists_tip(e: BranchExistsError) -> None:
     """Print contextual tip for a branch that already exists."""
     if e.worktree:
-        print_error_with_tip(str(e), "Use --branch to specify a different branch name.", console=console)
+        print_error_with_tip(str(e), "Use --branch to specify a different branch name.")
     else:
         print_error_with_tip(
             str(e),
             f"Run 'git branch -d {e.branch}' to delete it, or use --branch to specify a different name.",
-            console=console,
         )
 
 
@@ -529,7 +536,11 @@ class _ClaudeStartCliPresenter:
                     force_extensions=event.extensions_flag,
                 )
         elif event.extensions_flag is True:
-            print_tip("--extensions only applies with --worktree.", blank_before=False, console=console)
+            print_tip(
+                "--extensions only applies with --worktree.",
+                blank_before=False,
+                console=console,
+            )
         console.print()
 
     def on_no_launch(self) -> None:
@@ -542,7 +553,7 @@ class _ClaudeStartCliPresenter:
         _render_sidecar_launch(event)
 
     def on_launch_error(self, error: ForgeOpError) -> None:
-        print_error(f"{error}", console=console)
+        print_error(f"{error}")
 
     def on_incognito_cleanup_start(self) -> None:
         console.print(f"\n[dim]Cleaning up incognito session '{self._session_name}'...[/dim]")
@@ -611,10 +622,12 @@ class _ClaudeResumeCliPresenter:
         _render_sidecar_launch(event)
 
     def on_launch_error(self, error: ForgeOpError) -> None:
-        print_error(str(error), console=console)
+        print_error(str(error))
 
 
-def _resume_routing_for_op(routing: ResolvedRouting | None) -> ClaudeResumeRouting | None:
+def _resume_routing_for_op(
+    routing: ResolvedRouting | None,
+) -> ClaudeResumeRouting | None:
     if routing is None:
         return None
 
@@ -723,31 +736,31 @@ def launch_new_session(
     """
     # --- flag validation ---
     if branch and not worktree:
-        print_error("--branch requires --worktree", console=console)
+        print_error("--branch requires --worktree")
         return 1
     if sidecar and host_proxy:
-        print_error("--sidecar and --host-proxy are mutually exclusive", console=console)
+        print_error("--sidecar and --host-proxy are mutually exclusive")
         return 1
     if direct and (template or base_url):
-        print_error("--no-proxy cannot be combined with proxy routing (--proxy)", console=console)
+        print_error("--no-proxy cannot be combined with proxy routing (--proxy)")
         return 1
     if direct and sidecar:
-        print_error("--no-proxy cannot be combined with --sidecar", console=console)
+        print_error("--no-proxy cannot be combined with --sidecar")
         return 1
     if direct and host_proxy:
-        print_error("--no-proxy cannot be combined with --host-proxy", console=console)
+        print_error("--no-proxy cannot be combined with --host-proxy")
         return 1
     if direct_model and sidecar:
-        print_error("--model cannot be combined with --sidecar", console=console)
+        print_error("--model cannot be combined with --sidecar")
         return 1
     if direct_model and host_proxy:
-        print_error("--model cannot be combined with --host-proxy", console=console)
+        print_error("--model cannot be combined with --host-proxy")
         return 1
     if incognito and no_launch:
-        print_error("--incognito and --no-launch are mutually exclusive", console=console)
+        print_error("--incognito and --no-launch are mutually exclusive")
         return 1
     if no_launch and (system_prompt or system_prompt_file):
-        print_error("--system-prompt is launch-only and lost with --no-launch", console=console)
+        print_error("--system-prompt is launch-only and lost with --no-launch")
         return 1
 
     launch_mode = LAUNCH_MODE_HOST if direct else _resolve_launch_mode(sidecar=sidecar, host_proxy=host_proxy)
@@ -761,14 +774,14 @@ def launch_new_session(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             return 1
 
     # Validate --model against proxy model_alternatives when in proxy mode
     if direct_model_pin and proxy_id and not direct:
         error = _validate_proxy_model_pin(proxy_id, direct_model_pin)
         if error:
-            print_error(f"{error}", console=console)
+            print_error(f"{error}")
             return 1
 
     # Resolve system prompt to absolute path BEFORE worktree creation
@@ -788,7 +801,7 @@ def launch_new_session(
         try:
             _supervisor_source_state = validate_supervisor_target(supervise_target, forge_root=_cwd_forge_root())
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             return 1
     if supervisor_proxy:
         from forge.policy.semantic.supervisor import ensure_supervisor_proxy
@@ -796,7 +809,7 @@ def launch_new_session(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             return 1
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -845,10 +858,10 @@ def launch_new_session(
             presenter=_ClaudeStartCliPresenter(session_name=name),
         )
     except ClaudeStartError as e:
-        print_error_with_tip(str(e), *e.tip_lines, commands=list(e.commands) or None, console=console)
+        print_error_with_tip(str(e), *e.tip_lines, commands=list(e.commands) or None)
         return 1
     except ForgeOpError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         return 1
 
     if result.did_run:
@@ -1053,30 +1066,27 @@ def start(
         sys.exit(codex_rc)
 
     if direct and proxy_name:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
     if supervisor_proxy and supervisor_direct:
-        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
+        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
+        print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise")
         sys.exit(1)
     if (
         cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
     ) and not supervise_target:
-        print_error(
-            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise", console=console
-        )
+        print_error("--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise")
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
     if subprocess_proxy and proxy_name:
         print_error(
             "--subprocess-proxy is for direct-mode sessions; use --proxy alone for full proxy routing",
-            console=console,
         )
         sys.exit(1)
 
@@ -1134,7 +1144,7 @@ def start(
             supervisor_runtime=supervisor_runtime,
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
-            memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+            memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
         )
     )
 
@@ -1264,31 +1274,29 @@ def resume(
       forge session resume my-session --fresh --no-proxy # Fresh conversation, direct mode
     """
     if direct and proxy_name:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
 
     _drop_last_explicit = ctx.get_parameter_source("drop_last") == click.core.ParameterSource.COMMANDLINE
     rewind_requested = strategy == ResumeStrategy.REWIND.value
     if _drop_last_explicit and not rewind_requested:
-        print_error("--drop-last requires --strategy rewind", console=console)
+        print_error("--drop-last requires --strategy rewind")
         sys.exit(1)
     if rewind_requested:
         if not fresh:
-            print_error("--strategy rewind requires --fresh", console=console)
+            print_error("--strategy rewind requires --fresh")
             sys.exit(1)
         if drop_last is None:
-            print_error("--strategy rewind requires --drop-last N", console=console)
+            print_error("--strategy rewind requires --drop-last N")
             sys.exit(1)
         if drop_last < 0:
-            print_error("--drop-last must be non-negative", console=console)
+            print_error("--drop-last must be non-negative")
             sys.exit(1)
         if resume_mode == "transfer":
-            print_error("--strategy rewind cannot be combined with --resume-mode transfer", console=console)
+            print_error("--strategy rewind cannot be combined with --resume-mode transfer")
             sys.exit(1)
         if review:
-            print_error(
-                "--review is only supported for transfer-mode fresh resumes, not --strategy rewind", console=console
-            )
+            print_error("--review is only supported for transfer-mode fresh resumes, not --strategy rewind")
             sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -1298,33 +1306,31 @@ def resume(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}")
             sys.exit(1)
 
     if resume_mode and not fresh:
-        print_error("--resume-mode requires --fresh", console=console)
+        print_error("--resume-mode requires --fresh")
         sys.exit(1)
 
     if not fresh and child_name:
-        print_error("--child-name requires --fresh", console=console)
+        print_error("--child-name requires --fresh")
         sys.exit(1)
 
     if memory_flag and not fresh:
         print_error(
             "--memory requires --fresh (creates a new child session). Add --fresh or omit --memory.",
-            console=console,
         )
         sys.exit(1)
 
     if review and not fresh:
-        print_error("--review requires --fresh", console=console)
+        print_error("--review requires --fresh")
         sys.exit(1)
 
     if review and resume_mode == "native":
         print_error(
             "--review is only meaningful in transfer mode; "
             "native resume carries the parent conversation verbatim with no editable artifact.",
-            console=console,
         )
         sys.exit(1)
 
@@ -1360,7 +1366,6 @@ def resume(
                 print_error_with_tip(
                     f"session '{name}' not found",
                     f"Run 'forge session start {name}' to create it.",
-                    console=console,
                 )
             sys.exit(1)
         try:
@@ -1371,7 +1376,6 @@ def resume(
                 print_error_with_tip(
                     f"session '{name}' not found",
                     f"Run 'forge session start {name}' to create it.",
-                    console=console,
                 )
             sys.exit(1)
         except ForgeSessionError as e:
@@ -1389,7 +1393,7 @@ def resume(
         sys.exit(run_codex_resume(ctx, name, task, manifest))
 
     if task is not None:
-        print_error("--task is only supported for Codex sessions", console=console)
+        print_error("--task is only supported for Codex sessions")
         sys.exit(1)
 
     if cross_project:
@@ -1398,7 +1402,6 @@ def resume(
             print_error_with_tip(
                 f"session '{name}' not found",
                 f"Run 'forge session start {name}' to create it.",
-                console=console,
             )
         sys.exit(1)
 
@@ -1417,7 +1420,7 @@ def resume(
             surface="resume",
         )
         if error:
-            print_error(f"{error}", console=console)
+            print_error(f"{error}")
             sys.exit(1)
 
     if fresh:
@@ -1430,21 +1433,28 @@ def resume(
                 effective_resume_mode == "native"
                 and ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE
             ):
-                print_tip("--strategy is ignored with --resume-mode native.", blank_before=False, console=console)
+                print_tip(
+                    "--strategy is ignored with --resume-mode native.",
+                    blank_before=False,
+                    console=console,
+                )
             if ctx.get_parameter_source("depth") == click.core.ParameterSource.COMMANDLINE:
                 depth_surface = (
                     "--strategy rewind"
                     if effective_resume_mode == ResumeStrategy.REWIND.value
                     else "--resume-mode native"
                 )
-                print_tip(f"--depth is ignored with {depth_surface}.", blank_before=False, console=console)
+                print_tip(
+                    f"--depth is ignored with {depth_surface}.",
+                    blank_before=False,
+                    console=console,
+                )
 
         if effective_resume_mode == ResumeStrategy.REWIND.value:
             if not _is_resumable_session(manifest):
                 print_error(
                     "--strategy rewind requires a parent with a confirmed Claude session "
                     "(hook-confirmed or transcript-backed).",
-                    console=console,
                 )
                 sys.exit(1)
             _parent_launch = manifest.intent.launch
@@ -1456,7 +1466,6 @@ def resume(
                     "--strategy rewind is not supported with sidecar mode.",
                     "Rewind writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) "
                     "or use transfer mode.",
-                    console=console,
                 )
                 sys.exit(1)
             if drop_last == 0:
@@ -1469,7 +1478,7 @@ def resume(
                     routing=routing,
                     direct=direct,
                     direct_model_override=normalized_direct_model,
-                    memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+                    memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
                 )
                 return
             assert drop_last is not None
@@ -1482,7 +1491,7 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
-                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+                memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             )
         elif effective_resume_mode == "native":
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
@@ -1492,7 +1501,6 @@ def resume(
                     "--resume-mode native requires a parent with a confirmed "
                     "Claude session (hook-confirmed or transcript-backed). "
                     "Use --resume-mode transfer for transcript-artifact-based resume.",
-                    console=console,
                 )
                 sys.exit(1)
             _resume_fresh_native(
@@ -1503,7 +1511,7 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
-                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+                memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             )
         else:
             _resume_fresh(
@@ -1517,7 +1525,7 @@ def resume(
                 direct=direct,
                 review=review,
                 direct_model_override=normalized_direct_model,
-                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+                memory_flag=({"on": True, "off": False}.get(memory_flag) if memory_flag else None),
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -1533,18 +1541,17 @@ def resume(
         if active_entry is not None and not force:
             print_error(
                 f"Cannot reconnect: session [bold]{name}[/bold] appears to still be active.",
-                console=console,
             )
-            console.print(f"  Launch mode: {active_entry.launch_mode}")
+            err_console.print(f"  Launch mode: {active_entry.launch_mode}")
             if active_entry.launcher_pid is not None:
-                console.print(f"  Launcher PID: {active_entry.launcher_pid}")
+                err_console.print(f"  Launcher PID: {active_entry.launcher_pid}")
             if active_entry.container_name:
-                console.print(f"  Container: {active_entry.container_name}")
+                err_console.print(f"  Container: {active_entry.container_name}")
             print_tip(
                 "Reconnect is only available after the previous launch has exited. "
                 "Return to that launch if it is still running, or stop it cleanly and retry.",
                 blank_before=False,
-                console=console,
+                console=err_console,
             )
             sys.exit(1)
         elif active_entry is not None and force:
@@ -1675,7 +1682,6 @@ def _reconnect_in_place(
         print_error_with_tip(
             "Cannot reconnect: no resumable Claude conversation was found.",
             f"Run 'forge session resume {name}' to reattach, or use --fresh to start a new conversation.",
-            console=console,
         )
         sys.exit(1)
 
@@ -2006,7 +2012,7 @@ def incognito(
         forge session incognito my-test                  # Custom name
     """
     if direct and proxy_name:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,
