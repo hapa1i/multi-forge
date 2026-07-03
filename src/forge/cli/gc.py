@@ -79,7 +79,11 @@ def _print_report(report: CleanReport, verbose: bool, console: Console) -> None:
         console.print("[green]Nothing to clean.[/green]")
     else:
         console.print(f"Total: [cyan]{report.total_count}[/cyan] objects to clean\n")
-        print_tip("Use --yes to clean, or --verbose for details.", blank_before=False, console=console)
+        print_tip(
+            "Use --yes to clean, or --verbose for details.",
+            blank_before=False,
+            console=console,
+        )
 
 
 def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, console: Console) -> None:
@@ -91,7 +95,7 @@ def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, cons
     try:
         result = run_clean(ctx=ctx, scope=scope)
     except CleanError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}")
         sys.exit(1)
 
     if result.deleted_count == 0 and not result.failed:
@@ -119,7 +123,7 @@ def _run_and_report_json(ctx: ExecutionContext, scope: str, report: CleanReport)
         try:
             clean_result = run_clean(ctx=ctx, scope=scope)
         except CleanError as e:
-            click.echo(json.dumps({"error": str(e)}))
+            click.echo(json.dumps({"error": str(e)}), err=True)
             sys.exit(1)
 
     data = {

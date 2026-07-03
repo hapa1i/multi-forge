@@ -109,7 +109,6 @@ def _run_search(query: str, *, limit: int, scope: str, as_json: bool) -> None:
         print_error_with_tip(
             f"Search index corrupted or outdated: {e}",
             "Run 'forge search rebuild-index' to rebuild.",
-            console=Console(),
         )
         return
 
@@ -195,7 +194,10 @@ def _run_search_all_projects(query: str, *, limit: int, as_json: bool) -> None:
             }
             click.echo(json.dumps(output, indent=2))
             return
-        print_tip("No indexed transcripts. Run 'forge search rebuild-index' first.", console=Console())
+        print_tip(
+            "No indexed transcripts. Run 'forge search rebuild-index' first.",
+            console=Console(),
+        )
         return
 
     # Merge and sort by score descending
@@ -477,7 +479,10 @@ def status_cmd(as_json: bool) -> None:
                     "updated_at": str(state.updated_at) if state.updated_at else None,
                     "sessions": len({d.session_name for d in documents}),
                     "bm25": (
-                        {"documents": len(bm25_index.doc_keys), "unique_terms": len(bm25_index.doc_freqs)}
+                        {
+                            "documents": len(bm25_index.doc_keys),
+                            "unique_terms": len(bm25_index.doc_freqs),
+                        }
                         if bm25_index is not None
                         else None
                     ),

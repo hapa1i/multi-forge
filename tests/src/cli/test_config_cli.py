@@ -223,7 +223,9 @@ class TestConfigSet:
         runner = CliRunner()
         result = runner.invoke(config, ["set", "unknown_key=foo"])
         assert result.exit_code == 1
-        assert "Unknown config key" in result.output
+        assert result.stdout == ""
+        assert "Unknown config key" in result.stderr
+        assert "Available keys" in result.stderr
 
     def test_set_invalid_value_rejected(self):
         runner = CliRunner()
@@ -340,7 +342,9 @@ class TestConfigReset:
         runner = CliRunner()
         result = runner.invoke(config, ["reset", "unknown_key"])
         assert result.exit_code == 1
-        assert "Unknown config key" in result.output
+        assert result.stdout == ""
+        assert "Unknown config key" in result.stderr
+        assert "Available keys" in result.stderr
 
     def test_reset_key_not_in_file(self):
         (get_forge_home() / "config.yaml").write_text("proxy_mode: host\n")
@@ -405,8 +409,10 @@ class TestConfigSetStatusline:
         runner = CliRunner()
         result = runner.invoke(config, ["set", "statusline.segments=path,bogus"])
         assert result.exit_code == 1
-        assert "Unknown segment" in result.output
-        assert "bogus" in result.output
+        assert result.stdout == ""
+        assert "Unknown segment" in result.stderr
+        assert "bogus" in result.stderr
+        assert "Valid segments" in result.stderr
 
     def test_set_forge_unique_segments_accepted(self):
         # All Forge-unique opt-in segments (Phases 4-5) are in the allowlist.
@@ -421,13 +427,17 @@ class TestConfigSetStatusline:
         runner = CliRunner()
         result = runner.invoke(config, ["set", "statusline.nope=1"])
         assert result.exit_code == 1
-        assert "Unknown statusline key" in result.output
+        assert result.stdout == ""
+        assert "Unknown statusline key" in result.stderr
+        assert "Available" in result.stderr
 
     def test_set_unknown_section_rejected(self):
         runner = CliRunner()
         result = runner.invoke(config, ["set", "bogus.key=1"])
         assert result.exit_code == 1
-        assert "Unknown config section" in result.output
+        assert result.stdout == ""
+        assert "Unknown config section" in result.stderr
+        assert "Nested sections" in result.stderr
 
     def test_set_preserves_other_statusline_keys(self):
         runner = CliRunner()
@@ -483,7 +493,9 @@ class TestConfigSetProviderTrace:
         runner = CliRunner()
         result = runner.invoke(config, ["set", "provider_trace.nope=1"])
         assert result.exit_code == 1
-        assert "Unknown provider_trace key" in result.output
+        assert result.stdout == ""
+        assert "Unknown provider_trace key" in result.stderr
+        assert "Available" in result.stderr
 
     def test_reset_statusline_section(self):
         runner = CliRunner()
@@ -529,8 +541,10 @@ class TestConfigEdit:
     def test_edit_rejects_unknown_segment(self, monkeypatch):
         result = self._run_edit_with("statusline:\n  segments: [path, bogus]\n", monkeypatch)
         assert result.exit_code == 1
-        assert "segment" in result.output.lower()
-        assert "bogus" in result.output
+        assert result.stdout == ""
+        assert "segment" in result.stderr.lower()
+        assert "bogus" in result.stderr
+        assert "Your changes are saved at" in result.stderr
 
     def test_edit_rejects_invalid_enum(self, monkeypatch):
         result = self._run_edit_with("statusline:\n  cost_mode: wat\n", monkeypatch)
@@ -552,8 +566,10 @@ class TestConfigEdit:
         # YAML is written). Parity with `forge config set`, which already rejects unknown subkeys.
         result = self._run_edit_with("provider_trace:\n  inject_provider_usre: true\n", monkeypatch)
         assert result.exit_code == 1
-        assert "provider_trace" in result.output
-        assert "inject_provider_usre" in result.output
+        assert result.stdout == ""
+        assert "provider_trace" in result.stderr
+        assert "inject_provider_usre" in result.stderr
+        assert "Your changes are saved at" in result.stderr
 
     def test_edit_accepts_valid_provider_trace(self, monkeypatch):
         result = self._run_edit_with("provider_trace:\n  inject_provider_user: true\n", monkeypatch)

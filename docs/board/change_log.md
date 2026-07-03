@@ -25,6 +25,22 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-03
+
+### cli_style A1: CLI Error Streams To Stderr
+
+**Goal**: Keep CLI result streams parse-safe by routing top-level CLI errors and diagnostics to stderr.
+
+**Key changes**:
+
+- Flipped error-helper defaults and bare `handle_session_error` to `err_console`; `print_tip` stays stdout by default.
+- Removed explicit stdout overrides, added `err=True` to JSON/red error echoes, and kept multi-statement error
+  continuations on stderr.
+- Saved AST guards for stdout overrides, adjacent stdout continuations, JSON errors, and red diagnostics; added
+  in-branch `--json` error coverage with stdout-empty assertions.
+
+**Verification**: `uv run pytest tests/src/cli -q` (2207 passed); `make pre-commit` clean.
+
 ## 2026-07-02
 
 ### session_op_layer_extraction Slice 5: Session shim retirement
@@ -1566,20 +1582,12 @@ unchanged; `make pre-commit` clean. Read-only render -- no integration tier.
   redact-before-persist audit JSONL (`forge proxy audit show|diff`); sidecar host-persistent mounts. design
   §7.x/§3.4/§3.7. Deferred: real-upstream `@slow` passthrough replay e2e.
 
-## 2026-05-31
+## 2026-05-22 — 2026-05-31 (compacted)
 
-**runtime_abstraction Phase 1** — schema-backed curated transfer + `forge transfer` CLI:
-
-- `transfer.py` `_build_ai_curated_output()` emits canonical sections 1-7 + User Notes overlay; `schema_version: 1`,
-  `target_runtime` reserved for Phase 5; citations outside the seen turn range dropped so `schema: full` never
-  overstates evidence. Three-file artifact model (`generated.md` cache, frozen `children/<child>.md`, `.notes.md`
-  overlay). New `forge transfer show|regenerate|edit|diff`. design §3.9 reframes curated transfer as the primary
-  cross-boundary substrate; appendix §M.
-- Closeout decisions (keep-current): `--review` stays opt-in; `structured` stays the CLI default (`ai-curated` opt-in).
-  `ctx` is prior art/inspiration only, never a dependency (appendix §M.4). Schema stable for Phase 5.
-
-## 2026-05-22 — 2026-05-29 (compacted)
-
+- **runtime_abstraction Phase 1**: shipped schema-backed curated transfer + `forge transfer` CLI. Canonical sections 1-7
+  \+ User Notes overlay, schema v1, three-file artifacts (`generated.md`, frozen child copy, notes overlay), and
+  `show|regenerate|edit|diff`; `--review` stayed opt-in, `structured` stayed default, `ai-curated` stayed opt-in, and
+  `ctx` remained inspiration only. Design detail lives in §3.9 and appendix §M.
 - **memory_substrate (PR #8)**: split "handoff" into the **memory writer** (Stop-time doc curation) and **transfer**
   (resume/fork context); renamed modules/CLI (`forge memory-writer run`, `forge memory report show`) with old paths
   tombstoned and durable accept-and-tolerate for `--resume-mode` / timeout keys.

@@ -528,7 +528,7 @@ def _generate_parent_transfer_context(
         parent_state=parent_state,
         forge_root=project_root,
         parent_worktree_root=parent_worktree,
-        output_root=fork_artifact_root if fork_artifact_root.resolve() != project_root.resolve() else None,
+        output_root=(fork_artifact_root if fork_artifact_root.resolve() != project_root.resolve() else None),
         strategy=resume_strategy,
         depth=1,
         get_session=_get_session_safe,
@@ -556,7 +556,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
         entry = IndexStore().get_session(name, forge_root=None)
         other_root = entry.forge_root or entry.worktree_path
         if other_root and other_root != forge_root:
-            print_error(f"session '{name}' not found in current project", console=console)
+            print_error(f"session '{name}' not found in current project")
             print_tip(f"Session '{name}' exists in:", console=console)
             console.print(
                 Text(display_path(other_root), style="dim", no_wrap=True),
@@ -565,7 +565,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
             console.print("[dim]Run the command from that directory instead.[/dim]")
             return True
     except AmbiguousSessionError as e:
-        print_error(f"session '{name}' not found in current project", console=console)
+        print_error(f"session '{name}' not found in current project")
         print_tip(f"Session '{name}' exists in multiple projects:", console=console)
         for root in e.forge_roots:
             console.print(

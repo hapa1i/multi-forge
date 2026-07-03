@@ -29,7 +29,15 @@ class TestReviewFlagValidation:
     def test_review_rejects_native_mode(self, runner: CliRunner) -> None:
         result = runner.invoke(
             main,
-            ["session", "resume", "some-session", "--fresh", "--review", "--resume-mode", "native"],
+            [
+                "session",
+                "resume",
+                "some-session",
+                "--fresh",
+                "--review",
+                "--resume-mode",
+                "native",
+            ],
         )
         assert result.exit_code == 1
         assert "--review is only meaningful in transfer mode" in result.output
@@ -88,7 +96,10 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                return_value=None,
+            ),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
         ):
             mgr = mock_mgr_cls.return_value
@@ -97,7 +108,15 @@ class TestReviewFlagEditorInvocation:
 
             result = runner.invoke(
                 main,
-                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+                [
+                    "session",
+                    "resume",
+                    "p1",
+                    "--fresh",
+                    "--review",
+                    "--child-name",
+                    "child-1",
+                ],
             )
 
         assert result.exit_code == 0, result.output
@@ -164,7 +183,8 @@ class TestReviewFlagEditorInvocation:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch(
-                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                side_effect=fake_execute_resume_launch_plan,
             ),
         ):
             mgr = mock_mgr_cls.return_value
@@ -173,7 +193,15 @@ class TestReviewFlagEditorInvocation:
 
             result = runner.invoke(
                 main,
-                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+                [
+                    "session",
+                    "resume",
+                    "p1",
+                    "--fresh",
+                    "--review",
+                    "--child-name",
+                    "child-1",
+                ],
             )
 
         assert result.exit_code == 0, result.output
@@ -232,7 +260,10 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                return_value=None,
+            ),
             patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
         ):
             mgr = mock_mgr_cls.return_value
@@ -241,7 +272,15 @@ class TestReviewFlagEditorInvocation:
 
             result = runner.invoke(
                 main,
-                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+                [
+                    "session",
+                    "resume",
+                    "p1",
+                    "--fresh",
+                    "--review",
+                    "--child-name",
+                    "child-1",
+                ],
             )
 
         assert result.exit_code == 0, result.output
@@ -290,7 +329,10 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None) as launch_mock,
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                return_value=None,
+            ) as launch_mock,
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
@@ -298,7 +340,15 @@ class TestReviewFlagEditorInvocation:
 
             result = runner.invoke(
                 main,
-                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+                [
+                    "session",
+                    "resume",
+                    "p1",
+                    "--fresh",
+                    "--review",
+                    "--child-name",
+                    "child-1",
+                ],
             )
 
         # Aborted -- launch was never invoked
@@ -347,7 +397,10 @@ class TestReviewFlagEditorInvocation:
 
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
-            patch("forge.cli.session_lifecycle._execute_resume_launch_plan", return_value=None),
+            patch(
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                return_value=None,
+            ),
         ):
             mgr = mock_mgr_cls.return_value
             mgr.get_session.return_value = parent
@@ -355,7 +408,15 @@ class TestReviewFlagEditorInvocation:
 
             result = runner.invoke(
                 main,
-                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+                [
+                    "session",
+                    "resume",
+                    "p1",
+                    "--fresh",
+                    "--review",
+                    "--child-name",
+                    "child-1",
+                ],
             )
 
         assert result.exit_code != 0
@@ -398,10 +459,17 @@ class TestReviewRelaunch:
 
         with (
             patch(
-                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                side_effect=fake_execute_resume_launch_plan,
             ),
-            patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
+            patch(
+                "forge.cli.session_lifecycle._get_effective_proxy_for_session",
+                return_value=(None, None, None),
+            ),
+            patch(
+                "forge.cli.session_lifecycle._resolve_context_limit",
+                return_value=200000,
+            ),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)
@@ -453,10 +521,17 @@ class TestReviewRelaunch:
 
         with (
             patch(
-                "forge.cli.session_lifecycle._execute_resume_launch_plan", side_effect=fake_execute_resume_launch_plan
+                "forge.cli.session_lifecycle._execute_resume_launch_plan",
+                side_effect=fake_execute_resume_launch_plan,
             ),
-            patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
-            patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=200000),
+            patch(
+                "forge.cli.session_lifecycle._get_effective_proxy_for_session",
+                return_value=(None, None, None),
+            ),
+            patch(
+                "forge.cli.session_lifecycle._resolve_context_limit",
+                return_value=200000,
+            ),
         ):
             with pytest.raises(SystemExit) as exc:
                 _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)
@@ -495,7 +570,8 @@ class TestReviewRelaunch:
         with pytest.raises(SystemExit) as exc:
             _resolve_derivation_context_file(child_manifest)
 
-        output = capsys.readouterr().out
+        captured = capsys.readouterr()
         assert exc.value.code == 1
-        assert "Legacy transfer artifact format is no longer supported" in output
-        assert "forge session resume p1 --fresh" in output
+        assert captured.out == ""
+        assert "Legacy transfer artifact format is no longer supported" in captured.err
+        assert "forge session resume p1 --fresh" in captured.err

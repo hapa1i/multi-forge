@@ -30,10 +30,10 @@ def open_in_editor(file_path: Path, *, console: Console, abort_tip: str | None =
     editor = os.environ.get("EDITOR", "vim")
     editor_argv = shlex.split(editor)
     if not editor_argv:
-        print_error("$EDITOR is empty. Set $EDITOR to an available editor.", console=console)
+        print_error("$EDITOR is empty. Set $EDITOR to an available editor.")
         sys.exit(1)
     if not shutil.which(editor_argv[0]):
-        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.")
         sys.exit(1)
 
     result = subprocess.run([*editor_argv, str(file_path)])

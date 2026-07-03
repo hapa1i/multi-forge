@@ -352,6 +352,15 @@ tiers:
 class TestProxyStart:
     """Tests for `forge proxy start`."""
 
+    def test_start_missing_proxy_routes_recovery_hint_to_stderr(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(main, ["proxy", "start", "missing-proxy"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "Proxy 'missing-proxy' not found" in result.stderr
+        assert "Create one first" in result.stderr
+        assert "forge proxy create <template> --name missing-proxy" in result.stderr
+
     def test_start_legacy_provider_fails_cleanly(self, runner: CliRunner, temp_env: Path) -> None:
         """A legacy `provider: gemini` proxy.yaml fails start with a clean error, not a traceback.
 
@@ -2405,7 +2414,9 @@ class TestProxyTemplate:
 
         result = runner.invoke(main, ["proxy", "template", "edit", "litellm-openai"])
         assert result.exit_code != 0
-        assert "Invalid YAML" in result.output or "must be a YAML mapping" in result.output
+        assert result.stdout == ""
+        assert "Invalid YAML" in result.stderr or "must be a YAML mapping" in result.stderr
+        assert "Your changes are saved at" in result.stderr
 
         # No user copy should be left behind on failure
         forge_home = Path(os.environ["FORGE_HOME"])

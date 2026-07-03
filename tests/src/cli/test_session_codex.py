@@ -44,7 +44,17 @@ from forge.session.models import CodexConfirmed, create_session_state
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
 
-_CODEX_BASE = ["session", "start", "impl", "--runtime", "codex", "--resume-from", "planner", "--task", "Build it"]
+_CODEX_BASE = [
+    "session",
+    "start",
+    "impl",
+    "--runtime",
+    "codex",
+    "--resume-from",
+    "planner",
+    "--task",
+    "Build it",
+]
 
 
 @pytest.fixture
@@ -64,7 +74,13 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _headless(returncode: int = 0, stdout: str = "OK", stderr: str = "") -> HeadlessResult:
-    return HeadlessResult(label="codex", stdout=stdout, stderr=stderr, returncode=returncode, duration_seconds=0.1)
+    return HeadlessResult(
+        label="codex",
+        stdout=stdout,
+        stderr=stderr,
+        returncode=returncode,
+        duration_seconds=0.1,
+    )
 
 
 def _start_result(**overrides: object) -> CodexSessionStartResult:
@@ -257,7 +273,16 @@ class TestStartCodexDispatch:
         assert result.exit_code == 3
 
     def test_auto_name_generated_when_omitted(self, runner: CliRunner, project: Path) -> None:
-        argv = ["session", "start", "--runtime", "codex", "--resume-from", "planner", "--task", "t"]
+        argv = [
+            "session",
+            "start",
+            "--runtime",
+            "codex",
+            "--resume-from",
+            "planner",
+            "--task",
+            "t",
+        ]
         with (
             patch("forge.cli.guards.require_repo_root"),
             patch("forge.cli.session_codex.launch_codex_session", return_value=0) as launch,
@@ -275,7 +300,10 @@ class TestStartInteractiveDispatch:
     def test_bare_start_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
         with (
             patch("forge.cli.guards.require_repo_root"),
-            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+            patch(
+                "forge.cli.session_codex.launch_interactive_codex_session",
+                return_value=0,
+            ) as launch,
         ):
             result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex"])
 
@@ -294,11 +322,22 @@ class TestStartInteractiveDispatch:
     def test_bridge_without_task_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
         with (
             patch("forge.cli.guards.require_repo_root"),
-            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+            patch(
+                "forge.cli.session_codex.launch_interactive_codex_session",
+                return_value=0,
+            ) as launch,
         ):
             result = runner.invoke(
                 main,
-                ["session", "start", "impl", "--runtime", "codex", "--resume-from", "planner"]
+                [
+                    "session",
+                    "start",
+                    "impl",
+                    "--runtime",
+                    "codex",
+                    "--resume-from",
+                    "planner",
+                ]
                 + ["--strategy", "full", "--depth", "2", "--context-delivery", "hook"],
             )
 
@@ -313,9 +352,23 @@ class TestStartInteractiveDispatch:
         """--sandbox shapes the TUI itself, not the transfer -- valid without a parent."""
         with (
             patch("forge.cli.guards.require_repo_root"),
-            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+            patch(
+                "forge.cli.session_codex.launch_interactive_codex_session",
+                return_value=0,
+            ) as launch,
         ):
-            result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex", "--sandbox", "read-only"])
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "impl",
+                    "--runtime",
+                    "codex",
+                    "--sandbox",
+                    "read-only",
+                ],
+            )
 
         assert result.exit_code == 0
         assert launch.call_args.kwargs["sandbox"] == "read-only"
@@ -323,7 +376,10 @@ class TestStartInteractiveDispatch:
     def test_interactive_exit_code_propagates(self, runner: CliRunner, project: Path) -> None:
         with (
             patch("forge.cli.guards.require_repo_root"),
-            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=3),
+            patch(
+                "forge.cli.session_codex.launch_interactive_codex_session",
+                return_value=3,
+            ),
         ):
             result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex"])
         assert result.exit_code == 3
@@ -333,7 +389,10 @@ class TestStartInteractiveDispatch:
         with (
             patch("forge.cli.guards.require_repo_root"),
             patch("forge.cli.session_codex.launch_codex_session", return_value=0) as headless,
-            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as interactive,
+            patch(
+                "forge.cli.session_codex.launch_interactive_codex_session",
+                return_value=0,
+            ) as interactive,
         ):
             result = runner.invoke(main, _CODEX_BASE)
 
@@ -402,7 +461,10 @@ class TestResumeCodexDispatch:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mgr_cls,
             patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
-            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+            patch(
+                "forge.cli.session_codex.reattach_interactive_codex_session",
+                return_value=0,
+            ) as reattach,
         ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
             result = runner.invoke(main, ["session", "resume", "impl"])
@@ -471,7 +533,10 @@ class TestResumeCodexDispatch:
         monkeypatch.chdir(other_project)
         with (
             patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
-            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+            patch(
+                "forge.cli.session_codex.reattach_interactive_codex_session",
+                return_value=0,
+            ) as reattach,
         ):
             result = runner.invoke(main, ["session", "resume", "impl"])
 
@@ -583,7 +648,10 @@ class TestCodexCliRendering:
         assert "Tip:" in out and "forge session resume impl --task" in out
 
     def test_start_op_error_exits_one(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with patch("forge.cli.session_codex.start_codex_session", side_effect=ForgeOpError("parent not found")):
+        with patch(
+            "forge.cli.session_codex.start_codex_session",
+            side_effect=ForgeOpError("parent not found"),
+        ):
             code = launch_codex_session(
                 name="impl",
                 parent="ghost",
@@ -596,8 +664,9 @@ class TestCodexCliRendering:
             )
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "Error:" in out and "parent not found" in out
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Error:" in captured.err and "parent not found" in captured.err
 
     def test_start_failed_turn_returns_codex_exit_code(self, capsys: pytest.CaptureFixture[str]) -> None:
         result = _start_result(codex=_headless(returncode=2, stdout="", stderr="boom"), thread_id=None)
@@ -636,10 +705,11 @@ class TestCodexCliRendering:
             )
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "did not deliver the transfer context" in out
-        assert "hook_undelivered" in out
-        assert "Tip:" in out and "forge session delete impl" in out
+        captured = capsys.readouterr()
+        assert "Created Codex session" in captured.out
+        assert "did not deliver the transfer context" in captured.err
+        assert "hook_undelivered" in captured.err
+        assert "Tip:" in captured.err and "forge session delete impl" in captured.err
 
     def test_start_hook_delivered_renders_delivery_line(self, capsys: pytest.CaptureFixture[str]) -> None:
         result = _start_result(context_delivery="session_start_hook")
@@ -662,7 +732,11 @@ class TestCodexCliRendering:
 
     def test_resume_success_render(self, capsys: pytest.CaptureFixture[str]) -> None:
         result = CodexSessionResumeResult(
-            session="impl", thread_id=_TID, root_run_id="run-2", codex=_headless(stdout="Done"), rollout_path=None
+            session="impl",
+            thread_id=_TID,
+            root_run_id="run-2",
+            codex=_headless(stdout="Done"),
+            rollout_path=None,
         )
         with patch("forge.cli.session_codex.continue_codex_session", return_value=result):
             code = resume_codex_session(name="impl", task="t", sandbox="workspace-write")
@@ -679,8 +753,9 @@ class TestCodexCliRendering:
             code = resume_codex_session(name="impl", task="t", sandbox="workspace-write")
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "Error:" in out and "no recorded Codex thread" in out
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Error:" in captured.err and "no recorded Codex thread" in captured.err
 
 
 class TestInteractiveCliRendering:
@@ -689,7 +764,11 @@ class TestInteractiveCliRendering:
     def test_announce_bare(self, capsys: pytest.CaptureFixture[str]) -> None:
         _render_interactive_launch(
             CodexInteractiveLaunch(
-                session="impl", parent=None, worktree_path=None, transfer_path=None, context_delivery=None
+                session="impl",
+                parent=None,
+                worktree_path=None,
+                transfer_path=None,
+                context_delivery=None,
             )
         )
         out = capsys.readouterr().out
@@ -743,12 +822,16 @@ class TestInteractiveCliRendering:
             )
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "Error:" in out and "not ready" in out
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Error:" in captured.err and "not ready" in captured.err
 
     def test_interactive_finish_renders_thread_and_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
         result = _interactive_result(warnings=("2 Codex rollouts appeared during this run",))
-        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+        with patch(
+            "forge.cli.session_codex.start_interactive_codex_session",
+            return_value=result,
+        ):
             code = launch_interactive_codex_session(
                 name="impl",
                 parent=None,
@@ -766,7 +849,10 @@ class TestInteractiveCliRendering:
 
     def test_interactive_exit_code_passes_through(self) -> None:
         result = _interactive_result(exit_code=130, thread_id=None, rollout_path=None, rollout_source=None)
-        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+        with patch(
+            "forge.cli.session_codex.start_interactive_codex_session",
+            return_value=result,
+        ):
             code = launch_interactive_codex_session(
                 name="impl",
                 parent=None,
@@ -782,7 +868,10 @@ class TestInteractiveCliRendering:
     def test_interactive_hook_undelivered_exits_one_with_tip(self, capsys: pytest.CaptureFixture[str]) -> None:
         """The TUI ran without the parent context: fail loud even on a clean exit."""
         result = _interactive_result(context_delivery="hook_undelivered", curation_ran=True)
-        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+        with patch(
+            "forge.cli.session_codex.start_interactive_codex_session",
+            return_value=result,
+        ):
             code = launch_interactive_codex_session(
                 name="impl",
                 parent="planner",
@@ -795,10 +884,11 @@ class TestInteractiveCliRendering:
             )
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "did not deliver the transfer context" in out
-        assert "hook_undelivered" in out
-        assert "forge session delete impl" in out
+        captured = capsys.readouterr()
+        assert "Thread:" in captured.out
+        assert "did not deliver the transfer context" in captured.err
+        assert "hook_undelivered" in captured.err
+        assert "forge session delete impl" in captured.err
 
     def test_reattach_op_error_exits_one(self, capsys: pytest.CaptureFixture[str]) -> None:
         with patch(
@@ -808,8 +898,9 @@ class TestInteractiveCliRendering:
             code = reattach_interactive_codex_session(name="impl")
 
         assert code == 1
-        out = capsys.readouterr().out
-        assert "Error:" in out and "no recorded Codex thread" in out
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Error:" in captured.err and "no recorded Codex thread" in captured.err
 
     def test_reattach_success_passes_through(self) -> None:
         result = _interactive_result()

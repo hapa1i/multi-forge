@@ -239,7 +239,11 @@ def auto_clean_old_logs() -> None:
         logs_root = get_forge_home() / "logs"
         removed, _, _ = _remove_files(logs_root, older_than_days=rc.log_retention_days)
         if removed:
-            logger.debug("Auto-cleaned %d log file(s) older than %d days", removed, rc.log_retention_days)
+            logger.debug(
+                "Auto-cleaned %d log file(s) older than %d days",
+                removed,
+                rc.log_retention_days,
+            )
     except Exception as e:
         logger.debug("Log auto-cleanup error (non-fatal): %s", e)
 
@@ -263,11 +267,11 @@ def logs_cmd(clean: bool, older_than: int | None) -> None:
         forge logs --clean --older-than 7 # Remove logs older than 7 days
     """
     if older_than is not None and not clean:
-        print_error("--older-than requires --clean", console=console)
+        print_error("--older-than requires --clean")
         raise SystemExit(1)
 
     if older_than is not None and older_than < 1:
-        print_error("--older-than must be >= 1", console=console)
+        print_error("--older-than must be >= 1")
         raise SystemExit(1)
 
     logs_root = get_forge_home() / "logs"
@@ -404,7 +408,11 @@ def _show_logs(logs_root: Path) -> None:
                     f"[yellow]Note:[/yellow] {len(adopted)} adopted proxy(ies) "
                     f"({names}{suffix}) were not started by Forge and have no log files."
                 )
-                print_tip("Delete and recreate proxies for full Forge logging.", blank_before=False, console=console)
+                print_tip(
+                    "Delete and recreate proxies for full Forge logging.",
+                    blank_before=False,
+                    console=console,
+                )
         except Exception:
             pass
 

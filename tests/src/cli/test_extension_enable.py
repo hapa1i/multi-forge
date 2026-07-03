@@ -632,7 +632,8 @@ class TestDisableNoInstallMessage:
         result = runner.invoke(disable_cmd, [])
 
         assert result.exit_code != 0
-        assert "forge extension enable" in result.output
+        normalized = " ".join(result.output.split())
+        assert "forge extension enable" in normalized
         assert "forge init" not in result.output
 
 

@@ -5,6 +5,16 @@ span different review risk, so this card is **not** meant to move wholesale to `
 rows into their own execution card(s)/`checklist.md` grouped by review concern (see
 [Sequencing & coupling](#sequencing--coupling)). Not blocking other work.
 
+**Scheduling status (2026-07-02)**: **A1 graduated** to `docs/board/doing/cli_error_stream_stderr/` (branch
+`fix/cli-error-stream-stderr`) as **Step 1** of an agreed interleave; this index stays in `proposed/` tracking the
+remaining rows. Interleave: **Step 1** cli_style A1 (error-stream root fix) -> **pause cli_style** -> **Step 2**
+[`backend_runtime_cleanup`](../backend_runtime_cleanup/card.md) (full) **+ fold in B1 backend-help** (help-only, no
+metavar rename) -> **Step 3** resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction (AST-verified 2026-07-02):** this
+row's grep model is wrong -- there are **0 bare `print_error*` calls** (so the default flip fixes no current site; it is
+a forward guard), **240** (not 173) `console=console` explicit-stdout overrides, and a missed **handler-default** gap
+(`handle_session_error` resolves to stdout at `output.py:108`, 11 bare sites). The graduated card owns the corrected
+root strategy.
+
 **Origin**: full-CLI audit, 2026-07-01. A 19-unit parallel fan-out (one auditor per command group + 4 cross-cutting
 lanes) enumerated all **135 commands/subcommands** via live `forge ... --help`, checked each against four dimensions
 (style-guide compliance, help sufficiency, missing examples/tips, cross-command consistency), then a per-unit

@@ -10,12 +10,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from rich.console import Console
-
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
-
-console = Console()
 
 
 def require_repo_root() -> Path:
@@ -40,16 +36,15 @@ def require_repo_root() -> Path:
     try:
         repo_root = find_project_root().resolve()
     except FileNotFoundError:
-        print_error("Not in a git repository", console=console)
+        print_error("Not in a git repository")
         sys.exit(1)
 
     if cwd != repo_root:
         hint = str(forge_root) if forge_root else str(repo_root)
         print_error(
             f"Must run from the repository root ({display_path(repo_root)}), " f"not a subdirectory",
-            console=console,
         )
-        print_tip("Run from:", commands=[f"cd {display_path(hint)}"], console=console)
+        print_tip("Run from:", commands=[f"cd {display_path(hint)}"], console=err_console)
         sys.exit(1)
 
     return cwd
@@ -74,7 +69,7 @@ def require_main_repo_root() -> Path:
     try:
         repo_root = find_project_root().resolve()
     except FileNotFoundError:
-        print_error("Not in a git repository", console=console)
+        print_error("Not in a git repository")
         sys.exit(1)
 
     # Resolve main repo root before any error so the tip is always correct
@@ -88,9 +83,8 @@ def require_main_repo_root() -> Path:
         print_error(
             "Cannot create worktrees from inside a child worktree. "
             f"Run from the main repository root ({display_path(main_root)})",
-            console=console,
         )
-        print_tip("Run from:", commands=[f"cd {display_path(main_root)}"], console=console)
+        print_tip("Run from:", commands=[f"cd {display_path(main_root)}"], console=err_console)
         sys.exit(1)
 
     # Accept CWD at a Forge project root (nested or top-level)
@@ -102,9 +96,8 @@ def require_main_repo_root() -> Path:
         # Subfolder of the main repo without .forge/
         print_error(
             f"Must run from the repository root ({display_path(repo_root)}), " f"not a subdirectory",
-            console=console,
         )
-        print_tip("Run from:", commands=[f"cd {display_path(repo_root)}"], console=console)
+        print_tip("Run from:", commands=[f"cd {display_path(repo_root)}"], console=err_console)
         sys.exit(1)
 
     return cwd
