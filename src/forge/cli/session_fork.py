@@ -14,6 +14,36 @@ from typing import cast
 import click
 
 from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.session import (  # noqa: E402
+    ResolvedRouting,
+    _apply_routing_override_to_state,
+    _auto_install_extensions,
+    _generate_parent_transfer_context,
+    _get_effective_proxy_for_session,
+    _get_launch_preferences,
+    _hint_cross_project_session,
+    _persist_routing_override,
+    _print_routing_summary,
+    _resolve_routing_from_cli,
+    _resolve_session_artifact_root,
+    console,
+    handle_session_error,
+    logger,
+)
+from forge.cli.session_lifecycle import (  # noqa: E402
+    _persist_fork_transfer_derivation,
+    _post_exit_render,
+    _prepare_rewind_launch_artifacts,
+    _print_branch_exists_tip,
+    _render_sidecar_launch,
+    _resolve_manifest_prompt_file,
+    _resume_tip_command,
+    _warn_before_claude_launch,
+)
+from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
+from forge.cli.session_model_pin import (  # noqa: E402
+    _apply_and_persist_direct_model_override,
+)
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.ops.claude_session import (
@@ -60,42 +90,6 @@ from forge.session.launch import (
 )
 from forge.session.model_pin import (
     _validate_direct_model_pin_for_routing,
-)
-
-
-def _sess():  # type: ignore[return]
-    return sys.modules["forge.cli.session"]
-
-
-from forge.cli.session import (  # noqa: E402
-    ResolvedRouting,
-    _apply_routing_override_to_state,
-    _auto_install_extensions,
-    _generate_parent_transfer_context,
-    _get_effective_proxy_for_session,
-    _get_launch_preferences,
-    _hint_cross_project_session,
-    _persist_routing_override,
-    _print_routing_summary,
-    _resolve_routing_from_cli,
-    _resolve_session_artifact_root,
-    console,
-    handle_session_error,
-    logger,
-)
-from forge.cli.session_lifecycle import (  # noqa: E402
-    _persist_fork_transfer_derivation,
-    _post_exit_render,
-    _prepare_rewind_launch_artifacts,
-    _print_branch_exists_tip,
-    _render_sidecar_launch,
-    _resolve_manifest_prompt_file,
-    _resume_tip_command,
-    _warn_before_claude_launch,
-)
-from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
-from forge.cli.session_model_pin import (  # noqa: E402
-    _apply_and_persist_direct_model_override,
 )
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
@@ -1199,7 +1193,5 @@ def fork(
             render_post_exit=(not incognito or use_sidecar),
         ),
         presenter=_ClaudeForkCliPresenter(session_name=fork_name),
-        invoke=_sess().invoke_claude,
-        run_active=_sess().run_with_active_session,
     )
     sys.exit(_render_claude_fork_result(result))

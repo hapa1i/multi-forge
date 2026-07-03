@@ -523,11 +523,11 @@ def start_claude_session(
 ) -> ClaudeSessionStartResult:
     """Create a Claude session and (unless ``no_launch``) run it interactively.
 
-    Render-free: the CLI supplies ``presenter`` for all output and injects
-    ``invoke``/``run_active`` (so ``patch("forge.cli.session.invoke_claude")`` and the
-    ``SessionManager`` patch sites still intercept). Raises ``ClaudeStartError`` /
-    ``ForgeOpError`` for create and launch-prep failures; ``StateCorrupted*`` propagate
-    bare to the top-level reset handler.
+    Render-free: the CLI supplies ``presenter`` for all output. ``invoke`` and
+    ``run_active`` are injectable test seams; when omitted, the op uses its
+    module-level launcher dependencies. Raises ``ClaudeStartError`` / ``ForgeOpError``
+    for create and launch-prep failures; ``StateCorrupted*`` propagate bare to the
+    top-level reset handler.
     """
     operation_started_at = datetime.now(timezone.utc)
     pre_seeded_uuid = str(uuid.uuid4())

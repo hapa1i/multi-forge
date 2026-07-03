@@ -153,7 +153,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
         captured["json"] = _manifest_json(SessionStore(str(temp_env), "char-incognito").read(), project=temp_env)
         return 0
 
-    with patch("forge.cli.session.invoke_claude", side_effect=_capture_manifest):
+    with patch("forge.core.ops.claude_session.invoke_claude", side_effect=_capture_manifest):
         result = runner.invoke(main, ["session", "start", "char-incognito", "--incognito"])
 
     assert result.exit_code == 0, result.output
@@ -226,7 +226,7 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
     result = runner.invoke(main, ["session", "start", "char-start", "--no-launch"])
     assert result.exit_code == 0, result.output
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         result = runner.invoke(main, ["session", "resume", "char-start", "--fresh", "--child-name", "char-child"])
 
     assert result.exit_code == 0, result.output
@@ -315,7 +315,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
     assert result.exit_code == 0, result.output
     _mark_resumable(temp_env, "char-reconnect")
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         result = runner.invoke(main, ["session", "resume", "char-reconnect"])
 
     assert result.exit_code == 0, result.output
@@ -398,7 +398,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     with (
         patch("forge.cli.session_lifecycle._get_active_session_entry", return_value=active_entry),
         patch("forge.session.manager.SessionManager._generate_relaunch_name", return_value="char-active-child"),
-        patch("forge.cli.session.invoke_claude", return_value=0),
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
     ):
         result = runner.invoke(main, ["session", "resume", "char-active", "--force"])
 
@@ -471,7 +471,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
     assert result.exit_code == 0, result.output
     _mark_resumable(temp_env, "char-native")
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         result = runner.invoke(
             main,
             [

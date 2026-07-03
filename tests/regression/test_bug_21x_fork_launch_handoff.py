@@ -135,7 +135,7 @@ def test_launch_same_dir_fork_created_with_no_launch_uses_native_fork_session(
     parent_manifest = SessionManager().get_session("fork-parent")
     assert parent_manifest.confirmed.claude_session_id is not None
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         launch_result = runner.invoke(main, ["session", "resume", "fork-child"])
 
     assert launch_result.exit_code == 0

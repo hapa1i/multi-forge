@@ -748,11 +748,11 @@ slice. Sub-sliced below so each step is reviewable and reversible.
 
 - [x] **5a -- long tail (~40 patches).** For each low-volume symbol, replace `_sess().X` with a direct import + call in
   the caller module and repoint that symbol's patches to the caller-module seam. Done 2026-07-02: migrated routing,
-  transfer-context, extension install, active-session, naming, delete, and warning seams. Remaining runtime `_sess()`
-  calls after 5b are only the planned 5c symbols (`invoke_claude`, `run_with_active_session`), while the separate
-  `_session_cli()` local-var seam is cleared in 5a.5. Parent patch lines are down to **207**. The stale-parent grep for
-  these 5a symbols is empty. `_detect_parent_extensions` remains a `forge.cli.session` patch seam because the helper is
-  still defined and directly unit-tested in `session.py`.
+  transfer-context, extension install, active-session, naming, delete, and warning seams. The remaining runtime
+  `_sess()` calls after 5b were cleared in 5c, while the separate `_session_cli()` local-var seam is cleared in 5a.5.
+  Parent patch lines are down to **207** after 5a. The stale-parent grep for these 5a symbols is empty.
+  `_detect_parent_extensions` remains a `forge.cli.session` patch seam because the helper is still defined and directly
+  unit-tested in `session.py`.
 - [x] **5a.5 -- `_session_cli()` resume-mode local seam (0 parent patches).** Replace `session_cli = _session_cli()` in
   `session_resume_modes.py` with direct imports for the 26 local calls: `_execute_resume_launch_plan`,
   `_get_effective_proxy_for_session`, `_get_resume_launch_preferences`, `_resolve_manifest_prompt_file`,
@@ -763,14 +763,14 @@ slice. Sub-sliced below so each step is reviewable and reversible.
   repoint its patches to that module's seam. Done 2026-07-02: `session_lifecycle`, `session_fork`, `session_manage`, and
   `session_codex` construct `SessionManager` directly; the old parent `SessionManager` patch grep is empty. Parent patch
   lines are down to **151**.
-- [ ] **5c -- `invoke_claude` + `run_active` (149 + 1 patches).** Drop the 3 *paired* injections
+- [x] **5c -- `invoke_claude` + `run_active` (149 + 1 patches).** Drop the 3 *paired* injections
   `invoke=_sess().invoke_claude` + `run_active=_sess().run_with_active_session` (adjacent at
   `session_lifecycle.py:689/859`, `session_fork.py:1198`); let `launch_claude_session` use its module defaults
   (`invoke or invoke_claude`, `run_active or run_with_active_session`). Repoint the 149 `invoke_claude` patches and the
-  1 `run_with_active_session` patch to `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}`.
-  **Atomic:** injection removal and patch repoint must land together (see false-green risk).
-- [ ] **5d -- delete the shim.** Remove the remaining lazy seams (2 `_sess()` definitions after 5b, with
-  `_session_cli()` already gone in 5a.5); convert the `import *` re-export tail (`:624-626`) to **side-effect imports**
+  1 `run_with_active_session` patch to `forge.core.ops.claude_session.{invoke_claude,run_with_active_session}`. Done
+  2026-07-02: parent patch lines are down to **1**, the expected `session.py`-owned `_detect_parent_extensions` seam.
+- [ ] **5d -- delete the shim.** With all lazy seams already gone (`_sess()` removed in 5c; `_session_cli()` removed in
+  5a.5), convert the `import *` re-export tail (`:624-626`) to **side-effect imports**
   (`from . import session_fork  # noqa: F401`) so command registration survives; drop the 3 name re-exports
   (`:619-621`). **Migrate the direct-import category:** repoint every
   `from forge.cli.session import <submodule-owned-name>` (currently the 6 test files, e.g. `delete`; today's src imports
@@ -833,6 +833,17 @@ are **151**;
 `python -m py_compile src/forge/cli/session_lifecycle.py src/forge/cli/session_fork.py src/forge/cli/session_manage.py src/forge/cli/session_codex.py`;
 `uv run pytest tests/src/cli/test_session_commands.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_codex.py tests/src/cli/test_session_resume_review.py tests/src/cli/test_session_subprocess_proxy.py tests/regression/test_bug_fork_session_exists_tip.py -q`
 -> **312 passed**.
+
+**5c verification (2026-07-02):** stale launcher seam grep
+`rg -n 'forge\.cli\.session\.(invoke_claude|run_with_active_session)|_sess\(\)|def _sess|sys\.modules\["forge\.cli\.session"\]' tests src/forge/cli src/forge/core/ops/claude_session.py`
+returned no launcher/shim hits; parent patch lines are **1** (`_detect_parent_extensions`, defined and called inside
+`session.py`); `rg -n 'patch\("forge\.core\.ops\.claude_session\.(invoke_claude|run_with_active_session)' tests | wc -l`
+-> **150**;
+`python -m py_compile src/forge/cli/session_lifecycle.py src/forge/cli/session_fork.py src/forge/core/ops/claude_session.py`;
+`python -c "import forge.cli.session; import forge.core.ops.claude_session"`;
+`uv run pytest tests/src/session/test_claude_session_manifest_characterization.py tests/src/cli/test_session_subprocess_proxy.py tests/src/cli/test_session_rewind_cli.py tests/src/cli/test_session_commands.py tests/src/cli/test_hook_warnings.py tests/src/cli/test_session_model_pins.py tests/regression/test_bug_supervisor_fork_uuid_drift.py tests/regression/test_bug_fork_session_exists_tip.py tests/regression/test_bug_21x_fork_launch_handoff.py tests/regression/test_bug_same_dir_transfer_fork.py -q`
+-> **265 passed**. Old parent-seam poison and new core `invoke_claude` poison each ran against the same set -> **265
+passed** each (pytest emitted one expected already-imported warning in each poison run).
 
 **Verification (per sub-slice + final):** affected test file(s) after each symbol;
 `python -c "import forge.cli.session"` (no cycle error); `forge session --help` + a couple of `--help` leaves; full

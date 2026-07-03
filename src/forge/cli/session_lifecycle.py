@@ -16,6 +16,23 @@ from typing import cast
 
 import click
 
+from forge.cli.editor import open_in_editor  # noqa: E402
+from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
+from forge.cli.session import (  # noqa: E402
+    ResolvedRouting,
+    _auto_install_extensions,
+    _generate_parent_transfer_context,
+    _get_active_session_entry,
+    _get_effective_proxy_for_session,
+    _get_launch_preferences,
+    _hint_cross_project_session,
+    _print_routing_summary,
+    _resolve_routing_from_cli,
+    console,
+    handle_session_error,
+    logger,
+)
+from forge.cli.session import session as _session_untyped  # noqa: E402
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.naming import generate_unique_name
@@ -79,33 +96,6 @@ from forge.session.prev_sessions import (
     notes_has_user_content,
 )
 from forge.session.transfer import ResumeStrategy
-
-
-# Names that tests still patch on forge.cli.session (invoke_claude,
-# run_with_active_session) must be
-# accessed through the parent module at call time. We use _sess() to get
-# the module from sys.modules (already loaded by the time any function runs).
-def _sess():  # type: ignore[return]
-    return sys.modules["forge.cli.session"]
-
-
-from forge.cli.editor import open_in_editor  # noqa: E402
-from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
-from forge.cli.session import (  # noqa: E402
-    ResolvedRouting,
-    _auto_install_extensions,
-    _generate_parent_transfer_context,
-    _get_active_session_entry,
-    _get_effective_proxy_for_session,
-    _get_launch_preferences,
-    _hint_cross_project_session,
-    _print_routing_summary,
-    _resolve_routing_from_cli,
-    console,
-    handle_session_error,
-    logger,
-)
-from forge.cli.session import session as _session_untyped  # noqa: E402
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -685,8 +675,6 @@ def _execute_resume_launch_plan(*, manager: SessionManager, plan: ResumeLaunchPl
         manager=manager,
         plan=plan,
         presenter=_ClaudeResumeCliPresenter(),
-        invoke=_sess().invoke_claude,
-        run_active=_sess().run_with_active_session,
     )
     sys.exit(_render_claude_resume_result(result))
 
@@ -855,8 +843,6 @@ def launch_new_session(
             subprocess_proxy=subprocess_proxy,
             supervisor=supervisor_wiring,
             presenter=_ClaudeStartCliPresenter(session_name=name),
-            invoke=_sess().invoke_claude,
-            run_active=_sess().run_with_active_session,
         )
     except ClaudeStartError as e:
         print_error_with_tip(str(e), *e.tip_lines, commands=list(e.commands) or None, console=console)

@@ -345,7 +345,7 @@ class TestSessionList:
     def test_list_shows_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """Should list existing sessions."""
         # Create a session first (mock invoke_claude)
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "test-session"])
 
         result = runner.invoke(main, ["session", "list"])
@@ -478,7 +478,7 @@ class TestSessionShow:
 
     def test_show_named_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should show detailed session info by name."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "inspect-test"])
 
         result = runner.invoke(main, ["session", "show", "inspect-test"])
@@ -498,7 +498,7 @@ class TestSessionShow:
         """--json should output merged manifest + context as JSON."""
         import json
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "json-test"])
 
         result = runner.invoke(main, ["session", "show", "json-test", "--json"])
@@ -515,7 +515,7 @@ class TestSessionShow:
 
     def test_show_field_extraction(self, runner: CliRunner, temp_env: Path) -> None:
         """--field should extract a single value."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "field-test"])
 
         result = runner.invoke(main, ["session", "show", "field-test", "--field", "session_name"])
@@ -525,7 +525,7 @@ class TestSessionShow:
 
     def test_show_field_nested(self, runner: CliRunner, temp_env: Path) -> None:
         """--field with dot notation should extract nested values."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "nested-test"])
 
         result = runner.invoke(main, ["session", "show", "nested-test", "--field", "context.model_family"])
@@ -535,7 +535,7 @@ class TestSessionShow:
 
     def test_show_env_fallback(self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should resolve from $FORGE_SESSION when no argument given."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "env-test"])
 
         monkeypatch.setenv("FORGE_SESSION", "env-test")
@@ -546,7 +546,7 @@ class TestSessionShow:
 
     def test_show_computed_context_section(self, runner: CliRunner, temp_env: Path) -> None:
         """Human-readable output should include Computed Context section."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "context-test"])
 
         result = runner.invoke(main, ["session", "show", "context-test"])
@@ -1041,7 +1041,7 @@ class TestSessionStart:
 
     def test_start_creates_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should create a new session."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "start", "new-session"])
 
         assert result.exit_code == 0
@@ -1058,7 +1058,7 @@ class TestSessionStart:
             captured["session_id"] = entry.claude_session_id if entry else None
             return 0
 
-        with patch("forge.cli.session.invoke_claude", side_effect=fake_invoke):
+        with patch("forge.core.ops.claude_session.invoke_claude", side_effect=fake_invoke):
             result = runner.invoke(main, ["session", "start", "tracked-start"])
 
         assert result.exit_code == 0
@@ -1131,7 +1131,7 @@ class TestSessionStart:
 
     def test_start_with_model(self, runner: CliRunner, temp_env: Path) -> None:
         """--model pins direct Claude sessions through env vars."""
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "start", "model-test", "--model", "opus-4-8"])
 
         assert result.exit_code == 0
@@ -1150,7 +1150,7 @@ class TestSessionStart:
         with (
             patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "start", "addendum-start", "--proxy", "openai-proxy"])
 
@@ -1174,7 +1174,7 @@ class TestSessionStart:
         with (
             patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "start", "proxy-context", "--proxy", "openrouter-gemini"])
 
@@ -1197,7 +1197,7 @@ class TestSessionStart:
         assert state.intent.launch.direct_model == "claude-opus-4-8[1m]"
 
     def test_start_with_sonnet_model_sets_sonnet_env(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(
                 main,
                 ["session", "start", "sonnet-model", "--model", "claude-sonnet-4-6[1m]"],
@@ -1209,7 +1209,7 @@ class TestSessionStart:
         assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-4-6[1m]"
 
     def test_start_with_model_accepts_subprocess_proxy(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(
                 main,
                 [
@@ -1272,7 +1272,7 @@ class TestSessionStart:
         with (
             patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.config.loader.load_proxy_instance_config", return_value=proxy_cfg),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(
                 main,
@@ -1318,10 +1318,10 @@ class TestSessionStart:
 
     def test_start_duplicate_fails(self, runner: CliRunner, temp_env: Path) -> None:
         """Should fail when session already exists."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "duplicate-test"])
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "start", "duplicate-test"])
 
         assert result.exit_code == 1
@@ -1334,7 +1334,7 @@ class TestSessionStart:
         """Should auto-generate a name when none provided."""
         with (
             patch("forge.cli.session_lifecycle.generate_unique_name", return_value="auto-test-session"),
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             result = runner.invoke(main, ["session", "start"])
 
@@ -1390,7 +1390,7 @@ class TestSessionDelete:
 
     def test_delete_removes_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should delete the session."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "delete-test"])
 
         result = runner.invoke(main, ["session", "delete", "delete-test", "--yes"])
@@ -1407,7 +1407,7 @@ class TestSessionDelete:
 
     def test_delete_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
         """Should prompt for confirmation without --yes."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "confirm-test"])
 
         # Simulate 'n' response to confirmation
@@ -1557,7 +1557,7 @@ class TestSessionDelete:
 
     def test_delete_multiple_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """Should delete multiple sessions in one command."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "multi-1"])
             runner.invoke(main, ["session", "start", "multi-2"])
             runner.invoke(main, ["session", "start", "multi-3"])
@@ -1578,7 +1578,7 @@ class TestSessionDelete:
 
     def test_delete_all_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """--all should delete every session."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "all-1"])
             runner.invoke(main, ["session", "start", "all-2"])
 
@@ -1614,7 +1614,7 @@ class TestSessionDelete:
 
     def test_delete_partial_failure(self, runner: CliRunner, temp_env: Path) -> None:
         """Should continue deleting after a failure and report summary."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "exists-1"])
 
         result = runner.invoke(main, ["session", "delete", "exists-1", "nonexistent", "--yes"])
@@ -1628,7 +1628,7 @@ class TestSessionDelete:
 
     def test_delete_all_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
         """--all without --yes should prompt with session list."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "prompt-1"])
             runner.invoke(main, ["session", "start", "prompt-2"])
 
@@ -1748,7 +1748,7 @@ class TestSessionIncognito:
 
     def test_incognito_creates_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should create an incognito session."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "incognito", "incognito-test"])
 
         assert result.exit_code == 0
@@ -1756,7 +1756,7 @@ class TestSessionIncognito:
 
     def test_incognito_generates_name(self, runner: CliRunner, temp_env: Path) -> None:
         """Should generate name when not provided."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "incognito"])
 
         assert result.exit_code == 0
@@ -1764,7 +1764,7 @@ class TestSessionIncognito:
 
     def test_incognito_direct_clears_proxy_env(self, runner: CliRunner, temp_env: Path) -> None:
         """Direct incognito sessions should unset proxy routing env vars."""
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "incognito", "direct-incognito", "--no-proxy"])
 
         assert result.exit_code == 0
@@ -2001,7 +2001,7 @@ class TestResumeProjectScoping:
             launcher_pid=os.getpid(),
         )
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "shared", "--force"])
 
         assert result.exit_code == 0, result.output
@@ -2037,7 +2037,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2072,7 +2072,7 @@ class TestSessionFork:
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "fork", "fork-sidecar-parent", "--name", "fork-sidecar-child"])
 
@@ -2132,7 +2132,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2182,7 +2182,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
@@ -2247,7 +2247,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2283,7 +2283,7 @@ class TestSessionFork:
         context_file.write_text("# ctx\n")
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2324,7 +2324,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2410,7 +2410,7 @@ class TestSessionFork:
             samedir_fork.worktree.is_worktree = False
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2458,7 +2458,7 @@ class TestSessionFork:
         ctx = self._seed_context_file(temp_env)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2484,7 +2484,7 @@ class TestSessionFork:
         ctx = self._seed_context_file(temp_env, "# Parent transfer context\nSENTINEL-CTX\n")
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2509,7 +2509,7 @@ class TestSessionFork:
         parent, fork_state = self._samedir_parent_and_fork(temp_env)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2591,7 +2591,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2610,7 +2610,7 @@ class TestSessionFork:
         ctx = self._seed_context_file(temp_env)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(ctx, [])),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2642,7 +2642,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.cli.session_fork._generate_parent_transfer_context", side_effect=_spy),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -2663,7 +2663,7 @@ class TestSessionFork:
         parent, fork_state = self._nr_parent_and_fork(temp_env)
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2840,7 +2840,7 @@ class TestSessionFork:
             patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(context_file, [])),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2892,7 +2892,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),
         ):
@@ -2940,7 +2940,7 @@ class TestSessionFork:
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
             patch("forge.cli.session_fork._resolve_context_limit", return_value=100),
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.get_session.return_value = parent
@@ -2983,7 +2983,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
@@ -3012,7 +3012,7 @@ class TestSessionFork:
 
     def test_fork_worktree_requires_git_repo(self, runner: CliRunner, temp_env: Path) -> None:
         """Fork with --worktree requires a proper git repository."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "fork-parent"])
 
         result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child", "--worktree"])
@@ -3047,7 +3047,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(None, []),
@@ -3085,7 +3085,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=1),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=1),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -3116,7 +3116,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -3151,7 +3151,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.runtime_config.get_default_direct_model", return_value="claude-sonnet-4-6"),
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3188,7 +3188,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -3230,7 +3230,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
                 return_value=(context_file, []),
@@ -3295,7 +3295,7 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
             patch(
                 "forge.cli.session_fork._generate_parent_transfer_context",
@@ -3359,8 +3359,8 @@ class TestSessionFork:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
-            patch("forge.cli.session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.run_with_active_session", side_effect=lambda runner, **kw: runner()),
             patch("forge.cli.session_lifecycle._warn_if_hooks_missing"),
             patch("forge.cli.session_lifecycle._warn_if_version_outdated"),
             patch("forge.cli.session_fork._auto_install_extensions", return_value=False),
@@ -3458,7 +3458,7 @@ class TestSessionForkIntoPreflight:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
             patch("subprocess.run") as mock_run,
         ):
             mock_manager = mock_manager_cls.return_value
@@ -3529,7 +3529,7 @@ class TestSessionForkIntoPreflight:
 
         with (
             patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-            patch("forge.cli.session.invoke_claude") as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
             patch("forge.cli.session_fork._auto_install_extensions") as mock_auto,
             patch("forge.cli.session_fork._generate_parent_transfer_context", return_value=(None, [])),
             patch("forge.install.tracking.TrackingStore") as mock_tracking_cls,
@@ -3580,7 +3580,7 @@ class TestSessionResumeExtended:
         custom_prompt = temp_env / "custom-system.md"
         custom_prompt.write_text("Custom system prompt", encoding="utf-8")
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "resume-parent", "--no-launch"])
 
         manager = SessionManager()
@@ -3609,7 +3609,7 @@ class TestSessionResumeExtended:
 
         parent_store.update(timeout_s=5.0, mutate=_set_parent_transcript)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "resume-parent", "--fresh"])
 
         assert result.exit_code == 0
@@ -3646,7 +3646,7 @@ class TestSessionResumeExtended:
 
         with (
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "reconnect-addendum"])
 
@@ -3664,10 +3664,10 @@ class TestSessionResume:
 
     def test_resume_fresh_creates_derived_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh should create a derived session from an existing one."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "resume-test"])
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "resume", "resume-test", "--fresh"])
 
         assert result.exit_code == 0
@@ -3677,7 +3677,7 @@ class TestSessionResume:
         """--fresh on a direct parent should launch the child without proxy env."""
         runner.invoke(main, ["session", "start", "resume-direct", "--no-proxy", "--no-launch"])
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "resume-direct", "--fresh"])
 
         assert result.exit_code == 0
@@ -3698,7 +3698,7 @@ class TestSessionResume:
         runner.invoke(main, ["session", "start", "resume-direct", "--no-proxy", "--no-launch"])
 
         with (
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.runtime_config.get_default_direct_model", return_value="claude-sonnet-4-6"),
         ):
             result = runner.invoke(main, ["session", "resume", "resume-direct", "--fresh"])
@@ -3723,10 +3723,10 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_default_is_transfer(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh without --resume-mode should use transfer (assembled context)."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "native-test"])
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "native-test", "--fresh"])
 
         assert result.exit_code == 0
@@ -3738,7 +3738,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_uses_resume_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native should use --resume --fork-session."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "native-test"])
 
         # Set confirmed session evidence (UUID + confirmed_by, required for native mode)
@@ -3750,7 +3750,7 @@ class TestResumeNativeMode:
 
         store.update(timeout_s=5.0, mutate=_confirm_native_test)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "native-test", "--fresh", "--resume-mode", "native"])
 
         assert result.exit_code == 0
@@ -3764,7 +3764,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_no_handoff_generation(self, runner: CliRunner, temp_env: Path) -> None:
         """Native mode must not call handoff generation at all."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "native-nogen"])
 
         store = SessionStore(str(temp_env), "native-nogen")
@@ -3776,7 +3776,7 @@ class TestResumeNativeMode:
         store.update(timeout_s=5.0, mutate=_confirm_nogen)
 
         with (
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
             patch("forge.session.manager.assemble_transfer_context") as mock_handoff,
         ):
             result = runner.invoke(main, ["session", "resume", "native-nogen", "--fresh", "--resume-mode", "native"])
@@ -3826,7 +3826,7 @@ class TestResumeNativeMode:
         transcript_path.parent.mkdir(parents=True, exist_ok=True)
         transcript_path.write_text('{"message":{"role":"user","content":[{"type":"text","text":"hello"}]}}\n')
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(
                 main,
                 ["session", "resume", "native-inferred", "--fresh", "--resume-mode", "native"],
@@ -3852,7 +3852,7 @@ class TestResumeNativeMode:
 
         store.update(timeout_s=5.0, mutate=_set_stale_transcript)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(
                 main,
                 ["session", "resume", "native-stale", "--fresh", "--resume-mode", "native"],
@@ -3864,7 +3864,7 @@ class TestResumeNativeMode:
 
     def test_resume_mode_without_fresh_is_error(self, runner: CliRunner, temp_env: Path) -> None:
         """--resume-mode without --fresh should error."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "mode-test"])
 
         result = runner.invoke(main, ["session", "resume", "mode-test", "--resume-mode", "native"])
@@ -3874,7 +3874,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_warns_about_strategy(self, runner: CliRunner, temp_env: Path) -> None:
         """--resume-mode native with explicit --strategy should print a warning tip."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "warn-test"])
 
         store = SessionStore(str(temp_env), "warn-test")
@@ -3885,7 +3885,7 @@ class TestResumeNativeMode:
 
         store.update(timeout_s=5.0, mutate=_confirm_warn)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(
                 main,
                 ["session", "resume", "warn-test", "--fresh", "--resume-mode", "native", "--strategy", "full"],
@@ -3897,7 +3897,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_with_proxy_override(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native --proxy should apply routing override."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "proxy-native"])
 
         store = SessionStore(str(temp_env), "proxy-native")
@@ -3909,7 +3909,7 @@ class TestResumeNativeMode:
         store.update(timeout_s=5.0, mutate=_confirm_proxy)
 
         with (
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch(
                 "forge.cli.session_lifecycle._resolve_routing_from_cli",
                 return_value=type(
@@ -3938,7 +3938,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_with_direct_flag(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native --no-proxy should strip proxy env."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "direct-native"])
 
         store = SessionStore(str(temp_env), "direct-native")
@@ -3949,7 +3949,7 @@ class TestResumeNativeMode:
 
         store.update(timeout_s=5.0, mutate=_confirm_direct)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(
                 main,
                 ["session", "resume", "direct-native", "--fresh", "--resume-mode", "native", "--no-proxy"],
@@ -3964,7 +3964,7 @@ class TestResumeNativeMode:
 
     def test_resume_fresh_native_persists_derivation(self, runner: CliRunner, temp_env: Path) -> None:
         """Native resume should persist correct derivation fields in child manifest."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "persist-parent"])
 
         store = SessionStore(str(temp_env), "persist-parent")
@@ -3975,7 +3975,7 @@ class TestResumeNativeMode:
 
         store.update(timeout_s=5.0, mutate=_confirm_persist)
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(
                 main,
                 [
@@ -4023,7 +4023,7 @@ class TestProxyDirectFlags:
         assert "mutually exclusive" in result.output
 
     def test_fork_proxy_and_direct_mutually_exclusive(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "parent", "--no-proxy"])
         result = runner.invoke(main, ["session", "fork", "parent", "--proxy", "foo", "--no-proxy"])
         assert result.exit_code == 1
@@ -4043,7 +4043,7 @@ class TestProxyDirectFlags:
             proxy_base_url="http://localhost:8084",
         )
 
-        with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
             result = runner.invoke(main, ["session", "resume", "proxy-parent", "--no-proxy"])
 
         assert result.exit_code == 0
@@ -4063,7 +4063,7 @@ class TestProxyDirectFlags:
         with (
             patch("forge.cli.session_lifecycle._resolve_routing_from_cli", return_value=routing),
             patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=None),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(main, ["session", "resume", "proxy-resume-parent", "--proxy", "test-proxy"])
 
@@ -4091,7 +4091,7 @@ class TestProxyDirectFlags:
         with (
             patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=routing),
             patch("forge.cli.session_fork._resolve_context_limit", return_value=None),
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
         ):
             result = runner.invoke(
                 main,
@@ -4118,7 +4118,7 @@ class TestProxyDirectFlags:
         )
 
         with (
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
         ):
             result = runner.invoke(
@@ -4160,7 +4160,7 @@ class TestProxyDirectFlags:
 
         with (
             patch("forge.cli.session_lifecycle._resolve_context_limit", return_value=1048576) as mock_context_limit,
-            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
             patch("forge.sidecar.run_sidecar_session", return_value=0) as mock_run_sidecar,
         ):
             result = runner.invoke(
@@ -4200,7 +4200,7 @@ class TestProxyDirectFlags:
         import json
 
         # Create parent with direct routing
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "persist-parent", "--no-proxy"])
 
         # Write a proxy registry so resolve_proxy succeeds
@@ -4275,7 +4275,7 @@ class TestProxyDirectFlags:
         store.write(manifest)
 
         # Resume with --no-proxy (should change intent but not clear confirmed on disk)
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "resume", "confirmed-proxy-test", "--no-proxy"])
 
         assert result.exit_code == 0, result.output
@@ -4311,7 +4311,7 @@ class TestSupervisorProxyFlags:
         assert "require --supervise" in result.output
 
     def test_fork_supervisor_proxy_mutual_exclusivity(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "sup-parent", "--no-proxy"])
         result = runner.invoke(
             main,
@@ -4321,7 +4321,7 @@ class TestSupervisorProxyFlags:
         assert "mutually exclusive" in result.output
 
     def test_fork_supervisor_proxy_requires_supervise(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "sup-parent2", "--no-proxy"])
         result = runner.invoke(main, ["session", "fork", "sup-parent2", "--supervisor-proxy", "x"])
         assert result.exit_code == 1
@@ -4357,7 +4357,7 @@ class TestSupervisorProxyFlags:
 
     def test_fork_bad_supervisor_proxy_leaves_no_fork(self, runner: CliRunner, temp_env: Path) -> None:
         """Bad --supervisor-proxy should fail before creating fork state."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "fork-badproxy-parent", "--no-proxy"])
         result = runner.invoke(
             main,
@@ -4384,7 +4384,7 @@ class TestSupervisorLaunchControls:
 
     def _seed_supervise_parent(self, runner: CliRunner, temp_env: Path, name: str) -> SessionStore:
         """Start a real parent session and confirm its Claude UUID."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", name, "--no-proxy"])
         store = SessionStore(str(temp_env), name)
         store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid-x"))
@@ -4630,7 +4630,7 @@ class TestSessionSetOverride:
 
     def test_set_updates_overrides(self, runner: CliRunner, temp_env: Path) -> None:
         """Should set an override value."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "set-test"])
 
         result = runner.invoke(main, ["session", "set", "--session", "set-test", "policy.fail_mode", "closed"])
@@ -4642,7 +4642,7 @@ class TestSessionSetOverride:
 
     def test_set_nested_key(self, runner: CliRunner, temp_env: Path) -> None:
         """Should set nested key values."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "nested-test"])
 
         result = runner.invoke(main, ["session", "set", "--session", "nested-test", "custom.my_flag", "true"])
@@ -4652,7 +4652,7 @@ class TestSessionSetOverride:
 
     def test_set_json_value(self, runner: CliRunner, temp_env: Path) -> None:
         """Should parse JSON values."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "json-test"])
 
         result = runner.invoke(main, ["session", "set", "--session", "json-test", "custom.count", "42"])
@@ -4662,7 +4662,7 @@ class TestSessionSetOverride:
 
     def test_set_null_clears(self, runner: CliRunner, temp_env: Path) -> None:
         """Should set null value (clears field)."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "null-test"])
 
         result = runner.invoke(main, ["session", "set", "--session", "null-test", "custom.flag", "null"])
@@ -4672,7 +4672,7 @@ class TestSessionSetOverride:
 
     def test_set_invalid_key_fails(self, runner: CliRunner, temp_env: Path) -> None:
         """Should fail for invalid key."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "invalid-key-test"])
 
         result = runner.invoke(
@@ -4691,7 +4691,7 @@ class TestSessionSetOverride:
 
     def test_set_with_session_option(self, runner: CliRunner, temp_env: Path) -> None:
         """Should accept --session option."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "target-session"])
 
         result = runner.invoke(
@@ -4708,7 +4708,7 @@ class TestSessionReset:
 
     def test_reset_single_key(self, runner: CliRunner, temp_env: Path) -> None:
         """Should reset a single override key."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "reset-single"])
 
         # Set an override first
@@ -4722,7 +4722,7 @@ class TestSessionReset:
 
     def test_reset_all(self, runner: CliRunner, temp_env: Path) -> None:
         """Should reset all overrides with --all."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "reset-all"])
 
         # Set some overrides
@@ -4738,7 +4738,7 @@ class TestSessionReset:
 
     def test_reset_nonexistent_key_noop(self, runner: CliRunner, temp_env: Path) -> None:
         """Should be a no-op for key that isn't overridden."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "reset-noop"])
 
         result = runner.invoke(main, ["session", "reset", "--session", "reset-noop", "policy.fail_mode"])
@@ -4754,7 +4754,7 @@ class TestSessionReset:
 
     def test_reset_key_and_all_errors(self, runner: CliRunner, temp_env: Path) -> None:
         """Should error when both key and --all provided."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "reset-conflict"])
 
         result = runner.invoke(main, ["session", "reset", "--session", "reset-conflict", "policy.fail_mode", "--all"])
@@ -4764,7 +4764,7 @@ class TestSessionReset:
 
     def test_reset_no_args_clears_all(self, runner: CliRunner, temp_env: Path) -> None:
         """Reset with no args clears all overrides (same as --all)."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "reset-neither"])
 
         # Set some overrides first
@@ -4783,7 +4783,7 @@ class TestInspectShowsOverrides:
 
     def test_show_displays_overrides_section(self, runner: CliRunner, temp_env: Path) -> None:
         """Show should display active overrides."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "inspect-override"])
 
         # Set an override
@@ -4804,7 +4804,7 @@ class TestTransactionalBehavior:
         """Manifest file should be unchanged when set fails type validation."""
         import json
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "transactional-test"])
 
         # Read manifest contents before (per-session directory)
@@ -4831,7 +4831,7 @@ class TestTransactionalBehavior:
     def test_no_write_on_invalid_key(self, runner: CliRunner, temp_env: Path) -> None:
         """Manifest file should be unchanged when set fails key validation."""
 
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "invalid-key-transact"])
 
         manifest_path = temp_env / ".forge" / "sessions" / "invalid-key-transact" / "forge.session.json"
@@ -4854,7 +4854,7 @@ class TestCwdGuardWiring:
         with (
             patch("forge.cli.guards.require_repo_root", return_value=temp_env) as mock_rr,
             patch("forge.cli.guards.require_main_repo_root") as mock_mrr,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             runner.invoke(main, ["session", "start", "policy-test"])
         mock_rr.assert_called_once()
@@ -4864,7 +4864,7 @@ class TestCwdGuardWiring:
         with (
             patch("forge.cli.guards.require_repo_root") as mock_rr,
             patch("forge.cli.guards.require_main_repo_root", return_value=temp_env) as mock_mrr,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
             patch("forge.session.worktree.get_main_repo_root", return_value=temp_env),
             patch("forge.session.worktree.create_worktree") as mock_wt,
             patch("forge.session.worktree.copy_runtime_config"),
@@ -4882,20 +4882,20 @@ class TestCwdGuardWiring:
         mock_rr.assert_not_called()
 
     def test_fork_calls_require_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "fork-parent", "--no-proxy", "--no-launch"])
 
         with (
             patch("forge.cli.guards.require_repo_root", return_value=temp_env) as mock_rr,
             patch("forge.cli.guards.require_main_repo_root") as mock_mrr,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child", "--no-proxy"])
         mock_rr.assert_called_once()
         mock_mrr.assert_not_called()
 
     def test_fork_worktree_calls_require_main_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "fork-wt-parent", "--no-proxy", "--no-launch"])
 
         with (
@@ -4910,7 +4910,7 @@ class TestCwdGuardWiring:
         mock_rr.assert_not_called()
 
     def test_fork_into_skips_guards(self, runner: CliRunner, temp_env: Path) -> None:
-        with patch("forge.cli.session.invoke_claude", return_value=0):
+        with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "fork-into-parent", "--no-proxy", "--no-launch"])
 
         with (
@@ -4925,7 +4925,7 @@ class TestCwdGuardWiring:
     def test_incognito_calls_require_repo_root(self, runner: CliRunner, temp_env: Path) -> None:
         with (
             patch("forge.cli.guards.require_repo_root", return_value=temp_env) as mock_rr,
-            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
         ):
             runner.invoke(main, ["session", "incognito", "policy-incog", "--no-proxy"])
         mock_rr.assert_called_once()

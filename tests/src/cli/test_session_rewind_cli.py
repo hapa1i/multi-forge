@@ -142,7 +142,7 @@ def test_worktree_rewind_launches_truncated_uuid_with_context(runner: CliRunner,
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
@@ -207,7 +207,7 @@ def test_worktree_rewind_proxy_addendum_injected_once(runner: CliRunner, temp_en
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.cli.session_fork._resolve_routing_from_cli", return_value=_proxy_routing()),
         patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
@@ -256,7 +256,7 @@ def test_worktree_rewind_fallback_copy_failure_aborts_before_launch(
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
         patch("forge.session.rewind._call_llm_for_curation_prompt", side_effect=RuntimeError("llm unavailable")),
         patch("forge.session.claude.relocate_transcript", side_effect=OSError("disk full")),
-        patch("forge.cli.session.invoke_claude") as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
@@ -315,7 +315,7 @@ def test_rewind_fork_rejects_sidecar_parent(runner: CliRunner, temp_env: Path) -
     parent, _fork_state = _nr_parent_and_fork(temp_env, parent_sidecar=True)
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session.invoke_claude") as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
@@ -348,7 +348,7 @@ def test_rewind_fork_rejects_sidecar_child_at_launch_seam(runner: CliRunner, tem
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session.invoke_claude") as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         patch("forge.cli.session_fork._prepare_rewind_launch_artifacts") as mock_prepare,
     ):
         mock_manager = mock_manager_cls.return_value
@@ -402,7 +402,7 @@ def test_resume_fresh_rewind_uses_truncated_uuid_with_context(runner: CliRunner,
         encoding="utf-8",
     )
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(
             main,
             [
@@ -473,7 +473,7 @@ def test_resume_fresh_rewind_empty_prefix_falls_back_native(runner: CliRunner, t
         encoding="utf-8",
     )
 
-    with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke:
         result = runner.invoke(
             main,
             [
@@ -530,7 +530,7 @@ def test_resume_fresh_rewind_snap_warning_reports_extra_turns(runner: CliRunner,
         encoding="utf-8",
     )
 
-    with patch("forge.cli.session.invoke_claude", return_value=0):
+    with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
         result = runner.invoke(
             main,
             [
@@ -572,7 +572,7 @@ def test_resume_fresh_rewind_writer_error_falls_back_native(runner: CliRunner, t
 
     with (
         patch("forge.cli.session_rewind.write_rewind_transcript_prefix", side_effect=ValueError("bad turn order")),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,
@@ -619,7 +619,7 @@ def test_resume_fresh_rewind_code_delta_failure_falls_back_native(runner: CliRun
 
     with (
         patch("forge.session.rewind._call_llm_for_curation_prompt", side_effect=RuntimeError("llm unavailable")),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,
@@ -676,7 +676,7 @@ def test_resume_fresh_rewind_parse_failure_falls_back_with_privacy_warning(runne
     with (
         patch("forge.session.rewind._call_llm_for_curation_prompt", return_value=curation_call),
         patch("forge.session.rewind._emit_curation_usage"),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,
@@ -735,7 +735,7 @@ def test_resume_fresh_rewind_privacy_warning_for_code_delta_llm(runner: CliRunne
     with (
         patch("forge.session.rewind._call_llm_for_curation_prompt", return_value=curation_call),
         patch("forge.session.rewind._emit_curation_usage"),
-        patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         result = runner.invoke(
             main,

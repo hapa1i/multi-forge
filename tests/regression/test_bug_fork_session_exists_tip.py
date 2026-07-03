@@ -64,7 +64,7 @@ def test_fork_onto_existing_name_emits_recovery_tip(runner: CliRunner, session_p
 
     with (
         patch("forge.cli.session_fork.SessionManager") as mock_manager_cls,
-        patch("forge.cli.session.invoke_claude", return_value=0),
+        patch("forge.core.ops.claude_session.invoke_claude", return_value=0),
     ):
         mock_manager = mock_manager_cls.return_value
         mock_manager.get_session.return_value = parent
