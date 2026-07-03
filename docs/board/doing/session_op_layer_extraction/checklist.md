@@ -722,8 +722,9 @@ migrating 256 patches to real seams without silent breakage is the actual work.
 
 **Scope decision (please confirm before implementing):**
 
-- **A (full, the plan):** untangle the cycle, migrate all 256 patches, delete the shim + re-export tail,
-  `patch("forge.cli.session.` -> 0. High churn (mostly one test file), modest behavior value (test-idiom hygiene).
+- **A (full, the plan):** untangle the cycle, migrate shim-artifact patches, delete the shim + re-export tail, and leave
+  only `session.py`-owned helper patches such as `forge.cli.session._detect_parent_extensions` if those helpers stay in
+  `session.py`. High churn (mostly one test file), modest behavior value (test-idiom hygiene).
 - **B (defer):** leave the shim -- at ~33 call sites it is small and harmless now; revisit only if it blocks future
   work.
 
@@ -788,8 +789,9 @@ slice. Sub-sliced below so each step is reviewable and reversible.
   Before declaring 5c done, temporarily poison the **old** parent seam (`forge.cli.session.invoke_claude` and
   `forge.cli.session.run_with_active_session`) to raise while the new `forge.core.ops.claude_session.*` patches are in
   place; the migrated tests must still pass. Also make at least one representative new-seam mock assert it was called.
-  Poisoning only the new op seam and expecting patched tests to pass is not enough, because forgotten `_sess()`
-  injection would still bypass it.
+  Also run the complementary clean poison: make `forge.core.ops.claude_session.invoke_claude` raise and confirm the
+  repointed CLI/session tests still pass under their new patches. The old-seam poison proves the `_sess()` injections
+  are gone; the new-seam poison proves no unmocked real launch leaks through the high-stakes op seam.
 - **Command registration (5d trap).** `from .session_fork import *` doubles as the side-effect import that runs the
   `@session.command()` decorators. Convert it, do not delete it, and verify `forge session --help` still lists
   start/resume/fork/... and a leaf like `forge session fork --help` works.
@@ -842,14 +844,14 @@ smokes green).
 
 ## Roadmap
 
-| Slice | Scope                                                                                                             | Crux                                                                                                             |
-| ----- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 1     | system-prompt op + model-pin cluster relocation + characterization test                                           | Low-risk pattern and harness                                                                                     |
-| 2     | `start_claude_session -> ClaudeSessionStartResult`                                                                | Relocate launcher/invoker seams out of CLI-safe wrappers                                                         |
-| 3     | `resume_claude_session -> ClaudeResumeResult`                                                                     | Collapse repeated launch/resume routing/model/preference logic                                                   |
-| 4a    | fork launch migration (`fork_claude_session`)                                                                     | 4a.1 delete `_launch_claude_for_session`; 4a.2 unify 4 host closures into the op (launcher already resolves cwd) |
-| 4b    | 4b.1 unify fork supervisor wiring onto core `_apply_supervisor_wiring`; 4b.2 (conditional) sidecar-internal tests | Sidecar prep already core-owned; only fork supervisor persistence still duplicated in CLI                        |
-| 5     | Retire the `_sess()` shim (5a tail -> 5b SessionManager -> 5c invoke_claude -> 5d delete)                         | Untangle the circular-import shim; migrate 256 `forge.cli.session.X` patches to real seams; patch-count -> 0     |
+| Slice | Scope                                                                                                             | Crux                                                                                                                                                                           |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | system-prompt op + model-pin cluster relocation + characterization test                                           | Low-risk pattern and harness                                                                                                                                                   |
+| 2     | `start_claude_session -> ClaudeSessionStartResult`                                                                | Relocate launcher/invoker seams out of CLI-safe wrappers                                                                                                                       |
+| 3     | `resume_claude_session -> ClaudeResumeResult`                                                                     | Collapse repeated launch/resume routing/model/preference logic                                                                                                                 |
+| 4a    | fork launch migration (`fork_claude_session`)                                                                     | 4a.1 delete `_launch_claude_for_session`; 4a.2 unify 4 host closures into the op (launcher already resolves cwd)                                                               |
+| 4b    | 4b.1 unify fork supervisor wiring onto core `_apply_supervisor_wiring`; 4b.2 (conditional) sidecar-internal tests | Sidecar prep already core-owned; only fork supervisor persistence still duplicated in CLI                                                                                      |
+| 5     | Retire the `_sess()` shim (5a tail -> 5b SessionManager -> 5c invoke_claude -> 5d delete)                         | Untangle the circular-import shim; migrate shim-artifact `forge.cli.session.X` patches to real seams; parent patches may remain only for helpers still defined in `session.py` |
 
 ## Closeout Items
 
