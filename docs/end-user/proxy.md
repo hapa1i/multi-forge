@@ -665,7 +665,7 @@ logging:
 Like audit, this **never** writes plaintext: there is no `full` mode — `body_capture=full` is rejected with a pointer to
 the audit policy, and `redacted` reuses the same redaction as audit (roles, block types, lengths — no prompt/completion/
 tool text). `enabled: on` is the way to capture diagnostics without turning on full `log_level=debug` spam. Retention is
-enforced at proxy startup. `forge logs` notes the current capture mode; `forge proxy show <id> --raw` shows the
+enforced at proxy startup. `forge logs show` notes the current capture mode; `forge proxy show <id> --raw` shows the
 configured block.
 
 ---

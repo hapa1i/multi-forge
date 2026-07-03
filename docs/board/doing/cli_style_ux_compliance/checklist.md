@@ -3,9 +3,10 @@
 **Branch**: `feat/cli-style-ux-compliance` - **Card**: [`card.md`](card.md)
 
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
-(PR #71), and **S1/A2+A4** are done; what remains is **A3, A5, B2-B5, C1-C3**, executed as **focused slices grouped by
-review concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out individually; this
-checklist stays the durable index. **Status: S1 IMPLEMENTED (A2/A4 code + tests; verification passed 2026-07-03).**
+(PR #71), **S1/A2+A4**, and **S2/A5** are done; what remains is **A3, B2-B5, C1-C3**, executed as **focused slices
+grouped by review concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out
+individually; this checklist stays the durable index. **Status: S2 IMPLEMENTED (A5 logs group redesign; verification
+passed 2026-07-03).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -15,7 +16,7 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 ## Grounded Base
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
-resolved A2/A4; A3/A5/B5/C1 remain live anchors.
+resolved A2/A4; S2 resolved A5; A3/B5/C1 remain live anchors.
 
 | Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                                                                                |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -58,7 +59,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - [x] Move card directory `proposed/cli_style_ux_compliance -> doing/cli_style_ux_compliance`.
 - [x] Update card status from proposed index to active Step 3 coordinator.
 - [x] Update stale board links that still pointed at `proposed/cli_style_ux_compliance`.
-- [ ] Commit the board activation (rename + this expanded checklist) separately before the first code slice.
+- [x] Commit the board activation (rename + this expanded checklist) separately before the first code slice.
 
 ## Phase 1 -- Slice plan (execute by review concern, not as one change)
 
@@ -91,27 +92,34 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Phase 3 -- Slice S2: A5 (`logs` group redesign)
 
-- [ ] Promote `logs` to a group with `no_args_is_help=True` (Slice-12 F13 pattern) exposing two leaves:
+- [x] Promote `logs` to a group with `no_args_is_help=True` (Slice-12 F13 pattern) exposing two leaves:
   `forge logs show [--json]` (read/status) and `forge logs clean [--older-than N] --yes` (destructive, preview-default).
   **Assertion:** `forge logs` prints help + exits 2 (group); both leaves resolve.
-- [ ] `logs show --json`: stable shape over locations/retention/counts (from `_show_logs`). **Assertion:**
+- [x] `logs show --json`: stable shape over locations/retention/counts (from `_show_logs`). **Assertion:**
   `test_read_leaves_expose_json` passes with `show` present; `--json` is valid JSON on stdout, stderr empty.
-- [ ] **Add a preview/count capability first** -- `_remove_files` (`logs.py:181`) only deletes (`f.unlink()`, `:210`);
+- [x] **Add a preview/count capability first** -- `_remove_files` (`logs.py:181`) only deletes (`f.unlink()`, `:210`);
   it has no dry mode. Add a `preview: bool` param (or a sibling counter) that runs the same `older_than` + active-skip
   filters as `_try_remove` (`:202-213`) but skips `unlink`, returning the would-remove count. **Assertion:** the preview
   count equals what a real clean removes; no file is unlinked in preview.
-- [ ] `logs clean`: preview by default (report the would-remove count via the new preview helper), `--yes` mutates; keep
+- [x] `logs clean`: preview by default (report the would-remove count via the new preview helper), `--yes` mutates; keep
   `--older-than N` (>=1 validation) as a leaf option. **Assertion:** `test_clean_verbs_preview_by_default` passes;
   `logs clean` without `--yes` deletes nothing; `logs clean --yes` removes files.
-- [ ] Clean break: the bare-leaf `--clean` / `--older-than` flags are removed. **Assertion:** `forge logs --clean` and
+- [x] Clean break: the bare-leaf `--clean` / `--older-than` flags are removed. **Assertion:** `forge logs --clean` and
   `forge logs --older-than 7` exit 2 (Click "No such option"); clean-break guard test added.
-- [ ] Keep the `main.py` cleanup exemption: move `logs` in `_EXEMPT_SUBCOMMANDS` / `_SESSION_CLEANUP_EXEMPT` to cover
+- [x] Keep the `main.py` cleanup exemption: move `logs` in `_EXEMPT_SUBCOMMANDS` / `_SESSION_CLEANUP_EXEMPT` to cover
   the **group**. **Assertion:** session-cleanup invariants still pass.
-- [ ] **Absorb B4's logs tip here**: `logs clean --older-than` validation failure prints a recovery tip via
+- [x] **Absorb B4's logs tip here**: `logs clean --older-than` validation failure prints a recovery tip via
   `forge.cli.output` (`Use --older-than <days>` form). **Assertion:** invalid `--older-than 0` errors with a tip on
   stderr.
-- [ ] Docs sync: `cli_reference.md` System table (`forge logs` -> group rows), `end-user/*` if `logs` usage documented.
-- [ ] Changelog entry (feature + clean break naming the removed bare flags).
+- [x] Docs sync: `cli_reference.md` System table (`forge logs` -> group rows), `end-user/*` if `logs` usage documented;
+  bundled QA/walkthrough skill guidance also moved to `logs show` / `logs clean --yes`.
+- [x] Changelog entry (feature + clean break naming the removed bare flags).
+- [x] S2 verification:
+  `uv run pytest tests/src/cli/test_logs_command.py tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_output_streams.py -q`
+  passed (99 tests); `make pre-commit` passed.
+- **S2 follow-up observation:** `logs clean` intentionally remains human-only; unlike `logs show`, no guard currently
+  requires `--json` on clean leaves. If scriptable log cleanup becomes useful, mirror the `forge clean --json` /
+  `search clean --json` shape in a later slice.
 
 ## Phase 4 -- Slice S3: A3 (`policy enable` fail-loud) -- **BLOCKED on OQ-1**
 

@@ -216,7 +216,8 @@ behavior cards such as `backend_runtime_cleanup`, which should follow whatever n
 Add an example to: `model backend start`/`stop` (source-vs-adapter + `--port`), `search query` (phrase syntax),
 `workflow panel --context resume:<uuid>` (Forge name vs Claude UUID), `session lane set`/`clear` (consumer + backend
 combos). Add actionable next-step tips on error/empty paths: `telemetry activity --json` currently drops the human-mode
-"run `forge session list`" tip in JSON mode; `logs --older-than` validation gives no recovery tip.
+"run `forge session list`" tip in JSON mode. The old `logs --older-than` validation tip was folded into A5/S2 with the
+`logs clean` redesign.
 
 ### B5 -- `session lane set` gives no way to discover valid lanes, and the invalid-lane error is raw
 

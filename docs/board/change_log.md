@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-03
 
+### cli_style_ux_compliance S2: Logs Group Redesign
+
+**Goal**: Split `forge logs` into a scriptable read surface and a preview-default cleanup surface that follows the CLI
+destructive-verb shape.
+
+**Key changes**:
+
+- Promoted `forge logs` to a `show`/`clean` group: `logs show --json` emits stable status JSON, and `logs clean`
+  previews by default with `--yes` required for deletion.
+- Added dry-count support to the shared log remover so preview and mutation use the same age and active-process filters.
+- Clean break: removed the old bare `forge logs --clean` and `forge logs --older-than` flags; Click now reports "No such
+  option" for those paths.
+- Updated CLI docs and bundled QA/walkthrough guidance to use `forge logs show` and `forge logs clean --yes`.
+
+**Verification**:
+`uv run pytest tests/src/cli/test_logs_command.py tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_output_streams.py -q`
+(99 passed); `make pre-commit` clean.
+
 ### backend_runtime_cleanup Step 2: Runtime-Id Backend Stop
 
 **Goal**: Make backend runtime cleanup operate on the live runtime objects users see in `forge model backend list`,

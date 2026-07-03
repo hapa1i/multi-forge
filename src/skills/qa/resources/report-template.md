@@ -54,7 +54,7 @@ If no issues: "No issues found."
 
 - **step-logs/**: raw command output per checklist step (copied from the mounted QA state dir)
 - **forge-logs/final/**: final Forge debug logs copied from the container at artifact-save time
-- **forge-logs-snapshots/**: pre-clean snapshots captured before any checklist step runs `forge logs --clean`
+- **forge-logs-snapshots/**: pre-clean snapshots captured before any checklist step runs `forge logs clean --yes`
 - **transcript.jsonl**: copied when the QA session exits (if the transcript claim token is satisfied)
 
 ## Notes

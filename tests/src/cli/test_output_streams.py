@@ -24,6 +24,7 @@ from forge.core.ops.session_context import SessionContextError
 
 # --json success paths that need no seeded data: empty logs still yield valid JSON.
 _JSON_STDOUT_LEAVES = [
+    ["logs", "show", "--json"],
     ["telemetry", "costs", "show", "--json"],
     ["telemetry", "trace", "list", "--json"],
     ["proxy", "audit", "show", "--json"],

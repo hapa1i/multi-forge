@@ -262,14 +262,15 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### System
 
-| Command             | Purpose                                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `forge info`        | Show global system information (`--json`)                                                            |
-| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                               |
-| `forge config`      | Manage global runtime preferences                                                                    |
-| `forge auth login`  | Store credentials for LLM providers                                                                  |
-| `forge auth status` | Show credential status per provider                                                                  |
-| `forge logs`        | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| Command             | Purpose                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `forge info`        | Show global system information (`--json`)                                                                       |
+| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                                          |
+| `forge config`      | Manage global runtime preferences                                                                               |
+| `forge auth login`  | Store credentials for LLM providers                                                                             |
+| `forge auth status` | Show credential status per provider                                                                             |
+| `forge logs show`   | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| `forge logs clean`  | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
 
 ### Internal (hidden from `forge --help`)
 
