@@ -1584,8 +1584,8 @@ unchanged; `make pre-commit` clean. Read-only render -- no integration tier.
 
 ## 2026-05-22 — 2026-05-31 (compacted)
 
-- **runtime_abstraction Phase 1**: shipped schema-backed curated transfer + `forge transfer` CLI. Canonical sections
-  1-7 + User Notes overlay, schema v1, three-file artifacts (`generated.md`, frozen child copy, notes overlay), and
+- **runtime_abstraction Phase 1**: shipped schema-backed curated transfer + `forge transfer` CLI. Canonical sections 1-7
+  \+ User Notes overlay, schema v1, three-file artifacts (`generated.md`, frozen child copy, notes overlay), and
   `show|regenerate|edit|diff`; `--review` stayed opt-in, `structured` stayed default, `ai-curated` stayed opt-in, and
   `ctx` remained inspiration only. Design detail lives in §3.9 and appendix §M.
 - **memory_substrate (PR #8)**: split "handoff" into the **memory writer** (Stop-time doc curation) and **transfer**
