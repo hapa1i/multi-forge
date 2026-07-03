@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-03
 
+### backend_runtime_cleanup Step 2: Runtime-Id Backend Stop
+
+**Goal**: Make backend runtime cleanup operate on the live runtime objects users see in `forge model backend list`,
+while keeping backend config management separate.
+
+**Key changes**:
+
+- Changed `forge model backend stop` to accept runtime instance ids, multiple targets, and `--all`/`--yes`; local source
+  ids and bare adapters now fail with runtime-id guidance, while remote sources keep the no-local-lifecycle boundary.
+- Removed the `stop/delete --port` runtime spelling. `delete <adapter>` is config-only, rejects registered runtime ids
+  with a `stop <runtime-id>` tip, and still stops matching local runtime instances before removing the adapter config.
+- Deleted the obsolete `delete --port` double-stop regression after replacing that behavior with a clean-break exit-2
+  assertion.
+- Folded in the backend slice of cli_style B1: group help defines source id/runtime instance id/adapter, examples use
+  valid id spaces, reconcile help names `backend list` discovery, and source-row JSON dual keys are documented.
+
+**Verification**: `uv run pytest tests/src/cli/test_backend_commands.py -q` (42 passed); `make test-regression` (482
+passed); `make test-unit` (7302 passed, 117 deselected);
+`uv run ruff check src/forge/cli/backend.py tests/src/cli/test_backend_commands.py`; help smoke for
+`forge model backend --help`, `stop --help`, and `delete --help`; `make pre-commit` clean.
+
 ### cli_style A1: CLI Error Streams To Stderr
 
 **Goal**: Keep CLI result streams parse-safe by routing top-level CLI errors and diagnostics to stderr.
@@ -1493,109 +1514,73 @@ unchanged; `make pre-commit` clean. Read-only render -- no integration tier.
 
 ## 2026-06-10 -- 2026-06-14 (compacted)
 
-- **Codex frontend shipped as a first-class alternate runtime.** Phases 2-6 added the one-command Codex launch path
-  (`forge session start/resume --runtime codex`), hook adapter/responder surfaces, SessionStart transfer delivery,
-  interactive TUI support, codex-hooks installation/enrollment plumbing, capability/version guards, and review fixes
-  around fork/rollback isolation, enrollment state, policy persistence, handoff artifacts, and invoker behavior. The
-  closeout moved the card to done and recorded remaining empirical enrollment residuals.
-- **Deferred Codex items remain tracked** (full detail in `done/codex_frontend/` and `done/runtime_abstraction/`):
-  app-server transport (`codex app-server`/`--stdio`, unevaluated by scope decision), filing the upstream fail-open
-  issue (draft ready), and the PermissionRequest/`trusted_hash` source-dive (documented-not-built).
-- **Codex probe and enrollment evidence was preserved at the decision level.** Stages 84-87 covered cross-project trust,
-  version churn, guided enrollment, and interactive reattach smoke paths. The durable outcome was that trust is scoped,
-  `pretool_policy` is partial/enrollment-gated, SessionStart additional context is viable when enrolled, and some
-  guided/operator steps remain intentionally external to non-interactive automation.
-- **Supervisor/session work landed in parallel.** Supervisor cascade added tier-1 plan checks before the frontier
-  supervisor; launch controls gained cascade/reasoning-effort parity across subprocesses; shadow sampling measured
-  false-aligned cascade outcomes; same-dir transfer forks decoupled transfer mode from worktree isolation.
-- **Verification highlights**: focused Codex runtime/hook/session suites, real-Codex E2E probes, supervisor cascade and
-  shadow suites, same-dir transfer fork regressions, mypy/pyright, and `make pre-commit` were run across the compacted
-  work. Detailed per-phase matrices remain in git history before this compaction.
+- **Codex frontend shipped as a first-class alternate runtime** (detail in `done/codex_frontend/`,
+  `done/runtime_abstraction/`). Phases 2-6: one-command launch (`forge session start/resume --runtime codex`), hook
+  adapter/responder surfaces, SessionStart transfer delivery, interactive TUI, codex-hooks enrollment,
+  capability/version guards, review fixes (fork/rollback isolation, enrollment state, policy persistence, handoff
+  artifacts, invoker). Deferred: app-server transport (`codex app-server`/`--stdio`), upstream fail-open issue (draft),
+  PermissionRequest/ `trusted_hash` source-dive. Enrollment evidence (stages 84-87): trust scoped, `pretool_policy`
+  enrollment-gated, SessionStart context viable when enrolled.
+- **Supervisor/session in parallel**: supervisor cascade tier-1 plan checks; launch-control cascade/effort parity across
+  subprocesses; shadow sampling of false-aligned outcomes; same-dir transfer forks decoupled from worktree isolation.
+- **Verification**: Codex runtime/hook/session suites, real-Codex E2E, supervisor cascade/shadow suites, same-dir
+  transfer regressions, mypy/pyright, `make pre-commit` clean.
 
 ## 2026-06-04 -- 2026-06-09 (compacted)
 
-- **Codex/runtime_abstraction closeout.** Probe-only Codex frontend evaluation confirmed `codex exec` hooks do not fire
-  headless in codex-cli 0.138.0, so SessionStart transfer delivery and headless policy hooks stay no-go while the bridge
-  path stays initial-message based. Runtime/preflight capability fields now report `headless_inert`/`none`. Phase 5e
-  shipped `bridge_session_to_codex` (parent -> ai-curated Codex transfer -> `codex exec`, one run tree) plus transfer
-  curation usage attribution; Phase 5f synced design docs and added the end-user transfer guide. Codex headless runtime,
-  preflight, stream parser, unavailable-cost usage, and target-runtime transfer threading shipped in the preceding
-  phases.
-- **Metric evidence and activity closeout.** Forge cost accounting moved to reported-or-unavailable figures, deleted the
-  price catalog, removed strict preflight cap estimates, added reporter/confidence vocabulary, and kept spend caps
-  post-event. `forge usage` became `forge activity`; `forge proxy costs reset` now clears telemetry/cap/status-line cost
-  state; tombstones and stale migration shims were removed as clean breaks where appropriate.
-- **Workspace/status-line hardening.** `project_root` resolution became git-common-dir-derived for linked worktrees,
-  `--scope repo` became `--scope workspace`, session pre-seed lifecycle docs were aligned, and status-line producer /
-  cap-load / weekly-quota regressions were fixed.
-- **Reader and proxy safety fixes.** Cost/audit JSONL readers gained non-object guards; headless retry, parallel
-  cleanup, negative-delta, and provenance edge cases from PR review were covered by regressions.
-- **Verification highlights**: Codex probe harness stages and runtime/preflight suites green; bridge/transfer/codex
-  suites and real-codex E2E green; metric/activity/status-line suites and `make pre-commit` clean. Detailed per-phase
-  verification remains in git history before this compaction.
+- **Codex/runtime_abstraction closeout.** Probe confirmed `codex exec` hooks do not fire headless in codex-cli 0.138.0
+  (SessionStart delivery + headless policy hooks stay no-go; bridge path stays initial-message based; capability fields
+  report `headless_inert`/`none`). Phase 5e shipped `bridge_session_to_codex` (parent -> ai-curated transfer ->
+  `codex exec`, one run tree) + transfer-curation usage attribution; 5f synced docs + end-user transfer guide.
+- **Metric/activity closeout.** Cost accounting moved to reported-or-unavailable (deleted price catalog, dropped strict
+  cap estimates, added reporter/confidence vocab, spend caps post-event). `forge usage` -> `forge activity`;
+  `forge proxy costs reset` clears telemetry/cap/status-line cost; stale migration shims removed as clean breaks.
+- **Workspace/status-line hardening.** `project_root` git-common-dir-derived for linked worktrees; `--scope repo` ->
+  `--scope workspace`; status-line producer / cap-load / weekly-quota regressions fixed.
+- **Reader/proxy safety.** Cost/audit JSONL non-object guards; headless retry, parallel cleanup, negative-delta,
+  provenance edge cases covered by regressions.
+- **Verification**: Codex probe/preflight suites, bridge/transfer/codex + real-codex E2E, metric/activity/status-line
+  suites, `make pre-commit` clean.
 
-## 2026-06-03 (compacted)
+## 2026-06-01 -- 2026-06-03 (compacted)
 
-- **runtime_abstraction Phase 4 follow-up**: `forge usage [session]` + session-end summary
-  (`read_usage_events(session=)` filter, pure `build_session_activity_summary`; design §3.12/§3.14, appendix §A.13);
-  sidecar usage-ledger mount (rw, proxy-id gated). Review fixes: workflow double-count (N-worker panel read as N+1)
-  split into `CommandUsage.workers`; supervisor-warning misattribution. QA proxy bugs: accepts mid-conversation
-  `{"role":"system"}`; passthrough streaming errors surface real status; QA refuses a stale-revision container.
-- **Statusline Enhancement (Phases 1-5)**: config-driven status line — segment registry + lazy `RenderContext`;
-  billing-aware cost (`api`→$ / `subscription`→quota / `ambiguous`→`≈$`); throttled file-backed `cache_hit`;
-  Forge-unique opt-in segments (`supervisor`/`policy`/`audit`/`drift`); spend-cap proximity. Break: flat
-  `show_rate_limits` → opt-in `rate_limits` segment. Golden no-op guard freezes default output.
+**runtime_abstraction Phase 4 (Slices 4a-4f) + statusline** — runtime-abstraction core:
 
-## 2026-06-02 (compacted)
-
-- **Phase 4 hardening (4a/4c/4d)**: `run_parallel` spawn/register TOCTOU fixed with a lock-guarded `cleanup_started`
-  flag (children reaped exactly once; no Ctrl+C hang/orphan); typed `HeadlessResult.cancelled` (cancelled workers emit
-  no error usage); `emit_direct_llm_usage` copies `cached_tokens`; both-or-neither `origin_run_id`/`origin_root_run_id`
-  contract.
-- **Phase 4 integration validation**: `test_policy_hooks.py` 10/10, `test_supervisor_e2e.py` 4/4, real-claude
-  memory/workers green. Pre-existing: `test_real_shadow_curation_smoke` fails on a stale `--session` arg (PR #6
-  ancestor; test-only, tracked).
-
-## 2026-06-01 (compacted)
-
-**runtime_abstraction Phase 4 (Slices 4a-4f)** — runtime-abstraction core:
-
-- **4a run-tree env**: `RunIdentity` + `FORGE_RUN_ID`/`PARENT`/`ROOT`, orthogonal to `FORGE_DEPTH`; memory writer
-  re-roots under the session's origin identity. appendix §F.5/§C.1.
-- **4b usage ledger**: durable versioned `~/.forge/usage/events/` (third plane, joined by `request_id`; schema v1 strict
-  reads, never-raising writer). design §3.14, appendix §A.13.
-- **4c instrument paths**: `track_verb_cost` cost holder; emitters for workflow verbs + memory-writer/supervisor/shadow
-  \+ action tagger; conservative `billing_mode` (no key-presence inference).
-- **4d HeadlessInvoker**: new `core/invoker/` (`HeadlessRequest`/`Result`/`Attribution` + protocol +
-  `ClaudeHeadlessInvoker`); review fan-out moved **verbatim** behind `run_parallel` (the seam is the lifecycle, not
-  routing). design §5.5.5.
-- **4e runtime registry**: frozen `RuntimeSpec` per runtime in `RUNTIMES` (the capability source Phase 5 reads);
-  tri-state capability literals with version gates; `forge runtime list`. Nothing branches on it yet.
-- **4f runtime-tagged ActionContext**: `ActionContext.runtime` required attribution (policy engine stays
-  runtime-agnostic); Claude halves named behind `HookAdapter`/`HookResponder` protocols. design §4.1.4/§4.1.5.
-- **Phase 3 native-relocate** (PASS on Claude 2.1.158): opt-in `forge session fork --resume-mode native-relocate` (host
-  only; transfer stays default) with preflights + rollback + dir-scoped cleanup. Bug: `encode_project_path` now maps
-  `_`→`-` (Claude 2.1.158 hyphenates underscores). Regression `test_bug_encode_project_path_underscore.py`. design §3.9.
-  Deferred: `--rewrite-paths`, sidecar native-relocate, gated default flip.
-- **Phase 2 optional audit proxy**: opt-in wire chokepoint (inert by default); orthogonal `wire_shape`
-  (`openai_translated`|`anthropic_passthrough`) × `intercept.mode`; thinking-preserving passthrough;
-  redact-before-persist audit JSONL (`forge proxy audit show|diff`); sidecar host-persistent mounts. design
+- **4a-4c run-tree + usage ledger + instrumentation**: `RunIdentity` env (`FORGE_RUN_ID`/`PARENT`/`ROOT`, orthogonal to
+  `FORGE_DEPTH`; writer re-roots under origin); durable versioned `~/.forge/usage/events/` (schema v1 strict reads,
+  never-raising writer); `track_verb_cost` emitters, conservative `billing_mode`. appendix §F.5/§C.1/§A.13, design
+  §3.14.
+- **4d-4f invoker + runtime registry**: `core/invoker/` (`HeadlessRequest`/`Result`/`Attribution`; review fan-out moved
+  verbatim behind `run_parallel`); frozen `RuntimeSpec` in `RUNTIMES` + `forge runtime list` (Phase 5's capability
+  source); runtime-tagged `ActionContext` behind `HookAdapter`/`HookResponder`. design §5.5.5/§4.1.4/§4.1.5.
+- **Phase 4 hardening + follow-up**: `run_parallel` TOCTOU fixed (`cleanup_started`, reaped once); typed
+  `HeadlessResult.cancelled`; `emit_direct_llm_usage` copies `cached_tokens`; both-or-neither `origin_run_id` contract.
+  `forge usage [session]` + session-end summary (design §3.12/§3.14); sidecar usage-ledger mount. Review fixes: workflow
+  double-count → `CommandUsage.workers`; QA proxy bugs (mid-conversation `{"role":"system"}`, passthrough error status).
+  Validation: `test_policy_hooks.py` 10/10, `test_supervisor_e2e.py` 4/4; pre-existing `test_real_shadow_curation_smoke`
+  stale `--session` (test-only, tracked).
+- **Phase 3 native-relocate** (PASS, Claude 2.1.158): opt-in `session fork --resume-mode native-relocate` (host only;
+  transfer stays default). Bug: `encode_project_path` maps `_`→`-`; regression
+  `test_bug_encode_project_path_underscore.py`. design §3.9. Deferred: `--rewrite-paths`, sidecar native-relocate, gated
+  default flip.
+- **Phase 2 optional audit proxy**: opt-in wire chokepoint (inert by default); `wire_shape` × `intercept.mode`;
+  thinking-preserving passthrough; redact-before-persist audit JSONL (`forge proxy audit show|diff`). design
   §7.x/§3.4/§3.7. Deferred: real-upstream `@slow` passthrough replay e2e.
+- **Statusline Enhancement (Phases 1-5)**: config-driven segment registry + lazy `RenderContext`; billing-aware cost
+  (`api`→$ / `subscription`→quota / `ambiguous`→`≈$`); throttled `cache_hit`; opt-in
+  `supervisor`/`policy`/`audit`/`drift` segments. Break: `show_rate_limits` → opt-in `rate_limits`. Golden no-op guard.
 
 ## 2026-05-22 — 2026-05-31 (compacted)
 
-- **runtime_abstraction Phase 1**: shipped schema-backed curated transfer + `forge transfer` CLI. Canonical sections 1-7
-  \+ User Notes overlay, schema v1, three-file artifacts (`generated.md`, frozen child copy, notes overlay), and
-  `show|regenerate|edit|diff`; `--review` stayed opt-in, `structured` stayed default, `ai-curated` stayed opt-in, and
-  `ctx` remained inspiration only. Design detail lives in §3.9 and appendix §M.
-- **memory_substrate (PR #8)**: split "handoff" into the **memory writer** (Stop-time doc curation) and **transfer**
-  (resume/fork context); renamed modules/CLI (`forge memory-writer run`, `forge memory report show`) with old paths
-  tombstoned and durable accept-and-tolerate for `--resume-mode` / timeout keys.
-- **Add Claude Opus 4.8** (opt-in; defaults stayed on 4.6 at the time), and **memory strategies 7→4** (`--as`→
-  `--strategy`; shadow mode orthogonal via `--propose`; stale removed-strategy passports rejected).
-- **Memory Enhancement (PR #1, Phases 0-5)**: passport-authoritative doc ownership (passports select docs, session
-  activation decides whether the writer runs); `forge memory enable/track/untrack/list/status` + `shadows review`;
-  removed `.forge/memory.yaml`, `MemoryIntent.designated_docs`, and the three-tier resolver. design §5.6, appendix §G;
-  card archived to `done/memory_enhancement/`.
-- **CLI hardening**: command-shape invariant (groups orient, leaves act), shared recovery-tip helpers (`cli/output.py`),
-  template auto-start proxies, live-session deletion protection. Regressions added for each.
+- **runtime_abstraction Phase 1**: schema-backed curated transfer + `forge transfer` CLI (canonical sections 1-7 + User
+  Notes overlay, schema v1, three-file artifacts, `show|regenerate|edit|diff`; `--review`/`ai-curated` opt-in,
+  `structured` default). design §3.9, appendix §M.
+- **memory_substrate (PR #8)**: split "handoff" into the **memory writer** (Stop-time curation) and **transfer**
+  (resume/fork); renamed CLI (`forge memory-writer run`, `forge memory report show`), old paths tombstoned.
+- **Add Claude Opus 4.8** (opt-in), **memory strategies 7→4** (`--as`→`--strategy`; shadow via `--propose`; stale
+  removed-strategy passports rejected).
+- **Memory Enhancement (PR #1, Phases 0-5)**: passport-authoritative doc ownership;
+  `forge memory enable/track/untrack/list/status` + `shadows review`; removed `.forge/memory.yaml`,
+  `MemoryIntent.designated_docs`, three-tier resolver. design §5.6, appendix §G; card in `done/memory_enhancement/`.
+- **CLI hardening**: command-shape invariant, shared recovery-tip helpers (`cli/output.py`), template auto-start
+  proxies, live-session deletion protection. Regressions added.
