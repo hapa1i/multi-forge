@@ -1,8 +1,7 @@
 # CLI error-stream fix (stdout -> stderr) -- cli_style A1
 
-**Graduated slice** of
-[`docs/board/doing/cli_style_ux_compliance/card.md`](../../doing/cli_style_ux_compliance/card.md) item **A1** (the
-audit headline). The index stays in `proposed/`; this card owns the A1 execution unit only.
+**Graduated slice** of [`docs/board/doing/cli_style_ux_compliance/card.md`](../../doing/cli_style_ux_compliance/card.md)
+item **A1** (the audit headline). The index now lives in `doing/`; this card owns the A1 execution unit only.
 
 **Lane**: `done/`. **Branch**: `fix/cli-error-stream-stderr`. **Merged**: PR #70 on 2026-07-03. **Interleave**: Step 1
 of the agreed backend/cli sequencing (below).
@@ -53,8 +52,8 @@ So A1 = default flip (guard) **+** handler-default fix (11 sites) **+** 240-over
 `print_error`/`print_error_with_tip` default flip, the `handle_session_error` default, the 240 explicit-stdout
 overrides, the 13 `--json` error sites, the 4 red `secho` sites, and the guard extension that would have caught this.
 
-**Out:** every other cli_style row (A2/A4/A5, B1-B5, C) -- they stay in the `proposed/` index. B1 (backend help) folds
-into the Step-2 backend PR. `cli/hooks/` (hook-JSON contract) is a different surface, not A1.
+**Out:** every other cli_style row (A2/A4/A5, B1-B5, C) -- they stay in the `doing/` index. B1 (backend help) folds into
+the Step-2 backend PR. `cli/hooks/` (hook-JSON contract) is a different surface, not A1.
 
 ## Interleave / pause plan (agreed 2026-07-02)
 

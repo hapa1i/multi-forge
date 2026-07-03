@@ -202,5 +202,5 @@ re-raises `SystemExit` only when a single target (`:1154`).
 - [x] `change_log.md` entry added (feature-completion size).
 - [x] Docs synced: `cli_reference.md`, `design_appendix.md` §A.2.1, `end-user/proxy.md`.
 - [x] cli_style index annotated: **B1 shipped** (strike the group-help rows folded here); note the remaining B1 metavar
-  \+ B2-B5 rows stay in `proposed/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
+  \+ B2-B5 rows stay in `doing/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
 - [x] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).

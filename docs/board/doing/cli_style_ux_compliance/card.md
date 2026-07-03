@@ -273,11 +273,10 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 ## Sequencing & coupling
 
 - **This card is the active Step 3 coordinator, not one execution unit.** The rows span very different review risk:
-  auth/config output routing, telemetry/money-path-adjacent commands, a `session --json` shape change (A4/B), the
-  `logs` group redesign (A5), pure docs (B2), and clean-break removals (C). Execute selected rows as focused slices in
-  the checklist grouped by review concern (for example, "A5 logs group", "Batch B help-text pass", "Batch C breaks") --
-  each with its own verification guard. The batch card stays the durable index while individual slices graduate out of
-  it.
+  auth/config output routing, telemetry/money-path-adjacent commands, a `session --json` shape change (A4/B), the `logs`
+  group redesign (A5), pure docs (B2), and clean-break removals (C). Execute selected rows as focused slices in the
+  checklist grouped by review concern (for example, "A5 logs group", "Batch B help-text pass", "Batch C breaks") -- each
+  with its own verification guard. The batch card stays the durable index while individual slices graduate out of it.
 - **Batch A is independent and high-value.** A1 shipped with the guard-test extension in PR #70. A2/A4 are trivial
   single-file changes; A3 is gated on its Open question.
 - **A3 \<-> the `accidental_complexity_cleanup` "WorkflowPolicy product boundary" item.** Both touch `policy enable`:

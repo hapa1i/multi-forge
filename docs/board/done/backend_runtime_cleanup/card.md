@@ -18,8 +18,8 @@ runtime object is a process/registry entry rather than durable config, so the cl
 **Relationship to existing work**:
 
 - Builds on `unified_backend`: catalog source ids and runtime instance ids are intentionally separate value-spaces.
-- Distinct from, but coupled to, `doing/cli_style_ux_compliance` B1/C2, which improves help/metavar clarity for the
-  same id-space split. This card adds the missing operator behavior.
+- Distinct from, but coupled to, `doing/cli_style_ux_compliance` B1/C2, which improves help/metavar clarity for the same
+  id-space split. This card adds the missing operator behavior.
 - Does not make remote backend sources lifecycle-managed. Remote sources remain built-in/static definitions with no
   local process to delete.
 
