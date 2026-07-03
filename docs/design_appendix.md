@@ -190,9 +190,14 @@ command stays offline for remote sources: configured remote sources show as `unp
 reachability/auth probe without echoing secret values. A `runtime_native` source carries no Forge credential, so `list`
 reports its auth as `runtime_native` and health as `runtime-owned`, and `test-auth` skips the probe with a pointer to
 `forge runtime preflight codex` instead of reporting a credential failure. `forge model backend show <source-id>`
-renders catalog details and local runtime state when a source has lifecycle. `start` and `stop` accept local source ids
-or legacy adapter operands; remote source operands return an intentional no-lifecycle capability error. `create` and
-`delete` remain local adapter/config operations because built-in remote sources are not user-created durable state.
+renders catalog details and local runtime state when a source has lifecycle, while `show <runtime-id>` renders a
+registry-only runtime view. `start` stays config-oriented: it accepts local source ids or adapter operands with
+`--port`. `stop` is process-oriented: it accepts runtime instance ids such as `litellm-4000`, or `--all` for every
+registered local runtime instance; local source ids and bare adapters are rejected with a runtime-id recovery tip, and
+remote source operands keep the intentional no-lifecycle capability error. `create` and `delete` remain local
+adapter/config operations because built-in remote sources are not user-created durable state. `delete <adapter>` may
+stop matching runtime instances before removing the config, but `delete <adapter> --port <port>` is no longer a
+runtime-instance spelling.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 

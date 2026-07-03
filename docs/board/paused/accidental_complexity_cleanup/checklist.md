@@ -24,7 +24,9 @@ Order does not matter functionally; #1 (bug fix) and the trivial deletions lead 
 - [x] **#1** `cli/backend.py`: extract `_stop_instance(adapter, port)` (core stop, no output/exit) shared by `stop_cmd`
   and `delete_cmd`. Assertion: `delete_cmd` no longer calls `stop_cmd.callback`; both `# type: ignore[misc]` gone; a
   single-instance delete prints exactly one "Stopped" line (no double), and a stop failure surfaces via `delete_cmd`'s
-  own `print_error` (no nested `sys.exit` from `stop_cmd`).
+  own `print_error` (no nested `sys.exit` from `stop_cmd`). **Superseded 2026-07-03** by `backend_runtime_cleanup`:
+  `delete --port` was removed, `stop` now targets runtime ids, and the old regression was deleted in favor of
+  clean-break coverage in `tests/src/cli/test_backend_commands.py`.
 - [x] **#2** Delete `src/forge/policy/semantic/promotion.py` (18-line docstring-only module, 0 importers). Assertion:
   `grep -rn "semantic.promotion\|import promotion" src tests` returns nothing; suite imports clean.
 - [x] **#3** `install/settings_merge.py`: delete `resolve_template_paths()` (0 callers, empty placeholder dict).
@@ -71,14 +73,14 @@ Order does not matter functionally; #1 (bug fix) and the trivial deletions lead 
 
 ### Acceptance tests (risky / behavior-touching items)
 
-| Test                             | Fixture                                               | Assertion                                            | Test File                                                                           |
-| -------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `is_active` truthful             | one live active-session entry + one dormant session   | live item `is_active is True`, dormant `False`       | `tests/src/core/ops/test_session_ops.py`                                            |
-| `--json` emits live flag         | `session list --json --scope all` with a live session | JSON row `is_active: true`                           | `tests/src/cli/test_session_commands.py` (`test_list_json_reports_active_liveness`) |
-| backend delete: single "Stopped" | one running instance, `backend delete --port -y`      | exactly one "Stopped" line; no nested exit           | `tests/regression/test_bug_backend_delete_double_stop.py`                           |
-| old passport accept-and-ignore   | YAML `update.inherit_on_fork: false`                  | parses without error; round-trips without the key    | `tests/src/session/test_passport.py`                                                |
-| env override still coerces       | `FORGE_DEBUG=1` / bogus value                         | `log_level=debug` / warn-and-ignore                  | `tests/src/test_runtime_config.py`                                                  |
-| upstream suppression holds       | invoker result with `attribution.operation=None`      | no upstream row recorded (usage event still emitted) | `tests/src/core/invoker/test_*.py`                                                  |
+| Test                           | Fixture                                               | Assertion                                            | Test File                                                                           |
+| ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `is_active` truthful           | one live active-session entry + one dormant session   | live item `is_active is True`, dormant `False`       | `tests/src/core/ops/test_session_ops.py`                                            |
+| `--json` emits live flag       | `session list --json --scope all` with a live session | JSON row `is_active: true`                           | `tests/src/cli/test_session_commands.py` (`test_list_json_reports_active_liveness`) |
+| backend delete clean break     | `backend delete litellm --port 4000`                  | exits 2; no runtime stop path remains                | `tests/src/cli/test_backend_commands.py` (`test_delete_port_option_is_clean_break`) |
+| old passport accept-and-ignore | YAML `update.inherit_on_fork: false`                  | parses without error; round-trips without the key    | `tests/src/session/test_passport.py`                                                |
+| env override still coerces     | `FORGE_DEBUG=1` / bogus value                         | `log_level=debug` / warn-and-ignore                  | `tests/src/test_runtime_config.py`                                                  |
+| upstream suppression holds     | invoker result with `attribution.operation=None`      | no upstream row recorded (usage event still emitted) | `tests/src/core/invoker/test_*.py`                                                  |
 
 ### Deferred / decisions
 

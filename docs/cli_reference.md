@@ -201,12 +201,12 @@ runners.
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `forge model catalog`                             | List the static model catalog (`--json`)                                                   |
 | `forge model backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
-| `forge model backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
+| `forge model backend show <source-or-backend-id>` | Show source details or runtime instance details (`--raw`)                                  |
 | `forge model backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
 | `forge model backend create <adapter>`            | Create local backend adapter config                                                        |
-| `forge model backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
-| `forge model backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
-| `forge model backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
+| `forge model backend start <source-or-adapter>`   | Start a local lifecycle source or adapter config                                           |
+| `forge model backend stop <runtime-id>...`        | Stop live local runtime instances by id, or all with `--all`                               |
+| `forge model backend delete <adapter>`            | Delete local backend adapter config, stopping matching runtime instances first             |
 | `forge model backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement
