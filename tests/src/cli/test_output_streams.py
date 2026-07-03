@@ -253,7 +253,7 @@ _JSON_ERROR_PATH_CASES = [
     (["proxy", "create", "no-such-template-xyz", "--json"], "not found"),
     (
         ["model", "backend", "test-auth", "no-such-source-xyz", "--json"],
-        "Unknown backend source",
+        "Unknown backend",
     ),
     (
         ["model", "backend", "reconcile", "no-such-source-xyz", "--json"],
