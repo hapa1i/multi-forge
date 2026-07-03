@@ -504,8 +504,9 @@ construct minimal valid tool-call objects (avoiding empty placeholders like `"pa
 prefer dedicated tools (Read/Edit/Write) over Bash. Both OpenAI and Gemini share the same core tool-discipline guidance;
 the Gemini variant uses stronger Bash-avoidance language due to a higher observed rate of `cat`/`sed`/`grep` use.
 
-**Injection layer:** `src/forge/cli/session_addendum.py` resolves the addendum at session launch time
-(`session_lifecycle.py`), not inside the proxy request path. Direct HTTP use of a proxy does not get addendum injection.
+**Injection layer:** `src/forge/session/addendum.py` resolves and writes the addendum; `launch_claude_session` in
+`src/forge/core/ops/claude_session.py` composes it at session launch time, not inside the proxy request path. Direct
+HTTP use of a proxy does not get addendum injection.
 
 **Catalog field:** `system_prompt_addendum` on each model entry in `model_catalog.yaml`. Value is a relative path like
 `system_prompt_addendums/openai.md` pointing to a markdown resource in `src/forge/core/data/`.
