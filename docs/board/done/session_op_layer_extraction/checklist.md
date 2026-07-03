@@ -882,8 +882,8 @@ smokes green).
 
 ## Closeout Items
 
-- [x] Slice 1 assertions ticked with verification recorded.
-- [x] `docs/board/change_log.md` entry added for Slice 1.
-- [x] `make pre-commit` clean.
-- [x] Integration result recorded, including any environment limitation.
-- [x] Card remains in `doing/` after Slice 1; move to `done/` only when all 5 slices land.
+- [x] All five roadmap slices ticked with verification recorded.
+- [x] `docs/board/change_log.md` entries added for the completed extraction slices.
+- [x] `make pre-commit` clean after final Slice 5 closeout.
+- [x] Docker lifecycle integration result recorded (`21 passed`).
+- [x] Card is ready to move `doing/ -> done/`.
