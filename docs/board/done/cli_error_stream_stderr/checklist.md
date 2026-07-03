@@ -3,7 +3,7 @@
 **Branch**: `fix/cli-error-stream-stderr` - **Card**: [`card.md`](card.md)
 
 **Current focus**: Step 1 of the interleave -- route CLI error/diagnostic output to stderr so `forge ... --json | jq`
-never sees an error on stdout. **Status: IMPLEMENTED; pending review/merge closeout.**
+never sees an error on stdout. **Status: SHIPPED in PR #70; board closeout complete.**
 
 **Guiding rule** (`cli_style_guidelines.md` "Output Streams"): results + all `--json` -> stdout; errors/diagnostics ->
 stderr. **AST-verified base counts** (branch base, 2026-07-02, scope `src/forge/cli/*.py`): **0** bare `print_error*`;
@@ -95,6 +95,6 @@ not line greps -- greps miscount multiline calls.**
 - [x] All phases ticked with verification recorded.
 - [x] `change_log.md` entry added.
 - [x] Falsifiable grep + AST `console=console`/continuation re-scan + extended guard all green.
-- [ ] cli_style index annotated: A1 shipped (row struck), pause of the remaining rows continues.
-- [ ] Card moved `doing/ -> done/` after merge to `main`; index note points to Step 2 (`backend_runtime_cleanup`) as the
+- [x] cli_style index annotated: A1 shipped (row struck), pause of the remaining rows continues.
+- [x] Card moved `doing/ -> done/` after merge to `main`; index note points to Step 2 (`backend_runtime_cleanup`) as the
   next cursor.

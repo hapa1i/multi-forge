@@ -4,8 +4,8 @@
 [`docs/board/proposed/cli_style_ux_compliance/card.md`](../../proposed/cli_style_ux_compliance/card.md) item **A1** (the
 audit headline). The index stays in `proposed/`; this card owns the A1 execution unit only.
 
-**Lane**: `doing/`. **Branch**: `fix/cli-error-stream-stderr`. **Interleave**: Step 1 of the agreed backend/cli
-sequencing (below).
+**Lane**: `done/`. **Branch**: `fix/cli-error-stream-stderr`. **Merged**: PR #70 on 2026-07-03. **Interleave**: Step 1
+of the agreed backend/cli sequencing (below).
 
 ## Problem
 
@@ -58,8 +58,9 @@ into the Step-2 backend PR. `cli/hooks/` (hook-JSON contract) is a different sur
 
 ## Interleave / pause plan (agreed 2026-07-02)
 
-1. **Step 1 (this card):** cli_style A1 error-stream root fix. Ship, then pause cli_style.
-2. **Step 2:** `backend_runtime_cleanup` (full) + fold in cli_style **B1** backend-help (help-only, no metavar rename).
+1. **Step 1 (this card):** cli_style A1 error-stream root fix. **Shipped in PR #70**; cli_style is paused.
+2. **Step 2 (next cursor):** `backend_runtime_cleanup` (full) + fold in cli_style **B1** backend-help (help-only, no
+   metavar rename).
 3. **Step 3:** resume cli_style for A2/A4/A5, B2-B5, C by review concern.
 
 ## Resolved decisions (maintainer, 2026-07-02)

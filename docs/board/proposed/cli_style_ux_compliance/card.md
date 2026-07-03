@@ -5,15 +5,14 @@ span different review risk, so this card is **not** meant to move wholesale to `
 rows into their own execution card(s)/`checklist.md` grouped by review concern (see
 [Sequencing & coupling](#sequencing--coupling)). Not blocking other work.
 
-**Scheduling status (2026-07-02)**: **A1 graduated** to `docs/board/doing/cli_error_stream_stderr/` (branch
-`fix/cli-error-stream-stderr`) as **Step 1** of an agreed interleave; this index stays in `proposed/` tracking the
-remaining rows. Interleave: **Step 1** cli_style A1 (error-stream root fix) -> **pause cli_style** -> **Step 2**
-[`backend_runtime_cleanup`](../backend_runtime_cleanup/card.md) (full) **+ fold in B1 backend-help** (help-only, no
-metavar rename) -> **Step 3** resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction (AST-verified 2026-07-02):** this
-row's grep model is wrong -- there are **0 bare `print_error*` calls** (so the default flip fixes no current site; it is
-a forward guard), **240** (not 173) `console=console` explicit-stdout overrides, and a missed **handler-default** gap
-(`handle_session_error` resolves to stdout at `output.py:108`, 11 bare sites). The graduated card owns the corrected
-root strategy.
+**Scheduling status (2026-07-03)**: **A1 shipped in PR #70** and is archived at
+[`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). cli_style is paused after the
+A1 step. Next cursor: **Step 2** [`backend_runtime_cleanup`](../backend_runtime_cleanup/card.md) (full) **+ fold in B1
+backend-help** (help-only, no metavar rename), then **Step 3** resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
+(AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls** (so the
+default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
+overrides, and a missed **handler-default** gap (`handle_session_error` resolved to stdout at `output.py:108`, 11 bare
+sites). The shipped card owns the corrected root strategy and verification.
 
 **Origin**: full-CLI audit, 2026-07-01. A 19-unit parallel fan-out (one auditor per command group + 4 cross-cutting
 lanes) enumerated all **135 commands/subcommands** via live `forge ... --help`, checked each against four dimensions
@@ -70,7 +69,7 @@ three small research-preview breaking changes (batch separately).
 
 ## Batch A -- compliance bugs (High confidence, verified file:line) -- do first
 
-### A1 -- Errors leak to stdout, not stderr (**systemic**, not a handful) -- **the headline**
+### ~~A1 -- Errors leak to stdout, not stderr~~ (**shipped via PR #70**)
 
 `cli_style_guidelines.md` "Output Streams" (lines 122, 146): *results (incl. all `--json`) -> stdout;
 diagnostics/warnings/errors -> stderr*, and errors "that must not pollute stdout pass `console=err_console`." **Verified
@@ -87,7 +86,12 @@ but the Output Streams rule is unambiguous, and the scripting-breaking subset is
 | **1b: human `print_error` -> stdout** (systemic)            | `print_error(..., console=<local stdout console>)`                           | **~253** across most modules -- e.g. `proxy.py` **27** (`proxy set` errors, `:883`), `session_manage.py` **21** (`session delete`, `:125`), `policy.py` **17**, `config_cmd.py` **14** (`config set`, `:123`), `logs.py` (`:265,270`), `backend.py` **5** |
 | **1c: `secho` red -> stdout**                               | `click.secho(..., fg="red")` w/o `err=True`                                  | **4**: `auth.py:191,396,505,508` (note `auth.py:182` gets it right -- copy-paste miss)                                                                                                                                                                    |
 
-**Action** (recommended: fix the *root*, not 300 call sites):
+**Status**: shipped via PR #70; closeout and verification live in
+[`done/cli_error_stream_stderr`](../../done/cli_error_stream_stderr/card.md). The implementation used the corrected
+AST-derived root strategy, kept JSON error objects on stderr with `err=True`, and added guards for stdout overrides,
+split continuations, red diagnostics, and in-branch `--json` errors.
+
+**Original action** (kept for provenance):
 
 - **Flip the default.** Change `print_error` / `print_error_with_tip` in `output.py` to default their `Console` to the
   shared `err_console` (stderr), then audit the small set of genuinely-*informational* stdout uses and pass an explicit
@@ -253,12 +257,11 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 
 ## Open questions (need human input)
 
-| Q                                                                                                                                                                       | Area           | Why it matters                                                                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| A3: make `policy enable --bundle` **required** (fail loud) or implement **restore-configured-bundles-from-intent** (the `design_workflows.md §3.6` "planned" behavior)? | policy         | Decides whether A3 is a 2-line guard or a small feature.                                                         |
-| B1/C2: is the `model backend` metavar variance worth a rename at all, given it encodes a real source/adapter/instance distinction?                                      | model backend  | A blind rename would erase a documented value-space split (`impl_notes.md`); the safe fix may be help-text-only. |
-| A1: JSON error object on stderr (`err=True`, matching `proxy.py:135`) vs plain `err_console` text for `--json` failures?                                                | output streams | Both satisfy the rule; confirm the house pattern (existing compliant sites use JSON-on-stderr).                  |
-| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope          | Determines how much of C3 is actually actionable.                                                                |
+| Q                                                                                                                                                                       | Area          | Why it matters                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A3: make `policy enable --bundle` **required** (fail loud) or implement **restore-configured-bundles-from-intent** (the `design_workflows.md §3.6` "planned" behavior)? | policy        | Decides whether A3 is a 2-line guard or a small feature.                                                         |
+| B1/C2: is the `model backend` metavar variance worth a rename at all, given it encodes a real source/adapter/instance distinction?                                      | model backend | A blind rename would erase a documented value-space split (`impl_notes.md`); the safe fix may be help-text-only. |
+| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope         | Determines how much of C3 is actually actionable.                                                                |
 
 ---
 
@@ -270,8 +273,8 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
   split the selected rows into their own execution card(s)/`checklist.md` grouped by review concern (e.g. "A1
   error-stream root fix", "A5 logs group", "Batch B help-text pass", "Batch C breaks") -- each with its own PR and
   guard. The batch card stays the durable index; individual slices graduate out of it.
-- **Batch A is independent and high-value.** A1 is the one genuine bug; ship it **with** the guard-test extension in the
-  same PR (else it re-slips). A2/A4 are trivial single-file changes; A3 is gated on its Open question.
+- **Batch A is independent and high-value.** A1 shipped with the guard-test extension in PR #70. A2/A4 are trivial
+  single-file changes; A3 is gated on its Open question.
 - **A3 \<-> the `accidental_complexity_cleanup` "WorkflowPolicy product boundary" item.** Both touch `policy enable`:
   this card's A3 fixes its warn-and-exit-0; that card decides whether `--bundle`'s `Choice(["tdd","coding_standards"])`
   should gain a `workflow` path. Coordinate -- an A3 "make `--bundle` required" fix must not preempt that card's
@@ -296,9 +299,8 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 - The guard-gap finding (A1) was confirmed by reading `test_output_streams.py`: its failure-path cases all trigger
   *pre-flight* errors that never reach the in-branch `click.echo(json.dumps({"error": ...}))`.
 - 27 refuted candidates are listed above so they are not re-flagged.
-- **Falsifiable check**: after A1 lands,
-  `rg 'click\.echo\(json\.dumps\(\{"(error|routing_error)"' src/forge/cli/ | grep -v 'err=True'` must return empty, and
-  the extended guard must fail on a re-introduced no-`err=True` site.
+- **A1 shipped check**: PR #70 added CI-facing guards for JSON error `err=True`, `print_error*(console=console)`, split
+  error continuations, red diagnostics, and in-branch `--json` errors with empty stdout.
 
 ---
 

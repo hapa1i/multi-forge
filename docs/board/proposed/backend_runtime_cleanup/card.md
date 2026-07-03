@@ -2,12 +2,11 @@
 
 **Lane**: `proposed/`. Focused CLI ergonomics/ops card, not an architecture rewrite.
 
-**Scheduling status (2026-07-02)**: **Step 2** of an agreed interleave -- sequenced **after**
-[`cli_style_ux_compliance`](../cli_style_ux_compliance/card.md) **A1** (now active in
-`docs/board/doing/cli_error_stream_stderr/`, branch `fix/cli-error-stream-stderr`). When this card starts, **fold in
-cli_style B1 backend-help** in the same PR (define source-id vs runtime-instance-id vs adapter in the `backend` group
-help; fix B1's 3 verified traps; **help-only, no metavar rename**), since both edit `backend.py` help. Stays parked in
-`proposed/` until Step 1 ships.
+**Scheduling status (2026-07-03)**: **Next cursor / Step 2** of the agreed interleave after
+[`cli_style_ux_compliance`](../cli_style_ux_compliance/card.md) **A1** shipped in PR #70
+([done card](../../done/cli_error_stream_stderr/card.md)). When this card starts, **fold in cli_style B1 backend-help**
+in the same PR (define source-id vs runtime-instance-id vs adapter in the `backend` group help; fix B1's 3 verified
+traps; **help-only, no metavar rename**), since both edit `backend.py` help.
 
 **Origin**: stale local backend/proxy debugging, 2026-07-02. The proxy incident made the operator gap visible: when a
 local LiteLLM backend is suspected of carrying stale credentials or other bad process state, Forge has a clean
