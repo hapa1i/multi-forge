@@ -3,9 +3,9 @@
 **Branch**: `feat/cli-style-ux-compliance` - **Card**: [`card.md`](card.md)
 
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
-(PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, and **S5/C1** are done; what remains is **A3, C2, and C3**, each gated
-by an open question. Slices graduate out individually; this checklist stays the durable index. **Status: S5/C1
-IMPLEMENTED (activity `--period` clean break; verification passed 2026-07-03).**
+(PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, **S5/C1**, and **S3/A3** are done; what remains is **C2 and C3**, each
+gated by an open question. Slices graduate out individually; this checklist stays the durable index. **Status: S3/A3
+IMPLEMENTED (`policy enable` fail-loud clean break; focused tests passed 2026-07-03, `make pre-commit` at commit).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -15,16 +15,17 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 ## Grounded Base
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
-resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; A3 remains the live anchor.
+resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; S3 resolved A3. Every A/B anchor and C1 is shipped;
+only the OQ-gated C2/C3 remain.
 
-| Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                         |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A2   | `session_lifecycle.py:909`                                                                                                           | `:1189`                 | `--model` help literal ends `...claude-sonnet-4-6[1m])` (stray ANSI) -> delete `[1m]`                                                                                    |
-| A3   | `policy.py:282` (`enable`), warn `:291`, `return` `:293`                                                                             | `:275-278`              | bare `enable` prints `[yellow]Warning:[/yellow] No bundles specified` then `return` (exit 0) -> fail loud OR restore-from-intent (**gated**)                             |
-| A4   | `search.py:383` (`clean_cmd(yes)`), preview `:401-402`, tip `:408`                                                                   | `:381`                  | no `as_json`; `find_missing()` preview + `print_tip("Use --yes to prune.")` -> add `--json` (dest `as_json`), shape matching `forge clean`                               |
-| A5   | `logs.py:260` (`logs_cmd(clean, older_than)`); `--clean` `:252`; `_clean_logs` `:280`; `_show_logs` `:283`                           | `:247,265,270,275`      | `--clean` is_flag deletes immediately (no `--yes`, no preview); no `--json` on the read surface -> split into `logs show [--json]` + `logs clean [--older-than N] --yes` |
-| B5   | `session_lane.py` `--runtime` `:122` / `--backend` `:123`, `set_cmd` `:125`, raw re-print `:144`; origin `consumer_lanes.py:115,137` | `:100,115,141` / `:102` | **Resolved in S4**: `session lane set --help` and invalid-lane errors enumerate `valid_lanes(consumer)` (default + allowed, gate-filtered), including the default lane.  |
-| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | **Resolved in S5/C1**: `--period today\|week\|month\|all` replaces `--days`/`--all`; old flags exit 2 via Click "No such option".                                        |
+| Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A2   | `session_lifecycle.py:909`                                                                                                           | `:1189`                 | `--model` help literal ends `...claude-sonnet-4-6[1m])` (stray ANSI) -> delete `[1m]`                                                                                                                |
+| A3   | `policy.py:282` (`enable`), warn `:291`, `return` `:293`                                                                             | `:275-278`              | **Resolved in S3**: bare `enable` fails loud (`print_error_with_tip` -> stderr, exit 1); `--bundle` required. Restore-from-intent deferred to the `%policy enable` dispatcher (design_workflows.md). |
+| A4   | `search.py:383` (`clean_cmd(yes)`), preview `:401-402`, tip `:408`                                                                   | `:381`                  | no `as_json`; `find_missing()` preview + `print_tip("Use --yes to prune.")` -> add `--json` (dest `as_json`), shape matching `forge clean`                                                           |
+| A5   | `logs.py:260` (`logs_cmd(clean, older_than)`); `--clean` `:252`; `_clean_logs` `:280`; `_show_logs` `:283`                           | `:247,265,270,275`      | `--clean` is_flag deletes immediately (no `--yes`, no preview); no `--json` on the read surface -> split into `logs show [--json]` + `logs clean [--older-than N] --yes`                             |
+| B5   | `session_lane.py` `--runtime` `:122` / `--backend` `:123`, `set_cmd` `:125`, raw re-print `:144`; origin `consumer_lanes.py:115,137` | `:100,115,141` / `:102` | **Resolved in S4**: `session lane set --help` and invalid-lane errors enumerate `valid_lanes(consumer)` (default + allowed, gate-filtered), including the default lane.                              |
+| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | **Resolved in S5/C1**: `--period today\|week\|month\|all` replaces `--days`/`--all`; old flags exit 2 via Click "No such option".                                                                    |
 
 **Streams already correct** (do not touch): B5's routing goes through `err_console` (`session_lane.py:144`); the A1
 sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/message quality only, zero stream change.
@@ -62,13 +63,13 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Phase 1 -- Slice plan (execute by review concern, not as one change)
 
-| Slice  | Items          | Review concern                                     | Ships / gating                                                       |
-| ------ | -------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
-| **S1** | A2, A4         | Trivial CLI correctness (2 single-file edits)      | Ship first; lowest risk                                              |
-| **S2** | A5             | `logs` group redesign (behavior + clean break)     | After S1; needs docs + changelog                                     |
-| **S3** | A3             | `policy enable` fail-loud / restore-from-intent    | **BLOCKED on OQ-1**; coordinate with `accidental_complexity_cleanup` |
-| **S4** | B2, B3, B4, B5 | Help & error-message pass (+1 machine-output item) | Ship anytime; mostly help-snapshot; B4-json updates a pinning test   |
-| **S5** | C1, C2, C3     | Research-preview clean breaks                      | Batch separately; changelog per break; C2 gated on OQ-2, C3 on OQ-3  |
+| Slice  | Items          | Review concern                                     | Ships / gating                                                        |
+| ------ | -------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| **S1** | A2, A4         | Trivial CLI correctness (2 single-file edits)      | Ship first; lowest risk                                               |
+| **S2** | A5             | `logs` group redesign (behavior + clean break)     | After S1; needs docs + changelog                                      |
+| **S3** | A3             | `policy enable` fail-loud (clean break)            | **Done** -- OQ-1 resolved: fail loud; `%` dispatcher restore deferred |
+| **S4** | B2, B3, B4, B5 | Help & error-message pass (+1 machine-output item) | Ship anytime; mostly help-snapshot; B4-json updates a pinning test    |
+| **S5** | C1, C2, C3     | Research-preview clean breaks                      | Batch separately; changelog per break; C2 gated on OQ-2, C3 on OQ-3   |
 
 - [ ] Confirm the slice split with the maintainer (or proceed S1 -> S2 -> S4, holding S3/S5 on their gates).
 
@@ -120,17 +121,22 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   requires `--json` on clean leaves. If scriptable log cleanup becomes useful, mirror the `forge clean --json` /
   `search clean --json` shape in a later slice.
 
-## Phase 4 -- Slice S3: A3 (`policy enable` fail-loud) -- **BLOCKED on OQ-1**
+## Phase 4 -- Slice S3: A3 (`policy enable` fail-loud) -- **DONE** (OQ-1 resolved: fail loud)
 
-- [ ] Resolve **OQ-1** first: make `--bundle` **required** (fail non-zero), OR implement the `design_workflows.md §3.6`
-  "restore configured bundles from intent" behavior. Coordinate with `accidental_complexity_cleanup`'s
-  WorkflowPolicy-boundary item (both touch `policy enable`; an A3 "require --bundle" fix must not preempt that card's
-  demote-vs-graduate decision -- card [Sequencing](card.md#sequencing--coupling)).
-- [ ] Implement the resolved behavior at `policy.py:291-293`. **Assertion:** no missing-input path warns-and-exits-0;
-  bare `policy enable` either errors non-zero with a tip, or restores intent bundles and reports what it enabled.
-- [ ] Verification: add coverage in `tests/src/cli/test_policy_status.py` or a focused policy-enable test -- there is
-  **no** existing `policy enable` CLI invocation today (the file's `enable` hits are all `PolicyIntent(enabled=True)`
-  constructions, not CLI calls); `make pre-commit` clean.
+- [x] **OQ-1 resolved: fail loud** (not restore-from-intent). Rationale: the CLI is the explicit/scriptable surface, so
+  it requires `--bundle`; restore-from-intent belongs on the interactive `%policy enable` shortcut -- a *separate*
+  parser (`hooks/direct_commands.py` writes `overrides`; the CLI writes `intent`) where it is still `(planned)`. This
+  does not preempt `accidental_complexity_cleanup`'s WorkflowPolicy decision: that card owns the `%` dispatcher restore
+  path, not the CLI's require-a-bundle guard.
+- [x] Implemented at `policy.py:290-300`: replaced the stdout warn + `return` (exit 0) with `print_error_with_tip` on
+  **stderr** + `sys.exit(1)`. **Assertion:** bare `policy enable` prints `Error:` + `Tip:` naming
+  `tdd`/`coding_standards` and exits 1; stdout is empty (verified with `2>/dev/null`).
+- [x] Doc split: `design_workflows.md` "Re-enable enforcement" now says terminal `forge policy enable` requires an
+  explicit `--bundle`, scoping restore-from-intent to the `%policy enable` shortcut (previously implied CLI parity).
+- [x] Verification: new `tests/src/cli/test_policy_enable.py` (fail-loud names both bundles + help choices); happy-path
+  `enable --bundle tdd` and the `%` dispatcher/M7 regression suites unaffected. Repro:
+  `uv run pytest tests/src/cli/test_policy_enable.py tests/regression/test_bug_policy_ambiguous_session.py tests/src/cli/test_user_prompt_dispatcher.py tests/regression/test_bug_m7_policy_overrides.py`
+  -> 94 passed. CLI tip/error guards pass. `make pre-commit` at commit.
 
 ## Phase 5 -- Slice S4: Batch B (help & error-message pass; one machine-output exception)
 
@@ -195,9 +201,9 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Open questions (need human input -- from card)
 
-- **OQ-1 (gates S3/A3):** make `policy enable --bundle` required (fail loud), or implement the
-  `design_workflows.md §3.6` "restore configured bundles from intent" behavior? Resolve against
-  `accidental_complexity_cleanup`'s WorkflowPolicy decision.
+- **OQ-1 (gated S3/A3) -- RESOLVED 2026-07-03: fail loud.** `policy enable` requires `--bundle` (bare invocation errors
+  non-zero with a tip). Restore-from-intent is deferred to the `%policy enable` dispatcher -- a separate parser, still
+  `(planned)` in `design_workflows.md` -- so it does not preempt `accidental_complexity_cleanup`'s WorkflowPolicy work.
 - **OQ-2 (gates C2):** is the `model backend` metavar variance worth a rename, given it encodes a real
   source/adapter/instance distinction? (Likely help-only; B1 definitions already shipped.)
 - **OQ-3 (gates C3):** which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?
@@ -212,7 +218,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 | A5 logs clean preview      | logs dir populated                                    | `logs clean` deletes nothing; `logs clean --yes` removes files                  | `tests/src/cli/test_logs_command.py`            |
 | A5 old flags clean break   | `logs --clean` / `logs --older-than 7`                | exit 2 (Click "No such option")                                                 | `tests/src/cli/test_logs_command.py`            |
 | A5 tree invariants         | full command tree                                     | `logs show` guarded-read-JSON; `logs clean` `--yes`-preview                     | `tests/src/cli/test_command_tree_invariants.py` |
-| A3 no warn-and-exit-0      | bare `policy enable`                                  | resolved behavior: fail non-zero + tip, or restore-from-intent                  | `tests/src/cli/test_policy_status.py`           |
+| A3 no warn-and-exit-0      | bare `policy enable`                                  | fail loud: `Error`+`Tip` on stderr, exit 1, stdout empty                        | `tests/src/cli/test_policy_enable.py`           |
 | B5 invalid lane enumerates | `lane set --consumer team_supervisor --runtime codex` | stderr names valid lanes for the consumer, not raw `LaneError`                  | `tests/src/cli/test_session_lane.py`            |
 | C1 `--period` clean break  | `telemetry activity --days 7`                         | `--period week` works; `--days` exits 2                                         | `tests/src/cli/test_activity.py`                |
 | B4-json activity tip       | `telemetry activity ghost --json` (missing)           | tip reachable in `--json`; stdout clean for `jq`; `test_not_found_json` updated | `tests/src/cli/test_activity.py`                |

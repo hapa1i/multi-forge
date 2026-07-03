@@ -633,6 +633,8 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
    - **Re-enable enforcement:**
      - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
      - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
+     - Terminal `forge policy enable` requires an explicit `--bundle` and fails loud with none: restore-from-intent is
+       the interactive `%policy enable` shortcut's behavior, not the scriptable CLI's.
 
    `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the
    next Write/Edit passes the hook.
