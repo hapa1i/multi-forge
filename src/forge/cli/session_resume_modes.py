@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from forge.cli.output import console, handle_session_error, print_error_with_tip
+from forge.cli.session_routing import ResolvedRouting
 from forge.core.ops.claude_session import ClaudeResumeAction, ResumeLaunchPlan
 from forge.core.paths import display_path
 from forge.session import ForgeSessionError, SessionManager, SessionState
@@ -14,9 +14,6 @@ from forge.session.context_limit import _resolve_context_limit
 from forge.session.launch import _combine_prompt_files
 
 from .session_rewind import _prepare_rewind_launch_artifacts
-
-if TYPE_CHECKING:
-    from forge.cli.session import ResolvedRouting
 
 
 def _resume_fresh_rewind(

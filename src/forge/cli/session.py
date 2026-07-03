@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,6 +29,7 @@ import click
 from forge.cli.output import console, err_console
 from forge.cli.output import handle_session_error as handle_session_error
 from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.session_routing import ResolvedRouting
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
 from forge.session import (
@@ -50,24 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 # --- Routing resolution ---
-
-
-@dataclass(frozen=True)
-class ResolvedRouting:
-    """Resolved proxy routing for a session launch.
-
-    Produced by _resolve_routing_from_cli() and threaded through
-    launch_new_session, resume, fork, etc.
-    """
-
-    template: str | None = None
-    base_url: str | None = None
-    proxy_id: str | None = None
-    context_limit: int | None = None
-
-    @property
-    def is_direct(self) -> bool:
-        return self.base_url is None
 
 
 def _resolve_routing_from_cli(
