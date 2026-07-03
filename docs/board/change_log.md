@@ -81,18 +81,54 @@ safety net.
 **Verification**: characterization test 2 passed; focused units 241 passed; Docker lifecycle integration 21 passed;
 layering/UI-free greps empty; `make pre-commit` clean.
 
-### Board closeout: rewind_resume_strategy
+### reject_rewind_transfer_strategy: rewind is not a transfer-context strategy (PR #68)
 
-**Goal**: Close the shipped rewind resume strategy card so `doing/` reflects only active work.
+**Goal**: Fix the follow-up bug from #66 -- adding `ResumeStrategy.REWIND` made the codex/transfer ops accept
+`strategy="rewind"` at the front door even though transfer assembly rejects it (rewind is a Claude-only `--drop-last`
+launch path, not a context-assembly strategy).
 
 **Key changes**:
 
-- `rewind_resume_strategy` moved `doing/ -> done/` after confirming all implementation slices were already ticked and
-  the docs named in the checklist reflect the shipped `--strategy rewind --drop-last N` behavior.
-- The card/checklist stale "Slice 4 next" focus was corrected to closeout state.
+- Single source of truth in `session/transfer.py`: `TRANSFER_CONTEXT_STRATEGIES` / `TRANSFER_CONTEXT_STRATEGY_VALUES` +
+  `parse_transfer_context_strategy()` (the four assembly strategies; excludes rewind). The four codex/transfer ops and
+  both transfer-facing CLI `Choice` lists source from it; `assemble_transfer_context` now rejects any non-transfer
+  strategy (not just `REWIND`) with one uniform message, fired before the ~20s `codex doctor` preflight + session
+  create/rollback.
+- Deliberately untouched: the `manager.py`/`cli/session.py` transfer-mode branches (rewind dispatches to its own launch
+  path before they see it; their `assemble` backstop still fires) and the fork/resume `Choice` lists (rewind-inclusive
+  superset).
 
-**Verification**: `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q`
-(26 passed); `make pre-commit` clean.
+**Verification**: 253 unit tests green (codex ops + transfer + session_codex, incl. parametrized `[bogus, rewind]`
+rejection); `make pre-commit` clean. Merged via PR #68 (`016e9d0a`).
+
+### rewind_resume_strategy closeout: drop-last-N resume with an AI code-delta
+
+**Goal**: Ship `--strategy rewind --drop-last N` -- resume/fork a session that carries turns `1..(T-N)` as *real*
+relocated Claude history plus an AI-generated code-delta of the dropped window -- and close the card after PR #66 merged
+to `main`.
+
+**Key changes** (shipped via PR #66, `107b9251`):
+
+- New `session/rewind.py` primitive: writes a truncated raw-JSONL prefix under a **fresh** rewind-owned UUID `<R>`
+  (snapped to a complete `tool_use`/`tool_result` turn boundary), and builds a grounded net-change code-delta over only
+  the dropped window `(T-N)..T`. Launches `--resume <R> --fork-session` co-delivered with an
+  `--append-system-prompt-file` code-delta context.
+- Deliberate break of the `native-relocate => no context file` convention: `Derivation` gains additive `dropped_turns` +
+  `rewind_relocated_session_id` (no `SCHEMA_VERSION` bump); design.md §3.9 documents the new matrix row and flags it
+  convention-not-guard.
+- Fail-closed contiguity guard (`_assert_kept_turns_form_raw_prefix`) rejects requestId-interleaved transcripts;
+  code-delta LLM failure falls back to plain native-relocate + a "code-delta unavailable" note; a privacy warning fires
+  when the dropped window is sent to the curation model. Fork rewind is worktree/`--into`-only (same-dir/sidecar
+  rejected); `resume --fresh --strategy rewind` is legitimately same-dir because it resumes `<R>`, not the parent UUID.
+- Docs synced in-PR: design.md §3.9, design_appendix.md §H (frontmatter enum + `rewind-code-delta` schema marker),
+  cli_reference.md, end-user/transfer.md.
+
+**Verification**: unit green on merged `main` -- 26 rewind tests (`test_rewind_strategy.py` +
+`test_session_rewind_cli.py`) and 30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`); PR #66
+landed after an 8-dimension adversarial review (verdict: mergeable, no blocking defects). **Disclosed gap**: the
+real-`claude` resume against a truncated `<R>` prefix is unit-covered only -- the `@pytest.mark.slow` integration test
+is not yet written (design.md:765 records the same caveat). The Slice-1 stem probe proved stem-tolerance live on Claude
+Code 2.1.197.
 
 ### Board closeout: Sonnet 5 done; accidental_complexity A/B merged + paused
 

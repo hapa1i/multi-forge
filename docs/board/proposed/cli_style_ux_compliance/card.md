@@ -144,6 +144,13 @@ group.)
 | `memory track`/`passport ... PATH`                                                              | `PATH` undefined -- file/dir/repo-relative?                                                                                                                                                                                                                                                                                                                                                                                                                 | Add metavar clarity + example.                                                                                                                                               |
 | `session show [SESSION_ID]` vs `policy shadow show [SESSION]` vs `telemetry activity [SESSION]` | Same concept, two metavar names                                                                                                                                                                                                                                                                                                                                                                                                                             | Standardize the metavar spelling.                                                                                                                                            |
 
+**Additional backend naming concern (surfaced 2026-07-02):** `source id` is technically correct in the code
+(`ModelSource.id`), but `source` is not a first-class CLI noun. There is no `forge model source ...` command; users
+encounter these ids through `forge model backend list`, `test-auth`, `start`, `stop`, and `reconcile`. Treat bare
+`SOURCE_ID` / "source id" wording as an internal vocabulary leak unless the help defines "source" inline as the upstream
+model endpoint/capacity unit shown by `forge model backend list`. The wording decision belongs here, not in individual
+behavior cards such as `proposed/backend_runtime_cleanup`, which should follow whatever naming this batch chooses.
+
 **Verified backend traps (sharper than the table row -- these actively fail, not just confuse):**
 
 - **The group example teaches the wrong id for its own leaves.** `backend.py:58` (group help) uses `litellm` (an

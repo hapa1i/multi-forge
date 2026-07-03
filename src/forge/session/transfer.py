@@ -108,6 +108,28 @@ class ResumeStrategy(str, Enum):
     REWIND = "rewind"
 
 
+TRANSFER_CONTEXT_STRATEGIES: tuple[ResumeStrategy, ...] = (
+    ResumeStrategy.MINIMAL,
+    ResumeStrategy.STRUCTURED,
+    ResumeStrategy.FULL,
+    ResumeStrategy.AI_CURATED,
+)
+TRANSFER_CONTEXT_STRATEGY_VALUES: tuple[str, ...] = tuple(strategy.value for strategy in TRANSFER_CONTEXT_STRATEGIES)
+
+
+def parse_transfer_context_strategy(strategy: str) -> ResumeStrategy:
+    """Parse a strategy accepted by transfer-context assembly."""
+    try:
+        resume_strategy = ResumeStrategy(strategy)
+    except ValueError as e:
+        valid = ", ".join(TRANSFER_CONTEXT_STRATEGY_VALUES)
+        raise ValueError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
+    if resume_strategy not in TRANSFER_CONTEXT_STRATEGIES:
+        valid = ", ".join(TRANSFER_CONTEXT_STRATEGY_VALUES)
+        raise ValueError(f"Unknown strategy '{strategy}' (valid: {valid}).")
+    return resume_strategy
+
+
 def _build_frontmatter(
     *,
     parent_name: str,
@@ -1138,8 +1160,10 @@ def assemble_transfer_context(
     if target_runtime not in TRANSFER_TARGET_RUNTIMES:
         valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
         raise ValueError(f"Unknown target runtime '{target_runtime}' (valid: {valid}).")
-    if strategy == ResumeStrategy.REWIND:
-        raise ValueError("rewind is not a transfer context strategy; use the CLI rewind launch path with --drop-last")
+    if strategy not in TRANSFER_CONTEXT_STRATEGIES:
+        valid = ", ".join(TRANSFER_CONTEXT_STRATEGY_VALUES)
+        strategy_value = strategy.value if isinstance(strategy, ResumeStrategy) else str(strategy)
+        raise ValueError(f"Unknown strategy '{strategy_value}' (valid: {valid}).")
 
     warnings: list[str] = []
 

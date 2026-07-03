@@ -39,6 +39,7 @@ from forge.core.ops.codex_session import (
 from forge.core.ops.context import ExecutionContext, _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.session import SessionManager, SessionState
+from forge.session.transfer import TRANSFER_CONTEXT_STRATEGY_VALUES
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def codex_start_options(f: Callable[..., Any]) -> Callable[..., Any]:
         click.option(
             "--strategy",
             "transfer_strategy",
-            type=click.Choice(["minimal", "structured", "full", "ai-curated"]),
+            type=click.Choice(list(TRANSFER_CONTEXT_STRATEGY_VALUES)),
             default=None,
             help="Transfer strategy for --resume-from (requires --runtime codex; default: ai-curated)",
         ),

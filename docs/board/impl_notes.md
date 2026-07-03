@@ -36,6 +36,40 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Rewind resume: fresh-UUID truncated head + code-delta (shipped 2026-07-02)
+
+Durable invariants for `--strategy rewind --drop-last N` (`session/rewind.py`, `cli/session_rewind.py`,
+`cli/session_resume_modes.py`). Rewind resumes turns `1..(T-N)` as *real* relocated Claude history plus an AI code-delta
+of the dropped window `(T-N)..T`.
+
+- **`claude --resume <R> --fork-session` tolerates stem `<R>` != the transcript's embedded `sessionId` -- no envelope
+  rewrite needed** (live-pinned, Claude Code 2.1.197, `parent_has_signature=yes`). This is the load-bearing empirical
+  fact with **zero in-tree precedent** (`relocate_transcript` always produced `<uuid>.jsonl` where stem == embedded
+  sessionId). It lets rewind write the truncated head under a fresh UUID while leaving the parent's embedded `sessionId`
+  and signed `thinking`/`tool_result` blocks byte-intact. Re-pin with a live probe if a future codex-cli/claude version
+  changes resume lookup. **Still unproven at integration tier**: the *truncated clean-prefix* resume (vs the whole-copy
+  stem probe) needs a `@pytest.mark.slow` real-`claude` test -- unit tests cannot cover it (`design.md:765`).
+- **Fresh rewind-owned UUID `<R>` makes cleanup unshared by construction -- no reference counting.** The truncated head
+  is written as `<R>.jsonl` and tracked by a **distinct** `Derivation.rewind_relocated_session_id` (not
+  `relocated_parent_session_id`, which byte-for-byte native-relocate uses for the *parent* UUID). Because `<R>` is
+  unique to this child, the delete-time unlink branch keys only on `<R>` and is dir-scoped to the child's Claude project
+  root, so same-dir resume rewind can **never** touch the parent's original transcript. Keep the two GC ids separate.
+- **Turn-space cut vs raw-line prefix -- the contiguity guard fails closed.** Turns group by `requestId` in first-seen
+  order (`_group_entries_into_turns`), but the writer emits a raw-LINE prefix while computing the boundary in TURN
+  space. `_assert_kept_turns_form_raw_prefix` raises when the two coordinate systems disagree (interleaved requestIds
+  would pull a dropped turn's lines into the kept prefix), forcing degrade-to-plain-native-relocate. Real-Claude
+  transcripts are append-contiguous, so this guards malformed/unexpected input, not the normal path.
+- **Rewind deliberately breaks `native-relocate => no context file` -- and that "invariant" was a convention, not a
+  guard.** No code asserted `strategy null <=> native`. When extending native-relocate, branch on
+  `resume_mode == "native-relocate"` + explicit `strategy`, never on "context_file is None => native". Additive
+  `dropped_turns` + `rewind_relocated_session_id` on `Derivation` needed **no `SCHEMA_VERSION` bump** (strict dacite
+  fills missing optionals; precedent: consumer_lanes T4).
+- **Landmine for a future editor**: `session_fork.py`'s `uses_fresh_transfer` computes `True` for a rewind worktree fork
+  (`(is_worktree_fork and not native_relocate) or same_dir_transfer`, where `native_relocate` excludes rewind). Rewind
+  is handled by its own `elif rewind_active:` branch *before* that matters today, but anyone refactoring the fork
+  launch-path branching must keep rewind out of the transfer-derivation-persistence path or it will double-write
+  `strategy`.
+
 ### consumer_lanes epic closed: context-delivery model, not lane plumbing, gates a consumer's runtime swap (shipped 2026-07-01)
 
 The `consumer_lanes` epic shipped and closed (`done/epic_consumer_lanes/`). The lane contract --

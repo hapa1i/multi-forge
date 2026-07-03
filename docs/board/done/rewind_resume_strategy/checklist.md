@@ -5,8 +5,13 @@ design points, and risks; this file is the ordered execution plan with observabl
 
 ## Current focus
 
-**Closeout verified 2026-07-02.** Slices 1-6 are implemented and documented; the remaining closeout gate is complete, so
-this card moves to `done/`.
+**DONE** (2026-07-02). All six slices implemented and merged to `main` via PR #66 (`107b9251`); card moved
+`doing/ -> done/`. Unit coverage green: 26 rewind tests (`test_rewind_strategy.py` + `test_session_rewind_cli.py`) and
+30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`). **One disclosed gap remains**: the "Resume
+tolerates fresh UUID" acceptance row — a real-`claude` resume against a truncated `<R>.jsonl` — was **not** implemented
+as a `@pytest.mark.slow` integration test; `design.md:765` records the same caveat ("clean-prefix truncated resume
+remains an integration assertion"). The Slice-1 stem probe proved stem-tolerance live, but the truncated-prefix resume
+is unit-covered only. File that integration test before relying on rewind in production.
 
 ## Verified code anchors (re-checked 2026-07-01, card line numbers had drifted)
 
@@ -242,15 +247,19 @@ an envelope `sessionId` rewrite; Slice 4 writes `strategy="rewind"`, `dropped_tu
 ## Closeout items
 
 - [x] All slice assertions ticked with verification recorded.
-- [x] `tests/src/session/test_rewind_strategy.py` + `tests/src/cli/test_session_rewind_cli.py` green; implementation
-  coverage for the real-`claude` resume behavior remains in the shipped slice verification.
-- [x] `make pre-commit` clean.
-- [x] design.md §3.9 matrix, design_appendix.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior.
-- [x] Change-log entry added (`docs/board/change_log.md`), durable lessons proposed for `impl_notes.md` review (esp. the
-  `sessionId`-stem probe outcome).
-- [x] Card moved `doing/ → done/`.
-
-**Closeout verification (2026-07-02):**
-
-- `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q` — 26 passed.
-- `make pre-commit` — passed.
+- [x] Unit suites green on merged `main` (`107b9251`): `tests/src/session/test_rewind_strategy.py` +
+  `tests/src/cli/test_session_rewind_cli.py` (26 passed) and `tests/src/session/test_fork_into.py` +
+  `tests/src/session/test_models_derivation.py` (30 passed). **Correction**: the closeout row originally named
+  `tests/src/cli/test_session_fork.py`, which never existed — the CLI-level rewind coverage lives in
+  `test_session_rewind_cli.py`, and fork behavior is covered by `test_fork_into.py` + the `test_bug_*_fork_*` regression
+  files. **Not done**: the real-`claude` resume integration test (truncated `<R>` prefix) is still unwritten — the one
+  path unit tests cannot cover (see Current focus + `design.md:765`).
+- [x] Pre-commit clean on the touched surface (this closeout is board/docs-only markdown; mdformat + hygiene hooks
+  pass). The code itself landed pre-commit-clean via PR #66.
+- [x] design.md §3.9 matrix, design_appendix.md §H, cli_reference.md, end-user/transfer.md reflect shipped behavior
+  (re-verified on merged `main`: the §3.9 matrix carries the `Rewind` row and self-discloses the integration caveat; §H
+  carries the `rewind` strategy + `rewind-code-delta` schema marker; both CLI/end-user docs document
+  `--strategy rewind --drop-last N` and the same-dir/sidecar fork rejection).
+- [x] Change-log entry added (`docs/board/change_log.md`); durable lessons promoted to `impl_notes.md` (the
+  `sessionId`-stem probe outcome, the fresh-UUID unshared-GC design, and the contiguity guard).
+- [x] Card moved `doing/ -> done/`.
