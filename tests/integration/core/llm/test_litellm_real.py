@@ -12,7 +12,7 @@ For local LiteLLM tests:
   - Local LiteLLM must be running on port 4001 (test instance, avoids conflict with dev)
   - GEMINI_API_KEY must be set (for local LiteLLM to authenticate with Gemini)
   - Start test LiteLLM: forge model backend start litellm --port 4001
-  - Stop test LiteLLM: forge model backend stop litellm --port 4001
+  - Stop test LiteLLM: forge model backend stop litellm-4001
 """
 
 import os

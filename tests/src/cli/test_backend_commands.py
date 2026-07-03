@@ -49,8 +49,41 @@ def _json_output(result: Any) -> Any:
     return json.loads(result.output)
 
 
+def _normalized_output(result: Any) -> str:
+    return " ".join(result.output.split())
+
+
 def _backend_args(*args: str) -> list[str]:
     return ["model", "backend", *args]
+
+
+def _backend_instance(
+    backend_id: str = "litellm-4000",
+    *,
+    adapter_type: str = "litellm",
+    port: int = 4000,
+    pid: int | None = None,
+) -> BackendInstance:
+    return BackendInstance(
+        backend_id=backend_id,
+        adapter_type=adapter_type,
+        port=port,
+        pid=pid,
+        status="healthy",
+    )
+
+
+def _write_backend_registry(forge_home: Path, *instances: BackendInstance) -> BackendRegistryStore:
+    store = BackendRegistryStore(forge_home / "backends" / "index.json")
+    store.write(BackendRegistry(backends={instance.backend_id: instance for instance in instances}))
+    return store
+
+
+def _write_litellm_config(forge_home: Path) -> Path:
+    config_path = forge_home / "backends" / "litellm" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("model_list: []\n")
+    return config_path
 
 
 def test_create_existing_config_errors_with_tip(runner: CliRunner, tmp_path: Path) -> None:
@@ -311,11 +344,160 @@ def test_local_source_start_uses_default_lifecycle_port(
     assert "forge model backend create litellm" in result.output
 
 
+def test_stop_runtime_id_stops_instance_and_keeps_config(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    config_path = _write_litellm_config(forge_home)
+    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("stop", "litellm-4000"))
+
+    assert result.exit_code == 0
+    assert "Stopped" in result.output
+    assert "litellm-4000" in result.output
+    kill.assert_called_once_with(12345, 15)
+    assert store.read().backends == {}
+    assert config_path.exists()
+
+
+def test_stop_multiple_runtime_ids_continues_after_failure(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+
+    with patch("forge.backend.adapters.litellm.os.kill"):
+        result = runner.invoke(main, _backend_args("stop", "litellm-4000", "missing-9999"))
+
+    assert result.exit_code == 1
+    assert "Stopped" in result.output
+    assert "Unknown runtime instance 'missing-9999'" in result.output
+    assert "1 stopped, 1 failed" in result.output
+    assert store.read().backends == {}
+
+
+def test_stop_all_yes_stops_every_runtime_and_keeps_configs(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    config_path = _write_litellm_config(forge_home)
+    store = _write_backend_registry(
+        forge_home,
+        _backend_instance(pid=12345),
+        _backend_instance("litellm-4001", port=4001, pid=12346),
+    )
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
+
+    assert result.exit_code == 0
+    assert "About to stop" in result.output
+    assert "litellm-4000" in result.output
+    assert "litellm-4001" in result.output
+    assert "2 stopped" in result.output
+    assert kill.call_count == 2
+    assert store.read().backends == {}
+    assert config_path.exists()
+
+
+def test_stop_all_unregisters_pidless_instance(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    store = _write_backend_registry(forge_home, _backend_instance(pid=None))
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
+
+    assert result.exit_code == 0
+    assert "no process was killed" in result.output
+    kill.assert_not_called()
+    assert store.read().backends == {}
+
+
+def test_stop_all_empty_registry_is_noop(runner: CliRunner, forge_home: Path) -> None:
+    result = runner.invoke(main, _backend_args("stop", "--all"))
+
+    assert result.exit_code == 0
+    assert "No runtime instances to stop" in result.output
+
+
+def test_stop_all_conflicts_with_explicit_targets(runner: CliRunner, forge_home: Path) -> None:
+    _write_backend_registry(forge_home, _backend_instance())
+
+    result = runner.invoke(main, _backend_args("stop", "litellm-4000", "--all"))
+
+    assert result.exit_code == 1
+    assert "Cannot combine --all with explicit runtime instance IDs" in result.output
+
+
+def test_stop_requires_target_or_all(runner: CliRunner, forge_home: Path) -> None:
+    result = runner.invoke(main, _backend_args("stop"))
+
+    assert result.exit_code == 1
+    assert "Provide runtime instance ID(s) or use --all" in result.output
+    assert "forge model backend list" in result.output
+
+
+def test_stop_rejects_local_source_without_stopping_shared_runtime(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("stop", "litellm-openai-local"))
+
+    assert result.exit_code == 1
+    assert "not a runtime instance id" in result.output
+    assert "forge model backend list" in result.output
+    kill.assert_not_called()
+    assert set(store.read().backends) == {"litellm-4000"}
+
+
+def test_stop_rejects_bare_adapter_without_legacy_port_resolution(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("stop", "litellm"))
+
+    assert result.exit_code == 1
+    assert "Backend adapter 'litellm' is not a runtime instance id" in result.output
+    assert "forge model backend list" in result.output
+    kill.assert_not_called()
+    assert set(store.read().backends) == {"litellm-4000"}
+
+
+def test_stop_port_option_is_clean_break(runner: CliRunner, forge_home: Path) -> None:
+    result = runner.invoke(main, _backend_args("stop", "litellm", "--port", "4000"))
+
+    assert result.exit_code == 2
+    assert "No such option" in result.output
+    assert "--port" in result.output
+
+
+def test_start_runtime_id_stays_config_oriented(runner: CliRunner, forge_home: Path) -> None:
+    store = _write_backend_registry(forge_home, _backend_instance())
+
+    result = runner.invoke(main, _backend_args("start", "litellm-4000"))
+
+    assert result.exit_code == 1
+    assert "Unknown backend source or adapter 'litellm-4000'" in result.output
+    assert set(store.read().backends) == {"litellm-4000"}
+
+
 def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("test-auth", "openrouter", "--json"))
 
     assert result.exit_code == 1
     payload = _json_output(result)
+    assert payload["backend_id"] == "openrouter"
+    assert payload["source_id"] == "openrouter"
     assert payload["auth_status"] == "missing"
     assert payload["missing_required_env_vars"] == ["OPENROUTER_API_KEY"]
     assert payload["probe"]["status"] == "skipped"
@@ -415,6 +597,82 @@ def test_delete_missing_config_errors_with_create_tip(
     assert "not found" in result.output
     assert "Tip:" in result.output
     assert "forge model backend create litellm" in result.output
+
+
+def test_delete_runtime_id_points_to_stop(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    _write_backend_registry(forge_home, _backend_instance())
+
+    result = runner.invoke(main, _backend_args("delete", "litellm-4000"))
+
+    assert result.exit_code == 1
+    assert "runtime instance id" in result.output
+    assert "forge model backend stop litellm-4000" in result.output
+
+
+def test_delete_port_option_is_clean_break(runner: CliRunner, forge_home: Path) -> None:
+    result = runner.invoke(main, _backend_args("delete", "litellm", "--port", "4000"))
+
+    assert result.exit_code == 2
+    assert "No such option" in result.output
+    assert "--port" in result.output
+
+
+def test_delete_adapter_config_stops_matching_instances_first(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    config_path = _write_litellm_config(forge_home)
+    store = _write_backend_registry(
+        forge_home,
+        _backend_instance(pid=12345),
+        _backend_instance("litellm-4001", port=4001, pid=12346),
+    )
+
+    with patch("forge.backend.adapters.litellm.os.kill") as kill:
+        result = runner.invoke(main, _backend_args("delete", "litellm", "--yes"))
+
+    assert result.exit_code == 0
+    assert "Stopped instances: litellm-4000, litellm-4001" in result.output
+    assert "Deleted" in result.output
+    assert kill.call_count == 2
+    assert store.read().backends == {}
+    assert not config_path.parent.exists()
+
+
+def test_backend_group_help_defines_id_spaces(runner: CliRunner) -> None:
+    result = runner.invoke(main, _backend_args("--help"))
+
+    assert result.exit_code == 0
+    assert "Source id: openrouter" in result.output
+    assert "Runtime instance id: litellm-4000" in result.output
+    assert "Adapter: litellm" in result.output
+
+
+def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> None:
+    show_help = runner.invoke(main, _backend_args("show", "--help"))
+    test_auth_help = runner.invoke(main, _backend_args("test-auth", "--help"))
+    reconcile_help = runner.invoke(main, _backend_args("reconcile", "--help"))
+    stop_help = runner.invoke(main, _backend_args("stop", "--help"))
+    delete_help = runner.invoke(main, _backend_args("delete", "--help"))
+
+    assert show_help.exit_code == 0
+    assert "forge model backend show openrouter" in show_help.output
+    assert "forge model backend show litellm-4000" in show_help.output
+    assert test_auth_help.exit_code == 0
+    assert "forge model backend test-auth openrouter" in test_auth_help.output
+    assert reconcile_help.exit_code == 0
+    assert "forge model backend reconcile openrouter --request-id" in reconcile_help.output
+    reconcile_text = _normalized_output(reconcile_help)
+    assert "forge model backend list" in reconcile_text
+    assert "source ids" in reconcile_text
+    assert stop_help.exit_code == 0
+    assert "RUNTIME_ID..." in stop_help.output
+    assert "--port" not in stop_help.output
+    assert delete_help.exit_code == 0
+    assert "--port" not in delete_help.output
 
 
 _SOURCE_RECORD_KEYS = {

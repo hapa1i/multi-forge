@@ -96,7 +96,9 @@ Use `forge model backend list` to inspect the built-in source catalog, required 
 LiteLLM runtime instance. Use `forge model backend test-auth <source-id>` when you want Forge to resolve the source's
 credentials and probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and
 `litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id
-or by the legacy `litellm --port <port>` adapter form.
+or by the `litellm --port <port>` adapter form. Stop live local backend processes by the runtime instance id shown in
+`forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered local
+runtime instance with `forge model backend stop --all`.
 
 The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
 adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local source whose credential it is
@@ -277,6 +279,10 @@ forge proxy start openrouter-openai --smoke-test
 
 Use `--smoke-test` after first setup or credential changes to verify the proxy can reach its upstream LLM provider.
 Without it, health checks only confirm the local proxy process is alive.
+
+If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
+`forge model backend stop --all --yes` in automation) before restarting proxies. This clears local backend runtime
+processes and registry rows without deleting adapter config files.
 
 ### Start Claude with a proxy
 
