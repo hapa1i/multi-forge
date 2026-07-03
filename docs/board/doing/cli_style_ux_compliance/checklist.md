@@ -3,14 +3,11 @@
 **Branch**: `feat/cli-style-ux-compliance` - **Card**: [`card.md`](card.md)
 
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
-(PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, **S5/C1**, and **S3/A3** are done. **C2/OQ-2** and **C3/OQ-3** now have
-draft decisions recorded for maintainer review: C2 is a public terminology cleanup only, with the deeper backend
-instance identity migration split to
-[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). **C2 still needs an exit
-before this card closes:** either ship the narrow public wording pass here, or explicitly defer that wording pass to its
-own follow-up. C3 is a record-only "do not globally normalize scope order" decision. Slices graduate out individually;
-this checklist stays the durable index. **Status: C2/C3 DECISIONS DRAFTED FOR REVIEW (docs only; no implementation in
-this stop).**
+(PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, **S5/C1**, **S3/A3**, and **S5/C2** are done. **C2/OQ-2** is resolved:
+the public backend wording pass shipped here, while the deeper backend instance identity migration is split to
+[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). C3 is a record-only "do
+not globally normalize scope order" decision. Slices graduate out individually; this checklist stays the durable index.
+**Status: C2 IMPLEMENTED (public wording only; no storage/JSON rename).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -20,8 +17,8 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 ## Grounded Base
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
-resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; S3 resolved A3. Every A/B anchor and C1 is shipped;
-C2/C3 are now decision-recorded for review.
+resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; S3 resolved A3; S5/C2 resolved the public backend
+wording pass. Every A/B anchor and C1/C2 is shipped; C3 is now decision-recorded for review.
 
 | Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                                                     |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +71,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 | **S2** | A5             | `logs` group redesign (behavior + clean break)     | After S1; needs docs + changelog                                      |
 | **S3** | A3             | `policy enable` fail-loud (clean break)            | **Done** -- OQ-1 resolved: fail loud; `%` dispatcher restore deferred |
 | **S4** | B2, B3, B4, B5 | Help & error-message pass (+1 machine-output item) | Ship anytime; mostly help-snapshot; B4-json updates a pinning test    |
-| **S5** | C1, C2, C3     | Research-preview clean breaks                      | C1 shipped; C2/C3 decisions drafted for review before any more code   |
+| **S5** | C1, C2, C3     | Research-preview clean breaks                      | C1/C2 shipped; C3 decision drafted for review                         |
 
 - [ ] Confirm the slice split with the maintainer (or proceed S1 -> S2 -> S4, holding S3/S5 on their gates).
 
@@ -192,18 +189,17 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   (research preview, no default shims) and to match the sibling clean-break pattern -- not a deprecation window.
   **Assertion:** `--period week` works; removed `--days` exits 2 (Click "No such option"); changelog entry names the
   replacement.
-- [ ] **C2** -- backend metavar standardization -- **OQ-2 draft decision recorded; awaiting review before
-  implementation**. Public CLI terminology should use first-class CLI nouns: `backend` for the configured inference
-  target users see under `forge model backend`, `backend instance` for a concrete usable endpoint/process, and `adapter`
-  for implementation/config families such as `litellm`. Avoid user-facing `source id` and avoid `runtime instance` under
-  `forge model backend` because `runtime` already means the agent/frontend runtime (`codex`, `claude_code`).
-  **Boundary:** leave internal/storage/JSON names (`ModelSource.id`, `source_id`, `runtime_instance`,
-  `BackendInstance.backend_id`) unchanged in this UX slice; the real domain/schema migration is split to
-  [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md), but that domain card
-  does **not** close C2's public wording pass. **Exit:** after review, either ship the help/metavar/table/prose wording
-  pass in this card with verification, or create/link a separate public-wording follow-up and mark C2 explicitly
-  deferred. **Assertion (if actioned):** help/metavars/tables communicate accepted values as backend/backend-instance
-  concepts; no storage or JSON contract rename sneaks in.
+- [x] **C2** -- backend metavar standardization -- **OQ-2 resolved and public wording pass implemented**. Public CLI
+  terminology now uses first-class CLI nouns: `backend` for the configured inference target users see under
+  `forge model backend`, `backend instance` for a concrete usable endpoint/process, and `adapter` for
+  implementation/config families such as `litellm`. User-facing `source id` and model-backend `runtime instance` wording
+  were removed from help/metavars/tables/prose because `runtime` already means the agent/frontend runtime (`codex`,
+  `claude_code`). **Boundary held:** internal/storage/JSON names (`ModelSource.id`, `source_id`, `runtime_instance`,
+  `BackendInstance.backend_id`) stayed unchanged; the real domain/schema migration remains split to
+  [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). **Verification:**
+  `uv run pytest tests/src/cli/test_backend_commands.py tests/src/cli/test_command_tree_invariants.py -q` passed (51
+  tests); live help/table smoke checked `backend --help`, `show --help`, `test-auth --help`, `start --help`,
+  `stop --help`, `reconcile --help`, and `backend list`; `make pre-commit` passed.
 - [ ] **C3** -- `--scope` value-set/ordering canonicalization -- **OQ-3 draft decision recorded; likely no code**. Do
   not globally canonicalize scope value order. The observed families are semantic: session/cleanup uses
   `workspace|project|all`; memory/shadows/session-memory uses `project|workspace|all`; search has no workspace scope
@@ -221,10 +217,10 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - **OQ-1 (S3/A3) -- RESOLVED 2026-07-03: fail loud.** `policy enable` requires `--bundle` (bare invocation errors
   non-zero with a tip). Restore-from-intent is deferred to the `%policy enable` dispatcher -- a separate parser, still
   `(planned)` in `design_workflows.md` -- so it does not preempt `accidental_complexity_cleanup`'s WorkflowPolicy work.
-- **OQ-2 (gates C2) -- DRAFT RESOLUTION 2026-07-03:** yes, rename public CLI wording where it leaks `source` or
-  overloads `runtime`, but keep this slice help/metavar/table-only. The desired long-term abstraction is all model
-  backends as backend instances (remote singleton names may be instance ids for now; managed local LiteLLM instances
-  already have ids like `litellm-4000`), and that migration is split to
+- **OQ-2 (C2) -- RESOLVED 2026-07-03:** yes, rename public CLI wording where it leaks `source` or overloads `runtime`,
+  but keep this slice help/metavar/table-only. The desired long-term abstraction is all model backends as backend
+  instances (remote singleton names may be instance ids for now; managed local LiteLLM instances already have ids like
+  `litellm-4000`), and that migration is split to
   [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
 - **OQ-3 (gates C3) -- DRAFT RESOLUTION 2026-07-03:** the observed `--scope` divergences are semantic families, not one
   accidental enum. Do not globally reorder; only normalize local drift inside a family.
@@ -242,13 +238,14 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 | A3 no warn-and-exit-0      | bare `policy enable`                                  | fail loud: `Error`+`Tip` on stderr, exit 1, stdout empty                        | `tests/src/cli/test_policy_enable.py`           |
 | B5 invalid lane enumerates | `lane set --consumer team_supervisor --runtime codex` | stderr names valid lanes for the consumer, not raw `LaneError`                  | `tests/src/cli/test_session_lane.py`            |
 | C1 `--period` clean break  | `telemetry activity --days 7`                         | `--period week` works; `--days` exits 2                                         | `tests/src/cli/test_activity.py`                |
+| C2 backend wording         | `forge model backend --help` / leaves / list          | public surface says backend/backend instance/adapter; storage/JSON keys stable  | `tests/src/cli/test_backend_commands.py`        |
 | B4-json activity tip       | `telemetry activity ghost --json` (missing)           | tip reachable in `--json`; stdout clean for `jq`; `test_not_found_json` updated | `tests/src/cli/test_activity.py`                |
 | Help wording (B2/B3/B4)    | `forge <cmd> --help`                                  | canonical wording/examples appear; no internal vocab leak                       | help-render / snapshot tests                    |
 
 ## Closeout items
 
 - [ ] All selected slices ticked with verification recorded (each slice: focused suite + `make pre-commit` clean).
-- [ ] C2 has a closure state before moving this card to `done/`: either the public wording pass shipped here, or it was
+- [x] C2 has a closure state before moving this card to `done/`: either the public wording pass shipped here, or it was
   explicitly deferred to a named follow-up separate from `backend_instance_identity_model`.
 - [ ] Integration: none expected (host CLI + help rendering; no `claude -p`/Docker path). Confirm and record.
 - [ ] Docs synced for behavior changes: `cli_reference.md` (A5 logs group, C1 `--period`), `design_appendix.md` /

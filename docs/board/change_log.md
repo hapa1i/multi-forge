@@ -27,6 +27,18 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-03
 
+### cli_style_ux_compliance S5/C2: Backend Public Terminology
+
+**Goal**: Make `forge model backend` use first-class CLI nouns without changing backend storage or JSON contracts.
+
+**Key changes**:
+
+- Reworded backend help, metavars, human tables, errors/tips, and public docs to backend/backend-instance/adapter
+  language while keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
+  stable. Deeper domain migration stays in `todo/backend_instance_identity_model`.
+
+**Verification**: backend + command-tree tests passed (51); help/list smoke checked; `make pre-commit` clean.
+
 ### cli_style_ux_compliance S3/A3: policy enable Fail-Loud
 
 **Goal**: Replace bare `forge policy enable`'s silent no-op (warning on stdout, exit 0) with a loud, actionable failure.

@@ -142,7 +142,7 @@ def session_lane() -> None:
     help="Consumer id (memory_writer, shadow_curation, team_supervisor, supervisor).",
 )
 @click.option("--runtime", "runtime", default=None, help="Lane runtime (e.g. claude_code, codex).")
-@click.option("--backend", "backend", default=None, help="Lane backend/source id (e.g. claude-max).")
+@click.option("--backend", "backend", default=None, help="Lane backend (e.g. claude-max).")
 @_SESSION_OPTION
 def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_name: str | None) -> None:
     """Record a consumer's requested lane in the session's ``intent``.
