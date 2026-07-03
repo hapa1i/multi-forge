@@ -160,7 +160,8 @@ forge session list --scope all      # All sessions globally
 
 # What a session did (operation outcomes + model calls)
 forge telemetry activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
-forge telemetry activity [name] --json --days N --all
+forge telemetry activity [name] --period week --json
+forge telemetry activity [name] --period all
 
 # Fork (conversation branching)
 forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
@@ -807,8 +808,8 @@ rejection. The line is best-effort and prints only when the session had activity
 ```bash
 forge telemetry activity                      # current session ($FORGE_SESSION)
 forge telemetry activity my-feature           # a named session (or Claude UUID)
-forge telemetry activity my-feature --days 7  # last 7 days (default: 30)
-forge telemetry activity my-feature --all     # full history
+forge telemetry activity my-feature --period week  # this week (default: today)
+forge telemetry activity my-feature --period all   # full history
 forge telemetry activity my-feature --json    # machine-readable
 ```
 
@@ -827,7 +828,7 @@ The Supervisor line appends `failing open: N timeout, N error` when recent front
 always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
 may be proceeding without frontier review). The two are scoped differently, so the counts can differ: `SUP!N` is the
 **current consecutive** fail-open streak (it resets on the supervisor's next successful check), while
-`forge telemetry activity` totals fail-opens across the selected window (`--days`/`--all`).
+`forge telemetry activity` totals fail-opens across the selected `--period` window.
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

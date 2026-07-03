@@ -71,11 +71,37 @@ def test_not_found_json(monkeypatch) -> None:
     assert "forge session list" in payload["tip"]
 
 
+def test_help_shows_period_clean_break() -> None:
+    result = CliRunner().invoke(main, _activity_args("--help"))
+    assert result.exit_code == 0
+    assert "--period" in result.output
+    assert "today" in result.output
+    assert "week" in result.output
+    assert "month" in result.output
+    assert "all" in result.output
+    assert "--days" not in result.output
+    assert "--all" not in result.output
+
+
+def test_old_days_flag_is_clean_break() -> None:
+    result = CliRunner().invoke(main, _activity_args("planner", "--days", "7"))
+    assert result.exit_code == 2
+    assert "No such option" in result.output
+    assert "--days" in result.output
+
+
+def test_old_all_flag_is_clean_break() -> None:
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    assert result.exit_code == 2
+    assert "No such option" in result.output
+    assert "--all" in result.output
+
+
 def test_human_render_shows_supervisor(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(status="success"))
     log_usage_event(_event(status="error"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Forge activity" in result.output
     assert "planner" in result.output
@@ -85,7 +111,7 @@ def test_human_render_shows_supervisor(monkeypatch) -> None:
 def test_json_shape(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", status="error"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["session"] == "planner"
@@ -100,7 +126,7 @@ def test_json_carries_runtime_and_billing(monkeypatch) -> None:
     """T5/WS3: --json exposes the per-row runtime/billing_mode lane fields."""
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
     assert rows["supervisor"]["runtime"] == "codex"
@@ -112,7 +138,7 @@ def test_human_render_shows_runtime_billing(monkeypatch) -> None:
     monkeypatch.setenv("COLUMNS", "200")  # widen so Rich does not truncate the lane cell
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Runtime/Billing" in result.output
     assert "codex/subscription_quota" in result.output
@@ -145,7 +171,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
         )
     )
 
-    human = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    human = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert human.exit_code == 0
     assert "Operation outcomes" in human.output
     assert "Model calls" in human.output
@@ -153,7 +179,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     assert "memory_writer.run" in human.output
     assert "matched" in human.output
 
-    machine = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    machine = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert machine.exit_code == 0
     data = json.loads(machine.output)
     operation = data["upstream"]["operations"][0]
@@ -171,7 +197,7 @@ def test_human_render_shows_failing_open(monkeypatch) -> None:
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "failing open: 2 timeout, 1 error" in result.output
 
@@ -181,7 +207,7 @@ def test_json_includes_error_kinds(monkeypatch) -> None:
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
     assert rows["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
@@ -206,7 +232,7 @@ def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="supervisor"))
 
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Subagents" in result.output
     assert "3" in result.output
@@ -242,7 +268,7 @@ def test_human_render_shows_plan_check_counters(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="plan-check"))
 
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Plan check (tier-1)" in result.output
     assert "1 allow" in result.output
@@ -285,7 +311,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="plan-check"))
 
-    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["upstream"]["policy"]["plan_check_needs_review"] == 1
@@ -294,10 +320,10 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     assert data["upstream"]["manifest_fallback_used"] is True
 
 
-def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
+def test_period_week_excludes_nothing_recent(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor"))
-    result = CliRunner().invoke(main, _activity_args("planner", "--days", "7", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "week", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["downstream"]["rows"][0]["attempts"] == 1
@@ -336,7 +362,7 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
         forge_run_id="run_mw",
         forge_root_run_id="run_mw",
     )
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "$0.12" in result.output
     assert "~$0.12" not in result.output  # exact -> no estimate marker
@@ -370,7 +396,7 @@ def test_human_render_shows_shadow_section(monkeypatch, tmp_path) -> None:
     _write_shadow_done(tmp_path, "d1", status="disagree", frontier_verdict="divergent", frontier_confidence=0.9)
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
-    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Shadow (audit)" in result.output
     assert "2 checked" in result.output
@@ -385,7 +411,7 @@ def test_json_includes_shadow(monkeypatch, tmp_path) -> None:
     _write_shadow_done(tmp_path, "d1", status="disagree")
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
-    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["shadow"]["checked"] == 1

@@ -27,19 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-03
 
+### cli_style_ux_compliance S5/C1: Activity Period Clean Break
+
+**Goal**: Align `forge telemetry activity` with sibling telemetry period selectors.
+
+**Key changes**:
+
+- Replaced `--days`/`--all` with `--period today|week|month|all` (default `today`), and updated tests, docs, QA, and
+  integration references.
+
+**Verification**: 22 focused tests, 9 invariants, 1 targeted integration test, and `make pre-commit` clean.
+
 ### cli_style_ux_compliance S4: Help And Lane Errors
 
 **Goal**: Finish the Batch B CLI help/error-message pass and the planned `telemetry activity --json` tip shape.
 
 **Key changes**:
 
-- Normalized generic `--json`, workflow `--check`, Codex sandbox, extension scope, memory shadow, backend reconcile,
-  config, search, runtime, and backend help wording; added examples for thin surfaces.
-- Added `telemetry activity --json` `tip` in the stderr JSON object while keeping stdout empty on errors.
-- Made `session lane set --help` and invalid-lane errors enumerate live `valid_lanes(consumer)`, including default
-  lanes, so invalid lane choices are recoverable.
+- Normalized touched help wording/examples, added the activity JSON error tip, and made lane help/errors enumerate live
+  valid lanes including defaults.
 
-**Verification**: Focused CLI suite covering touched help/error paths passed (171 tests); `make pre-commit` clean.
+**Verification**: Focused help/error suite passed (171 tests); `make pre-commit` clean.
 
 ### cli_style_ux_compliance S2: Logs Group Redesign
 
@@ -48,16 +56,11 @@ destructive-verb shape.
 
 **Key changes**:
 
-- Promoted `forge logs` to a `show`/`clean` group: `logs show --json` emits stable status JSON, and `logs clean`
-  previews by default with `--yes` required for deletion.
-- Added dry-count support to the shared log remover so preview and mutation use the same age and active-process filters.
-- Clean break: removed the old bare `forge logs --clean` and `forge logs --older-than` flags; Click now reports "No such
-  option" for those paths.
-- Updated CLI docs and bundled QA/walkthrough guidance to use `forge logs show` and `forge logs clean --yes`.
+- Promoted `forge logs` to `show`/`clean`: `show --json`, preview-default `clean --yes`, shared dry-count filtering, and
+  Click clean breaks for the old bare flags.
+- Updated CLI docs and bundled QA/walkthrough guidance for the new spellings.
 
-**Verification**:
-`uv run pytest tests/src/cli/test_logs_command.py tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_output_streams.py -q`
-(99 passed); `make pre-commit` clean.
+**Verification**: Focused logs/command-tree/stream tests passed (99 tests); `make pre-commit` clean.
 
 ### backend_runtime_cleanup Step 2: Runtime-Id Backend Stop
 

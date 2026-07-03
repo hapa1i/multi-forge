@@ -30,14 +30,20 @@ from forge.core.ops.usage_summary import (
 
 console = Console()
 _SESSION_LIST_TIP = "Run 'forge session list' to see sessions."
+_PERIOD_CHOICES = ("today", "week", "month", "all")
 
 
 @click.command("activity")
 @click.argument("session", required=False)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--days", "-d", type=int, default=30, help="Look back this many days (default: 30)")
-@click.option("--all", "all_time", is_flag=True, help="Report all time (ignore --days)")
-def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) -> None:
+@click.option(
+    "--period",
+    type=click.Choice(_PERIOD_CHOICES),
+    default="today",
+    show_default=True,
+    help="Time window",
+)
+def activity_cmd(session: str | None, as_json: bool, period: str) -> None:
     """Show Forge automation outcomes and model-call evidence for a session.
 
     This is what Forge did *on top of* your session — the supervisor, memory writer,
@@ -50,7 +56,8 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
     Examples:
         forge telemetry activity                  # current session ($FORGE_SESSION)
         forge telemetry activity planner          # a named session (or Claude UUID)
-        forge telemetry activity --all --json     # full history, JSON
+        forge telemetry activity --period week    # this week
+        forge telemetry activity --period all --json
     """
     try:
         session_name, forge_root = resolve_session_identifier(session)
@@ -64,17 +71,30 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
             )
         sys.exit(1)
 
-    since = None if all_time else datetime.now(timezone.utc) - timedelta(days=days)
+    since = _period_start(period)
     summary = build_session_activity_summary(session_name, forge_root, since=since)
 
     if as_json:
         console.print_json(data=activity_summary_to_json(summary))
         return
-    _render(summary, days=None if all_time else days)
+    _render(summary, period=period)
 
 
-def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
-    scope = "all time" if days is None else f"last {days}d"
+def _period_start(period: str) -> datetime | None:
+    """Return the UTC lower bound for a named local-calendar period."""
+    now_local = datetime.now().astimezone()
+    if period == "today":
+        return now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    if period == "week":
+        local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        return (local_midnight - timedelta(days=local_midnight.weekday())).astimezone(timezone.utc)
+    if period == "month":
+        return now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    return None
+
+
+def _render(summary: SessionActivitySummary, *, period: str) -> None:
+    scope = {"today": "today", "week": "this week", "month": "this month", "all": "all time"}[period]
     if summary.is_empty:
         console.print(f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]")
         return

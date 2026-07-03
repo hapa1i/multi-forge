@@ -150,14 +150,14 @@ consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` 
 provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
 view.
 
-| Command                                      | Purpose                                                                                                                           |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost/lane (`runtime`/`billing_mode`; `--json`, `--days`, `--all`) |
-| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                                               |
-| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                                                            |
-| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)                                       |
-| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                                                  |
-| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                                                          |
+| Command                                      | Purpose                                                                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost/lane (`runtime`/`billing_mode`; `--json`, `--period`) |
+| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                                        |
+| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                                                     |
+| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)                                |
+| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                                           |
+| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                                                   |
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed

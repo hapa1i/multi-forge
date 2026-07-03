@@ -3,10 +3,9 @@
 **Branch**: `feat/cli-style-ux-compliance` - **Card**: [`card.md`](card.md)
 
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
-(PR #71), **S1/A2+A4**, and **S2/A5** are done; what remains is **A3, B2-B5, C1-C3**, executed as **focused slices
-grouped by review concern** (card [Sequencing & coupling](card.md#sequencing--coupling)). Slices graduate out
-individually; this checklist stays the durable index. **Status: S4 IMPLEMENTED (Batch B help/error-message pass;
-verification passed 2026-07-03).**
+(PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, and **S5/C1** are done; what remains is **A3, C2, and C3**, each gated
+by an open question. Slices graduate out individually; this checklist stays the durable index. **Status: S5/C1
+IMPLEMENTED (activity `--period` clean break; verification passed 2026-07-03).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -16,7 +15,7 @@ research-preview clean breaks (removed flags rely on Click's native "No such opt
 ## Grounded Base
 
 Re-verified on `main`, 2026-07-03 -- the card's original line numbers predate PR #69/#70/#71 and have drifted. S1
-resolved A2/A4; S2 resolved A5; S4 resolved B5; A3/C1 remain live anchors.
+resolved A2/A4; S2 resolved A5; S4 resolved B5; S5/C1 resolved C1; A3 remains the live anchor.
 
 | Item | Site (verified now)                                                                                                                  | Card's stale ref        | Current behavior -> intended fix                                                                                                                                         |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -25,7 +24,7 @@ resolved A2/A4; S2 resolved A5; S4 resolved B5; A3/C1 remain live anchors.
 | A4   | `search.py:383` (`clean_cmd(yes)`), preview `:401-402`, tip `:408`                                                                   | `:381`                  | no `as_json`; `find_missing()` preview + `print_tip("Use --yes to prune.")` -> add `--json` (dest `as_json`), shape matching `forge clean`                               |
 | A5   | `logs.py:260` (`logs_cmd(clean, older_than)`); `--clean` `:252`; `_clean_logs` `:280`; `_show_logs` `:283`                           | `:247,265,270,275`      | `--clean` is_flag deletes immediately (no `--yes`, no preview); no `--json` on the read surface -> split into `logs show [--json]` + `logs clean [--older-than N] --yes` |
 | B5   | `session_lane.py` `--runtime` `:122` / `--backend` `:123`, `set_cmd` `:125`, raw re-print `:144`; origin `consumer_lanes.py:115,137` | `:100,115,141` / `:102` | **Resolved in S4**: `session lane set --help` and invalid-lane errors enumerate `valid_lanes(consumer)` (default + allowed, gate-filtered), including the default lane.  |
-| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | `--days` diverges from sibling telemetry `--period` -> align to `--period [today\|week\|month\|all]`                                                                     |
+| C1   | `activity.py:37` `--days`/`-d` default 30; `--all` `:38`; `activity_cmd` `:39`                                                       | (card)                  | **Resolved in S5/C1**: `--period today\|week\|month\|all` replaces `--days`/`--all`; old flags exit 2 via Click "No such option".                                        |
 
 **Streams already correct** (do not touch): B5's routing goes through `err_console` (`session_lane.py:144`); the A1
 sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/message quality only, zero stream change.
@@ -177,7 +176,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 
 ## Phase 6 -- Slice S5: Batch C (research-preview clean breaks) -- C2/C3 gated
 
-- [ ] **C1** -- align `telemetry activity` `--days` -> `--period [today|week|month|all]` (`activity.py:37`), copying the
+- [x] **C1** -- align `telemetry activity` `--days` -> `--period [today|week|month|all]` (`activity.py:37`), copying the
   `trace list`/`costs show` `Choice`. **Decision: clean break** (remove `--days`), per `coding_standards.md §5`
   (research preview, no default shims) and to match the sibling clean-break pattern -- not a deprecation window.
   **Assertion:** `--period week` works; removed `--days` exits 2 (Click "No such option"); changelog entry names the
@@ -190,7 +189,9 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - [ ] **C3** -- `--scope` value-set/ordering canonicalization -- **BLOCKED on OQ-3** (classify semantic vs cosmetic
   first). Lowest value; do last. **Assertion:** only *arbitrary ordering* is normalized; documented divergences
   (workspace vs user scope) preserved.
-- [ ] Changelog entry per shipped break (`coding_standards.md §5`).
+- [x] Changelog entry per shipped break (`coding_standards.md §5`).
+- [x] S5/C1 verification: focused activity/stream tests passed (22 tests), command-tree invariants passed (9 tests),
+  targeted activity integration passed (1 test), and `make pre-commit` passed on 2026-07-03.
 
 ## Open questions (need human input -- from card)
 

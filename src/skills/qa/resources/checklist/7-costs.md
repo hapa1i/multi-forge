@@ -307,7 +307,7 @@ cat > ~/.forge/usage/events/qa-usage-fixture_99999.jsonl <<'EOF'
 EOF
 
 # JSON contract + the double-count assertion
-forge telemetry activity qa-usage --all --json | python3 -c "
+forge telemetry activity qa-usage --period all --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 cmds = {c['command']: c for c in d['downstream']['rows']}
@@ -322,7 +322,7 @@ print(f'cost_partial={d[\"downstream\"][\"cost_partial\"]} total_cost_micro_usd=
 
 echo "---"
 # Human-readable render (Rich table -> stderr): the Workers column appears only with a fan-out.
-forge telemetry activity qa-usage --all 2>&1
+forge telemetry activity qa-usage --period all 2>&1
 
 # Clean up
 rm -f ~/.forge/usage/events/qa-usage-fixture_99999.jsonl
