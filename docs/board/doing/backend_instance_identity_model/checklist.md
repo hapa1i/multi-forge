@@ -2,16 +2,17 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 3 / S3 managed local process vocabulary. S2 moved proxy templates/runtime config from
-`proxy.source` to `proxy.backend`, with template strict failures for old/unknown fields and runtime warn/degrade for
-unknown `proxy.backend`. Next action: rename the local registry/process axis away from backend instance identity.
+**Current focus**: Phase 3 / S4 CLI/proxy JSON clean break. S3 moved the managed local process registry to schema v2
+with `ManagedBackendProcess.process_id`; backend CLI human surfaces now say managed process for local PID/port state.
+Next action: migrate public JSON identity keys.
 
 ## Invariants (do not violate during migration)
 
 - **Do not undo C2.** `done/cli_style_ux_compliance` C2 shipped public backend / backend-instance / adapter wording
-  while deliberately keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
-  stable. Any change to those machine names must be a deliberate clean break owned by this card -- never an incidental
-  rename riding along a wording pass.
+  while deliberately keeping machine names stable for later clean-break slices. S3 deliberately renamed the local
+  process schema from `BackendInstance.backend_id` to `ManagedBackendProcess.process_id`; remaining machine names such
+  as `source_id`, `runtime_instance`, and telemetry `backend_id` must change only in their owning slices -- never as an
+  incidental rename riding along a wording pass.
 - **Runtime vocabulary stays the lane runtime axis.** `runtime` means the `forge.core.runtime_vocab` axis -- agent
   runtimes `claude_code` / `codex` / `gemini` plus the in-process `core_llm` -- never a model backend (kind, instance,
   or local process).
@@ -38,8 +39,8 @@ unknown `proxy.backend`. Next action: rename the local registry/process axis awa
 card dir; it is not promoted to design docs.
 
 - [x] Enumerate persisted fields and JSON keys with their reader(s) and writer(s): `ModelSource.id`, `source_id`,
-  `source_kind`, `BackendInstance.backend_id`, `runtime_instance`, telemetry `backend_id`, `proxy.source`, the backend
-  registry (`~/.forge/backends/index.json`), telemetry ledgers, and proxy templates. **Assertion:** load-bearing
+  `source_kind`, legacy `BackendInstance.backend_id`, `runtime_instance`, telemetry `backend_id`, `proxy.source`, the
+  backend registry (`~/.forge/backends/index.json`), telemetry ledgers, and proxy templates. **Assertion:** load-bearing
   reader/writer paths are named with boundary tags -- strict durable state vs system boundary vs display-only -- so
   Phase 2 knows which fields can clean-break and what failure behavior each surface needs.
 - [x] Enumerate human-facing terms in CLI help, end-user docs, design docs, and board notes. **Assertion:** the
@@ -105,20 +106,21 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S3 -- Managed local process vocabulary
 
-- [ ] Rename the local registry/process axis away from backend instance identity. **Assertion:** the durable
+- [x] Rename the local registry/process axis away from backend instance identity. **Assertion:** the durable
   `~/.forge/backends/index.json` schema clean-breaks old `backend_id` process records with a rebuild/recreate tip, while
   live local process behavior remains local-only. **Tests:** `tests/src/backend/`,
   `tests/integration/backend/test_backend_cli.py`.
-- [ ] Preserve shared LiteLLM display semantics. **Assertion:** one managed process can still back
+- [x] Preserve shared LiteLLM display semantics. **Assertion:** one managed process can still back
   `litellm-gemini-local` and `litellm-openai-local`, and list/show mark the process as shared. **Tests:**
   `tests/src/cli/test_backend_commands.py`.
 
 ### S4 -- CLI/proxy JSON clean break
 
-- [ ] Replace backend CLI JSON identity keys with backend-instance / managed-process names. **Assertion:** source-row
-  `source_id` and nested `runtime_instance` do not survive in the new JSON shape; old-shape expectations fail through
-  tests rather than compatibility aliases. **Tests:** `tests/src/cli/test_backend_commands.py`,
-  `tests/src/cli/test_output_streams.py`.
+- [ ] Replace backend CLI JSON identity keys and coupled internal builders/results with backend-instance /
+  managed-process names. **Assertion:** source-row `source_id`, nested `runtime_instance`,
+  `_runtime_instance_record(...)`, and `BackendEnsureResult.instance` do not survive in the new shape/API; old-shape
+  expectations fail through tests rather than compatibility aliases. **Tests:**
+  `tests/src/cli/test_backend_commands.py`, `tests/src/cli/test_output_streams.py`, `tests/src/backend/test_manager.py`.
 - [ ] Replace proxy route/inspect wire backend identity keys. **Assertion:** `_inspect_route()` no longer reports
   backend identity as `"source"`; if any temporary alias is deliberately retained for clients, it is documented and
   tested. `ProxyIdentity.source` remains provenance of the proxy identity lookup, not backend identity. **Tests:**

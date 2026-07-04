@@ -12,7 +12,7 @@ import pytest
 
 from forge.backend import BackendStartError
 from forge.backend.adapters.litellm import LiteLLMAdapter
-from forge.backend.registry import BackendInstance
+from forge.backend.registry import ManagedBackendProcess
 
 
 class TestLiteLLMAdapterHealthCheck:
@@ -21,8 +21,8 @@ class TestLiteLLMAdapterHealthCheck:
     def test_returns_true_when_healthy(self) -> None:
         """Verify health_check returns True when backend responds 200."""
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
@@ -39,8 +39,8 @@ class TestLiteLLMAdapterHealthCheck:
     def test_returns_false_when_unhealthy(self) -> None:
         """Verify health_check returns False when backend responds non-200."""
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
@@ -59,8 +59,8 @@ class TestLiteLLMAdapterHealthCheck:
         import httpx
 
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
@@ -79,8 +79,8 @@ class TestLiteLLMAdapterStop:
     def test_sends_sigterm_to_pid(self) -> None:
         """Verify stop sends SIGTERM to process."""
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=12345,
@@ -93,8 +93,8 @@ class TestLiteLLMAdapterStop:
     def test_does_nothing_for_none_pid(self) -> None:
         """Verify stop does nothing when pid is None."""
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=None,
@@ -107,8 +107,8 @@ class TestLiteLLMAdapterStop:
     def test_ignores_process_not_found(self) -> None:
         """Verify stop ignores ProcessLookupError."""
         adapter = LiteLLMAdapter()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=12345,
@@ -141,7 +141,7 @@ class TestLiteLLMAdapterStart:
 
             result = adapter.start("litellm-4000", config_path, 4000)
 
-        assert result.backend_id == "litellm-4000"
+        assert result.process_id == "litellm-4000"
         assert result.port == 4000
         assert result.pid == 12345
         assert result.status == "healthy"

@@ -79,15 +79,16 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
   `ProxyIdentity.source` as part of backend identity cleanup; it is intentionally provenance, not model backend
   identity.
 
-### `BackendInstance.backend_id`
+### Legacy `BackendInstance.backend_id` / current `ManagedBackendProcess.process_id`
 
 - **Boundary:** strict durable state in the local backend registry.
 - **Writers:** `src/forge/backend/__init__.py` (`BackendManager.ensure_backend`, `stop_backend`),
   `src/forge/backend/adapters/litellm.py`, tests that construct registry fixtures.
 - **Readers:** `src/forge/backend/registry.py`, `src/forge/backend/__init__.py`, `src/forge/cli/backend.py`.
-- **Current meaning:** local managed process instance id, currently adapter plus port, e.g. `litellm-4000`.
-- **Migration note:** this is not the same axis as `ModelSource.id`. It is local-lifecycle-only; remote backends do not
-  have registry instances today.
+- **Current meaning:** local managed process id, currently adapter plus port, e.g. `litellm-4000`.
+- **Migration note:** S3 renamed the code/schema object to `ManagedBackendProcess.process_id` and registry schema v2
+  clean-breaks old v1 `backend_id` process records with a rebuild/recreate tip. This is not the same axis as
+  `ModelSource.id`. It is local-lifecycle-only; remote backends do not have registry processes today.
 
 ### Backend registry `~/.forge/backends/index.json`
 
@@ -95,9 +96,10 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Writers:** `src/forge/backend/registry.py` (`BackendRegistryStore.write`, `update`),
   `src/forge/backend/__init__.py`, `src/forge/cli/backend.py` lifecycle commands.
 - **Readers:** `src/forge/backend/registry.py`, `src/forge/backend/__init__.py`, `src/forge/cli/backend.py`.
-- **Current meaning:** Forge-owned index of local process instances keyed by `BackendInstance.backend_id`.
-- **Migration note:** registry shape is not suitable as the only future backend-instance registry unless Phase 2 decides
-  how non-local remote instances persist without fake lifecycle state.
+- **Current meaning:** Forge-owned index of local managed processes keyed by `ManagedBackendProcess.process_id` under a
+  schema-v2 `processes` map.
+- **Migration note:** registry shape is not suitable as the only future backend-instance registry because it is
+  local-lifecycle state only; non-local remote instances need separate persistence/config, not fake lifecycle state.
 
 ### `forge model backend ... --json`
 
@@ -105,13 +107,14 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Writers:** `src/forge/cli/backend.py` (`_source_record`, `_runtime_instance_record`, `show_cmd`, `test_auth_cmd`).
 - **Readers:** external scripts/users; guard tests in `tests/src/cli/test_backend_commands.py` and
   `tests/src/cli/test_output_streams.py`.
-- **Current meaning:** source rows expose both `"backend_id": source.id` and `"source_id": source.id`; local runtime
-  details live under `"runtime_instance"` with its own `"backend_id": instance.backend_id`. Unmatched local instances
-  use `"source_id": null`.
+- **Current meaning:** source rows expose both `"backend_id": source.id` and `"source_id": source.id`; local process
+  details still live under the legacy `"runtime_instance"` wire key with its own legacy `"backend_id"` carrying
+  `ManagedBackendProcess.process_id`. Unmatched local processes use `"source_id": null`.
 - **Migration note:** this duplicated shape is intentionally transitional from C2. A Phase 3 JSON migration should be
   explicit, tested, and not bundled with help-text cleanup. The `runtime_instance` key itself is also a first-class OQ-1
   JSON-migration candidate if the target term is "backend instance"; do not leave it behind as accidental
-  runtime-vocabulary residue.
+  runtime-vocabulary residue. S4 also owns the coupled internal names that still call managed local processes "instance"
+  while building this legacy JSON shape (`_runtime_instance_record(...)`, `BackendEnsureResult.instance`).
 
 ### Downstream telemetry `source_id`, `source_kind`, and `backend_id`
 
@@ -194,10 +197,10 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
   `litellm-gemini-local`, `litellm-openai-local`, and any other local LiteLLM source whose required env vars match the
   process config.
 - `src/forge/cli/backend.py` derives the display relationship through `_local_source_matches_backend_config`,
-  `_runtime_instance_for_source`, and `_instance_source_map`; list/show then render `(shared)` and `shared_with`.
+  `_managed_process_for_source`, and `_process_source_map`; list/show then render `(shared)` and `shared_with`.
 - This matching is **display-only**. It must not become telemetry attribution. Telemetry attribution currently follows
   the proxy's configured source/catalog id through `_backend_source_id`, while the local process id remains
-  `BackendInstance.backend_id`.
+  `ManagedBackendProcess.process_id`.
 
 ## Phase 2 Feed
 

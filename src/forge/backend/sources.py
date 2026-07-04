@@ -1,7 +1,7 @@
 """Static model-source catalog for Forge backends.
 
 This module defines local and remote model sources as static catalog entries.
-Runtime local backend instances remain owned by ``forge.backend.registry``.
+Managed local backend processes remain owned by ``forge.backend.registry``.
 """
 
 from __future__ import annotations

@@ -9,9 +9,9 @@ from typing import cast
 import pytest
 
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryStore,
+    ManagedBackendProcess,
 )
 from forge.backend.sources import (
     BackendInstanceAmbiguousError,
@@ -81,7 +81,7 @@ def test_all_shipped_templates_resolve_to_a_source(tmp_path: Path, monkeypatch: 
 
 
 def test_local_sources_map_to_lifecycle_without_using_instance_ids() -> None:
-    """Local source ids stay disjoint from BackendInstance-style adapter-port ids."""
+    """Local source ids stay disjoint from ManagedBackendProcess-style adapter-port ids."""
 
     local_sources = [source for source in list_model_sources() if source.kind == "local"]
     assert local_sources
@@ -120,14 +120,14 @@ def test_remote_sources_do_not_enter_runtime_registry(tmp_path: Path) -> None:
     remote_sources = [source for source in list_model_sources() if source.kind == "remote"]
 
     assert remote_sources
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert all(source.local_lifecycle is None for source in remote_sources)
 
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                 )
@@ -136,8 +136,8 @@ def test_remote_sources_do_not_enter_runtime_registry(tmp_path: Path) -> None:
     )
 
     registry = store.read()
-    assert set(registry.backends) == {"litellm-4000"}
-    assert not ({source.id for source in remote_sources} & set(registry.backends))
+    assert set(registry.processes) == {"litellm-4000"}
+    assert not ({source.id for source in remote_sources} & set(registry.processes))
 
 
 def test_duplicate_source_identifiers_are_rejected() -> None:

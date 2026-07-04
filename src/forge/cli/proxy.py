@@ -193,14 +193,14 @@ def list_cmd(as_json: bool) -> None:
         from forge.backend.registry import BackendRegistryStore
 
         backend_store = BackendRegistryStore()
-        backends = backend_store.list_backends()  # Prunes dead PIDs
-        if backends:
+        processes = backend_store.list_processes()  # Prunes dead PIDs
+        if processes:
             console.print("\n[bold]Backends:[/bold]")
-            for backend in backends:
-                status_color = "green" if backend.status == "healthy" else "yellow"
+            for process in processes:
+                status_color = "green" if process.status == "healthy" else "yellow"
                 console.print(
-                    f"  [{status_color}]{backend.backend_id}[/{status_color}] "
-                    f"(port {backend.port}, pid {backend.pid or '-'})"
+                    f"  [{status_color}]{process.process_id}[/{status_color}] "
+                    f"(port {process.port}, pid {process.pid or '-'})"
                 )
     except Exception:
         # Best-effort - don't fail proxy list if backend registry has issues

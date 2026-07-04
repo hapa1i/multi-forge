@@ -15,9 +15,9 @@ import pytest
 from click.testing import CliRunner
 
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryStore,
+    ManagedBackendProcess,
 )
 from forge.cli import backend as backend_cli
 from forge.cli.main import main
@@ -57,15 +57,15 @@ def _backend_args(*args: str) -> list[str]:
     return ["model", "backend", *args]
 
 
-def _backend_instance(
-    backend_id: str = "litellm-4000",
+def _managed_process(
+    process_id: str = "litellm-4000",
     *,
     adapter_type: str = "litellm",
     port: int = 4000,
     pid: int | None = None,
-) -> BackendInstance:
-    return BackendInstance(
-        backend_id=backend_id,
+) -> ManagedBackendProcess:
+    return ManagedBackendProcess(
+        process_id=process_id,
         adapter_type=adapter_type,
         port=port,
         pid=pid,
@@ -73,9 +73,9 @@ def _backend_instance(
     )
 
 
-def _write_backend_registry(forge_home: Path, *instances: BackendInstance) -> BackendRegistryStore:
+def _write_backend_registry(forge_home: Path, *instances: ManagedBackendProcess) -> BackendRegistryStore:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
-    store.write(BackendRegistry(backends={instance.backend_id: instance for instance in instances}))
+    store.write(BackendRegistry(processes={instance.process_id: instance for instance in instances}))
     return store
 
 
@@ -129,9 +129,9 @@ def test_list_json_includes_static_sources_and_local_runtime(
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -157,7 +157,7 @@ def test_list_json_includes_static_sources_and_local_runtime(
     assert records["litellm-anthropic-local"]["runtime_instance"] is None
 
     registry = store.read()
-    assert set(registry.backends) == {"litellm-4000"}
+    assert set(registry.processes) == {"litellm-4000"}
 
 
 def test_list_json_marks_shared_local_runtime_instance(
@@ -184,9 +184,9 @@ def test_list_json_marks_shared_local_runtime_instance(
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -213,11 +213,11 @@ def test_list_json_marks_shared_local_runtime_instance(
     # anthropic-local is not in the config, so it stays unmatched.
     assert records["litellm-anthropic-local"]["runtime_instance"] is None
     # The shared instance is still a single registry entry, not duplicated.
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
-def test_list_human_marks_shared_backend_instance(runner: CliRunner, forge_home: Path) -> None:
-    """The human table flags a shared backend instance in the INSTANCE column."""
+def test_list_human_marks_shared_managed_process(runner: CliRunner, forge_home: Path) -> None:
+    """The human table flags a shared managed process in the PROCESS column."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -234,9 +234,9 @@ def test_list_human_marks_shared_backend_instance(runner: CliRunner, forge_home:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -262,16 +262,16 @@ def test_list_human_shows_backends_even_without_instances(runner: CliRunner, for
     assert "No backends found" not in result.output
 
 
-def test_list_human_shows_unmatched_backend_instance_without_backend_match(
+def test_list_human_shows_unmatched_managed_process_without_backend_match(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -284,7 +284,7 @@ def test_list_human_shows_unmatched_backend_instance_without_backend_match(
     result = runner.invoke(main, _backend_args("list"))
 
     assert result.exit_code == 0
-    assert "Unmatched Backend Instances" in result.output
+    assert "Unmatched Managed Processes" in result.output
     assert "litellm-4000" in result.output
 
     json_result = runner.invoke(main, _backend_args("list", "--json"))
@@ -317,7 +317,7 @@ def test_remote_source_lifecycle_errors_before_registry_mutation(
 
     assert result.exit_code == 1
     assert "no local lifecycle" in result.output
-    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().backends == {}
+    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().processes == {}
 
 
 def test_delete_remote_source_has_intentional_error(runner: CliRunner, forge_home: Path) -> None:
@@ -326,7 +326,7 @@ def test_delete_remote_source_has_intentional_error(runner: CliRunner, forge_hom
     assert result.exit_code == 1
     assert "remote" in result.output
     assert "no local config" in result.output
-    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().backends == {}
+    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().processes == {}
 
 
 def test_local_source_start_uses_default_lifecycle_port(
@@ -344,12 +344,12 @@ def test_local_source_start_uses_default_lifecycle_port(
     assert "forge model backend create litellm" in result.output
 
 
-def test_stop_runtime_id_stops_instance_and_keeps_config(
+def test_stop_process_id_stops_process_and_keeps_config(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-4000"))
@@ -358,35 +358,35 @@ def test_stop_runtime_id_stops_instance_and_keeps_config(
     assert "Stopped" in result.output
     assert "litellm-4000" in result.output
     kill.assert_called_once_with(12345, 15)
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert config_path.exists()
 
 
-def test_stop_multiple_runtime_ids_continues_after_failure(
+def test_stop_multiple_process_ids_continues_after_failure(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill"):
         result = runner.invoke(main, _backend_args("stop", "litellm-4000", "missing-9999"))
 
     assert result.exit_code == 1
     assert "Stopped" in result.output
-    assert "Unknown backend instance 'missing-9999'" in result.output
+    assert "Unknown managed process 'missing-9999'" in result.output
     assert "1 stopped, 1 failed" in result.output
-    assert store.read().backends == {}
+    assert store.read().processes == {}
 
 
-def test_stop_all_yes_stops_every_runtime_and_keeps_configs(
+def test_stop_all_yes_stops_every_process_and_keeps_configs(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
     store = _write_backend_registry(
         forge_home,
-        _backend_instance(pid=12345),
-        _backend_instance("litellm-4001", port=4001, pid=12346),
+        _managed_process(pid=12345),
+        _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
@@ -398,15 +398,15 @@ def test_stop_all_yes_stops_every_runtime_and_keeps_configs(
     assert "litellm-4001" in result.output
     assert "2 stopped" in result.output
     assert kill.call_count == 2
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert config_path.exists()
 
 
-def test_stop_all_unregisters_pidless_instance(
+def test_stop_all_unregisters_pidless_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=None))
+    store = _write_backend_registry(forge_home, _managed_process(pid=None))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
@@ -414,30 +414,30 @@ def test_stop_all_unregisters_pidless_instance(
     assert result.exit_code == 0
     assert "no process was killed" in result.output
     kill.assert_not_called()
-    assert store.read().backends == {}
+    assert store.read().processes == {}
 
 
 def test_stop_all_empty_registry_is_noop(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("stop", "--all"))
 
     assert result.exit_code == 0
-    assert "No backend instances to stop" in result.output
+    assert "No managed processes to stop" in result.output
 
 
 def test_stop_all_conflicts_with_explicit_targets(runner: CliRunner, forge_home: Path) -> None:
-    _write_backend_registry(forge_home, _backend_instance())
+    _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("stop", "litellm-4000", "--all"))
 
     assert result.exit_code == 1
-    assert "Cannot combine --all with explicit backend instance IDs" in result.output
+    assert "Cannot combine --all with explicit managed process IDs" in result.output
 
 
 def test_stop_requires_target_or_all(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("stop"))
 
     assert result.exit_code == 1
-    assert "Provide backend instance ID(s) or use --all" in result.output
+    assert "Provide managed process ID(s) or use --all" in result.output
     assert "forge model backend list" in result.output
 
 
@@ -445,32 +445,32 @@ def test_stop_rejects_local_source_without_stopping_shared_runtime(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-openai-local"))
 
     assert result.exit_code == 1
-    assert "not a backend instance id" in result.output
+    assert "not a managed process id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_stop_rejects_bare_adapter_without_legacy_port_resolution(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm"))
 
     assert result.exit_code == 1
-    assert "Backend adapter 'litellm' is not a backend instance id" in result.output
+    assert "Backend adapter 'litellm' is not a managed process id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_stop_port_option_is_clean_break(runner: CliRunner, forge_home: Path) -> None:
@@ -481,14 +481,14 @@ def test_stop_port_option_is_clean_break(runner: CliRunner, forge_home: Path) ->
     assert "--port" in result.output
 
 
-def test_start_runtime_id_stays_config_oriented(runner: CliRunner, forge_home: Path) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance())
+def test_start_process_id_stays_config_oriented(runner: CliRunner, forge_home: Path) -> None:
+    store = _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("start", "litellm-4000"))
 
     assert result.exit_code == 1
     assert "Unknown backend or adapter 'litellm-4000'" in result.output
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, forge_home: Path) -> None:
@@ -599,16 +599,16 @@ def test_delete_missing_config_errors_with_create_tip(
     assert "forge model backend create litellm" in result.output
 
 
-def test_delete_runtime_id_points_to_stop(
+def test_delete_process_id_points_to_stop(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    _write_backend_registry(forge_home, _backend_instance())
+    _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("delete", "litellm-4000"))
 
     assert result.exit_code == 1
-    assert "backend instance id" in result.output
+    assert "managed process id" in result.output
     assert "forge model backend stop litellm-4000" in result.output
 
 
@@ -620,25 +620,25 @@ def test_delete_port_option_is_clean_break(runner: CliRunner, forge_home: Path) 
     assert "--port" in result.output
 
 
-def test_delete_adapter_config_stops_matching_instances_first(
+def test_delete_adapter_config_stops_matching_processes_first(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
     store = _write_backend_registry(
         forge_home,
-        _backend_instance(pid=12345),
-        _backend_instance("litellm-4001", port=4001, pid=12346),
+        _managed_process(pid=12345),
+        _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("delete", "litellm", "--yes"))
 
     assert result.exit_code == 0
-    assert "Stopped instances: litellm-4000, litellm-4001" in result.output
+    assert "Stopped managed processes: litellm-4000, litellm-4001" in result.output
     assert "Deleted" in result.output
     assert kill.call_count == 2
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert not config_path.parent.exists()
 
 
@@ -647,7 +647,7 @@ def test_backend_group_help_defines_id_spaces(runner: CliRunner) -> None:
 
     assert result.exit_code == 0
     assert "Backend: openrouter" in result.output
-    assert "Backend instance: litellm-4000" in result.output
+    assert "Managed process: litellm-4000" in result.output
     assert "Adapter: litellm" in result.output
 
 
@@ -660,7 +660,7 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     delete_help = runner.invoke(main, _backend_args("delete", "--help"))
 
     assert show_help.exit_code == 0
-    assert "BACKEND_OR_INSTANCE" in show_help.output
+    assert "BACKEND_OR_PROCESS" in show_help.output
     assert "forge model backend show openrouter" in show_help.output
     assert "forge model backend show litellm-4000" in show_help.output
     assert test_auth_help.exit_code == 0
@@ -680,7 +680,7 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     assert "forge model backend start litellm --port 4000" in start_help.output
     assert "backend names use their default port unless overridden" in start_help.output
     assert stop_help.exit_code == 0
-    assert "BACKEND_INSTANCE..." in stop_help.output
+    assert "PROCESS_ID..." in stop_help.output
     assert "RUNTIME_ID..." not in stop_help.output
     assert "forge model backend list" in stop_help.output
     assert "--port" not in stop_help.output
@@ -730,7 +730,7 @@ def test_show_json_configured_backend_emits_source_record(
     assert payload["backend_id"] == "openrouter"
     assert payload["source_id"] == "openrouter"
     assert payload["kind"] == "remote"
-    # Remote backend has no local lifecycle, so no backend instance is matched.
+    # Remote backend has no local lifecycle, so no managed process is matched.
     assert payload["runtime_instance"] is None
     assert payload["has_lifecycle"] is False
     assert isinstance(payload["credentials"], list)
@@ -741,18 +741,18 @@ def test_show_json_registry_only_fallback_when_not_a_source(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <registry-id> --json uses the registry fallback shape (path 2).
+    """show <process-id> --json uses the registry fallback shape (path 2).
 
-    litellm-4000 is a registry backend_id but not a model source, so the command
+    litellm-4000 is a registry process_id but not a model source, so the command
     falls through to the registry-only branch and reports found=true with a
     populated runtime_instance record.
     """
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,

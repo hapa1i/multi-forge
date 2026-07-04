@@ -69,15 +69,15 @@ class TestProxyListShowsBackends:
     def test_proxy_list_shows_backends_section(self, isolated_forge_home: Path) -> None:
         """Verify proxy list shows backends when they exist."""
         from forge.backend.registry import (
-            BackendInstance,
             BackendRegistry,
             BackendRegistryStore,
+            ManagedBackendProcess,
         )
 
         # Manually register a backend
         store = BackendRegistryStore()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=None,
@@ -85,7 +85,7 @@ class TestProxyListShowsBackends:
         )
 
         def add_backend(reg: BackendRegistry) -> None:
-            reg.backends["litellm-4000"] = instance
+            reg.processes["litellm-4000"] = instance
 
         store.update(timeout_s=5.0, mutate=add_backend)
 

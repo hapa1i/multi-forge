@@ -11,9 +11,9 @@ from forge.backend import (
     BackendStartError,
 )
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryStore,
+    ManagedBackendProcess,
 )
 
 
@@ -25,10 +25,10 @@ class MockAdapter(BackendAdapter):
         self.stop_called = False
         self.health_check_result = True
 
-    def start(self, backend_id: str, config_path: Path, port: int) -> BackendInstance:
+    def start(self, process_id: str, config_path: Path, port: int) -> ManagedBackendProcess:
         self.start_called = True
-        return BackendInstance(
-            backend_id=backend_id,
+        return ManagedBackendProcess(
+            process_id=process_id,
             adapter_type="mock",
             port=port,
             pid=12345,
@@ -36,10 +36,10 @@ class MockAdapter(BackendAdapter):
             created_at="2026-02-03T10:00:00Z",
         )
 
-    def stop(self, instance: BackendInstance) -> None:
+    def stop(self, instance: ManagedBackendProcess) -> None:
         self.stop_called = True
 
-    def health_check(self, instance: BackendInstance) -> bool:
+    def health_check(self, instance: ManagedBackendProcess) -> bool:
         return self.health_check_result
 
 
@@ -75,12 +75,12 @@ class TestBackendManager:
 
         assert isinstance(result, BackendEnsureResult)
         assert result.source == "start"
-        assert result.instance.backend_id == "mock-4000"
+        assert result.instance.process_id == "mock-4000"
         assert adapter.start_called
 
         # Verify registered
         registry = store.read()
-        assert "mock-4000" in registry.backends
+        assert "mock-4000" in registry.processes
 
     def test_ensure_backend_reuses_healthy(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ensure_backend reuses existing healthy backend."""
@@ -89,14 +89,14 @@ class TestBackendManager:
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
 
         # Pre-register backend
-        existing = BackendInstance(
-            backend_id="mock-4000",
+        existing = ManagedBackendProcess(
+            process_id="mock-4000",
             adapter_type="mock",
             port=4000,
             pid=12345,
             status="healthy",
         )
-        registry = BackendRegistry(backends={"mock-4000": existing})
+        registry = BackendRegistry(processes={"mock-4000": existing})
         store.write(registry)
 
         manager = BackendManager(store)
@@ -107,7 +107,7 @@ class TestBackendManager:
         result = manager.ensure_backend("mock-4000", "mock", 4000)
 
         assert result.source == "reuse"
-        assert result.instance.backend_id == "mock-4000"
+        assert result.instance.process_id == "mock-4000"
         assert not adapter.start_called  # Should NOT have started
 
     def test_ensure_backend_restarts_dead(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,14 +122,14 @@ class TestBackendManager:
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
 
         # Pre-register backend
-        existing = BackendInstance(
-            backend_id="mock-4000",
+        existing = ManagedBackendProcess(
+            process_id="mock-4000",
             adapter_type="mock",
             port=4000,
             pid=12345,
             status="healthy",
         )
-        registry = BackendRegistry(backends={"mock-4000": existing})
+        registry = BackendRegistry(processes={"mock-4000": existing})
         store.write(registry)
 
         manager = BackendManager(store)
@@ -171,14 +171,14 @@ class TestBackendManager:
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
 
         # Pre-register backend
-        existing = BackendInstance(
-            backend_id="mock-4000",
+        existing = ManagedBackendProcess(
+            process_id="mock-4000",
             adapter_type="mock",
             port=4000,
             pid=12345,
             status="healthy",
         )
-        registry = BackendRegistry(backends={"mock-4000": existing})
+        registry = BackendRegistry(processes={"mock-4000": existing})
         store.write(registry)
 
         manager = BackendManager(store)
@@ -189,7 +189,7 @@ class TestBackendManager:
 
         assert adapter.stop_called
         registry = store.read()
-        assert "mock-4000" not in registry.backends
+        assert "mock-4000" not in registry.processes
 
     def test_stop_backend_raises_for_unknown(self, tmp_path: Path) -> None:
         """Verify stop_backend raises for unknown backend."""
@@ -207,8 +207,8 @@ class TestBackendEnsureResult:
 
     def test_create_with_start_source(self) -> None:
         """Verify result can be created with start source."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
@@ -219,8 +219,8 @@ class TestBackendEnsureResult:
 
     def test_create_with_reuse_source(self) -> None:
         """Verify result can be created with reuse source."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
@@ -230,8 +230,8 @@ class TestBackendEnsureResult:
 
     def test_is_frozen(self) -> None:
         """Verify result is immutable (frozen dataclass)."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )

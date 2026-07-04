@@ -93,10 +93,10 @@ Recommended target:
 - **Backend instance definition**: concrete configured inference target keyed by stable instance id. The current
   `ModelSource` object is closest to this object because it already carries endpoint, credentials, capabilities, billing
   posture, template names, and reachability.
-- **Managed local process**: PID/port/process state for Forge-managed local backends. Current
-  `BackendInstance.backend_id` (`litellm-4000`) should move toward this axis, not become the universal backend instance
-  id. Because `~/.forge/backends/index.json` is strict durable state, a clean-break field rename should use a registry
-  version bump and fail with a clear rebuild/recreate tip rather than silently accepting the old schema.
+- **Managed local process**: PID/port/process state for Forge-managed local backends. S3 moved the old
+  `BackendInstance.backend_id` (`litellm-4000`) to `ManagedBackendProcess.process_id`, keeping it out of the universal
+  backend instance id axis. Because `~/.forge/backends/index.json` is strict durable state, the schema v2 rename fails
+  old v1 records with a clear rebuild/recreate tip rather than silently accepting the old schema.
 
 Concrete examples:
 

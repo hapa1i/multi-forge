@@ -1,4 +1,4 @@
-"""Backend registry for Forge backend services.
+"""Local backend process registry for Forge backend services.
 
 A backend is a service that proxies depend on (e.g., LiteLLM on port 4000).
 The backend registry is stored at:
@@ -30,9 +30,14 @@ from forge.core.state import (
 
 logger = logging.getLogger(__name__)
 
-BACKEND_REGISTRY_VERSION = 1
+BACKEND_REGISTRY_VERSION = 2
 BACKENDS_DIR = "backends"
 BACKEND_INDEX_FILENAME = "index.json"
+OLD_BACKEND_ID_PROCESS_FIELD_TIP = (
+    "local backend process registry uses old backend_id records; "
+    "stop local backends first (or free their ports), then delete ~/.forge/backends/index.json "
+    "and restart local backends."
+)
 
 CLI_LOCK_TIMEOUT_S = 5.0
 
@@ -57,13 +62,13 @@ class BackendRegistryUnreadableError(StateUnreadableError):
 
 
 @dataclass
-class BackendInstance:
-    """A backend instance (used both in registry and at runtime).
+class ManagedBackendProcess:
+    """A Forge-managed local backend process.
 
     Timestamps are stored as ISO8601 strings.
     """
 
-    backend_id: str  # e.g., "litellm-4000"
+    process_id: str  # e.g., "litellm-4000"
     adapter_type: str  # e.g., "litellm"
     port: int
     pid: int | None = None
@@ -76,13 +81,22 @@ class BackendRegistry:
     """Backend registry file format."""
 
     version: int = BACKEND_REGISTRY_VERSION
-    backends: dict[str, BackendInstance] = field(default_factory=dict)
+    processes: dict[str, ManagedBackendProcess] = field(default_factory=dict)
 
 
 def get_backend_registry_path() -> Path:
     """Return the full path to the backend registry file."""
 
     return get_forge_home() / BACKENDS_DIR / BACKEND_INDEX_FILENAME
+
+
+def _uses_old_backend_id_process_records(data: object) -> bool:
+    if not isinstance(data, dict):
+        return False
+    entries = data.get("backends")
+    if not isinstance(entries, dict):
+        return False
+    return any(isinstance(entry, dict) and "backend_id" in entry for entry in entries.values())
 
 
 class BackendRegistryStore:
@@ -120,6 +134,8 @@ class BackendRegistryStore:
         if version is None:
             raise BackendRegistryCorruptedError(str(self._registry_path), "missing version field")
         if version != BACKEND_REGISTRY_VERSION:
+            if version == 1 and _uses_old_backend_id_process_records(data):
+                raise BackendRegistryCorruptedError(str(self._registry_path), OLD_BACKEND_ID_PROCESS_FIELD_TIP)
             raise BackendRegistryCorruptedError(
                 str(self._registry_path),
                 f"incompatible version {version} (this Forge expects {BACKEND_REGISTRY_VERSION}). "
@@ -156,35 +172,35 @@ class BackendRegistryStore:
         - Entries with pid == None are never auto-pruned.
 
         Returns:
-            List of backend IDs removed from the registry.
+            List of managed process IDs removed from the registry.
         """
 
         with file_lock_for_target(target_path=self._registry_path, timeout_s=timeout_s):
             registry = self.read()
 
             stale_ids: list[str] = []
-            for backend_id, entry in list(registry.backends.items()):
+            for process_id, entry in list(registry.processes.items()):
                 if entry.pid is None:
                     continue
                 if not is_pid_alive(entry.pid):
-                    del registry.backends[backend_id]
-                    stale_ids.append(backend_id)
+                    del registry.processes[process_id]
+                    stale_ids.append(process_id)
 
             if stale_ids:
                 self.write(registry)
 
             return stale_ids
 
-    def list_backends(self) -> list[BackendInstance]:
-        """List all backends (prunes dead PIDs first).
+    def list_processes(self) -> list[ManagedBackendProcess]:
+        """List all managed backend processes (prunes dead PIDs first).
 
         Returns:
-            List of backend instances, ordered by creation time (oldest first).
+            List of managed processes, ordered by creation time (oldest first).
         """
 
         self.prune_dead_pids()
         registry = self.read()
 
-        backends = list(registry.backends.values())
-        backends.sort(key=lambda x: x.created_at or "")
-        return backends
+        processes = list(registry.processes.values())
+        processes.sort(key=lambda x: x.created_at or "")
+        return processes
