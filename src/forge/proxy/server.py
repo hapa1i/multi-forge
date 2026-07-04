@@ -1652,6 +1652,20 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     error_type=None,
                     cost_micros=_rcost,
                 )
+                # The auth-retry success path is a real provider call too; without this a
+                # 401 -> refresh -> 200 logged cost/metrics with no provider-trace record.
+                record_provider_trace(
+                    **_trace_ctx,
+                    request_mode="non_streaming",
+                    provider_meta=openai_response.get("_provider_meta"),
+                    stream_started=True,
+                    first_chunk_seen=True,
+                    final_usage_seen=True,
+                    client_disconnected=False,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
+                    latency_ms=retry_duration_ms,
+                    downstream_event_id=downstream_event_id,
+                )
 
                 response_dict = anthropic_response.model_dump()
                 response_dict["_request_id"] = request_id
