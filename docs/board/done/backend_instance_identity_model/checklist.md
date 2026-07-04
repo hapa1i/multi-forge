@@ -2,7 +2,7 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: S6 docs and closeout ready for review. Remaining ceremony after review: move the card to `done/`.
+**Current focus**: Done -- S1-S6 shipped on PR #73 and card moved to `done/`.
 
 ## Invariants (do not violate during migration)
 
@@ -163,4 +163,4 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 - [x] Design docs and end-user docs updated for shipped behavior.
 - [x] `docs/board/impl_notes.md` updated with durable invariants only.
 - [x] `docs/board/change_log.md` entry added when code ships.
-- [ ] Card moved to `done/` after verification and review.
+- [x] Card moved to `done/` after verification and review.

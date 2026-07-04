@@ -1,6 +1,6 @@
 # Backend instance identity model -- make every model backend instance-addressable
 
-**Lane**: `doing/` -- active on branch `feat/backend-instance-identity-model`. Draft execution plan in
+**Lane**: `done/` -- shipped on branch `feat/backend-instance-identity-model` via PR #73. Execution record in
 [`checklist.md`](checklist.md).
 
 **Origin**: split out of [`done/cli_style_ux_compliance`](../../done/cli_style_ux_compliance/card.md) C2/OQ-2 on
