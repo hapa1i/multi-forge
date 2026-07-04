@@ -2,9 +2,9 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 3 / S1 core identity resolver. Phase 1 inventory is recorded in [`inventory.md`](inventory.md),
-and the accepted clean-break target is recorded in [`card.md`](card.md). Next action: land the backend instance/kind
-resolver before touching proxy config, CLI JSON, or telemetry writers.
+**Current focus**: Phase 3 / S2 proxy config clean break. S1 landed the backend instance/kind resolver with exact-id
+precedence, duplicate-kind ambiguity, and managed-process id rejection. Next action: move proxy templates/runtime config
+from `proxy.source` to `proxy.backend`.
 
 ## Invariants (do not violate during migration)
 
@@ -76,19 +76,24 @@ _Slice-ordering guardrails:_
 
 - Land schema/domain resolution with clean-break failure tests before public surfaces.
 - Migrate proxy config before CLI JSON so proxy-created runtime files use the new identity field.
+- Route `proxy.backend` through the new backend-instance resolver; keep `resolve_model_source_id` only where a later
+  slice explicitly justifies the legacy model-source path or removes it.
 - Keep telemetry origin `source_id`/`source_kind` distinct from backend identity unless a slice explicitly renames that
   origin axis.
 - Keep remote backend instances connection/auth-only; no remote CRUD or remote lifecycle commands in this card.
 
 ### S1 -- Core backend identity resolver
 
-- [ ] Introduce the minimal backend kind / backend instance resolver in `src/forge/backend/sources.py` (or a sibling
+- [x] Introduce the minimal backend kind / backend instance resolver in `src/forge/backend/sources.py` (or a sibling
   module if that keeps the boundary cleaner). **Assertion:** exact backend instance ids resolve first, explicit aliases
-  resolve second, unmatched ambiguous kind/name shorthand fails loudly, and `litellm-4000` is not a backend instance id.
-  **Tests:** `tests/src/backend/test_sources.py`.
-- [ ] Add duplicate-remote fixtures in tests only (for example `openrouter` + `openrouter-work`) without adding remote
+  resolve second, unique kind/name shorthand resolves third, unmatched ambiguous kind/name shorthand fails loudly, and
+  `litellm-4000` is not a backend instance id. **Tests:** `tests/src/backend/test_sources.py`.
+- [x] Add duplicate-remote fixtures in tests only (for example `openrouter` + `openrouter-work`) without adding remote
   CRUD. **Assertion:** singleton ids continue to resolve as concrete instances; duplicate kind shorthand errors.
   **Tests:** `tests/src/backend/test_sources.py`.
+
+_Expectation note_: shipped catalog kinds are mostly latent today; many bare-kind shorthands intentionally fail as
+ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S2 -- Proxy config clean break
 
@@ -100,9 +105,10 @@ _Slice-ordering guardrails:_
 
 ### S3 -- Managed local process vocabulary
 
-- [ ] Rename the local registry/process axis away from backend instance identity. **Assertion:** `~/.forge/backends`
-  clean-breaks old `backend_id` process records with a rebuild/recreate tip, while live local process behavior remains
-  local-only. **Tests:** `tests/src/backend/`, `tests/integration/backend/test_backend_cli.py`.
+- [ ] Rename the local registry/process axis away from backend instance identity. **Assertion:** the durable
+  `~/.forge/backends/index.json` schema clean-breaks old `backend_id` process records with a rebuild/recreate tip, while
+  live local process behavior remains local-only. **Tests:** `tests/src/backend/`,
+  `tests/integration/backend/test_backend_cli.py`.
 - [ ] Preserve shared LiteLLM display semantics. **Assertion:** one managed process can still back
   `litellm-gemini-local` and `litellm-openai-local`, and list/show mark the process as shared. **Tests:**
   `tests/src/cli/test_backend_commands.py`.

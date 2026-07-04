@@ -18,6 +18,7 @@ from forge.core.runtime_vocab import LANE_RUNTIME_IDS
 
 ModelSourceKind = Literal["local", "remote"]
 EndpointKind = Literal["literal_url", "connection_value", "local_backend", "runtime_native"]
+BackendInstanceMatchKind = Literal["instance_id", "alias", "kind"]
 # A source's billing nature (a declared catalog fact), distinct from the
 # per-invocation BillingMode (core/usage/ledger). "subscription_quota" is the one
 # spelling shared between the two; posture is coarse and source-level.
@@ -37,6 +38,18 @@ class ModelSourceCatalogError(ValueError):
 
 class ModelSourceNotFoundError(LookupError):
     """Raised when a model-source id or alias is not found."""
+
+
+class BackendInstanceResolutionError(LookupError):
+    """Base class for backend-instance resolver misses and ambiguities."""
+
+
+class BackendInstanceNotFoundError(BackendInstanceResolutionError):
+    """Raised when a backend instance id, alias, or shorthand is not found."""
+
+
+class BackendInstanceAmbiguousError(BackendInstanceResolutionError):
+    """Raised when a backend shorthand matches more than one backend instance."""
 
 
 @dataclass(frozen=True)
@@ -133,6 +146,10 @@ class ModelSource:
     # auth is a runtime's native login pins it here (chatgpt -> ("codex",)). Read
     # by forge.core.lanes._reachable; not consulted by transport resolution.
     reachable_via: tuple[str, ...] = ()
+    # Minimal backend kind axis for backend-instance resolution. When unset,
+    # backend_kind_for_source() derives the provider/protocol family from existing
+    # catalog facts so S1 can stay additive.
+    backend_kind: str | None = None
 
     def __post_init__(self) -> None:
         _validate_source(self)
@@ -163,6 +180,15 @@ class ModelSource:
         return self.local_lifecycle.to_backend_dependency(self.required_env_vars)
 
 
+@dataclass(frozen=True)
+class BackendInstanceResolution:
+    """Resolved logical backend instance plus how the identifier matched."""
+
+    instance_id: str
+    source: ModelSource
+    matched_by: BackendInstanceMatchKind
+
+
 def _build_identifier_lookup(sources: Iterable[ModelSource]) -> dict[str, str]:
     lookup: dict[str, str] = {}
     for source in sources:
@@ -190,6 +216,8 @@ def _validate_source(source: ModelSource) -> None:
         raise ModelSourceCatalogError(f"invalid provider for {source.id!r}: {source.provider!r}")
     if source.billing_posture not in _VALID_BILLING_POSTURES:
         raise ModelSourceCatalogError(f"invalid billing_posture for {source.id!r}: {source.billing_posture!r}")
+    if source.backend_kind is not None and not _SOURCE_ID_RE.match(source.backend_kind):
+        raise ModelSourceCatalogError(f"source {source.id!r} has invalid backend_kind {source.backend_kind!r}")
 
     # Credential symmetry by endpoint family: a runtime_native source's auth is
     # owned by its runtime, so it declares NO Forge credential; every other kind
@@ -279,6 +307,72 @@ def required_env_vars_for_source(source: ModelSource) -> tuple[str, ...]:
         add(source.endpoint.value)
 
     return tuple(required)
+
+
+def backend_kind_for_source(source: ModelSource) -> str:
+    """Return the backend kind/protocol family for a backend instance definition."""
+
+    if source.backend_kind is not None:
+        return source.backend_kind
+    if source.local_lifecycle is not None:
+        return source.local_lifecycle.adapter
+    if source.provider in {"litellm_local", "litellm_remote"}:
+        return "litellm"
+    return source.provider
+
+
+def resolve_backend_instance(
+    identifier: str,
+    *,
+    sources: Iterable[ModelSource] | None = None,
+) -> BackendInstanceResolution:
+    """Resolve a backend instance id, explicit alias, or unique kind shorthand.
+
+    Resolution precedence is deliberate: concrete backend instance ids win before
+    aliases, and aliases win before kind/name shorthand. That preserves singleton
+    ids such as ``openrouter`` even when another instance of the same kind exists.
+    Managed local process ids such as ``litellm-4000`` are not backend instance ids.
+    """
+
+    catalog = BUILTIN_MODEL_SOURCES if sources is None else tuple(sources)
+
+    exact_matches = [source for source in catalog if source.id == identifier]
+    if len(exact_matches) > 1:
+        # Duplicate canonical ids are catalog corruption, not user ambiguity.
+        raise ModelSourceCatalogError(f"duplicate backend instance id {identifier!r}")
+    if exact_matches:
+        source = exact_matches[0]
+        return BackendInstanceResolution(instance_id=source.id, source=source, matched_by="instance_id")
+
+    alias_matches = [source for source in catalog if identifier in source.template_names]
+    if len(alias_matches) > 1:
+        raise BackendInstanceAmbiguousError(_ambiguous_backend_instance_message(identifier, alias_matches))
+    if alias_matches:
+        source = alias_matches[0]
+        return BackendInstanceResolution(instance_id=source.id, source=source, matched_by="alias")
+
+    kind_matches = [source for source in catalog if backend_kind_for_source(source) == identifier]
+    if len(kind_matches) > 1:
+        raise BackendInstanceAmbiguousError(_ambiguous_backend_instance_message(identifier, kind_matches))
+    if kind_matches:
+        source = kind_matches[0]
+        return BackendInstanceResolution(instance_id=source.id, source=source, matched_by="kind")
+
+    raise BackendInstanceNotFoundError(f"Unknown backend instance, alias, or kind: {identifier}")
+
+
+def resolve_backend_instance_id(identifier: str, *, sources: Iterable[ModelSource] | None = None) -> str:
+    """Resolve a backend instance identifier to its canonical backend instance id."""
+
+    return resolve_backend_instance(identifier, sources=sources).instance_id
+
+
+def _ambiguous_backend_instance_message(identifier: str, matches: Iterable[ModelSource]) -> str:
+    choices = ", ".join(source.id for source in matches)
+    return (
+        f"Ambiguous backend instance shorthand {identifier!r}: matches {choices}. "
+        "Use a concrete backend instance id."
+    )
 
 
 def template_env_vars_by_template() -> dict[str, list[str]]:
@@ -519,6 +613,11 @@ _SOURCE_BY_IDENTIFIER = {
 
 
 __all__ = [
+    "BackendInstanceAmbiguousError",
+    "BackendInstanceMatchKind",
+    "BackendInstanceNotFoundError",
+    "BackendInstanceResolution",
+    "BackendInstanceResolutionError",
     "BUILTIN_MODEL_SOURCES",
     "BillingPosture",
     "EndpointKind",
@@ -531,10 +630,13 @@ __all__ = [
     "OPENROUTER_TEMPLATE_NAMES",
     "REMOTE_LITELLM_TEMPLATE_NAMES",
     "SourceEndpoint",
+    "backend_kind_for_source",
     "get_model_source",
     "list_model_sources",
     "model_source_for_template",
     "required_env_vars_for_source",
+    "resolve_backend_instance",
+    "resolve_backend_instance_id",
     "resolve_model_source_id",
     "template_env_vars_by_template",
     "validate_model_sources",
