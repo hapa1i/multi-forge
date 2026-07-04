@@ -81,7 +81,7 @@ This is intentionally a candidate, not a final design. The first active phase sh
 `ModelSource` catalog is closer to a backend instance definition, a backend kind definition, or a mixed object that
 needs to split.
 
-## Phase 2 recommendation (draft for review)
+## Phase 2 decision (accepted)
 
 The inventory points to a split, but not the naive one where the local process id becomes the backend instance id.
 Recommended target:
@@ -142,7 +142,7 @@ Recommended OQ resolutions:
   fixture-backed duplicate-remote tests if useful. Do not add remote backend CRUD or remote lifecycle commands here;
   those belong in a follow-up card once the identity model is stable.
 
-## Open questions
+## Resolved questions
 
 | Question                                                                                        | Why it matters                                                                                                     |
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

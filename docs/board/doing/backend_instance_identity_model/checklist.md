@@ -2,9 +2,9 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 2 design review. Phase 1 inventory is recorded in [`inventory.md`](inventory.md), and a draft
-OQ-1 through OQ-5 recommendation is recorded in [`card.md`](card.md). Next action: review/accept or revise that target
-before choosing implementation slices or changing `src/`.
+**Current focus**: Phase 3 / S1 core identity resolver. Phase 1 inventory is recorded in [`inventory.md`](inventory.md),
+and the accepted clean-break target is recorded in [`card.md`](card.md). Next action: land the backend instance/kind
+resolver before touching proxy config, CLI JSON, or telemetry writers.
 
 ## Invariants (do not violate during migration)
 
@@ -21,6 +21,9 @@ before choosing implementation slices or changing `src/`.
   warn-and-degrade on the runtime read path. Old `proxy.source` may fail loudly under the clean-break plan. Strict
   reject-on-unknown stays scoped to the **template load path** (`_apply_template_source`) -- shipped *or* user
   templates, since `read_template` prefers the user copy -- not the runtime `proxy.yaml` read path.
+- **Telemetry origin fields are not backend identity fields.** `source_id`/`source_kind` in downstream telemetry remain
+  the origin/correlation axis unless a later slice explicitly renames that axis. The clean break targets
+  backend-identity fields such as config `proxy.source`, CLI/backend JSON `source_id`, and `runtime_instance`.
 
 ## Phase 0 -- Activation (complete)
 
@@ -52,47 +55,94 @@ card dir; it is not promoted to design docs.
 `design_appendix.md §A.2.1` only when the corresponding code ships (board contract: cards are aspirational, design docs
 are contract).
 
-- [ ] **OQ-1 -- object shape.** Decide whether the target is a rename of `ModelSource` or a split into backend kind +
+- [x] **OQ-1 -- object shape.** Decide whether the target is a rename of `ModelSource` or a split into backend kind +
   backend instance. **Assertion:** worked through concrete examples -- `openrouter`, `claude-max`, a hypothetical second
   remote of the same kind, and local `litellm-4000` -- each landing on exactly one canonical object.
-- [ ] **OQ-2 -- telemetry identity.** Decide what downstream `backend_id` means post-migration. **Assertion:** the
+- [x] **OQ-2 -- telemetry identity.** Decide what downstream `backend_id` means post-migration. **Assertion:** the
   meaning is stated for singleton remotes, duplicate remotes, and shared local LiteLLM, and says whether existing
   records are ignored, shown as legacy-shape records, or migrated by a deliberate tool (no silent attribution drift;
   keep `backend_id` distinct from the `source_id`/`source_kind` origin axis).
-- [ ] **OQ-3/OQ-4 -- config + ambiguity.** Decide the config spelling and the singleton-to-duplicate transition.
+- [x] **OQ-3/OQ-4 -- config + ambiguity.** Decide the config spelling and the singleton-to-duplicate transition.
   **Assertion:** `proxy.source` has a clean-break failure/recreate plan, the successor spelling has read/write behavior
   documented, exact instance ids resolve before aliases/kind shorthands, and ambiguous unmatched shorthand **fails
   loudly**, not mis-routes to one instance.
-- [ ] **OQ-5 -- scope boundary.** Decide foundation-only vs remote-instance CRUD, explicitly and with rationale.
+- [x] **OQ-5 -- scope boundary.** Decide foundation-only vs remote-instance CRUD, explicitly and with rationale.
   **Assertion:** the card states the choice (non-goals currently lean foundation-only -- confirm or overturn, do not
   leave it implicit in a Phase 3 guardrail), and the Phase 3 slice list matches it.
 
-## Phase 3 -- Implementation slices (PROVISIONAL -- expand after Phase 2)
-
-These are ordering guardrails, not fixture-grounded slices. Do not tick or expand them into real slices until the Phase
-2 decision fixes the schema -- expanding now would bake in the wrong slices.
+## Phase 3 -- Implementation slices
 
 _Slice-ordering guardrails:_
 
-- Land schema/domain resolution with clean-break failure tests first.
-- Migrate CLI help and docs only after machine contracts are clear.
-- Add exact-id, ambiguity, and old-field failure tests before removing old names.
-- Keep remote backend instances connection/auth-only unless a later card adds remote CRUD.
+- Land schema/domain resolution with clean-break failure tests before public surfaces.
+- Migrate proxy config before CLI JSON so proxy-created runtime files use the new identity field.
+- Keep telemetry origin `source_id`/`source_kind` distinct from backend identity unless a slice explicitly renames that
+  origin axis.
+- Keep remote backend instances connection/auth-only; no remote CRUD or remote lifecycle commands in this card.
 
-_Remaining Phase 3 task:_
+### S1 -- Core backend identity resolver
 
-- [ ] Expand this phase into fixture-grounded slices (each with an assertion and a test file) once Phase 2 lands, and
-  fill the Verification table's `Test File` column as those slices ship.
+- [ ] Introduce the minimal backend kind / backend instance resolver in `src/forge/backend/sources.py` (or a sibling
+  module if that keeps the boundary cleaner). **Assertion:** exact backend instance ids resolve first, explicit aliases
+  resolve second, unmatched ambiguous kind/name shorthand fails loudly, and `litellm-4000` is not a backend instance id.
+  **Tests:** `tests/src/backend/test_sources.py`.
+- [ ] Add duplicate-remote fixtures in tests only (for example `openrouter` + `openrouter-work`) without adding remote
+  CRUD. **Assertion:** singleton ids continue to resolve as concrete instances; duplicate kind shorthand errors.
+  **Tests:** `tests/src/backend/test_sources.py`.
 
-## Verification (PROVISIONAL -- fixtures/files pending the Phase 2 schema decision)
+### S2 -- Proxy config clean break
 
-| Test area                 | Fixture                                | Assertion                                                                                         | Test File |
-| ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- | --------- |
-| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                         | TBD       |
-| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                  | TBD       |
-| Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the instance `(shared)`; telemetry attribution follows the OQ-2 decision | TBD       |
-| Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance (guard/grep test)                                       | TBD       |
-| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution   | TBD       |
+- [ ] Make `proxy.backend` the canonical template/runtime field and update shipped templates. **Assertion:** template
+  load rejects old `proxy.source` with a migration/recreate tip and rejects unknown `proxy.backend` strictly. **Tests:**
+  `tests/src/config/test_loader.py`, `tests/src/core/auth/test_template_secrets.py`.
+- [ ] Keep runtime `proxy.yaml` as a system boundary for the new field. **Assertion:** unknown `proxy.backend` in
+  runtime config warns-and-degrades; old `proxy.source` fails loudly with a recreate tip. **Tests:** `tests/src/proxy/`.
+
+### S3 -- Managed local process vocabulary
+
+- [ ] Rename the local registry/process axis away from backend instance identity. **Assertion:** `~/.forge/backends`
+  clean-breaks old `backend_id` process records with a rebuild/recreate tip, while live local process behavior remains
+  local-only. **Tests:** `tests/src/backend/`, `tests/integration/backend/test_backend_cli.py`.
+- [ ] Preserve shared LiteLLM display semantics. **Assertion:** one managed process can still back
+  `litellm-gemini-local` and `litellm-openai-local`, and list/show mark the process as shared. **Tests:**
+  `tests/src/cli/test_backend_commands.py`.
+
+### S4 -- CLI JSON clean break
+
+- [ ] Replace backend CLI JSON identity keys with backend-instance / managed-process names. **Assertion:** source-row
+  `source_id` and nested `runtime_instance` do not survive in the new JSON shape; old-shape expectations fail through
+  tests rather than compatibility aliases. **Tests:** `tests/src/cli/test_backend_commands.py`,
+  `tests/src/cli/test_output_streams.py`.
+- [ ] Add runtime terminology guards for help and docs touched by this card. **Assertion:** `runtime` never labels a
+  backend instance or managed local process. **Tests:** `tests/src/cli/test_backend_commands.py` or a focused docs/CLI
+  grep test.
+
+### S5 -- Telemetry backend identity clean break
+
+- [ ] Route new proxy/direct telemetry writes through backend instance ids. **Assertion:** downstream telemetry
+  `backend_id` is the logical backend instance id for singleton remotes, duplicate remotes, and shared local LiteLLM;
+  the local managed-process id is not used for attribution. **Tests:** `tests/src/proxy/test_provider_trace.py`,
+  `tests/src/core/ops/test_usage_summary.py`.
+- [ ] Decide and implement the historical-record outcome. **Assertion:** pre-break records are ignored, shown as
+  legacy-shape records, or migrated by a deliberate tool; no view silently reinterprets legacy ids. **Tests:**
+  `tests/src/cli/test_activity.py`, telemetry/cost tests touched by the implementation.
+
+### S6 -- Docs and closeout
+
+- [ ] Update shipped docs for implemented behavior only. **Assertion:** `docs/design.md`, `docs/design_appendix.md`,
+  `docs/end-user/proxy.md`, and `docs/cli_reference.md` match the final CLI/config/telemetry behavior.
+- [ ] Add board closeout entries. **Assertion:** `docs/board/change_log.md` records shipped behavior, and
+  `docs/board/impl_notes.md` receives only durable invariants after review.
+
+## Verification
+
+| Test area                 | Fixture                                | Assertion                                                                                        | Test File                                                                   |
+| ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                        | `tests/src/config/test_loader.py`, `tests/src/cli/test_backend_commands.py` |
+| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                 | `tests/src/backend/test_sources.py`                                         |
+| Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the process `(shared)`; telemetry attribution follows the OQ-2 decision | `tests/src/cli/test_backend_commands.py`                                    |
+| Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance or managed local process                               | `tests/src/cli/test_backend_commands.py` or focused grep test               |
+| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution  | `tests/src/cli/test_activity.py`, telemetry/cost tests touched by S5        |
 
 ## Closeout
 
