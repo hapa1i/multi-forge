@@ -59,10 +59,25 @@ ipython_config.py
 __pypackages__/
 
 # Claude Code local artifacts (machine-specific)
-.claude/
+.claude/*
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/gather-context.md
+!.claude/commands/refactor_audit.md
+!.claude/commands/simplicity_audit.md
+
+# Codex local artifacts
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/gather-context/
+!.agents/skills/gather-context/SKILL.md
+!.agents/skills/refactor-audit/
+!.agents/skills/refactor-audit/SKILL.md
+!.agents/skills/simplicity-audit/
+!.agents/skills/simplicity-audit/SKILL.md
 
 # Codex local config
-.agents
 .codex/
 
 # Forge local artifacts (machine-specific, may contain sensitive transcript snippets)
