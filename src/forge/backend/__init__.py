@@ -45,7 +45,7 @@ from forge.backend.sources import (
 class BackendEnsureResult:
     """Result of ensure_backend() operation."""
 
-    instance: ManagedBackendProcess
+    process: ManagedBackendProcess
     source: Literal["reuse", "start"]
 
 
@@ -69,19 +69,19 @@ class BackendAdapter(ABC):
         """
 
     @abstractmethod
-    def stop(self, instance: ManagedBackendProcess) -> None:
+    def stop(self, process: ManagedBackendProcess) -> None:
         """Stop backend (best effort).
 
         Args:
-            instance: Managed backend process to stop
+            process: Managed backend process to stop
         """
 
     @abstractmethod
-    def health_check(self, instance: ManagedBackendProcess) -> bool:
+    def health_check(self, process: ManagedBackendProcess) -> bool:
         """Check if backend is healthy.
 
         Args:
-            instance: Managed backend process to check
+            process: Managed backend process to check
 
         Returns:
             True if healthy, False otherwise
@@ -122,7 +122,7 @@ class BackendManager:
             port: Port number
 
         Returns:
-            BackendEnsureResult with instance and source ("reuse" or "start")
+            BackendEnsureResult with process and source ("reuse" or "start")
 
         Raises:
             BackendStartError: If backend fails to start
@@ -139,7 +139,7 @@ class BackendManager:
         if existing:
             # health_check works with or without PID (port probe fallback)
             if adapter.health_check(existing):
-                return BackendEnsureResult(instance=existing, source="reuse")
+                return BackendEnsureResult(process=existing, source="reuse")
 
             def remove_dead(reg: BackendRegistry) -> None:
                 reg.processes.pop(process_id, None)
@@ -153,14 +153,14 @@ class BackendManager:
                 f"Create it with: forge model backend create {adapter_type}"
             )
 
-        instance = adapter.start(process_id, config_path, port)
+        process = adapter.start(process_id, config_path, port)
 
-        def add_instance(reg: BackendRegistry) -> None:
-            reg.processes[process_id] = instance
+        def add_process(reg: BackendRegistry) -> None:
+            reg.processes[process_id] = process
 
-        self.registry_store.update(timeout_s=10.0, mutate=add_instance)
+        self.registry_store.update(timeout_s=10.0, mutate=add_process)
 
-        return BackendEnsureResult(instance=instance, source="start")
+        return BackendEnsureResult(process=process, source="start")
 
     def stop_backend(self, process_id: str) -> None:
         """Stop backend and remove from registry.
@@ -172,19 +172,19 @@ class BackendManager:
             ValueError: If managed process not found
         """
         registry = self.registry_store.read()
-        instance = registry.processes.get(process_id)
+        process = registry.processes.get(process_id)
 
-        if not instance:
+        if not process:
             raise ValueError(f"Managed process not found: {process_id}")
 
-        adapter = self.adapters.get(instance.adapter_type)
+        adapter = self.adapters.get(process.adapter_type)
         if adapter:
-            adapter.stop(instance)
+            adapter.stop(process)
 
-        def remove_instance(reg: BackendRegistry) -> None:
+        def remove_process(reg: BackendRegistry) -> None:
             reg.processes.pop(process_id, None)
 
-        self.registry_store.update(timeout_s=10.0, mutate=remove_instance)
+        self.registry_store.update(timeout_s=10.0, mutate=remove_process)
 
 
 __all__ = [

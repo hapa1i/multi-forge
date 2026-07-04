@@ -21,7 +21,7 @@ class TestLiteLLMAdapterHealthCheck:
     def test_returns_true_when_healthy(self) -> None:
         """Verify health_check returns True when backend responds 200."""
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -32,14 +32,14 @@ class TestLiteLLMAdapterHealthCheck:
             mock_response.status_code = 200
             mock_client.return_value.__enter__.return_value.get.return_value = mock_response
 
-            result = adapter.health_check(instance)
+            result = adapter.health_check(process)
 
         assert result is True
 
     def test_returns_false_when_unhealthy(self) -> None:
         """Verify health_check returns False when backend responds non-200."""
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -50,7 +50,7 @@ class TestLiteLLMAdapterHealthCheck:
             mock_response.status_code = 500
             mock_client.return_value.__enter__.return_value.get.return_value = mock_response
 
-            result = adapter.health_check(instance)
+            result = adapter.health_check(process)
 
         assert result is False
 
@@ -59,7 +59,7 @@ class TestLiteLLMAdapterHealthCheck:
         import httpx
 
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -68,7 +68,7 @@ class TestLiteLLMAdapterHealthCheck:
         with patch("forge.backend.adapters.litellm.httpx.Client") as mock_client:
             mock_client.return_value.__enter__.return_value.get.side_effect = httpx.RequestError("Connection refused")
 
-            result = adapter.health_check(instance)
+            result = adapter.health_check(process)
 
         assert result is False
 
@@ -79,7 +79,7 @@ class TestLiteLLMAdapterStop:
     def test_sends_sigterm_to_pid(self) -> None:
         """Verify stop sends SIGTERM to process."""
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -87,13 +87,13 @@ class TestLiteLLMAdapterStop:
         )
 
         with patch("os.kill") as mock_kill:
-            adapter.stop(instance)
+            adapter.stop(process)
             mock_kill.assert_called_once_with(12345, 15)  # 15 = SIGTERM
 
     def test_does_nothing_for_none_pid(self) -> None:
         """Verify stop does nothing when pid is None."""
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -101,13 +101,13 @@ class TestLiteLLMAdapterStop:
         )
 
         with patch("os.kill") as mock_kill:
-            adapter.stop(instance)
+            adapter.stop(process)
             mock_kill.assert_not_called()
 
     def test_ignores_process_not_found(self) -> None:
         """Verify stop ignores ProcessLookupError."""
         adapter = LiteLLMAdapter()
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -116,7 +116,7 @@ class TestLiteLLMAdapterStop:
 
         with patch("os.kill", side_effect=ProcessLookupError):
             # Should not raise
-            adapter.stop(instance)
+            adapter.stop(process)
 
 
 class TestLiteLLMAdapterStart:

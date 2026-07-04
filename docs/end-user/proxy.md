@@ -83,9 +83,9 @@ Forge provides ready-to-use proxy configurations (internal templates):
 
 `litellm-gemini-test` also exists internally, but it is hidden from normal end-user template lists.
 
-Built-in templates declare `proxy.source`, the legacy config field that names the model backend owning endpoint and
-credential requirements. If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.source` set to
-an existing backend such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend
+Built-in templates declare `proxy.backend`, the config field that names the backend owning endpoint and credential
+requirements. If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.backend` set to an
+existing backend such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend
 auto-start and remote upstream URLs from that backend at proxy creation time.
 
 OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_BASE_URL` only when you intentionally
@@ -93,17 +93,17 @@ route OpenRouter-compatible traffic through a different endpoint; new proxies cr
 copy that resolved upstream URL into `proxy.yaml`.
 
 Use `forge model backend list` to inspect built-in backends, required credentials, and any matching local LiteLLM
-backend instance. Use `forge model backend test-auth <backend>` when you want Forge to resolve the backend's credentials
+managed process. Use `forge model backend test-auth <backend>` when you want Forge to resolve the backend's credentials
 and probe the upstream endpoint without printing secret values. Remote backends such as `openrouter` and
 `litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM backends can be started by backend
-name or by the `litellm --port <port>` adapter form. Stop live local backend processes by the backend instance id shown
-in `forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered local
-backend instance with `forge model backend stop --all`.
+name or by the `litellm --port <port>` adapter form. Stop live local backend processes by the managed process id shown
+in `forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered managed
+process with `forge model backend stop --all`.
 
 The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
 adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local backend whose credential it is
 configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
-`forge model backend list` shows that backend instance under each matching backend and marks it `(shared)`; starting a
+`forge model backend list` shows that managed process under each matching backend and marks it `(shared)`; starting a
 second matching backend reuses the running process rather than launching a new one. This is expected -- there is one
 local LiteLLM process, not one per backend.
 
@@ -281,7 +281,7 @@ Use `--smoke-test` after first setup or credential changes to verify the proxy c
 Without it, health checks only confirm the local proxy process is alive.
 
 If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
-`forge model backend stop --all --yes` in automation) before restarting proxies. This clears local backend instance
+`forge model backend stop --all --yes` in automation) before restarting proxies. This clears managed local backend
 processes and registry rows without deleting adapter config files.
 
 ### Start Claude with a proxy
@@ -386,7 +386,7 @@ template: openrouter-openai
 template_digest: abc123...
 
 provider: openrouter
-source: openrouter
+backend: openrouter
 proxy_endpoint: http://localhost:8096
 port: 8096
 upstream_base_url: https://openrouter.ai/api/v1

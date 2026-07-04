@@ -45,3 +45,26 @@ def test_unknown_backend_warns_once_and_still_returns(
         r for r in caplog.records if _UNKNOWN_MARKER in r.getMessage() and "not-a-real-backend" in r.getMessage()
     ]
     assert len(warnings) == 1
+
+
+def test_inspect_route_uses_backend_not_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        SimpleNamespace(
+            active_template="openrouter-openai",
+            preferred_provider="openrouter",
+            backend="openrouter",
+            wire_shape="openai_translated",
+        ),
+    )
+
+    route = server._inspect_route()
+
+    assert route == {
+        "template": "openrouter-openai",
+        "provider": "openrouter",
+        "backend": "openrouter",
+        "wire_shape": "openai_translated",
+    }
+    assert "source" not in route

@@ -113,7 +113,7 @@ def test_start_missing_config_errors_with_create_tip(runner: CliRunner, tmp_path
     assert "forge model backend create litellm" in result.output
 
 
-def test_list_json_includes_static_sources_and_local_runtime(
+def test_list_json_includes_static_sources_and_managed_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
@@ -144,29 +144,33 @@ def test_list_json_includes_static_sources_and_local_runtime(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    payload = _json_output(result)
+    assert all({"backend_id", "source_id", "runtime_instance"}.isdisjoint(item) for item in payload)
+    records = {item["backend_instance_id"]: item for item in payload}
     assert records["openrouter"]["kind"] == "remote"
     assert records["openrouter"]["endpoint"]["env_var"] == "OPENROUTER_BASE_URL"
-    assert records["openrouter"]["runtime_instance"] is None
+    assert records["openrouter"]["managed_process"] is None
     assert records["litellm-gemini-local"]["kind"] == "local"
-    assert records["litellm-gemini-local"]["runtime_instance"]["backend_id"] == "litellm-4000"
+    gemini_process = records["litellm-gemini-local"]["managed_process"]
+    assert gemini_process["process_id"] == "litellm-4000"
+    assert "backend_id" not in gemini_process
     assert records["litellm-gemini-local"]["health"] == "healthy"
     # A gemini-only config means only one source matches, so the instance is not shared.
-    assert records["litellm-gemini-local"]["runtime_instance"]["shared_with"] == []
-    assert records["litellm-openai-local"]["runtime_instance"] is None
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+    assert records["litellm-gemini-local"]["managed_process"]["shared_with"] == []
+    assert records["litellm-openai-local"]["managed_process"] is None
+    assert records["litellm-anthropic-local"]["managed_process"] is None
 
     registry = store.read()
     assert set(registry.processes) == {"litellm-4000"}
 
 
-def test_list_json_marks_shared_local_runtime_instance(
+def test_list_json_marks_shared_managed_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     """A multi-provider config mirrors the shipped default: one litellm-4000 process
     serves both Gemini and OpenAI, so every local source backed by it (Gemini, OpenAI,
-    and the OpenAI-credentialed codex-responses source) matches the single instance and
+    and the OpenAI-credentialed codex-responses source) matches the single process and
     the list marks it as shared rather than implying separate backends."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
@@ -199,20 +203,20 @@ def test_list_json_marks_shared_local_runtime_instance(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
 
-    gemini = records["litellm-gemini-local"]["runtime_instance"]
-    openai = records["litellm-openai-local"]["runtime_instance"]
-    # Both sources are backed by the single running instance.
-    assert gemini["backend_id"] == "litellm-4000"
-    assert openai["backend_id"] == "litellm-4000"
-    # Each row names the sibling sources it shares the instance with (catalog order),
+    gemini = records["litellm-gemini-local"]["managed_process"]
+    openai = records["litellm-openai-local"]["managed_process"]
+    # Both sources are backed by the single running process.
+    assert gemini["process_id"] == "litellm-4000"
+    assert openai["process_id"] == "litellm-4000"
+    # Each row names the sibling sources it shares the process with (catalog order),
     # never itself. codex-responses-local is an OpenAI-credentialed co-tenant on 4000.
     assert gemini["shared_with"] == ["litellm-openai-local", "codex-responses-local"]
     assert openai["shared_with"] == ["litellm-gemini-local", "codex-responses-local"]
     # anthropic-local is not in the config, so it stays unmatched.
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
-    # The shared instance is still a single registry entry, not duplicated.
+    assert records["litellm-anthropic-local"]["managed_process"] is None
+    # The shared process is still a single registry entry, not duplicated.
     assert set(store.read().processes) == {"litellm-4000"}
 
 
@@ -289,10 +293,10 @@ def test_list_human_shows_unmatched_managed_process_without_backend_match(
 
     json_result = runner.invoke(main, _backend_args("list", "--json"))
     assert json_result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(json_result)}
-    assert records["litellm-gemini-local"]["runtime_instance"] is None
-    assert records["litellm-openai-local"]["runtime_instance"] is None
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+    records = {item["backend_instance_id"]: item for item in _json_output(json_result)}
+    assert records["litellm-gemini-local"]["managed_process"] is None
+    assert records["litellm-openai-local"]["managed_process"] is None
+    assert records["litellm-anthropic-local"]["managed_process"] is None
 
 
 def test_show_remote_source_details(runner: CliRunner, forge_home: Path) -> None:
@@ -441,7 +445,7 @@ def test_stop_requires_target_or_all(runner: CliRunner, forge_home: Path) -> Non
     assert "forge model backend list" in result.output
 
 
-def test_stop_rejects_local_source_without_stopping_shared_runtime(
+def test_stop_rejects_local_source_without_stopping_shared_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
@@ -496,8 +500,9 @@ def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, for
 
     assert result.exit_code == 1
     payload = _json_output(result)
-    assert payload["backend_id"] == "openrouter"
-    assert payload["source_id"] == "openrouter"
+    assert "backend_id" not in payload
+    assert "source_id" not in payload
+    assert payload["backend_instance_id"] == "openrouter"
     assert payload["auth_status"] == "missing"
     assert payload["missing_required_env_vars"] == ["OPENROUTER_API_KEY"]
     assert payload["probe"]["status"] == "skipped"
@@ -688,9 +693,26 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     assert "--port" not in delete_help.output
 
 
+def test_backend_help_does_not_label_processes_as_runtime(runner: CliRunner) -> None:
+    help_commands = [
+        _backend_args("--help"),
+        _backend_args("list", "--help"),
+        _backend_args("show", "--help"),
+        _backend_args("start", "--help"),
+        _backend_args("stop", "--help"),
+        _backend_args("delete", "--help"),
+    ]
+
+    for args in help_commands:
+        result = runner.invoke(main, args)
+        assert result.exit_code == 0
+        help_text = result.output.lower()
+        assert "runtime instance" not in help_text
+        assert "runtime id" not in help_text
+
+
 _SOURCE_RECORD_KEYS = {
-    "backend_id",
-    "source_id",
+    "backend_instance_id",
     "kind",
     "provider",
     "endpoint",
@@ -700,15 +722,14 @@ _SOURCE_RECORD_KEYS = {
     "missing_required_env_vars",
     "health",
     "has_lifecycle",
-    "runtime_instance",
+    "managed_process",
 }
 
 _REGISTRY_FALLBACK_KEYS = {
-    "backend_id",
-    "source_id",
+    "managed_process_id",
     "found",
     "adapter_type",
-    "runtime_instance",
+    "managed_process",
     "config_path",
 }
 
@@ -727,11 +748,10 @@ def test_show_json_configured_backend_emits_source_record(
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _SOURCE_RECORD_KEYS
-    assert payload["backend_id"] == "openrouter"
-    assert payload["source_id"] == "openrouter"
+    assert payload["backend_instance_id"] == "openrouter"
     assert payload["kind"] == "remote"
     # Remote backend has no local lifecycle, so no managed process is matched.
-    assert payload["runtime_instance"] is None
+    assert payload["managed_process"] is None
     assert payload["has_lifecycle"] is False
     assert isinstance(payload["credentials"], list)
     assert "OPENROUTER_API_KEY" in payload["missing_required_env_vars"]
@@ -745,7 +765,7 @@ def test_show_json_registry_only_fallback_when_not_a_source(
 
     litellm-4000 is a registry process_id but not a model source, so the command
     falls through to the registry-only branch and reports found=true with a
-    populated runtime_instance record.
+    populated managed_process record.
     """
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
@@ -767,35 +787,33 @@ def test_show_json_registry_only_fallback_when_not_a_source(
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _REGISTRY_FALLBACK_KEYS
-    assert payload["backend_id"] == "litellm-4000"
-    assert payload["source_id"] is None
+    assert payload["managed_process_id"] == "litellm-4000"
     assert payload["found"] is True
     assert payload["adapter_type"] == "litellm"
-    runtime = payload["runtime_instance"]
-    assert runtime is not None
-    assert runtime["backend_id"] == "litellm-4000"
-    assert runtime["adapter_type"] == "litellm"
-    assert runtime["port"] == 4000
-    assert runtime["status"] == "healthy"
-    assert runtime["alive"] is False
+    process = payload["managed_process"]
+    assert process is not None
+    assert process["process_id"] == "litellm-4000"
+    assert process["adapter_type"] == "litellm"
+    assert process["port"] == 4000
+    assert process["status"] == "healthy"
+    assert process["alive"] is False
 
 
 def test_show_json_unknown_id_reports_not_found(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <unknown-id> --json reports found=false with empty runtime/config (path 3)."""
+    """show <unknown-id> --json reports found=false with empty process/config (path 3)."""
     result = runner.invoke(main, _backend_args("show", "nope-9999", "--json"))
 
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _REGISTRY_FALLBACK_KEYS
-    assert payload["backend_id"] == "nope-9999"
-    assert payload["source_id"] is None
+    assert payload["managed_process_id"] == "nope-9999"
     assert payload["found"] is False
     # rsplit("-", 1) on "nope-9999" yields adapter "nope".
     assert payload["adapter_type"] == "nope"
-    assert payload["runtime_instance"] is None
+    assert payload["managed_process"] is None
     assert payload["config_path"] is None
 
 
@@ -809,7 +827,7 @@ def test_list_json_renders_runtime_native_source_as_runtime_owned(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
     chatgpt = records["chatgpt"]
     assert chatgpt["provider"] == "openai"
     assert chatgpt["kind"] == "remote"
@@ -817,7 +835,7 @@ def test_list_json_renders_runtime_native_source_as_runtime_owned(
     assert chatgpt["auth_status"] == "runtime_native"
     assert chatgpt["health"] == "runtime-owned"
     assert chatgpt["required_credentials"] == []
-    assert chatgpt["runtime_instance"] is None
+    assert chatgpt["managed_process"] is None
 
 
 def test_test_auth_runtime_native_source_is_skipped_not_failed(
@@ -846,7 +864,7 @@ def test_list_json_renders_claude_max_as_runtime_owned(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
     claude_max = records["claude-max"]
     assert claude_max["provider"] == "anthropic"
     assert claude_max["kind"] == "remote"
@@ -854,7 +872,7 @@ def test_list_json_renders_claude_max_as_runtime_owned(
     assert claude_max["auth_status"] == "runtime_native"
     assert claude_max["health"] == "runtime-owned"
     assert claude_max["required_credentials"] == []
-    assert claude_max["runtime_instance"] is None
+    assert claude_max["managed_process"] is None
 
 
 def test_test_auth_claude_max_skipped_with_claude_hint_not_codex(

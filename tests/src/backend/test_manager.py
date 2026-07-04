@@ -36,10 +36,10 @@ class MockAdapter(BackendAdapter):
             created_at="2026-02-03T10:00:00Z",
         )
 
-    def stop(self, instance: ManagedBackendProcess) -> None:
+    def stop(self, process: ManagedBackendProcess) -> None:
         self.stop_called = True
 
-    def health_check(self, instance: ManagedBackendProcess) -> bool:
+    def health_check(self, process: ManagedBackendProcess) -> bool:
         return self.health_check_result
 
 
@@ -75,7 +75,7 @@ class TestBackendManager:
 
         assert isinstance(result, BackendEnsureResult)
         assert result.source == "start"
-        assert result.instance.process_id == "mock-4000"
+        assert result.process.process_id == "mock-4000"
         assert adapter.start_called
 
         # Verify registered
@@ -107,7 +107,7 @@ class TestBackendManager:
         result = manager.ensure_backend("mock-4000", "mock", 4000)
 
         assert result.source == "reuse"
-        assert result.instance.process_id == "mock-4000"
+        assert result.process.process_id == "mock-4000"
         assert not adapter.start_called  # Should NOT have started
 
     def test_ensure_backend_restarts_dead(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -207,35 +207,35 @@ class TestBackendEnsureResult:
 
     def test_create_with_start_source(self) -> None:
         """Verify result can be created with start source."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        result = BackendEnsureResult(instance=instance, source="start")
+        result = BackendEnsureResult(process=process, source="start")
 
-        assert result.instance is instance
+        assert result.process is process
         assert result.source == "start"
 
     def test_create_with_reuse_source(self) -> None:
         """Verify result can be created with reuse source."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        result = BackendEnsureResult(instance=instance, source="reuse")
+        result = BackendEnsureResult(process=process, source="reuse")
 
         assert result.source == "reuse"
 
     def test_is_frozen(self) -> None:
         """Verify result is immutable (frozen dataclass)."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        result = BackendEnsureResult(instance=instance, source="start")
+        result = BackendEnsureResult(process=process, source="start")
 
         with pytest.raises(AttributeError):
             result.source = "reuse"  # type: ignore

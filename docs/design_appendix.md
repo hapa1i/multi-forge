@@ -102,18 +102,18 @@ forge proxy edit my-high-reasoning
 
 Forge now has a built-in, code-level model-source catalog in `forge.backend.sources`. It is a static definition layer
 for the upstream model source a proxy or direct runtime reaches; it is **not** user-authored durable state and it is
-distinct from both proxy templates and runtime backend instances.
+distinct from both proxy templates and managed local backend processes.
 
 | Layer                    | Owner / Location                             | Unit                                                                                    |
 | ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability   |
-| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.source`                                |
+| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.backend`                               |
 | Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge model backend create` |
-| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                           |
+| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for managed local backend processes only                           |
 
 `ModelSource.id` is the canonical catalog id. Local source ids intentionally live in a different value-space from
-runtime instance ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
-`BackendInstance.backend_id`. Downstream telemetry uses `backend_id` for source attribution and writes the catalog
+managed process ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
+`ManagedBackendProcess.process_id`. Downstream telemetry uses `backend_id` for source attribution and writes the catalog
 source id rather than the runtime instance id.
 
 Source definitions have:
@@ -163,16 +163,16 @@ outside the lane runtime axis (`{core_llm}` plus the agent `RUNTIMES`, via depen
 malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local sources
 without lifecycle. Remote definitions are never written to `BackendRegistry`.
 
-Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
-the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
-source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. A `runtime_native` source
-cannot back a proxy: template loading rejects a `proxy.source` pointing at one, because a key-authenticated proxy
-injects its own bearer key and so cannot present the source's runtime-owned subscription credential (the "no key-auth
-proxy support for subscriptions" boundary -- the limit is the key-auth transport, not the source). Shipped local
-templates no longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry
-inline provider `base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path
-used by credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to
-`https://openrouter.ai/api/v1` when no override is configured.
+Proxy templates declare `proxy.backend: <backend-instance-id-or-alias>`. During template loading, Forge resolves that
+value through the catalog, stores the canonical backend instance id on `ProxyConfig.backend`, derives any local
+`BackendDependency` from the source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. A
+`runtime_native` source cannot back a proxy: template loading rejects a `proxy.backend` pointing at one, because a
+key-authenticated proxy injects its own bearer key and so cannot present the source's runtime-owned subscription
+credential (the "no key-auth proxy support for subscriptions" boundary -- the limit is the key-auth transport, not the
+source). Shipped local templates no longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough
+templates no longer carry inline provider `base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the
+same connection-value path used by credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way,
+defaulting to `https://openrouter.ai/api/v1` when no override is configured.
 
 `TEMPLATE_ENV_VARS` remains as a compatibility map for existing auth callers, but it is generated from
 `ModelSource.credential_ids` and source endpoint connection values. Template `backend_dependency.required_env_vars`,
@@ -182,22 +182,22 @@ helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template
 
 `forge model backend` is the operator view over this catalog. `forge model backend list` reads the static sources plus
 the local runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance,
-offline auth/health status, and any matching local `BackendInstance`. The local LiteLLM sources share one adapter/port
-(`litellm` on `4000`), so a single runtime instance can back several sources at once; `forge model backend list` marks
-such an instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The
-command stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
-`forge model backend test-auth <source-id>`, which resolves the same credentials and performs the source's
-reachability/auth probe without echoing secret values. A `runtime_native` source carries no Forge credential, so `list`
-reports its auth as `runtime_native` and health as `runtime-owned`, and `test-auth` skips the probe with a pointer to
-`forge runtime preflight codex` instead of reporting a credential failure. `forge model backend show <source-id>`
-renders catalog details and local runtime state when a source has lifecycle, while `show <runtime-id>` renders a
-registry-only runtime view. `start` stays config-oriented: it accepts local source ids or adapter operands with
-`--port`. `stop` is process-oriented: it accepts runtime instance ids such as `litellm-4000`, or `--all` for every
-registered local runtime instance; local source ids and bare adapters are rejected with a runtime-id recovery tip, and
-remote source operands keep the intentional no-lifecycle capability error. `create` and `delete` remain local
-adapter/config operations because built-in remote sources are not user-created durable state. `delete <adapter>` may
-stop matching runtime instances before removing the config, but `delete <adapter> --port <port>` is no longer a
-runtime-instance spelling.
+offline auth/health status, and any matching local `ManagedBackendProcess`. The local LiteLLM sources share one
+adapter/port (`litellm` on `4000`), so a single managed process can back several sources at once;
+`forge model backend list` marks such a process `(shared)` and `--json` carries a `runtime_instance.shared_with` list of
+the sibling source ids. The command stays offline for remote sources: configured remote sources show as `unprobed` until
+an operator runs `forge model backend test-auth <source-id>`, which resolves the same credentials and performs the
+source's reachability/auth probe without echoing secret values. A `runtime_native` source carries no Forge credential,
+so `list` reports its auth as `runtime_native` and health as `runtime-owned`, and `test-auth` skips the probe with a
+pointer to `forge runtime preflight codex` instead of reporting a credential failure.
+`forge model backend show <source-id>` renders catalog details and local runtime state when a source has lifecycle,
+while `show <runtime-id>` renders a registry-only runtime view. `start` stays config-oriented: it accepts local source
+ids or adapter operands with `--port`. `stop` is process-oriented: it accepts runtime instance ids such as
+`litellm-4000`, or `--all` for every registered local runtime instance; local source ids and bare adapters are rejected
+with a runtime-id recovery tip, and remote source operands keep the intentional no-lifecycle capability error. `create`
+and `delete` remain local adapter/config operations because built-in remote sources are not user-created durable state.
+`delete <adapter>` may stop matching runtime instances before removing the config, but `delete <adapter> --port <port>`
+is no longer a runtime-instance spelling.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 

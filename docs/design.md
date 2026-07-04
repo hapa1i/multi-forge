@@ -999,7 +999,7 @@ a route actually reported — OpenRouter's response-body `usage.cost` (`confiden
 predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
 `reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). Downstream records also carry a nullable
 `backend_id`: the canonical model-source catalog id from `forge.backend.sources` (`openrouter`, `litellm-remote`,
-`anthropic-direct`, etc.). Proxy-origin writers populate it from `proxy.source`; direct emitters populate it only where
+`anthropic-direct`, etc.). Proxy-origin writers populate it from `proxy.backend`; direct emitters populate it only where
 the provider/reporter maps unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1.
 `source_id`/`source_kind` remain the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with
 local/remote source kind. The proxy bootstraps its in-memory `CostTracker` from downstream attempts on startup, then

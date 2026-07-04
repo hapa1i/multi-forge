@@ -615,7 +615,7 @@ def _inspect_route() -> dict[str, Any]:
     return {
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
-        "source": _backend_source_id() or "",
+        "backend": _backend_source_id() or "",
         "wire_shape": getattr(config.proxy, "wire_shape", "openai_translated"),
     }
 

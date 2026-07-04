@@ -32,7 +32,7 @@ class RemoteAdapterError(RuntimeError):
 
 
 class RemoteAdapterNotFoundError(LookupError):
-    """Raised when a backend source id has no registered remote-reconciliation adapter."""
+    """Raised when a backend instance id has no registered remote-reconciliation adapter."""
 
 
 @dataclass(frozen=True)
@@ -78,9 +78,9 @@ class RemoteRecord:
 
 @runtime_checkable
 class BackendRemoteAdapter(Protocol):
-    """The read/account-side adapter for one backend source.
+    """The read/account-side adapter for one backend instance.
 
-    ``source_id`` matches the model-source catalog id (e.g. ``"openrouter"``).
+    ``source_id`` is the internal registry key and matches the backend instance catalog id (e.g. ``"openrouter"``).
     ``fetch_activity`` is the windowed follow-on seam; MVP adapters may raise
     ``RemoteAdapterError`` from it (the single-id op never calls it).
     """
@@ -111,7 +111,7 @@ def get_remote_adapter(source_id: str) -> BackendRemoteAdapter:
     try:
         return _REMOTE_ADAPTERS[source_id]
     except KeyError:
-        raise RemoteAdapterNotFoundError(f"Backend source '{source_id}' has no remote-reconciliation adapter") from None
+        raise RemoteAdapterNotFoundError(f"Backend '{source_id}' has no remote-reconciliation adapter") from None
 
 
 def has_remote_adapter(source_id: str) -> bool:

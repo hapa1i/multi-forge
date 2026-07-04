@@ -1,9 +1,9 @@
 """Backend remote reconciliation (command-core op).
 
 Joins LOCAL downstream telemetry evidence to REMOTE account-side evidence for one backend
-source. MVP: single-id lookup.
+instance. MVP: single-id lookup.
 
-- ``--request-id`` (local-anchored): the local downstream trace under this source -> its
+- ``--request-id`` (local-anchored): the local downstream trace under this backend -> its
   ``provider_generation_id`` -> the backend's remote record -> one joined entry.
 - ``--remote-id`` (single-sided): a raw backend record id -> remote lookup, with no local side.
 
@@ -15,7 +15,7 @@ is lost when outcomes share a bucket. Local and remote cost/tokens are kept sepa
 provenance -- a remote figure never overwrites a locally observed one.
 
 Remote/network failures are renderable data (``not-queryable``), never raised. ``ForgeOpError``
-is reserved for an unknown source, a source with no adapter, and (request-id mode) no local
+is reserved for an unknown backend, a backend with no adapter, and (request-id mode) no local
 record at all -- never for a queryable-but-empty result.
 """
 
@@ -34,9 +34,8 @@ from forge.backend.remote.base import (
     RemoteOutcome,
 )
 from forge.backend.sources import (
-    ModelSourceNotFoundError,
-    get_model_source,
-    resolve_model_source_id,
+    BackendInstanceResolutionError,
+    resolve_backend_instance_id,
 )
 from forge.core.telemetry.downstream import read_downstream_records
 
@@ -79,7 +78,7 @@ class ReconcileEntry:
 
 @dataclass(frozen=True)
 class ReconcileResult:
-    source_id: str
+    backend_instance_id: str
     mode: ReconcileMode
     entries: list[ReconcileEntry] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)
@@ -90,17 +89,23 @@ class ReconcileResult:
 def reconcile_generation(
     *,
     ctx: ExecutionContext,
-    source_id: str,
+    backend_instance_id: str,
     request_id: str | None = None,
     remote_id: str | None = None,
     timeout_s: float = 5.0,
 ) -> ReconcileResult:
-    """Reconcile one local request id OR one raw remote id against a backend source.
+    """Reconcile one local request id OR one raw remote id against a backend instance.
 
     Exactly one of ``request_id`` / ``remote_id`` must be given. Raises ``ForgeOpError`` for an
-    unknown source, a source with no remote adapter, or (request-id mode) no local record.
+    unknown backend, a backend with no remote adapter, or (request-id mode) no local record.
     """
-    _log.debug("reconcile_generation: cwd=%s source=%s req=%s remote=%s", ctx.cwd, source_id, request_id, remote_id)
+    _log.debug(
+        "reconcile_generation: cwd=%s backend=%s req=%s remote=%s",
+        ctx.cwd,
+        backend_instance_id,
+        request_id,
+        remote_id,
+    )
     # Treat empty strings as absent so the xor guard (truthiness) and the mode dispatch (below) agree;
     # otherwise --request-id "" would slip past the guard yet enter request-id mode via `is not None`.
     request_id = request_id or None
@@ -108,21 +113,24 @@ def reconcile_generation(
     if bool(request_id) == bool(remote_id):
         raise ForgeOpError("Provide exactly one of --request-id or --remote-id")
 
-    # Resolve template aliases (e.g. openrouter-anthropic) to the canonical source id, like the
+    # Resolve template aliases (e.g. openrouter-anthropic) to the canonical backend instance id, like the
     # other `forge model backend` subcommands; the canonical id keys both the adapter and downstream reads.
     try:
-        source_id = get_model_source(resolve_model_source_id(source_id)).id
-    except ModelSourceNotFoundError:
-        raise ForgeOpError(f"Unknown backend source '{source_id}'") from None
+        backend_instance_id = resolve_backend_instance_id(backend_instance_id)
+    except BackendInstanceResolutionError as e:
+        raise ForgeOpError(str(e)) from None
     try:
-        adapter = get_remote_adapter(source_id)
+        adapter = get_remote_adapter(backend_instance_id)
     except RemoteAdapterNotFoundError:
-        raise ForgeOpError(f"Backend source '{source_id}' has no remote reconciliation adapter") from None
+        raise ForgeOpError(f"Backend '{backend_instance_id}' has no remote reconciliation adapter") from None
 
     if request_id is not None:
         mode: ReconcileMode = "request-id"
         entry = _reconcile_by_request_id(
-            adapter=adapter, source_id=source_id, request_id=request_id, timeout_s=timeout_s
+            adapter=adapter,
+            backend_instance_id=backend_instance_id,
+            request_id=request_id,
+            timeout_s=timeout_s,
         )
     else:
         assert remote_id is not None  # guaranteed by the xor check above
@@ -135,7 +143,7 @@ def reconcile_generation(
     counts: dict[str, int] = dict(bucket_counts)
     needs_credential_id, needs_key_class = _credential_hint(adapter, entries)
     return ReconcileResult(
-        source_id=source_id,
+        backend_instance_id=backend_instance_id,
         mode=mode,
         entries=entries,
         counts=counts,
@@ -145,13 +153,17 @@ def reconcile_generation(
 
 
 def _reconcile_by_request_id(
-    *, adapter: BackendRemoteAdapter, source_id: str, request_id: str, timeout_s: float
+    *,
+    adapter: BackendRemoteAdapter,
+    backend_instance_id: str,
+    request_id: str,
+    timeout_s: float,
 ) -> ReconcileEntry:
-    # Scope the read to THIS source so an id that belongs to another backend cannot false-join.
-    records = read_downstream_records(kind="attempt", backend_id=source_id, request_id=request_id)
+    # Scope the read to THIS backend instance so an id that belongs to another backend cannot false-join.
+    records = read_downstream_records(kind="attempt", backend_id=backend_instance_id, request_id=request_id)
     if not records:
         raise ForgeOpError(
-            f"No local downstream record for request '{request_id}' under source '{source_id}'. "
+            f"No local downstream record for request '{request_id}' under backend '{backend_instance_id}'. "
             "The id may belong to another backend."
         )
     latest = records[-1]  # read_downstream_records sorts ascending by ts -> last is newest
@@ -229,7 +241,7 @@ def _credential_hint(
 
 def render_reconcile_lines(result: ReconcileResult) -> list[str]:
     """Render a reconciliation result as stable plain text (no Rich, no secrets, no content)."""
-    lines = [f"Backend reconcile: source={result.source_id} mode={result.mode}"]
+    lines = [f"Backend reconcile: backend={result.backend_instance_id} mode={result.mode}"]
     if result.counts:
         lines.append("  buckets: " + ", ".join(f"{k}={v}" for k, v in sorted(result.counts.items())))
     for e in result.entries:

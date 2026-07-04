@@ -155,57 +155,52 @@ def _process_source_map(
     """
     mapping: dict[str, list[str]] = {}
     for source in list_model_sources():
-        instance = _managed_process_for_source(source, managed_processes)
-        if instance is not None:
-            mapping.setdefault(instance.process_id, []).append(source.id)
+        process = _managed_process_for_source(source, managed_processes)
+        if process is not None:
+            mapping.setdefault(process.process_id, []).append(source.id)
     return mapping
 
 
 def _shared_sibling_sources(
     source: ModelSource,
-    instance: ManagedBackendProcess | None,
-    instance_sources: dict[str, list[str]],
+    process: ManagedBackendProcess | None,
+    process_sources: dict[str, list[str]],
 ) -> tuple[str, ...]:
-    """Return other source ids that share `instance`'s process with `source`."""
+    """Return other source ids that share `process` with `source`."""
 
-    if instance is None:
+    if process is None:
         return ()
-    return tuple(sid for sid in instance_sources.get(instance.process_id, ()) if sid != source.id)
+    return tuple(sid for sid in process_sources.get(process.process_id, ()) if sid != source.id)
 
 
-def _runtime_instance_record(
-    instance: ManagedBackendProcess | None,
+def _managed_process_record(
+    process: ManagedBackendProcess | None,
     *,
     shared_with: tuple[str, ...] = (),
 ) -> dict[str, Any] | None:
-    """Build the legacy CLI JSON runtime_instance record.
-
-    S4 owns renaming this public JSON shape. S3 only moves the durable/internal
-    process axis to process_id.
-    """
-
-    if instance is None:
+    if process is None:
         return None
     return {
-        "backend_id": instance.process_id,
-        "adapter_type": instance.adapter_type,
-        "port": instance.port,
-        "pid": instance.pid,
-        "status": instance.status,
-        "created_at": instance.created_at,
+        "process_id": process.process_id,
+        "adapter_type": process.adapter_type,
+        "port": process.port,
+        "pid": process.pid,
+        "status": process.status,
+        "created_at": process.created_at,
+        "alive": process.pid is not None and is_pid_alive(process.pid),
         # Other local sources backed by the same adapter+port process; non-empty
-        # when one local LiteLLM instance serves multiple sources (e.g. Gemini + OpenAI).
+        # when one local LiteLLM process serves multiple sources (e.g. Gemini + OpenAI).
         "shared_with": list(shared_with),
     }
 
 
-def _runtime_cell(runtime: dict[str, Any] | None) -> str:
+def _process_cell(process: dict[str, Any] | None) -> str:
     """Render the PROCESS column, flagging a process shared across sources."""
 
-    if not runtime:
+    if not process:
         return "-"
-    label = str(runtime["backend_id"])
-    if runtime.get("shared_with"):
+    label = str(process["process_id"])
+    if process.get("shared_with"):
         label += " (shared)"
     return label
 
@@ -267,7 +262,7 @@ def _auth_record(source: ModelSource) -> dict[str, Any]:
     }
 
 
-def _endpoint_record(source: ModelSource, instance: ManagedBackendProcess | None = None) -> dict[str, Any]:
+def _endpoint_record(source: ModelSource, process: ManagedBackendProcess | None = None) -> dict[str, Any]:
     endpoint = source.endpoint
     if endpoint.kind == "local_backend":
         lifecycle = source.local_lifecycle
@@ -275,7 +270,7 @@ def _endpoint_record(source: ModelSource, instance: ManagedBackendProcess | None
             "kind": endpoint.kind,
             "adapter": lifecycle.adapter if lifecycle else None,
             "default_port": lifecycle.default_port if lifecycle else None,
-            "url": (f"http://localhost:{instance.port if instance else lifecycle.default_port}" if lifecycle else None),
+            "url": (f"http://localhost:{process.port if process else lifecycle.default_port}" if lifecycle else None),
         }
     if endpoint.kind == "connection_value":
         _, provenance = resolve_env_or_credential_with_source(endpoint.value or "")
@@ -291,8 +286,8 @@ def _endpoint_record(source: ModelSource, instance: ManagedBackendProcess | None
     }
 
 
-def _endpoint_display(source: ModelSource, instance: ManagedBackendProcess | None = None) -> str:
-    endpoint = _endpoint_record(source, instance)
+def _endpoint_display(source: ModelSource, process: ManagedBackendProcess | None = None) -> str:
+    endpoint = _endpoint_record(source, process)
     if endpoint["kind"] == "local_backend":
         return str(endpoint.get("url") or "-")
     if endpoint["kind"] == "connection_value":
@@ -323,41 +318,38 @@ def _auth_display(auth: dict[str, Any]) -> str:
     return f"{auth['status']} ({missing})" if missing else str(auth["status"])
 
 
-def _source_health(source: ModelSource, instance: ManagedBackendProcess | None, auth: dict[str, Any]) -> str:
+def _source_health(source: ModelSource, process: ManagedBackendProcess | None, auth: dict[str, Any]) -> str:
     if source.endpoint.kind == "runtime_native":
         return "runtime-owned"
     if source.kind == "remote":
         return "missing" if auth["status"] != "configured" else "unprobed"
-    if instance is None:
+    if process is None:
         return "stopped"
-    if instance.pid is not None and not is_pid_alive(instance.pid):
+    if process.pid is not None and not is_pid_alive(process.pid):
         return "stopped"
-    return instance.status
+    return process.status
 
 
 def _source_record(
     source: ModelSource,
     managed_processes: dict[str, ManagedBackendProcess],
-    instance_sources: dict[str, list[str]] | None = None,
+    process_sources: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    instance = _managed_process_for_source(source, managed_processes)
-    shared_with = _shared_sibling_sources(source, instance, instance_sources or {})
+    process = _managed_process_for_source(source, managed_processes)
+    shared_with = _shared_sibling_sources(source, process, process_sources or {})
     auth = _auth_record(source)
-    # Source-row JSON keeps both names: backend_id is the telemetry catalog key,
-    # while source_id is the row alias. Runtime-instance JSON uses source_id=None.
     return {
-        "backend_id": source.id,
-        "source_id": source.id,
+        "backend_instance_id": source.id,
         "kind": source.kind,
         "provider": source.provider,
-        "endpoint": _endpoint_record(source, instance),
+        "endpoint": _endpoint_record(source, process),
         "required_credentials": list(source.credential_ids),
         "credentials": auth["credentials"],
         "auth_status": auth["status"],
         "missing_required_env_vars": auth["missing_required_env_vars"],
-        "health": _source_health(source, instance, auth),
+        "health": _source_health(source, process, auth),
         "has_lifecycle": source.has_lifecycle,
-        "runtime_instance": _runtime_instance_record(instance, shared_with=shared_with),
+        "managed_process": _managed_process_record(process, shared_with=shared_with),
     }
 
 
@@ -366,10 +358,10 @@ def _unmatched_managed_processes(
     managed_processes: dict[str, ManagedBackendProcess],
 ) -> list[ManagedBackendProcess]:
     matched_process_ids = {
-        runtime["backend_id"] for record in records if (runtime := record["runtime_instance"]) is not None
+        process["process_id"] for record in records if (process := record["managed_process"]) is not None
     }
     return [
-        instance for process_id, instance in sorted(managed_processes.items()) if process_id not in matched_process_ids
+        process for process_id, process in sorted(managed_processes.items()) if process_id not in matched_process_ids
     ]
 
 
@@ -480,7 +472,7 @@ def _join_url(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
-def _resolved_endpoint_url(source: ModelSource, instance: ManagedBackendProcess | None = None) -> str | None:
+def _resolved_endpoint_url(source: ModelSource, process: ManagedBackendProcess | None = None) -> str | None:
     endpoint = source.endpoint
     if endpoint.kind == "literal_url":
         return endpoint.value
@@ -491,7 +483,7 @@ def _resolved_endpoint_url(source: ModelSource, instance: ManagedBackendProcess 
         lifecycle = source.local_lifecycle
         if lifecycle is None:
             return None
-        return f"http://localhost:{instance.port if instance else lifecycle.default_port}"
+        return f"http://localhost:{process.port if process else lifecycle.default_port}"
     return None
 
 
@@ -507,7 +499,7 @@ def _runtime_native_probe_detail(source: ModelSource) -> str:
 def _probe_model_source(
     source: ModelSource,
     *,
-    instance: ManagedBackendProcess | None,
+    process: ManagedBackendProcess | None,
     timeout_s: float,
 ) -> _ProbeResult:
     if source.endpoint.kind == "runtime_native":
@@ -518,12 +510,12 @@ def _probe_model_source(
 
     import httpx
 
-    base_url = _resolved_endpoint_url(source, instance)
+    base_url = _resolved_endpoint_url(source, process)
     if not base_url:
         return _ProbeResult(status="failed", detail="endpoint is not configured")
 
     if source.provider == "litellm_local":
-        if instance is None:
+        if process is None:
             return _ProbeResult(status="skipped", detail="local backend is not running")
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
@@ -581,16 +573,16 @@ def _probe_model_source(
 
 def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
     managed_processes = _load_managed_processes()
-    instance = _managed_process_for_source(source, managed_processes)
-    shared_with = _shared_sibling_sources(source, instance, _process_source_map(managed_processes))
+    process = _managed_process_for_source(source, managed_processes)
+    shared_with = _shared_sibling_sources(source, process, _process_source_map(managed_processes))
     auth = _auth_record(source)
 
     console.print(f"[bold]Backend:[/bold] [cyan]{source.id}[/cyan]")
     console.print(f"[bold]Kind:[/bold] {source.kind}")
     console.print(f"[bold]Provider:[/bold] {source.provider}")
-    console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, instance)}")
+    console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, process)}")
     console.print(f"[bold]Credentials:[/bold] {_auth_display(auth)}")
-    console.print(f"[bold]Health:[/bold] {_source_health(source, instance, auth)}")
+    console.print(f"[bold]Health:[/bold] {_source_health(source, process, auth)}")
 
     if source.template_names:
         console.print(f"[bold]Templates:[/bold] {', '.join(source.template_names)}")
@@ -598,10 +590,10 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
     if source.local_lifecycle:
         lifecycle = source.local_lifecycle
         console.print(f"[bold]Lifecycle:[/bold] {lifecycle.adapter} on default port {lifecycle.default_port}")
-        if instance:
-            console.print(f"[bold]Managed process:[/bold] {instance.process_id}")
-            console.print(f"[bold]Process PID:[/bold] {instance.pid or '-'}")
-            console.print(f"[bold]Process status:[/bold] {instance.status}")
+        if process:
+            console.print(f"[bold]Managed process:[/bold] {process.process_id}")
+            console.print(f"[bold]Process PID:[/bold] {process.pid or '-'}")
+            console.print(f"[bold]Process status:[/bold] {process.status}")
             if shared_with:
                 console.print(f"[bold]Shared with:[/bold] {', '.join(shared_with)}")
         else:
@@ -635,8 +627,8 @@ def list_cmd(as_json: bool) -> None:
     """List model backends and managed local processes."""
     console = Console(width=200)
     managed_processes = _load_managed_processes()
-    instance_sources = _process_source_map(managed_processes)
-    records = [_source_record(source, managed_processes, instance_sources) for source in list_model_sources()]
+    process_sources = _process_source_map(managed_processes)
+    records = [_source_record(source, managed_processes, process_sources) for source in list_model_sources()]
 
     if as_json:
         click.echo(json.dumps(records, indent=2, default=str))
@@ -652,14 +644,14 @@ def list_cmd(as_json: bool) -> None:
     table.add_column("PROCESS")
 
     for record in records:
-        runtime = record["runtime_instance"]
+        process = record["managed_process"]
         table.add_row(
-            record["source_id"],
+            record["backend_instance_id"],
             record["kind"],
             record["provider"],
             _endpoint_display(
-                get_model_source(record["source_id"]),
-                managed_processes.get(runtime["backend_id"]) if runtime else None,
+                get_model_source(record["backend_instance_id"]),
+                managed_processes.get(process["process_id"]) if process else None,
             ),
             _auth_display(
                 {
@@ -669,7 +661,7 @@ def list_cmd(as_json: bool) -> None:
                 }
             ),
             record["health"],
-            _runtime_cell(runtime),
+            _process_cell(process),
         )
 
     console.print(table)
@@ -713,10 +705,10 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
     if source is not None:
         if as_json:
             managed_processes = _load_managed_processes()
-            instance_sources = _process_source_map(managed_processes)
+            process_sources = _process_source_map(managed_processes)
             click.echo(
                 json.dumps(
-                    _source_record(source, managed_processes, instance_sources),
+                    _source_record(source, managed_processes, process_sources),
                     indent=2,
                     default=str,
                 )
@@ -733,32 +725,19 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
     adapter_type = parts[0] if len(parts) == 2 else process_id
 
     if as_json:
-        json_instance = None
+        json_process = None
         try:
-            json_instance = store.read().processes.get(process_id)
+            json_process = store.read().processes.get(process_id)
         except Exception:
-            json_instance = None
+            json_process = None
         json_config_path = get_backend_config_path(adapter_type)
-        runtime_record: dict[str, Any] | None = None
-        if json_instance is not None:
-            alive = json_instance.pid is not None and is_pid_alive(json_instance.pid)
-            runtime_record = {
-                "backend_id": process_id,
-                "adapter_type": json_instance.adapter_type,
-                "port": json_instance.port,
-                "pid": json_instance.pid,
-                "status": json_instance.status,
-                "alive": alive,
-                "created_at": json_instance.created_at,
-            }
         click.echo(
             json.dumps(
                 {
-                    "backend_id": process_id,
-                    "source_id": None,
-                    "found": json_instance is not None,
+                    "managed_process_id": process_id,
+                    "found": json_process is not None,
                     "adapter_type": adapter_type,
-                    "runtime_instance": runtime_record,
+                    "managed_process": _managed_process_record(json_process),
                     "config_path": (str(json_config_path) if json_config_path.exists() else None),
                 },
                 indent=2,
@@ -769,19 +748,19 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
 
     try:
         registry = store.read()
-        instance = registry.processes.get(process_id)
-        if instance:
-            alive = instance.pid is not None and is_pid_alive(instance.pid)
+        process = registry.processes.get(process_id)
+        if process:
+            alive = process.pid is not None and is_pid_alive(process.pid)
             status_color = "green" if alive else "yellow"
             console.print(f"[bold]Managed process:[/bold] [cyan]{process_id}[/cyan]")
-            console.print(f"[bold]Adapter:[/bold] {instance.adapter_type}")
-            console.print(f"[bold]Port:[/bold] {instance.port}")
-            console.print(f"[bold]PID:[/bold] {instance.pid or '-'}")
+            console.print(f"[bold]Adapter:[/bold] {process.adapter_type}")
+            console.print(f"[bold]Port:[/bold] {process.port}")
+            console.print(f"[bold]PID:[/bold] {process.pid or '-'}")
             console.print(
                 f"[bold]Status:[/bold] [{status_color}]{'healthy' if alive else 'not running'}[/{status_color}]"
             )
-            if instance.created_at:
-                console.print(f"[bold]Started:[/bold] {instance.created_at}")
+            if process.created_at:
+                console.print(f"[bold]Started:[/bold] {process.created_at}")
         else:
             console.print(f"[bold]Managed process:[/bold] [cyan]{process_id}[/cyan] [dim](not in registry)[/dim]")
     except Exception:
@@ -818,7 +797,7 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
 
 
 @backend.command("test-auth")
-@click.argument("source_id", metavar="BACKEND")
+@click.argument("backend_identifier", metavar="BACKEND")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--timeout",
@@ -827,7 +806,7 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
     show_default=True,
     help="Probe timeout in seconds",
 )
-def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
+def test_auth_cmd(backend_identifier: str, as_json: bool, timeout: float) -> None:
     """Test a backend's credential configuration and reachable auth endpoint.
 
     \b
@@ -835,16 +814,16 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
         forge model backend test-auth openrouter
     """
     console = Console(width=200)
-    source = _source_for_identifier(source_id)
+    source = _source_for_identifier(backend_identifier)
     if source is None:
         print_error(
-            f"Unknown backend '{source_id}'. Use '{_BACKEND_COMMAND} list' to see backends.",
+            f"Unknown backend '{backend_identifier}'. Use '{_BACKEND_COMMAND} list' to see backends.",
             console=err_console,
         )
         sys.exit(1)
 
     managed_processes = _load_managed_processes()
-    instance = _managed_process_for_source(source, managed_processes)
+    process = _managed_process_for_source(source, managed_processes)
     auth = _auth_record(source)
     probe: _ProbeResult
     if auth["status"] == "runtime_native":
@@ -858,13 +837,10 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     elif not source.capabilities.auth_probe:
         probe = _ProbeResult(status="skipped", detail="source does not declare an auth probe capability")
     else:
-        probe = _probe_model_source(source, instance=instance, timeout_s=timeout)
+        probe = _probe_model_source(source, process=process, timeout_s=timeout)
 
-    # Source-row JSON keeps both names: backend_id is the telemetry catalog key,
-    # while source_id is the row alias. Runtime-instance JSON uses source_id=None.
     payload = {
-        "backend_id": source.id,
-        "source_id": source.id,
+        "backend_instance_id": source.id,
         "kind": source.kind,
         "provider": source.provider,
         "auth_status": auth["status"],
@@ -972,7 +948,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         if result.source == "start":
             console.print(
                 f"[green]Started[/green] managed process '{process_id}' on port {resolved_port} "
-                f"(pid {result.instance.pid})"
+                f"(pid {result.process.pid})"
             )
         else:
             console.print(f"Managed process '{process_id}' already running on port {resolved_port}")
@@ -981,12 +957,12 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         sys.exit(1)
 
 
-def _stop_managed_process(instance: ManagedBackendProcess) -> None:
+def _stop_managed_process(process: ManagedBackendProcess) -> None:
     """Stop a single registered managed process. Raises on failure; the caller owns output."""
     store = BackendRegistryStore()
     manager = BackendManager(store)
-    manager.register_adapter(instance.adapter_type, get_adapter(instance.adapter_type))
-    manager.stop_backend(instance.process_id)
+    manager.register_adapter(process.adapter_type, get_adapter(process.adapter_type))
+    manager.stop_backend(process.process_id)
 
 
 @backend.command("stop")
@@ -1042,8 +1018,8 @@ def stop_cmd(process_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
     stopped = 0
     failed = 0
     for target in targets:
-        instance = registry.processes.get(target)
-        if instance is None:
+        process = registry.processes.get(target)
+        if process is None:
             message, tip_lines, commands = _process_stop_target_error(target)
             _print_error_with_optional_tip(message, tip_lines, commands)
             failed += 1
@@ -1051,9 +1027,9 @@ def stop_cmd(process_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
                 sys.exit(1)
             continue
 
-        was_pidless = instance.pid is None
+        was_pidless = process.pid is None
         try:
-            _stop_managed_process(instance)
+            _stop_managed_process(process)
         except Exception as e:
             print_error(f"{target}: {e}")
             failed += 1
@@ -1117,11 +1093,11 @@ def delete_cmd(adapter: str, yes: bool) -> None:
 
     stopped = []
     registry = store.read()
-    for instance in list(registry.processes.values()):
-        if instance.adapter_type == adapter:
+    for process in list(registry.processes.values()):
+        if process.adapter_type == adapter:
             try:
-                _stop_managed_process(instance)
-                stopped.append(instance.process_id)
+                _stop_managed_process(process)
+                stopped.append(process.process_id)
             except Exception:
                 pass
 
@@ -1133,7 +1109,7 @@ def delete_cmd(adapter: str, yes: bool) -> None:
 
 
 @backend.command("reconcile")
-@click.argument("source_id", metavar="BACKEND")
+@click.argument("backend_identifier", metavar="BACKEND")
 @click.option(
     "--request-id",
     "request_id",
@@ -1155,7 +1131,7 @@ def delete_cmd(adapter: str, yes: bool) -> None:
     help="Remote lookup timeout (seconds).",
 )
 def reconcile_cmd(
-    source_id: str,
+    backend_identifier: str,
     request_id: str | None,
     remote_id: str | None,
     as_json: bool,
@@ -1188,7 +1164,7 @@ def reconcile_cmd(
     try:
         result = reconcile_generation(
             ctx=ExecutionContext.from_cwd(),
-            source_id=source_id,
+            backend_instance_id=backend_identifier,
             request_id=request_id,
             remote_id=remote_id,
             timeout_s=timeout,

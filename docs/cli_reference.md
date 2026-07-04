@@ -200,13 +200,13 @@ runners.
 | Command                                          | Purpose                                                                                    |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `forge model catalog`                            | List the static model catalog (`--json`)                                                   |
-| `forge model backend list`                       | List model backends and local backend instances (`--json`)                                 |
-| `forge model backend show <backend-or-instance>` | Show backend details or backend instance details (`--raw`)                                 |
+| `forge model backend list`                       | List model backends and managed local processes (`--json`)                                 |
+| `forge model backend show <backend-or-process>`  | Show backend details or managed process details (`--raw`)                                  |
 | `forge model backend test-auth <backend>`        | Check backend credentials and run a reachability/auth probe (`--json`)                     |
 | `forge model backend create <adapter>`           | Create local backend adapter config                                                        |
 | `forge model backend start <backend-or-adapter>` | Start a local lifecycle backend or adapter config                                          |
-| `forge model backend stop <backend-instance>...` | Stop live local backend instances by id, or all with `--all`                               |
-| `forge model backend delete <adapter>`           | Delete local backend adapter config, stopping matching backend instances first             |
+| `forge model backend stop <process-id>...`       | Stop live managed local processes by id, or all with `--all`                               |
+| `forge model backend delete <adapter>`           | Delete local backend adapter config, stopping matching managed processes first             |
 | `forge model backend reconcile <backend>`        | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement

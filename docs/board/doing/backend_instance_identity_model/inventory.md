@@ -69,15 +69,14 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 ### Proxy route JSON `source` and `ProxyIdentity.source`
 
 - **Boundary:** display-only/public machine output, not canonical backend identity storage.
-- **Writers:** `src/forge/proxy/server.py` (`_inspect_route`) writes route metadata with `"source"` currently carrying
-  the configured backend/catalog id; the root proxy response writes `proxy.source` from `ProxyIdentity.source`.
+- **Writers:** `src/forge/proxy/server.py` (`_inspect_route`) writes route metadata with `"backend"` carrying the
+  configured backend instance id; the root proxy response writes `proxy.source` from `ProxyIdentity.source`.
 - **Readers:** request audit/guard context, proxy status/launch-preflight consumers, and external clients that inspect
   the proxy's JSON responses.
-- **Current meaning:** `_inspect_route().source` is a legacy wire key for backend identity. `ProxyIdentity.source` is a
-  separate provenance axis (`registry` vs `derived`) for how the proxy identity was established.
-- **Migration note:** S4 owns renaming the route backend-identity key to `backend` with consumers/tests. Do not rename
-  `ProxyIdentity.source` as part of backend identity cleanup; it is intentionally provenance, not model backend
-  identity.
+- **Current meaning:** `_inspect_route().backend` is backend identity. `ProxyIdentity.source` is a separate provenance
+  axis (`registry` vs `derived`) for how the proxy identity was established.
+- **Migration note:** S4 removed the legacy route `"source"` key with no alias. Do not rename `ProxyIdentity.source` as
+  part of backend identity cleanup; it is intentionally provenance, not model backend identity.
 
 ### Legacy `BackendInstance.backend_id` / current `ManagedBackendProcess.process_id`
 
@@ -104,17 +103,16 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 ### `forge model backend ... --json`
 
 - **Boundary:** display-only public machine output.
-- **Writers:** `src/forge/cli/backend.py` (`_source_record`, `_runtime_instance_record`, `show_cmd`, `test_auth_cmd`).
+- **Writers:** `src/forge/cli/backend.py` (`_source_record`, `_managed_process_record`, `show_cmd`, `test_auth_cmd`).
 - **Readers:** external scripts/users; guard tests in `tests/src/cli/test_backend_commands.py` and
   `tests/src/cli/test_output_streams.py`.
-- **Current meaning:** source rows expose both `"backend_id": source.id` and `"source_id": source.id`; local process
-  details still live under the legacy `"runtime_instance"` wire key with its own legacy `"backend_id"` carrying
-  `ManagedBackendProcess.process_id`. Unmatched local processes use `"source_id": null`.
-- **Migration note:** this duplicated shape is intentionally transitional from C2. A Phase 3 JSON migration should be
-  explicit, tested, and not bundled with help-text cleanup. The `runtime_instance` key itself is also a first-class OQ-1
-  JSON-migration candidate if the target term is "backend instance"; do not leave it behind as accidental
-  runtime-vocabulary residue. S4 also owns the coupled internal names that still call managed local processes "instance"
-  while building this legacy JSON shape (`_runtime_instance_record(...)`, `BackendEnsureResult.instance`).
+- **Current meaning:** source rows expose `"backend_instance_id": source.id`; local process details live under
+  `"managed_process"` with `"process_id": ManagedBackendProcess.process_id`. Process-only fallback output uses
+  `"managed_process_id"`.
+- **Migration note:** S4 removed the old `"source_id"`, `"runtime_instance"`, nested process `"backend_id"`, and
+  top-level CLI JSON `"backend_id"` identity aliases. The coupled internal names also moved:
+  `_runtime_instance_record(...)` to `_managed_process_record(...)`, and `BackendEnsureResult.instance` to
+  `BackendEnsureResult.process`.
 
 ### Downstream telemetry `source_id`, `source_kind`, and `backend_id`
 
@@ -154,16 +152,18 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Migration note:** any successor backend identity needs compatibility for stored session manifests and lane
   constants.
 
-### Remote reconciliation adapter `source_id`
+### Remote reconciliation adapter registry and result identity
 
 - **Boundary:** strict code registry plus public op result surface.
 - **Writers:** `src/forge/backend/remote/base.py`, remote adapter modules such as
-  `src/forge/backend/remote/openrouter.py`.
+  `src/forge/backend/remote/openrouter.py`, `src/forge/core/ops/backend_reconcile.py`.
 - **Readers:** `src/forge/core/ops/backend_reconcile.py`, `src/forge/cli/backend.py`.
-- **Current meaning:** remote adapter registry key matching the model-source catalog id.
-- **Migration note:** current errors/output still say "backend source" and `render_reconcile_lines` prints
-  `source=<id>`. Treat that as a machine-contract residue, not a C2 public-wording target that should be edited
-  casually.
+- **Current meaning:** the remote adapter registry still has an internal `source_id` attribute matching the catalog id,
+  while the public reconcile op/result surface uses `backend_instance_id`. `render_reconcile_lines` prints
+  `backend=<id>`.
+- **Migration note:** S4 removed the public reconcile `source_id` result field, `source=<id>` text, and "backend source"
+  errors in `backend_reconcile.py`. The remote adapter registry's internal `source_id` is not a public CLI/backend JSON
+  identity key.
 
 ### Adjacent derivations intentionally excluded from identity axes
 
@@ -181,25 +181,23 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Already migrated by C2:** `forge model backend` help, tables, `docs/cli_reference.md`, `docs/end-user/proxy.md`, and
   `docs/design_appendix.md` §A.2.1 use "backend", "backend instance", and "adapter" for public CLI concepts. The
   `runtime` word remains reserved for the agent/runtime axis.
-- **Machine names intentionally still visible:** `source_id`, `source_kind`, `runtime_instance`, `proxy.source`,
-  `ModelSource`, and telemetry `backend_id` remain because they are JSON/config/code contracts, not prose cleanup. The
-  main literal-bearing docs are `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_appendix.md`, and this board
+- **Machine names intentionally still visible:** `source_id`, `source_kind`, `proxy.source`, `ModelSource`, and
+  telemetry `backend_id` remain because they are telemetry/config/code contracts, not prose cleanup. The main
+  literal-bearing docs are `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_appendix.md`, and this board
   card/checklist.
 - **Design/docs literals:** `proxy.source` is a literal legacy config field; `ModelSource` is the current implementation
   object; `backend_dependency` and `TEMPLATE_ENV_VARS` are derived compatibility surfaces. Those should not be renamed
   until the Phase 2 model and Phase 3 compatibility plan exist.
-- **Residual ambiguous wording to revisit only with schema work:** backend reconciliation still has `source_id` result
-  fields, "backend source" errors, and `source=<id>` text output in `src/forge/core/ops/backend_reconcile.py`.
 
 ## Local LiteLLM Sharing
 
-- The concrete many-to-one case is one local registry instance, `litellm-4000`, backing multiple local catalog rows:
+- The concrete many-to-one case is one managed local process, `litellm-4000`, backing multiple local catalog rows:
   `litellm-gemini-local`, `litellm-openai-local`, and any other local LiteLLM source whose required env vars match the
   process config.
 - `src/forge/cli/backend.py` derives the display relationship through `_local_source_matches_backend_config`,
   `_managed_process_for_source`, and `_process_source_map`; list/show then render `(shared)` and `shared_with`.
 - This matching is **display-only**. It must not become telemetry attribution. Telemetry attribution currently follows
-  the proxy's configured source/catalog id through `_backend_source_id`, while the local process id remains
+  the proxy's configured backend/catalog id through `_backend_source_id`, while the local process id remains
   `ManagedBackendProcess.process_id`.
 
 ## Phase 2 Feed

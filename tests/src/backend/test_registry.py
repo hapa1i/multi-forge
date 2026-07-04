@@ -19,21 +19,21 @@ class TestManagedBackendProcess:
 
     def test_create_with_required_fields(self) -> None:
         """Verify ManagedBackendProcess can be created with required fields."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        assert instance.process_id == "litellm-4000"
-        assert instance.adapter_type == "litellm"
-        assert instance.port == 4000
-        assert instance.pid is None
-        assert instance.status == "unknown"
-        assert instance.created_at is None
+        assert process.process_id == "litellm-4000"
+        assert process.adapter_type == "litellm"
+        assert process.port == 4000
+        assert process.pid is None
+        assert process.status == "unknown"
+        assert process.created_at is None
 
     def test_create_with_all_fields(self) -> None:
         """Verify ManagedBackendProcess can be created with all fields."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -41,9 +41,9 @@ class TestManagedBackendProcess:
             status="healthy",
             created_at="2026-02-03T10:00:00Z",
         )
-        assert instance.pid == 12345
-        assert instance.status == "healthy"
-        assert instance.created_at == "2026-02-03T10:00:00Z"
+        assert process.pid == 12345
+        assert process.status == "healthy"
+        assert process.created_at == "2026-02-03T10:00:00Z"
 
 
 class TestBackendRegistry:
@@ -57,12 +57,12 @@ class TestBackendRegistry:
 
     def test_registry_with_processes(self) -> None:
         """Verify registry can store managed processes."""
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        registry = BackendRegistry(processes={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         assert "litellm-4000" in registry.processes
         assert registry.processes["litellm-4000"].port == 4000
 
@@ -83,7 +83,7 @@ class TestBackendRegistryStore:
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
@@ -91,7 +91,7 @@ class TestBackendRegistryStore:
             status="healthy",
             created_at="2026-02-03T10:00:00Z",
         )
-        registry = BackendRegistry(processes={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         loaded = store.read()
@@ -168,14 +168,14 @@ class TestBackendRegistryStore:
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
 
         def add_process(reg: BackendRegistry) -> None:
-            reg.processes["litellm-4000"] = instance
+            reg.processes["litellm-4000"] = process
 
         store.update(timeout_s=5.0, mutate=add_process)
 
@@ -189,14 +189,14 @@ class TestBackendRegistryStore:
         store = BackendRegistryStore(registry_path)
 
         # Create registry with a managed process that has a "dead" PID
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=99999999,  # Very unlikely to be a real PID
             status="healthy",
         )
-        registry = BackendRegistry(processes={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         # Mock is_pid_alive to return False
@@ -214,14 +214,14 @@ class TestBackendRegistryStore:
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = ManagedBackendProcess(
+        process = ManagedBackendProcess(
             process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=None,  # Adopted managed process
             status="healthy",
         )
-        registry = BackendRegistry(processes={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         pruned = store.prune_dead_pids()

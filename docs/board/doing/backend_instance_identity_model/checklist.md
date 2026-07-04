@@ -2,16 +2,16 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 3 / S4 CLI/proxy JSON clean break. S3 moved the managed local process registry to schema v2
-with `ManagedBackendProcess.process_id`; backend CLI human surfaces now say managed process for local PID/port state.
-Next action: migrate public JSON identity keys.
+**Current focus**: Phase 3 / S5 telemetry backend identity clean break. S4 moved backend CLI JSON to
+`backend_instance_id` / `managed_process` and inspect-route metadata to `backend`. Next action: migrate telemetry
+backend attribution.
 
 ## Invariants (do not violate during migration)
 
 - **Do not undo C2.** `done/cli_style_ux_compliance` C2 shipped public backend / backend-instance / adapter wording
   while deliberately keeping machine names stable for later clean-break slices. S3 deliberately renamed the local
-  process schema from `BackendInstance.backend_id` to `ManagedBackendProcess.process_id`; remaining machine names such
-  as `source_id`, `runtime_instance`, and telemetry `backend_id` must change only in their owning slices -- never as an
+  process schema from `BackendInstance.backend_id` to `ManagedBackendProcess.process_id`; remaining telemetry machine
+  names such as `source_id`, `source_kind`, and `backend_id` must change only in their owning slices -- never as an
   incidental rename riding along a wording pass.
 - **Runtime vocabulary stays the lane runtime axis.** `runtime` means the `forge.core.runtime_vocab` axis -- agent
   runtimes `claude_code` / `codex` / `gemini` plus the in-process `core_llm` -- never a model backend (kind, instance,
@@ -24,7 +24,7 @@ Next action: migrate public JSON identity keys.
   templates, since `read_template` prefers the user copy -- not the runtime `proxy.yaml` read path.
 - **Telemetry origin fields are not backend identity fields.** `source_id`/`source_kind` in downstream telemetry remain
   the origin/correlation axis unless a later slice explicitly renames that axis. The clean break targets
-  backend-identity fields such as config `proxy.source`, CLI/backend JSON `source_id`, and `runtime_instance`.
+  backend-identity fields such as config `proxy.backend`, CLI/backend JSON `backend_instance_id`, and `managed_process`.
 
 ## Phase 0 -- Activation (complete)
 
@@ -116,16 +116,17 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S4 -- CLI/proxy JSON clean break
 
-- [ ] Replace backend CLI JSON identity keys and coupled internal builders/results with backend-instance /
+- [x] Replace backend CLI JSON identity keys and coupled internal builders/results with backend-instance /
   managed-process names. **Assertion:** source-row `source_id`, nested `runtime_instance`,
-  `_runtime_instance_record(...)`, and `BackendEnsureResult.instance` do not survive in the new shape/API; old-shape
-  expectations fail through tests rather than compatibility aliases. **Tests:**
-  `tests/src/cli/test_backend_commands.py`, `tests/src/cli/test_output_streams.py`, `tests/src/backend/test_manager.py`.
-- [ ] Replace proxy route/inspect wire backend identity keys. **Assertion:** `_inspect_route()` no longer reports
-  backend identity as `"source"`; if any temporary alias is deliberately retained for clients, it is documented and
-  tested. `ProxyIdentity.source` remains provenance of the proxy identity lookup, not backend identity. **Tests:**
-  `tests/src/proxy/`, `tests/src/cli/test_proxy_commands.py`.
-- [ ] Add runtime terminology guards for help and docs touched by this card. **Assertion:** `runtime` never labels a
+  `_runtime_instance_record(...)`, `BackendEnsureResult.instance`, and `ReconcileResult.source_id` do not survive in the
+  new shape/API; old-shape expectations fail through tests rather than compatibility aliases. **Tests:**
+  `tests/src/cli/test_backend_commands.py`, `tests/src/cli/test_output_streams.py`, `tests/src/backend/test_manager.py`,
+  `tests/src/cli/test_backend_reconcile.py`, `tests/src/core/ops/test_backend_reconciliation.py`.
+- [x] Replace proxy route/inspect wire backend identity keys. **Assertion:** `_inspect_route()` no longer reports
+  backend identity as `"source"` and now reports it as `"backend"` with no alias. `ProxyIdentity.source` remains
+  provenance of the proxy identity lookup, not backend identity. **Tests:** `tests/src/proxy/`,
+  `tests/src/cli/test_proxy_commands.py`.
+- [x] Add runtime terminology guards for help and docs touched by this card. **Assertion:** `runtime` never labels a
   backend instance or managed local process. **Tests:** `tests/src/cli/test_backend_commands.py` or a focused docs/CLI
   grep test.
 

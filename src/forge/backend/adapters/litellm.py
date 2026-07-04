@@ -123,34 +123,34 @@ class LiteLLMAdapter(BackendAdapter):
             created_at=now_iso(),
         )
 
-    def stop(self, instance: ManagedBackendProcess) -> None:
+    def stop(self, process: ManagedBackendProcess) -> None:
         """Stop LiteLLM backend (best effort).
 
         Args:
-            instance: Managed backend process to stop
+            process: Managed backend process to stop
         """
-        if instance.pid is None:
+        if process.pid is None:
             return
 
         try:
-            os.kill(instance.pid, 15)  # SIGTERM
+            os.kill(process.pid, 15)  # SIGTERM
         except (ProcessLookupError, PermissionError):
             pass
 
-    def health_check(self, instance: ManagedBackendProcess) -> bool:
+    def health_check(self, process: ManagedBackendProcess) -> bool:
         """Check if LiteLLM backend is healthy.
 
         Uses /health/liveliness for fast checks (~5ms) rather than the full
         /health endpoint which contacts all model providers (~5-10s).
 
         Args:
-            instance: Managed backend process to check
+            process: Managed backend process to check
 
         Returns:
             True if healthy, False otherwise
         """
         try:
-            url = f"http://localhost:{instance.port}/health/liveliness"
+            url = f"http://localhost:{process.port}/health/liveliness"
             with httpx.Client(timeout=httpx.Timeout(2.0)) as client:
                 response = client.get(url)
                 return response.status_code == 200
