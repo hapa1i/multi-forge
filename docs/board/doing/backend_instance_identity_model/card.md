@@ -49,8 +49,8 @@ This card should be an architecture/schema migration, not a CLI wording pass.
   docs that describe those contracts.
 - Decide the canonical domain objects and names. Do not merely rename `ModelSource` mechanically if the target object is
   really a configured backend instance, a backend definition, or a backend kind.
-- Define a compatibility plan for existing configs, JSON readers, telemetry records, and docs. Old fields may need
-  aliases for at least one release window even if the internal model moves.
+- Define a clean-break plan for configs, JSON readers, telemetry records, and docs. Old field names can fail loudly with
+  migration/recreate guidance instead of being accepted through compatibility readers.
 - Decide what telemetry `backend_id` means after migration. This is non-trivial for local LiteLLM because today's source
   ids encode provider/auth intent while `litellm-4000` can be shared by multiple local source rows.
 - Keep agent/frontend runtime vocabulary separate from model backend vocabulary throughout the migration.
@@ -61,8 +61,9 @@ This card should be an architecture/schema migration, not a CLI wording pass.
   to prove the abstraction.
 - Do not make C2 depend on this card. C2 can improve public help/metavar language first while leaving storage and JSON
   contracts unchanged.
-- Do not silently change telemetry attribution. Any telemetry identity migration needs explicit compatibility and
-  backfill/read-path decisions.
+- Do not silently change telemetry attribution. A clean break is allowed, but the implementation must explicitly decide
+  whether historical records are ignored, shown as legacy-shape records, or migrated by a deliberate tool -- never
+  silently reattributed.
 
 ## Candidate shape
 
@@ -73,8 +74,8 @@ The eventual model likely has:
 - Backend instances: configured inference targets keyed by a stable instance id, with endpoint/auth/billing and
   instance-level capability overrides.
 - Local lifecycle records: process/PID/port state attached only to managed local backend instances.
-- Legacy aliases: singleton remote backend names resolve to their instance ids; old `source_id`/`proxy.source` fields
-  resolve through compatibility readers during migration.
+- Clean-break surface migration: singleton backend names may continue to resolve to their instance ids, but old field
+  names such as `source_id`, `proxy.source`, and `runtime_instance` do not need compatibility readers.
 
 This is intentionally a candidate, not a final design. The first active phase should verify whether the current
 `ModelSource` catalog is closer to a backend instance definition, a backend kind definition, or a mixed object that
@@ -91,11 +92,11 @@ Recommended target:
   a configured instance belongs to.
 - **Backend instance definition**: concrete configured inference target keyed by stable instance id. The current
   `ModelSource` object is closest to this object because it already carries endpoint, credentials, capabilities, billing
-  posture, template aliases, and reachability.
+  posture, template names, and reachability.
 - **Managed local process**: PID/port/process state for Forge-managed local backends. Current
   `BackendInstance.backend_id` (`litellm-4000`) should move toward this axis, not become the universal backend instance
-  id. Because `~/.forge/backends/index.json` is strict durable state, any field rename here needs a versioned
-  compatibility reader/writer (for example, accepting old `backend_id` while writing a new managed-process id field).
+  id. Because `~/.forge/backends/index.json` is strict durable state, a clean-break field rename should use a registry
+  version bump and fail with a clear rebuild/recreate tip rather than silently accepting the old schema.
 
 Concrete examples:
 
@@ -126,18 +127,20 @@ Recommended OQ resolutions:
   kind/adapter metadata only where it removes duplicated lifecycle/protocol facts.
 - **OQ-2 telemetry identity:** downstream telemetry `backend_id` should mean backend instance id. Existing catalog
   source ids mostly already behave as logical instance ids; keep `source_id`/`source_kind` as the origin axis. Do not
-  backfill historical records initially; add read aliases only for ids that Phase 3 actually renames. If process
-  attribution is needed later, add a separate local-process field instead of overloading `backend_id`.
+  backfill historical records initially, and do not add read aliases for renamed ids unless Phase 3 deliberately adds a
+  one-shot migration tool. New views must not silently join or reinterpret pre-break records. If process attribution is
+  needed later, add a separate local-process field instead of overloading `backend_id`.
 - **OQ-3/OQ-4 config + ambiguity:** make the canonical config spelling `proxy.backend` with backend instance id/name
-  values. Keep `proxy.source` as a compatibility reader. Template load keeps the current strict posture for both
-  spellings; runtime `proxy.yaml` keeps the current warn-and-degrade posture for both spellings. If both are present and
-  conflict, fail loudly. Resolution precedence is: exact backend instance id first, explicit alias second, then optional
-  unique kind/name shorthand. Therefore `proxy.backend: openrouter` keeps resolving to the concrete instance
-  `openrouter` even after `openrouter-work` exists. Only an unmatched shorthand that resolves to more than one instance
-  fails loudly with a tip to choose a concrete backend instance id.
-- **OQ-5 scope boundary:** keep this card foundation-only: schema/domain/resolution/compatibility, plus fixture-backed
-  duplicate-remote tests if useful. Do not add remote backend CRUD or remote lifecycle commands here; those belong in a
-  follow-up card once the identity model is stable.
+  values. `proxy.source` is not a compatibility reader in the clean-break path: templates or runtime `proxy.yaml` files
+  that still use it should fail loudly with a recreate/migration tip. The new `proxy.backend` field keeps the existing
+  posture split: strict reject-on-unknown at template load, warn-and-degrade for unknown values in runtime `proxy.yaml`.
+  Resolution precedence is: exact backend instance id first, explicit alias second, then optional unique kind/name
+  shorthand. Therefore `proxy.backend: openrouter` keeps resolving to the concrete instance `openrouter` even after
+  `openrouter-work` exists. Only an unmatched shorthand that resolves to more than one instance fails loudly with a tip
+  to choose a concrete backend instance id.
+- **OQ-5 scope boundary:** keep this card foundation-only: schema/domain/resolution/clean-break migration, plus
+  fixture-backed duplicate-remote tests if useful. Do not add remote backend CRUD or remote lifecycle commands here;
+  those belong in a follow-up card once the identity model is stable.
 
 ## Open questions
 
@@ -153,7 +156,7 @@ Recommended OQ resolutions:
 
 - Public docs and CLI text use `backend` / `backend instance` / `adapter` consistently, with `runtime` reserved for
   agent/frontend runtime.
-- Machine contracts have a documented migration path: old names still parse where promised, new names are canonical
-  where adopted, and tests pin both.
+- Machine contracts have a documented clean-break path: new names are canonical, old names fail loudly with actionable
+  guidance where they are still encountered, and tests pin both the new shape and old-shape failure.
 - Multiple remote backend instances of the same kind can be represented without inventing a separate "source" CLI noun.
 - Local managed lifecycle remains local-only; remote backend instances do not gain fake start/stop semantics.

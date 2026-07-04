@@ -10,17 +10,17 @@ before choosing implementation slices or changing `src/`.
 
 - **Do not undo C2.** `done/cli_style_ux_compliance` C2 shipped public backend / backend-instance / adapter wording
   while deliberately keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
-  stable. Any change to those machine names must be a deliberate, compat-guarded migration in this card -- never an
-  incidental rename riding along a wording pass.
+  stable. Any change to those machine names must be a deliberate clean break owned by this card -- never an incidental
+  rename riding along a wording pass.
 - **Runtime vocabulary stays the lane runtime axis.** `runtime` means the `forge.core.runtime_vocab` axis -- agent
   runtimes `claude_code` / `codex` / `gemini` plus the in-process `core_llm` -- never a model backend (kind, instance,
   or local process).
 - **Local lifecycle stays local-only.** Remote backend instances gain no fake start/stop semantics; managed PID/port
   state attaches only to local instances.
-- **`proxy.yaml` `source` (and any successor) is a system boundary** (user-owned): unknown values warn-and-degrade on
-  the runtime `proxy.yaml` read path. The strict reject-on-unknown contract is scoped to the **template load path**
-  (`_apply_template_source`) -- shipped *or* user templates, since `read_template` prefers the user copy -- not the
-  runtime `proxy.yaml` read path.
+- **Runtime `proxy.yaml` remains a system boundary** (user-owned): unknown values under the new canonical backend field
+  warn-and-degrade on the runtime read path. Old `proxy.source` may fail loudly under the clean-break plan. Strict
+  reject-on-unknown stays scoped to the **template load path** (`_apply_template_source`) -- shipped *or* user
+  templates, since `read_template` prefers the user copy -- not the runtime `proxy.yaml` read path.
 
 ## Phase 0 -- Activation (complete)
 
@@ -38,7 +38,7 @@ card dir; it is not promoted to design docs.
   `source_kind`, `BackendInstance.backend_id`, `runtime_instance`, telemetry `backend_id`, `proxy.source`, the backend
   registry (`~/.forge/backends/index.json`), telemetry ledgers, and proxy templates. **Assertion:** load-bearing
   reader/writer paths are named with boundary tags -- strict durable state vs system boundary vs display-only -- so
-  Phase 2 knows which fields can clean-break and which need compat readers.
+  Phase 2 knows which fields can clean-break and what failure behavior each surface needs.
 - [x] Enumerate human-facing terms in CLI help, end-user docs, design docs, and board notes. **Assertion:** the
   inventory separates already-migrated public terminology (C2) from still-legacy machine-contract names, so Phase 3
   never re-touches a C2 surface.
@@ -57,11 +57,12 @@ are contract).
   remote of the same kind, and local `litellm-4000` -- each landing on exactly one canonical object.
 - [ ] **OQ-2 -- telemetry identity.** Decide what downstream `backend_id` means post-migration. **Assertion:** the
   meaning is stated for singleton remotes, duplicate remotes, and shared local LiteLLM, and says whether existing
-  records need a read-path alias or backfill (no silent attribution drift; keep `backend_id` distinct from the
-  `source_id`/`source_kind` origin axis).
+  records are ignored, shown as legacy-shape records, or migrated by a deliberate tool (no silent attribution drift;
+  keep `backend_id` distinct from the `source_id`/`source_kind` origin axis).
 - [ ] **OQ-3/OQ-4 -- config + ambiguity.** Decide the config spelling and the singleton-to-duplicate transition.
-  **Assertion:** `proxy.source` and any successor have a read/write migration plan, and a second instance of a kind
-  makes the bare kind name **fail loudly**, not mis-route to one instance.
+  **Assertion:** `proxy.source` has a clean-break failure/recreate plan, the successor spelling has read/write behavior
+  documented, exact instance ids resolve before aliases/kind shorthands, and ambiguous unmatched shorthand **fails
+  loudly**, not mis-routes to one instance.
 - [ ] **OQ-5 -- scope boundary.** Decide foundation-only vs remote-instance CRUD, explicitly and with rationale.
   **Assertion:** the card states the choice (non-goals currently lean foundation-only -- confirm or overturn, do not
   leave it implicit in a Phase 3 guardrail), and the Phase 3 slice list matches it.
@@ -73,9 +74,9 @@ These are ordering guardrails, not fixture-grounded slices. Do not tick or expan
 
 _Slice-ordering guardrails:_
 
-- Land schema/domain changes behind compatibility readers first.
+- Land schema/domain resolution with clean-break failure tests first.
 - Migrate CLI help and docs only after machine contracts are clear.
-- Add alias/ambiguity tests before removing or deprecating old names.
+- Add exact-id, ambiguity, and old-field failure tests before removing old names.
 - Keep remote backend instances connection/auth-only unless a later card adds remote CRUD.
 
 _Remaining Phase 3 task:_
@@ -87,11 +88,11 @@ _Remaining Phase 3 task:_
 
 | Test area                 | Fixture                                | Assertion                                                                                         | Test File |
 | ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- | --------- |
-| Compatibility readers     | old `proxy.source` / old JSON fields   | old configs load, or fail with a migration tip naming the successor                               | TBD       |
-| Remote duplicate identity | two instances of one remote kind       | distinct instance ids resolve; the bare kind name errors, not mis-routes                          | TBD       |
+| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                         | TBD       |
+| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                  | TBD       |
 | Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the instance `(shared)`; telemetry attribution follows the OQ-2 decision | TBD       |
 | Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance (guard/grep test)                                       | TBD       |
-| Telemetry migration       | pre- and post-migration records        | both shapes read the documented backend identity; no silent attribution loss                      | TBD       |
+| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution   | TBD       |
 
 ## Closeout
 
