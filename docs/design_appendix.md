@@ -853,11 +853,11 @@ Semantics and invariants:
 
 Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals and rationale remain in design.md.
 
-### B.1 Marker schema (v2)
+### B.1 Marker schema (v1)
 
 ```json
 {
-    "schema_version": 2,
+    "schema_version": 1,
     "kind": "stop",
     "marker_id": "uuid-123",
     "forge_version": "0.9.0",

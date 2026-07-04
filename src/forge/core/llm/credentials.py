@@ -429,31 +429,3 @@ class CredentialManager:
             if provider in self._cache:
                 del self._cache[provider]
                 logger.info(f"Invalidated cached credentials for {provider}")
-
-    def get_cache_status(self) -> dict[str, Any]:
-        """Get current cache status for monitoring.
-
-        Returns:
-            Dictionary with cache information per provider.
-        """
-        status: dict[str, Any] = {
-            "default_ttl": self._default_ttl,
-            "providers": {},
-        }
-        current_time = time.monotonic()
-
-        for provider, (_, fetch_time, ttl) in self._cache.items():
-            age = current_time - fetch_time
-            status["providers"][provider] = {
-                "age_seconds": round(age, 1),
-                "ttl_seconds": ttl,
-                "remaining_seconds": round(max(0, ttl - age), 1),
-                "expired": age >= ttl,
-            }
-
-        return status
-
-    def clear_cache(self) -> None:
-        """Clear all cached credentials."""
-        self._cache.clear()
-        logger.info("Cleared all cached credentials")

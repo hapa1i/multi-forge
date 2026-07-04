@@ -1,13 +1,20 @@
 # checklist -- accidental_complexity_cleanup
 
-**Branch**: `cleanup/accidental-complexity-batch-a-b` (merged)
+**Branch (Phase C)**: `cleanup/accidental-complexity-batch-c` (off `main` @ `1effdc7a`). Batches A + B shipped earlier
+on `cleanup/accidental-complexity-batch-a-b`, merged via PR #65 (`584aa2a1`).
 
-**Status**: **PAUSED** (2026-07-02). Batches A + B shipped and **merged to `main` via PR #65** (`584aa2a1`), including
-two pre-merge review follow-ups folded into the squash: a `FORGE_DEBUG` fail-open regression test
-(`test_forge_debug_invalid_warns_and_ignores`) and a black-format fix to `loader.py`. An 8-dimension adversarial review
-plus an independent `make pre-commit` + full touched-suite run came back clean before merge. **Paused with Batch C
-(#17-#20) and the two surfaced defects (Defect B: auth-retry provider-trace gap; Gap A: policy fail-open prose-only
-check) still open** -- see the Phase C stub below. To resume: move this card back to `doing/` and start from Phase C.
+**Status**: **ACTIVE** (resumed 2026-07-04) -- Phase C, the finishing phase. Batches A + B are on `main`. Phase C ships
+the one real bug (**Defect B**), the last trivial deletion (**#17**), and the **Gap A** audit. **#18-#20 are Earned
+(keep, no deletion)** -- touched only if already in the file; #19 is reassessed only after Defect B (coupled pair 2).
+
+**Current focus**: Defect B (auth-retry provider-trace gap + regression test) -> #17 (drop two dead `CredentialManager`
+methods + their tests) -> Gap A (audit fail-open emitters; fix only if the CLI prose-only check is a real gap). All
+anchors below re-verified on `main` @ `1effdc7a` -- line numbers are current, not the card's pre-merge base.
+
+**History**: Batches A + B merged via PR #65 (`584aa2a1`) with two pre-merge follow-ups folded into the squash (a
+`FORGE_DEBUG` fail-open regression test `test_forge_debug_invalid_warns_and_ignores` + a `loader.py` black-format fix);
+an 8-dimension adversarial review plus an independent `make pre-commit` + full touched-suite run came back clean before
+merge.
 
 **Scope note**: all anchors re-verified on this branch's HEAD before editing (zero-caller `grep` across `src/` +
 `tests/`). Decisions locked before implementation: **#9 = wire** (read `ActiveSessionStore` at list time; keeps the
@@ -188,11 +195,157 @@ gemini/openai `auth_url` vestige in `config/loader.py`, so they land together (o
 | provider fail-fast                 | `ProxyInstanceConfig(provider='gemini')`                   | raises `ValueError` naming litellm/openrouter                          | `tests/src/config/test_schema.py`     |
 | create still works                 | `forge proxy create litellm-gemini`                        | proxy created (`provider=litellm` from template)                       | `tests/src/config/test_loader.py`     |
 
-## Phase C -- optional / low-value -- STUB
+## Phase C -- finishing phase (real wins + owed decisions)
 
-Items #17-#20 per `card.md` (mostly Earned; #17 drops two dead methods). Plus surfaced defects: **Defect B** (auth-retry
-provider-trace gap -- needs a regression test) and **Gap A** (policy fail-open prose-only check -- needs the fail-open
-emitter audit before deciding if it is a real gap).
+Order: **Defect B -> #17 -> Gap A**. Defect B is the only behavior change; #17 is a trivial deletion; Gap A is an audit
+that may or may not produce a fix. #18-#20 are **Earned** and stay unless the file is already open (see "Keep" below).
+
+### Committed work
+
+- [x] **Defect B (confirmed, High -- real bug, not a cleanup)** `proxy/server.py`: the auth-retry success branch
+  (`client_factory.invalidate_and_retry` at `:1610`, records cost + metrics via the two `latency_ms=retry_duration_ms`
+  blocks at `:1634`/`:1648`) never calls `record_provider_trace` -- the only two call sites are the non-retry success
+  paths (`:1394`, `:1478`). A 401 -> credential-refresh -> 200-on-retry therefore produces cost/metrics with **no**
+  provider-trace record, the exact "what happened to this request?" gap the plane was built to close (origin: a
+  supervised fork through OpenRouter). Fix: add one `record_provider_trace(...)` on the retry branch (the
+  backend-capability gate lives inside the helper, so an unconditional call is safe). **Assertion**: a 401->refresh->200
+  retry emits exactly one downstream provider-trace record carrying the retry's `request_id` + `latency_ms`; a
+  non-provider-trace-capable backend still emits none. Regression:
+  `tests/regression/test_bug_auth_retry_provider_trace.py`. **Verified 2026-07-04**: shipped as two commits -- a
+  no-behavior `refactor(proxy)` routing all provider-trace sites through one shared `_trace_ctx` dict
+  (`record_provider_trace(**_trace_ctx, ...)`; dropping the spread fails loudly on the missing required `request_id`, so
+  a new path cannot silently omit the run-tree context -- the bug class Defect B was), then a `fix(proxy)` adding the
+  retry-branch call via that spread. DRY (not a minimal add) kept `server.py` under the personal 2,500-line guardrail
+  (2,494) while removing real duplication; the durable module-extraction is logged as a follow-up (see Deferred). The
+  regression drives `create_message` through the retry branch with the **real** helper (no spy) under an isolated
+  `FORGE_HOME`, then asserts on the observable outcome by reading the downstream plane back via
+  `read_provider_traces(request_id=...)`: the capable case (`openrouter`, premise-guarded
+  `capabilities.provider_trace is True`) reads exactly one record carrying `request_id`/`request_mode`/`latency_ms`; the
+  non-capable case (`anthropic-passthrough`, premise-guarded `... is False`) reads `[]` (the read-side field filter
+  drops the retry's cost-only record). Fail-first proof: with the fix reverted the capable test fails at the read-back
+  (`got 0`, `assert 0 == 1`) while the non-capable test stays green; reapplying the fix -> 2 passed. The read-back (vs a
+  call spy) is what makes the "exactly one readable record" and "gate holds" claims real -- it would catch a no-op
+  helper, wrong backend, failed `downstream_event_id` merge, or gate regression.
+
+- [x] **#17** Delete `CredentialManager.get_cache_status` (`core/llm/credentials.py:433`) and `.clear_cache` (`:456`) --
+  no `src/` caller (the `proxy/client_factory.py:497,528` pair is a **different** class; leave it). Remove their direct
+  tests in `tests/src/core/llm/test_credentials.py:180-206` (removed code -> delete test, testing_guidelines).
+  **Assertion**: `grep -rn "get_cache_status\|clear_cache" src/forge/core/llm` returns nothing; the credentials suite is
+  green with the two methods and their tests gone. **Verified 2026-07-04**: both methods deleted; `test_cache_status` +
+  `test_clear_cache` removed; `test_invalidate_clears_cache` **rewritten** to read `cm._cache` directly (it borrowed the
+  now-deleted `get_cache_status` but tests the kept `invalidate` -- refines the card's blunt "delete :180-206"). grep
+  clean; `time`/`Any` imports still used (3/8); ruff clean; `test_credentials.py` 25 passed.
+
+- [x] **Gap A (audit -> fix only if real)** `cli/policy.py::supervisor_evaluate` sets `passed` from prose-prefix
+  matching only (`_INFRA_FAILURE_PREFIXES = ("Supervisor error:", "Supervisor skipped")` `:764`, applied `:920`), while
+  the engine treats the **structural** `decision.fail_open` flag as authoritative (`engine.py:302,321`). Audit every
+  `_supervisor_fail_open_decision` call site (`policy/semantic/supervisor.py:763,782,816,829,848,876,889`): does each
+  emit a warning starting with one of the two prefixes? **If any sets `fail_open=True` with a non-matching/absent
+  warning**, `forge policy supervisor evaluate` reports `passed=true`/exit-0 on a fail-open -- fix by having the CLI
+  honor `decision.fail_open` (reuse the engine predicate `_warning_mentions_fail_open` / the flag) instead of prose
+  only. **Assertion**: either (a) record the enumerated audit showing every fail-open warning carries a matching prefix
+  and mark "not a gap", or (b) add a regression asserting `supervisor evaluate` exits 1 on a `fail_open=True` decision
+  whose warning lacks the prefix. **Verified 2026-07-04 -- REAL gap**: 4 fail-open warnings miss the two prefixes
+  (`Supervisor lane unavailable:` :816; `Codex supervisor lane needs an approved plan:` :829;
+  `str(_SupervisorRoutingError)`, e.g. `Supervisor proxy '...' not found` :848/:562;
+  `Supervisor verdict could not be parsed` :889). `invoke_supervisor` returns the raw decision, so `fail_open` is
+  intact. Fix (`cli/policy.py:925`): `infra_failure` now also honors `decision.fail_open` (prose match kept as a
+  fallback). Regressions `test_fail_open_without_infra_prefix_exits_2/_json` fail pre-fix (exit 0) and pass post-fix
+  (exit **2**, not 1 -- infra_failure is exit 2; the earlier "exits 1" wording was wrong). Full
+  `test_policy_supervisor.py` 79 passed.
+
+### Keep -- Earned, no deletion (act only if already editing the file)
+
+- [ ] **#18** `cli/claude.py:99-139` hand-rolls a 3rd copy of the proxy `GET /` identity gate. Earned (deliberate seam).
+  Optional: extract an `assert_proxy_healthy` primitive -- **not** required to close the card.
+- [x] **#19** `proxy/server.py` repeats per-outcome cost/metrics/provider-trace accounting ~5x. Earned (money/telemetry
+  caution zone). **Reassessed after Defect B landed** (coupled pair 2): took the *thin* consolidation for the
+  provider-trace **context** only -- one shared `_trace_ctx` dict spread (`**_trace_ctx`) at all three trace call sites,
+  which is what let Defect B add its retry call without repeating 8 kwargs (and blocks the next silent-omission). The
+  broader per-outcome cost/metrics blocks stay Earned/as-is (money path, genuine per-outcome divergence).
+- [ ] **#20** `cli/workflow.py:1391,1723` `_parse_worker_specs`/`_parse_consensus_worker_specs` are near-identical.
+  Earned; consolidating would surface the `code_mode` asymmetry (Minor C). Low value -- default: leave as-is.
+
+### Resolved decisions (2026-07-04) -- now committed
+
+- [x] **WorkflowPolicy: DEMOTE** (confirmed) -- make the current unshipped state explicit; do **not** graduate here, do
+  **not** delete the pipeline. Sub-tasks:
+
+  - Relabel the `docs/end-user/policy.md` workflow section **experimental / manifest-only**; state plainly there is no
+    CLI enable/list surface -- the only activation is manually setting `policy.bundles: ["workflow"]` +
+    `policy.bundle_config.workflow`.
+  - Narrow/remove `get_all_bundles()` (verify its caller set first) so `workflow` is not advertised as a normal
+    discoverable bundle when its only caller is tests; leave `BUNDLES` discovery + `policy enable --bundle`
+    (`tdd`/`coding_standards`) untouched.
+  - **Keep** the pipeline, registry path, and `build_divergence_config()` intact (no deletion).
+  - File a follow-on `proposed/graduate_workflow_policy_cli/` card for the real `--workflow <preset>` UX + wiring
+    `build_divergence_config` (product/docs/tests -- deliberately out of this cleanup card).
+  - **Assertion**: `policy.md` names it experimental/manifest-only; `get_all_bundles` no longer advertises `workflow` to
+    any non-test path; `policy list` / `policy enable --bundle` unchanged; the pipeline + `build_divergence_config`
+    still import and run; the follow-on card exists in `proposed/`.
+  - **Verified 2026-07-04**: `get_all_bundles()` had exactly one caller -- its own test. The CLI `list_bundles`/`enable`
+    iterate `BUNDLES` directly and never included `workflow`, so deleting the function (clean-break) + its
+    `test_workflow_in_all_bundles` removes the only place `workflow` was advertised as discoverable. Relabeled the
+    `policy.md` header experimental/manifest-only and hardened the note ("no CLI surface... not in
+    `forge policy list`"). Pipeline, `get_bundle_policies`, `get_bundle_for_policy`, `build_divergence_config`
+    untouched; `proposed/graduate_workflow_policy_cli/card.md` filed. 578 policy tests + mypy green. **Review
+    follow-up**: the `registry.py` module docstring still listed `workflow` as a flat "Available bundle"; reworded to
+    split CLI-discoverable `BUNDLES` (tdd/coding_standards) from the dynamic manifest-only `workflow` path.
+
+- [x] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_appendix §B` (says schema
+  **v2**) with the code's emitted + strictly-accepted `schema_version` (`core/workqueue`). Verify which side is right,
+  fix the drifted one. **Assertion**: doc and code agree (grep the emitted `schema_version` + the strict-read guard; one
+  authoritative value). **Verified 2026-07-04**: code is authoritative -- `MARKER_SCHEMA_VERSION = 1`, `queue.py` emits
+  1 and strictly rejects `!= 1`. The **doc** drifted; fixed `design_appendix §B.1` header `(v2) -> (v1)` + example
+  `schema_version: 2 -> 1`. The unrelated downstream `schema_version=2` references (a different schema) stay.
+
+- [x] **Micro-cleanup (b) -- Reporter/Confidence literal dedup** (confirmed in scope, #7-style): import
+  `Reporter`/`Confidence` from their owner instead of re-declaring them in `core/telemetry/downstream.py`.
+  **Assertion**: the literals are defined once (owner only); `grep` shows no duplicate
+  `Reporter = Literal`/`Confidence = Literal`; telemetry tests pass. **Verified 2026-07-04 -- direction reversed from
+  the card's assumption**: `vocabulary.py` could not be the sole owner (the card's guess) because `core/usage/__init__`
+  eagerly imports `emit -> downstream`, so `downstream` importing `usage.vocabulary` cycles; de-coupling `__init__` was
+  out (~12 `from core.usage import emit_*` consumers). Instead defined both **once** in a new neutral leaf
+  `core/telemetry/vocabulary.py` (imports only `typing`, sits below `downstream`); `downstream` and `usage/vocabulary`
+  import + re-export it (all consumer import sites unchanged; `__all__` marks the re-exports). Import smoke test shows
+  no cycle and one shared object; 830 telemetry/usage/proxy tests + mypy/pyright/ruff green.
+
+### Deferred (Phase C)
+
+- [ ] **`server.py` at the 2,500-line guardrail** (surfaced by Defect B): the file sits at **2,494** after the
+  provider-trace DRY -- durable headroom needs a real extraction, not more line-golf. Extract cohesive module-level
+  helpers (e.g. reasoning/verbosity/hyperparameter mapping, `_request_log_config`) into a sibling module; the
+  `create_message` hot path stays put. Own card/commit, deliberately out of this cleanup's scope. **Trigger**: next time
+  `server.py` growth is blocked, or as a standalone `proposed/` card.
+
+### Acceptance tests (Phase C)
+
+| Test                            | Fixture                                                                        | Assertion                                                                             | Test File                                                |
+| ------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| auth-retry emits provider-trace | 401 -> credential refresh -> 200 on retry, provider-trace-capable backend      | exactly one downstream provider-trace record with the retry `request_id`/`latency_ms` | `tests/regression/test_bug_auth_retry_provider_trace.py` |
+| retry trace gated by capability | same retry, non-capable backend                                                | no provider-trace record emitted (helper gate holds)                                  | `tests/regression/test_bug_auth_retry_provider_trace.py` |
+| #17 methods gone                | --                                                                             | `grep` clean in `core/llm`; credentials suite green                                   | `tests/src/core/llm/test_credentials.py`                 |
+| Gap A (real; fixed)             | `fail_open=True` decision, warning without an `_INFRA_FAILURE_PREFIXES` prefix | `supervisor evaluate` exits 2 (not 0)                                                 | `tests/src/cli/test_policy_supervisor.py`                |
+| WorkflowPolicy demoted          | --                                                                             | `get_all_bundles` gone; `policy list`/`enable` unchanged; pipeline still imports      | `tests/src/policy/workflow/test_registry_integration.py` |
+| marker schema doc = code        | --                                                                             | `design_appendix §B.1` says v1, matching `MARKER_SCHEMA_VERSION`                      | (doc-only)                                               |
+| Reporter/Confidence single-src  | import from `downstream` and `usage.vocabulary`                                | no duplicate `Literal` decl; both resolve to the one leaf object; no import cycle     | `tests/src/core/telemetry/`, `tests/src/core/usage/`     |
+
+### Phase C closeout
+
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks) across all touched files.
+- [x] Focused suites green: proxy provider-trace/server, `test_credentials.py`, policy supervisor, policy/workflow,
+  telemetry + usage (830 + 578 + 25 + ... all green across the touched packages).
+- [x] **Integration run** (Defect B touches the proxy request path): user ran the **full integration suite green**
+  (2026-07-04), covering the proxy provider-trace E2E path.
+- [x] `change_log.md` entry (feature-completion size) covering Defect B + #17 + Gap A + WorkflowPolicy DEMOTE + the two
+  micro-cleanups.
+- [x] Promoted two durable lessons to `impl_notes.md` (2026-07-04, human-approved): every proxy success path -- incl.
+  auth-retry -- must emit provider-trace (the `_trace_ctx`-spread guard); and shared cost/usage vocabulary Literals live
+  in the `core/telemetry/vocabulary.py` leaf, never in `core/usage`, because `usage/__init__ -> emit -> downstream`
+  cycles.
+- [x] Docs synced: WorkflowPolicy decision landed in `policy.md` (experimental/manifest-only); marker-schema doc drift
+  fixed in `design_appendix §B.1`.
+- [ ] Card moved `doing/ -> done/` after merge to `main`.
 
 ---
 

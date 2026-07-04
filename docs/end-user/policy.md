@@ -80,14 +80,15 @@ forge policy enable --bundle tdd --permissive
 | `coding_standards.no-type-checking`   | Blocks `if TYPE_CHECKING:` imports                  |
 | `coding_standards.no-backward-compat` | Blocks backward-compatibility wrappers and adapters |
 
-### `workflow` — LLM-based review pipelines (advanced)
+### `workflow` — LLM-based review pipelines (experimental, manifest-only)
 
 Config-driven pipelines that classify code changes via a cheap LLM tagger, then route through filter → checker →
 reviewer stages. Only actions flagged as "architectural" or "migration" reach the expensive reviewer.
 
-> **Note:** The `workflow` bundle is not available via `forge policy enable`. Enable it by setting `policy.bundles` and
-> `policy.bundle_config` in the session manifest (e.g., via `forge session set`). See [`design.md` §4.1.2](../design.md)
-> for the configuration schema.
+> **Note:** The `workflow` bundle is **experimental** and has **no CLI surface** — it is not offered by
+> `forge policy enable` and does not appear in `forge policy list`. The only way to activate it is to set
+> `policy.bundles: ["workflow"]` plus `policy.bundle_config.workflow` in the session manifest (e.g., via
+> `forge session set`). See [`design.md` §4.1.2](../design.md) for the configuration schema.
 
 ---
 

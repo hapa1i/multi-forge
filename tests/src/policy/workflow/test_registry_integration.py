@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from forge.policy.deterministic.registry import (
-    get_all_bundles,
     get_bundle_for_policy,
     get_bundle_policies,
     get_policy_ids_for_bundle,
@@ -64,9 +63,6 @@ class TestWorkflowBundleLookup:
 
     def test_get_bundle_for_non_workflow(self):
         assert get_bundle_for_policy("tdd.tests-before-impl") == "tdd"
-
-    def test_workflow_in_all_bundles(self):
-        assert "workflow" in get_all_bundles()
 
     def test_policy_ids_for_workflow_returns_empty(self):
         """Workflow policy IDs are dynamic; without config, returns []."""

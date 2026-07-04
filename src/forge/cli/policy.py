@@ -915,9 +915,15 @@ def supervisor_evaluate(
             print_error(f"Supervisor invocation failed: {e}")
         sys.exit(2)
 
-    # Detect infra failures hidden behind fail-open allow decisions
-    infra_failure = decision.decision == "allow" and any(
-        w.startswith(prefix) for w in (decision.warnings or []) for prefix in _INFRA_FAILURE_PREFIXES
+    # Detect infra failures hidden behind fail-open allow decisions. The structural
+    # `fail_open` flag is authoritative -- every supervisor fail-open path sets it (lane
+    # unavailable, plan missing, routing error, parse failure, subprocess error), and the
+    # engine keys on it too. Prose-prefix matching alone missed the warnings that do not
+    # start with "Supervisor error:"/"Supervisor skipped", so a fail-open reported exit-0
+    # "passed". The prefix match stays as a fallback for any non-flagged fail-open.
+    infra_failure = decision.decision == "allow" and (
+        decision.fail_open
+        or any(w.startswith(prefix) for w in (decision.warnings or []) for prefix in _INFRA_FAILURE_PREFIXES)
     )
 
     if infra_failure:
