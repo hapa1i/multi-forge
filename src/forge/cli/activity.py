@@ -82,7 +82,7 @@ def activity_cmd(session: str | None, as_json: bool, period: str) -> None:
 
 def _period_start(period: str) -> datetime | None:
     """Return the UTC lower bound for a named local-calendar period."""
-    now_local = datetime.now().astimezone()
+    now_local = datetime.now()
     if period == "today":
         return now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     if period == "week":

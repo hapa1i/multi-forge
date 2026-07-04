@@ -29,12 +29,12 @@ class TestBackendCLI:
     """Integration tests for forge model backend commands."""
 
     def test_backend_list_empty(self, isolated_forge_home: Path) -> None:
-        """Verify backend list shows built-in sources when no local runtime is running."""
+        """Verify backend list shows built-in backends when no local backend is running."""
         runner = CliRunner()
         result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
-        assert "Forge Backend Sources" in result.output
+        assert "Forge Model Backends" in result.output
         assert "openrouter" in result.output
         assert "litellm-remote" in result.output
         assert "No backends found" not in result.output
@@ -135,7 +135,7 @@ class TestBackendRegistry:
         result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
-        assert "Unmatched Runtime Instances" in result.output
+        assert "Unmatched Backend Instances" in result.output
         assert "litellm-4000" in result.output
         assert "4000" in result.output
 
