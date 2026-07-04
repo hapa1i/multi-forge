@@ -3,9 +3,11 @@
 **Branch (Phase C)**: `cleanup/accidental-complexity-batch-c` (off `main` @ `1effdc7a`). Batches A + B shipped earlier
 on `cleanup/accidental-complexity-batch-a-b`, merged via PR #65 (`584aa2a1`).
 
-**Status**: **ACTIVE** (resumed 2026-07-04) -- Phase C, the finishing phase. Batches A + B are on `main`. Phase C ships
-the one real bug (**Defect B**), the last trivial deletion (**#17**), and the **Gap A** audit. **#18-#20 are Earned
-(keep, no deletion)** -- touched only if already in the file; #19 is reassessed only after Defect B (coupled pair 2).
+**Status**: **DONE** (closed 2026-07-04) -- Phase C shipped via PR #74 (squash `534c9fcf`), merged to `main`; card moved
+`doing/ -> done/`. Phase C delivered the one real bug (**Defect B**), the last trivial deletion (**#17**), the **Gap A**
+fix, the **WorkflowPolicy DEMOTE**, and both micro-cleanups. **#18-#20 stayed Earned** (no deletion; #19's post-Defect-B
+reassessment took the thin `_trace_ctx` consolidation, broader blocks left as-is). Deferred: durable `server.py` module
+extraction (see Deferred). This card is now historical; normative behavior lives in the design docs + code.
 
 **Current focus**: Defect B (auth-retry provider-trace gap + regression test) -> #17 (drop two dead `CredentialManager`
 methods + their tests) -> Gap A (audit fail-open emitters; fix only if the CLI prose-only check is a real gap). All
@@ -345,7 +347,7 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
   cycles.
 - [x] Docs synced: WorkflowPolicy decision landed in `policy.md` (experimental/manifest-only); marker-schema doc drift
   fixed in `design_appendix §B.1`.
-- [ ] Card moved `doing/ -> done/` after merge to `main`.
+- [x] Card moved `doing/ -> done/` after merge to `main` (PR #74, `534c9fcf`).
 
 ---
 
