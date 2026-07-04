@@ -509,6 +509,30 @@ def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, for
     assert "sk-" not in result.output
 
 
+def test_test_auth_unique_backend_kind_shorthand_resolves(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("test-auth", "openai", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert payload["backend_instance_id"] == "chatgpt"
+    assert payload["probe"]["status"] == "skipped"
+
+
+def test_test_auth_ambiguous_backend_kind_fails_loudly(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("test-auth", "anthropic", "--json"))
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Ambiguous backend instance shorthand 'anthropic'" in result.stderr
+    assert "Use a concrete backend instance id" in result.stderr
+
+
 def test_test_auth_unknown_source_uses_cli_error_helper(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("test-auth", "missing-source"))
 
@@ -755,6 +779,31 @@ def test_show_json_configured_backend_emits_source_record(
     assert payload["has_lifecycle"] is False
     assert isinstance(payload["credentials"], list)
     assert "OPENROUTER_API_KEY" in payload["missing_required_env_vars"]
+
+
+def test_show_json_unique_backend_kind_shorthand_uses_source_record(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("show", "openai", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert set(payload) == _SOURCE_RECORD_KEYS
+    assert payload["backend_instance_id"] == "chatgpt"
+    assert payload["endpoint"]["kind"] == "runtime_native"
+
+
+def test_show_json_ambiguous_backend_kind_fails_loudly(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("show", "anthropic", "--json"))
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Ambiguous backend instance shorthand 'anthropic'" in result.stderr
+    assert "Use a concrete backend instance id" in result.stderr
 
 
 def test_show_json_registry_only_fallback_when_not_a_source(

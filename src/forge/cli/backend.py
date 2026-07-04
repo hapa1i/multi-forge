@@ -22,7 +22,14 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from forge.backend import BackendManager, ModelSource, ModelSourceNotFoundError
+from forge.backend import (
+    BackendInstanceAmbiguousError,
+    BackendInstanceNotFoundError,
+    BackendManager,
+    ModelSource,
+    ModelSourceNotFoundError,
+    resolve_backend_instance,
+)
 from forge.backend.adapters import get_adapter
 from forge.backend.creation import create_backend_config, get_backend_config_path
 from forge.backend.registry import (
@@ -83,6 +90,13 @@ def _source_for_identifier(identifier: str) -> ModelSource | None:
     try:
         return get_model_source(resolve_model_source_id(identifier))
     except ModelSourceNotFoundError:
+        return None
+
+
+def _source_for_backend_identifier(identifier: str) -> ModelSource | None:
+    try:
+        return resolve_backend_instance(identifier).source
+    except BackendInstanceNotFoundError:
         return None
 
 
@@ -701,7 +715,11 @@ def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
         forge model backend show litellm-4000
     """
     console = Console(width=200)
-    source = _source_for_identifier(identifier)
+    try:
+        source = _source_for_backend_identifier(identifier)
+    except BackendInstanceAmbiguousError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
     if source is not None:
         if as_json:
             managed_processes = _load_managed_processes()
@@ -814,7 +832,11 @@ def test_auth_cmd(backend_identifier: str, as_json: bool, timeout: float) -> Non
         forge model backend test-auth openrouter
     """
     console = Console(width=200)
-    source = _source_for_identifier(backend_identifier)
+    try:
+        source = _source_for_backend_identifier(backend_identifier)
+    except BackendInstanceAmbiguousError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
     if source is None:
         print_error(
             f"Unknown backend '{backend_identifier}'. Use '{_BACKEND_COMMAND} list' to see backends.",
