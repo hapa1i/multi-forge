@@ -172,38 +172,15 @@ class TestCredentialCaching:
         # Should be the same dict object (from cache)
         assert creds1 is creds2
 
-    async def test_cache_status(self, env_vars):
-        """Cache status reports correct information."""
-        cm = CredentialManager()
-
-        # Initially empty
-        status = cm.get_cache_status()
-        assert status["providers"] == {}
-
-        # After fetching
-        await cm.get_credentials("litellm_remote")
-        status = cm.get_cache_status()
-        assert "litellm_remote" in status["providers"]
-        assert status["providers"]["litellm_remote"]["expired"] is False
-
     async def test_invalidate_clears_cache(self, env_vars):
         """Invalidate removes credentials from cache."""
         cm = CredentialManager()
 
         await cm.get_credentials("litellm_remote")
-        assert "litellm_remote" in cm.get_cache_status()["providers"]
+        assert "litellm_remote" in cm._cache
 
         await cm.invalidate("litellm_remote")
-        assert "litellm_remote" not in cm.get_cache_status()["providers"]
-
-    async def test_clear_cache(self, env_vars):
-        """Clear cache removes all credentials."""
-        cm = CredentialManager()
-        # Manually add to cache for test
-        cm._cache["test"] = ({}, 0, 3600)
-
-        cm.clear_cache()
-        assert cm._cache == {}
+        assert "litellm_remote" not in cm._cache
 
 
 @pytest.mark.asyncio
