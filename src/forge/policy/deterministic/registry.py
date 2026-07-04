@@ -113,11 +113,6 @@ def _build_workflow_policies(config: dict[str, Any] | None) -> list[Policy]:
     return policies
 
 
-def get_all_bundles() -> list[str]:
-    """Get list of all available bundle names."""
-    return list(BUNDLES.keys()) + ["workflow"]
-
-
 def get_bundle_for_policy(policy_id: str) -> str | None:
     """Get the bundle name for a policy ID.
 
