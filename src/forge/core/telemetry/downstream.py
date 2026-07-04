@@ -24,16 +24,21 @@ from forge.core.state import decode_json_object
 
 logger = logging.getLogger(__name__)
 
-DOWNSTREAM_SCHEMA_VERSION = 1
+DOWNSTREAM_SCHEMA_VERSION = 2
 
 DownstreamKind = Literal["attempt", "audit", "drift", "mutation"]
 LocalUsageStatus = Literal["available", "unavailable"]
 RequestMode = Literal["streaming", "non_streaming"]
-Reporter = Literal["claude_code", "forge_proxy", "openrouter", "litellm", "provider", "codex_jsonl"]
-Confidence = Literal["reported", "gateway_calculated", "inferred", "unavailable", "unknown"]
+Reporter = Literal[
+    "claude_code", "forge_proxy", "openrouter", "litellm", "provider", "codex_jsonl"
+]
+Confidence = Literal[
+    "reported", "gateway_calculated", "inferred", "unavailable", "unknown"
+]
 
 _lock = threading.Lock()
 _warned_newer_schema = False
+_warned_older_schema = False
 _DOWNSTREAM_EVENT_NAMESPACE = uuid.UUID("4fbcae84-0d9e-5b1b-b46d-f647dc8183f5")
 
 
@@ -124,6 +129,18 @@ class DownstreamRecord:
     ts: str = field(default_factory=_now_iso)
 
 
+@dataclass(frozen=True)
+class DownstreamReadStats:
+    skipped_legacy_schema: int = 0
+    skipped_newer_schema: int = 0
+
+
+@dataclass(frozen=True)
+class DownstreamReadResult:
+    records: list[DownstreamRecord]
+    stats: DownstreamReadStats = field(default_factory=DownstreamReadStats)
+
+
 def write_downstream_record(record: DownstreamRecord) -> None:
     """Append one downstream record. Best-effort; never raises into callers."""
     try:
@@ -158,13 +175,38 @@ def _merge_attempt_records(records: list[DownstreamRecord]) -> list[DownstreamRe
         for key, value in asdict(rec).items():
             if key in {"schema_version", "downstream_event_id", "kind"}:
                 continue
-            if key == "confidence" and value == "unknown" and current.confidence != "unknown":
+            if (
+                key == "confidence"
+                and value == "unknown"
+                and current.confidence != "unknown"
+            ):
                 continue
             if value is not None:
                 setattr(current, key, value)
     passthrough = [rec for rec in records if rec.kind != "attempt"]
     attempts = [merged[key] for key in ordered_keys]
     return sorted([*attempts, *passthrough], key=lambda r: r.ts)
+
+
+def _record_in_period(
+    record: dict[str, Any],
+    period_start: datetime | None,
+    period_end: datetime | None,
+) -> bool:
+    if not period_start and not period_end:
+        return True
+    ts_str = record.get("ts", "")
+    try:
+        ts = datetime.fromisoformat(
+            ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00"
+        )
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if period_start and ts < period_start:
+        return False
+    if period_end and ts >= period_end:
+        return False
+    return True
 
 
 def read_downstream_records(
@@ -184,13 +226,41 @@ def read_downstream_records(
     Attempt records with the same ``downstream_event_id`` are merged so duplicate
     writes for one physical attempt count once.
     """
+    return read_downstream_records_with_stats(
+        period_start,
+        period_end,
+        kind=kind,
+        request_id=request_id,
+        proxy_id=proxy_id,
+        backend_id=backend_id,
+        forge_run_id=forge_run_id,
+        forge_root_run_id=forge_root_run_id,
+        provider_session_id=provider_session_id,
+    ).records
+
+
+def read_downstream_records_with_stats(
+    period_start: datetime | None = None,
+    period_end: datetime | None = None,
+    *,
+    kind: DownstreamKind | None = None,
+    request_id: str | None = None,
+    proxy_id: str | None = None,
+    backend_id: str | None = None,
+    forge_run_id: str | None = None,
+    forge_root_run_id: str | None = None,
+    provider_session_id: str | None = None,
+) -> DownstreamReadResult:
+    """Read downstream records plus schema-fence skip counts."""
     log_dir = _downstream_dir()
     if not log_dir.is_dir():
-        return []
+        return DownstreamReadResult(records=[])
 
-    global _warned_newer_schema
+    global _warned_newer_schema, _warned_older_schema
     config = dacite.Config(strict=True)
     records: list[DownstreamRecord] = []
+    skipped_legacy_schema = 0
+    skipped_newer_schema = 0
     for path in sorted(log_dir.glob("*.jsonl")):
         try:
             with open(path) as f:
@@ -198,8 +268,24 @@ def read_downstream_records(
                     record = decode_json_object(line)
                     if record is None:
                         continue
+                    if kind and record.get("kind") != kind:
+                        continue
+                    if not _record_in_period(record, period_start, period_end):
+                        continue
                     ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > DOWNSTREAM_SCHEMA_VERSION:
+                    if not isinstance(ver, int) or ver < DOWNSTREAM_SCHEMA_VERSION:
+                        skipped_legacy_schema += 1
+                        if not _warned_older_schema:
+                            logger.warning(
+                                "Skipping downstream telemetry from older Forge backend-identity schema "
+                                "(schema_version=%s); new backend-attributed views start at schema_version=%s",
+                                ver if ver is not None else "missing",
+                                DOWNSTREAM_SCHEMA_VERSION,
+                            )
+                            _warned_older_schema = True
+                        continue
+                    if ver > DOWNSTREAM_SCHEMA_VERSION:
+                        skipped_newer_schema += 1
                         if not _warned_newer_schema:
                             logger.warning(
                                 "Skipping downstream telemetry from newer Forge (schema_version=%s); upgrade Forge",
@@ -207,30 +293,26 @@ def read_downstream_records(
                             )
                             _warned_newer_schema = True
                         continue
-                    if kind and record.get("kind") != kind:
-                        continue
                     if request_id and record.get("request_id") != request_id:
                         continue
                     if proxy_id and record.get("proxy_id") != proxy_id:
                         continue
                     if forge_run_id and record.get("forge_run_id") != forge_run_id:
                         continue
-                    if forge_root_run_id and record.get("forge_root_run_id") != forge_root_run_id:
+                    if (
+                        forge_root_run_id
+                        and record.get("forge_root_run_id") != forge_root_run_id
+                    ):
                         continue
-                    if provider_session_id and record.get("provider_session_id") != provider_session_id:
+                    if (
+                        provider_session_id
+                        and record.get("provider_session_id") != provider_session_id
+                    ):
                         continue
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError, AttributeError):
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
                     try:
-                        records.append(dacite.from_dict(DownstreamRecord, record, config=config))
+                        records.append(
+                            dacite.from_dict(DownstreamRecord, record, config=config)
+                        )
                     except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
                         logger.warning(
                             "Skipping malformed downstream telemetry in %s: %s",
@@ -243,8 +325,14 @@ def read_downstream_records(
     records.sort(key=lambda r: r.ts)
     merged = _merge_attempt_records(records)
     if backend_id:
-        return [record for record in merged if record.backend_id == backend_id]
-    return merged
+        merged = [record for record in merged if record.backend_id == backend_id]
+    return DownstreamReadResult(
+        records=merged,
+        stats=DownstreamReadStats(
+            skipped_legacy_schema=skipped_legacy_schema,
+            skipped_newer_schema=skipped_newer_schema,
+        ),
+    )
 
 
 def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> None:

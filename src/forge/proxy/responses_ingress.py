@@ -208,7 +208,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
 
     provider_trace_ctx = (
         {
-            "backend_id": server._backend_source_id(),
+            "backend_id": server._backend_instance_id(),
             "proxy_id": server.PROXY_ID or "unknown",
             "mapped_model": model,
             "request_id": request_id,

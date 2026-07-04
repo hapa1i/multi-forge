@@ -29,7 +29,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from forge.core.run_id import derive_provider_session_id
-from forge.core.telemetry.downstream import DownstreamRecord, read_downstream_records
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    read_downstream_records_with_stats,
+)
 from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
@@ -47,7 +50,9 @@ _OperationKey = tuple[str, str | None, str | None, str, str | None]
 # spend (`forge +$Y`): a directly-reported figure or a gateway-computed one.
 # `inferred` (a local estimate), `unavailable`, and `unknown` never contribute -- the
 # north star is to sum what a route reported, never an estimate.
-_FORGE_ADDED_COST_CONFIDENCES: frozenset[Confidence] = frozenset({"reported", "gateway_calculated"})
+_FORGE_ADDED_COST_CONFIDENCES: frozenset[Confidence] = frozenset(
+    {"reported", "gateway_calculated"}
+)
 
 
 @dataclass
@@ -70,7 +75,9 @@ class CommandUsage:
     input_tokens: int = 0
     output_tokens: int = 0
     cached_tokens: int = 0
-    cost_micro_usd: int | None = None  # sum where measured; None if no event carried cost
+    cost_micro_usd: int | None = (
+        None  # sum where measured; None if no event carried cost
+    )
     # False when no verb-snapshot estimate is mixed into this command's figure -- i.e. it
     # is entirely cost-plane-exact (4g root-join) and/or runtime-reported (runtime_native)
     # -> rendered without the `~` estimate marker. Defaults True: the safe caveat for
@@ -163,7 +170,9 @@ class OperationPane:
 
     @property
     def has_content(self) -> bool:
-        return bool(self.operations or (self.policy is not None and self.policy.has_content))
+        return bool(
+            self.operations or (self.policy is not None and self.policy.has_content)
+        )
 
 
 @dataclass
@@ -203,6 +212,7 @@ class ModelCallPane:
     cost_partial: bool = False
     cost_estimated: bool = True
     downstream_records: int = 0
+    skipped_legacy_schema: int = 0
 
     @property
     def has_content(self) -> bool:
@@ -264,7 +274,9 @@ def build_session_activity_summary(
     ``evaluated_at``). Best-effort: a missing manifest or unreadable ledger yields a
     valid, partial summary rather than raising.
     """
-    summary = SessionActivitySummary(session=session_name, since=since.isoformat() if since else None)
+    summary = SessionActivitySummary(
+        session=session_name, since=since.isoformat() if since else None
+    )
     events = _read_session_usage_events(session_name, since)
 
     _aggregate_ledger(summary, events, since)
@@ -320,11 +332,15 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     # The error clause: the per-kind fail-open breakdown when the ledger recorded kinds
     # (real data), else the plain count for a hand-built summary (error_kinds empty). The
     # `or` fallback is load-bearing -- it must never silently drop a known error count.
-    failing = format_failing_open(sup_cmd) or (f"{sup_errors} errors" if sup_errors else None)
+    failing = format_failing_open(sup_cmd) or (
+        f"{sup_errors} errors" if sup_errors else None
+    )
     pol = summary.policy
     if pol and pol.has_content:
         if pol.plan_check_allow or pol.plan_check_needs_review:
-            parts.append(f"plan-check: {pol.plan_check_allow} allow, {pol.plan_check_needs_review} needs-review")
+            parts.append(
+                f"plan-check: {pol.plan_check_allow} allow, {pol.plan_check_needs_review} needs-review"
+            )
         # `checks` (allow+warn+deny) is the capped decision-log count; `sup_errors` is the
         # uncapped ledger count -- different planes. A supervisor error fails open to an
         # `allow`, so normally errors <= checks; only decision-log eviction breaks that. So
@@ -367,12 +383,16 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     if tokens:
         parts.append(f"{_fmt_tokens(tokens)} tok")
 
-    workflows = sum(c.calls for c in summary.commands if c.command in _WORKFLOW_COMMANDS)
+    workflows = sum(
+        c.calls for c in summary.commands if c.command in _WORKFLOW_COMMANDS
+    )
     if workflows:
         parts.append(f"{workflows} workflow{'s' if workflows != 1 else ''}")
 
     if summary.subagents:
-        parts.append(f"{summary.subagents} subagent{'s' if summary.subagents != 1 else ''}")
+        parts.append(
+            f"{summary.subagents} subagent{'s' if summary.subagents != 1 else ''}"
+        )
 
     if not parts:
         return None
@@ -421,7 +441,9 @@ def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int 
     Adding root/session identity to the ledger schema is deferred to a future card.
     """
     events = read_usage_events(session=session, period_start=since)
-    return _join_session_cost(events, since, exclude_interactive=True, trusted_only=True).total
+    return _join_session_cost(
+        events, since, exclude_interactive=True, trusted_only=True
+    ).total
 
 
 @dataclass
@@ -463,7 +485,9 @@ def _failure_kind(failure_type: str | None) -> str:
     return "timeout" if failure_type == "timeout" else "error"
 
 
-def read_supervisor_health(session: str, *, since: datetime | None = None) -> SupervisorHealth:
+def read_supervisor_health(
+    session: str, *, since: datetime | None = None
+) -> SupervisorHealth:
     """Return the recent consecutive frontier-supervisor fail-open run for ``session``.
 
     Reads upstream supervisor outcomes plus legacy ``command="supervisor"`` usage
@@ -491,8 +515,13 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
     count = 0
     last_kind: str | None = None
     last_seen_at: str | None = None
-    for event in reversed(events):  # newest-first (read_usage_events sorts ascending by ts)
-        if event.status not in _ERROR_STATUSES and event.status not in _UPSTREAM_FAIL_OPEN_STATUSES:
+    for event in reversed(
+        events
+    ):  # newest-first (read_usage_events sorts ascending by ts)
+        if (
+            event.status not in _ERROR_STATUSES
+            and event.status not in _UPSTREAM_FAIL_OPEN_STATUSES
+        ):
             break  # the first non-failure (a success) ends the recent fail-open run
         if count == 0:  # the newest failure defines the displayed kind + timestamp
             last_kind = _failure_kind(event.failure_type)
@@ -500,14 +529,26 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
         count += 1
     if count == 0:
         return SupervisorHealth()
-    return SupervisorHealth(recent_failures=count, last_kind=last_kind, last_seen_at=last_seen_at)
+    return SupervisorHealth(
+        recent_failures=count, last_kind=last_kind, last_seen_at=last_seen_at
+    )
 
 
-def _supervisor_health_events(session: str, since: datetime | None) -> list[_HealthEvent]:
+def _supervisor_health_events(
+    session: str, since: datetime | None
+) -> list[_HealthEvent]:
     """Merge new upstream outcomes with legacy usage events for supervisor health."""
     events: list[_HealthEvent] = [
-        _HealthEvent(ts=e.ts, status=e.status, failure_type=e.failure_type, run_id=e.run_id, source="legacy")
-        for e in read_usage_events(session=session, command="supervisor", period_start=since)
+        _HealthEvent(
+            ts=e.ts,
+            status=e.status,
+            failure_type=e.failure_type,
+            run_id=e.run_id,
+            source="legacy",
+        )
+        for e in read_usage_events(
+            session=session, command="supervisor", period_start=since
+        )
     ]
     for outcome in read_upstream_outcomes(
         period_start=since,
@@ -522,7 +563,11 @@ def _supervisor_health_events(session: str, since: datetime | None) -> list[_Hea
 
 
 def _health_event_from_upstream(outcome: UpstreamOutcome) -> _HealthEvent:
-    failure_type = "timeout" if outcome.status == "timeout" or outcome.reason_code == "timeout" else outcome.reason_code
+    failure_type = (
+        "timeout"
+        if outcome.status == "timeout" or outcome.reason_code == "timeout"
+        else outcome.reason_code
+    )
     return _HealthEvent(
         ts=outcome.ts,
         status=outcome.status,
@@ -554,14 +599,20 @@ def _dedupe_supervisor_health_events(events: list[_HealthEvent]) -> list[_Health
             continue
         winning_source = max(
             sources,
-            key=lambda source: max(_health_event_rank(event) for event in run_events if event.source == source),
+            key=lambda source: max(
+                _health_event_rank(event)
+                for event in run_events
+                if event.source == source
+            ),
         )
         out.extend(event for event in run_events if event.source == winning_source)
     return out
 
 
 def _health_event_rank(event: _HealthEvent) -> tuple[int, int, str]:
-    is_failure = event.status in _ERROR_STATUSES or event.status in _UPSTREAM_FAIL_OPEN_STATUSES
+    is_failure = (
+        event.status in _ERROR_STATUSES or event.status in _UPSTREAM_FAIL_OPEN_STATUSES
+    )
     is_upstream = event.source == "upstream"
     return (int(is_failure), int(is_upstream), event.ts)
 
@@ -574,7 +625,9 @@ class _CostJoin:
     """Result of :func:`_join_session_cost`: the session's cost with provenance flags."""
 
     total: int | None  # summed micro-USD, or None when nothing in scope carried cost
-    partial: bool  # some in-scope run/event carried no usable cost (incomplete coverage)
+    partial: (
+        bool  # some in-scope run/event carried no usable cost (incomplete coverage)
+    )
     by_command: dict[str, int]  # per-command micro-USD
     estimated: bool  # the total mixes in at least one verb-snapshot estimate (-> `~`)
     estimated_commands: set[str]  # commands whose figure includes a snapshot estimate
@@ -620,7 +673,9 @@ def _join_session_cost(
             join = sum_reported_cost_by_root(roots, since=since)
             per_run = join.per_run
             runs_with_records = join.runs_with_records
-        except Exception as e:  # best-effort: a cost-plane read failure falls back to event cost
+        except (
+            Exception
+        ) as e:  # best-effort: a cost-plane read failure falls back to event cost
             logger.debug("4g cost-plane root join failed; using event cost: %s", e)
 
     run_to_command = {e.run_id: e.command for e in events if e.run_id}
@@ -628,7 +683,11 @@ def _join_session_cost(
     # by those exact records. Derived from worker events (parent_run_id == the verb's run,
     # set by build_claude_env and threaded onto the worker event), so suppression stays
     # per-subtree -- never whole-root.
-    producer_parents = {e.parent_run_id for e in events if e.run_id in runs_with_records and e.parent_run_id}
+    producer_parents = {
+        e.parent_run_id
+        for e in events
+        if e.run_id in runs_with_records and e.parent_run_id
+    }
 
     by_command: dict[str, int] = {}
     estimated_commands: set[str] = set()
@@ -653,7 +712,8 @@ def _join_session_cost(
         if exclude_interactive and event.route == ROUTE_CLAUDE_INTERACTIVE:
             continue
         superseded = event.run_id in runs_with_records or (
-            event.measurement_source == "verb_snapshot_estimated" and event.run_id in producer_parents
+            event.measurement_source == "verb_snapshot_estimated"
+            and event.run_id in producer_parents
         )
         if superseded:
             continue  # cost comes from the cost plane (exact), not this event's snapshot
@@ -679,7 +739,9 @@ def _join_session_cost(
     )
 
 
-def _read_session_usage_events(session_name: str, since: datetime | None) -> list[UsageEvent]:
+def _read_session_usage_events(
+    session_name: str, since: datetime | None
+) -> list[UsageEvent]:
     try:
         return read_usage_events(period_start=since, session=session_name)
     except Exception as e:  # best-effort: telemetry read must not break the summary
@@ -687,7 +749,9 @@ def _read_session_usage_events(session_name: str, since: datetime | None) -> lis
         return []
 
 
-def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent], since: datetime | None) -> None:
+def _aggregate_ledger(
+    summary: SessionActivitySummary, events: list[UsageEvent], since: datetime | None
+) -> None:
     summary.total_events = len(events)
     by_command: dict[str, CommandUsage] = {}
 
@@ -718,13 +782,19 @@ def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent],
         if event.cached_tokens:
             cu.cached_tokens += event.cached_tokens
 
-    cost = _join_session_cost(events, since, exclude_interactive=True, trusted_only=False)
+    cost = _join_session_cost(
+        events, since, exclude_interactive=True, trusted_only=False
+    )
     for cmd, micros in cost.by_command.items():
         cu = by_command.setdefault(cmd, CommandUsage(command=cmd))
         cu.cost_micro_usd = micros
-        cu.cost_estimated = cmd in cost.estimated_commands  # exact (cost-plane) -> no `~`
+        cu.cost_estimated = (
+            cmd in cost.estimated_commands
+        )  # exact (cost-plane) -> no `~`
 
-    summary.commands = sorted(by_command.values(), key=lambda c: (c.calls + c.workers, c.calls), reverse=True)
+    summary.commands = sorted(
+        by_command.values(), key=lambda c: (c.calls + c.workers, c.calls), reverse=True
+    )
     summary.total_cost_micro_usd = cost.total
     summary.cost_partial = cost.partial
     summary.cost_estimated = cost.estimated
@@ -746,26 +816,46 @@ def _build_activity_panes(
     known_roots.update(o.root_run_id for o in outcomes if o.root_run_id)
     known_runs = {e.run_id for e in events if e.run_id}
     known_runs.update(o.run_id for o in outcomes if o.run_id)
-    provider_prefix = derive_provider_session_id(session_name, root_run_id="", role=None)
+    provider_prefix = derive_provider_session_id(
+        session_name, root_run_id="", role=None
+    )
 
     try:
+        downstream_read = read_downstream_records_with_stats(
+            period_start=since, kind="attempt"
+        )
         records = [
             rec
-            for rec in read_downstream_records(period_start=since, kind="attempt")
-            if _downstream_visible_to_session(rec, known_roots, known_runs, provider_prefix)
+            for rec in downstream_read.records
+            if _downstream_visible_to_session(
+                rec, known_roots, known_runs, provider_prefix
+            )
         ]
+        skipped_legacy_schema = downstream_read.stats.skipped_legacy_schema
     except Exception as e:
-        logger.debug("activity panes: downstream read failed for %s: %s", session_name, e)
+        logger.debug(
+            "activity panes: downstream read failed for %s: %s", session_name, e
+        )
         records = []
+        skipped_legacy_schema = 0
 
-    downstream_roots = {rec.forge_root_run_id for rec in records if rec.forge_root_run_id}
+    downstream_roots = {
+        rec.forge_root_run_id for rec in records if rec.forge_root_run_id
+    }
     downstream_roots.update(event.root_run_id for event in events if event.root_run_id)
     downstream_runs = {rec.forge_run_id for rec in records if rec.forge_run_id}
     downstream_runs.update(event.run_id for event in events if event.run_id)
-    upstream_roots = {outcome.root_run_id for outcome in outcomes if outcome.root_run_id}
+    upstream_roots = {
+        outcome.root_run_id for outcome in outcomes if outcome.root_run_id
+    }
 
-    summary.upstream = _build_operation_pane(outcomes, downstream_roots, downstream_runs, summary.policy)
-    summary.downstream = _build_model_call_pane(summary, events, records, upstream_roots)
+    summary.upstream = _build_operation_pane(
+        outcomes, downstream_roots, downstream_runs, summary.policy
+    )
+    summary.downstream = _build_model_call_pane(
+        summary, events, records, upstream_roots
+    )
+    summary.downstream.skipped_legacy_schema = skipped_legacy_schema
     if summary.downstream.rows:
         summary.total_cost_micro_usd = summary.downstream.total_cost_micro_usd
         summary.total_input_tokens = summary.downstream.total_input_tokens
@@ -839,7 +929,9 @@ def _build_operation_pane(
         if row.join_state != "matched" and join_state == "matched":
             row.join_state = "matched"
     return OperationPane(
-        operations=sorted(grouped.values(), key=lambda r: (r.latest_at or "", r.command), reverse=True),
+        operations=sorted(
+            grouped.values(), key=lambda r: (r.latest_at or "", r.command), reverse=True
+        ),
         policy=policy,
         manifest_fallback_used=policy is not None and policy.has_content,
         log_capped=bool(policy and policy.log_capped),
@@ -899,11 +991,18 @@ def _build_model_call_pane(
                 cached_tokens=command.cached_tokens,
                 cost_micro_usd=command.cost_micro_usd,
                 cost_estimated=command.cost_estimated,
-                cost_partial=command.cost_micro_usd is None and bool(command.calls or command.workers),
-                join_state="matched" if set(roots) & upstream_roots else "downstream_only",
+                cost_partial=command.cost_micro_usd is None
+                and bool(command.calls or command.workers),
+                join_state="matched"
+                if set(roots) & upstream_roots
+                else "downstream_only",
                 root_run_ids=roots,
-                runtime=_rollup_lane_value(runtimes_by_command.get(command.command, set())),
-                billing_mode=_rollup_lane_value(billing_by_command.get(command.command, set())),
+                runtime=_rollup_lane_value(
+                    runtimes_by_command.get(command.command, set())
+                ),
+                billing_mode=_rollup_lane_value(
+                    billing_by_command.get(command.command, set())
+                ),
             )
         )
 
@@ -933,7 +1032,9 @@ def _build_model_call_pane(
                 cost_micro_usd=sum(cost_values) if cost_values else None,
                 cost_estimated=False,
                 cost_partial=len(cost_values) != len(recs),
-                join_state="matched" if set(roots) & upstream_roots else "downstream_only",
+                join_state="matched"
+                if set(roots) & upstream_roots
+                else "downstream_only",
                 root_run_ids=roots,
             )
         )
@@ -946,7 +1047,8 @@ def _build_model_call_pane(
         total_cost_micro_usd=sum(cost_values) if has_cost else None,
         total_input_tokens=sum(row.input_tokens for row in rows),
         total_output_tokens=sum(row.output_tokens for row in rows),
-        cost_partial=summary.cost_partial or (has_cost and any(row.cost_partial for row in rows)),
+        cost_partial=summary.cost_partial
+        or (has_cost and any(row.cost_partial for row in rows)),
         cost_estimated=(
             any(row.cost_estimated for row in rows if row.cost_micro_usd is not None)
             if has_cost
@@ -956,10 +1058,17 @@ def _build_model_call_pane(
     )
 
 
-def _group_downstream_records(records: list[DownstreamRecord]) -> dict[str, list[DownstreamRecord]]:
+def _group_downstream_records(
+    records: list[DownstreamRecord],
+) -> dict[str, list[DownstreamRecord]]:
     grouped: dict[str, list[DownstreamRecord]] = {}
     for record in records:
-        label = record.provider_command or record.source_id or record.provider or "downstream"
+        label = (
+            record.provider_command
+            or record.source_id
+            or record.provider
+            or "downstream"
+        )
         grouped.setdefault(label, []).append(record)
     return grouped
 
@@ -985,12 +1094,16 @@ def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[n
         if forge_root:
             return SessionStore(forge_root, session_name).read()
         return SessionManager().get_session(session_name)
-    except Exception as e:  # best-effort: a missing/locked manifest just drops the policy half
+    except (
+        Exception
+    ) as e:  # best-effort: a missing/locked manifest just drops the policy half
         logger.debug("usage summary: manifest load failed for %s: %s", session_name, e)
         return None
 
 
-def _policy_activity(manifest, since: datetime | None, session_name: str) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
+def _policy_activity(
+    manifest, since: datetime | None, session_name: str
+) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
     try:
         decisions = manifest.confirmed.policy.decisions if manifest is not None else []
     except Exception:
@@ -1045,7 +1158,9 @@ def _policy_activity(manifest, since: datetime | None, session_name: str) -> Pol
             if isinstance(sub_warnings, list):
                 warnings.extend(str(w) for w in sub_warnings)
 
-    _apply_upstream_policy_activity(activity, manifest_seen, warnings, since, session_name)
+    _apply_upstream_policy_activity(
+        activity, manifest_seen, warnings, since, session_name
+    )
     activity.total_warnings = len(warnings)
     activity.recent_warnings = warnings[-_MAX_RECENT_WARNINGS:]
     # PolicyActivity is *semantic-tier* activity (supervisor + plan-check); if neither
@@ -1083,7 +1198,9 @@ def _apply_upstream_policy_activity(
     session_name: str,
 ) -> None:
     try:
-        outcomes = read_upstream_outcomes(period_start=since, session=session_name, command="policy-check")
+        outcomes = read_upstream_outcomes(
+            period_start=since, session=session_name, command="policy-check"
+        )
     except Exception:
         return
     for outcome in outcomes:
@@ -1110,7 +1227,11 @@ def _apply_upstream_policy_activity(
             activity.supervisor_warn += 1
         elif decision == "deny":
             activity.supervisor_deny += 1
-        if outcome.message and decision in {"allow", "warn"} and outcome.status != "success":
+        if (
+            outcome.message
+            and decision in {"allow", "warn"}
+            and outcome.status != "success"
+        ):
             warnings.append(outcome.message)
 
 
@@ -1128,7 +1249,9 @@ def _upstream_outcome_decision(outcome: UpstreamOutcome) -> str | None:
     return None
 
 
-def _shadow_activity(forge_root: str | None, session_name: str, since: datetime | None) -> ShadowActivity | None:
+def _shadow_activity(
+    forge_root: str | None, session_name: str, since: datetime | None
+) -> ShadowActivity | None:
     """Count shadow candidates from the session's shadow dir (best-effort).
 
     Reads ``.done`` terminal status and pending (``*.json``/``.processing``) records,

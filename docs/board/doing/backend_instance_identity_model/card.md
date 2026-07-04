@@ -129,7 +129,9 @@ Recommended OQ resolutions:
   source ids mostly already behave as logical instance ids; keep `source_id`/`source_kind` as the origin axis. Do not
   backfill historical records initially, and do not add read aliases for renamed ids unless Phase 3 deliberately adds a
   one-shot migration tool. New views must not silently join or reinterpret pre-break records. If process attribution is
-  needed later, add a separate local-process field instead of overloading `backend_id`.
+  needed later, add a separate local-process field instead of overloading `backend_id`. S5 takes the clean-break path:
+  new downstream writes use `schema_version=2`; current readers skip missing/older downstream schemas with one warning
+  and surface activity/cost skip counts instead of reinterpreting them under the backend-instance contract.
 - **OQ-3/OQ-4 config + ambiguity:** make the canonical config spelling `proxy.backend` with backend instance id/name
   values. `proxy.source` is not a compatibility reader in the clean-break path: templates or runtime `proxy.yaml` files
   that still use it should fail loudly with a recreate/migration tip. The new `proxy.backend` field keeps the existing

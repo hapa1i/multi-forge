@@ -15,6 +15,7 @@ from forge.core.telemetry.downstream import (
     DownstreamRecord,
     prune_downstream_records,
     read_downstream_records,
+    read_downstream_records_with_stats,
     write_downstream_record,
 )
 
@@ -22,8 +23,11 @@ from forge.core.telemetry.downstream import (
 @pytest.fixture(autouse=True)
 def _isolated_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     telemetry_dir = tmp_path / "telemetry" / "downstream"
-    monkeypatch.setattr("forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir)
+    monkeypatch.setattr(
+        "forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir
+    )
     downstream._warned_newer_schema = False
+    downstream._warned_older_schema = False
     return telemetry_dir
 
 
@@ -54,6 +58,24 @@ def test_duplicate_attempt_ids_merge_latest_non_null_fields() -> None:
     assert records[0].output_tokens == 5
     assert records[0].cost_micros == 123
     assert records[0].confidence == "reported"
+
+
+def test_write_stamps_current_backend_identity_schema(
+    _isolated_downstream: Path,
+) -> None:
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id="ds_current_schema",
+            backend_id="openrouter",
+        )
+    )
+
+    [path] = list(_isolated_downstream.glob("*.jsonl"))
+    raw = json.loads(path.read_text().strip())
+
+    assert raw["schema_version"] == downstream.DOWNSTREAM_SCHEMA_VERSION
+    assert raw["backend_id"] == "openrouter"
 
 
 def test_backend_id_survives_later_null_merge_and_can_filter() -> None:
@@ -105,7 +127,9 @@ def test_non_attempt_substreams_do_not_merge() -> None:
     assert [record.kind for record in records] == ["audit", "drift"]
 
 
-def test_newer_schema_is_skipped(_isolated_downstream: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_newer_schema_is_skipped(
+    _isolated_downstream: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     _isolated_downstream.mkdir(parents=True)
     path = _isolated_downstream / "2026-06_1.jsonl"
     with open(path, "w") as f:
@@ -119,13 +143,65 @@ def test_newer_schema_is_skipped(_isolated_downstream: Path, caplog: pytest.LogC
             )
             + "\n"
         )
-        f.write(json.dumps({"schema_version": 1, "kind": "attempt", "downstream_event_id": "ok"}) + "\n")
+        f.write(
+            json.dumps(
+                {
+                    "schema_version": downstream.DOWNSTREAM_SCHEMA_VERSION,
+                    "kind": "attempt",
+                    "downstream_event_id": "ok",
+                }
+            )
+            + "\n"
+        )
 
     with caplog.at_level("WARNING"):
-        records = read_downstream_records(kind="attempt")
+        result = read_downstream_records_with_stats(kind="attempt")
 
+    records = result.records
     assert [record.downstream_event_id for record in records] == ["ok"]
+    assert result.stats.skipped_newer_schema == 1
     assert sum("newer Forge" in message for message in caplog.messages) == 1
+
+
+def test_older_identity_schema_is_skipped(
+    _isolated_downstream: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _isolated_downstream.mkdir(parents=True)
+    path = _isolated_downstream / "2026-06_1.jsonl"
+    with open(path, "w") as f:
+        f.write(
+            json.dumps(
+                {"schema_version": 1, "kind": "attempt", "downstream_event_id": "old"}
+            )
+            + "\n"
+        )
+        f.write(
+            json.dumps({"kind": "attempt", "downstream_event_id": "unversioned"}) + "\n"
+        )
+        f.write(
+            json.dumps(
+                {
+                    "schema_version": downstream.DOWNSTREAM_SCHEMA_VERSION,
+                    "kind": "attempt",
+                    "downstream_event_id": "current",
+                }
+            )
+            + "\n"
+        )
+
+    with caplog.at_level("WARNING"):
+        result = read_downstream_records_with_stats(kind="attempt")
+
+    records = result.records
+    assert [record.downstream_event_id for record in records] == ["current"]
+    assert result.stats.skipped_legacy_schema == 2
+    assert (
+        sum(
+            "older Forge backend-identity schema" in message
+            for message in caplog.messages
+        )
+        == 1
+    )
 
 
 def test_strict_reader_skips_unknown_fields_and_non_object_lines(
@@ -134,11 +210,20 @@ def test_strict_reader_skips_unknown_fields_and_non_object_lines(
     _isolated_downstream.mkdir(parents=True)
     path = _isolated_downstream / "2026-06_1.jsonl"
     with open(path, "w") as f:
-        f.write(json.dumps({"schema_version": 1, "kind": "attempt", "downstream_event_id": "valid"}) + "\n")
         f.write(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": downstream.DOWNSTREAM_SCHEMA_VERSION,
+                    "kind": "attempt",
+                    "downstream_event_id": "valid",
+                }
+            )
+            + "\n"
+        )
+        f.write(
+            json.dumps(
+                {
+                    "schema_version": downstream.DOWNSTREAM_SCHEMA_VERSION,
                     "kind": "attempt",
                     "downstream_event_id": "unknown-field",
                     "future_field": "must be rejected",
@@ -152,7 +237,10 @@ def test_strict_reader_skips_unknown_fields_and_non_object_lines(
         records = read_downstream_records(kind="attempt")
 
     assert [record.downstream_event_id for record in records] == ["valid"]
-    assert any("Skipping malformed downstream telemetry" in message for message in caplog.messages)
+    assert any(
+        "Skipping malformed downstream telemetry" in message
+        for message in caplog.messages
+    )
 
 
 def test_prune_downstream_records_by_age(_isolated_downstream: Path) -> None:

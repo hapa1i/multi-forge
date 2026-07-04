@@ -2,9 +2,9 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 3 / S5 telemetry backend identity clean break. S4 moved backend CLI JSON to
-`backend_instance_id` / `managed_process` and inspect-route metadata to `backend`. Next action: migrate telemetry
-backend attribution.
+**Current focus**: S6 docs and closeout. S5 keeps downstream telemetry `backend_id` as logical backend-instance
+attribution, bumps new downstream writes to `schema_version=2`, and skips missing/older downstream schemas in current
+read paths with activity/cost skip counts instead of silently reattributing historical records.
 
 ## Invariants (do not violate during migration)
 
@@ -132,13 +132,16 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S5 -- Telemetry backend identity clean break
 
-- [ ] Route new proxy/direct telemetry writes through backend instance ids. **Assertion:** downstream telemetry
+- [x] Route new proxy/direct telemetry writes through backend instance ids. **Assertion:** downstream telemetry
   `backend_id` is the logical backend instance id for singleton remotes, duplicate remotes, and shared local LiteLLM;
-  the local managed-process id is not used for attribution. **Tests:** `tests/src/proxy/test_provider_trace.py`,
-  `tests/src/core/ops/test_usage_summary.py`.
-- [ ] Decide and implement the historical-record outcome. **Assertion:** pre-break records are ignored, shown as
-  legacy-shape records, or migrated by a deliberate tool; no view silently reinterprets legacy ids. **Tests:**
-  `tests/src/cli/test_activity.py`, telemetry/cost tests touched by the implementation.
+  the local managed-process id is not used for attribution. **Tests:**
+  `tests/src/proxy/test_server_backend_identity.py`, `tests/src/core/usage/test_emit.py`,
+  `tests/src/proxy/test_provider_trace_logger.py`, `tests/src/proxy/test_cost_logger.py`.
+- [x] Bump the downstream telemetry schema and ignore historical downstream records from pre-break identity schemas.
+  **Assertion:** new records write `schema_version=2`; records with missing or older downstream schema versions are
+  skipped with one warning and surfaced as activity/cost skip counts, not joined or reinterpreted by current views.
+  **Tests:** `tests/src/core/telemetry/test_downstream.py`, `tests/src/cli/test_activity.py`,
+  `tests/src/cli/test_proxy_costs.py`, `tests/src/proxy/test_cost_logger.py`.
 
 ### S6 -- Docs and closeout
 
@@ -149,13 +152,13 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ## Verification
 
-| Test area                 | Fixture                                | Assertion                                                                                        | Test File                                                                   |
-| ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                        | `tests/src/config/test_loader.py`, `tests/src/cli/test_backend_commands.py` |
-| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                 | `tests/src/backend/test_sources.py`                                         |
-| Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the process `(shared)`; telemetry attribution follows the OQ-2 decision | `tests/src/cli/test_backend_commands.py`                                    |
-| Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance or managed local process                               | `tests/src/cli/test_backend_commands.py` or focused grep test               |
-| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution  | `tests/src/cli/test_activity.py`, telemetry/cost tests touched by S5        |
+| Test area                 | Fixture                                | Assertion                                                                                                                   | Test File                                                                                                    |
+| ------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                                                   | `tests/src/config/test_loader.py`, `tests/src/cli/test_backend_commands.py`                                  |
+| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                                            | `tests/src/backend/test_sources.py`                                                                          |
+| Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the process `(shared)`; telemetry attribution follows the OQ-2 decision                            | `tests/src/cli/test_backend_commands.py`                                                                     |
+| Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance or managed local process                                                          | `tests/src/cli/test_backend_commands.py` or focused grep test                                                |
+| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution or empty-without-count view | `tests/src/cli/test_activity.py`, `tests/src/cli/test_proxy_costs.py`, `tests/src/proxy/test_cost_logger.py` |
 
 ## Closeout
 

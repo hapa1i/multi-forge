@@ -14,7 +14,7 @@ from typing import Any
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     mint_downstream_event_id,
-    read_downstream_records,
+    read_downstream_records_with_stats,
     write_downstream_record,
 )
 from forge.core.usage.vocabulary import Confidence, Reporter
@@ -25,6 +25,12 @@ COST_SCHEMA_VERSION = 1
 
 # One-time warning latch for records written by a newer Forge.
 _warned_newer_schema = False
+
+
+@dataclass(frozen=True)
+class CostLogReadResult:
+    records: list[dict[str, Any]]
+    skipped_legacy_schema: int = 0
 
 
 def log_request_cost(
@@ -104,12 +110,24 @@ def read_cost_logs(
     Returns:
         List of cost record dicts, sorted by timestamp.
 
-    Skips malformed lines and records written by a newer Forge (schema_version >
-    COST_SCHEMA_VERSION), surfacing the latter once at warning level. Legacy
-    unversioned records (no schema_version) are read normally.
+    Skips malformed downstream lines, records written by a newer Forge, and records
+    from older downstream backend-identity schemas before projecting cost records.
     """
+    return read_cost_logs_with_stats(
+        period_start=period_start, period_end=period_end
+    ).records
+
+
+def read_cost_logs_with_stats(
+    period_start: datetime | None = None,
+    period_end: datetime | None = None,
+) -> CostLogReadResult:
+    """Read projected cost records plus downstream schema-fence skip counts."""
     records: list[dict[str, Any]] = []
-    for rec in read_downstream_records(period_start, period_end, kind="attempt"):
+    downstream_read = read_downstream_records_with_stats(
+        period_start, period_end, kind="attempt"
+    )
+    for rec in downstream_read.records:
         records.append(
             {
                 "schema_version": COST_SCHEMA_VERSION,
@@ -131,7 +149,10 @@ def read_cost_logs(
                 "backend_id": rec.backend_id,
             }
         )
-    return records
+    return CostLogReadResult(
+        records=records,
+        skipped_legacy_schema=downstream_read.stats.skipped_legacy_schema,
+    )
 
 
 @dataclass
@@ -146,11 +167,15 @@ class RootCostJoin:
     """
 
     roots_with_records: set[str] = field(default_factory=set)
-    cost_micros: int | None = None  # summed reported cost; None when no matched record reported one
+    cost_micros: int | None = (
+        None  # summed reported cost; None when no matched record reported one
+    )
     input_tokens: int = 0
     output_tokens: int = 0
     cached_tokens: int = 0
-    per_run: dict[str, int] = field(default_factory=dict)  # forge_run_id -> summed reported micros
+    per_run: dict[str, int] = field(
+        default_factory=dict
+    )  # forge_run_id -> summed reported micros
     # Every forge_run_id seen on a matched record, INCLUDING dollar-less ones (per_run
     # holds only the dollar-bearing subset). Read-time suppression keys on this presence
     # set, not per_run, so a records-present/no-dollars run still supersedes its snapshot.

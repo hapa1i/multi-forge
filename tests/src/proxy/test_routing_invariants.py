@@ -271,8 +271,8 @@ async def test_create_message_no_forge_user_when_flag_off(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_message_no_forge_user_when_source_not_capable(monkeypatch):
-    """A configured non-capable backend source suppresses the provider user field."""
+async def test_create_message_no_forge_user_when_backend_not_capable(monkeypatch):
+    """A configured non-capable backend instance suppresses the provider user field."""
     openai_request = await _capture_openrouter_request(
         monkeypatch,
         inject_flag=True,

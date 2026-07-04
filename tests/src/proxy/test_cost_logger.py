@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
+from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION
 from forge.proxy.cost_logger import (
     log_request_cost,
     read_cost_logs,
+    read_cost_logs_with_stats,
 )
 
 
@@ -18,7 +20,9 @@ from forge.proxy.cost_logger import (
 def cost_log_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point downstream telemetry to a temp directory."""
     telemetry_dir = tmp_path / "telemetry" / "downstream"
-    monkeypatch.setattr("forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir)
+    monkeypatch.setattr(
+        "forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir
+    )
     return telemetry_dir
 
 
@@ -49,6 +53,7 @@ class TestLogRequestCost:
         assert len(lines) == 1
 
         record = json.loads(lines[0])
+        assert record["schema_version"] == DOWNSTREAM_SCHEMA_VERSION
         assert record["proxy_id"] == "openrouter"
         assert record["backend_id"] == "openrouter"
         assert record["model"] == "anthropic/claude-sonnet-4.6"
@@ -175,7 +180,9 @@ class TestRoundtrip:
 
         one_minute_ago = now - timedelta(minutes=1)
         one_minute_later = now + timedelta(minutes=1)
-        records = read_cost_logs(period_start=one_minute_ago, period_end=one_minute_later)
+        records = read_cost_logs(
+            period_start=one_minute_ago, period_end=one_minute_later
+        )
         assert len(records) == 1
         assert records[0]["request_id"] == "req_roundtrip"
         assert records[0]["cost_micros"] == 5000
@@ -208,6 +215,39 @@ class TestReadCostLogs:
     def test_empty_dir_returns_empty(self, cost_log_dir: Path):
         assert read_cost_logs() == []
 
+    def test_stats_count_legacy_downstream_identity_schema(self, cost_log_dir: Path):
+        cost_log_dir.mkdir(parents=True, exist_ok=True)
+        path = cost_log_dir / "2026-05_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_old",
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_current",
+                        "ts": "2026-05-07T10:00:00Z",
+                        "cost_micros": 100,
+                    }
+                )
+                + "\n"
+            )
+
+        result = read_cost_logs_with_stats()
+
+        assert len(result.records) == 1
+        assert result.records[0]["cost_micros"] == 100
+        assert result.skipped_legacy_schema == 1
+
     def test_reads_all_shards(self, cost_log_dir: Path):
         """Simulate multiple PID shards."""
         cost_log_dir.mkdir(parents=True, exist_ok=True)
@@ -216,6 +256,7 @@ class TestReadCostLogs:
             path = cost_log_dir / f"2026-05_{pid}.jsonl"
             with open(path, "w") as f:
                 record = {
+                    "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                     "kind": "attempt",
                     "downstream_event_id": f"ds_{pid}",
                     "ts": "2026-05-07T10:00:00Z",
@@ -233,6 +274,7 @@ class TestReadCostLogs:
         with open(path, "w") as f:
             for hour in [8, 12, 16]:
                 record = {
+                    "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                     "kind": "attempt",
                     "downstream_event_id": f"ds_{hour}",
                     "ts": f"2026-05-07T{hour:02d}:00:00Z",
@@ -254,6 +296,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_ok",
                         "ts": "2026-05-07T10:00:00Z",
@@ -268,7 +311,9 @@ class TestReadCostLogs:
         assert len(records) == 1
         assert records[0]["request_id"] == "req_ok"
 
-    def test_provider_trace_fragment_does_not_clobber_cost_confidence(self, cost_log_dir: Path):
+    def test_provider_trace_fragment_does_not_clobber_cost_confidence(
+        self, cost_log_dir: Path
+    ):
         """A later provider-trace fragment carries default confidence=unknown, which is not
         cost evidence and must not replace the cost fragment's provenance."""
         cost_log_dir.mkdir(parents=True, exist_ok=True)
@@ -277,6 +322,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_one",
                         "ts": "2026-05-07T10:00:00Z",
@@ -292,6 +338,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_one",
                         "ts": "2026-05-07T10:00:01Z",
@@ -312,7 +359,9 @@ class TestReadCostLogs:
 class TestForgeRunCorrelation:
     """Slice 4g: cost records carry the Forge run-tree ids; the root-join sums them."""
 
-    def _log(self, dir_: Path, *, root: str | None, run: str | None, cost: int | None) -> None:
+    def _log(
+        self, dir_: Path, *, root: str | None, run: str | None, cost: int | None
+    ) -> None:
         log_request_cost(
             proxy_id="p1",
             model="gpt-5.5",
@@ -360,7 +409,9 @@ class TestForgeRunCorrelation:
 
         self._log(cost_log_dir, root="run_A", run="run_a1", cost=100)
         self._log(cost_log_dir, root="run_A", run="run_a2", cost=50)
-        self._log(cost_log_dir, root="run_B", run="run_b1", cost=999)  # different root, excluded
+        self._log(
+            cost_log_dir, root="run_B", run="run_b1", cost=999
+        )  # different root, excluded
         join = sum_reported_cost_by_root({"run_A"})
         assert join.has_records and join.has_cost
         assert join.cost_micros == 150
@@ -371,7 +422,9 @@ class TestForgeRunCorrelation:
     def test_root_join_present_without_cost(self, cost_log_dir: Path):
         from forge.proxy.cost_logger import sum_reported_cost_by_root
 
-        self._log(cost_log_dir, root="run_A", run="run_a1", cost=None)  # passthrough: no dollars
+        self._log(
+            cost_log_dir, root="run_A", run="run_a1", cost=None
+        )  # passthrough: no dollars
         join = sum_reported_cost_by_root({"run_A"})
         assert join.has_records is True  # the run went through the proxy
         assert join.has_cost is False  # but no price -> not $0
@@ -382,7 +435,9 @@ class TestForgeRunCorrelation:
         assert join.runs_with_records == {"run_a1"}
         assert join.per_run == {}
 
-    def test_root_join_runs_with_records_mixes_dollar_and_priceless(self, cost_log_dir: Path):
+    def test_root_join_runs_with_records_mixes_dollar_and_priceless(
+        self, cost_log_dir: Path
+    ):
         from forge.proxy.cost_logger import sum_reported_cost_by_root
 
         self._log(cost_log_dir, root="run_A", run="run_paid", cost=70)
@@ -401,6 +456,7 @@ class TestForgeRunCorrelation:
         shard = next(cost_log_dir.glob("*.jsonl"))
         with shard.open("a", encoding="utf-8") as f:
             corrupt = {
+                "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                 "kind": "attempt",
                 "downstream_event_id": "ds_bool",
                 "ts": "2099-01-01T00:00:00+00:00",

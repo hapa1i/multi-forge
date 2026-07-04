@@ -41,28 +41,29 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Migration note:** this is the existing alias mechanism to preserve old names while a successor id model is
   introduced.
 
-### `proxy.source` in proxy templates
+### `proxy.backend` in proxy templates
 
 - **Boundary:** system boundary on input, strict at template load.
 - **Writers:** shipped templates under `src/forge/config/defaults/templates/`; user template copies under the Forge
   home.
-- **Readers:** `src/forge/config/loader.py` (`read_template`, `_resolve_template_source`, `_apply_template_source`),
+- **Readers:** `src/forge/config/loader.py` (`read_template`, `_resolve_template_backend`, `_apply_template_backend`),
   `src/forge/core/auth/template_secrets.py`.
-- **Current meaning:** template-declared source/catalog id or alias. `_apply_template_source` rejects invalid, unknown,
-  missing, or runtime-native values and canonicalizes to `source.id` before schema loading.
-- **Migration note:** any successor spelling needs a template-input compatibility reader and clear errors for old,
-  unknown, and ambiguous values.
+- **Current meaning:** template-declared backend instance id, alias, or unambiguous backend-kind shorthand.
+  `_apply_template_backend` rejects old `proxy.source`, invalid, unknown, missing, ambiguous, or runtime-native values
+  and canonicalizes to the backend instance id before schema loading.
+- **Migration note:** S2 took the clean-break path for old `proxy.source`: template load fails loudly with a migration
+  tip instead of retaining a compatibility reader.
 
-### `ProxyConfig.source` and runtime `proxy.yaml` `source`
+### `ProxyConfig.backend` and runtime `proxy.yaml` `backend`
 
-- **Boundary:** `ProxyConfig.source` is strict while creating from a template; persisted `ProxyInstanceConfig.source` in
-  `proxy.yaml` is a system boundary at runtime.
-- **Writers:** `src/forge/config/loader.py` writes canonical `proxy.source` into template data;
-  `src/forge/proxy/proxy_orchestrator.py` copies it into `ProxyInstanceConfig.source`.
+- **Boundary:** `ProxyConfig.backend` is strict while creating from a template; persisted `ProxyInstanceConfig.backend`
+  in `proxy.yaml` is a system boundary at runtime.
+- **Writers:** `src/forge/config/loader.py` writes canonical `proxy.backend` into template data;
+  `src/forge/proxy/proxy_orchestrator.py` copies it into `ProxyInstanceConfig.backend`.
 - **Readers:** `src/forge/config/schema.py` (`ProxyConfig`, `ProxyInstanceConfig`), `src/forge/proxy/server.py`
-  (`_backend_source_id`), `src/forge/proxy/responses_ingress.py`, `src/forge/core/runtime/codex_preflight.py`.
-- **Current meaning:** canonical model-source id when known. Runtime `proxy.yaml` unknowns warn once and degrade by
-  returning the raw value; missing source disables downstream attribution, provider trace, and provider-user grouping.
+  (`_backend_instance_id`), `src/forge/proxy/responses_ingress.py`, `src/forge/core/runtime/codex_preflight.py`.
+- **Current meaning:** canonical backend instance id when known. Runtime `proxy.yaml` unknowns warn once and degrade by
+  returning the raw value; missing backend disables downstream attribution, provider trace, and provider-user grouping.
 - **Migration note:** runtime `proxy.yaml` cannot become reject-on-unknown without changing the current system-boundary
   invariant.
 
@@ -124,10 +125,13 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
   `src/forge/core/ops/backend_reconcile.py`, `src/forge/cli/activity.py`, `src/forge/cli/telemetry.py`,
   `src/forge/cli/session_lifecycle.py`.
 - **Current meaning:** `source_id`/`source_kind` are origin/correlation fields (`proxy`, `provider`, reporter);
-  `backend_id` is catalog attribution when known. Proxy-origin writers populate it from runtime `proxy.source`; direct
-  emitters map known providers/reporters to catalog ids (`anthropic-direct`, `openrouter`).
+  `backend_id` is backend-instance attribution when known. Proxy-origin writers populate it from runtime
+  `proxy.backend`; direct emitters map known providers/reporters to backend instance ids (`anthropic-direct`,
+  `openrouter`).
 - **Migration note:** OQ-2 is the load-bearing decision. Do not collapse `backend_id` into the `source_id`/`source_kind`
-  origin axis, and do not silently reattribute historical records.
+  origin axis. S5 bumps the downstream schema to `schema_version=2` for the backend-instance identity break and skips
+  missing/older downstream schemas in current read paths instead of silently reattributing historical records; activity
+  and cost views surface skipped legacy-schema counts so a fully fenced window does not look like ordinary empty data.
 
 ### Usage ledger `UsageEvent.runtime`
 
@@ -181,13 +185,12 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Already migrated by C2:** `forge model backend` help, tables, `docs/cli_reference.md`, `docs/end-user/proxy.md`, and
   `docs/design_appendix.md` §A.2.1 use "backend", "backend instance", and "adapter" for public CLI concepts. The
   `runtime` word remains reserved for the agent/runtime axis.
-- **Machine names intentionally still visible:** `source_id`, `source_kind`, `proxy.source`, `ModelSource`, and
-  telemetry `backend_id` remain because they are telemetry/config/code contracts, not prose cleanup. The main
-  literal-bearing docs are `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_appendix.md`, and this board
-  card/checklist.
-- **Design/docs literals:** `proxy.source` is a literal legacy config field; `ModelSource` is the current implementation
-  object; `backend_dependency` and `TEMPLATE_ENV_VARS` are derived compatibility surfaces. Those should not be renamed
-  until the Phase 2 model and Phase 3 compatibility plan exist.
+- **Machine names intentionally still visible:** `source_id`, `source_kind`, `ModelSource`, and telemetry `backend_id`
+  remain because they are telemetry/config/code contracts, not prose cleanup. The main literal-bearing docs are
+  `docs/end-user/proxy.md`, `docs/design.md`, `docs/design_appendix.md`, and this board card/checklist.
+- **Design/docs literals:** `proxy.source` is visible only as a legacy rejected config field; `ModelSource` is the
+  current implementation object; `backend_dependency` and `TEMPLATE_ENV_VARS` are derived compatibility surfaces. Those
+  should not be renamed until the Phase 2 model and Phase 3 compatibility plan exist.
 
 ## Local LiteLLM Sharing
 
@@ -197,7 +200,7 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - `src/forge/cli/backend.py` derives the display relationship through `_local_source_matches_backend_config`,
   `_managed_process_for_source`, and `_process_source_map`; list/show then render `(shared)` and `shared_with`.
 - This matching is **display-only**. It must not become telemetry attribution. Telemetry attribution currently follows
-  the proxy's configured backend/catalog id through `_backend_source_id`, while the local process id remains
+  the proxy's configured backend/catalog id through `_backend_instance_id`, while the local process id remains
   `ManagedBackendProcess.process_id`.
 
 ## Phase 2 Feed
@@ -206,7 +209,7 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
   lifecycle, runtime-native reachability, and billing posture.
 - There are already three distinct identity axes using overlapping names: catalog source ids, local process instance
   ids, and telemetry/lane backend ids.
-- `proxy.source` has two different compatibility postures: strict for templates, warn-and-degrade for runtime
-  `proxy.yaml`.
+- `proxy.backend` has two different validation postures: strict for templates, warn-and-degrade for runtime
+  `proxy.yaml`; old `proxy.source` has no compatibility reader.
 - Remote backends are static catalog rows today. Adding duplicate remote instances requires a new persistence/config
   story, not just renaming `ModelSource.id`.
