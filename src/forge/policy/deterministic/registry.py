@@ -3,10 +3,14 @@
 Maps bundle names to policy classes. Bundles are collections of related
 policies that can be enabled together.
 
-Available bundles:
+CLI-discoverable bundles (in ``BUNDLES``; enabled with ``forge policy enable --bundle``):
 - tdd: Test-driven development workflow enforcement
 - coding_standards: Code style and architecture conventions
-- workflow: Config-driven tagger → branch → stage pipelines
+
+``workflow`` is deliberately NOT a ``BUNDLES`` entry: it is experimental and manifest-only
+(dynamic ``workflow.<name>`` policies built at runtime from ``bundle_config.workflow``,
+resolved via ``get_bundle_policies("workflow", config=...)``) with no CLI enable/list
+surface. See ``docs/end-user/policy.md``.
 """
 
 from __future__ import annotations

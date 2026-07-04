@@ -288,7 +288,9 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
     `test_workflow_in_all_bundles` removes the only place `workflow` was advertised as discoverable. Relabeled the
     `policy.md` header experimental/manifest-only and hardened the note ("no CLI surface... not in
     `forge policy list`"). Pipeline, `get_bundle_policies`, `get_bundle_for_policy`, `build_divergence_config`
-    untouched; `proposed/graduate_workflow_policy_cli/card.md` filed. 578 policy tests + mypy green.
+    untouched; `proposed/graduate_workflow_policy_cli/card.md` filed. 578 policy tests + mypy green. **Review
+    follow-up**: the `registry.py` module docstring still listed `workflow` as a flat "Available bundle"; reworded to
+    split CLI-discoverable `BUNDLES` (tdd/coding_standards) from the dynamic manifest-only `workflow` path.
 
 - [x] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_appendix §B` (says schema
   **v2**) with the code's emitted + strictly-accepted `schema_version` (`core/workqueue`). Verify which side is right,
