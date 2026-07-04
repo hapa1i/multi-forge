@@ -2,9 +2,8 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 1 inventory. Phase 0 activation is complete. Next action: enumerate the machine-readable
-backend identity surfaces into `inventory.md` (this card dir) before choosing the schema/domain migration shape. No
-`src/` change until Phase 2 fixes the target model.
+**Current focus**: Phase 2 design decision. Phase 1 inventory is recorded in [`inventory.md`](inventory.md). Next
+action: resolve OQ-1 through OQ-5 before choosing implementation slices or changing `src/`.
 
 ## Invariants (do not violate during migration)
 
@@ -34,15 +33,15 @@ backend identity surfaces into `inventory.md` (this card dir) before choosing th
 **Deliverable**: `inventory.md` (this card dir) -- the raw work-product Phase 2 decides from. Inventory stays in the
 card dir; it is not promoted to design docs.
 
-- [ ] Enumerate persisted fields and JSON keys with their reader(s) and writer(s): `ModelSource.id`, `source_id`,
+- [x] Enumerate persisted fields and JSON keys with their reader(s) and writer(s): `ModelSource.id`, `source_id`,
   `source_kind`, `BackendInstance.backend_id`, `runtime_instance`, telemetry `backend_id`, `proxy.source`, the backend
-  registry (`~/.forge/backends/index.json`), telemetry ledgers, and proxy templates. **Assertion:** every reader/writer
-  is named with a file path and a boundary tag -- strict durable state vs system boundary vs display-only -- so Phase 2
-  knows which fields can clean-break and which need compat readers.
-- [ ] Enumerate human-facing terms in CLI help, end-user docs, design docs, and board notes. **Assertion:** the
+  registry (`~/.forge/backends/index.json`), telemetry ledgers, and proxy templates. **Assertion:** load-bearing
+  reader/writer paths are named with boundary tags -- strict durable state vs system boundary vs display-only -- so
+  Phase 2 knows which fields can clean-break and which need compat readers.
+- [x] Enumerate human-facing terms in CLI help, end-user docs, design docs, and board notes. **Assertion:** the
   inventory separates already-migrated public terminology (C2) from still-legacy machine-contract names, so Phase 3
   never re-touches a C2 surface.
-- [ ] Capture local LiteLLM sharing behavior. **Assertion:** the inventory shows the concrete many-to-one case -- one
+- [x] Capture local LiteLLM sharing behavior. **Assertion:** the inventory shows the concrete many-to-one case -- one
   `litellm-4000` process backing both `litellm-gemini-local` and `litellm-openai-local` -- and names
   `_local_source_matches_backend_config` (`cli/backend.py`) as **display-only**, never a telemetry-attribution source.
 
