@@ -27,9 +27,10 @@ from dotenv import load_dotenv
 from ruamel.yaml import YAML
 
 from forge.backend.sources import (
+    BackendInstanceAmbiguousError,
+    BackendInstanceNotFoundError,
     ModelSource,
-    ModelSourceNotFoundError,
-    model_source_for_template,
+    resolve_backend_instance,
 )
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
@@ -46,6 +47,11 @@ from forge.core.paths import get_forge_home
 from forge.core.state.exceptions import StateCorruptedError
 
 logger = logging.getLogger(__name__)
+
+_PROXY_SOURCE_CLEAN_BREAK_TIP = (
+    "proxy.source is no longer supported; use proxy.backend. "
+    "Recreate this proxy/template or replace 'source:' with 'backend:'."
+)
 
 
 def deep_merge(base: dict, overlay: dict) -> dict:
@@ -432,6 +438,9 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
             opus=_optional_tier_override(tier_overrides_data.get("opus"), "tier_overrides.opus"),
         )
 
+        if "source" in data_map:
+            raise ValueError(_PROXY_SOURCE_CLEAN_BREAK_TIP)
+
         return ProxyInstanceConfig(
             proxy_format=data_map.get("proxy_format", 1),
             template=data_map.get("template", ""),
@@ -441,7 +450,7 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
             port=data_map.get("port", 0),
             upstream_base_url=data_map.get("upstream_base_url", ""),
             tiers=tiers,
-            source=data_map.get("source", ""),
+            backend=data_map.get("backend", ""),
             family=data_map.get("family", ""),
             tier_overrides=tier_overrides,
             model_alternatives=data_map.get("model_alternatives", {}),
@@ -557,7 +566,7 @@ def _proxy_instance_to_forge_config(
     proxy_server_config = ProxyConfig(
         family=proxy_config.family,
         preferred_provider=proxy_config.provider,
-        source=proxy_config.source,
+        backend=proxy_config.backend,
         active_template=proxy_config.template,
         default_tier=proxy_config.default_tier,
         default_port=proxy_config.port,
@@ -584,31 +593,32 @@ def _proxy_instance_to_forge_config(
     )
 
 
-def _resolve_template_source(template: str, proxy_block: dict[str, Any]) -> ModelSource:
-    """Resolve and validate the source declared by a proxy template."""
+def _resolve_template_backend(template: str, proxy_block: dict[str, Any]) -> ModelSource:
+    """Resolve and validate the backend instance declared by a proxy template."""
 
-    raw_source = proxy_block.get("source", template)
-    if not isinstance(raw_source, str) or not raw_source.strip():
-        raise ValueError(f"Template '{template}' has invalid 'proxy.source' (must be a non-blank string)")
+    if "source" in proxy_block:
+        raise ValueError(f"Template '{template}' uses old proxy.source. {_PROXY_SOURCE_CLEAN_BREAK_TIP}")
+
+    raw_backend = proxy_block.get("backend")
+    if not isinstance(raw_backend, str) or not raw_backend.strip():
+        raise ValueError(f"Template '{template}' must declare non-blank 'proxy.backend'")
 
     try:
-        return model_source_for_template(raw_source.strip())
-    except ModelSourceNotFoundError as e:
-        if "source" in proxy_block:
-            raise ValueError(f"Template '{template}' references unknown proxy.source '{raw_source}'") from e
-        raise ValueError(
-            f"Template '{template}' must declare proxy.source because no built-in source alias matches its name"
-        ) from e
+        return resolve_backend_instance(raw_backend.strip()).source
+    except BackendInstanceNotFoundError as e:
+        raise ValueError(f"Template '{template}' references unknown proxy.backend '{raw_backend}'") from e
+    except BackendInstanceAmbiguousError as e:
+        raise ValueError(f"Template '{template}' references ambiguous proxy.backend '{raw_backend}': {e}") from e
 
 
-def _apply_template_source(template: str, template_data: dict[str, Any]) -> None:
-    """Apply source-catalog defaults to a template config dict before strict schema loading."""
+def _apply_template_backend(template: str, template_data: dict[str, Any]) -> None:
+    """Apply backend-catalog defaults to a template config dict before strict schema loading."""
 
     proxy_block = template_data.get("proxy")
     if not isinstance(proxy_block, dict):
         raise ValueError(f"Template '{template}' must have a 'proxy' mapping")
 
-    source = _resolve_template_source(template, proxy_block)
+    source = _resolve_template_backend(template, proxy_block)
     # A runtime_native source (e.g. a ChatGPT subscription) is reached through its
     # runtime, which owns the connection and auth; a key-authenticated proxy cannot
     # carry it. Reject here so a template can never mint a proxy for an undialable
@@ -618,9 +628,9 @@ def _apply_template_source(template: str, template_data: dict[str, Any]) -> None
             f"Template '{template}' references runtime-native source '{source.id}', which a proxy cannot back: "
             f"its connection and auth are owned by a runtime, not a key-authenticated proxy"
         )
-    proxy_block["source"] = source.id
+    proxy_block["backend"] = source.id
 
-    # backend_dependency is derived from the catalog so source identity, lifecycle, and
+    # backend_dependency is derived from the catalog so backend identity, lifecycle, and
     # required env vars do not remain parallel template-maintained facts.
     legacy_dependency = proxy_block.pop("backend_dependency", None)
     if legacy_dependency is not None and source.kind != "local":
@@ -683,7 +693,7 @@ def _load_template_config(template: str) -> "ForgeConfig":
     family = proxy_block.get("family", "")
     if not isinstance(family, str) or not family.strip():
         raise ValueError(f"Template '{template}' missing required 'proxy.family' field (must be a non-blank string)")
-    _apply_template_source(template, template_data)
+    _apply_template_backend(template, template_data)
 
     secrets = env_to_dict()
     config_dict = deep_merge(template_data, secrets)

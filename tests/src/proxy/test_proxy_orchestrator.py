@@ -52,7 +52,7 @@ def test_load_template_for_proxy_wraps_malformed_template(tmp_path: Path, monkey
     (tpl_dir / "bad-overrides.yaml").write_text(
         "proxy:\n"
         "  family: openai\n"
-        "  source: openrouter\n"
+        "  backend: openrouter\n"
         "  default_port: 9911\n"
         "  openrouter:\n"
         "    tier_overrides: []\n"
@@ -204,7 +204,7 @@ def test_start_spawns_new_and_persists(
 
     proxy_config = load_proxy_instance_config("proxy_spawned")
     assert proxy_config is not None
-    assert proxy_config.source == "litellm-remote"
+    assert proxy_config.backend == "litellm-remote"
 
 
 def test_start_persists_failed_reuse_status_before_spawn(

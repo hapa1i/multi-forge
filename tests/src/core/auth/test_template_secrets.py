@@ -44,7 +44,7 @@ class TestTemplateSecrets:
 
 
 class TestRequiredEnvVarsForTemplate:
-    """Resolve required env vars from a template's declared ``proxy.source``."""
+    """Resolve required env vars from a template's declared ``proxy.backend``."""
 
     def _write_template(self, tmp_path, monkeypatch: pytest.MonkeyPatch, name: str, body: str) -> None:
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
@@ -52,13 +52,13 @@ class TestRequiredEnvVarsForTemplate:
         templates_dir.mkdir(exist_ok=True)
         (templates_dir / f"{name}.yaml").write_text(body)
 
-    def test_custom_template_resolves_declared_source(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-        # A user-named template (absent from TEMPLATE_ENV_VARS) resolves via proxy.source.
-        self._write_template(tmp_path, monkeypatch, "my-openrouter", "proxy:\n  source: openrouter\n")
+    def test_custom_template_resolves_declared_backend(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A user-named template (absent from TEMPLATE_ENV_VARS) resolves via proxy.backend.
+        self._write_template(tmp_path, monkeypatch, "my-openrouter", "proxy:\n  backend: openrouter\n")
         assert "OPENROUTER_API_KEY" in required_env_vars_for_template("my-openrouter")
 
-    def test_template_without_source_falls_back(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-        # No proxy.source and not in TEMPLATE_ENV_VARS -> empty (no credentials known).
+    def test_template_without_backend_falls_back(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # No proxy.backend and not in TEMPLATE_ENV_VARS -> empty (no credentials known).
         self._write_template(tmp_path, monkeypatch, "nosource", "proxy:\n  family: openai\n")
         assert required_env_vars_for_template("nosource") == []
 

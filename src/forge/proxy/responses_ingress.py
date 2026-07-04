@@ -97,11 +97,11 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
 
     # Capability gate = the runtime guard the codex preflight mirrors.
     wire_shape = getattr(config.proxy, "wire_shape", "openai_translated")
-    source_id = getattr(config.proxy, "source", "") or ""
+    backend_id = getattr(config.proxy, "backend", "") or ""
     source = None
-    if wire_shape == "openai_responses_passthrough" and source_id:
+    if wire_shape == "openai_responses_passthrough" and backend_id:
         try:
-            source = get_model_source(source_id)
+            source = get_model_source(backend_id)
         except ModelSourceNotFoundError:
             source = None
     if source is None or not source.capabilities.responses_ingress:

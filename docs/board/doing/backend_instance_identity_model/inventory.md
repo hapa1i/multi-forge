@@ -66,6 +66,19 @@ mechanical rename checklist; any Phase 3 field migration must re-grep from scrat
 - **Migration note:** runtime `proxy.yaml` cannot become reject-on-unknown without changing the current system-boundary
   invariant.
 
+### Proxy route JSON `source` and `ProxyIdentity.source`
+
+- **Boundary:** display-only/public machine output, not canonical backend identity storage.
+- **Writers:** `src/forge/proxy/server.py` (`_inspect_route`) writes route metadata with `"source"` currently carrying
+  the configured backend/catalog id; the root proxy response writes `proxy.source` from `ProxyIdentity.source`.
+- **Readers:** request audit/guard context, proxy status/launch-preflight consumers, and external clients that inspect
+  the proxy's JSON responses.
+- **Current meaning:** `_inspect_route().source` is a legacy wire key for backend identity. `ProxyIdentity.source` is a
+  separate provenance axis (`registry` vs `derived`) for how the proxy identity was established.
+- **Migration note:** S4 owns renaming the route backend-identity key to `backend` with consumers/tests. Do not rename
+  `ProxyIdentity.source` as part of backend identity cleanup; it is intentionally provenance, not model backend
+  identity.
+
 ### `BackendInstance.backend_id`
 
 - **Boundary:** strict durable state in the local backend registry.

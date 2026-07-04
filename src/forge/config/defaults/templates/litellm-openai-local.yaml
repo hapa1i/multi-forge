@@ -12,7 +12,7 @@
 proxy:
   family: openai
   preferred_provider: litellm
-  source: litellm-openai-local
+  backend: litellm-openai-local
   default_port: 8089
 
   litellm:

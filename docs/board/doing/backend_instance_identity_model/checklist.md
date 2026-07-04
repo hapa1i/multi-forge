@@ -2,9 +2,9 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 3 / S2 proxy config clean break. S1 landed the backend instance/kind resolver with exact-id
-precedence, duplicate-kind ambiguity, and managed-process id rejection. Next action: move proxy templates/runtime config
-from `proxy.source` to `proxy.backend`.
+**Current focus**: Phase 3 / S3 managed local process vocabulary. S2 moved proxy templates/runtime config from
+`proxy.source` to `proxy.backend`, with template strict failures for old/unknown fields and runtime warn/degrade for
+unknown `proxy.backend`. Next action: rename the local registry/process axis away from backend instance identity.
 
 ## Invariants (do not violate during migration)
 
@@ -19,7 +19,7 @@ from `proxy.source` to `proxy.backend`.
   state attaches only to local instances.
 - **Runtime `proxy.yaml` remains a system boundary** (user-owned): unknown values under the new canonical backend field
   warn-and-degrade on the runtime read path. Old `proxy.source` may fail loudly under the clean-break plan. Strict
-  reject-on-unknown stays scoped to the **template load path** (`_apply_template_source`) -- shipped *or* user
+  reject-on-unknown stays scoped to the **template load path** (`_apply_template_backend`) -- shipped *or* user
   templates, since `read_template` prefers the user copy -- not the runtime `proxy.yaml` read path.
 - **Telemetry origin fields are not backend identity fields.** `source_id`/`source_kind` in downstream telemetry remain
   the origin/correlation axis unless a later slice explicitly renames that axis. The clean break targets
@@ -97,10 +97,10 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S2 -- Proxy config clean break
 
-- [ ] Make `proxy.backend` the canonical template/runtime field and update shipped templates. **Assertion:** template
+- [x] Make `proxy.backend` the canonical template/runtime field and update shipped templates. **Assertion:** template
   load rejects old `proxy.source` with a migration/recreate tip and rejects unknown `proxy.backend` strictly. **Tests:**
   `tests/src/config/test_loader.py`, `tests/src/core/auth/test_template_secrets.py`.
-- [ ] Keep runtime `proxy.yaml` as a system boundary for the new field. **Assertion:** unknown `proxy.backend` in
+- [x] Keep runtime `proxy.yaml` as a system boundary for the new field. **Assertion:** unknown `proxy.backend` in
   runtime config warns-and-degrades; old `proxy.source` fails loudly with a recreate tip. **Tests:** `tests/src/proxy/`.
 
 ### S3 -- Managed local process vocabulary
@@ -113,12 +113,16 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
   `litellm-gemini-local` and `litellm-openai-local`, and list/show mark the process as shared. **Tests:**
   `tests/src/cli/test_backend_commands.py`.
 
-### S4 -- CLI JSON clean break
+### S4 -- CLI/proxy JSON clean break
 
 - [ ] Replace backend CLI JSON identity keys with backend-instance / managed-process names. **Assertion:** source-row
   `source_id` and nested `runtime_instance` do not survive in the new JSON shape; old-shape expectations fail through
   tests rather than compatibility aliases. **Tests:** `tests/src/cli/test_backend_commands.py`,
   `tests/src/cli/test_output_streams.py`.
+- [ ] Replace proxy route/inspect wire backend identity keys. **Assertion:** `_inspect_route()` no longer reports
+  backend identity as `"source"`; if any temporary alias is deliberately retained for clients, it is documented and
+  tested. `ProxyIdentity.source` remains provenance of the proxy identity lookup, not backend identity. **Tests:**
+  `tests/src/proxy/`, `tests/src/cli/test_proxy_commands.py`.
 - [ ] Add runtime terminology guards for help and docs touched by this card. **Assertion:** `runtime` never labels a
   backend instance or managed local process. **Tests:** `tests/src/cli/test_backend_commands.py` or a focused docs/CLI
   grep test.

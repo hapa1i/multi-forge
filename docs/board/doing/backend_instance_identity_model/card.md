@@ -137,7 +137,9 @@ Recommended OQ resolutions:
   Resolution precedence is: exact backend instance id first, explicit alias second, then optional unique kind/name
   shorthand. Therefore `proxy.backend: openrouter` keeps resolving to the concrete instance `openrouter` even after
   `openrouter-work` exists. Only an unmatched shorthand that resolves to more than one instance fails loudly with a tip
-  to choose a concrete backend instance id.
+  to choose a concrete backend instance id. S2 intentionally leaves `_inspect_route().source` unchanged as a
+  client-facing wire key; S4 owns renaming that route backend-identity key to `backend` with its consumers/tests.
+  `ProxyIdentity.source` remains provenance of the proxy identity lookup, not backend identity.
 - **OQ-5 scope boundary:** keep this card foundation-only: schema/domain/resolution/clean-break migration, plus
   fixture-backed duplicate-remote tests if useful. Do not add remote backend CRUD or remote lifecycle commands here;
   those belong in a follow-up card once the identity model is stable.

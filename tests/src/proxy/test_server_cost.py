@@ -32,11 +32,11 @@ def recorded_costs(monkeypatch: pytest.MonkeyPatch) -> list[int | None]:
     return recorded
 
 
-def _set_provider(monkeypatch: pytest.MonkeyPatch, provider: str, *, source: str = "") -> None:
+def _set_provider(monkeypatch: pytest.MonkeyPatch, provider: str, *, backend: str = "") -> None:
     monkeypatch.setattr(
         server,
         "config",
-        SimpleNamespace(proxy=SimpleNamespace(preferred_provider=provider, source=source)),
+        SimpleNamespace(proxy=SimpleNamespace(preferred_provider=provider, backend=backend)),
     )
 
 
@@ -76,7 +76,7 @@ class TestCalcAndLogCostReported:
         captured_log: list[dict[str, Any]],
         recorded_costs: list[int | None],
     ) -> None:
-        _set_provider(monkeypatch, "openrouter", source="openrouter")
+        _set_provider(monkeypatch, "openrouter", backend="openrouter")
         result = _calc(reported_cost_micros=2300)
 
         assert result == 2300

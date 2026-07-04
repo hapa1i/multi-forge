@@ -9,7 +9,7 @@
 proxy:
   family: qwen
   preferred_provider: openrouter
-  source: openrouter
+  backend: openrouter
   default_port: 8101
 
   openrouter:

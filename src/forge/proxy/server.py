@@ -110,35 +110,35 @@ _warned_absent_backend_source: bool = False
 
 def _backend_source_id() -> str | None:
     global _warned_absent_backend_source
-    source = getattr(config.proxy, "source", "") or None
-    if not source:
-        # No source -> no backend_id, so downstream attribution, provider-trace, and provider-user
-        # grouping are all disabled for this proxy (they gate on a source-capable backend_id).
-        # Surface it once; absent source has no value to key on, so use a dedicated latch rather
+    backend = getattr(config.proxy, "backend", "") or None
+    if not backend:
+        # No backend -> no backend_id, so downstream attribution, provider-trace, and provider-user
+        # grouping are all disabled for this proxy (they gate on a backend-capable backend_id).
+        # Surface it once; absent backend has no value to key on, so use a dedicated latch rather
         # than the value-keyed _warned_unknown_backend_sources set (best-effort log, never silent).
         if not _warned_absent_backend_source:
             _warned_absent_backend_source = True
             logger.info(
-                "proxy.yaml has no 'source:'; downstream attribution, provider-trace, and "
+                "proxy.yaml has no 'backend:'; downstream attribution, provider-trace, and "
                 "provider-user grouping are disabled for this proxy. Recreate it to refresh proxy.yaml."
             )
         return None
-    source = str(source)
-    # proxy.yaml is user-owned config (a system boundary): an unrecognized source is a
+    backend = str(backend)
+    # proxy.yaml is user-owned config (a system boundary): an unrecognized backend is a
     # misconfiguration, not durable-state corruption to reject. Degrade to the raw value
     # but warn once so the silent telemetry-attribution gap is visible -- best-effort
     # degradation must log, never be silent (coding-standards section 5).
-    if source not in _warned_unknown_backend_sources:
+    if backend not in _warned_unknown_backend_sources:
         try:
-            get_model_source(source)
+            get_model_source(backend)
         except ModelSourceNotFoundError:
-            _warned_unknown_backend_sources.add(source)
+            _warned_unknown_backend_sources.add(backend)
             logger.warning(
-                "proxy.source %r is not a known backend source; downstream telemetry for this "
+                "proxy.backend %r is not a known backend instance; downstream telemetry for this "
                 "proxy will carry an unrecognized backend_id. Recreate the proxy to refresh proxy.yaml.",
-                source,
+                backend,
             )
-    return source
+    return backend
 
 
 def _inject_provider_user_enabled() -> bool:
@@ -1984,7 +1984,7 @@ async def root(request: Request):
         _wire_shape, _intercept_mode, bool(getattr(_audit_cfg, "audit_full_body", False))
     )
     # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
-    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "source", "") or "")
+    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
 
     # Per-proxy metrics (request counts, token usage, latency); spend-cap
     # proximity is attached under metrics.costs.caps when caps are configured.

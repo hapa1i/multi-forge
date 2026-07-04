@@ -476,11 +476,11 @@ class _RawReq:
         return self._body
 
 
-def _proxy_cfg(*, wire_shape: str, source: str):
+def _proxy_cfg(*, wire_shape: str, backend: str):
     provider = SimpleNamespace(base_url="https://upstream.test")
     return SimpleNamespace(
         wire_shape=wire_shape,
-        source=source,
+        backend=backend,
         default_tier="sonnet",
         get_provider=lambda name=None: provider,
     )
@@ -488,7 +488,7 @@ def _proxy_cfg(*, wire_shape: str, source: str):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("wire_shape", "source"),
+    ("wire_shape", "backend"),
     [
         ("anthropic_passthrough", "codex-responses-local"),  # right source, wrong wire shape
         ("openai_responses_passthrough", "litellm-gemini-test"),  # right shape, non-ingress source
@@ -496,9 +496,9 @@ def _proxy_cfg(*, wire_shape: str, source: str):
         ("openai_responses_passthrough", ""),  # right shape, empty source
     ],
 )
-async def test_responses_route_501_when_not_responses_capable(monkeypatch, wire_shape, source):
+async def test_responses_route_501_when_not_responses_capable(monkeypatch, wire_shape, backend):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
-    monkeypatch.setattr(server.config, "proxy", _proxy_cfg(wire_shape=wire_shape, source=source))
+    monkeypatch.setattr(server.config, "proxy", _proxy_cfg(wire_shape=wire_shape, backend=backend))
 
     resp = await ri.handle_responses_passthrough(_RawReq(), method="POST", url_path="/v1/responses")
 
@@ -511,7 +511,7 @@ async def test_responses_route_forwards_when_capable(monkeypatch):
     # handler reaches forward() (stubbed), proving the conjunction is the gate.
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr(
         "forge.core.auth.template_secrets.resolve_env_or_credential",
@@ -544,7 +544,7 @@ async def test_responses_route_rejects_non_object_post_json(monkeypatch, body):
     """Regression: valid-but-non-object JSON must not be transformed into no body."""
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "UPSTREAM-KEY")
 
@@ -565,7 +565,7 @@ async def test_responses_route_rejects_non_object_post_json(monkeypatch, body):
 async def test_responses_route_bodyless_get_never_reads_json(monkeypatch):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr(
         "forge.core.auth.template_secrets.resolve_env_or_credential",
@@ -653,7 +653,7 @@ async def test_retrieve_with_usage_is_not_accounted(monkeypatch):
     server must NOT account it (no on_complete) or it double-counts tokens."""
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     accounted: list = []
@@ -695,7 +695,7 @@ async def test_retrieve_with_usage_is_not_accounted(monkeypatch):
 async def test_accounting_only_on_generation_endpoint(monkeypatch, method, url_path, should_account):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     captured: dict = {}
@@ -872,7 +872,7 @@ async def test_responses_warn_mode_cap_attaches_spend_warning(monkeypatch):
     in X-Spend-Warning (design.md). The bug forwarded silently with no header."""
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     monkeypatch.setattr(server, "cost_tracker", _cap_tracker(on_cap_hit="warn"))
@@ -904,7 +904,7 @@ async def test_responses_reject_mode_cap_returns_429_without_forwarding(monkeypa
     """Issue 3 companion: reject-mode caps return 429 with X-Spend-Warning, never forward."""
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     monkeypatch.setattr(server, "cost_tracker", _cap_tracker(on_cap_hit="reject"))
@@ -1200,7 +1200,7 @@ async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch,
     generic configuration error; the detail is logged server-side for the operator."""
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
-        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
     secret = "source 'codex-responses-local' declares 2 secret bearer vars: FOO_KEY, BAR_KEY"
 
