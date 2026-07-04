@@ -36,6 +36,38 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Every real provider call must emit a provider-trace; retry paths included (Defect B, shipped 2026-07-04)
+
+`proxy/server.py::create_message` has three provider-call success paths -- streaming, non-streaming, and the auth-retry
+`client_factory.invalidate_and_retry` branch. Each records cost + metrics AND must emit `record_provider_trace`, or the
+downstream plane has a "what happened to this request?" hole. Defect B was exactly that: the retry branch (401 ->
+credential refresh -> 200) logged cost/metrics but skipped the trace, so a refreshed request left no record.
+
+- **Guard**: all three sites now spread one `_trace_ctx` dict (the 8 run-tree context kwargs, built once). A new
+  provider path that forgets `**_trace_ctx` fails loudly -- `record_provider_trace`'s
+  `request_id`/`proxy_id`/`mapped_model` are required (no defaults), so omission is a TypeError, not a silent gap.
+  Adding a fourth provider path? spread the dict.
+- **Capability gating lives inside the helper** (call sites stay unconditional; a non-capable backend writes nothing).
+  Verified end-to-end by `tests/regression/test_bug_auth_retry_provider_trace.py`, which drives the retry branch with
+  the real helper and reads back via `read_provider_traces(request_id=...)` for capable (one record) + non-capable
+  (none).
+
+### Shared cost/usage vocabulary Literals live in a telemetry leaf, never in `core/usage` (shipped 2026-07-04)
+
+Any `Literal` shared by BOTH the usage ledger and downstream telemetry (`Reporter`, `Confidence`, and future kin) must
+be defined in `core/telemetry/vocabulary.py` -- a leaf that imports only `typing`, below `downstream` -- NOT in
+`core/usage/vocabulary.py`.
+
+- **Why**: `core/usage/__init__.py` eagerly imports `emit`, which imports `core/telemetry/downstream`. So `downstream`
+  importing from `core.usage.*` cycles (`downstream -> usage/__init__ -> emit -> downstream`). The dependency arrow is
+  `usage -> telemetry`; shared vocab must sit on the telemetry side so both planes import *down*.
+- **Pattern**: `downstream.py` and `usage/vocabulary.py` both import + re-export the leaf's names, so existing
+  `from ...downstream import Reporter` / `from ...usage.vocabulary import Reporter` sites are unchanged;
+  `usage/vocabulary.py` lists them in `__all__` to mark the re-exports used.
+- **Sibling vs foreign leaf**: `downstream -> .vocabulary` (same telemetry package) is cycle-safe because the package
+  `__init__` is already mid-run when `downstream` loads. A *foreign*-package leaf whose `__init__` eagerly pulls
+  machinery is the trap that killed the "vocabulary owns" direction (the card's original assumption).
+
 ### Rewind resume: fresh-UUID truncated head + code-delta (shipped 2026-07-02)
 
 Durable invariants for `--strategy rewind --drop-last N` (`session/rewind.py`, `cli/session_rewind.py`,

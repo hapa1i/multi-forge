@@ -339,9 +339,10 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
   (2026-07-04), covering the proxy provider-trace E2E path.
 - [x] `change_log.md` entry (feature-completion size) covering Defect B + #17 + Gap A + WorkflowPolicy DEMOTE + the two
   micro-cleanups.
-- [ ] Promote the durable lesson to `impl_notes.md` after human review (Defect B: every proxy success path -- including
-  auth-retry -- must emit provider-trace; and the `usage <-> telemetry` cycle constraint that forced the neutral
-  vocabulary leaf).
+- [x] Promoted two durable lessons to `impl_notes.md` (2026-07-04, human-approved): every proxy success path -- incl.
+  auth-retry -- must emit provider-trace (the `_trace_ctx`-spread guard); and shared cost/usage vocabulary Literals live
+  in the `core/telemetry/vocabulary.py` leaf, never in `core/usage`, because `usage/__init__ -> emit -> downstream`
+  cycles.
 - [x] Docs synced: WorkflowPolicy decision landed in `policy.md` (experimental/manifest-only); marker-schema doc drift
   fixed in `design_appendix §B.1`.
 - [ ] Card moved `doing/ -> done/` after merge to `main`.
