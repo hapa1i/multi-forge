@@ -27,6 +27,34 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-04
 
+### accidental_complexity_cleanup Phase C: finishing phase (Defect B, #17, Gap A, WorkflowPolicy demote, dedups)
+
+**Goal**: Close the accidental-complexity cleanup -- fix the one real bug, drop the last dead code, and resolve the owed
+decisions (WorkflowPolicy scope + two dedups).
+
+**Key changes**:
+
+- **Defect B (proxy provider-trace hole)**: the auth-retry success path (401 -> refresh -> 200) recorded cost/metrics
+  but never wrote a provider-trace record. Routed all three proxy trace sites through one shared `_trace_ctx` dict
+  spread (no-behavior refactor) and added the retry call, so a new provider path can't silently omit the run-tree
+  context.
+- **Gap A (supervisor exit code)**: `supervisor evaluate` keyed "passed" on warning-prose matching, so fail-open paths
+  without an `_INFRA_FAILURE_PREFIXES` prefix reported exit 0 instead of 2. Now honors the structural
+  `PolicyDecision.fail_open` flag (prose match kept as fallback).
+- **#17**: deleted unused `CredentialManager.get_cache_status`/`clear_cache`.
+- **WorkflowPolicy DEMOTE**: deleted the test-only `get_all_bundles()` (the only place `workflow` was advertised as a
+  discoverable bundle); relabeled `policy.md` experimental/manifest-only. Pipeline + `build_divergence_config` kept;
+  `proposed/graduate_workflow_policy_cli` filed for the real CLI UX.
+- **Micro-cleanups**: (a) `design_appendix §B.1` marker schema `v2 -> v1` to match `MARKER_SCHEMA_VERSION = 1`; (b)
+  single-sourced `Reporter`/`Confidence` in a new neutral leaf `core/telemetry/vocabulary.py`. The card's assumed
+  "vocabulary owns" direction cycles via `usage/__init__ -> emit -> downstream`; the leaf sits below `downstream` and
+  both planes re-export.
+
+**Verification**: Regression `test_bug_auth_retry_provider_trace.py` (real helper + `read_provider_traces` round-trip,
+capable + non-capable, fail-first proven). Focused suites green (proxy/telemetry/usage/policy/credentials); user ran the
+full integration suite green. mypy/pyright/ruff clean. `server.py` held under the personal 2,500-line guardrail via the
+trace DRY; a durable `server.py` module extraction is deferred (logged in the checklist).
+
 ### backend_instance_identity_model S1-S6: Backend Instance Identity Clean Break
 
 **Goal**: Separate backend instances, managed processes, and telemetry origin fields.
@@ -1314,203 +1342,36 @@ command-group card; the proxy-backed launcher stays parked behind the Phase 2 pr
 `--all` local, Forge-only filter, wrong-event, no-`start`-command) plus tree-invariant + output guards = 31 pass;
 `make pre-commit` clean (mypy, pyright, ruff, black, isort, mdformat).
 
-## 2026-06-20
+## 2026-06-18 -- 2026-06-20 (compacted)
 
-### openrouter_user_direct_callers: unified provider-`user` toggle + direct-caller injection
+Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_downstream_ledgers`, `unified_backend`,
+`backend_remote_reconciliation`, `openrouter_user_direct_callers`).
 
-**Goal**: Extend OpenRouter `user`-field session grouping (shipped for the proxied path) to Forge's direct `core.llm`
-callers, governed by a single global toggle instead of a per-proxy one — chosen on the principle *product experience
-drives architecture* (one switch over two per-scope homes).
-
-**Key changes**:
-
-- **Global toggle**: `provider_trace.inject_provider_user` (default off) now lives in `~/.forge/config.yaml`
-  (`RuntimeProviderTraceConfig`); `forge config set/edit` gained nested-section support via a `_nested_sections()`
-  registry. Loader is fail-open (bad subtree resets only `provider_trace`); write surfaces (`set`/`edit`) fail-closed on
-  unknown subkeys.
-- **Proxied gate repointed**: `_inject_provider_user_enabled()` reads `get_runtime_config().provider_trace` (same
-  pattern as `auth_ignore_env`); `proxy.yaml`'s `provider_trace` is now retention-only.
-- **Sidecar**: mounts `~/.forge/config.yaml` read-only so in-container proxied forks read the same toggle.
-- **Direct injection**: `with_openrouter_user` + `resolve_direct_provider_user(role)` (`core/usage/correlation.py`)
-  wired into plan-check (role `plan-check`, OpenRouter-gated) and transfer curation (role `transfer-curate`). Both
-  derive the id with the same `derive_provider_session_id` as the proxied path, so a run's direct and proxied OpenRouter
-  calls group identically account-side. Tagger excluded by design (local LiteLLM).
-
-**Breaking change (research preview)**: the per-proxy `proxy.yaml` `provider_trace.inject_provider_user` (and its legacy
-`inject_openrouter_user` alias) is removed. A stale key still loads but is **ignored** with a one-time relocation
-warning. Migration: `forge config set provider_trace.inject_provider_user=true` in `~/.forge/config.yaml`. Retention
-keys (`retention_days`, `max_total_mb`) stay proxy-owned.
-
-**Verification**: 432 tests green across all touched files (runtime-config, config CLI, schema, routing invariants,
-sidecar, correlation, plan-check, transfer, 2 regressions); `mypy` + `pyright` clean on every changed source and test
-module. Docs synced (design §3.14, appendix §A.14, end-user config.md + proxy.md). Sidecar integration run passed in
-Docker (`test_audit_plumbing.py`: config.yaml mounted read-only + in-container `get_runtime_config()` reads the toggle).
-`make pre-commit` clean.
-
-### backend_remote_reconciliation PR 2: `forge backend reconcile` (single-id MVP)
-
-**Goal**: Ship the MVP of backend remote reconciliation -- join one local downstream trace to one remote account-side
-record for any backend with a registered remote adapter. OpenRouter is the first adapter.
-
-**Key changes**:
-
-- New `src/forge/backend/remote/` package: a `BackendRemoteAdapter` protocol + adapter registry (presence in the
-  registry, not a `ModelSourceCapabilities` flag, is what makes a source remote-reconcile capable), generic
-  metadata-only DTOs (`RemoteCapability`, `RemoteRecord`), and `RemoteAdapterError`/`RemoteAdapterNotFoundError`.
-- `OpenRouterRemoteAdapter` (narrow `httpx` client) hits `GET /api/v1/generation?id=...` with the normal key, whitelists
-  metadata only (never `/generation/content`), normalizes `total_cost` USD -> micros, and maps every HTTP/network result
-  to a `RemoteRecord(outcome=...)` (200->found, 404->not_found, 401/403->not_authorized, else->unavailable; missing key
-  -> not_authorized via a no-HTTP pre-check).
-- New op `core/ops/backend_reconcile.py` (`reconcile_generation` + `render_reconcile_lines`): comparative bucket
-  taxonomy `joined`/`remote`/`missing-remote`/`not-queryable`; downstream reads scoped by `backend_id`; local and remote
-  cost/tokens kept separate with provenance; remote/network failures are renderable data, never raised.
-- New CLI leaf `forge backend reconcile <source-id>` (`--request-id`/`--remote-id`/`--json`/`--timeout`), and docs
-  (cli_reference, design_appendix §A.14, end-user/proxy.md). Windowed account-wide activity/analytics (management key,
-  `local`/`missing-local` buckets) stays a declared follow-on -- the protocol already carries the window seam.
-- Review hardening (from a 32-agent adversarial review, 21 confirmed findings): total numeric coercers + a parse net so
-  a malformed-but-parseable 200 body (NaN/Infinity/overflow/bool, default `json.loads` accepts these) maps to
-  `unavailable` instead of crashing the CLI with a traceback (the error-vs-data invariant); empty-string ids normalized
-  so the xor guard and mode dispatch agree; template aliases resolved to canonical; a 200 error-envelope ->
-  `unavailable`; render predicate includes `local_output_tokens`; CLI catches `RemoteAdapterError`; tip wording
-  `Use --flag`.
-
-**Verification**: `tests/src/core/ops/test_backend_reconciliation.py` + `tests/src/cli/test_backend_reconcile.py` +
-`tests/src/backend/remote/test_openrouter_remote.py` -> 52 passed (14 added for the review fixes, incl. a replaced
-tautological content-leak assertion); broader `tests/src/{backend,core/ops,cli}` -> 2322 passed; `make pre-commit` clean
-(mypy + pyright).
-
-## 2026-06-19
-
-### backend_remote_reconciliation PR 1: generalize provider-trace observability over any backend
-
-**Goal**: Resume the paused `openrouter_remote_reconciliation` work as the provider-generic
-`backend_remote_reconciliation` card (OpenRouter becomes the first adapter, not the feature). PR 1 removes the last
-OpenRouter coupling from the provider-trace / provider-user-grouping surfaces so the upcoming `forge backend reconcile`
-feature builds on a backend-neutral base.
-
-**Key changes**:
-
-- Renamed the source capability `openrouter_user_grouping` -> `provider_user_grouping` (`backend/sources.py`) and the
-  config key `provider_trace.inject_openrouter_user` -> `inject_provider_user` (`config/schema.py`).
-- Removed the two `provider_name == "openrouter"` fallbacks: provider-trace writes and the `user`-field injection are
-  now purely source-capability gated by `backend_id`. Renamed `_openrouter_user_value` -> `_provider_user_value` and
-  `_inject_openrouter_user_enabled` -> `_inject_provider_user_enabled`, and dropped the now-dead `provider_name` param
-  from `record_provider_trace` and all call sites + the passthrough ctx dict.
-- A proxy with no `proxy.source` now writes no trace / injects no user (the fallback's only beneficiary), surfaced once
-  via a dedicated `_warned_absent_backend_source` INFO latch in `server.py`.
-- `proxy.yaml` is user-owned config (system boundary): the old `inject_openrouter_user` key is honored as a
-  warn-and-degrade alias (new key wins if both set), not a hard reject.
-- Genericized provider-coupled comments/docstrings and normative docs (design §3.14, appendix §A.14, cli_reference,
-  end-user/proxy.md incl. an alias note). Board: moved `paused/openrouter_remote_reconciliation` ->
-  `doing/backend_remote_reconciliation`, reframed card/checklist (two-PR plan, superseded Phase 0 decisions), and
-  updated the telemetry epic's member table + the `openrouter_user_direct_callers` references.
-
-**Verification**: `uv run pytest` over the renamed proxy/config/cli/ops surfaces + the new
-`test_bug_provider_trace_inject_alias.py` regression (185 passed); `make pre-commit` clean (mypy + pyright); live
-`tests/integration/proxy/test_provider_trace_e2e.py` (2 passed) confirms the real OpenRouter proxy still writes traces
-via the `source: openrouter` capability gate.
-
-### unified_backend follow-up: custom templates preflight credentials from declared source
-
-**Goal**: Fix a credential-preflight gap left by `unified_backend` — user-named proxy templates silently skipped
-credential checks because lookups keyed on the shipped-only `TEMPLATE_ENV_VARS` map, so a custom template launched
-without its API key and failed at runtime instead of failing fast at start.
-
-**Key changes**:
-
-- `required_env_vars_for_template()` (`core/auth/template_secrets.py`) reads a template's declared `proxy.source` and
-  resolves required env vars from the model-source catalog, falling back to `TEMPLATE_ENV_VARS` when no source is
-  readable/declared. `credentials_for_template`, `get_secrets_for_template`, and proxy-start
-  `_ensure_template_credentials` route through it.
-- Read hardening: an existing-but-unreadable template (permissions/IO) or invalid YAML now logs at WARNING instead of
-  degrading silently; an unknown name stays silent (`FileNotFoundError`). Still best-effort — returns the safe fallback,
-  never raises into callers.
-- `credentials_for_template(..., required_vars=)` reuses the resolved list on the proxy-start failure path, removing a
-  redundant template read.
-- AGENTS.md: added backend-source / telemetry / provider-trace operator-verification guidance.
-
-**Verification**: New regression `tests/regression/test_bug_custom_template_source_credentials.py` plus 5
-`test_template_secrets.py` unit cases (declared-source resolve, no-source/unknown-name fallback, unreadable-warns,
-invalid-yaml-warns); `tests/src/{proxy,core/auth,backend,sidecar}` + regression green (156 focused); mypy clean;
-`make pre-commit` clean.
-
-### unified_backend closeout: shared local-instance display + review follow-up
-
-**Goal**: Land the PR #39 review follow-up and close the `unified_backend` card.
-
-**Key changes**:
-
-- `forge backend list`/`show` now mark a local LiteLLM runtime instance shared across sources (one `litellm-4000`
-  process backs Gemini + OpenAI under the shipped default config); `--json` carries `runtime_instance.shared_with`. The
-  matching heuristic stays display-only and never feeds downstream telemetry `backend_id` (still derived from
-  `proxy.source`).
-- Proxy `_backend_source_id` warns once when `proxy.yaml` carries an unrecognized `source` (warn-and-degrade; user-owned
-  config is a system boundary), instead of silently passing an unknown `backend_id` into telemetry.
-- Added a multi-key backend-list test mirroring the shipped default (the case the prior gemini-only fixture masked) plus
-  warn-once server coverage; documented the shared local LiteLLM process model in `proxy.md` and design appendix §A.2.1.
-- Card moved `doing/ -> done/`; telemetry epic member table updated (`unified_backend` done).
-
-**Verification**: backend CLI + new server suite (22) and proxy/backend/telemetry/usage suites (175) green;
-`make pre-commit` clean (mypy + pyright). Shipped via PR #39 (squash `ab690ac9`).
-
-## 2026-06-18
-
-### unified_backend: model-source catalog and downstream source attribution
-
-**Goal**: Make local and remote model sources one listable backend/source axis and key downstream telemetry on a
-canonical catalog id.
-
-**Key changes**:
-
-- Added a built-in `ModelSource` catalog for local LiteLLM, remote LiteLLM, OpenRouter, Anthropic passthrough, and
-  direct-runtime sources, with endpoint, credential, lifecycle, and capability metadata.
-- Moved proxy templates to `proxy.source`, deriving endpoint/auth/lifecycle facts from the catalog while keeping runtime
-  backend instances separate from static source definitions.
-- Expanded `forge backend list/show/test-auth` around source ids; remote sources have intentional no-lifecycle behavior
-  and local lifecycle still resolves to existing LiteLLM adapters/ports.
-- Added downstream `backend_id` attribution across proxy cost, audit, provider trace, and direct usage emitters while
-  preserving `source_id`/`source_kind` as writer-origin metadata.
-- Replaced OpenRouter-specific provider-trace and `user` injection gates with source capabilities.
-
-**Verification**: Focused unit/regression acceptance slice passed 526 tests; backend integration slice passed 11 tests;
-`make pre-commit` clean.
-
-### upstream_downstream_ledgers closeout: two-pane activity + upstream boundary coverage
-
-**Goal**: Finish two-pane `forge activity` and close non-engine upstream outcome gaps.
-
-**Key changes**:
-
-- Extracted shared measurement resolution for proxied/direct/self-reported paths.
-- Routed policy-engine writes through `record_upstream_operation(...)` and added non-engine operation outcomes.
-- Reworked `forge activity` into Operation outcomes and Model calls panes with clean-break JSON and bounded rollups.
-- Kept `render_summary_line(...)` in lockstep and updated design, user, CLI, QA, and board docs.
-
-**Verification**: `mypy` clean for `measurement.py`; targeted suites passed 434/237/517 tests; integration closeout
-passed 36 tests; `make pre-commit` clean.
-
-### upstream_downstream_ledgers: telemetry clean cut and cap-safe migration
-
-**Goal**: Re-cut Forge telemetry toward downstream model-attempt evidence and upstream operation outcomes without
-silently resetting spend caps during the path move.
-
-**Key changes**:
-
-- Added `~/.forge/telemetry/downstream/` and `~/.forge/telemetry/upstream/` JSONL planes. Proxy cost, audit/drift/
-  mutation, provider lifecycle evidence, direct `core.llm`, direct `claude -p`, and Codex usage now write downstream
-  attempt records; policy evaluation outcomes write upstream records.
-- Default upstream volume is `non_success`; `upstream_event_volume=all` enables success/cached-allow operation logs.
-- Spend caps now persist `telemetry/caps/<proxy_id>.json` and bootstrap from
-  `max(cap_state, downstream logs, legacy cost logs)`, so clean-cut migration and dropped best-effort telemetry writes
-  do not reset monthly caps to zero.
-- `forge proxy costs reset` now wipes old cost logs, new upstream/downstream telemetry, cap state, audit sidecar state,
-  usage events, and derived status-line caches; sidecar proxy launches mount `~/.forge/telemetry/` rw.
-- Provider trace reads now project downstream attempt fields, and `forge proxy costs show --by-verb` derives attribution
-  by joining downstream requests to usage run ids instead of writing new `costs/verbs` shards.
-
-**Verification**: Focused telemetry/proxy/policy/activity/sidecar suite green (264 tests), provider-trace CLI/core/
-regression suite green (32 tests), direct/provider metadata regression coverage added, ruff clean on touched Python and
-tests.
+- **upstream_downstream_ledgers** (06-18): re-cut telemetry into `~/.forge/telemetry/{downstream,upstream}/` JSONL
+  planes (downstream = model-attempt evidence; upstream = operation outcomes, default volume `non_success`). Cap-safe
+  migration: caps persist `telemetry/caps/<proxy_id>.json` and bootstrap from `max(cap_state, downstream, legacy)` so
+  the path move never zeroes monthly caps; `proxy costs reset` wipes all new planes + caches; provider-trace reads
+  project downstream fields. Closeout: two-pane `forge activity` (Operation outcomes / Model calls), shared measurement
+  resolution, engine writes via `record_upstream_operation`. Verified: 264 + 32 + 434/237/517 + 36 integration;
+  `make pre-commit`.
+- **unified_backend** (06-18, closeout 06-19): built-in `ModelSource` catalog (local/remote LiteLLM, OpenRouter,
+  Anthropic passthrough, direct); templates moved to `proxy.source` deriving endpoint/auth/lifecycle from the catalog;
+  downstream `backend_id` attribution while `source_id`/`source_kind` stay writer-origin; OpenRouter-specific gates
+  replaced by source capabilities. `backend list/show` mark a shared local LiteLLM instance (display-only, never feeds
+  `backend_id`). Follow-up: custom templates preflight credentials from declared `proxy.source`. Verified: 526 + 11
+  integration; 175; 156 focused; `make pre-commit`. Shipped via PR #39 (`ab690ac9`).
+- **backend_remote_reconciliation** (PR 1 06-19, PR 2 06-20): generalized provider-trace/user-grouping off OpenRouter
+  (`openrouter_user_grouping` -> `provider_user_grouping`; capability-gated by `backend_id`; a source-less proxy writes
+  no trace). PR 2 shipped `forge backend reconcile <source-id>` (single-id MVP): `backend/remote/` adapter protocol +
+  registry, `OpenRouterRemoteAdapter` (metadata-only `GET /generation`, never content), buckets
+  joined/remote/missing-remote/not-queryable; remote/network failures are renderable data, never raised (hardened by a
+  32-agent review, 21 findings: NaN/overflow bodies -> `unavailable`). Verified: 185 + 52 + 2322; live
+  `test_provider_trace_e2e.py`; `make pre-commit`.
+- **openrouter_user_direct_callers** (06-20): extended OpenRouter `user`-field grouping to direct `core.llm` callers
+  under ONE global toggle `provider_trace.inject_provider_user` (`~/.forge/config.yaml`, default off) instead of
+  per-proxy; `forge config set/edit` gained nested-section support. Breaking (research preview): per-proxy `proxy.yaml`
+  `inject_provider_user`/`inject_openrouter_user` removed (stale key ignored with a one-time relocation warning).
+  Verified: 432 tests; mypy/pyright; sidecar Docker integration; `make pre-commit`.
 
 ## 2026-06-16 (compacted)
 

@@ -268,7 +268,7 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
 
 ### Resolved decisions (2026-07-04) -- now committed
 
-- [ ] **WorkflowPolicy: DEMOTE** (confirmed) -- make the current unshipped state explicit; do **not** graduate here, do
+- [x] **WorkflowPolicy: DEMOTE** (confirmed) -- make the current unshipped state explicit; do **not** graduate here, do
   **not** delete the pipeline. Sub-tasks:
 
   - Relabel the `docs/end-user/policy.md` workflow section **experimental / manifest-only**; state plainly there is no
@@ -283,16 +283,30 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
   - **Assertion**: `policy.md` names it experimental/manifest-only; `get_all_bundles` no longer advertises `workflow` to
     any non-test path; `policy list` / `policy enable --bundle` unchanged; the pipeline + `build_divergence_config`
     still import and run; the follow-on card exists in `proposed/`.
+  - **Verified 2026-07-04**: `get_all_bundles()` had exactly one caller -- its own test. The CLI `list_bundles`/`enable`
+    iterate `BUNDLES` directly and never included `workflow`, so deleting the function (clean-break) + its
+    `test_workflow_in_all_bundles` removes the only place `workflow` was advertised as discoverable. Relabeled the
+    `policy.md` header experimental/manifest-only and hardened the note ("no CLI surface... not in
+    `forge policy list`"). Pipeline, `get_bundle_policies`, `get_bundle_for_policy`, `build_divergence_config`
+    untouched; `proposed/graduate_workflow_policy_cli/card.md` filed. 578 policy tests + mypy green.
 
-- [ ] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_appendix §B` (says schema
+- [x] **Micro-cleanup (a) -- marker-schema doc drift** (confirmed in scope): reconcile `design_appendix §B` (says schema
   **v2**) with the code's emitted + strictly-accepted `schema_version` (`core/workqueue`). Verify which side is right,
   fix the drifted one. **Assertion**: doc and code agree (grep the emitted `schema_version` + the strict-read guard; one
-  authoritative value).
+  authoritative value). **Verified 2026-07-04**: code is authoritative -- `MARKER_SCHEMA_VERSION = 1`, `queue.py` emits
+  1 and strictly rejects `!= 1`. The **doc** drifted; fixed `design_appendix §B.1` header `(v2) -> (v1)` + example
+  `schema_version: 2 -> 1`. The unrelated downstream `schema_version=2` references (a different schema) stay.
 
-- [ ] **Micro-cleanup (b) -- Reporter/Confidence literal dedup** (confirmed in scope, #7-style): import
+- [x] **Micro-cleanup (b) -- Reporter/Confidence literal dedup** (confirmed in scope, #7-style): import
   `Reporter`/`Confidence` from their owner instead of re-declaring them in `core/telemetry/downstream.py`.
   **Assertion**: the literals are defined once (owner only); `grep` shows no duplicate
-  `Reporter = Literal`/`Confidence = Literal`; telemetry tests pass.
+  `Reporter = Literal`/`Confidence = Literal`; telemetry tests pass. **Verified 2026-07-04 -- direction reversed from
+  the card's assumption**: `vocabulary.py` could not be the sole owner (the card's guess) because `core/usage/__init__`
+  eagerly imports `emit -> downstream`, so `downstream` importing `usage.vocabulary` cycles; de-coupling `__init__` was
+  out (~12 `from core.usage import emit_*` consumers). Instead defined both **once** in a new neutral leaf
+  `core/telemetry/vocabulary.py` (imports only `typing`, sits below `downstream`); `downstream` and `usage/vocabulary`
+  import + re-export it (all consumer import sites unchanged; `__all__` marks the re-exports). Import smoke test shows
+  no cycle and one shared object; 830 telemetry/usage/proxy tests + mypy/pyright/ruff green.
 
 ### Deferred (Phase C)
 
@@ -310,18 +324,24 @@ that may or may not produce a fix. #18-#20 are **Earned** and stay unless the fi
 | retry trace gated by capability | same retry, non-capable backend                                                | no provider-trace record emitted (helper gate holds)                                  | `tests/regression/test_bug_auth_retry_provider_trace.py` |
 | #17 methods gone                | --                                                                             | `grep` clean in `core/llm`; credentials suite green                                   | `tests/src/core/llm/test_credentials.py`                 |
 | Gap A (real; fixed)             | `fail_open=True` decision, warning without an `_INFRA_FAILURE_PREFIXES` prefix | `supervisor evaluate` exits 2 (not 0)                                                 | `tests/src/cli/test_policy_supervisor.py`                |
+| WorkflowPolicy demoted          | --                                                                             | `get_all_bundles` gone; `policy list`/`enable` unchanged; pipeline still imports      | `tests/src/policy/workflow/test_registry_integration.py` |
+| marker schema doc = code        | --                                                                             | `design_appendix §B.1` says v1, matching `MARKER_SCHEMA_VERSION`                      | (doc-only)                                               |
+| Reporter/Confidence single-src  | import from `downstream` and `usage.vocabulary`                                | no duplicate `Literal` decl; both resolve to the one leaf object; no import cycle     | `tests/src/core/telemetry/`, `tests/src/core/usage/`     |
 
 ### Phase C closeout
 
-- [ ] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
-- [ ] Focused suites green: proxy provider-trace/server, `test_credentials.py`, policy supervisor.
-- [ ] **Integration run** (Defect B touches the proxy request path): the relevant proxy provider-trace E2E
-  (`tests/integration/proxy/test_provider_trace_e2e.py`) -- unit tests never exercise a real retry through the proxy
-  (testing_guidelines "when to run integration").
-- [ ] `change_log.md` entry (feature-completion size) covering Defect B + #17 + the Gap A outcome.
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks) across all touched files.
+- [x] Focused suites green: proxy provider-trace/server, `test_credentials.py`, policy supervisor, policy/workflow,
+  telemetry + usage (830 + 578 + 25 + ... all green across the touched packages).
+- [x] **Integration run** (Defect B touches the proxy request path): user ran the **full integration suite green**
+  (2026-07-04), covering the proxy provider-trace E2E path.
+- [x] `change_log.md` entry (feature-completion size) covering Defect B + #17 + Gap A + WorkflowPolicy DEMOTE + the two
+  micro-cleanups.
 - [ ] Promote the durable lesson to `impl_notes.md` after human review (Defect B: every proxy success path -- including
-  auth-retry -- must emit provider-trace, or the observability plane has a hole).
-- [ ] Docs synced: the WorkflowPolicy decision landed in `policy.md`; any doc-drift fix applied.
+  auth-retry -- must emit provider-trace; and the `usage <-> telemetry` cycle constraint that forced the neutral
+  vocabulary leaf).
+- [x] Docs synced: WorkflowPolicy decision landed in `policy.md` (experimental/manifest-only); marker-schema doc drift
+  fixed in `design_appendix §B.1`.
 - [ ] Card moved `doing/ -> done/` after merge to `main`.
 
 ---
