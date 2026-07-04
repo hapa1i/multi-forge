@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from click.testing import CliRunner
 
@@ -32,16 +33,12 @@ def _usage_event(run_id: str, command: str) -> None:
     )
 
 
-def _patch_cost_logs(
-    monkeypatch, records: list[dict], *, skipped_legacy_schema: int = 0
-) -> None:
+def _patch_cost_logs(monkeypatch, records: list[dict[str, Any]], *, skipped_legacy_schema: int = 0) -> None:
     from forge.proxy.cost_logger import CostLogReadResult
 
     monkeypatch.setattr(
         "forge.proxy.cost_logger.read_cost_logs_with_stats",
-        lambda *a, **k: CostLogReadResult(
-            records=records, skipped_legacy_schema=skipped_legacy_schema
-        ),
+        lambda *a, **k: CostLogReadResult(records=records, skipped_legacy_schema=skipped_legacy_schema),
     )
 
 
@@ -68,7 +65,7 @@ class TestFormatUsd:
 def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
     _usage_event("run_panel", "panel")
     _usage_event("run_supervisor", "supervisor")
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {
             "proxy_id": "openrouter",
             "model": "anthropic/claude-sonnet-4.6",
@@ -115,7 +112,7 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
     The present-but-null cost_micros must NOT be summed as 0 (and `sum` must not
     crash on it): it's excluded from the total and counted as unavailable.
     """
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         # Legacy catalog record (pre-rename: int cost, no provenance fields).
         {
             "proxy_id": "p",
@@ -162,7 +159,7 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
 
 def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
     """A cost-unavailable request renders 'unavailable', not $0.00, without crashing."""
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {
             "proxy_id": "p",
             "model": "m-unavail",
@@ -183,7 +180,7 @@ def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
 
 
 def test_costs_human_output_uses_stdout(monkeypatch) -> None:
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {
             "proxy_id": "p",
             "model": "m",
@@ -202,7 +199,7 @@ def test_costs_human_output_uses_stdout(monkeypatch) -> None:
 
 
 def test_costs_json_output_uses_stdout(monkeypatch) -> None:
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {
             "proxy_id": "p",
             "model": "m",
@@ -236,10 +233,7 @@ def test_costs_human_reports_legacy_downstream_identity_schema(monkeypatch) -> N
 
     assert result.exit_code == 0, result.output
     assert "No cost data" in result.output
-    assert (
-        "Skipped 1 downstream telemetry record from an older Forge schema"
-        in result.output
-    )
+    assert "Skipped 1 downstream telemetry record from an older Forge schema" in result.output
 
 
 class TestVerbCostReported:
@@ -247,23 +241,15 @@ class TestVerbCostReported:
 
     def test_evidence_flag_true_with_zero_total_is_reported(self) -> None:
         # Reported $0 (all-free models): the flag, not the total, is the signal.
-        assert (
-            _verb_cost_reported({"cost_measured": True, "total_cost_micros": 0}) is True
-        )
+        assert _verb_cost_reported({"cost_measured": True, "total_cost_micros": 0}) is True
 
     def test_evidence_flag_false_with_zero_total_is_unavailable(self) -> None:
         # The user's reproduction: passthrough verb, tokens but no reported cost.
-        assert (
-            _verb_cost_reported({"cost_measured": False, "total_cost_micros": 0})
-            is False
-        )
+        assert _verb_cost_reported({"cost_measured": False, "total_cost_micros": 0}) is False
 
     def test_evidence_flag_authoritative_over_positive_total(self) -> None:
         # A present flag always wins; a stray positive total cannot override it.
-        assert (
-            _verb_cost_reported({"cost_measured": False, "total_cost_micros": 50_000})
-            is False
-        )
+        assert _verb_cost_reported({"cost_measured": False, "total_cost_micros": 50_000}) is False
 
     def test_legacy_record_without_flag_is_unavailable(self) -> None:
         # Pre cost-evidence record (no flag): its total_cost_micros was a now-deleted
@@ -285,7 +271,7 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
     _usage_event("run_passthrough", "passthrough")
     _usage_event("run_freebie", "freebie")
     _usage_event("run_panel", "panel")
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"},
         {"model": "m", "cost_micros": 0, "forge_run_id": "run_freebie"},
         {"model": "m", "cost_micros": 15_000, "forge_run_id": "run_panel"},
@@ -306,9 +292,7 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
 def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None:
     """Human view shows 'unavailable' for a cost_measured=False verb, not $0.00."""
     _usage_event("run_passthrough", "passthrough")
-    request_records = [
-        {"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}
-    ]
+    request_records: list[dict[str, Any]] = [{"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}]
     _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--by-verb"))
@@ -371,9 +355,7 @@ class TestCostsReset:
         audit_shard.write_text('{"x": 1}\n')
         result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
-        assert (
-            audit_shard.exists()
-        )  # audit is a separate plane, intentionally NOT reset
+        assert audit_shard.exists()  # audit is a separate plane, intentionally NOT reset
 
     def test_clears_fcost_cache_but_not_cache_hit_entries(self) -> None:
         # The derived `forge +$Y` cache (fcost-*.json) would otherwise replay a stale

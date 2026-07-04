@@ -23,9 +23,7 @@ from forge.core.telemetry.downstream import (
 @pytest.fixture(autouse=True)
 def _isolated_downstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     telemetry_dir = tmp_path / "telemetry" / "downstream"
-    monkeypatch.setattr(
-        "forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir
-    )
+    monkeypatch.setattr("forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir)
     downstream._warned_newer_schema = False
     downstream._warned_older_schema = False
     return telemetry_dir
@@ -127,9 +125,7 @@ def test_non_attempt_substreams_do_not_merge() -> None:
     assert [record.kind for record in records] == ["audit", "drift"]
 
 
-def test_newer_schema_is_skipped(
-    _isolated_downstream: Path, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_newer_schema_is_skipped(_isolated_downstream: Path, caplog: pytest.LogCaptureFixture) -> None:
     _isolated_downstream.mkdir(parents=True)
     path = _isolated_downstream / "2026-06_1.jsonl"
     with open(path, "w") as f:
@@ -163,21 +159,12 @@ def test_newer_schema_is_skipped(
     assert sum("newer Forge" in message for message in caplog.messages) == 1
 
 
-def test_older_identity_schema_is_skipped(
-    _isolated_downstream: Path, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_older_identity_schema_is_skipped(_isolated_downstream: Path, caplog: pytest.LogCaptureFixture) -> None:
     _isolated_downstream.mkdir(parents=True)
     path = _isolated_downstream / "2026-06_1.jsonl"
     with open(path, "w") as f:
-        f.write(
-            json.dumps(
-                {"schema_version": 1, "kind": "attempt", "downstream_event_id": "old"}
-            )
-            + "\n"
-        )
-        f.write(
-            json.dumps({"kind": "attempt", "downstream_event_id": "unversioned"}) + "\n"
-        )
+        f.write(json.dumps({"schema_version": 1, "kind": "attempt", "downstream_event_id": "old"}) + "\n")
+        f.write(json.dumps({"kind": "attempt", "downstream_event_id": "unversioned"}) + "\n")
         f.write(
             json.dumps(
                 {
@@ -195,13 +182,7 @@ def test_older_identity_schema_is_skipped(
     records = result.records
     assert [record.downstream_event_id for record in records] == ["current"]
     assert result.stats.skipped_legacy_schema == 2
-    assert (
-        sum(
-            "older Forge backend-identity schema" in message
-            for message in caplog.messages
-        )
-        == 1
-    )
+    assert sum("older Forge backend-identity schema" in message for message in caplog.messages) == 1
 
 
 def test_strict_reader_skips_unknown_fields_and_non_object_lines(
@@ -237,10 +218,7 @@ def test_strict_reader_skips_unknown_fields_and_non_object_lines(
         records = read_downstream_records(kind="attempt")
 
     assert [record.downstream_event_id for record in records] == ["valid"]
-    assert any(
-        "Skipping malformed downstream telemetry" in message
-        for message in caplog.messages
-    )
+    assert any("Skipping malformed downstream telemetry" in message for message in caplog.messages)
 
 
 def test_prune_downstream_records_by_age(_isolated_downstream: Path) -> None:

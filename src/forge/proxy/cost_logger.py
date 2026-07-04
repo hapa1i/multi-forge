@@ -113,9 +113,7 @@ def read_cost_logs(
     Skips malformed downstream lines, records written by a newer Forge, and records
     from older downstream backend-identity schemas before projecting cost records.
     """
-    return read_cost_logs_with_stats(
-        period_start=period_start, period_end=period_end
-    ).records
+    return read_cost_logs_with_stats(period_start=period_start, period_end=period_end).records
 
 
 def read_cost_logs_with_stats(
@@ -124,9 +122,7 @@ def read_cost_logs_with_stats(
 ) -> CostLogReadResult:
     """Read projected cost records plus downstream schema-fence skip counts."""
     records: list[dict[str, Any]] = []
-    downstream_read = read_downstream_records_with_stats(
-        period_start, period_end, kind="attempt"
-    )
+    downstream_read = read_downstream_records_with_stats(period_start, period_end, kind="attempt")
     for rec in downstream_read.records:
         records.append(
             {
@@ -167,15 +163,11 @@ class RootCostJoin:
     """
 
     roots_with_records: set[str] = field(default_factory=set)
-    cost_micros: int | None = (
-        None  # summed reported cost; None when no matched record reported one
-    )
+    cost_micros: int | None = None  # summed reported cost; None when no matched record reported one
     input_tokens: int = 0
     output_tokens: int = 0
     cached_tokens: int = 0
-    per_run: dict[str, int] = field(
-        default_factory=dict
-    )  # forge_run_id -> summed reported micros
+    per_run: dict[str, int] = field(default_factory=dict)  # forge_run_id -> summed reported micros
     # Every forge_run_id seen on a matched record, INCLUDING dollar-less ones (per_run
     # holds only the dollar-bearing subset). Read-time suppression keys on this presence
     # set, not per_run, so a records-present/no-dollars run still supersedes its snapshot.

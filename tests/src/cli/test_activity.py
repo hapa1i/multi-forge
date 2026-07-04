@@ -40,9 +40,7 @@ def _event(**overrides: object) -> UsageEvent:
     return UsageEvent(**base)  # type: ignore[arg-type]
 
 
-def _patch_resolver(
-    monkeypatch, name: str = "planner", forge_root: str | None = None
-) -> None:
+def _patch_resolver(monkeypatch, name: str = "planner", forge_root: str | None = None) -> None:
     monkeypatch.setattr(
         "forge.cli.activity.resolve_session_identifier",
         lambda _s=None: (name, forge_root),
@@ -101,15 +99,9 @@ def test_period_start_uses_local_calendar_boundaries(monkeypatch) -> None:
     monkeypatch.setattr(activity_module, "datetime", FrozenDateTime)
 
     assert activity_module._period_start("all") is None
-    assert activity_module._period_start("today") == datetime(
-        2026, 7, 3, 4, tzinfo=timezone.utc
-    )
-    assert activity_module._period_start("week") == datetime(
-        2026, 6, 29, 4, tzinfo=timezone.utc
-    )
-    assert activity_module._period_start("month") == datetime(
-        2026, 7, 1, 4, tzinfo=timezone.utc
-    )
+    assert activity_module._period_start("today") == datetime(2026, 7, 3, 4, tzinfo=timezone.utc)
+    assert activity_module._period_start("week") == datetime(2026, 6, 29, 4, tzinfo=timezone.utc)
+    assert activity_module._period_start("month") == datetime(2026, 7, 1, 4, tzinfo=timezone.utc)
 
 
 def test_old_days_flag_is_clean_break() -> None:
@@ -140,9 +132,7 @@ def test_human_render_shows_supervisor(monkeypatch) -> None:
 def test_json_shape(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", status="error"))
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["session"] == "planner"
@@ -164,12 +154,8 @@ def test_json_shape(monkeypatch) -> None:
 def test_json_carries_runtime_and_billing(monkeypatch) -> None:
     """T5/WS3: --json exposes the per-row runtime/billing_mode lane fields."""
     _patch_resolver(monkeypatch)
-    log_usage_event(
-        _event(command="supervisor", runtime="codex", billing_mode="subscription_quota")
-    )
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
     assert rows["supervisor"]["runtime"] == "codex"
@@ -178,13 +164,9 @@ def test_json_carries_runtime_and_billing(monkeypatch) -> None:
 
 def test_human_render_shows_runtime_billing(monkeypatch) -> None:
     """T5/WS3: the human table has a Runtime/Billing column showing the resolved lane."""
-    monkeypatch.setenv(
-        "COLUMNS", "200"
-    )  # widen so Rich does not truncate the lane cell
+    monkeypatch.setenv("COLUMNS", "200")  # widen so Rich does not truncate the lane cell
     _patch_resolver(monkeypatch)
-    log_usage_event(
-        _event(command="supervisor", runtime="codex", billing_mode="subscription_quota")
-    )
+    log_usage_event(_event(command="supervisor", runtime="codex", billing_mode="subscription_quota"))
     result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
     assert result.exit_code == 0
     assert "Runtime/Billing" in result.output
@@ -207,9 +189,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     write_downstream_record(
         DownstreamRecord(
             kind="attempt",
-            downstream_event_id=mint_downstream_event_id(
-                event_key="memory-writer:run_join"
-            ),
+            downstream_event_id=mint_downstream_event_id(event_key="memory-writer:run_join"),
             provider_command="memory-writer",
             forge_run_id="run_join",
             forge_root_run_id="run_join",
@@ -228,9 +208,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     assert "memory_writer.run" in human.output
     assert "matched" in human.output
 
-    machine = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    machine = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert machine.exit_code == 0
     data = json.loads(machine.output)
     operation = data["upstream"]["operations"][0]
@@ -258,9 +236,7 @@ def test_json_includes_error_kinds(monkeypatch) -> None:
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
     assert rows["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
@@ -295,9 +271,7 @@ def test_json_ignores_legacy_downstream_identity_schema(monkeypatch) -> None:
         + "\n"
     )
 
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
 
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -327,10 +301,7 @@ def test_human_render_reports_legacy_downstream_identity_schema(monkeypatch) -> 
 
     assert result.exit_code == 0
     assert "No Forge activity" in result.output
-    assert (
-        "skipped 1 downstream telemetry record from an older Forge schema"
-        in result.output
-    )
+    assert "skipped 1 downstream telemetry record from an older Forge schema" in result.output
 
 
 def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
@@ -423,9 +394,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="plan-check"))
 
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["upstream"]["policy"]["plan_check_needs_review"] == 1
@@ -437,9 +406,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
 def test_period_week_excludes_nothing_recent(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor"))
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "week", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "week", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["downstream"]["rows"][0]["attempts"] == 1
@@ -485,9 +452,7 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
     assert "no snapshot estimates mixed in" in result.output
 
 
-def _write_shadow_done(
-    forge_root, cand_hash: str, *, status: str, session: str = "planner", **extra
-) -> None:
+def _write_shadow_done(forge_root, cand_hash: str, *, status: str, session: str = "planner", **extra) -> None:
     import json as _json
     from pathlib import Path as _Path
 
@@ -509,9 +474,7 @@ def test_human_render_shows_shadow_section(monkeypatch, tmp_path) -> None:
     from forge.session.models import create_session_state
     from forge.session.store import SessionStore
 
-    SessionStore(str(tmp_path), "planner").write(
-        create_session_state("planner", worktree_path=str(tmp_path))
-    )
+    SessionStore(str(tmp_path), "planner").write(create_session_state("planner", worktree_path=str(tmp_path)))
     _write_shadow_done(tmp_path, "a1", status="agree")
     _write_shadow_done(
         tmp_path,
@@ -533,15 +496,11 @@ def test_json_includes_shadow(monkeypatch, tmp_path) -> None:
     from forge.session.models import create_session_state
     from forge.session.store import SessionStore
 
-    SessionStore(str(tmp_path), "planner").write(
-        create_session_state("planner", worktree_path=str(tmp_path))
-    )
+    SessionStore(str(tmp_path), "planner").write(create_session_state("planner", worktree_path=str(tmp_path)))
     _write_shadow_done(tmp_path, "d1", status="disagree")
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
-    result = CliRunner().invoke(
-        main, _activity_args("planner", "--period", "all", "--json")
-    )
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["shadow"]["checked"] == 1

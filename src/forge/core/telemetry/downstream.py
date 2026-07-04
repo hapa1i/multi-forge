@@ -29,12 +29,8 @@ DOWNSTREAM_SCHEMA_VERSION = 2
 DownstreamKind = Literal["attempt", "audit", "drift", "mutation"]
 LocalUsageStatus = Literal["available", "unavailable"]
 RequestMode = Literal["streaming", "non_streaming"]
-Reporter = Literal[
-    "claude_code", "forge_proxy", "openrouter", "litellm", "provider", "codex_jsonl"
-]
-Confidence = Literal[
-    "reported", "gateway_calculated", "inferred", "unavailable", "unknown"
-]
+Reporter = Literal["claude_code", "forge_proxy", "openrouter", "litellm", "provider", "codex_jsonl"]
+Confidence = Literal["reported", "gateway_calculated", "inferred", "unavailable", "unknown"]
 
 _lock = threading.Lock()
 _warned_newer_schema = False
@@ -175,11 +171,7 @@ def _merge_attempt_records(records: list[DownstreamRecord]) -> list[DownstreamRe
         for key, value in asdict(rec).items():
             if key in {"schema_version", "downstream_event_id", "kind"}:
                 continue
-            if (
-                key == "confidence"
-                and value == "unknown"
-                and current.confidence != "unknown"
-            ):
+            if key == "confidence" and value == "unknown" and current.confidence != "unknown":
                 continue
             if value is not None:
                 setattr(current, key, value)
@@ -197,9 +189,7 @@ def _record_in_period(
         return True
     ts_str = record.get("ts", "")
     try:
-        ts = datetime.fromisoformat(
-            ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00"
-        )
+        ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
     except (ValueError, TypeError, AttributeError):
         return False
     if period_start and ts < period_start:
@@ -299,20 +289,12 @@ def read_downstream_records_with_stats(
                         continue
                     if forge_run_id and record.get("forge_run_id") != forge_run_id:
                         continue
-                    if (
-                        forge_root_run_id
-                        and record.get("forge_root_run_id") != forge_root_run_id
-                    ):
+                    if forge_root_run_id and record.get("forge_root_run_id") != forge_root_run_id:
                         continue
-                    if (
-                        provider_session_id
-                        and record.get("provider_session_id") != provider_session_id
-                    ):
+                    if provider_session_id and record.get("provider_session_id") != provider_session_id:
                         continue
                     try:
-                        records.append(
-                            dacite.from_dict(DownstreamRecord, record, config=config)
-                        )
+                        records.append(dacite.from_dict(DownstreamRecord, record, config=config))
                     except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
                         logger.warning(
                             "Skipping malformed downstream telemetry in %s: %s",

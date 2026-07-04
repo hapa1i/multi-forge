@@ -63,9 +63,7 @@ def activity_cmd(session: str | None, as_json: bool, period: str) -> None:
         session_name, forge_root = resolve_session_identifier(session)
     except SessionContextError as e:
         if as_json:
-            click.echo(
-                json.dumps({"error": str(e), "tip": _SESSION_LIST_TIP}), err=True
-            )
+            click.echo(json.dumps({"error": str(e), "tip": _SESSION_LIST_TIP}), err=True)
         else:
             print_error_with_tip(
                 str(e),
@@ -86,18 +84,12 @@ def _period_start(period: str) -> datetime | None:
     """Return the UTC lower bound for a named local-calendar period."""
     now_local = datetime.now()
     if period == "today":
-        return now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(
-            timezone.utc
-        )
+        return now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     if period == "week":
         local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return (local_midnight - timedelta(days=local_midnight.weekday())).astimezone(
-            timezone.utc
-        )
+        return (local_midnight - timedelta(days=local_midnight.weekday())).astimezone(timezone.utc)
     if period == "month":
-        return now_local.replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0
-        ).astimezone(timezone.utc)
+        return now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     return None
 
 
@@ -109,16 +101,12 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
         "all": "all time",
     }[period]
     if summary.is_empty:
-        console.print(
-            f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]"
-        )
+        console.print(f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]")
         if note := _legacy_schema_note(summary.downstream.skipped_legacy_schema):
             console.print(f"[dim]{note}[/dim]")
         return
 
-    console.print(
-        f"\n[bold]Forge activity — {summary.session}[/bold] [dim]({scope})[/dim]"
-    )
+    console.print(f"\n[bold]Forge activity — {summary.session}[/bold] [dim]({scope})[/dim]")
     console.print(
         "[dim]Forge automation (supervisor, memory writer, workflow verbs) — "
         "not your full interactive session.[/dim]"
@@ -136,26 +124,17 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
     rendered_operation_content = False
     if pol and (pol.plan_check_allow or pol.plan_check_needs_review):
         console.print(
-            f"Plan check (tier-1): {pol.plan_check_allow} allow · "
-            f"{pol.plan_check_needs_review} needs review"
+            f"Plan check (tier-1): {pol.plan_check_allow} allow · " f"{pol.plan_check_needs_review} needs review"
         )
         rendered_operation_content = True
 
     sup_has_pol = bool(
-        pol
-        and (
-            pol.supervisor_allow
-            or pol.supervisor_warn
-            or pol.supervisor_deny
-            or pol.total_warnings
-        )
+        pol and (pol.supervisor_allow or pol.supervisor_warn or pol.supervisor_deny or pol.total_warnings)
     )
     if sup_has_pol or failing:
         bits: list[str] = []
         if sup_has_pol and pol is not None:
-            bits.append(
-                f"{pol.supervisor_allow} allow · {pol.supervisor_warn} warn · {pol.supervisor_deny} block"
-            )
+            bits.append(f"{pol.supervisor_allow} allow · {pol.supervisor_warn} warn · {pol.supervisor_deny} block")
         if failing:
             bits.append(f"[red]{failing}[/red]")
         console.print("Supervisor: " + " · ".join(bits))
@@ -270,23 +249,15 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
     if summary.cost_partial:
         notes.append("cost is best-effort and partial (some calls report no cost)")
     if summary.upstream.log_capped:
-        notes.append(
-            "policy decision log is at capacity — older decisions may not be shown"
-        )
+        notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
     # "no snapshot estimates" covers both exact sources: the 4g cost-plane root-join
     # and runtime-reported (runtime_native) self-reports. A cost-less summary keeps
     # the generic caveat -- there is no figure to call exact.
     exact = summary.total_cost_micro_usd is not None and not summary.cost_estimated
-    evidence = (
-        "reported (no snapshot estimates mixed in)"
-        if exact
-        else "reported-or-estimated"
-    )
-    notes.append(
-        f"cost is {evidence}, best-effort; 'forge telemetry costs show' is the authoritative spend view"
-    )
+    evidence = "reported (no snapshot estimates mixed in)" if exact else "reported-or-estimated"
+    notes.append(f"cost is {evidence}, best-effort; 'forge telemetry costs show' is the authoritative spend view")
     return notes
 
 
