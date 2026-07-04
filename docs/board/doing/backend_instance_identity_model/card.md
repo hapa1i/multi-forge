@@ -25,16 +25,17 @@ Anthropic-compatible remotes should not require a new CLI noun.
 
 ## Target vocabulary
 
-| Term                   | Meaning                                                                                            | Examples / notes                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Runtime                | Agent/frontend runtime that runs the work.                                                         | `codex`, `claude_code`. Never a model backend process.                                |
-| Backend kind / adapter | Implementation or protocol family.                                                                 | `litellm`, future `anthropic-compatible`; local kinds may have lifecycle adapters.    |
-| Backend instance       | Concrete configured inference target, local or remote.                                             | `openrouter`, `claude-max`, future `anthropic-compatible-work`, local `litellm-4000`. |
-| Backend name           | Human-facing configured backend label; for singleton remotes it may equal the backend instance id. | Compatibility bridge while only one instance of a remote kind exists.                 |
+| Term                   | Meaning                                                                                            | Examples / notes                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Runtime                | Agent/frontend runtime that runs the work.                                                         | `codex`, `claude_code`. Never a model backend process.                                                             |
+| Backend kind / adapter | Implementation or protocol/provider family.                                                        | `openrouter`, `litellm`, `anthropic`, future `anthropic-compatible`; local kinds may have lifecycle adapters.      |
+| Backend instance id    | Stable id for a concrete configured inference target, local or remote.                             | `openrouter`, `claude-max`, `litellm-gemini-local`, future `anthropic-compatible-work`.                            |
+| Managed local process  | Forge-managed PID/port/process state backing one or more local backend instances.                  | `litellm-4000`; local-only lifecycle state, not the logical backend instance id.                                   |
+| Backend name / alias   | Human-facing label or compatibility alias that resolves to a backend instance id when unambiguous. | For singleton remotes it may equal the instance id; exact instance-id matches always win over alias/kind matching. |
 
 The important future-proofing point: **remote backends are instances too**. Today a singleton remote can use its backend
 name as its instance id. Later, multiple configured remotes of the same kind can get distinct instance ids without
-inventing a second axis.
+inventing a separate "source" CLI noun.
 
 Local LiteLLM remains special because Forge manages local processes for it. That lifecycle difference should be a
 capability on the backend instance, not a reason to reserve "instance" only for local processes.
@@ -67,8 +68,10 @@ This card should be an architecture/schema migration, not a CLI wording pass.
 
 The eventual model likely has:
 
-- Backend kind / adapter definitions: implementation families and lifecycle/probe capabilities.
-- Backend instances: configured inference targets keyed by a stable instance id.
+- Backend kind / adapter definitions: minimal implementation families, lifecycle/probe mechanisms, and default
+  capabilities.
+- Backend instances: configured inference targets keyed by a stable instance id, with endpoint/auth/billing and
+  instance-level capability overrides.
 - Local lifecycle records: process/PID/port state attached only to managed local backend instances.
 - Legacy aliases: singleton remote backend names resolve to their instance ids; old `source_id`/`proxy.source` fields
   resolve through compatibility readers during migration.
@@ -77,15 +80,74 @@ This is intentionally a candidate, not a final design. The first active phase sh
 `ModelSource` catalog is closer to a backend instance definition, a backend kind definition, or a mixed object that
 needs to split.
 
+## Phase 2 recommendation (draft for review)
+
+The inventory points to a split, but not the naive one where the local process id becomes the backend instance id.
+Recommended target:
+
+- **Backend kind / adapter definition**: implementation or protocol/provider family (`openrouter`, `litellm`,
+  `anthropic`, `openai-compatible`, future `anthropic-compatible`). This is distinct from the existing `EndpointKind`
+  enum: `runtime_native` remains an endpoint/transport shape, while backend kind says which provider or protocol family
+  a configured instance belongs to.
+- **Backend instance definition**: concrete configured inference target keyed by stable instance id. The current
+  `ModelSource` object is closest to this object because it already carries endpoint, credentials, capabilities, billing
+  posture, template aliases, and reachability.
+- **Managed local process**: PID/port/process state for Forge-managed local backends. Current
+  `BackendInstance.backend_id` (`litellm-4000`) should move toward this axis, not become the universal backend instance
+  id. Because `~/.forge/backends/index.json` is strict durable state, any field rename here needs a versioned
+  compatibility reader/writer (for example, accepting old `backend_id` while writing a new managed-process id field).
+
+Concrete examples:
+
+- `openrouter`: kind `openrouter`, singleton instance id `openrouter` (the name and instance id are currently
+  synonymous).
+- `claude-max`: instance id `claude-max`, backend kind/provider `anthropic`, endpoint kind `runtime_native`.
+- `chatgpt`: instance id `chatgpt`, backend kind/provider `openai`, endpoint kind `runtime_native`.
+- Future duplicate remote: kind `anthropic-compatible`, instance ids such as `claude-compatible-work` and
+  `claude-compatible-personal`, each with its own endpoint/auth config.
+- Local LiteLLM: backend instances such as `litellm-gemini-local` and `litellm-openai-local` share a managed local
+  process id such as `litellm-4000`. Telemetry and lane binding should keep the logical backend instance id, not
+  collapse to the shared process id.
+
+Capability ownership rule:
+
+- Transport/lifecycle mechanisms and probe implementations belong to backend kinds/adapters.
+- Endpoint/auth/billing posture, runtime reachability, and externally visible feature gates belong to backend instances.
+- Kind definitions may provide defaults, but the resolved capability used by callers must be instance-specific. Today's
+  `ModelSource.capabilities` reads (`provider_trace`, `provider_user_grouping`, `responses_ingress`) therefore migrate
+  to resolved backend-instance capabilities unless Phase 3 proves a specific flag is truly invariant for every instance
+  of a kind.
+
+Recommended OQ resolutions:
+
+- **OQ-1 object shape:** split into backend kind / backend instance / managed local process. Model a minimal kind axis
+  in this card (`kind_id`/adapter family) so duplicate-remote fixtures and ambiguity checks are computable, but keep the
+  rest foundation-only. Rename or replace `ModelSource` as a backend instance definition, then factor out shared
+  kind/adapter metadata only where it removes duplicated lifecycle/protocol facts.
+- **OQ-2 telemetry identity:** downstream telemetry `backend_id` should mean backend instance id. Existing catalog
+  source ids mostly already behave as logical instance ids; keep `source_id`/`source_kind` as the origin axis. Do not
+  backfill historical records initially; add read aliases only for ids that Phase 3 actually renames. If process
+  attribution is needed later, add a separate local-process field instead of overloading `backend_id`.
+- **OQ-3/OQ-4 config + ambiguity:** make the canonical config spelling `proxy.backend` with backend instance id/name
+  values. Keep `proxy.source` as a compatibility reader. Template load keeps the current strict posture for both
+  spellings; runtime `proxy.yaml` keeps the current warn-and-degrade posture for both spellings. If both are present and
+  conflict, fail loudly. Resolution precedence is: exact backend instance id first, explicit alias second, then optional
+  unique kind/name shorthand. Therefore `proxy.backend: openrouter` keeps resolving to the concrete instance
+  `openrouter` even after `openrouter-work` exists. Only an unmatched shorthand that resolves to more than one instance
+  fails loudly with a tip to choose a concrete backend instance id.
+- **OQ-5 scope boundary:** keep this card foundation-only: schema/domain/resolution/compatibility, plus fixture-backed
+  duplicate-remote tests if useful. Do not add remote backend CRUD or remote lifecycle commands here; those belong in a
+  follow-up card once the identity model is stable.
+
 ## Open questions
 
-| Question                                                                                        | Why it matters                                                                                                       |
-| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Does `ModelSource` become a backend instance definition, or split into backend kind + instance? | A mechanical rename could preserve today's confusion under better words.                                             |
-| Should downstream telemetry `backend_id` point to backend instance id after migration?          | Current records use catalog source ids; local LiteLLM process ids can be shared across source/provider rows.         |
-| What is the config spelling for user-defined remote backend instances?                          | `proxy.source` is legacy vocabulary; a `proxy.backend` migration would affect templates, docs, and user config.      |
-| How do singleton aliases behave once a user creates a second remote instance of the same kind?  | `openrouter` can be both name and instance id today, but ambiguity must fail loudly once names are no longer unique. |
-| Is remote-instance CRUD in scope, or only the identity/schema foundation?                       | Supporting multiple remotes may require user-managed config before it requires lifecycle verbs.                      |
+| Question                                                                                        | Why it matters                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Does `ModelSource` become a backend instance definition, or split into backend kind + instance? | A mechanical rename could preserve today's confusion under better words.                                           |
+| Should downstream telemetry `backend_id` point to backend instance id after migration?          | Current records use catalog source ids; local LiteLLM process ids can be shared across source/provider rows.       |
+| What is the config spelling for user-defined remote backend instances?                          | `proxy.source` is legacy vocabulary; a `proxy.backend` migration would affect templates, docs, and user config.    |
+| How do singleton aliases behave once a user creates a second remote instance of the same kind?  | Exact instance ids keep resolving; only unmatched shorthand/alias resolution can become ambiguous and fail loudly. |
+| Is remote-instance CRUD in scope, or only the identity/schema foundation?                       | Supporting multiple remotes may require user-managed config before it requires lifecycle verbs.                    |
 
 ## Acceptance shape
 

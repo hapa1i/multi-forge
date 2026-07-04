@@ -2,8 +2,9 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: Phase 2 design decision. Phase 1 inventory is recorded in [`inventory.md`](inventory.md). Next
-action: resolve OQ-1 through OQ-5 before choosing implementation slices or changing `src/`.
+**Current focus**: Phase 2 design review. Phase 1 inventory is recorded in [`inventory.md`](inventory.md), and a draft
+OQ-1 through OQ-5 recommendation is recorded in [`card.md`](card.md). Next action: review/accept or revise that target
+before choosing implementation slices or changing `src/`.
 
 ## Invariants (do not violate during migration)
 
