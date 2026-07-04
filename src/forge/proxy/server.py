@@ -1288,6 +1288,22 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 },
             )
 
+        # Shared run-tree context for every provider-trace record on this request.
+        # Spreading one dict at each real-call path means a new path cannot silently omit
+        # the context -- the auth-retry gap (Defect B) was exactly that kind of omission,
+        # and dropping ``**_trace_ctx`` now fails loudly (missing required request_id).
+        # Capability gating lives inside ``record_provider_trace``; callers stay unconditional.
+        _trace_ctx: dict[str, Any] = {
+            "backend_id": _backend_instance_id(),
+            "proxy_id": PROXY_ID or "unknown",
+            "mapped_model": actual_model_id,
+            "request_id": request_id,
+            "forge_run_id": forge_run_id,
+            "forge_root_run_id": forge_root_run_id,
+            "provider_session_id": forge_session,
+            "provider_command": forge_command,
+        }
+
         if request_data.stream:
             # Streaming response
             async def stream_generator():
@@ -1386,21 +1402,13 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     error_type=error_type,
                     cost_micros=cost,
                 )
-                # Provider-trace plane (Phase 3): backend-capability gated inside the helper.
                 # The converter parked provider_meta + stream lifecycle under usage["_provider_trace"];
                 # a stream cancelled before the final usage chunk still carries the generation id here.
                 _trace = usage.get("_provider_trace") or {}
                 _lc = _trace.get("lifecycle", {})
                 record_provider_trace(
-                    backend_id=_backend_instance_id(),
+                    **_trace_ctx,
                     request_mode="streaming",
-                    proxy_id=PROXY_ID or "unknown",
-                    mapped_model=actual_model_id,
-                    request_id=request_id,
-                    forge_run_id=forge_run_id,
-                    forge_root_run_id=forge_root_run_id,
-                    provider_session_id=forge_session,
-                    provider_command=forge_command,
                     provider_meta=_trace.get("provider_meta"),
                     stream_started=_lc.get("stream_started", False),
                     first_chunk_seen=_lc.get("first_chunk_seen", False),
@@ -1473,18 +1481,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     error_type=None,
                     cost_micros=_cost,
                 )
-                # Provider-trace plane (Phase 3): non-streaming lifecycle is trivially complete
-                # (the full body arrived); provider_meta rides the top-level carrier key.
+                # Non-streaming: the full body arrived, so the lifecycle is trivially
+                # complete; provider_meta rides the top-level carrier key.
                 record_provider_trace(
-                    backend_id=_backend_instance_id(),
+                    **_trace_ctx,
                     request_mode="non_streaming",
-                    proxy_id=PROXY_ID or "unknown",
-                    mapped_model=actual_model_id,
-                    request_id=request_id,
-                    forge_run_id=forge_run_id,
-                    forge_root_run_id=forge_root_run_id,
-                    provider_session_id=forge_session,
-                    provider_command=forge_command,
                     provider_meta=openai_response.get("_provider_meta"),
                     stream_started=True,
                     first_chunk_seen=True,
