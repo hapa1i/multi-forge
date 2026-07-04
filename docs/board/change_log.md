@@ -35,7 +35,7 @@ wc -l docs/board/change_log.md
 
 - Reworded backend help, metavars, human tables, errors/tips, and public docs to backend/backend-instance/adapter
   language while keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
-  stable. Deeper domain migration stays in `todo/backend_instance_identity_model`.
+  stable. Deeper domain migration is split to `backend_instance_identity_model`.
 
 **Verification**: backend + command-tree tests passed (51); help/list smoke checked; `make pre-commit` clean.
 

@@ -1,7 +1,7 @@
 # CLI error-stream fix (stdout -> stderr) -- cli_style A1
 
-**Graduated slice** of [`docs/board/doing/cli_style_ux_compliance/card.md`](../../doing/cli_style_ux_compliance/card.md)
-item **A1** (the audit headline). The index now lives in `doing/`; this card owns the A1 execution unit only.
+**Graduated slice** of [`docs/board/done/cli_style_ux_compliance/card.md`](../../done/cli_style_ux_compliance/card.md)
+item **A1** (the audit headline). The index now lives in `done/`; this card owns the A1 execution unit only.
 
 **Lane**: `done/`. **Branch**: `fix/cli-error-stream-stderr`. **Merged**: PR #70 on 2026-07-03. **Interleave**: Step 1
 of the agreed backend/cli sequencing (below).

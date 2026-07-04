@@ -1,13 +1,15 @@
 # Checklist -- backend_instance_identity_model
 
-**Lane**: `todo/` -- draft only. Move this card to `doing/`, create/switch to its execution branch, and re-verify this
-checklist before ticking items.
+**Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
+
+**Current focus**: Phase 1 inventory. Phase 0 activation is complete; the next step is to re-verify the current
+machine-readable backend identity surfaces before choosing the schema/domain migration shape.
 
 ## Phase 0 -- Activation
 
-- [ ] Create or switch to the execution branch.
-- [ ] Move `docs/board/todo/backend_instance_identity_model/` to `docs/board/doing/backend_instance_identity_model/`.
-- [ ] Re-read `doing/cli_style_ux_compliance` C2/OQ-2 so the migration does not undo the CLI terminology decision.
+- [x] Create or switch to the execution branch.
+- [x] Move `docs/board/todo/backend_instance_identity_model/` to `docs/board/doing/backend_instance_identity_model/`.
+- [x] Re-read `done/cli_style_ux_compliance` C2/OQ-2 so the migration does not undo the CLI terminology decision.
 - [ ] Re-verify current backend identity surfaces before changing code.
 
 ## Phase 1 -- Inventory current contracts

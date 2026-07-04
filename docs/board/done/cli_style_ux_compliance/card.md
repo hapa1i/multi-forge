@@ -1,15 +1,15 @@
 # cli_style_ux_compliance -- fix CLI style-guide violations + close help/consistency UX gaps
 
-**Lane**: `doing/` -- active Step 3 coordinator/index on branch `feat/cli-style-ux-compliance`. The items are
-**independently shippable** and span different review risk, so this card is not one monolithic implementation unit:
-execute selected rows as focused slices grouped by review concern in [`checklist.md`](checklist.md).
+**Lane**: `done/`. **Branch**: `feat/cli-style-ux-compliance`. **Merged**: PR #72 on 2026-07-04. This snapshot preserves
+the Step 3 coordinator/index for the independently shippable CLI style slices; slice verification lives in
+[`checklist.md`](checklist.md).
 
 **Scheduling status (2026-07-03)**: **A1 shipped in PR #70** and is archived at
 [`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). **Step 2** shipped in PR #71
 and is archived at [`docs/board/done/backend_runtime_cleanup/`](../../done/backend_runtime_cleanup/card.md), including
-the backend-help slice of B1. **Step 3 is active**: resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
-(AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls** (so the
-default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
+the backend-help slice of B1. **Step 3 shipped in PR #72** for A2/A4/A5, B2-B5, C1/C2, and C3 record-only. **A1
+correction (AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls**
+(so the default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
 overrides, and a missed **handler-default** gap (`handle_session_error` resolved to stdout at `output.py:108`, 11 bare
 sites). The shipped card owns the corrected root strategy and verification.
 
@@ -154,7 +154,7 @@ then-current source-id vs runtime-instance-id vs adapter split, the backend exam
 mentions `forge model backend list` for source ids, and the source-row `backend_id == source_id` JSON shape is
 documented at the emitters. **C2 resolution:** the public CLI terminology now uses backend/backend-instance language,
 while the deeper storage/domain migration stays out of this UX card and is parked in
-[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
+[`doing/backend_instance_identity_model`](../../doing/backend_instance_identity_model/card.md).
 
 | Command(s)                                                                                      | Problem                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Action                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -179,7 +179,7 @@ singleton remote, the backend name can also be its instance id; when Forge suppo
 those remotes should get distinct backend instance ids. C2 shipped as a help/metavar/table/prose cleanup only:
 internal/storage and JSON names such as `ModelSource.id`, `source_id`, `runtime_instance`, and
 `BackendInstance.backend_id` stayed unchanged. The underlying abstraction migration is intentionally split to
-[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
+[`doing/backend_instance_identity_model`](../../doing/backend_instance_identity_model/card.md).
 
 **Verified backend traps (sharper than the table row -- these actively fail, not just confuse):**
 
@@ -248,11 +248,11 @@ here is already correct (`err_console`).
 
 Each needs a changelog entry per `coding_standards.md §5` and is higher-friction than a help edit.
 
-| #   | Change                                                                | Rationale / caveat                                                                                                                                                                                                                                                                        |
-| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | `telemetry activity --days N` -> `--period [today\|week\|month\|all]` | Sibling telemetry commands (`trace list`, `costs show`, `proxy audit`) all use `--period`. Align, or add `--period` and deprecate `--days`.                                                                                                                                               |
-| C2  | `model backend` positional metavar standardization                    | **Shipped in S5/C2:** public terminology says backend/backend instance/adapter and avoids unexplained `source` or overloaded `runtime`; implementation stayed help/metavar/table/prose-only. Storage/JSON/domain migration is separately split to `todo/backend_instance_identity_model`. |
-| C3  | `--scope` value-set/ordering canonicalization                         | **Resolved record-only:** no global reorder. The observed value sets are semantic families (`workspace\|project\|all`, `project\|workspace\|all`, `project\|all`, `local\|project\|user`, `user\|project\|local`), not one accidental enum. Only normalize local drift inside a family.   |
+| #   | Change                                                                | Rationale / caveat                                                                                                                                                                                                                                                                         |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C1  | `telemetry activity --days N` -> `--period [today\|week\|month\|all]` | Sibling telemetry commands (`trace list`, `costs show`, `proxy audit`) all use `--period`. Align, or add `--period` and deprecate `--days`.                                                                                                                                                |
+| C2  | `model backend` positional metavar standardization                    | **Shipped in S5/C2:** public terminology says backend/backend instance/adapter and avoids unexplained `source` or overloaded `runtime`; implementation stayed help/metavar/table/prose-only. Storage/JSON/domain migration is separately split to `doing/backend_instance_identity_model`. |
+| C3  | `--scope` value-set/ordering canonicalization                         | **Resolved record-only:** no global reorder. The observed value sets are semantic families (`workspace\|project\|all`, `project\|workspace\|all`, `project\|all`, `local\|project\|user`, `user\|project\|local`), not one accidental enum. Only normalize local drift inside a family.    |
 
 **C3 decision (2026-07-03):** do not force one canonical `--scope` order across the CLI. The verified orderings map to
 different objects:

@@ -1,9 +1,9 @@
 # Backend instance identity model -- make every model backend instance-addressable
 
-**Lane**: `todo/` -- accepted but parked. **Branch**: TBD when this card moves to `doing/`. Draft execution plan in
+**Lane**: `doing/` -- active on branch `feat/backend-instance-identity-model`. Draft execution plan in
 [`checklist.md`](checklist.md).
 
-**Origin**: split out of [`doing/cli_style_ux_compliance`](../../doing/cli_style_ux_compliance/card.md) C2/OQ-2 on
+**Origin**: split out of [`done/cli_style_ux_compliance`](../../done/cli_style_ux_compliance/card.md) C2/OQ-2 on
 2026-07-03. C2 should clean up public CLI terminology without renaming storage/JSON/domain fields. This card owns the
 deeper abstraction migration needed to support multiple configured remote backends of the same kind.
 
