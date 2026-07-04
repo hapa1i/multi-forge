@@ -57,12 +57,12 @@ class _ProbeResult:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def backend() -> None:
-    """Manage backend sources, local configs, and runtime instances.
+    """Manage model backends, local configs, and backend instances.
 
     \b
     Identifiers:
-        Source id: openrouter (upstream endpoint/capacity unit shown by list)
-        Runtime instance id: litellm-4000 (running local process)
+        Backend: openrouter (configured inference target shown by list)
+        Backend instance: litellm-4000 (managed local process shown by list)
         Adapter: litellm (local config type)
 
     \b
@@ -190,7 +190,7 @@ def _runtime_instance_record(
 
 
 def _runtime_cell(runtime: dict[str, Any] | None) -> str:
-    """Render the RUNTIME column, flagging an instance shared across sources."""
+    """Render the INSTANCE column, flagging an instance shared across sources."""
 
     if not runtime:
         return "-"
@@ -373,7 +373,7 @@ def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int
     if source is not None:
         if source.local_lifecycle is None:
             raise click.ClickException(
-                f"Backend source '{source.id}' is {source.kind} and has no local lifecycle to start or stop."
+                f"Backend '{source.id}' is {source.kind} and has no local lifecycle to start or stop."
             )
         lifecycle = source.local_lifecycle
         return lifecycle.adapter, port or lifecycle.default_port
@@ -384,12 +384,12 @@ def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int
         return operand, port
 
     raise click.ClickException(
-        f"Unknown backend source or adapter '{operand}'. Use '{_BACKEND_COMMAND} list' to see source ids."
+        f"Unknown backend or adapter '{operand}'. Use '{_BACKEND_COMMAND} list' to see backends."
     )
 
 
 def _runtime_id_tip() -> str:
-    return "Find the runtime instance id with:"
+    return "Find the backend instance id with:"
 
 
 def _runtime_id_tip_commands() -> tuple[str, ...]:
@@ -403,26 +403,26 @@ def _runtime_stop_target_error(
     if source is not None:
         if source.local_lifecycle is None:
             return (
-                f"Backend source '{source.id}' is {source.kind} and has no local lifecycle to start or stop.",
+                f"Backend '{source.id}' is {source.kind} and has no local lifecycle to start or stop.",
                 (),
                 (),
             )
         return (
-            f"Backend source '{source.id}' is not a runtime instance id.",
+            f"Backend '{source.id}' is not a backend instance id.",
             (_runtime_id_tip(),),
             _runtime_id_tip_commands(),
         )
 
     if operand in _SUPPORTED_ADAPTERS:
         return (
-            f"Backend adapter '{operand}' is not a runtime instance id.",
+            f"Backend adapter '{operand}' is not a backend instance id.",
             (_runtime_id_tip(),),
             _runtime_id_tip_commands(),
         )
 
     return (
-        f"Unknown runtime instance '{operand}'.",
-        ("Run 'forge model backend list' to see runtime instance ids.",),
+        f"Unknown backend instance '{operand}'.",
+        ("Run 'forge model backend list' to see backend instance ids.",),
         (),
     )
 
@@ -446,18 +446,18 @@ def _resolve_local_adapter_operand(operand: str) -> str:
     if source is not None:
         if source.kind == "remote":
             raise click.ClickException(
-                f"Backend source '{source.id}' is built in and remote; it has no local config to create or delete."
+                f"Backend '{source.id}' is built in and remote; it has no local config to create or delete."
             )
         adapter = source.local_lifecycle.adapter if source.local_lifecycle else "litellm"
         raise click.ClickException(
-            f"Backend source '{source.id}' is built in; manage its local adapter config with "
+            f"Backend '{source.id}' is built in; manage its local adapter config with "
             f"'{_BACKEND_COMMAND} create {adapter}' or '{_BACKEND_COMMAND} delete {adapter}'."
         )
 
     valid_adapters = ", ".join(sorted(_SUPPORTED_ADAPTERS))
     raise click.ClickException(
-        f"Unknown backend adapter or source '{operand}'. Valid adapters: {valid_adapters}. "
-        f"Use '{_BACKEND_COMMAND} list' to see source ids."
+        f"Unknown backend or adapter '{operand}'. Valid adapters: {valid_adapters}. "
+        f"Use '{_BACKEND_COMMAND} list' to see backends."
     )
 
 
@@ -575,7 +575,7 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
     shared_with = _shared_sibling_sources(source, instance, _instance_source_map(runtime_instances))
     auth = _auth_record(source)
 
-    console.print(f"[bold]Backend source:[/bold] [cyan]{source.id}[/cyan]")
+    console.print(f"[bold]Backend:[/bold] [cyan]{source.id}[/cyan]")
     console.print(f"[bold]Kind:[/bold] {source.kind}")
     console.print(f"[bold]Provider:[/bold] {source.provider}")
     console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, instance)}")
@@ -589,13 +589,13 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
         lifecycle = source.local_lifecycle
         console.print(f"[bold]Lifecycle:[/bold] {lifecycle.adapter} on default port {lifecycle.default_port}")
         if instance:
-            console.print(f"[bold]Runtime instance:[/bold] {instance.backend_id}")
-            console.print(f"[bold]Runtime PID:[/bold] {instance.pid or '-'}")
-            console.print(f"[bold]Runtime status:[/bold] {instance.status}")
+            console.print(f"[bold]Backend instance:[/bold] {instance.backend_id}")
+            console.print(f"[bold]Instance PID:[/bold] {instance.pid or '-'}")
+            console.print(f"[bold]Instance status:[/bold] {instance.status}")
             if shared_with:
                 console.print(f"[bold]Shared with:[/bold] {', '.join(shared_with)}")
         else:
-            console.print("[bold]Runtime instance:[/bold] -")
+            console.print("[bold]Backend instance:[/bold] -")
 
         config_path = get_backend_config_path(lifecycle.adapter)
         if config_path.exists():
@@ -622,7 +622,7 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
 @backend.command("list")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def list_cmd(as_json: bool) -> None:
-    """List built-in backend sources and local runtime state."""
+    """List model backends and local backend instances."""
     console = Console(width=200)
     runtime_instances = _load_runtime_instances()
     instance_sources = _instance_source_map(runtime_instances)
@@ -632,14 +632,14 @@ def list_cmd(as_json: bool) -> None:
         click.echo(json.dumps(records, indent=2, default=str))
         return
 
-    table = Table(title="Forge Backend Sources")
-    table.add_column("SOURCE ID", style="cyan")
+    table = Table(title="Forge Model Backends")
+    table.add_column("BACKEND", style="cyan")
     table.add_column("KIND")
     table.add_column("PROVIDER")
     table.add_column("ENDPOINT")
     table.add_column("AUTH")
     table.add_column("HEALTH")
-    table.add_column("RUNTIME")
+    table.add_column("INSTANCE")
 
     for record in records:
         runtime = record["runtime_instance"]
@@ -666,8 +666,8 @@ def list_cmd(as_json: bool) -> None:
 
     unmatched_runtimes = _unmatched_runtime_instances(records, runtime_instances)
     if unmatched_runtimes:
-        runtime_table = Table(title="Unmatched Runtime Instances")
-        runtime_table.add_column("RUNTIME", style="cyan")
+        runtime_table = Table(title="Unmatched Backend Instances")
+        runtime_table.add_column("INSTANCE", style="cyan")
         runtime_table.add_column("ADAPTER")
         runtime_table.add_column("PORT", justify="right")
         runtime_table.add_column("PID", justify="right")
@@ -687,11 +687,11 @@ def list_cmd(as_json: bool) -> None:
 
 
 @backend.command("show")
-@click.argument("backend_id")
+@click.argument("backend_id", metavar="BACKEND_OR_INSTANCE")
 @click.option("--raw", is_flag=True, help="Output raw config without syntax highlighting")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
-    """Show backend details and configuration.
+    """Show backend or backend instance details and configuration.
 
     \b
     Examples:
@@ -762,7 +762,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
         if instance:
             alive = instance.pid is not None and is_pid_alive(instance.pid)
             status_color = "green" if alive else "yellow"
-            console.print(f"[bold]Backend:[/bold] [cyan]{backend_id}[/cyan]")
+            console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan]")
             console.print(f"[bold]Adapter:[/bold] {instance.adapter_type}")
             console.print(f"[bold]Port:[/bold] {instance.port}")
             console.print(f"[bold]PID:[/bold] {instance.pid or '-'}")
@@ -772,9 +772,9 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
             if instance.created_at:
                 console.print(f"[bold]Started:[/bold] {instance.created_at}")
         else:
-            console.print(f"[bold]Backend:[/bold] [cyan]{backend_id}[/cyan] [dim](not in registry)[/dim]")
+            console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan] [dim](not in registry)[/dim]")
     except Exception:
-        console.print(f"[bold]Backend:[/bold] [cyan]{backend_id}[/cyan]")
+        console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan]")
 
     log_file = get_forge_home() / "logs" / "backend" / f"{backend_id}.log"
     if log_file.exists():
@@ -807,7 +807,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
 
 
 @backend.command("test-auth")
-@click.argument("source_id")
+@click.argument("source_id", metavar="BACKEND")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--timeout",
@@ -817,7 +817,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
     help="Probe timeout in seconds",
 )
 def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
-    """Test a backend source's credential configuration and reachable auth endpoint.
+    """Test a backend's credential configuration and reachable auth endpoint.
 
     \b
     Examples:
@@ -827,7 +827,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     source = _source_for_identifier(source_id)
     if source is None:
         print_error(
-            f"Unknown backend source '{source_id}'. Use '{_BACKEND_COMMAND} list' to see source ids.",
+            f"Unknown backend '{source_id}'. Use '{_BACKEND_COMMAND} list' to see backends.",
             console=err_console,
         )
         sys.exit(1)
@@ -869,7 +869,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     if as_json:
         click.echo(json.dumps(payload, indent=2, default=str))
     else:
-        console.print(f"[bold]Backend source:[/bold] [cyan]{source.id}[/cyan]")
+        console.print(f"[bold]Backend:[/bold] [cyan]{source.id}[/cyan]")
         console.print(f"[bold]Auth:[/bold] {_auth_display(auth)}")
         console.print(f"[bold]Probe:[/bold] {probe.status} - {probe.detail}")
 
@@ -883,7 +883,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     "--config",
     "-c",
     type=Path,
-    help="Source config file (defaults to installed template)",
+    help="Adapter config file (defaults to installed template)",
 )
 def create_cmd(adapter: str, config: Path | None) -> None:
     """Create a backend config (copy to installed location).
@@ -920,10 +920,22 @@ def create_cmd(adapter: str, config: Path | None) -> None:
 
 
 @backend.command("start")
-@click.argument("source_or_adapter")
-@click.option("--port", "-p", type=int, required=False, help="Port number")
+@click.argument("source_or_adapter", metavar="BACKEND_OR_ADAPTER")
+@click.option(
+    "--port",
+    "-p",
+    type=int,
+    required=False,
+    help="Port number (required for adapter names like litellm; backend names use their default port unless overridden)",
+)
 def start_cmd(source_or_adapter: str, port: int | None) -> None:
-    """Start a local backend instance from a source id or adapter config."""
+    """Start a local backend instance from a backend or adapter config.
+
+    \b
+    Examples:
+        forge model backend start litellm-openai-local
+        forge model backend start litellm --port 4000
+    """
     console = Console(width=200)
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
@@ -958,7 +970,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
 
 
 def _stop_runtime_instance(instance: BackendInstance) -> None:
-    """Stop a single registered runtime instance. Raises on failure; the caller owns output."""
+    """Stop a single registered backend instance. Raises on failure; the caller owns output."""
     store = BackendRegistryStore()
     manager = BackendManager(store)
     manager.register_adapter(instance.adapter_type, get_adapter(instance.adapter_type))
@@ -966,17 +978,19 @@ def _stop_runtime_instance(instance: BackendInstance) -> None:
 
 
 @backend.command("stop")
-@click.argument("runtime_ids", nargs=-1, metavar="RUNTIME_ID...")
+@click.argument("runtime_ids", nargs=-1, metavar="BACKEND_INSTANCE...")
 @click.option(
     "--all",
     "-a",
     "stop_all",
     is_flag=True,
-    help="Stop all registered local runtime instances",
+    help="Stop all registered local backend instances",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
 def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
-    """Stop live local backend runtime instance(s).
+    """Stop live local backend instance(s).
+
+    Backend instance ids are shown in `forge model backend list` (for example, litellm-4000).
 
     \b
     Examples:
@@ -987,12 +1001,12 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
     """
     console = Console(width=200)
     if stop_all and runtime_ids:
-        print_error("Cannot combine --all with explicit runtime instance IDs")
+        print_error("Cannot combine --all with explicit backend instance IDs")
         sys.exit(1)
     if not stop_all and not runtime_ids:
         print_error_with_tip(
-            "Provide runtime instance ID(s) or use --all.",
-            "Run 'forge model backend list' to see runtime instance ids.",
+            "Provide backend instance ID(s) or use --all.",
+            "Run 'forge model backend list' to see backend instance ids.",
         )
         sys.exit(1)
 
@@ -1000,14 +1014,14 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
     registry = store.read()
     if stop_all:
         if not registry.backends:
-            console.print("[dim]No runtime instances to stop.[/dim]")
+            console.print("[dim]No backend instances to stop.[/dim]")
             return
         targets = list(registry.backends.keys())
-        console.print(f"About to stop [bold]all {len(targets)} runtime instance(s)[/bold]:")
+        console.print(f"About to stop [bold]all {len(targets)} backend instance(s)[/bold]:")
         for target in targets:
             console.print(f"  - {target}")
         console.print()
-        if not yes and not click.confirm("Are you sure you want to stop all runtime instances?"):
+        if not yes and not click.confirm("Are you sure you want to stop all backend instances?"):
             console.print("Cancelled.")
             return
     else:
@@ -1056,8 +1070,8 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
 def delete_cmd(adapter: str, yes: bool) -> None:
     """Delete a local backend adapter config.
 
-    Stops matching runtime instances first, but the command's object is the
-    adapter config. Use 'stop' for runtime instances.
+    Stops matching backend instances first, but the command's object is the
+    adapter config. Use 'stop' for backend instances.
     """
     import shutil
 
@@ -1066,8 +1080,8 @@ def delete_cmd(adapter: str, yes: bool) -> None:
     registry = store.read()
     if adapter in registry.backends:
         print_error_with_tip(
-            f"'{adapter}' is a runtime instance id, not an adapter config.",
-            f"Use '{_BACKEND_COMMAND} stop {adapter}' to stop a runtime instance.",
+            f"'{adapter}' is a backend instance id, not an adapter config.",
+            f"Use '{_BACKEND_COMMAND} stop {adapter}' to stop a backend instance.",
         )
         sys.exit(1)
 
@@ -1085,7 +1099,7 @@ def delete_cmd(adapter: str, yes: bool) -> None:
         )
         sys.exit(1)
 
-    if not yes and not click.confirm(f"Delete backend config for '{adapter}' (stops matching runtime instances)?"):
+    if not yes and not click.confirm(f"Delete backend config for '{adapter}' (stops matching backend instances)?"):
         console.print("Cancelled.")
         return
 
@@ -1107,12 +1121,12 @@ def delete_cmd(adapter: str, yes: bool) -> None:
 
 
 @backend.command("reconcile")
-@click.argument("source_id")
+@click.argument("source_id", metavar="BACKEND")
 @click.option(
     "--request-id",
     "request_id",
     default=None,
-    help="Local request id to join to a remote record (scoped to <source-id>; run 'forge model backend list' for source ids).",
+    help="Local request id to join to a remote record (scoped to <backend>; run 'forge model backend list' for backends).",
 )
 @click.option(
     "--remote-id",
@@ -1154,7 +1168,7 @@ def reconcile_cmd(
     if not request_id and not remote_id:
         print_error_with_tip(
             "Provide a local request id or a remote record id to reconcile.",
-            "Use --request-id <id> (local) or --remote-id <id> (the backend's own record id).",
+            "Use --request-id <id> for a local request, or use --remote-id <id> for the backend's own record id.",
             console=err_console,
         )
         sys.exit(1)
@@ -1170,7 +1184,7 @@ def reconcile_cmd(
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
-            f"Run '{_BACKEND_COMMAND} list' to see source ids.",
+            f"Run '{_BACKEND_COMMAND} list' to see backends.",
             console=err_console,
         )
         sys.exit(1)

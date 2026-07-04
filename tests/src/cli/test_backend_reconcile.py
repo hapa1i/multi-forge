@@ -100,6 +100,8 @@ def test_no_id_prints_tip_exit_1(monkeypatch):
     res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter"))
     assert res.exit_code == 1
     assert "Tip:" in res.output
+    assert "Use --request-id <id>" in res.output
+    assert "use --remote-id <id>" in res.output
 
 
 def test_forge_op_error_exits_1_with_backend_list_tip(monkeypatch):

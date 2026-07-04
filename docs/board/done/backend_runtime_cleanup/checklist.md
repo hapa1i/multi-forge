@@ -4,7 +4,7 @@
 
 **Current focus**: Make local backend **runtime instances** first-class `stop` targets (by id, and `--all`), turn
 `delete` into a config-only command, and keep `start` config-oriented -- then fold in the cli_style **B1** backend-help
-pass (same PR, both edit `backend.py`). **Status: PLAN FOR REVIEW (no code written yet).**
+pass (same PR, both edit `backend.py`). **Status: SHIPPED in PR #71; board closeout complete.**
 
 **Guiding rules**: card [Proposal](card.md) + [Start/stop asymmetry](card.md); `coding_standards.md` §5
 (research-preview clean break -- removed options rely on Click's native "No such option", named in the changelog);
@@ -189,7 +189,7 @@ re-raises `SystemExit` only when a single target (`:1154`).
   runtime-instance JSON already carries `source_id: None` -- removing the key is a contract change.
 - **Open question (card, deferred):** an `--unhealthy` filter for `stop`. MVP is `--all` only (operator case = "flush
   local runtime state"), not fault classification. Out of scope; leave the open question in the card.
-- **Out of scope (stays in `proposed/cli_style_ux_compliance` index):** the B1 metavar *standardization* (row 1) + C2
+- **Out of scope (stays in `doing/cli_style_ux_compliance` index):** the B1 metavar *standardization* (row 1) + C2
   rename; B2 tip-form/`--json`-wording; B3/B4/B5. Only B1's id-space definition + 3 traps fold in here.
 
 ## Closeout items
@@ -202,5 +202,5 @@ re-raises `SystemExit` only when a single target (`:1154`).
 - [x] `change_log.md` entry added (feature-completion size).
 - [x] Docs synced: `cli_reference.md`, `design_appendix.md` §A.2.1, `end-user/proxy.md`.
 - [x] cli_style index annotated: **B1 shipped** (strike the group-help rows folded here); note the remaining B1 metavar
-  \+ B2-B5 rows stay in `proposed/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
-- [ ] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).
+  \+ B2-B5 rows stay in `doing/`. Point the index's next cursor at **Step 3** (resume cli_style A2/A4/A5, B2-B5, C).
+- [x] Card moved `doing/ -> done/` after merge to `main` (with this checklist alongside).

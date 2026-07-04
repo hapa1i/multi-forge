@@ -1,14 +1,13 @@
 # cli_style_ux_compliance -- fix CLI style-guide violations + close help/consistency UX gaps
 
-**Lane**: `proposed/` -- accepted-candidate **index**, not yet scheduled. The items are **independently shippable** and
-span different review risk, so this card is **not** meant to move wholesale to `doing/`: when scheduled, split selected
-rows into their own execution card(s)/`checklist.md` grouped by review concern (see
-[Sequencing & coupling](#sequencing--coupling)). Not blocking other work.
+**Lane**: `doing/` -- active Step 3 coordinator/index on branch `feat/cli-style-ux-compliance`. The items are
+**independently shippable** and span different review risk, so this card is not one monolithic implementation unit:
+execute selected rows as focused slices grouped by review concern in [`checklist.md`](checklist.md).
 
 **Scheduling status (2026-07-03)**: **A1 shipped in PR #70** and is archived at
-[`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). cli_style is paused after the
-A1 step. Next cursor: **Step 2** [`backend_runtime_cleanup`](../backend_runtime_cleanup/card.md) (full) **+ fold in B1
-backend-help** (help-only, no metavar rename), then **Step 3** resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
+[`docs/board/done/cli_error_stream_stderr/`](../../done/cli_error_stream_stderr/card.md). **Step 2** shipped in PR #71
+and is archived at [`docs/board/done/backend_runtime_cleanup/`](../../done/backend_runtime_cleanup/card.md), including
+the backend-help slice of B1. **Step 3 is active**: resume cli_style for A2/A4/A5, B2-B5, C. **A1 correction
 (AST-verified 2026-07-02):** this row's grep model was wrong -- there were **0 bare `print_error*` calls** (so the
 default flip fixed no current site; it was a forward guard), **240** (not 173) `console=console` explicit-stdout
 overrides, and a missed **handler-default** gap (`handle_session_error` resolved to stdout at `output.py:108`, 11 bare
@@ -111,13 +110,12 @@ split continuations, red diagnostics, and in-branch `--json` errors.
 `session_lifecycle.py:1189` -- the help string literally contains a stray bold marker: `...claude-sonnet-4-6[1m])`,
 which renders verbatim in `--help`. One-character fix (delete `[1m]`).
 
-### A3 -- `forge policy enable` warn-and-exits-0 on missing input (needs a decision)
+### A3 -- `forge policy enable` warn-and-exits-0 on missing input (**shipped in S3**)
 
 `policy.py:275-278` -- with no `--bundle`, prints a yellow `Warning:` and `return`s (exit 0). Violates "Leaves fail
-loudly on missing required input." **Resolve the design intent first** (see [Open questions](#open-questions)):
-`design_workflows.md §3.6` describes a *planned* behavior for bare `enable` -- "restores the session's configured
-bundles from intent." So the fix is either (a) make `--bundle` required (fail non-zero), or (b) implement
-restore-from-intent. Either way, warn-and-exit-0 is wrong.
+loudly on missing required input." **Resolution (2026-07-03):** terminal `forge policy enable` fails loud unless
+`--bundle` is provided. The planned restore-from-intent behavior belongs to the `%policy enable` dispatcher, not this
+terminal CLI leaf.
 
 ### A4 -- `forge search clean` lacks `--json`
 
@@ -150,10 +148,13 @@ group.)
 
 ### B1 -- Undefined identifiers (the "source_id needed but source not defined" archetype)
 
-**Status (2026-07-03)**: `doing/backend_runtime_cleanup` folds in the backend help/definition slice: the `model backend`
-group defines source id vs runtime instance id vs adapter, the backend examples use valid id spaces, `reconcile`
+**Status (2026-07-03)**: the backend help/definition slice shipped via
+[`done/backend_runtime_cleanup`](../../done/backend_runtime_cleanup/card.md): the `model backend` group defines the
+then-current source-id vs runtime-instance-id vs adapter split, the backend examples use valid id spaces, `reconcile`
 mentions `forge model backend list` for source ids, and the source-row `backend_id == source_id` JSON shape is
-documented at the emitters. The broader backend metavar/C2 rename question stays open.
+documented at the emitters. **C2 resolution:** the public CLI terminology now uses backend/backend-instance language,
+while the deeper storage/domain migration stays out of this UX card and is parked in
+[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
 
 | Command(s)                                                                                      | Problem                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Action                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -168,7 +169,17 @@ documented at the emitters. The broader backend metavar/C2 rename question stays
 encounter these ids through `forge model backend list`, `test-auth`, `start`, `stop`, and `reconcile`. Treat bare
 `SOURCE_ID` / "source id" wording as an internal vocabulary leak unless the help defines "source" inline as the upstream
 model endpoint/capacity unit shown by `forge model backend list`. The wording decision belongs here, not in individual
-behavior cards such as `proposed/backend_runtime_cleanup`, which should follow whatever naming this batch chooses.
+behavior cards such as `backend_runtime_cleanup`, which should follow whatever naming this batch chooses.
+
+**C2 decision and implementation (2026-07-03):** use only first-class CLI nouns in the public surface. `runtime` is
+reserved for the agent/frontend runtime (`codex`, `claude_code`). Under `forge model backend`, configured inference
+targets are **backends**, concrete usable endpoints/processes are **backend instances**, and implementation/config
+families are **adapters**. Remote backends are still instances conceptually: while Forge has only one configured
+singleton remote, the backend name can also be its instance id; when Forge supports multiple remotes of the same kind,
+those remotes should get distinct backend instance ids. C2 shipped as a help/metavar/table/prose cleanup only:
+internal/storage and JSON names such as `ModelSource.id`, `source_id`, `runtime_instance`, and
+`BackendInstance.backend_id` stayed unchanged. The underlying abstraction migration is intentionally split to
+[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
 
 **Verified backend traps (sharper than the table row -- these actively fail, not just confuse):**
 
@@ -216,7 +227,8 @@ behavior cards such as `proposed/backend_runtime_cleanup`, which should follow w
 Add an example to: `model backend start`/`stop` (source-vs-adapter + `--port`), `search query` (phrase syntax),
 `workflow panel --context resume:<uuid>` (Forge name vs Claude UUID), `session lane set`/`clear` (consumer + backend
 combos). Add actionable next-step tips on error/empty paths: `telemetry activity --json` currently drops the human-mode
-"run `forge session list`" tip in JSON mode; `logs --older-than` validation gives no recovery tip.
+"run `forge session list`" tip in JSON mode. The old `logs --older-than` validation tip was folded into A5/S2 with the
+`logs clean` redesign.
 
 ### B5 -- `session lane set` gives no way to discover valid lanes, and the invalid-lane error is raw
 
@@ -236,11 +248,23 @@ here is already correct (`err_console`).
 
 Each needs a changelog entry per `coding_standards.md §5` and is higher-friction than a help edit.
 
-| #   | Change                                                                | Rationale / caveat                                                                                                                                                                                                                                                 |
-| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C1  | `telemetry activity --days N` -> `--period [today\|week\|month\|all]` | Sibling telemetry commands (`trace list`, `costs show`, `proxy audit`) all use `--period`. Align, or add `--period` and deprecate `--days`.                                                                                                                        |
-| C2  | `model backend` positional metavar standardization                    | See B1 -- **preserve the source/adapter/instance distinction**; this is a naming+help fix that *may* rename a metavar, not a semantic merge. Gate on the Open-question answer.                                                                                     |
-| C3  | `--scope` value-set/ordering canonicalization                         | Several orderings/sets exist (`[workspace\|project\|all]`, `[local\|project\|user]`, `[project\|all]`). Some divergence is legitimate (user-scope vs workspace-scope apply to different objects); only the *arbitrary ordering* is the target. Low value; do last. |
+| #   | Change                                                                | Rationale / caveat                                                                                                                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | `telemetry activity --days N` -> `--period [today\|week\|month\|all]` | Sibling telemetry commands (`trace list`, `costs show`, `proxy audit`) all use `--period`. Align, or add `--period` and deprecate `--days`.                                                                                                                                               |
+| C2  | `model backend` positional metavar standardization                    | **Shipped in S5/C2:** public terminology says backend/backend instance/adapter and avoids unexplained `source` or overloaded `runtime`; implementation stayed help/metavar/table/prose-only. Storage/JSON/domain migration is separately split to `todo/backend_instance_identity_model`. |
+| C3  | `--scope` value-set/ordering canonicalization                         | **Resolved record-only:** no global reorder. The observed value sets are semantic families (`workspace\|project\|all`, `project\|workspace\|all`, `project\|all`, `local\|project\|user`, `user\|project\|local`), not one accidental enum. Only normalize local drift inside a family.   |
+
+**C3 decision (2026-07-03):** do not force one canonical `--scope` order across the CLI. The verified orderings map to
+different objects:
+
+- `session list` / `forge clean`: `workspace|project|all` (workspace-default session/state cleanup).
+- `memory shadows` / `session memory status`: `project|workspace|all` (project-default memory discovery).
+- `search query`: `project|all` (no workspace scope exists for indexed-project search).
+- `extension enable|sync|disable|status`: `local|project|user` (installation specificity).
+- `codex status`: `user|project|local` (runtime-install reporting order, matching install tracking).
+
+So C3 is record-only for this card; no code change is needed unless future review identifies local drift inside a
+semantic family.
 
 ---
 
@@ -260,37 +284,36 @@ Each needs a changelog entry per `coding_standards.md §5` and is higher-frictio
 
 ---
 
-## Open questions (need human input)
+## Decisions from open questions
 
-| Q                                                                                                                                                                       | Area          | Why it matters                                                                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------- |
-| A3: make `policy enable --bundle` **required** (fail loud) or implement **restore-configured-bundles-from-intent** (the `design_workflows.md §3.6` "planned" behavior)? | policy        | Decides whether A3 is a 2-line guard or a small feature.                                                         |
-| B1/C2: is the `model backend` metavar variance worth a rename at all, given it encodes a real source/adapter/instance distinction?                                      | model backend | A blind rename would erase a documented value-space split (`impl_notes.md`); the safe fix may be help-text-only. |
-| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope         | Determines how much of C3 is actually actionable.                                                                |
+| Q                                                                                                                                                                       | Area          | Decision                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A3: make `policy enable --bundle` **required** (fail loud) or implement **restore-configured-bundles-from-intent** (the `design_workflows.md §3.6` "planned" behavior)? | policy        | Resolved 2026-07-03: fail loud in the terminal CLI; restore-from-intent stays with the `%policy enable` dispatcher.                        |
+| B1/C2: is the `model backend` metavar variance worth a rename at all, given it encodes a real source/adapter/instance distinction?                                      | model backend | Resolved 2026-07-03: yes for public backend/backend-instance wording; no for opportunistic internal/storage/JSON renames in this UX slice. |
+| C3: which `--scope` divergences are semantic (user vs workspace) vs cosmetic ordering?                                                                                  | scope         | Resolved 2026-07-03: semantic families; do not globally canonicalize. Only fix local drift inside a family if review finds any.            |
 
 ---
 
 ## Sequencing & coupling
 
-- **This card is a proposed *index*, not one execution unit -- do NOT move it wholesale to `doing/`.** The rows span
-  very different review risk: auth/config output routing, telemetry/money-path-adjacent commands, a `session --json`
-  shape change (A4/B), the `logs` group redesign (A5), pure docs (B2), and clean-break removals (C). When scheduled,
-  split the selected rows into their own execution card(s)/`checklist.md` grouped by review concern (e.g. "A1
-  error-stream root fix", "A5 logs group", "Batch B help-text pass", "Batch C breaks") -- each with its own PR and
-  guard. The batch card stays the durable index; individual slices graduate out of it.
-- **Batch A is independent and high-value.** A1 shipped with the guard-test extension in PR #70. A2/A4 are trivial
-  single-file changes; A3 is gated on its Open question.
+- **This card is the active Step 3 coordinator, not one execution unit.** The rows span very different review risk:
+  auth/config output routing, telemetry/money-path-adjacent commands, a `session --json` shape change (A4/B), the `logs`
+  group redesign (A5), pure docs (B2), and clean-break removals (C). Execute selected rows as focused slices in the
+  checklist grouped by review concern (for example, "A5 logs group", "Batch B help-text pass", "Batch C breaks") -- each
+  with its own verification guard. The batch card stays the durable index while individual slices graduate out of it.
+- **Batch A is independent and high-value.** A1 shipped with the guard-test extension in PR #70. A2/A4 shipped as
+  trivial correctness fixes; A3 shipped as the fail-loud terminal-CLI path.
 - **A3 \<-> the `accidental_complexity_cleanup` "WorkflowPolicy product boundary" item.** Both touch `policy enable`:
   this card's A3 fixes its warn-and-exit-0; that card decides whether `--bundle`'s `Choice(["tdd","coding_standards"])`
-  should gain a `workflow` path. Coordinate -- an A3 "make `--bundle` required" fix must not preempt that card's
-  demote-vs-graduate decision. Resolve A3's Open question against it.
+  should gain a `workflow` path. The shipped A3 fail-loud path must not preempt that card's demote-vs-graduate decision.
 - **A2 \<-> `session_op_layer_extraction`.** A2 edits a help string in `session_lifecycle.py:1189`, which that card will
   refactor. It is a one-character fix -- land A2 first (independently), or let the refactor absorb it; do not block A2
   on the refactor.
 - **Batch B is pure help/docstring edits.** Zero behavior change, no test risk beyond help-snapshot updates; ship
   anytime, in any order.
-- **Batch C are breaking changes.** Batch separately with changelog entries; C2 depends on the B1 answer; C3 is
-  lowest-value.
+- **Batch C are breaking changes where code changes ship.** C1 shipped as a clean break. C2 shipped as a public
+  help/metavar/table cleanup, while the deeper backend-instance abstraction is a separate todo card. C3 is record-only:
+  semantic scope families stay as-is.
 
 ---
 

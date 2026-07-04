@@ -150,14 +150,14 @@ consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` 
 provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
 view.
 
-| Command                                      | Purpose                                                                                                                           |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost/lane (`runtime`/`billing_mode`; `--json`, `--days`, `--all`) |
-| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                                               |
-| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                                                            |
-| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)                                       |
-| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                                                  |
-| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                                                          |
+| Command                                      | Purpose                                                                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost/lane (`runtime`/`billing_mode`; `--json`, `--period`) |
+| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                                        |
+| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                                                     |
+| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)                                |
+| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                                           |
+| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                                                   |
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed
@@ -197,17 +197,17 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 windows, and model capabilities. `forge workflow list-models` is separate: it checks runtime readiness for workflow
 runners.
 
-| Command                                           | Purpose                                                                                    |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `forge model catalog`                             | List the static model catalog (`--json`)                                                   |
-| `forge model backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
-| `forge model backend show <source-or-backend-id>` | Show source details or runtime instance details (`--raw`)                                  |
-| `forge model backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
-| `forge model backend create <adapter>`            | Create local backend adapter config                                                        |
-| `forge model backend start <source-or-adapter>`   | Start a local lifecycle source or adapter config                                           |
-| `forge model backend stop <runtime-id>...`        | Stop live local runtime instances by id, or all with `--all`                               |
-| `forge model backend delete <adapter>`            | Delete local backend adapter config, stopping matching runtime instances first             |
-| `forge model backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
+| Command                                          | Purpose                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `forge model catalog`                            | List the static model catalog (`--json`)                                                   |
+| `forge model backend list`                       | List model backends and local backend instances (`--json`)                                 |
+| `forge model backend show <backend-or-instance>` | Show backend details or backend instance details (`--raw`)                                 |
+| `forge model backend test-auth <backend>`        | Check backend credentials and run a reachability/auth probe (`--json`)                     |
+| `forge model backend create <adapter>`           | Create local backend adapter config                                                        |
+| `forge model backend start <backend-or-adapter>` | Start a local lifecycle backend or adapter config                                          |
+| `forge model backend stop <backend-instance>...` | Stop live local backend instances by id, or all with `--all`                               |
+| `forge model backend delete <adapter>`           | Delete local backend adapter config, stopping matching backend instances first             |
+| `forge model backend reconcile <backend>`        | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement
 
@@ -253,23 +253,24 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### Search
 
-| Command                      | Purpose                                       |
-| ---------------------------- | --------------------------------------------- |
-| `forge search query <query>` | Search transcripts (table; `--json` for JSON) |
-| `forge search rebuild-index` | Full index rebuild from artifacts             |
-| `forge search status`        | Show index statistics                         |
-| `forge search clean`         | Preview orphaned documents; `--yes` to prune  |
+| Command                      | Purpose                                                         |
+| ---------------------------- | --------------------------------------------------------------- |
+| `forge search query <query>` | Search transcripts (table; `--json` for JSON)                   |
+| `forge search rebuild-index` | Full index rebuild from artifacts                               |
+| `forge search status`        | Show index statistics                                           |
+| `forge search clean`         | Preview orphaned documents; `--yes` to prune; `--json` for JSON |
 
 ### System
 
-| Command             | Purpose                                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `forge info`        | Show global system information (`--json`)                                                            |
-| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                               |
-| `forge config`      | Manage global runtime preferences                                                                    |
-| `forge auth login`  | Store credentials for LLM providers                                                                  |
-| `forge auth status` | Show credential status per provider                                                                  |
-| `forge logs`        | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| Command             | Purpose                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `forge info`        | Show global system information (`--json`)                                                                       |
+| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                                          |
+| `forge config`      | Manage global runtime preferences                                                                               |
+| `forge auth login`  | Store credentials for LLM providers                                                                             |
+| `forge auth status` | Show credential status per provider                                                                             |
+| `forge logs show`   | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| `forge logs clean`  | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
 
 ### Internal (hidden from `forge --help`)
 

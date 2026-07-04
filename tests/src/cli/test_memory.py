@@ -69,6 +69,14 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
 
 
 class TestMemoryTrack:
+    def test_track_help_documents_intent_and_writer_formats(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["memory", "track", "--help"])
+        output = " ".join(result.output.split())
+
+        assert result.exit_code == 0
+        assert "why this doc is memory" in output
+        assert "all-sessions or comma-separated session names" in output
+
     def test_track_writes_passport_no_manifest(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """track authors a project-lifetime passport and writes no session participation."""
         forge_root = seeded_session[0]
@@ -470,6 +478,20 @@ class TestMemoryList:
 
 
 class TestMemoryShadowsList:
+    def test_shadows_help_documents_scope_and_for_format(self, runner: CliRunner) -> None:
+        list_help = runner.invoke(main, ["memory", "shadows", "list", "--help"])
+        show_help = runner.invoke(main, ["memory", "shadows", "show", "--help"])
+        review_help = runner.invoke(main, ["memory", "shadows", "review", "--help"])
+
+        assert list_help.exit_code == 0
+        assert "Scope for shadow discovery" in list_help.output
+        assert show_help.exit_code == 0
+        assert "docs/impl_notes.md" in show_help.output
+        assert "Output as JSON" in show_help.output
+        assert review_help.exit_code == 0
+        assert "docs/impl_notes.md" in review_help.output
+        assert "Scope for shadow discovery" in review_help.output
+
     def test_empty_shadows(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "shadows", "list"])
         assert result.exit_code == 0, result.output

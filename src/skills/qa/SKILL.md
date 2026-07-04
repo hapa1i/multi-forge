@@ -298,8 +298,8 @@ For each section/step in the filtered range:
     **Default debug logging**: the QA container exports `FORGE_DEBUG=1` via `/etc/profile.d/forge-qa.sh`, so Forge
     commands write debug logs to `/root/.forge/logs/...` unless the subcommand is explicitly exempt.
 
-    **Before a block that contains `forge logs --clean`**, snapshot the current Forge debug logs into the mounted state
-    dir so evidence survives the cleanup step:
+    **Before a block that contains `forge logs clean --yes`**, snapshot the current Forge debug logs into the mounted
+    state dir so evidence survives the cleanup step:
 
     ```bash
     docker exec "$CONTAINER" bash -lc 'SNAP="$FORGE_TEST_REPO/.forge/qa/forge-logs-snapshots/N.X/pre-clean"; rm -rf "$SNAP"; if [ -d /root/.forge/logs ]; then mkdir -p "$SNAP" && cp -R /root/.forge/logs/. "$SNAP"/; fi'

@@ -87,7 +87,7 @@ not line greps -- greps miscount multiline calls.**
 ## Blockers / deferred
 
 - Decisions **D-json / D-codemod / D-scope** are resolved (see card). No open blockers.
-- Everything else in cli_style (A2/A4/A5, B, C) is **out of scope** and stays in the `proposed/` index. B1 -> Step-2
+- Everything else in cli_style (A2/A4/A5, B, C) is **out of scope** and stays in the `doing/` index. B1 -> Step-2
   backend PR. `cli/hooks/` is a separate surface, not A1.
 
 ## Closeout items

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -42,11 +43,21 @@ def _isolate_forge_logger():
 # ---------------------------------------------------------------------------
 
 
-def test_logs_shows_directory_and_level(tmp_path, monkeypatch):
-    """forge logs shows the log directory path and level."""
-    monkeypatch.delenv("FORGE_DEBUG", raising=False)
+def test_logs_bare_group_shows_help(tmp_path, monkeypatch):
+    """Bare `forge logs` is the group help surface."""
     runner = CliRunner()
     result = runner.invoke(main, ["logs"])
+    assert result.exit_code == 2
+    assert "Usage:" in result.output
+    assert "show" in result.output
+    assert "clean" in result.output
+
+
+def test_logs_shows_directory_and_level(tmp_path, monkeypatch):
+    """forge logs show shows the log directory path and level."""
+    monkeypatch.delenv("FORGE_DEBUG", raising=False)
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs", "show"])
     assert result.exit_code == 0
     assert "Log directory:" in result.output
     assert "Log level:" in result.output
@@ -56,15 +67,30 @@ def test_logs_shows_directory_and_level(tmp_path, monkeypatch):
 def test_logs_shows_level_debug_via_env(tmp_path, monkeypatch):
     monkeypatch.setenv("FORGE_DEBUG", "1")
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert "debug" in result.output
 
 
-def test_logs_surfaces_per_proxy_request_diagnostics_note(tmp_path, monkeypatch):
-    """forge logs explains the per-proxy request-diagnostics capture model without secrets."""
+def test_logs_show_json_outputs_status(tmp_path, monkeypatch):
+    """forge logs show --json emits stable status JSON on stdout."""
     monkeypatch.delenv("FORGE_DEBUG", raising=False)
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show", "--json"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    data = json.loads(result.stdout)
+    assert data["log_level"] == "off"
+    assert data["retention"]["days"] == 0
+    assert data["total"]["files"] == 0
+    assert {row["name"] for row in data["directories"]} >= {"proxy", "backend", "hooks", "cli"}
+    assert data["request_diagnostics"]["config_key"] == "logging.requests"
+
+
+def test_logs_surfaces_per_proxy_request_diagnostics_note(tmp_path, monkeypatch):
+    """forge logs show explains the per-proxy request-diagnostics capture model without secrets."""
+    monkeypatch.delenv("FORGE_DEBUG", raising=False)
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs", "show"])
     assert result.exit_code == 0
     assert "Request diagnostics:" in result.output
     assert "per-proxy logging.requests" in result.output
@@ -72,10 +98,10 @@ def test_logs_surfaces_per_proxy_request_diagnostics_note(tmp_path, monkeypatch)
 
 
 def test_logs_command_does_not_create_self_log_file(tmp_path, monkeypatch):
-    """`forge logs` should inspect logs without generating a fresh logs.*.log file."""
+    """`forge logs show` should inspect logs without generating a fresh logs.*.log file."""
     monkeypatch.setenv("FORGE_DEBUG", "1")
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert result.exit_code == 0
     logs_dir = tmp_path / "forge_home" / "logs" / "cli"
     assert not logs_dir.exists() or not list(logs_dir.glob("logs.*.log"))
@@ -84,7 +110,7 @@ def test_logs_command_does_not_create_self_log_file(tmp_path, monkeypatch):
 def test_logs_shows_tip_when_off(tmp_path, monkeypatch):
     monkeypatch.delenv("FORGE_DEBUG", raising=False)
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert "forge config set log_level=debug" in result.output
     assert "FORGE_DEBUG=1" in result.output
 
@@ -93,7 +119,7 @@ def test_logs_shows_retention_unlimited(tmp_path, monkeypatch):
     """Default retention shows 'unlimited'."""
     monkeypatch.delenv("FORGE_DEBUG", raising=False)
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert "unlimited" in result.output
 
 
@@ -108,13 +134,13 @@ def test_logs_shows_retention_days_when_set(tmp_path, monkeypatch):
     reset_runtime_config()
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert "14 days" in result.output
     assert "auto-cleanup" in result.output
 
 
 def test_logs_shows_file_counts(tmp_path, monkeypatch):
-    """forge logs shows file counts per subdirectory."""
+    """forge logs show shows file counts per subdirectory."""
     from forge.core.paths import get_forge_home
 
     logs_dir = get_forge_home() / "logs" / "hooks"
@@ -122,14 +148,14 @@ def test_logs_shows_file_counts(tmp_path, monkeypatch):
     (logs_dir / "policy-check.99999999.log").write_text("x" * 1024)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert result.exit_code == 0
     assert "hooks/" in result.output
     assert "1 files" in result.output
 
 
 def test_logs_shows_total_summary(tmp_path, monkeypatch):
-    """forge logs shows total file count and size."""
+    """forge logs show shows total file count and size."""
     from forge.core.paths import get_forge_home
 
     hooks_dir = get_forge_home() / "logs" / "hooks"
@@ -140,24 +166,25 @@ def test_logs_shows_total_summary(tmp_path, monkeypatch):
     (cli_dir / "b.log").write_text("data")
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs"])
+    result = runner.invoke(main, ["logs", "show"])
     assert "Total:" in result.output
     assert "2 files" in result.output
 
 
 # ---------------------------------------------------------------------------
-# forge logs --clean
+# forge logs clean
 # ---------------------------------------------------------------------------
 
 
 def test_logs_clean_no_logs(tmp_path, monkeypatch):
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean"])
+    result = runner.invoke(main, ["logs", "clean"])
     assert result.exit_code == 0
+    assert "No log files found" in result.output
 
 
-def test_logs_clean_removes_files(tmp_path, monkeypatch):
-    """forge logs --clean removes log files."""
+def test_logs_clean_previews_by_default(tmp_path, monkeypatch):
+    """forge logs clean previews without deleting."""
     from forge.core.paths import get_forge_home
 
     logs_dir = get_forge_home() / "logs" / "hooks"
@@ -166,14 +193,30 @@ def test_logs_clean_removes_files(tmp_path, monkeypatch):
     (logs_dir / "session-start.99999999.log").write_text("test")
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean"])
+    result = runner.invoke(main, ["logs", "clean"])
+    assert result.exit_code == 0
+    assert "Would remove 2 log files" in result.output
+    assert len(list(logs_dir.glob("*.log"))) == 2
+
+
+def test_logs_clean_yes_removes_files(tmp_path, monkeypatch):
+    """forge logs clean --yes removes log files."""
+    from forge.core.paths import get_forge_home
+
+    logs_dir = get_forge_home() / "logs" / "hooks"
+    logs_dir.mkdir(parents=True)
+    (logs_dir / "policy-check.99999998.log").write_text("test")
+    (logs_dir / "session-start.99999999.log").write_text("test")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs", "clean", "--yes"])
     assert result.exit_code == 0
     assert "Removed 2 log files" in result.output
     assert not list(logs_dir.glob("*.log"))
 
 
 def test_logs_clean_reports_active_files(tmp_path, monkeypatch):
-    """forge logs --clean reports files belonging to running processes."""
+    """forge logs clean --yes reports files belonging to running processes."""
     from forge.core.paths import get_forge_home
 
     logs_dir = get_forge_home() / "logs" / "proxy"
@@ -185,7 +228,7 @@ def test_logs_clean_reports_active_files(tmp_path, monkeypatch):
     (logs_dir / "proxy.99999999.log").write_text("dead proxy log")
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean"])
+    result = runner.invoke(main, ["logs", "clean", "--yes"])
     assert result.exit_code == 0
     assert "running process" in result.output
     assert (logs_dir / f"proxy.{pid}.log").exists()
@@ -193,34 +236,44 @@ def test_logs_clean_reports_active_files(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# forge logs --clean --older-than
+# forge logs clean --older-than
 # ---------------------------------------------------------------------------
 
 
-def test_older_than_requires_clean(tmp_path, monkeypatch):
-    """--older-than without --clean is an error."""
+def test_old_bare_clean_flag_is_clean_break(tmp_path, monkeypatch):
+    """The old bare --clean flag fails through Click."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs", "--clean"])
+    assert result.exit_code == 2
+    assert "No such option" in result.output
+
+
+def test_old_bare_older_than_flag_is_clean_break(tmp_path, monkeypatch):
+    """The old bare --older-than flag fails through Click."""
     runner = CliRunner()
     result = runner.invoke(main, ["logs", "--older-than", "7"])
-    assert result.exit_code != 0
-    assert "--older-than requires --clean" in result.output
+    assert result.exit_code == 2
+    assert "No such option" in result.output
 
 
-def test_older_than_rejects_zero(tmp_path, monkeypatch):
+def test_older_than_rejects_zero_with_tip(tmp_path, monkeypatch):
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean", "--older-than", "0"])
+    result = runner.invoke(main, ["logs", "clean", "--older-than", "0"])
     assert result.exit_code != 0
-    assert "--older-than must be >= 1" in result.output
+    assert result.stdout == ""
+    assert "--older-than must be >= 1" in result.stderr
+    assert "Use --older-than <days>" in result.stderr
 
 
 def test_older_than_rejects_negative(tmp_path, monkeypatch):
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean", "--older-than", "-5"])
-    # Click rejects negative int for type=int before our validator
+    result = runner.invoke(main, ["logs", "clean", "--older-than", "-5"])
     assert result.exit_code != 0
+    assert "--older-than must be >= 1" in result.stderr
 
 
-def test_clean_older_than_removes_old_files_only(tmp_path, monkeypatch):
-    """--older-than only removes files older than N days."""
+def test_clean_older_than_previews_old_files_only(tmp_path, monkeypatch):
+    """--older-than previews files older than N days without deleting."""
     from forge.core.paths import get_forge_home
 
     logs_dir = get_forge_home() / "logs" / "cli"
@@ -235,7 +288,32 @@ def test_clean_older_than_removes_old_files_only(tmp_path, monkeypatch):
     new_file.write_text("new data")
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean", "--older-than", "7"])
+    result = runner.invoke(main, ["logs", "clean", "--older-than", "7"])
+    assert result.exit_code == 0
+    assert "Would remove 1 log file" in result.output
+    assert "older than 7 days" in result.output
+    assert "forge logs clean --older-than 7 --yes" in result.output
+    assert old_file.exists()
+    assert new_file.exists()
+
+
+def test_clean_older_than_yes_removes_old_files_only(tmp_path, monkeypatch):
+    """--older-than --yes only removes files older than N days."""
+    from forge.core.paths import get_forge_home
+
+    logs_dir = get_forge_home() / "logs" / "cli"
+    logs_dir.mkdir(parents=True)
+
+    old_file = logs_dir / "old.log"
+    old_file.write_text("old data")
+    old_mtime = time.time() - (10 * 86400)
+    os.utime(old_file, (old_mtime, old_mtime))
+
+    new_file = logs_dir / "new.log"
+    new_file.write_text("new data")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs", "clean", "--older-than", "7", "--yes"])
     assert result.exit_code == 0
     assert "Removed 1 log file" in result.output
     assert "older than 7 days" in result.output
@@ -252,7 +330,7 @@ def test_clean_older_than_no_matches(tmp_path, monkeypatch):
     (logs_dir / "recent.log").write_text("data")
 
     runner = CliRunner()
-    result = runner.invoke(main, ["logs", "--clean", "--older-than", "7"])
+    result = runner.invoke(main, ["logs", "clean", "--older-than", "7"])
     assert result.exit_code == 0
     assert "No log files older than 7 days" in result.output
 
@@ -393,6 +471,32 @@ class TestRemoveFiles:
         assert not old.exists()
         assert new.exists()
 
+    def test_preview_uses_remove_filters_without_unlinking(self, tmp_path):
+        subdir = tmp_path / "cli"
+        subdir.mkdir()
+
+        old = subdir / "old.log"
+        old.write_text("data")
+        old_mtime = time.time() - (10 * 86400)
+        os.utime(old, (old_mtime, old_mtime))
+
+        new = subdir / "new.log"
+        new.write_text("data")
+
+        previewed, failed, skipped = _remove_files(tmp_path, older_than_days=7, preview=True)
+        assert previewed == 1
+        assert failed == 0
+        assert skipped == 0
+        assert old.exists()
+        assert new.exists()
+
+        removed, failed, skipped = _remove_files(tmp_path, older_than_days=7)
+        assert removed == previewed
+        assert failed == 0
+        assert skipped == 0
+        assert not old.exists()
+        assert new.exists()
+
     def test_nonexistent_dir_returns_zeros(self, tmp_path):
         removed, failed, skipped = _remove_files(tmp_path / "nope")
         assert removed == 0
@@ -418,6 +522,24 @@ class TestRemoveFiles:
         assert skipped == 1
         assert active_file.exists()
         assert not dead_file.exists()
+
+    def test_preview_skips_active_process_files(self, tmp_path):
+        """Preview mode counts active-process logs as skipped, not removable."""
+        subdir = tmp_path / "proxy"
+        subdir.mkdir()
+
+        pid = os.getpid()
+        active_file = subdir / f"proxy.{pid}.log"
+        active_file.write_text("active log data")
+        dead_file = subdir / "proxy.99999999.log"
+        dead_file.write_text("dead log data")
+
+        previewed, failed, skipped = _remove_files(tmp_path, older_than_days=None, preview=True)
+        assert previewed == 1
+        assert failed == 0
+        assert skipped == 1
+        assert active_file.exists()
+        assert dead_file.exists()
 
     def test_skips_active_rotated_log(self, tmp_path):
         """P1 fix: rotated logs (.log.1) for active processes are also skipped."""

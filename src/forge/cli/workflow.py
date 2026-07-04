@@ -225,7 +225,12 @@ def workflow_cmd() -> None:
 
 @workflow_cmd.command(name="list-models")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--available", "available_only", is_flag=True, help="Show only ready models")
+@click.option(
+    "--available",
+    "available_only",
+    is_flag=True,
+    help="Show only ready models (credentials configured and routing usable)",
+)
 def list_models(as_json: bool, available_only: bool) -> None:
     """Show workflow model readiness."""
     from forge.review.models import available_model_specs, check_model_availability
@@ -331,7 +336,7 @@ def _print_grouped_models(availabilities: list) -> None:
 
 @workflow_cmd.command(name="panel")
 @click.argument("target", nargs=-1)
-@click.option("-p", "--prompt", type=str, default=None, help="Review prompt")
+@click.option("-p", "--prompt", type=str, default=None, help="Review prompt (alternative to positional)")
 @click.option(
     "--code",
     "code_mode",
@@ -343,7 +348,7 @@ def _print_grouped_models(availabilities: list) -> None:
     "context_mode",
     type=str,
     default="blind",
-    help='Context mode: "blind" (default) or "resume:<uuid>"',
+    help='Context mode: "blind" (default) or "resume:<uuid>" where uuid is a Claude resume id',
 )
 @click.option(
     "--models",
@@ -353,12 +358,12 @@ def _print_grouped_models(availabilities: list) -> None:
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--check",
     "check_mode",
     is_flag=True,
-    help="Gate on results: exit 0 if passed, exit 1 if failed",
+    help="Gate on verdicts: exit 0 if all accepting, exit 1 otherwise",
 )
 @click.option(
     "--roles",
@@ -420,6 +425,7 @@ def panel(
       forge workflow panel -p "Review the error handling"  # custom prompt
       forge workflow panel src/ --code --roles security,architecture
       forge workflow panel src/ --code --review-type security --severity high
+      forge workflow panel src/ --context resume:<uuid>     # Claude resume UUID, not Forge session name
     """
     resume_id: str | None = None
     if context_mode == "blind":
@@ -819,12 +825,12 @@ def _handle_review_output(
     help="Comma-separated model names (default: claude-opus)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--check",
     "check_mode",
     is_flag=True,
-    help="Gate on verdict: exit 0 if passed, exit 1 if failed",
+    help="Gate on verdicts: exit 0 if all accepting, exit 1 otherwise",
 )
 @click.option(
     "--proxy",
@@ -1024,8 +1030,13 @@ def _resolve_debate_prompt(
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
-@click.option("--check", "check_mode", is_flag=True, help="Gate on verdicts: any REJECT exits 1")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option(
+    "--check",
+    "check_mode",
+    is_flag=True,
+    help="Gate on verdicts: exit 0 if all accepting, exit 1 otherwise",
+)
 @click.option(
     "--worker",
     "workers",
@@ -1556,7 +1567,7 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     default=600,
     help="Per-round timeout in seconds (total wall time ~2x for two rounds)",
 )
-@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--check",
     "check_mode",

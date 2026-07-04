@@ -83,6 +83,12 @@ class TestConfigShow:
         assert "FORGE_DEBUG" in result.output
         assert "debug" in result.output
 
+    def test_show_help_documents_json_shape(self):
+        result = CliRunner().invoke(config, ["show", "--help"])
+
+        assert result.exit_code == 0
+        assert "{path, env_sources, config}" in result.output
+
 
 class TestConfigShowJson:
     """Tests for `forge config show --json`.
@@ -238,6 +244,13 @@ class TestConfigSet:
         result = runner.invoke(config, ["set", "no_equals_sign"])
         assert result.exit_code == 1
         assert "Expected format" in result.output
+
+    def test_set_help_shows_nested_key_examples(self):
+        result = CliRunner().invoke(config, ["set", "--help"])
+
+        assert result.exit_code == 0
+        assert "statusline.cost_mode=actual" in result.output
+        assert "provider_trace.inject_provider_user=true" in result.output
 
     def test_set_invalid_integer_rejected(self):
         runner = CliRunner()

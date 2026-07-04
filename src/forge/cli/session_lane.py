@@ -19,7 +19,7 @@ import click
 
 from forge.cli.output import err_console, print_error, print_tip
 from forge.cli.session import console
-from forge.core.lanes import Consumer, LaneError
+from forge.core.lanes import Consumer, Lane, LaneError, valid_lanes
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError, ResolveSessionResult, resolve_session
 from forge.session.consumer_lanes import (
@@ -82,6 +82,28 @@ def _lane_str(record: LaneRecord) -> str:
     return f"runtime={record.runtime_id} backend={record.backend_id} model={record.model}"
 
 
+def _lane_option_str(lane: Lane) -> str:
+    return f"runtime={lane.runtime_id} backend={lane.backend_id} model={lane.model}"
+
+
+def _valid_lanes_text(consumer: Consumer) -> str:
+    return ", ".join(_lane_option_str(lane) for lane in valid_lanes(consumer))
+
+
+class _LaneSetCommand(click.Command):
+    """Append live valid-lane choices to ``session lane set --help``."""
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        super().format_help(ctx, formatter)
+        with formatter.section("Valid lanes"):
+            formatter.write_dl(
+                [
+                    (consumer_id, _valid_lanes_text(consumer))
+                    for consumer_id, consumer in sorted(_consumer_registry().items())
+                ]
+            )
+
+
 def _reject_frozen(consumer: Consumer, frozen: LaneRecord) -> None:
     print_error(f"Lane for {consumer.id!r} is frozen for this session ({_lane_str(frozen)}).", console=err_console)
     print_tip(
@@ -112,21 +134,28 @@ def session_lane() -> None:
     """
 
 
-@session_lane.command("set")
+@session_lane.command("set", cls=_LaneSetCommand)
 @click.option(
     "--consumer",
     "consumer_id",
     required=True,
     help="Consumer id (memory_writer, shadow_curation, team_supervisor, supervisor).",
 )
-@click.option("--runtime", "runtime", default=None, help="Lane runtime (e.g. claude_code).")
-@click.option("--backend", "backend", default=None, help="Lane backend (e.g. claude-max for the Max subscription).")
+@click.option("--runtime", "runtime", default=None, help="Lane runtime (e.g. claude_code, codex).")
+@click.option("--backend", "backend", default=None, help="Lane backend (e.g. claude-max).")
 @_SESSION_OPTION
 def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_name: str | None) -> None:
     """Record a consumer's requested lane in the session's ``intent``.
 
     Frozen into ``confirmed`` at the consumer's first dispatch; changing it to a
     different lane is rejected once frozen (immutable for the session).
+    Provide --runtime and/or --backend to choose one of the valid lanes below.
+
+    \b
+    Examples:
+        forge session lane set --consumer memory_writer --backend claude-max
+        forge session lane set --consumer shadow_curation --runtime codex
+        forge session lane set --consumer supervisor --runtime claude_code --backend anthropic-direct
     """
     consumer = _resolve_consumer(consumer_id)
 
@@ -141,7 +170,10 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
             print_error("Specify a lane with --runtime and/or --backend.", console=err_console)
             sys.exit(1)
     except LaneError as e:
-        print_error(str(e), console=err_console)
+        print_error(
+            f"{e}. Valid lanes for {consumer.id}: {_valid_lanes_text(consumer)}",
+            console=err_console,
+        )
         sys.exit(1)
 
     result = _resolve_session_or_exit(session_name)
@@ -176,7 +208,12 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
 
 
 @session_lane.command("clear")
-@click.option("--consumer", "consumer_id", required=True, help="Consumer id to clear.")
+@click.option(
+    "--consumer",
+    "consumer_id",
+    required=True,
+    help="Consumer id to clear (memory_writer, shadow_curation, team_supervisor, supervisor).",
+)
 @_SESSION_OPTION
 def clear_cmd(consumer_id: str, session_name: str | None) -> None:
     """Remove a consumer's requested (``intent``) lane.
@@ -184,6 +221,11 @@ def clear_cmd(consumer_id: str, session_name: str | None) -> None:
     Leaves any already-frozen ``confirmed`` binding intact (immutable for the
     session) -- clearing before the freeze drops the request (back to default);
     clearing after surfaces as drift in ``show`` and resets next session.
+
+    \b
+    Examples:
+        forge session lane clear --consumer memory_writer
+        forge session lane clear --consumer supervisor --session planner
     """
     consumer = _resolve_consumer(consumer_id)
     result = _resolve_session_or_exit(session_name)
@@ -202,7 +244,7 @@ def clear_cmd(consumer_id: str, session_name: str | None) -> None:
 
 @session_lane.command("show")
 @_SESSION_OPTION
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def show_cmd(session_name: str | None, as_json: bool) -> None:
     """Show each consumer's requested (``intent``) and frozen (``confirmed``) lane."""
     result = _resolve_session_or_exit(session_name)

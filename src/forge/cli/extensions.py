@@ -41,6 +41,7 @@ from forge.install.tracking import TrackingStore
 
 console = Console()
 _log = logging.getLogger(__name__)
+_INSTALL_SCOPE_HELP = "Installation scope: local (gitignored), project (committed), user (global)"
 
 
 def _find_git_root(start: Path) -> Path | None:
@@ -481,7 +482,7 @@ def extensions() -> None:
     "-S",
     type=click.Choice(["local", "project", "user"]),
     default=None,
-    help="Installation scope: local (gitignored), project (committed), user (global)",
+    help=_INSTALL_SCOPE_HELP,
 )
 @click.option(
     "--root",
@@ -675,7 +676,7 @@ def enable_cmd(
     "-S",
     type=click.Choice(["local", "project", "user"]),
     default=None,
-    help="Installation scope",
+    help=_INSTALL_SCOPE_HELP,
 )
 @click.option("--force", "-f", is_flag=True, help="Override conflicts")
 def sync_cmd(scope: str | None, force: bool) -> None:
@@ -763,7 +764,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
     "-S",
     type=click.Choice(["local", "project", "user"]),
     default=None,
-    help="Installation scope",
+    help=_INSTALL_SCOPE_HELP,
 )
 @click.option(
     "--all",
@@ -892,7 +893,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
     "-S",
     type=click.Choice(["local", "project", "user"]),
     default=None,
-    help="Installation scope",
+    help=_INSTALL_SCOPE_HELP,
 )
 @click.option(
     "--root",

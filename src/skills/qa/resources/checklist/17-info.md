@@ -19,33 +19,33 @@ forge info
 
 <!-- human:confirm -->
 
-Run a Forge command with debug logging enabled, then use `forge logs` to inspect and clean up log files.
+Run a Forge command with debug logging enabled, then use `forge logs show` to inspect and clean up log files.
 
 ```bash
 # Run a command with debug logging
 FORGE_DEBUG=1 forge info
 
 # Show log locations and file counts
-forge logs
+forge logs show
 
 # Verify logs were written
-forge logs
+forge logs show
 # Expected: shows log directory path and file count > 0
 
 # Clean up logs
-forge logs --clean
+forge logs clean --yes
 
 # Verify cleanup
-forge logs
+forge logs show
 # Expected: reports 0 log files when no Forge processes are running.
 # If QA proxies are still running, active proxy logs may be retained.
 ```
 
 - [ ] `FORGE_DEBUG=1` enables debug logging (no crash, no error)
-- [ ] `forge logs` shows log directory location and file counts
+- [ ] `forge logs show` shows log directory location and file counts
 - [ ] Log files were actually written (count > 0 after debug run)
-- [ ] `forge logs --clean` removes stale log files
-- [ ] After cleanup, `forge logs` reports 0 files, or only logs for currently running Forge proxy processes
+- [ ] `forge logs clean --yes` removes stale log files
+- [ ] After cleanup, `forge logs show` reports 0 files, or only logs for currently running Forge proxy processes
 
 ### 17.3 `forge runtime list`
 

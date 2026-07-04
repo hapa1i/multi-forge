@@ -19,7 +19,7 @@ from forge.core.models.types import ModelCatalog, ModelSpec
 
 @click.group(no_args_is_help=True, context_settings={"help_option_names": ["-h", "--help"]})
 def model() -> None:
-    """Inspect the model catalog and backend sources."""
+    """Inspect the model catalog and backends."""
 
 
 def _model_record(model_id: str, spec: ModelSpec) -> dict[str, Any]:

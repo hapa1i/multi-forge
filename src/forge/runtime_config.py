@@ -782,7 +782,7 @@ proxy_mode: host
 
 # Auto-delete log files older than N days on CLI startup.
 # 0 = disabled (no auto-cleanup). Example: 30 = keep last 30 days.
-# Manual cleanup: forge logs --clean [--older-than DAYS]
+# Manual cleanup: forge logs clean [--older-than DAYS] --yes
 # log_retention_days: 0
 
 # Auto-delete sessions older than N days on CLI startup.

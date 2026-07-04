@@ -906,7 +906,7 @@ def launch_new_session(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for direct sessions (for example: claude-opus-4-8 or claude-sonnet-4-6[1m])",
+    help="Pin the Claude model for direct sessions (for example: claude-opus-4-8 or claude-sonnet-4-6)",
 )
 @click.option("--sidecar", is_flag=True, help="Run with bundled proxy in Docker container")
 @click.option("--host-proxy", is_flag=True, help="Use host proxy (overrides config)")

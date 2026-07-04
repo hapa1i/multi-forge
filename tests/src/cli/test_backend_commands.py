@@ -216,8 +216,8 @@ def test_list_json_marks_shared_local_runtime_instance(
     assert set(store.read().backends) == {"litellm-4000"}
 
 
-def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home: Path) -> None:
-    """The human table flags a shared instance in the RUNTIME column."""
+def test_list_human_marks_shared_backend_instance(runner: CliRunner, forge_home: Path) -> None:
+    """The human table flags a shared backend instance in the INSTANCE column."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -252,17 +252,17 @@ def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home:
     assert "shared" in result.output
 
 
-def test_list_human_shows_sources_even_without_runtime(runner: CliRunner, forge_home: Path) -> None:
+def test_list_human_shows_backends_even_without_instances(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("list"))
 
     assert result.exit_code == 0
-    assert "Forge Backend Sources" in result.output
+    assert "Forge Model Backends" in result.output
     assert "openrouter" in result.output
     assert "litellm-remote" in result.output
     assert "No backends found" not in result.output
 
 
-def test_list_human_shows_unmatched_runtime_without_source_match(
+def test_list_human_shows_unmatched_backend_instance_without_backend_match(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
@@ -284,7 +284,7 @@ def test_list_human_shows_unmatched_runtime_without_source_match(
     result = runner.invoke(main, _backend_args("list"))
 
     assert result.exit_code == 0
-    assert "Unmatched Runtime Instances" in result.output
+    assert "Unmatched Backend Instances" in result.output
     assert "litellm-4000" in result.output
 
     json_result = runner.invoke(main, _backend_args("list", "--json"))
@@ -299,7 +299,7 @@ def test_show_remote_source_details(runner: CliRunner, forge_home: Path) -> None
     result = runner.invoke(main, _backend_args("show", "openrouter"))
 
     assert result.exit_code == 0
-    assert "Backend source:" in result.output
+    assert "Backend:" in result.output
     assert "openrouter" in result.output
     assert "Kind:" in result.output
     assert "remote" in result.output
@@ -373,7 +373,7 @@ def test_stop_multiple_runtime_ids_continues_after_failure(
 
     assert result.exit_code == 1
     assert "Stopped" in result.output
-    assert "Unknown runtime instance 'missing-9999'" in result.output
+    assert "Unknown backend instance 'missing-9999'" in result.output
     assert "1 stopped, 1 failed" in result.output
     assert store.read().backends == {}
 
@@ -421,7 +421,7 @@ def test_stop_all_empty_registry_is_noop(runner: CliRunner, forge_home: Path) ->
     result = runner.invoke(main, _backend_args("stop", "--all"))
 
     assert result.exit_code == 0
-    assert "No runtime instances to stop" in result.output
+    assert "No backend instances to stop" in result.output
 
 
 def test_stop_all_conflicts_with_explicit_targets(runner: CliRunner, forge_home: Path) -> None:
@@ -430,14 +430,14 @@ def test_stop_all_conflicts_with_explicit_targets(runner: CliRunner, forge_home:
     result = runner.invoke(main, _backend_args("stop", "litellm-4000", "--all"))
 
     assert result.exit_code == 1
-    assert "Cannot combine --all with explicit runtime instance IDs" in result.output
+    assert "Cannot combine --all with explicit backend instance IDs" in result.output
 
 
 def test_stop_requires_target_or_all(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("stop"))
 
     assert result.exit_code == 1
-    assert "Provide runtime instance ID(s) or use --all" in result.output
+    assert "Provide backend instance ID(s) or use --all" in result.output
     assert "forge model backend list" in result.output
 
 
@@ -451,7 +451,7 @@ def test_stop_rejects_local_source_without_stopping_shared_runtime(
         result = runner.invoke(main, _backend_args("stop", "litellm-openai-local"))
 
     assert result.exit_code == 1
-    assert "not a runtime instance id" in result.output
+    assert "not a backend instance id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
     assert set(store.read().backends) == {"litellm-4000"}
@@ -467,7 +467,7 @@ def test_stop_rejects_bare_adapter_without_legacy_port_resolution(
         result = runner.invoke(main, _backend_args("stop", "litellm"))
 
     assert result.exit_code == 1
-    assert "Backend adapter 'litellm' is not a runtime instance id" in result.output
+    assert "Backend adapter 'litellm' is not a backend instance id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
     assert set(store.read().backends) == {"litellm-4000"}
@@ -487,7 +487,7 @@ def test_start_runtime_id_stays_config_oriented(runner: CliRunner, forge_home: P
     result = runner.invoke(main, _backend_args("start", "litellm-4000"))
 
     assert result.exit_code == 1
-    assert "Unknown backend source or adapter 'litellm-4000'" in result.output
+    assert "Unknown backend or adapter 'litellm-4000'" in result.output
     assert set(store.read().backends) == {"litellm-4000"}
 
 
@@ -524,7 +524,7 @@ def test_local_only_unknown_adapter_names_valid_choices(
     )
 
     assert result.exit_code == 1
-    assert "Unknown backend adapter or source 'foobar'" in result.output
+    assert "Unknown backend or adapter 'foobar'" in result.output
     assert "Valid adapters: litellm" in result.output
     assert "forge model backend list" in result.output
 
@@ -608,7 +608,7 @@ def test_delete_runtime_id_points_to_stop(
     result = runner.invoke(main, _backend_args("delete", "litellm-4000"))
 
     assert result.exit_code == 1
-    assert "runtime instance id" in result.output
+    assert "backend instance id" in result.output
     assert "forge model backend stop litellm-4000" in result.output
 
 
@@ -646,8 +646,8 @@ def test_backend_group_help_defines_id_spaces(runner: CliRunner) -> None:
     result = runner.invoke(main, _backend_args("--help"))
 
     assert result.exit_code == 0
-    assert "Source id: openrouter" in result.output
-    assert "Runtime instance id: litellm-4000" in result.output
+    assert "Backend: openrouter" in result.output
+    assert "Backend instance: litellm-4000" in result.output
     assert "Adapter: litellm" in result.output
 
 
@@ -655,21 +655,34 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     show_help = runner.invoke(main, _backend_args("show", "--help"))
     test_auth_help = runner.invoke(main, _backend_args("test-auth", "--help"))
     reconcile_help = runner.invoke(main, _backend_args("reconcile", "--help"))
+    start_help = runner.invoke(main, _backend_args("start", "--help"))
     stop_help = runner.invoke(main, _backend_args("stop", "--help"))
     delete_help = runner.invoke(main, _backend_args("delete", "--help"))
 
     assert show_help.exit_code == 0
+    assert "BACKEND_OR_INSTANCE" in show_help.output
     assert "forge model backend show openrouter" in show_help.output
     assert "forge model backend show litellm-4000" in show_help.output
     assert test_auth_help.exit_code == 0
+    assert "BACKEND" in test_auth_help.output
+    assert "SOURCE_ID" not in test_auth_help.output
     assert "forge model backend test-auth openrouter" in test_auth_help.output
     assert reconcile_help.exit_code == 0
+    assert "BACKEND" in reconcile_help.output
+    assert "SOURCE_ID" not in reconcile_help.output
     assert "forge model backend reconcile openrouter --request-id" in reconcile_help.output
     reconcile_text = _normalized_output(reconcile_help)
     assert "forge model backend list" in reconcile_text
-    assert "source ids" in reconcile_text
+    assert "backends" in reconcile_text
+    assert start_help.exit_code == 0
+    assert "BACKEND_OR_ADAPTER" in start_help.output
+    assert "forge model backend start litellm-openai-local" in start_help.output
+    assert "forge model backend start litellm --port 4000" in start_help.output
+    assert "backend names use their default port unless overridden" in start_help.output
     assert stop_help.exit_code == 0
-    assert "RUNTIME_ID..." in stop_help.output
+    assert "BACKEND_INSTANCE..." in stop_help.output
+    assert "RUNTIME_ID..." not in stop_help.output
+    assert "forge model backend list" in stop_help.output
     assert "--port" not in stop_help.output
     assert delete_help.exit_code == 0
     assert "--port" not in delete_help.output
@@ -700,13 +713,13 @@ _REGISTRY_FALLBACK_KEYS = {
 }
 
 
-def test_show_json_configured_source_emits_source_record(
+def test_show_json_configured_backend_emits_source_record(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <source-id> --json dispatches through _source_record (path 1).
+    """show <backend> --json dispatches through _source_record (path 1).
 
-    A built-in source like openrouter resolves via _source_for_identifier, so the
+    A built-in backend like openrouter resolves via _source_for_identifier, so the
     payload carries the full source-record shape, not the registry-fallback shape.
     """
     result = runner.invoke(main, _backend_args("show", "openrouter", "--json"))
@@ -717,7 +730,7 @@ def test_show_json_configured_source_emits_source_record(
     assert payload["backend_id"] == "openrouter"
     assert payload["source_id"] == "openrouter"
     assert payload["kind"] == "remote"
-    # Remote source has no local lifecycle, so no runtime instance is matched.
+    # Remote backend has no local lifecycle, so no backend instance is matched.
     assert payload["runtime_instance"] is None
     assert payload["has_lifecycle"] is False
     assert isinstance(payload["credentials"], list)
