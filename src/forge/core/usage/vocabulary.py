@@ -1,10 +1,11 @@
 """Metric-evidence vocabulary shared across Forge's cost/usage planes.
 
 Plain, closed vocabularies for *what route* produced a metric, *who reported* it, and
-*how trustworthy the cost figure is*. Deliberately a thin module (no I/O, no dataclasses)
-so both the usage ledger (``ledger.py``) and -- later -- the cost plane
-(``proxy/cost_logger.py``, Phase 2) can import these terms without coupling to either
-plane's read/write machinery.
+*how trustworthy the cost figure is*. ``Route`` and its named tokens live here.
+``Reporter``/``Confidence`` are defined in the neutral telemetry leaf
+(``core/telemetry/vocabulary.py``): the downstream plane carries them too, and hosting
+them below ``downstream`` avoids a usage<->telemetry import cycle. They are re-exported
+here so usage-side callers keep a single import site.
 
 North star (the ``metric_evidence_simplification`` card): Forge is not a cost oracle.
 ``confidence`` exists to record "this dollar figure was *reported*" vs "*inferred* from a
@@ -14,6 +15,12 @@ local catalog" vs "*unavailable*", so an estimate is never presented as truth.
 from __future__ import annotations
 
 from typing import Literal
+
+from forge.core.telemetry.vocabulary import Confidence, Reporter
+
+# Public surface: the usage-owned Route vocabulary plus the re-exported telemetry-leaf
+# literals, so usage-side callers keep a single import site (also marks the re-exports used).
+__all__ = ["ROUTE_CLAUDE_INTERACTIVE", "Confidence", "Reporter", "Route"]
 
 # How the work reached a model/runtime (the invocation channel).
 # Emitted now: claude_p, core_llm (plus None on an aggregate spanning mixed routes).
@@ -29,39 +36,7 @@ Route = Literal[
     "gemini_headless",
 ]
 
-# The source that supplied the metric evidence -- tokens AND/OR a cost figure, NOT
-# specifically cost. So reporter="provider" can sit beside confidence="unavailable":
-# the provider reported tokens, just no dollars -- not a contradiction.
-# Emitted now: provider, forge_proxy, claude_code (Phase 5: a direct `claude -p`
-# verb/worker self-reports cost+usage via --output-format json).
-# Reserved: openrouter / litellm / codex_jsonl (Phase 2/5).
-Reporter = Literal[
-    "claude_code",
-    "forge_proxy",
-    "openrouter",
-    "litellm",
-    "provider",
-    "codex_jsonl",
-]
-
-# Trustworthiness of the COST figure (cost_micro_usd) specifically -- NOT the tokens
-# (that provenance is measurement_source). Authoritative for an event's OWN cost field
-# only: a null cost is "unavailable" regardless of any cost record joined via source_refs.
-#   reported           -- the route/reporter returned the dollar figure directly
-#   gateway_calculated -- a gateway (OpenRouter/LiteLLM) computed it
-#   inferred           -- Forge computed it from the local price catalog (an estimate)
-#   unavailable        -- the route reports no cost figure (cost is None)
-#   unknown            -- provenance was never recorded (legacy/default only)
-Confidence = Literal[
-    "reported",
-    "gateway_calculated",
-    "inferred",
-    "unavailable",
-    "unknown",
-]
-
-
-# --- named tokens referenced in code (typed against the literals above) ---
+# --- named tokens referenced in code (typed against ``Route`` above) ---
 
 # The main interactive-harness channel, as a named token. Referenced by
 # ``sum_forge_added_cost``'s load-bearing exclusion (the no-blend rule); naming it

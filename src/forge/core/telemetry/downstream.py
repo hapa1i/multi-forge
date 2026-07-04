@@ -22,6 +22,11 @@ import dacite
 from forge.core.paths import get_forge_home
 from forge.core.state import decode_json_object
 
+# Reporter/Confidence live in the neutral telemetry leaf so the usage ledger can share the
+# one definition without a cycle; re-exported here (records below carry both fields, and
+# several proxy modules import them from this module).
+from forge.core.telemetry.vocabulary import Confidence, Reporter
+
 logger = logging.getLogger(__name__)
 
 DOWNSTREAM_SCHEMA_VERSION = 2
@@ -29,8 +34,6 @@ DOWNSTREAM_SCHEMA_VERSION = 2
 DownstreamKind = Literal["attempt", "audit", "drift", "mutation"]
 LocalUsageStatus = Literal["available", "unavailable"]
 RequestMode = Literal["streaming", "non_streaming"]
-Reporter = Literal["claude_code", "forge_proxy", "openrouter", "litellm", "provider", "codex_jsonl"]
-Confidence = Literal["reported", "gateway_calculated", "inferred", "unavailable", "unknown"]
 
 _lock = threading.Lock()
 _warned_newer_schema = False
