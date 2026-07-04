@@ -154,8 +154,8 @@ checkout and leaves final cleanup to the user.
 
 This workflow motivates Forge's separation of **Session** and **Proxy**.
 
-**Goal:** Combine deep planning/review from one proxy (e.g., OpenAI-based) with fast/high-quality implementation from
-another, while keeping artifacts and the working directory shared.
+**Goal:** Combine planning/review through one proxy (e.g., OpenAI-based) with implementation through another, while
+keeping artifacts and the working directory shared.
 
 > See [diagrams.md §7: Multi-Proxy Workflow](diagrams.md#7-multi-proxy-workflow).
 
@@ -503,7 +503,7 @@ of a lookup-only `resolve_proxy()`. This makes a template name with no running p
 (revive with `forge proxy start <id>`); a name matching neither a proxy nor a template fails with a
 `forge proxy template list` hint.
 
-**Key principle:** You do NOT edit internal templates/model catalog—only your proxy overlay.
+**Overlay boundary:** You do NOT edit internal templates/model catalog—only your proxy overlay.
 
 > **Configuration reference details** — proxy overlay schema, template inventory, confusion traps, secrets, runtime
 > config (`~/.forge/config.yaml`), model catalog, and status line guidance are in
@@ -742,8 +742,8 @@ unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
 runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while
 shaping what propagates. `structured` stays the CLI default; `ai-curated` emits the full schema
-([design_appendix.md §H](design_appendix.md#h-transfer-context-schema)) and is the substrate for genuine cross-boundary
-moves.
+([design_appendix.md §H](design_appendix.md#h-transfer-context-schema)) and is the substrate for cross-worktree,
+cross-project, and cross-runtime moves.
 
 **Native mode** (`--resume-mode native`): no context assembly; the full conversation history is carried over via
 Claude's `--fork-session`.
@@ -786,7 +786,7 @@ The child snapshot is a **pure AI artifact**: `forge session resume --fresh --re
 write user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
 `--append-system-prompt-file`). You can resume the same parent with different strategies — the parent cache is
 regenerated, while existing per-child snapshots **and** their notes are never overwritten. Inspect and reshape transfer
-context with `forge session transfer show|regenerate|edit|diff` (§4.0).
+context with `forge session transfer show|regenerate|edit|diff`; §4 links the CLI inventory.
 
 **Session derivation tracking:**
 
@@ -888,8 +888,8 @@ Stop Pipeline:
   return verification_decision
 ```
 
-The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent—fine since they
-benefit future sessions.
+The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent; this is
+acceptable because they benefit future sessions, not the exiting session.
 
 **Idempotency rules** (verification can trigger Stop multiple times per session):
 
@@ -1285,9 +1285,9 @@ operational, not a security sandbox.
 
 A Forge proxy can be a user-controlled chokepoint that **observes** and optionally **controls** the wire between Claude
 Code and the model provider. The audit/intercept fields default to inert, so existing proxies are unchanged; the shipped
-`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). It is motivated by a simple
-property: agent quality can change at the harness boundary without leaving the user local evidence. Owning the wire
-gives Forge a durable observation point and a signature-safe control point.
+`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). The motivation is operational:
+agent quality can change at the harness boundary without leaving local evidence. A Forge-controlled proxy gives Forge a
+durable observation point and a signature-safe control point.
 
 **Two orthogonal axes** (kept distinct everywhere):
 

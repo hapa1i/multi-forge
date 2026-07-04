@@ -29,8 +29,8 @@ subprocess -- `claude -p` on the default Claude lane, or `codex exec` on the cod
 3. Applies per-doc strategy instructions (add completed tasks, record errors, propose changes)
 4. Writes minimal updates to each file
 
-The memory writer is **retrospective** — it sees the full session before deciding what to capture. This produces higher
-signal-to-noise than incremental note-taking during a session.
+The memory writer is **retrospective** — it sees the full session before deciding what to capture. That lets it compare
+the transcript against the tracked docs instead of writing partial notes while the session is still changing.
 
 ---
 

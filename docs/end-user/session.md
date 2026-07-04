@@ -164,7 +164,7 @@ forge telemetry activity [name] --period week --json
 forge telemetry activity [name] --period all
 
 # Fork (conversation branching)
-forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
+forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
 
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
@@ -427,10 +427,10 @@ supervision, memory, and other Claude-only flags are rejected. `--task` selects 
 first turn fails before Codex opens a thread, resume refuses with guidance — delete the session and start again.
 
 **Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
-prompt — zero setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead (`additionalContext`):
-register `forge hook codex-session-start` in your Codex config and complete the one-time trust ceremony first (see
-[hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment can't be verified up front, so Forge checks
-delivery **after** the turn via the hook's receipt and records the outcome in the manifest
+prompt without Codex hook setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead
+(`additionalContext`): register `forge hook codex-session-start` in your Codex config and complete the one-time trust
+ceremony first (see [hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment can't be verified up front,
+so Forge checks delivery **after** the turn via the hook's receipt and records the outcome in the manifest
 (`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran without the
 parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
 

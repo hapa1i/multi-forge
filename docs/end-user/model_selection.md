@@ -186,9 +186,8 @@ supervisor calls, verify the proxy template and gateway support caching before c
 
 ### 2. Tune `reasoning_effort`
 
-The same model can vary dramatically in cost between low and high effort. The supervisor's task is a structured verdict
-with citations; it does not always require maximum reasoning. Try a lower effort and re-run known aligned/divergent
-examples:
+The same model can cost more at higher effort settings. The supervisor's task is a structured verdict with citations; it
+does not always require maximum reasoning. Try a lower effort and re-run known aligned/divergent examples:
 
 ```bash
 forge proxy set <proxy_id> tier_overrides.opus.reasoning_effort=medium

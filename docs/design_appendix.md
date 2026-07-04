@@ -383,8 +383,8 @@ an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor
 `spend_cap`, `launch`, `forge_cost`. Full key/segment reference: `docs/end-user/config.md`.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
-real `$`; `cost_mode=subscription` shows quota burn (dollars are a phantom on a subscription) — both the 5h and weekly
-windows, `5h:N% · 7d:M%`, heat-mapped on the context gradient with the reset bound to the hotter window (`7d:52%↻1d`).
+real `$`; `cost_mode=subscription` shows quota burn instead of dollar spend — both the 5h and weekly windows,
+`5h:N% · 7d:M%`, heat-mapped on the context gradient with the reset bound to the hotter window (`7d:52%↻1d`).
 `cost_mode=auto` shows the quota when `rate_limits` is present, else hedges `≈$` — an `ANTHROPIC_API_KEY` in the env is
 a *capability*, not proof of who pays (Forge may have hydrated it into an OAuth session), so it never flips `auto` to
 API dollars. Proxy mode always shows the proxy's *reported* `~$` (may undercount; cost-unavailable routes are excluded,
@@ -1014,8 +1014,8 @@ Registration alone is inert: enable prints a Next-steps block naming the one-tim
 
 ## D. Interactive Manual Testing
 
-Automated tests catch logic bugs but miss UX/latency/real-system failures. Previous manual testing found 5 real bugs
-(including a macOS crash) that ~2,400 automated tests missed.
+Automated tests do not cover every UX, latency, or real-system failure mode. The interactive manual-testing skills cover
+those gaps with deterministic checklists and explicit human-verification points.
 
 **Why checklist-driven.** Early versions let the agent improvise commands — producing invented CLI commands, interactive
 prompts that hang the Bash tool, and leaked API keys. The fix: pre-written checklists where commands and assertions are
@@ -1070,18 +1070,20 @@ first needs interactive verification.
 
 **Smoke test** (`smoke-test.sh`): Read-only probes with mtime snapshot assertions. Not checklist-driven.
 
-**Walkthrough** (checklist-driven via `run-in-repo.sh`): Annotated checklist (11 sections) covering install, verify,
-guided exploration, proxy/session creation, live Claude session, and cleanup. Hermetic isolation via
-`setup-test-repo.sh` (FORGE_HOME redirection, marker file, 4 safety gates in `run-in-repo.sh`).
+**Walkthrough** (checklist-driven via `run-in-repo.sh`): Annotated checklist covering setup, install verification,
+real-system isolation checks, CLI exploration, proxy/session creation, live Claude session, sidecar execution, and
+cleanup. Hermetic isolation via `setup-test-repo.sh` (FORGE_HOME redirection, marker file, 4 safety gates in
+`run-in-repo.sh`).
 
-**Full QA** (checklist-driven via `docker exec`): 312-item checklist split into per-section files
-(`resources/checklist.md` index + `resources/checklist/*.md`, 20 sections). Includes `human:guided` items for
-interactive verification. State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
+**Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
+(`resources/checklist.md` + `resources/checklist/*.md`). Includes `human:guided` items for interactive verification.
+State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
 
 **Deterministic bookkeeper** (`walkthrough-state.py`): Each checklist-driven skill keeps a local state script that
-parses its checklist markdown into structured JSON. Seven commands: `index`, `step N.X`, `summary` (read-only) + `init`,
-`record`, `var`, `report` (state machine). Code blocks tagged `runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` =
-display-only). State file uses SHA-256 hash for drift detection. 58 unit tests.
+parses its checklist markdown into structured JSON. Commands: `index`, `step N.X`, and `summary` for read-only
+inspection; `init`, `record`, `var`, `prereq-check`, `report`, and `validate` for state management. Code blocks tagged
+`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection.
+Covered by `tests/src/skills/test_walkthrough_state.py`.
 
 ---
 

@@ -20,9 +20,9 @@ manual `regenerate → show → codex exec` recipe below remains for sessionless
 subresource.
 
 Native `--resume --fork-session` carries the full conversation but is opaque and locked to one runtime and working
-directory. **Curated transfer is the portable substrate**: a parent's context is distilled into a Markdown doc you can
-read, edit, and hand to another runtime. See [session.md](session.md#derive-a-fresh-session-from-an-existing-one) for
-how resume and fork produce it.
+directory. **Curated transfer is the portable form of that context**: a parent's context is distilled into a Markdown
+doc you can read, edit, and hand to another runtime. See
+[session.md](session.md#derive-a-fresh-session-from-an-existing-one) for how resume and fork produce it.
 
 ## The three files
 
@@ -95,9 +95,9 @@ forge session show impl     # Runtime, thread id, rollout path, auth posture
 forge telemetry activity impl         # transfer-curate + codex turns under one run tree
 ```
 
-By default the curated context rides the first `codex exec` prompt (zero setup). With a trust-enrolled
-`codex-session-start` hook you can opt into SessionStart delivery instead — `--context-delivery hook` — which keeps the
-prompt as your task alone and injects the context as `additionalContext`; see
+By default the curated context rides the first `codex exec` prompt, so no Codex hook setup is required. With a
+trust-enrolled `codex-session-start` hook you can opt into SessionStart delivery instead — `--context-delivery hook` —
+which keeps the prompt as your task alone and injects the context as `additionalContext`; see
 [session.md](session.md#derive-a-codex-session-from-a-claude-parent-cross-runtime) and
 [hook.md](hook.md#codex-session-start-codex-sessionstart) for the registration and failure semantics.
 
@@ -123,8 +123,8 @@ cross-runtime bridge does, but a bare `forge session transfer regenerate` from a
 ledger row (no ambient run tree).
 
 > **Note:** `forge session transfer show` prints the transfer's YAML frontmatter (metadata — strategy, lineage,
-> `target_runtime`) ahead of the curated body; both are harmless context for Codex, and the `## Runtime Hints` section
-> tells Codex how to run.
+> `target_runtime`) ahead of the curated body; Codex can read both as context, and the `## Runtime Hints` section tells
+> Codex how to run.
 
 > **Note:** The one-command flow rejects `--resume-from` without `--runtime codex` — with the default (Claude) runtime
 > it would just be `forge session resume <parent> --fresh`, which already exists. Omitting `--task` makes the bridge

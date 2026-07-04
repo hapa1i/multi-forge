@@ -25,17 +25,17 @@ Claude Code doesn't send session IDs downstream. The proxy identifies requests b
 
 If you want different model mappings or thinking defaults: use a different proxy.
 
-### Full model capabilities
+### API model capabilities
 
 Provider CLIs sometimes limit the models they serve. For example, OpenAI's Codex CLI caps GPT-5.5 at 400K tokens as a
 serving-budget decision, even though the model supports 1,050,000 tokens via the API. Forge proxies route through the
-API directly, so you get the model's full context window and the complete set of reasoning effort levels.
+API directly, so a proxy can use API context windows and reasoning effort levels that a product CLI may not expose.
 
-This also means access to models that product CLIs don't expose at all -- like `gpt-5.5-pro` (1M context, higher
-reasoning quality) or mixing providers within a single workflow (GPT for planning, Claude for execution).
+It can also route to API models that product CLIs don't expose at all -- like `gpt-5.5-pro` (1M context) -- or to
+different providers within a single workflow (GPT for planning, Claude for execution).
 
-The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Forge's
-[spend caps](#cost-tracking-and-spend-caps) make this manageable.
+The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Use Forge
+[spend caps](#cost-tracking-and-spend-caps) when you want warn/reject limits on that spend.
 
 ### System prompt addendums
 
@@ -455,8 +455,8 @@ forge proxy edit shared-proxy
 
 1. Create a **planning proxy** (`openrouter-openai`) and start Session A with that template.
 2. Approve plan; stop.
-3. Fork to Session B and relaunch Claude against an **execution proxy** (`forge claude start --proxy <proxy_id>`).
-4. Fork to Session C and relaunch Claude against a **review proxy** the same way.
+3. Fork to Session B with an **execution proxy** (`forge session fork <parent> --name <session_b> --proxy <proxy_id>`).
+4. Fork to Session C with a **review proxy** (`forge session fork <parent> --name <session_c> --proxy <proxy_id>`).
 5. Use A and C for independent reviews; have B synthesize and fix.
 
 Proxies make this deterministic: each session's requests hit a specific base URL, so routing defaults are stable.

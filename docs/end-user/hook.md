@@ -2,7 +2,7 @@
 
 **Status:** Implemented (hooks run as `forge hook <name>`).
 
-Hooks are Forge’s “glue” layer: they observe Claude Code lifecycle events and write **confirmed facts** and
+Hooks are Forge’s integration layer: they observe Claude Code lifecycle events and write **confirmed facts** and
 **artifacts** so sessions are inspectable and auditable.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
@@ -208,10 +208,11 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
 Purpose: deliver the transfer handoff to a Codex session as `additionalContext` — the hook half of
 `forge session start --runtime codex --context-delivery hook`.
 
-By default the curated transfer rides the first `codex exec` prompt (zero setup). With `--context-delivery hook`, Forge
-stages the handoff under the session directory and this hook injects it at SessionStart instead; after the turn, Forge
-reconciles the hook's delivery receipt into the session manifest (`confirmed.codex.context_delivery`). If the hook never
-fired (not enrolled), the command exits 1 and tells you so — the first turn ran without the parent context.
+By default the curated transfer rides the first `codex exec` prompt, so no Codex hook setup is required. With
+`--context-delivery hook`, Forge stages the handoff under the session directory and this hook injects it at SessionStart
+instead; after the turn, Forge reconciles the hook's delivery receipt into the session manifest
+(`confirmed.codex.context_delivery`). If the hook never fired (not enrolled), the command exits 1 and tells you so — the
+first turn ran without the parent context.
 
 - every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
   resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
@@ -324,8 +325,8 @@ They shouldn't. If this appears to happen:
 
 ### Hook resolution mechanism
 
-See [Hook session resolution](#hook-session-resolution) for the four-step resolution chain (`FORGE_FORK_NAME` ->
-`FORGE_SESSION` -> UUID lookup -> dir scan).
+See [Hook session resolution](#hook-session-resolution) for the three-step resolution chain (`FORGE_FORK_NAME` ->
+`FORGE_SESSION` -> UUID lookup).
 
 ### Hook command group
 

@@ -9,7 +9,7 @@ Three skills verify that Forge is installed and working correctly, with escalati
 | Full QA     | `/forge:qa`          | Full checklist in Docker                                  | `full`          |
 
 - Canonical architecture: [`docs/design_appendix.md` section D](../design_appendix.md#d-interactive-manual-testing)
-- Testing guidelines:[`testing_guidelines.md`](../developer/testing_guidelines.md)
+- Testing guidelines: [`testing_guidelines.md`](../developer/testing_guidelines.md)
 
 ---
 
