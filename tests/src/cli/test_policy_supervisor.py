@@ -340,6 +340,42 @@ class TestSupervisorInfraFailure:
         assert result.exit_code == 2
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
+    def test_fail_open_without_infra_prefix_exits_2(self, mock_invoke, tmp_path):
+        """Regression (Gap A): a fail-open allow whose warning does NOT start with an
+        `_INFRA_FAILURE_PREFIXES` prefix must still exit 2. The structural `fail_open`
+        flag is authoritative -- lane-unavailable / plan-missing / routing-error /
+        parse-failure fail-opens all set it but emit warnings the prose match misses, so
+        the pre-fix CLI reported exit-0 'passed' on a supervisor that never evaluated.
+        """
+        f = tmp_path / "src.py"
+        f.write_text("x = 1")
+        mock_invoke.return_value = _allow_decision(
+            fail_open=True,
+            warnings=["Supervisor lane unavailable: LaneError('bad lane'), failing open"],
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
+        assert result.exit_code == 2
+
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
+    def test_fail_open_without_infra_prefix_json(self, mock_invoke, tmp_path):
+        f = tmp_path / "src.py"
+        f.write_text("x = 1")
+        mock_invoke.return_value = _allow_decision(
+            fail_open=True,
+            warnings=["Supervisor verdict could not be parsed, failing open"],
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--json"])
+        assert result.exit_code == 2
+        data = json.loads(result.output)
+        assert data["passed"] is False
+        assert data["clean"] is False
+        assert data["final_decision"] == "error"
+
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_infra_failure_json(self, mock_invoke, tmp_path):
         f = tmp_path / "src.py"
         f.write_text("x = 1")
