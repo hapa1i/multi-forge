@@ -13,6 +13,7 @@ from click.testing import CliRunner
 
 from forge.cli import activity as activity_module
 from forge.cli.main import main
+from forge.core.paths import get_forge_home
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     mint_downstream_event_id,
@@ -135,7 +136,15 @@ def test_json_shape(monkeypatch) -> None:
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["session"] == "planner"
-    assert set(data) == {"session", "since", "upstream", "downstream", "shadow", "subagents", "notes"}
+    assert set(data) == {
+        "session",
+        "since",
+        "upstream",
+        "downstream",
+        "shadow",
+        "subagents",
+        "notes",
+    }
     assert "session_tagging_partial" in data["notes"]
     rows = {c["command"]: c for c in data["downstream"]["rows"]}
     assert rows["supervisor"]["calls"] == 1
@@ -239,6 +248,60 @@ def test_empty_session_message(monkeypatch) -> None:
     result = CliRunner().invoke(main, _activity_args("quiet"))
     assert result.exit_code == 0
     assert "No Forge activity" in result.output
+
+
+def test_json_ignores_legacy_downstream_identity_schema(monkeypatch) -> None:
+    _patch_resolver(monkeypatch)
+    log_dir = get_forge_home() / "telemetry" / "downstream"
+    log_dir.mkdir(parents=True)
+    (log_dir / "2026-06_legacy.jsonl").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "attempt",
+                "downstream_event_id": "ds_legacy",
+                "provider_command": "legacy-worker",
+                "forge_run_id": "run_legacy",
+                "forge_root_run_id": "run_legacy",
+                "input_tokens": 10,
+                "output_tokens": 5,
+                "cost_micros": 1200,
+            }
+        )
+        + "\n"
+    )
+
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all", "--json"))
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["downstream"]["rows"] == []
+    assert data["downstream"]["skipped_legacy_schema"] == 1
+
+
+def test_human_render_reports_legacy_downstream_identity_schema(monkeypatch) -> None:
+    _patch_resolver(monkeypatch)
+    log_dir = get_forge_home() / "telemetry" / "downstream"
+    log_dir.mkdir(parents=True)
+    (log_dir / "2026-06_legacy.jsonl").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "attempt",
+                "downstream_event_id": "ds_legacy",
+                "provider_command": "legacy-worker",
+                "forge_run_id": "run_legacy",
+                "forge_root_run_id": "run_legacy",
+            }
+        )
+        + "\n"
+    )
+
+    result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))
+
+    assert result.exit_code == 0
+    assert "No Forge activity" in result.output
+    assert "skipped 1 downstream telemetry record from an older Forge schema" in result.output
 
 
 def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
@@ -413,7 +476,13 @@ def test_human_render_shows_shadow_section(monkeypatch, tmp_path) -> None:
 
     SessionStore(str(tmp_path), "planner").write(create_session_state("planner", worktree_path=str(tmp_path)))
     _write_shadow_done(tmp_path, "a1", status="agree")
-    _write_shadow_done(tmp_path, "d1", status="disagree", frontier_verdict="divergent", frontier_confidence=0.9)
+    _write_shadow_done(
+        tmp_path,
+        "d1",
+        status="disagree",
+        frontier_verdict="divergent",
+        frontier_confidence=0.9,
+    )
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
     result = CliRunner().invoke(main, _activity_args("planner", "--period", "all"))

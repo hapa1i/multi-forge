@@ -9,7 +9,7 @@
 proxy:
   family: minimax
   preferred_provider: openrouter
-  source: openrouter
+  backend: openrouter
   default_port: 8104
 
   openrouter:

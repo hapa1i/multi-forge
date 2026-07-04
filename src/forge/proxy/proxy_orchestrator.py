@@ -237,7 +237,7 @@ def create_proxy_file(
         template=template,
         template_digest=template_digest,
         provider=provider_name,
-        source=cfg.proxy.source,
+        backend=cfg.proxy.backend,
         proxy_endpoint=base_url,
         port=port,
         upstream_base_url=resolved_upstream,

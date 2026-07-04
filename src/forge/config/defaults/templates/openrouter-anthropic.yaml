@@ -10,7 +10,7 @@
 proxy:
   family: anthropic
   preferred_provider: openrouter
-  source: openrouter
+  backend: openrouter
   default_port: 8095
 
   openrouter:

@@ -189,33 +189,39 @@ Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command re
   real binary's tip text (a latent plural-vs-singular assertion at `test_installer.py:158` was only proven correct by
   the live run).
 
-### Unified backend: source catalog invariants (shipped)
+### Backend identity axes: backend instance vs managed process vs telemetry origin (shipped)
 
-Shipped 2026-06-18 (`unified_backend`). Keep these boundaries intact when changing backend/source, template, auth, or
-telemetry ownership:
+Shipped 2026-07-04 (`backend_instance_identity_model`). Keep these boundaries intact when changing backend/catalog,
+template, auth, telemetry, or local lifecycle ownership:
 
 - **Credential registry is a dependency leaf.** Credential data lives in `src/forge/core/credential_registry.py`, while
-  template/source-aware logic lives above it (`forge.backend.sources`, `forge.core.auth.template_secrets`,
-  `forge.core.auth.capabilities`). Do not move `CREDENTIALS` back into a module that imports template/source logic; that
-  recreates the `sources -> auth -> sources` cycle that Phase 2 removed.
-- **Catalog source ids and runtime instance ids are different value-spaces.** `ModelSource.id` values such as
-  `litellm-gemini-local`, `openrouter`, and `anthropic-direct` are static source definitions.
-  `BackendInstance.backend_id` values such as `litellm-4000` are local process instances. Downstream telemetry
-  `backend_id` writes the catalog source id, never the runtime instance id; local catalog ids must not become
-  port-derived.
-- **The local sources share one adapter+port, so runtime-instance attribution is many-to-one.** All three local LiteLLM
-  sources declare `adapter=litellm, default_port=4000`, and the shipped default `litellm.yaml` references both
-  `GEMINI_API_KEY` and `OPENAI_API_KEY` — so a single `litellm-4000` process legitimately backs both
-  `litellm-gemini-local` and `litellm-openai-local`. `forge model backend list`/`show` surface this as `(shared)` /
-  `runtime_instance.shared_with`. The `_local_source_matches_backend_config` heuristic that disambiguates this is
+  template/catalog-aware logic lives above it (`forge.backend.sources`, `forge.core.auth.template_secrets`,
+  `forge.core.auth.capabilities`). Do not move `CREDENTIALS` back into a module that imports template/catalog logic;
+  that recreates the `sources -> auth -> sources` cycle that Phase 2 removed.
+- **Backend instance ids and managed process ids are different value-spaces.** `ModelSource.id` values such as
+  `litellm-gemini-local`, `openrouter`, and `anthropic-direct` currently implement logical backend instance ids.
+  `ManagedBackendProcess.process_id` values such as `litellm-4000` are local process ids. Downstream telemetry
+  `backend_id` writes the logical backend instance id, never the managed process id; local backend instance ids must not
+  become port-derived.
+- **The local backend instances share one adapter+port, so managed-process attribution is many-to-one.** The local
+  LiteLLM backend instances `litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`, and
+  `codex-responses-local` all declare `adapter=litellm, default_port=4000`. The shipped default `litellm.yaml`
+  references both `GEMINI_API_KEY` and `OPENAI_API_KEY`, so a single `litellm-4000` process legitimately backs multiple
+  matching backend instances. `forge model backend list`/`show` surface this as `(shared)` /
+  `managed_process.shared_with`. The `_local_source_matches_backend_config` heuristic that disambiguates this is
   **display-only** (`cli/backend.py`); it must never feed downstream telemetry `backend_id`, which stays derived from
-  `proxy.source`. A test fixture narrower than the shipped default (e.g. gemini-only) hides the multi-match case — lock
+  `proxy.backend`. A test fixture narrower than the shipped default (e.g. gemini-only) hides the multi-match case — lock
   shared-display behavior with a multi-key fixture, not a single-provider one.
-- **`proxy.source` on the durable read path is a system boundary, not strict durable state.** `proxy.yaml` is user-owned
-  ("edit freely"), so an unrecognized `source` is a misconfiguration to warn-and-degrade on, not corruption to reject:
-  `_backend_source_id` (`proxy/server.py`) warns **once** (module-level set guard) and returns the raw value; the
-  capability gates (provider-trace, OpenRouter user) already fail safe on an unknown id. The strict reject-on-unknown
-  contract is scoped to the **template** load path only (`_apply_template_source`), where the value originates in-repo.
+- **`proxy.backend` has two validation postures.** Template load is strict: old `proxy.source`, unknown backends,
+  ambiguous shorthand, missing values, and runtime-native backends fail loudly before proxy creation. Runtime
+  `proxy.yaml` is user-owned ("edit freely"), so an unrecognized `backend` is a misconfiguration to warn-and-degrade on,
+  not corruption to reject: `_backend_instance_id` (`proxy/server.py`) warns **once** (module-level set guard) and
+  returns the raw value; capability gates (provider-trace, OpenRouter user, responses ingress) fail safe on an unknown
+  id.
+- **Telemetry `source_id`/`source_kind` are origin/correlation, not backend identity.** The backend identity field is
+  downstream `backend_id`; the source fields remain the origin axis (`proxy`, `provider`, reporter). The schema-v2
+  backend-identity break skips missing/older downstream schemas with a one-time warning and activity/cost
+  `skipped_legacy_schema` counts rather than reattributing old records.
 
 ### Backend remote reconciliation: registry capability + total external-data coercers (shipped)
 

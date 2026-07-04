@@ -5,9 +5,9 @@
 **Current focus**: This card is the **Step 3 coordinator/index**, not one code change. A1 (PR #70), the B1 backend slice
 (PR #71), **S1/A2+A4**, **S2/A5**, **S4/B2-B5**, **S5/C1**, **S3/A3**, and **S5/C2** are done. **C2/OQ-2** is resolved:
 the public backend wording pass shipped here, while the deeper backend instance identity migration is split to
-[`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). **C3/OQ-3** is resolved as
+[`done/backend_instance_identity_model`](../backend_instance_identity_model/card.md). **C3/OQ-3** is resolved as
 record-only: do not globally normalize semantic `--scope` families. Slices graduate out individually; this checklist
-stays the durable index. **Status: READY FOR PR (card moves to `done/` after merge).**
+stays the durable index. **Status: DONE (merged PR #72; card moved to `done/` after merge).**
 
 **Guiding rules**: `docs/developer/cli_style_guidelines.md` is the CLI shape authority (Output Streams, destructive-verb
 shape, read-leaf `--json`, `Use --flag` / `Run '<cmd>'` tip forms); `docs/developer/coding_standards.md` §5 governs
@@ -196,7 +196,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   were removed from help/metavars/tables/prose because `runtime` already means the agent/frontend runtime (`codex`,
   `claude_code`). **Boundary held:** internal/storage/JSON names (`ModelSource.id`, `source_id`, `runtime_instance`,
   `BackendInstance.backend_id`) stayed unchanged; the real domain/schema migration remains split to
-  [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md). **Verification:**
+  [`done/backend_instance_identity_model`](../backend_instance_identity_model/card.md). **Verification:**
   `uv run pytest tests/src/cli/test_backend_commands.py tests/src/cli/test_command_tree_invariants.py -q` passed (51
   tests); live help/table smoke checked `backend --help`, `show --help`, `test-auth --help`, `start --help`,
   `stop --help`, `reconcile --help`, and `backend list`; `make pre-commit` passed.
@@ -205,8 +205,8 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   memory/shadows/session-memory uses `project|workspace|all`; search has no workspace scope (`project|all`); extension
   install uses `local|project|user`; Codex status reports `user|project|local` to mirror runtime-install reporting.
   **Assertion satisfied:** no arbitrary cross-family reorder; no code change needed.
-- [x] C2/C3 decision split recorded in this checklist and in [`card.md`](card.md); follow-up domain card created in
-  `todo/`.
+- [x] C2/C3 decision split recorded in this checklist and in [`card.md`](card.md); follow-up domain card created and
+  later closed in [`done/backend_instance_identity_model`](../backend_instance_identity_model/card.md).
 - [x] Changelog entry per shipped break (`coding_standards.md §5`).
 - [x] S5/C1 verification: focused activity/stream tests passed (23 tests), command-tree invariants passed (9 tests),
   targeted activity integration passed (1 test), and `make pre-commit` passed on 2026-07-03.
@@ -220,7 +220,7 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
   but keep this slice help/metavar/table-only. The desired long-term abstraction is all model backends as backend
   instances (remote singleton names may be instance ids for now; managed local LiteLLM instances already have ids like
   `litellm-4000`), and that migration is split to
-  [`todo/backend_instance_identity_model`](../../todo/backend_instance_identity_model/card.md).
+  [`done/backend_instance_identity_model`](../backend_instance_identity_model/card.md).
 - **OQ-3 (C3) -- RESOLVED 2026-07-03:** the observed `--scope` divergences are semantic families, not one accidental
   enum. Do not globally reorder; only normalize local drift inside a family.
 
@@ -254,5 +254,6 @@ sweep (PR #70) already flipped the systemic stdout leaks. Batch B is help/messag
 - [x] cli_style index (this card) annotated per shipped slice; refuted-candidate list in `card.md` preserved.
 - [x] Durable lessons promoted to `docs/board/impl_notes.md` only after human review. **Decision:** no new
   `impl_notes.md` promotion for this card. Existing impl notes already preserve the internal source-id/runtime-instance
-  invariant; the future-facing abstraction lives in `todo/backend_instance_identity_model` until it ships.
-- [ ] Move card `doing/ -> done/` when the resumed cli_style scope ships or is deliberately split into new active cards.
+  invariant; the future-facing abstraction shipped in
+  [`done/backend_instance_identity_model`](../backend_instance_identity_model/card.md).
+- [x] Move card `doing/ -> done/` after PR #72 merged.

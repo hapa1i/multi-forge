@@ -94,9 +94,16 @@ def _period_start(period: str) -> datetime | None:
 
 
 def _render(summary: SessionActivitySummary, *, period: str) -> None:
-    scope = {"today": "today", "week": "this week", "month": "this month", "all": "all time"}[period]
+    scope = {
+        "today": "today",
+        "week": "this week",
+        "month": "this month",
+        "all": "all time",
+    }[period]
     if summary.is_empty:
         console.print(f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]")
+        if note := _legacy_schema_note(summary.downstream.skipped_legacy_schema):
+            console.print(f"[dim]{note}[/dim]")
         return
 
     console.print(f"\n[bold]Forge activity — {summary.session}[/bold] [dim]({scope})[/dim]")
@@ -237,6 +244,8 @@ def _render(summary: SessionActivitySummary, *, period: str) -> None:
 
 def _footnotes(summary: SessionActivitySummary) -> list[str]:
     notes: list[str] = []
+    if note := _legacy_schema_note(summary.downstream.skipped_legacy_schema):
+        notes.append(note)
     if summary.cost_partial:
         notes.append("cost is best-effort and partial (some calls report no cost)")
     if summary.upstream.log_capped:
@@ -250,6 +259,13 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
     evidence = "reported (no snapshot estimates mixed in)" if exact else "reported-or-estimated"
     notes.append(f"cost is {evidence}, best-effort; 'forge telemetry costs show' is the authoritative spend view")
     return notes
+
+
+def _legacy_schema_note(skipped: int) -> str | None:
+    if not skipped:
+        return None
+    plural = "" if skipped == 1 else "s"
+    return f"skipped {skipped} downstream telemetry record{plural} from an older Forge schema in this window"
 
 
 def _fmt_usd(micros: int | None) -> str:

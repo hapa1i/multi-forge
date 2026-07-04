@@ -12,7 +12,7 @@ internal: true  # Hidden from user-facing template listings
 proxy:
   family: gemini
   preferred_provider: litellm
-  source: litellm-gemini-test
+  backend: litellm-gemini-test
   default_port: 8087
 
   litellm:

@@ -8,7 +8,7 @@
 proxy:
   family: gemini
   preferred_provider: openrouter
-  source: openrouter
+  backend: openrouter
   default_port: 8099
 
   openrouter:

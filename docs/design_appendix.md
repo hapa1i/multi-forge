@@ -98,57 +98,57 @@ forge proxy edit my-high-reasoning
 
 **Principle:** Create from template, then edit (don't modify internals).
 
-### A.2.1 Model source catalog (§3.6.5 / unified backend Phase 1/2)
+### A.2.1 Backend instance catalog (§3.6.5 / unified backend Phase 1/2)
 
-Forge now has a built-in, code-level model-source catalog in `forge.backend.sources`. It is a static definition layer
-for the upstream model source a proxy or direct runtime reaches; it is **not** user-authored durable state and it is
-distinct from both proxy templates and runtime backend instances.
+Forge has a built-in, code-level backend instance catalog in `forge.backend.sources` (still implemented as
+`ModelSource`). It is the static definition layer for the upstream model backend a proxy or direct runtime reaches; it
+is **not** user-authored durable state and it is distinct from both proxy templates and managed local backend processes.
 
 | Layer                    | Owner / Location                             | Unit                                                                                    |
 | ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability   |
-| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.source`                                |
+| Backend instance catalog | `forge.backend.sources`                      | Static instance definition: id, kind, endpoint shape, credentials, provider, capability |
+| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.backend`                               |
 | Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge model backend create` |
-| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                           |
+| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for managed local backend processes only                           |
 
-`ModelSource.id` is the canonical catalog id. Local source ids intentionally live in a different value-space from
-runtime instance ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
-`BackendInstance.backend_id`. Downstream telemetry uses `backend_id` for source attribution and writes the catalog
-source id rather than the runtime instance id.
+`ModelSource.id` is currently the canonical backend instance id. Backend instance ids intentionally live in a different
+value-space from managed process ids: for example, `litellm-gemini-local` is a backend instance id, while `litellm-4000`
+remains a `ManagedBackendProcess.process_id`. Downstream telemetry uses `backend_id` for backend-instance attribution
+and writes the logical backend instance id rather than the managed process id.
 
-Source definitions have:
+Backend instance definitions have:
 
 - `id`: stable catalog id, lowercase letters/digits plus `-`, `_`, or `.`
 - `kind`: `local` or `remote`
 - `provider`: `ProviderType` from dependency-light `forge.core.provider_types` (`litellm_remote`, `litellm_local`,
-  `anthropic`, `openrouter`, `openai`). `openai` is catalog-only -- a subscription/source provider, never a `core.llm`
-  routing target (`detect_provider` maps `openai/<model>` to `litellm_remote`)
+  `anthropic`, `openrouter`, `openai`). `openai` is catalog-only -- a subscription provider, never a `core.llm` routing
+  target (`detect_provider` maps `openai/<model>` to `litellm_remote`)
 - `endpoint`: one of `literal_url`, `connection_value`, `local_backend`, or `runtime_native`. A `runtime_native`
   endpoint carries no URL and no Forge credential -- connection and auth are owned by the runtime (a subscription
   reached through its native login)
 - `credential_ids`: credential registry names such as `openrouter`, `litellm-remote`, `anthropic-api`, `openai-api`, or
-  `gemini-api`. By validator symmetry a `runtime_native` source declares **none** (auth is runtime-owned); every other
-  endpoint kind declares at least one
+  `gemini-api`. By validator symmetry a `runtime_native` backend instance declares **none** (auth is runtime-owned);
+  every other endpoint kind declares at least one
 - `billing_posture`: declared billing nature, `per_token` (default), `subscription_quota`, or `free`. Distinct from the
   per-invocation `BillingMode` in `core/usage`, but its first consumer: `resolve_billing_mode` reads a keyless direct
   run's bound-lane backend posture and emits `subscription_quota` when the posture is `subscription_quota` (the shared
   spelling)
-- `reachable_via`: lane runtimes that can reach the source, empty = any. A subscription pins the runtime whose native
-  login authenticates it (`chatgpt -> ("codex",)`, `claude-max -> ("claude_code",)`); `forge.core.lanes._reachable`
-  reads this
+- `reachable_via`: lane runtimes that can reach the backend instance, empty = any. A subscription pins the runtime whose
+  native login authenticates it (`chatgpt -> ("codex",)`, `claude-max -> ("claude_code",)`);
+  `forge.core.lanes._reachable` reads this
 - `capabilities`: currently includes auth-probe, provider-trace eligibility, and provider-user-grouping capability
 - `local_lifecycle`: local-only refinement with adapter and default port; required env vars are derived from
-  `credential_ids`; remote sources never set it
-- `template_names`: current proxy templates that resolve to the canonical source id during template loading
+  `credential_ids`; remote backend instances never set it
+- `template_names`: current proxy templates that resolve to the canonical backend instance id during template loading
 
 The shipped v1 catalog includes:
 
-| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                                           |
+| Backend instance id       | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                                           |
 | ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------- |
 | `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable                                                           |
 | `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates                                                                |
-| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle                                                             |
-| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source                                                               |
+| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template backend, no lifecycle                                                            |
+| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution backend                                                              |
 | `chatgpt`                 | remote | `openai`         | `runtime_native` (no URL)            | (none)           | Subscription via codex; `subscription_quota`, `reachable_via=("codex",)`                        |
 | `claude-max`              | remote | `anthropic`      | `runtime_native` (no URL)            | (none)           | Claude Max subscription via claude_code; `subscription_quota`, `reachable_via=("claude_code",)` |
 | `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                                       |
@@ -157,47 +157,48 @@ The shipped v1 catalog includes:
 | `codex-responses-local`   | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Codex `/v1/responses` passthrough; responses-ingress + provider-trace                           |
 | `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                                            |
 
-Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider`/`billing_posture` values, missing
-or unknown credentials, a `runtime_native` source that declares any credential or endpoint URL, a `reachable_via` entry
-outside the lane runtime axis (`{core_llm}` plus the agent `RUNTIMES`, via dependency-light `forge.core.runtime_vocab`),
-malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local sources
-without lifecycle. Remote definitions are never written to `BackendRegistry`.
+Catalog validation rejects duplicate backend instance ids or aliases, unknown `kind`/`provider`/`billing_posture`
+values, missing or unknown credentials, a `runtime_native` backend instance that declares any credential or endpoint
+URL, a `reachable_via` entry outside the lane runtime axis (`{core_llm}` plus the agent `RUNTIMES`, via dependency-light
+`forge.core.runtime_vocab`), malformed literal URLs, malformed connection-value env var names, remote lifecycle
+declarations, and local backend instances without lifecycle. Remote definitions are never written to `BackendRegistry`.
 
-Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
-the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
-source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. A `runtime_native` source
-cannot back a proxy: template loading rejects a `proxy.source` pointing at one, because a key-authenticated proxy
-injects its own bearer key and so cannot present the source's runtime-owned subscription credential (the "no key-auth
-proxy support for subscriptions" boundary -- the limit is the key-auth transport, not the source). Shipped local
-templates no longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry
-inline provider `base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path
-used by credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to
-`https://openrouter.ai/api/v1` when no override is configured.
+Proxy templates declare `proxy.backend: <backend-instance-id-or-alias>`. During template loading, Forge resolves that
+value through the catalog, stores the canonical backend instance id on `ProxyConfig.backend`, derives any local
+`BackendDependency` from backend lifecycle metadata, and resolves remote provider `base_url` from the backend endpoint
+shape. A `runtime_native` backend instance cannot back a proxy: template loading rejects a `proxy.backend` pointing at
+one, because a key-authenticated proxy injects its own bearer key and so cannot present the backend's runtime-owned
+subscription credential (the "no key-auth proxy support for subscriptions" boundary -- the limit is the key-auth
+transport, not the backend). Shipped local templates no longer carry inline `backend_dependency`; OpenRouter and
+Anthropic passthrough templates no longer carry inline provider `base_url`. Remote LiteLLM templates resolve
+`LITELLM_BASE_URL` through the same connection-value path used by credentials. OpenRouter templates resolve
+`OPENROUTER_BASE_URL` the same way, defaulting to `https://openrouter.ai/api/v1` when no override is configured.
 
 `TEMPLATE_ENV_VARS` remains as a compatibility map for existing auth callers, but it is generated from
-`ModelSource.credential_ids` and source endpoint connection values. Template `backend_dependency.required_env_vars`,
+`ModelSource.credential_ids` and backend endpoint connection values. Template `backend_dependency.required_env_vars`,
 `credentials_for_template()`, sidecar secrets, and proxy preflight therefore derive from the same catalog-backed source
 of truth. Credential metadata itself lives in dependency-light `src/forge/core/credential_registry.py`; template-aware
-helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template/source import cycle.
+helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template/catalog import cycle.
 
-`forge model backend` is the operator view over this catalog. `forge model backend list` reads the static sources plus
-the local runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance,
-offline auth/health status, and any matching local `BackendInstance`. The local LiteLLM sources share one adapter/port
-(`litellm` on `4000`), so a single runtime instance can back several sources at once; `forge model backend list` marks
-such an instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The
-command stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
-`forge model backend test-auth <source-id>`, which resolves the same credentials and performs the source's
-reachability/auth probe without echoing secret values. A `runtime_native` source carries no Forge credential, so `list`
-reports its auth as `runtime_native` and health as `runtime-owned`, and `test-auth` skips the probe with a pointer to
-`forge runtime preflight codex` instead of reporting a credential failure. `forge model backend show <source-id>`
-renders catalog details and local runtime state when a source has lifecycle, while `show <runtime-id>` renders a
-registry-only runtime view. `start` stays config-oriented: it accepts local source ids or adapter operands with
-`--port`. `stop` is process-oriented: it accepts runtime instance ids such as `litellm-4000`, or `--all` for every
-registered local runtime instance; local source ids and bare adapters are rejected with a runtime-id recovery tip, and
-remote source operands keep the intentional no-lifecycle capability error. `create` and `delete` remain local
-adapter/config operations because built-in remote sources are not user-created durable state. `delete <adapter>` may
-stop matching runtime instances before removing the config, but `delete <adapter> --port <port>` is no longer a
-runtime-instance spelling.
+`forge model backend` is the operator view over this catalog. `forge model backend list` reads the static backend
+instances plus the local managed-process registry and reports backend kind, endpoint shape, required credentials,
+per-variable provenance, offline auth/health status, and any matching local `ManagedBackendProcess`. The local LiteLLM
+backend instances share one adapter/port (`litellm` on `4000`), so a single managed process can back several backend
+instances at once; `forge model backend list` marks such a process `(shared)` and `--json` carries
+`managed_process.shared_with` as sibling backend instance ids. The command stays offline for remote backend instances:
+configured remotes show as `unprobed` until an operator runs `forge model backend test-auth <backend>`, which resolves
+the same credentials and performs the backend's reachability/auth probe without echoing secret values. A
+`runtime_native` backend instance carries no Forge credential, so `list` reports its auth as `runtime_native` and health
+as `runtime-owned`, and `test-auth` skips the probe with a pointer to `forge runtime preflight codex` instead of
+reporting a credential failure. `forge model backend show <backend-or-process>` renders backend details and local
+managed-process state when a backend has lifecycle, while a process id such as `litellm-4000` renders a registry-only
+managed-process view. `start` stays config-oriented: it accepts local backend instance ids or adapter operands with
+`--port`. `stop` is process-oriented: it accepts managed process ids such as `litellm-4000`, or `--all` for every
+registered local managed process; local backend ids and bare adapters are rejected with a process-id recovery tip, and
+remote backend operands keep the intentional no-lifecycle capability error. `create` and `delete` remain local
+adapter/config operations because built-in remote backend instances are not user-created durable state.
+`delete <adapter>` may stop matching managed processes before removing the config, but `delete <adapter> --port <port>`
+is no longer a managed-process spelling.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 
@@ -277,8 +278,8 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
     context=None, extra_hint=None, profile=None, env_ignored=False) -> str
 ```
 
-`TEMPLATE_ENV_VARS` is generated from the model-source catalog for template-facing compatibility. It maps each template
-to required credential env vars and required connection-value env vars such as `LITELLM_BASE_URL`.
+`TEMPLATE_ENV_VARS` is generated from the backend instance catalog for template-facing compatibility. It maps each
+template to required credential env vars and required connection-value env vars such as `LITELLM_BASE_URL`.
 `credentials_for_template()` bridges that generated map to `CREDENTIALS` (credential → metadata) via reverse lookup.
 `format_missing_credential_error()` produces actionable messages with signup URLs, `forge auth login` commands, and
 `not_needed_for` disambiguation (rendered for credentials that define it: `anthropic-api` and `codex-api`).
@@ -465,14 +466,17 @@ Runtime logs:
 | `~/.forge/telemetry/audit_state/<id>.json` | `forge.proxy.audit_logger`        | Sidecar drift baseline                               |
 | `~/.forge/usage/events/*.jsonl`            | `forge.core.usage.ledger`         | Transitional attribution ledger; reset/user-prune    |
 
-Downstream attempt records contain timestamp, proxy/source ID, model/tier, token counts, `cost_micros` (null when no
-route reported a cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), provider lifecycle
-fields, optional redacted audit payloads, and the **run-tree correlation** `forge_run_id`/`forge_root_run_id` (§3.14 /
-§A.13: null for the interactive harness and any non-Forge-originated traffic; set when a Forge-routed `claude -p`
-subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers). `backend_id` is the canonical
-model-source catalog id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.) used for upstream source attribution.
-It is distinct from `source_id`/`source_kind`, which remain the telemetry-origin axis (`proxy` or `provider`). Two
-companion headers ride the same proven-proxy path for provider-trace correlation: `X-Forge-Session` (an opaque
+Downstream attempt records contain timestamp, proxy id, backend instance id, model/tier, token counts, `cost_micros`
+(null when no route reported a cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`),
+provider lifecycle fields, optional redacted audit payloads, and the **run-tree correlation**
+`forge_run_id`/`forge_root_run_id` (§3.14 / §A.13: null for the interactive harness and any non-Forge-originated
+traffic; set when a Forge-routed `claude -p` subprocess forwarded the validated `X-Forge-Run-ID` / `X-Forge-Root-Run-ID`
+headers). `backend_id` is the canonical backend instance id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.)
+used for backend attribution. For local LiteLLM, it remains the logical backend instance id rather than the managed
+process id. It is distinct from `source_id`/`source_kind`, which remain the telemetry-origin axis (`proxy` or
+`provider`). Current downstream writes use `schema_version=2`; readers skip missing/older schemas with a one-time
+warning and expose `skipped_legacy_schema` counts in activity/cost views rather than reattributing historical records.
+Two companion headers ride the same proven-proxy path for provider-trace correlation: `X-Forge-Session` (an opaque
 `forge_sess_<hash>` / `forge_run_<hash>` grouping id derived by hashing the session name + role — the raw name is never
 sent) and `X-Forge-Command` (the sanitized command role). Like the run-id headers they are validated on read, stored on
 `request.state`, and are **internal Forge↔proxy correlation only — never forwarded upstream** (the passthrough allowlist
@@ -496,8 +500,8 @@ cap-state snapshots, audit sidecar state, **and** the usage-attribution ledger (
 and clears the derived status-line caches (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for
 supervisor health) so a wiped ledger cannot replay a cached value; it prompts for confirmation unless `--yes`, and
 `--dry-run` previews. Either way, a running proxy keeps its cost totals and cap counters in memory until restarted — it
-re-bootstraps from the remaining downstream/legacy logs plus cap state at next startup, so restart any active proxy to
-also zero its live cumulative cost and cap enforcement.
+re-bootstraps from the remaining downstream logs plus cap state at next startup, so restart any active proxy to also
+zero its live cumulative cost and cap enforcement.
 
 ---
 
@@ -740,11 +744,12 @@ from upstream or `usage/events`, records whose provider-session id matches the h
 `session_tagging_partial` fields are represented inside panes or `notes`. The launcher still prints the compact one-line
 `render_summary_line(...)` on exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error`
 clause still comes from the window's supervisor failure split; JSON exposes those legacy counts under
-`downstream.rows[*].error_kinds`. Cost is reported-or-estimated and may be partial; `forge telemetry costs show` is
-authoritative. Each model-call row also carries the lane its usage events ran on -- `runtime` and `billing_mode`
-(uniform, `mixed` when a command's events disagree, `null`/`-` for a downstream-only row with no usage-event source).
-The per-call ledger carries **no** catalog backend id, so the full `(runtime, backend, model)` lane shows on
-`forge policy supervisor status`, not here.
+`downstream.rows[*].error_kinds`. The downstream pane also exposes `skipped_legacy_schema` when older downstream
+identity schemas were fenced from the current read. Cost is reported-or-estimated and may be partial;
+`forge telemetry costs show` is authoritative. Each model-call row also carries the lane its usage events ran on --
+`runtime` and `billing_mode` (uniform, `mixed` when a command's events disagree, `null`/`-` for a downstream-only row
+with no usage-event source). The per-call ledger carries **no** catalog backend id, so the full
+`(runtime, backend, model)` lane shows on `forge policy supervisor status`, not here.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
@@ -792,10 +797,10 @@ Semantics and invariants:
 - **Metadata-only.** There is deliberately no prompt/completion/tool/body field. `provider_headers` is the Phase 2
   correlation allowlist (`x-request-id` / `x-generation-id` / `x-litellm-call-id` / `x-litellm-model-id`), re-applied at
   the writer so a future caller that bypasses the upstream allowlist still cannot persist auth/cookie headers.
-- **Source-capability gated.** Written only when the selected backend source declares provider-trace capability.
-  `openrouter` opts in for v1; gateway-routed OpenRouter through non-capable LiteLLM sources writes nothing. The
-  passthrough relay is instrumented with the same lifecycle but remains quiet for current non-capable passthrough
-  sources.
+- **Backend-capability gated.** Written only when the selected backend instance declares provider-trace capability.
+  `openrouter` opts in for v1; gateway-routed OpenRouter through non-capable LiteLLM backend instances writes nothing.
+  The passthrough relay is instrumented with the same lifecycle but remains quiet for current non-capable passthrough
+  backend instances.
 - **`first_chunk_seen`** = first user-visible content chunk; the internal `_provider_meta` carrier (which delivers the
   `gen-…` id, captured on the **first** stream event) does not count, so a stream cancelled before any content still
   records the generation id with `first_chunk_seen=false`.
@@ -819,7 +824,7 @@ Semantics and invariants:
   retained in the indexed `/generation` record for account-side lookup, while a custom `session_id` is ignored.
   Metadata-only, hashed, never the raw session name.
   - **Proxied path.** Forwards the validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into the top-level
-    `user` field on source-capable routes — server-gated (`_provider_user_value`), adapter-forwarded via
+    `user` field on backend-capable routes — server-gated (`_provider_user_value`), adapter-forwarded via
     `extra["openai"]["user"]`.
   - **Direct path.** `resolve_direct_provider_user(role)` (`core/usage/correlation.py`) reads the same global flag plus
     `FORGE_SESSION`/`FORGE_ROOT_RUN_ID` (root falls back to `FORGE_RUN_ID`, mirroring `reactive/env.py`) and derives the
@@ -831,8 +836,8 @@ Semantics and invariants:
   - **Migration.** The pre-Phase-4 per-proxy `proxy.yaml` key is deprecated: it loads with a one-time relocation warning
     and is ignored (warn-and-degrade, user-owned config is a system boundary). The sidecar mounts `~/.forge/config.yaml`
     read-only so in-container proxied forks read the same toggle.
-- **Remote reconciliation (single-id MVP).** `forge model backend reconcile <source-id>` joins one local downstream
-  trace to one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A source is
+- **Remote reconciliation (single-id MVP).** `forge model backend reconcile <backend>` joins one local downstream trace
+  to one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A backend is
   remote-reconcile capable iff it has a registered adapter there — NOT a `ModelSourceCapabilities` flag (a flag could
   drift; registry presence is the single source of truth and keeps an account-side read concern out of the
   proxy-write-path capability struct). OpenRouter is the first adapter (`GET /api/v1/generation`, metadata-only, never

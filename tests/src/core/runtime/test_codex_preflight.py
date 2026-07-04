@@ -79,7 +79,7 @@ def _doctor(
     }
 
 
-def _write_proxy_yaml(proxy_id: str, wire_shape: str, source: str | None = None) -> None:
+def _write_proxy_yaml(proxy_id: str, wire_shape: str, backend: str | None = None) -> None:
     """Write a minimal valid proxy.yaml under the isolated FORGE_HOME (real loader path)."""
     path = get_proxy_file_path(proxy_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -93,8 +93,8 @@ def _write_proxy_yaml(proxy_id: str, wire_shape: str, source: str | None = None)
         "  sonnet: some-model\n"
         f"wire_shape: {wire_shape}\n"
     )
-    if source is not None:
-        body += f"source: {source}\n"
+    if backend is not None:
+        body += f"backend: {backend}\n"
     path.write_text(body)
 
 
@@ -399,7 +399,7 @@ class TestResponsesPosture:
 
     def test_responses_passthrough_with_capable_source_is_supported(self, monkeypatch) -> None:
         # The full conjunction: responses wire shape AND a responses_ingress source.
-        _write_proxy_yaml("codex-responses", wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        _write_proxy_yaml("codex-responses", wire_shape="openai_responses_passthrough", backend="codex-responses-local")
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")
 
@@ -413,7 +413,7 @@ class TestResponsesPosture:
         # Right wire shape, but the source does not declare responses_ingress: the
         # conjunction fails, so preflight cannot green-light what the route would 501.
         _write_proxy_yaml(
-            "codex-responses-badsrc", wire_shape="openai_responses_passthrough", source="litellm-gemini-test"
+            "codex-responses-badsrc", wire_shape="openai_responses_passthrough", backend="litellm-gemini-test"
         )
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")
@@ -439,7 +439,7 @@ class TestResponsesPosture:
         # Responses wire shape with a source id absent from the catalog -> fail closed
         # (ModelSourceNotFoundError is swallowed into proxy_unsupported, no traceback).
         _write_proxy_yaml(
-            "codex-responses-unknownsrc", wire_shape="openai_responses_passthrough", source="no-such-source"
+            "codex-responses-unknownsrc", wire_shape="openai_responses_passthrough", backend="no-such-source"
         )
         _stub_probes(monkeypatch)
         monkeypatch.setenv("CODEX_API_KEY", "sk-env")

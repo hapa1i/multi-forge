@@ -104,41 +104,41 @@ PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 cost_tracker: CostTracker | None = None
 
 
-_warned_unknown_backend_sources: set[str] = set()
-_warned_absent_backend_source: bool = False
+_warned_unknown_backend_instances: set[str] = set()
+_warned_absent_backend_instance: bool = False
 
 
-def _backend_source_id() -> str | None:
-    global _warned_absent_backend_source
-    source = getattr(config.proxy, "source", "") or None
-    if not source:
-        # No source -> no backend_id, so downstream attribution, provider-trace, and provider-user
-        # grouping are all disabled for this proxy (they gate on a source-capable backend_id).
-        # Surface it once; absent source has no value to key on, so use a dedicated latch rather
-        # than the value-keyed _warned_unknown_backend_sources set (best-effort log, never silent).
-        if not _warned_absent_backend_source:
-            _warned_absent_backend_source = True
+def _backend_instance_id() -> str | None:
+    global _warned_absent_backend_instance
+    backend = getattr(config.proxy, "backend", "") or None
+    if not backend:
+        # No backend -> no backend_id, so downstream attribution, provider-trace, and provider-user
+        # grouping are all disabled for this proxy (they gate on a backend-capable backend_id).
+        # Surface it once; absent backend has no value to key on, so use a dedicated latch rather
+        # than the value-keyed _warned_unknown_backend_instances set (best-effort log, never silent).
+        if not _warned_absent_backend_instance:
+            _warned_absent_backend_instance = True
             logger.info(
-                "proxy.yaml has no 'source:'; downstream attribution, provider-trace, and "
+                "proxy.yaml has no 'backend:'; downstream attribution, provider-trace, and "
                 "provider-user grouping are disabled for this proxy. Recreate it to refresh proxy.yaml."
             )
         return None
-    source = str(source)
-    # proxy.yaml is user-owned config (a system boundary): an unrecognized source is a
+    backend = str(backend)
+    # proxy.yaml is user-owned config (a system boundary): an unrecognized backend is a
     # misconfiguration, not durable-state corruption to reject. Degrade to the raw value
     # but warn once so the silent telemetry-attribution gap is visible -- best-effort
     # degradation must log, never be silent (coding-standards section 5).
-    if source not in _warned_unknown_backend_sources:
+    if backend not in _warned_unknown_backend_instances:
         try:
-            get_model_source(source)
+            get_model_source(backend)
         except ModelSourceNotFoundError:
-            _warned_unknown_backend_sources.add(source)
+            _warned_unknown_backend_instances.add(backend)
             logger.warning(
-                "proxy.source %r is not a known backend source; downstream telemetry for this "
+                "proxy.backend %r is not a known backend instance; downstream telemetry for this "
                 "proxy will carry an unrecognized backend_id. Recreate the proxy to refresh proxy.yaml.",
-                source,
+                backend,
             )
-    return source
+    return backend
 
 
 def _inject_provider_user_enabled() -> bool:
@@ -348,7 +348,7 @@ def _provider_user_value(
 ) -> str | None:
     """The provider ``user`` grouping id to inject, or None.
 
-    Opt-in and source-capability gated: the resolved ``backend_id`` must declare
+    Opt-in and backend-capability gated: the resolved ``backend_id`` must declare
     ``provider_user_grouping`` (no provider-name fallback). Prefers the already-derived, validated
     ``X-Forge-Session`` id; falls back to ``forge_run_<hash>`` when only run identity exists;
     returns None when there is nothing to group by (or the flag/route does not apply).
@@ -361,7 +361,7 @@ def _provider_user_value(
         if not get_model_source(backend_id).capabilities.provider_user_grouping:
             return None
     except ModelSourceNotFoundError:
-        logger.debug("unknown backend source for provider-user grouping: %s", backend_id)
+        logger.debug("unknown backend instance for provider-user grouping: %s", backend_id)
         return None
     if forge_session:
         return forge_session
@@ -403,7 +403,7 @@ def _calc_and_log_cost(
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
-            backend_id=_backend_source_id(),
+            backend_id=_backend_instance_id(),
             model=model,
             tier=tier,
             input_tokens=input_tokens,
@@ -615,7 +615,7 @@ def _inspect_route() -> dict[str, Any]:
     return {
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
-        "source": _backend_source_id() or "",
+        "backend": _backend_instance_id() or "",
         "wire_shape": getattr(config.proxy, "wire_shape", "openai_translated"),
     }
 
@@ -721,7 +721,7 @@ async def _observe_request_side(
         redact_headers = audit.effective_redact_headers() if audit is not None else set()
         ctx: dict[str, Any] = {
             "proxy_id": PROXY_ID or "unknown",
-            "backend_id": _backend_source_id(),
+            "backend_id": _backend_instance_id(),
             "route": _inspect_route(),
             "mode": intercept.mode,
             "sys_hash": audit_logger.hash_system_prompt(body.get("system")),
@@ -815,7 +815,7 @@ async def _apply_passthrough_override(
                 proxy_id=proxy_id,
                 route=route,
                 mutation=result.mutation_record,
-                backend_id=_backend_source_id(),
+                backend_id=_backend_instance_id(),
             )
         except Exception as e:
             logger.debug("[%s] mutation record skipped: %s", request_id, e)
@@ -1030,9 +1030,9 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     )
 
     # Provider-trace forward-wiring: the passthrough relay mirrors stream lifecycle
-    # into the same source-capability-gated record_provider_trace helper.
+    # into the same backend-capability-gated record_provider_trace helper.
     provider_trace_ctx = {
-        "backend_id": _backend_source_id(),
+        "backend_id": _backend_instance_id(),
         "proxy_id": PROXY_ID or "unknown",
         "mapped_model": model,
         "request_id": request_id,
@@ -1216,10 +1216,10 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 logger.debug(f"[{request_id}] Forwarding User-Agent: {incoming_user_agent[:120]!r}")
 
         # Opt-in (default off): record the Forge session grouping id in the provider's `user` field
-        # so a session/fork is retrievable from the provider's account-side record. Source-capability
+        # so a session/fork is retrievable from the provider's account-side record. Backend-capability
         # gated (the backend_id must declare provider-user grouping); metadata-only, already hashed.
         forge_user = _provider_user_value(
-            backend_id=_backend_source_id(),
+            backend_id=_backend_instance_id(),
             # Read the flag lazily: source capability decides whether this route uses it.
             inject=_inject_provider_user_enabled(),
             forge_session=forge_session,
@@ -1386,13 +1386,13 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     error_type=error_type,
                     cost_micros=cost,
                 )
-                # Provider-trace plane (Phase 3): source-capability gated inside the helper.
+                # Provider-trace plane (Phase 3): backend-capability gated inside the helper.
                 # The converter parked provider_meta + stream lifecycle under usage["_provider_trace"];
                 # a stream cancelled before the final usage chunk still carries the generation id here.
                 _trace = usage.get("_provider_trace") or {}
                 _lc = _trace.get("lifecycle", {})
                 record_provider_trace(
-                    backend_id=_backend_source_id(),
+                    backend_id=_backend_instance_id(),
                     request_mode="streaming",
                     proxy_id=PROXY_ID or "unknown",
                     mapped_model=actual_model_id,
@@ -1476,7 +1476,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # Provider-trace plane (Phase 3): non-streaming lifecycle is trivially complete
                 # (the full body arrived); provider_meta rides the top-level carrier key.
                 record_provider_trace(
-                    backend_id=_backend_source_id(),
+                    backend_id=_backend_instance_id(),
                     request_mode="non_streaming",
                     proxy_id=PROXY_ID or "unknown",
                     mapped_model=actual_model_id,
@@ -1984,7 +1984,7 @@ async def root(request: Request):
         _wire_shape, _intercept_mode, bool(getattr(_audit_cfg, "audit_full_body", False))
     )
     # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
-    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "source", "") or "")
+    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "backend", "") or "")
 
     # Per-proxy metrics (request counts, token usage, latency); spend-cap
     # proximity is attached under metrics.costs.caps when caps are configured.

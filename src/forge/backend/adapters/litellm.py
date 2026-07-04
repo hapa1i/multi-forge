@@ -19,7 +19,7 @@ from pathlib import Path
 import httpx
 
 from forge.backend import BackendAdapter, BackendStartError
-from forge.backend.registry import BackendInstance
+from forge.backend.registry import ManagedBackendProcess
 from forge.core.paths import get_forge_home
 from forge.core.state import now_iso
 
@@ -67,16 +67,16 @@ class LiteLLMAdapter(BackendAdapter):
 
         return False
 
-    def start(self, backend_id: str, config_path: Path, port: int) -> BackendInstance:
+    def start(self, process_id: str, config_path: Path, port: int) -> ManagedBackendProcess:
         """Start LiteLLM backend.
 
         Args:
-            backend_id: Backend instance ID (e.g., "litellm-4000")
+            process_id: Managed process ID (e.g., "litellm-4000")
             config_path: Path to LiteLLM config file
             port: Port number to bind
 
         Returns:
-            BackendInstance with PID and status
+            ManagedBackendProcess with PID and status
 
         Raises:
             BackendStartError: If backend fails to start
@@ -114,8 +114,8 @@ class LiteLLMAdapter(BackendAdapter):
                 pass  # Process already exited
             raise BackendStartError(f"LiteLLM failed to start on port {port}\nCheck logs: {log_file}")
 
-        return BackendInstance(
-            backend_id=backend_id,
+        return ManagedBackendProcess(
+            process_id=process_id,
             adapter_type="litellm",
             port=port,
             pid=proc.pid,
@@ -123,34 +123,34 @@ class LiteLLMAdapter(BackendAdapter):
             created_at=now_iso(),
         )
 
-    def stop(self, instance: BackendInstance) -> None:
+    def stop(self, process: ManagedBackendProcess) -> None:
         """Stop LiteLLM backend (best effort).
 
         Args:
-            instance: Backend instance to stop
+            process: Managed backend process to stop
         """
-        if instance.pid is None:
+        if process.pid is None:
             return
 
         try:
-            os.kill(instance.pid, 15)  # SIGTERM
+            os.kill(process.pid, 15)  # SIGTERM
         except (ProcessLookupError, PermissionError):
             pass
 
-    def health_check(self, instance: BackendInstance) -> bool:
+    def health_check(self, process: ManagedBackendProcess) -> bool:
         """Check if LiteLLM backend is healthy.
 
         Uses /health/liveliness for fast checks (~5ms) rather than the full
         /health endpoint which contacts all model providers (~5-10s).
 
         Args:
-            instance: Backend instance to check
+            process: Managed backend process to check
 
         Returns:
             True if healthy, False otherwise
         """
         try:
-            url = f"http://localhost:{instance.port}/health/liveliness"
+            url = f"http://localhost:{process.port}/health/liveliness"
             with httpx.Client(timeout=httpx.Timeout(2.0)) as client:
                 response = client.get(url)
                 return response.status_code == 200

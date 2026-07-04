@@ -10,7 +10,7 @@
 proxy:
   family: gemini
   preferred_provider: litellm
-  source: litellm-gemini-local
+  backend: litellm-gemini-local
   default_port: 8086
 
   litellm:

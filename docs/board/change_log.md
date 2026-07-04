@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-04
+
+### backend_instance_identity_model S1-S6: Backend Instance Identity Clean Break
+
+**Goal**: Separate backend instances, managed processes, and telemetry origin fields.
+
+**Key changes**:
+
+- `proxy.backend` is canonical; old `proxy.source` clean-breaks. Recreate affected proxies with
+  `forge proxy create ...`.
+- Backend CLI JSON now uses `backend_instance_id` / `managed_process`. Backend registry `~/.forge/backends/index.json`
+  is schema v2; for old records, stop local backends first (or free ports), delete the file, then restart.
+- Downstream telemetry is schema v2: `backend_id` means backend instance id, `source_id`/`source_kind` stay origin
+  fields, and missing/older schemas are skipped with activity/cost `skipped_legacy_schema` counts.
+
+**Verification**: S1-S5 focused tests and `make test-unit` passed; S6 docs verified with `make pre-commit-md`.
+
 ## 2026-07-03
 
 ### cli_style_ux_compliance S5/C2: Backend Public Terminology
@@ -35,7 +52,7 @@ wc -l docs/board/change_log.md
 
 - Reworded backend help, metavars, human tables, errors/tips, and public docs to backend/backend-instance/adapter
   language while keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
-  stable. Deeper domain migration stays in `todo/backend_instance_identity_model`.
+  stable. Deeper domain migration is split to `backend_instance_identity_model`.
 
 **Verification**: backend + command-tree tests passed (51); help/list smoke checked; `make pre-commit` clean.
 

@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
+from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION
 from forge.proxy.cost_logger import (
     log_request_cost,
     read_cost_logs,
+    read_cost_logs_with_stats,
 )
 
 
@@ -49,6 +51,7 @@ class TestLogRequestCost:
         assert len(lines) == 1
 
         record = json.loads(lines[0])
+        assert record["schema_version"] == DOWNSTREAM_SCHEMA_VERSION
         assert record["proxy_id"] == "openrouter"
         assert record["backend_id"] == "openrouter"
         assert record["model"] == "anthropic/claude-sonnet-4.6"
@@ -208,6 +211,39 @@ class TestReadCostLogs:
     def test_empty_dir_returns_empty(self, cost_log_dir: Path):
         assert read_cost_logs() == []
 
+    def test_stats_count_legacy_downstream_identity_schema(self, cost_log_dir: Path):
+        cost_log_dir.mkdir(parents=True, exist_ok=True)
+        path = cost_log_dir / "2026-05_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_old",
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_current",
+                        "ts": "2026-05-07T10:00:00Z",
+                        "cost_micros": 100,
+                    }
+                )
+                + "\n"
+            )
+
+        result = read_cost_logs_with_stats()
+
+        assert len(result.records) == 1
+        assert result.records[0]["cost_micros"] == 100
+        assert result.skipped_legacy_schema == 1
+
     def test_reads_all_shards(self, cost_log_dir: Path):
         """Simulate multiple PID shards."""
         cost_log_dir.mkdir(parents=True, exist_ok=True)
@@ -216,6 +252,7 @@ class TestReadCostLogs:
             path = cost_log_dir / f"2026-05_{pid}.jsonl"
             with open(path, "w") as f:
                 record = {
+                    "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                     "kind": "attempt",
                     "downstream_event_id": f"ds_{pid}",
                     "ts": "2026-05-07T10:00:00Z",
@@ -233,6 +270,7 @@ class TestReadCostLogs:
         with open(path, "w") as f:
             for hour in [8, 12, 16]:
                 record = {
+                    "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                     "kind": "attempt",
                     "downstream_event_id": f"ds_{hour}",
                     "ts": f"2026-05-07T{hour:02d}:00:00Z",
@@ -254,6 +292,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_ok",
                         "ts": "2026-05-07T10:00:00Z",
@@ -277,6 +316,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_one",
                         "ts": "2026-05-07T10:00:00Z",
@@ -292,6 +332,7 @@ class TestReadCostLogs:
             f.write(
                 json.dumps(
                     {
+                        "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "attempt",
                         "downstream_event_id": "ds_one",
                         "ts": "2026-05-07T10:00:01Z",
@@ -401,6 +442,7 @@ class TestForgeRunCorrelation:
         shard = next(cost_log_dir.glob("*.jsonl"))
         with shard.open("a", encoding="utf-8") as f:
             corrupt = {
+                "schema_version": DOWNSTREAM_SCHEMA_VERSION,
                 "kind": "attempt",
                 "downstream_event_id": "ds_bool",
                 "ts": "2099-01-01T00:00:00+00:00",

@@ -8,7 +8,7 @@
 proxy:
   family: deepseek
   preferred_provider: openrouter
-  source: openrouter
+  backend: openrouter
   default_port: 8100
 
   openrouter:

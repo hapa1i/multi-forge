@@ -168,14 +168,14 @@ def record_provider_trace(
     downstream_event_id: str | None = None,
     backend_id: str | None = None,
 ) -> None:
-    """Gate by backend/source capability, derive local_usage_status, and persist.
+    """Gate by backend-instance capability, derive local_usage_status, and persist.
 
     The shared write entry point for both the converters seam (``server.py``) and the
     passthrough relay (``passthrough.py``) — it lives in this neutral leaf so neither
     caller has to import the other (avoids the ``server`` <-> ``passthrough`` cycle).
 
-    Source-capability gated: the resolved ``backend_id`` must declare provider-trace
-    capability, so a route with no ``backend_id`` (or a non-capable source) writes nothing.
+    Backend-capability gated: the resolved ``backend_id`` must declare provider-trace
+    capability, so a route with no ``backend_id`` (or a non-capable backend instance) writes nothing.
     """
     if not _provider_trace_enabled(backend_id=backend_id):
         return
@@ -211,13 +211,13 @@ def record_provider_trace(
 
 
 def _provider_trace_enabled(*, backend_id: str | None) -> bool:
-    # Source-capability gated only: no backend_id (or a non-capable source) means no trace.
+    # Backend-capability gated only: no backend_id (or a non-capable backend instance) means no trace.
     if not backend_id:
         return False
     try:
         return get_model_source(backend_id).capabilities.provider_trace
     except ModelSourceNotFoundError:
-        logger.debug("unknown backend source for provider trace: %s", backend_id)
+        logger.debug("unknown backend instance for provider trace: %s", backend_id)
         return False
 
 

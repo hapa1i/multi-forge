@@ -7,7 +7,7 @@
 proxy:
   family: gemini
   preferred_provider: litellm
-  source: litellm-remote
+  backend: litellm-remote
   default_port: 8084
 
   litellm:

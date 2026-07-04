@@ -15,7 +15,7 @@
 proxy:
   family: openai
   preferred_provider: litellm
-  source: codex-responses-local
+  backend: codex-responses-local
   default_port: 8105
   wire_shape: openai_responses_passthrough
 

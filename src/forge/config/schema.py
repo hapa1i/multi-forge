@@ -649,7 +649,7 @@ class ProxyConfig:
 
     family: str = ""  # model family (e.g., "openai", "anthropic", "gemini")
     preferred_provider: str = ""  # set by --template flag
-    source: str = ""  # canonical model-source id (e.g., "openrouter", "litellm-gemini-local")
+    backend: str = ""  # canonical backend instance id (e.g., "openrouter", "litellm-gemini-local")
     active_template: str = ""
     default_tier: str = "sonnet"
     backend_dependency: BackendDependency | None = None
@@ -733,7 +733,7 @@ class ProxyInstanceConfig:
     upstream_base_url: str  # e.g., https://litellm.corp.com
 
     tiers: TierModels
-    source: str = ""  # canonical model-source id, when known
+    backend: str = ""  # canonical backend instance id, when known
     family: str = ""  # model family (e.g., "openai", "anthropic", "gemini")
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -778,6 +778,8 @@ class ProxyInstanceConfig:
 
         if not self.tiers.sonnet:
             raise ValueError("Tiers must define at least 'sonnet' model")
+        if not isinstance(self.backend, str):
+            raise ValueError("proxy.backend must be a string")
 
         _validate_default_tier(self.default_tier)
 

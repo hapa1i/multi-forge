@@ -515,7 +515,7 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
     if config.wire_shape == "openai_responses_passthrough":
         from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 
-        source_id = getattr(config, "source", "") or ""
+        source_id = getattr(config, "backend", "") or ""
         try:
             if source_id and get_model_source(source_id).capabilities.responses_ingress:
                 return _Responses("proxy_supported", None)

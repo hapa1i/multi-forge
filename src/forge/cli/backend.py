@@ -3,8 +3,8 @@
 Provides commands to manage backend services (LiteLLM, etc.) that proxies depend on:
 - forge model backend list: List all backends
 - forge model backend create: Create backend config
-- forge model backend start: Start a backend instance
-- forge model backend stop: Stop a backend instance
+- forge model backend start: Start a managed local process
+- forge model backend stop: Stop a managed local process
 - forge model backend delete: Delete backend config
 """
 
@@ -22,10 +22,21 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from forge.backend import BackendManager, ModelSource, ModelSourceNotFoundError
+from forge.backend import (
+    BackendInstanceAmbiguousError,
+    BackendInstanceNotFoundError,
+    BackendManager,
+    ModelSource,
+    ModelSourceNotFoundError,
+    resolve_backend_instance,
+)
 from forge.backend.adapters import get_adapter
 from forge.backend.creation import create_backend_config, get_backend_config_path
-from forge.backend.registry import BackendInstance, BackendRegistryStore, is_pid_alive
+from forge.backend.registry import (
+    BackendRegistryStore,
+    ManagedBackendProcess,
+    is_pid_alive,
+)
 from forge.backend.remote.base import RemoteAdapterError
 from forge.backend.sources import (
     get_model_source,
@@ -57,12 +68,12 @@ class _ProbeResult:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def backend() -> None:
-    """Manage model backends, local configs, and backend instances.
+    """Manage model backends, local configs, and managed local processes.
 
     \b
     Identifiers:
         Backend: openrouter (configured inference target shown by list)
-        Backend instance: litellm-4000 (managed local process shown by list)
+        Managed process: litellm-4000 (local process shown by list)
         Adapter: litellm (local config type)
 
     \b
@@ -79,6 +90,13 @@ def _source_for_identifier(identifier: str) -> ModelSource | None:
     try:
         return get_model_source(resolve_model_source_id(identifier))
     except ModelSourceNotFoundError:
+        return None
+
+
+def _source_for_backend_identifier(identifier: str) -> ModelSource | None:
+    try:
+        return resolve_backend_instance(identifier).source
+    except BackendInstanceNotFoundError:
         return None
 
 
@@ -124,78 +142,79 @@ def _local_source_matches_backend_config(source: ModelSource) -> bool:
     return bool(set(source.required_env_vars) & set(config_env_vars))
 
 
-def _runtime_instance_for_source(
+def _managed_process_for_source(
     source: ModelSource,
-    runtime_instances: dict[str, BackendInstance],
-) -> BackendInstance | None:
+    managed_processes: dict[str, ManagedBackendProcess],
+) -> ManagedBackendProcess | None:
     if source.local_lifecycle is None:
         return None
-    instance_id = f"{source.local_lifecycle.adapter}-{source.local_lifecycle.default_port}"
-    instance = runtime_instances.get(instance_id)
-    if instance is None:
+    process_id = f"{source.local_lifecycle.adapter}-{source.local_lifecycle.default_port}"
+    process = managed_processes.get(process_id)
+    if process is None:
         return None
     if not _local_source_matches_backend_config(source):
         return None
-    return instance
+    return process
 
 
-def _instance_source_map(
-    runtime_instances: dict[str, BackendInstance],
+def _process_source_map(
+    managed_processes: dict[str, ManagedBackendProcess],
 ) -> dict[str, list[str]]:
-    """Map each running instance backend_id to the local source ids it backs.
+    """Map each running process id to the local source ids it backs.
 
     Local LiteLLM sources share one adapter+port, so a single process can back
     several sources at once (the default config serves Gemini and OpenAI models
-    from one litellm-4000 process). The list/show views use this to mark a runtime
-    instance as shared instead of implying separate backends.
+    from one litellm-4000 process). The list/show views use this to mark a managed
+    process as shared instead of implying separate local processes.
     """
     mapping: dict[str, list[str]] = {}
     for source in list_model_sources():
-        instance = _runtime_instance_for_source(source, runtime_instances)
-        if instance is not None:
-            mapping.setdefault(instance.backend_id, []).append(source.id)
+        process = _managed_process_for_source(source, managed_processes)
+        if process is not None:
+            mapping.setdefault(process.process_id, []).append(source.id)
     return mapping
 
 
 def _shared_sibling_sources(
     source: ModelSource,
-    instance: BackendInstance | None,
-    instance_sources: dict[str, list[str]],
+    process: ManagedBackendProcess | None,
+    process_sources: dict[str, list[str]],
 ) -> tuple[str, ...]:
-    """Return other source ids that share `instance` with `source`."""
+    """Return other source ids that share `process` with `source`."""
 
-    if instance is None:
+    if process is None:
         return ()
-    return tuple(sid for sid in instance_sources.get(instance.backend_id, ()) if sid != source.id)
+    return tuple(sid for sid in process_sources.get(process.process_id, ()) if sid != source.id)
 
 
-def _runtime_instance_record(
-    instance: BackendInstance | None,
+def _managed_process_record(
+    process: ManagedBackendProcess | None,
     *,
     shared_with: tuple[str, ...] = (),
 ) -> dict[str, Any] | None:
-    if instance is None:
+    if process is None:
         return None
     return {
-        "backend_id": instance.backend_id,
-        "adapter_type": instance.adapter_type,
-        "port": instance.port,
-        "pid": instance.pid,
-        "status": instance.status,
-        "created_at": instance.created_at,
+        "process_id": process.process_id,
+        "adapter_type": process.adapter_type,
+        "port": process.port,
+        "pid": process.pid,
+        "status": process.status,
+        "created_at": process.created_at,
+        "alive": process.pid is not None and is_pid_alive(process.pid),
         # Other local sources backed by the same adapter+port process; non-empty
-        # when one local LiteLLM instance serves multiple sources (e.g. Gemini + OpenAI).
+        # when one local LiteLLM process serves multiple sources (e.g. Gemini + OpenAI).
         "shared_with": list(shared_with),
     }
 
 
-def _runtime_cell(runtime: dict[str, Any] | None) -> str:
-    """Render the INSTANCE column, flagging an instance shared across sources."""
+def _process_cell(process: dict[str, Any] | None) -> str:
+    """Render the PROCESS column, flagging a process shared across sources."""
 
-    if not runtime:
+    if not process:
         return "-"
-    label = str(runtime["backend_id"])
-    if runtime.get("shared_with"):
+    label = str(process["process_id"])
+    if process.get("shared_with"):
         label += " (shared)"
     return label
 
@@ -257,7 +276,7 @@ def _auth_record(source: ModelSource) -> dict[str, Any]:
     }
 
 
-def _endpoint_record(source: ModelSource, instance: BackendInstance | None = None) -> dict[str, Any]:
+def _endpoint_record(source: ModelSource, process: ManagedBackendProcess | None = None) -> dict[str, Any]:
     endpoint = source.endpoint
     if endpoint.kind == "local_backend":
         lifecycle = source.local_lifecycle
@@ -265,7 +284,7 @@ def _endpoint_record(source: ModelSource, instance: BackendInstance | None = Non
             "kind": endpoint.kind,
             "adapter": lifecycle.adapter if lifecycle else None,
             "default_port": lifecycle.default_port if lifecycle else None,
-            "url": (f"http://localhost:{instance.port if instance else lifecycle.default_port}" if lifecycle else None),
+            "url": (f"http://localhost:{process.port if process else lifecycle.default_port}" if lifecycle else None),
         }
     if endpoint.kind == "connection_value":
         _, provenance = resolve_env_or_credential_with_source(endpoint.value or "")
@@ -281,8 +300,8 @@ def _endpoint_record(source: ModelSource, instance: BackendInstance | None = Non
     }
 
 
-def _endpoint_display(source: ModelSource, instance: BackendInstance | None = None) -> str:
-    endpoint = _endpoint_record(source, instance)
+def _endpoint_display(source: ModelSource, process: ManagedBackendProcess | None = None) -> str:
+    endpoint = _endpoint_record(source, process)
     if endpoint["kind"] == "local_backend":
         return str(endpoint.get("url") or "-")
     if endpoint["kind"] == "connection_value":
@@ -313,59 +332,56 @@ def _auth_display(auth: dict[str, Any]) -> str:
     return f"{auth['status']} ({missing})" if missing else str(auth["status"])
 
 
-def _source_health(source: ModelSource, instance: BackendInstance | None, auth: dict[str, Any]) -> str:
+def _source_health(source: ModelSource, process: ManagedBackendProcess | None, auth: dict[str, Any]) -> str:
     if source.endpoint.kind == "runtime_native":
         return "runtime-owned"
     if source.kind == "remote":
         return "missing" if auth["status"] != "configured" else "unprobed"
-    if instance is None:
+    if process is None:
         return "stopped"
-    if instance.pid is not None and not is_pid_alive(instance.pid):
+    if process.pid is not None and not is_pid_alive(process.pid):
         return "stopped"
-    return instance.status
+    return process.status
 
 
 def _source_record(
     source: ModelSource,
-    runtime_instances: dict[str, BackendInstance],
-    instance_sources: dict[str, list[str]] | None = None,
+    managed_processes: dict[str, ManagedBackendProcess],
+    process_sources: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    instance = _runtime_instance_for_source(source, runtime_instances)
-    shared_with = _shared_sibling_sources(source, instance, instance_sources or {})
+    process = _managed_process_for_source(source, managed_processes)
+    shared_with = _shared_sibling_sources(source, process, process_sources or {})
     auth = _auth_record(source)
-    # Source-row JSON keeps both names: backend_id is the telemetry catalog key,
-    # while source_id is the row alias. Runtime-instance JSON uses source_id=None.
     return {
-        "backend_id": source.id,
-        "source_id": source.id,
+        "backend_instance_id": source.id,
         "kind": source.kind,
         "provider": source.provider,
-        "endpoint": _endpoint_record(source, instance),
+        "endpoint": _endpoint_record(source, process),
         "required_credentials": list(source.credential_ids),
         "credentials": auth["credentials"],
         "auth_status": auth["status"],
         "missing_required_env_vars": auth["missing_required_env_vars"],
-        "health": _source_health(source, instance, auth),
+        "health": _source_health(source, process, auth),
         "has_lifecycle": source.has_lifecycle,
-        "runtime_instance": _runtime_instance_record(instance, shared_with=shared_with),
+        "managed_process": _managed_process_record(process, shared_with=shared_with),
     }
 
 
-def _unmatched_runtime_instances(
+def _unmatched_managed_processes(
     records: list[dict[str, Any]],
-    runtime_instances: dict[str, BackendInstance],
-) -> list[BackendInstance]:
-    matched_backend_ids = {
-        runtime["backend_id"] for record in records if (runtime := record["runtime_instance"]) is not None
+    managed_processes: dict[str, ManagedBackendProcess],
+) -> list[ManagedBackendProcess]:
+    matched_process_ids = {
+        process["process_id"] for record in records if (process := record["managed_process"]) is not None
     }
     return [
-        instance for backend_id, instance in sorted(runtime_instances.items()) if backend_id not in matched_backend_ids
+        process for process_id, process in sorted(managed_processes.items()) if process_id not in matched_process_ids
     ]
 
 
-def _load_runtime_instances() -> dict[str, BackendInstance]:
+def _load_managed_processes() -> dict[str, ManagedBackendProcess]:
     store = BackendRegistryStore()
-    return {instance.backend_id: instance for instance in store.list_backends()}
+    return {instance.process_id: instance for instance in store.list_processes()}
 
 
 def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int]:
@@ -388,15 +404,15 @@ def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int
     )
 
 
-def _runtime_id_tip() -> str:
-    return "Find the backend instance id with:"
+def _process_id_tip() -> str:
+    return "Find the managed process id with:"
 
 
-def _runtime_id_tip_commands() -> tuple[str, ...]:
+def _process_id_tip_commands() -> tuple[str, ...]:
     return (f"{_BACKEND_COMMAND} list",)
 
 
-def _runtime_stop_target_error(
+def _process_stop_target_error(
     operand: str,
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     source = _source_for_identifier(operand)
@@ -408,21 +424,21 @@ def _runtime_stop_target_error(
                 (),
             )
         return (
-            f"Backend '{source.id}' is not a backend instance id.",
-            (_runtime_id_tip(),),
-            _runtime_id_tip_commands(),
+            f"Backend '{source.id}' is not a managed process id.",
+            (_process_id_tip(),),
+            _process_id_tip_commands(),
         )
 
     if operand in _SUPPORTED_ADAPTERS:
         return (
-            f"Backend adapter '{operand}' is not a backend instance id.",
-            (_runtime_id_tip(),),
-            _runtime_id_tip_commands(),
+            f"Backend adapter '{operand}' is not a managed process id.",
+            (_process_id_tip(),),
+            _process_id_tip_commands(),
         )
 
     return (
-        f"Unknown backend instance '{operand}'.",
-        ("Run 'forge model backend list' to see backend instance ids.",),
+        f"Unknown managed process '{operand}'.",
+        ("Run 'forge model backend list' to see managed process ids.",),
         (),
     )
 
@@ -470,7 +486,7 @@ def _join_url(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
-def _resolved_endpoint_url(source: ModelSource, instance: BackendInstance | None = None) -> str | None:
+def _resolved_endpoint_url(source: ModelSource, process: ManagedBackendProcess | None = None) -> str | None:
     endpoint = source.endpoint
     if endpoint.kind == "literal_url":
         return endpoint.value
@@ -481,7 +497,7 @@ def _resolved_endpoint_url(source: ModelSource, instance: BackendInstance | None
         lifecycle = source.local_lifecycle
         if lifecycle is None:
             return None
-        return f"http://localhost:{instance.port if instance else lifecycle.default_port}"
+        return f"http://localhost:{process.port if process else lifecycle.default_port}"
     return None
 
 
@@ -497,7 +513,7 @@ def _runtime_native_probe_detail(source: ModelSource) -> str:
 def _probe_model_source(
     source: ModelSource,
     *,
-    instance: BackendInstance | None,
+    process: ManagedBackendProcess | None,
     timeout_s: float,
 ) -> _ProbeResult:
     if source.endpoint.kind == "runtime_native":
@@ -508,12 +524,12 @@ def _probe_model_source(
 
     import httpx
 
-    base_url = _resolved_endpoint_url(source, instance)
+    base_url = _resolved_endpoint_url(source, process)
     if not base_url:
         return _ProbeResult(status="failed", detail="endpoint is not configured")
 
     if source.provider == "litellm_local":
-        if instance is None:
+        if process is None:
             return _ProbeResult(status="skipped", detail="local backend is not running")
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
@@ -570,17 +586,17 @@ def _probe_model_source(
 
 
 def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
-    runtime_instances = _load_runtime_instances()
-    instance = _runtime_instance_for_source(source, runtime_instances)
-    shared_with = _shared_sibling_sources(source, instance, _instance_source_map(runtime_instances))
+    managed_processes = _load_managed_processes()
+    process = _managed_process_for_source(source, managed_processes)
+    shared_with = _shared_sibling_sources(source, process, _process_source_map(managed_processes))
     auth = _auth_record(source)
 
     console.print(f"[bold]Backend:[/bold] [cyan]{source.id}[/cyan]")
     console.print(f"[bold]Kind:[/bold] {source.kind}")
     console.print(f"[bold]Provider:[/bold] {source.provider}")
-    console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, instance)}")
+    console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, process)}")
     console.print(f"[bold]Credentials:[/bold] {_auth_display(auth)}")
-    console.print(f"[bold]Health:[/bold] {_source_health(source, instance, auth)}")
+    console.print(f"[bold]Health:[/bold] {_source_health(source, process, auth)}")
 
     if source.template_names:
         console.print(f"[bold]Templates:[/bold] {', '.join(source.template_names)}")
@@ -588,14 +604,14 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
     if source.local_lifecycle:
         lifecycle = source.local_lifecycle
         console.print(f"[bold]Lifecycle:[/bold] {lifecycle.adapter} on default port {lifecycle.default_port}")
-        if instance:
-            console.print(f"[bold]Backend instance:[/bold] {instance.backend_id}")
-            console.print(f"[bold]Instance PID:[/bold] {instance.pid or '-'}")
-            console.print(f"[bold]Instance status:[/bold] {instance.status}")
+        if process:
+            console.print(f"[bold]Managed process:[/bold] {process.process_id}")
+            console.print(f"[bold]Process PID:[/bold] {process.pid or '-'}")
+            console.print(f"[bold]Process status:[/bold] {process.status}")
             if shared_with:
                 console.print(f"[bold]Shared with:[/bold] {', '.join(shared_with)}")
         else:
-            console.print("[bold]Backend instance:[/bold] -")
+            console.print("[bold]Managed process:[/bold] -")
 
         config_path = get_backend_config_path(lifecycle.adapter)
         if config_path.exists():
@@ -622,11 +638,11 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
 @backend.command("list")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def list_cmd(as_json: bool) -> None:
-    """List model backends and local backend instances."""
+    """List model backends and managed local processes."""
     console = Console(width=200)
-    runtime_instances = _load_runtime_instances()
-    instance_sources = _instance_source_map(runtime_instances)
-    records = [_source_record(source, runtime_instances, instance_sources) for source in list_model_sources()]
+    managed_processes = _load_managed_processes()
+    process_sources = _process_source_map(managed_processes)
+    records = [_source_record(source, managed_processes, process_sources) for source in list_model_sources()]
 
     if as_json:
         click.echo(json.dumps(records, indent=2, default=str))
@@ -639,17 +655,17 @@ def list_cmd(as_json: bool) -> None:
     table.add_column("ENDPOINT")
     table.add_column("AUTH")
     table.add_column("HEALTH")
-    table.add_column("INSTANCE")
+    table.add_column("PROCESS")
 
     for record in records:
-        runtime = record["runtime_instance"]
+        process = record["managed_process"]
         table.add_row(
-            record["source_id"],
+            record["backend_instance_id"],
             record["kind"],
             record["provider"],
             _endpoint_display(
-                get_model_source(record["source_id"]),
-                runtime_instances.get(runtime["backend_id"]) if runtime else None,
+                get_model_source(record["backend_instance_id"]),
+                managed_processes.get(process["process_id"]) if process else None,
             ),
             _auth_display(
                 {
@@ -659,23 +675,23 @@ def list_cmd(as_json: bool) -> None:
                 }
             ),
             record["health"],
-            _runtime_cell(runtime),
+            _process_cell(process),
         )
 
     console.print(table)
 
-    unmatched_runtimes = _unmatched_runtime_instances(records, runtime_instances)
-    if unmatched_runtimes:
-        runtime_table = Table(title="Unmatched Backend Instances")
-        runtime_table.add_column("INSTANCE", style="cyan")
+    unmatched_processes = _unmatched_managed_processes(records, managed_processes)
+    if unmatched_processes:
+        runtime_table = Table(title="Unmatched Managed Processes")
+        runtime_table.add_column("PROCESS", style="cyan")
         runtime_table.add_column("ADAPTER")
         runtime_table.add_column("PORT", justify="right")
         runtime_table.add_column("PID", justify="right")
         runtime_table.add_column("STATUS")
 
-        for instance in unmatched_runtimes:
+        for instance in unmatched_processes:
             runtime_table.add_row(
-                instance.backend_id,
+                instance.process_id,
                 instance.adapter_type,
                 str(instance.port),
                 str(instance.pid or "-"),
@@ -687,11 +703,11 @@ def list_cmd(as_json: bool) -> None:
 
 
 @backend.command("show")
-@click.argument("backend_id", metavar="BACKEND_OR_INSTANCE")
+@click.argument("identifier", metavar="BACKEND_OR_PROCESS")
 @click.option("--raw", is_flag=True, help="Output raw config without syntax highlighting")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
-    """Show backend or backend instance details and configuration.
+def show_cmd(identifier: str, raw: bool, as_json: bool) -> None:
+    """Show backend or managed process details and configuration.
 
     \b
     Examples:
@@ -699,14 +715,18 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
         forge model backend show litellm-4000
     """
     console = Console(width=200)
-    source = _source_for_identifier(backend_id)
+    try:
+        source = _source_for_backend_identifier(identifier)
+    except BackendInstanceAmbiguousError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
     if source is not None:
         if as_json:
-            runtime_instances = _load_runtime_instances()
-            instance_sources = _instance_source_map(runtime_instances)
+            managed_processes = _load_managed_processes()
+            process_sources = _process_source_map(managed_processes)
             click.echo(
                 json.dumps(
-                    _source_record(source, runtime_instances, instance_sources),
+                    _source_record(source, managed_processes, process_sources),
                     indent=2,
                     default=str,
                 )
@@ -716,38 +736,26 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
         return
 
     store = BackendRegistryStore()
+    process_id = identifier
 
-    # Parse adapter type from backend_id (e.g., "litellm-4000" -> "litellm")
-    parts = backend_id.rsplit("-", 1)
-    adapter_type = parts[0] if len(parts) == 2 else backend_id
+    # Parse adapter type from process_id (e.g., "litellm-4000" -> "litellm")
+    parts = process_id.rsplit("-", 1)
+    adapter_type = parts[0] if len(parts) == 2 else process_id
 
     if as_json:
-        json_instance = None
+        json_process = None
         try:
-            json_instance = store.read().backends.get(backend_id)
+            json_process = store.read().processes.get(process_id)
         except Exception:
-            json_instance = None
+            json_process = None
         json_config_path = get_backend_config_path(adapter_type)
-        runtime_record: dict[str, Any] | None = None
-        if json_instance is not None:
-            alive = json_instance.pid is not None and is_pid_alive(json_instance.pid)
-            runtime_record = {
-                "backend_id": backend_id,
-                "adapter_type": json_instance.adapter_type,
-                "port": json_instance.port,
-                "pid": json_instance.pid,
-                "status": json_instance.status,
-                "alive": alive,
-                "created_at": json_instance.created_at,
-            }
         click.echo(
             json.dumps(
                 {
-                    "backend_id": backend_id,
-                    "source_id": None,
-                    "found": json_instance is not None,
+                    "managed_process_id": process_id,
+                    "found": json_process is not None,
                     "adapter_type": adapter_type,
-                    "runtime_instance": runtime_record,
+                    "managed_process": _managed_process_record(json_process),
                     "config_path": (str(json_config_path) if json_config_path.exists() else None),
                 },
                 indent=2,
@@ -758,25 +766,25 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
 
     try:
         registry = store.read()
-        instance = registry.backends.get(backend_id)
-        if instance:
-            alive = instance.pid is not None and is_pid_alive(instance.pid)
+        process = registry.processes.get(process_id)
+        if process:
+            alive = process.pid is not None and is_pid_alive(process.pid)
             status_color = "green" if alive else "yellow"
-            console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan]")
-            console.print(f"[bold]Adapter:[/bold] {instance.adapter_type}")
-            console.print(f"[bold]Port:[/bold] {instance.port}")
-            console.print(f"[bold]PID:[/bold] {instance.pid or '-'}")
+            console.print(f"[bold]Managed process:[/bold] [cyan]{process_id}[/cyan]")
+            console.print(f"[bold]Adapter:[/bold] {process.adapter_type}")
+            console.print(f"[bold]Port:[/bold] {process.port}")
+            console.print(f"[bold]PID:[/bold] {process.pid or '-'}")
             console.print(
                 f"[bold]Status:[/bold] [{status_color}]{'healthy' if alive else 'not running'}[/{status_color}]"
             )
-            if instance.created_at:
-                console.print(f"[bold]Started:[/bold] {instance.created_at}")
+            if process.created_at:
+                console.print(f"[bold]Started:[/bold] {process.created_at}")
         else:
-            console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan] [dim](not in registry)[/dim]")
+            console.print(f"[bold]Managed process:[/bold] [cyan]{process_id}[/cyan] [dim](not in registry)[/dim]")
     except Exception:
-        console.print(f"[bold]Backend instance:[/bold] [cyan]{backend_id}[/cyan]")
+        console.print(f"[bold]Managed process:[/bold] [cyan]{process_id}[/cyan]")
 
-    log_file = get_forge_home() / "logs" / "backend" / f"{backend_id}.log"
+    log_file = get_forge_home() / "logs" / "backend" / f"{process_id}.log"
     if log_file.exists():
         console.print(f"[bold]Log:[/bold] {display_path(log_file)}")
     else:
@@ -807,7 +815,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
 
 
 @backend.command("test-auth")
-@click.argument("source_id", metavar="BACKEND")
+@click.argument("backend_identifier", metavar="BACKEND")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--timeout",
@@ -816,7 +824,7 @@ def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
     show_default=True,
     help="Probe timeout in seconds",
 )
-def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
+def test_auth_cmd(backend_identifier: str, as_json: bool, timeout: float) -> None:
     """Test a backend's credential configuration and reachable auth endpoint.
 
     \b
@@ -824,16 +832,20 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
         forge model backend test-auth openrouter
     """
     console = Console(width=200)
-    source = _source_for_identifier(source_id)
+    try:
+        source = _source_for_backend_identifier(backend_identifier)
+    except BackendInstanceAmbiguousError as exc:
+        print_error(str(exc), console=err_console)
+        sys.exit(1)
     if source is None:
         print_error(
-            f"Unknown backend '{source_id}'. Use '{_BACKEND_COMMAND} list' to see backends.",
+            f"Unknown backend '{backend_identifier}'. Use '{_BACKEND_COMMAND} list' to see backends.",
             console=err_console,
         )
         sys.exit(1)
 
-    runtime_instances = _load_runtime_instances()
-    instance = _runtime_instance_for_source(source, runtime_instances)
+    managed_processes = _load_managed_processes()
+    process = _managed_process_for_source(source, managed_processes)
     auth = _auth_record(source)
     probe: _ProbeResult
     if auth["status"] == "runtime_native":
@@ -847,13 +859,10 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     elif not source.capabilities.auth_probe:
         probe = _ProbeResult(status="skipped", detail="source does not declare an auth probe capability")
     else:
-        probe = _probe_model_source(source, instance=instance, timeout_s=timeout)
+        probe = _probe_model_source(source, process=process, timeout_s=timeout)
 
-    # Source-row JSON keeps both names: backend_id is the telemetry catalog key,
-    # while source_id is the row alias. Runtime-instance JSON uses source_id=None.
     payload = {
-        "backend_id": source.id,
-        "source_id": source.id,
+        "backend_instance_id": source.id,
         "kind": source.kind,
         "provider": source.provider,
         "auth_status": auth["status"],
@@ -929,7 +938,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
     help="Port number (required for adapter names like litellm; backend names use their default port unless overridden)",
 )
 def start_cmd(source_or_adapter: str, port: int | None) -> None:
-    """Start a local backend instance from a backend or adapter config.
+    """Start a managed local process from a backend or adapter config.
 
     \b
     Examples:
@@ -951,46 +960,47 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         )
         sys.exit(1)
 
-    backend_id = f"{adapter}-{resolved_port}"
+    process_id = f"{adapter}-{resolved_port}"
     store = BackendRegistryStore()
     manager = BackendManager(store)
     manager.register_adapter(adapter, get_adapter(adapter))
 
     try:
-        result = manager.ensure_backend(backend_id, adapter, resolved_port)
+        result = manager.ensure_backend(process_id, adapter, resolved_port)
         if result.source == "start":
             console.print(
-                f"[green]Started[/green] backend '{backend_id}' on port {resolved_port} (pid {result.instance.pid})"
+                f"[green]Started[/green] managed process '{process_id}' on port {resolved_port} "
+                f"(pid {result.process.pid})"
             )
         else:
-            console.print(f"Backend '{backend_id}' already running on port {resolved_port}")
+            console.print(f"Managed process '{process_id}' already running on port {resolved_port}")
     except Exception as e:
         print_error(str(e))
         sys.exit(1)
 
 
-def _stop_runtime_instance(instance: BackendInstance) -> None:
-    """Stop a single registered backend instance. Raises on failure; the caller owns output."""
+def _stop_managed_process(process: ManagedBackendProcess) -> None:
+    """Stop a single registered managed process. Raises on failure; the caller owns output."""
     store = BackendRegistryStore()
     manager = BackendManager(store)
-    manager.register_adapter(instance.adapter_type, get_adapter(instance.adapter_type))
-    manager.stop_backend(instance.backend_id)
+    manager.register_adapter(process.adapter_type, get_adapter(process.adapter_type))
+    manager.stop_backend(process.process_id)
 
 
 @backend.command("stop")
-@click.argument("runtime_ids", nargs=-1, metavar="BACKEND_INSTANCE...")
+@click.argument("process_ids", nargs=-1, metavar="PROCESS_ID...")
 @click.option(
     "--all",
     "-a",
     "stop_all",
     is_flag=True,
-    help="Stop all registered local backend instances",
+    help="Stop all registered managed local processes",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
-    """Stop live local backend instance(s).
+def stop_cmd(process_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
+    """Stop managed local backend process(es).
 
-    Backend instance ids are shown in `forge model backend list` (for example, litellm-4000).
+    Managed process ids are shown in `forge model backend list` (for example, litellm-4000).
 
     \b
     Examples:
@@ -1000,48 +1010,48 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
         forge model backend stop --all --yes
     """
     console = Console(width=200)
-    if stop_all and runtime_ids:
-        print_error("Cannot combine --all with explicit backend instance IDs")
+    if stop_all and process_ids:
+        print_error("Cannot combine --all with explicit managed process IDs")
         sys.exit(1)
-    if not stop_all and not runtime_ids:
+    if not stop_all and not process_ids:
         print_error_with_tip(
-            "Provide backend instance ID(s) or use --all.",
-            "Run 'forge model backend list' to see backend instance ids.",
+            "Provide managed process ID(s) or use --all.",
+            "Run 'forge model backend list' to see managed process ids.",
         )
         sys.exit(1)
 
     store = BackendRegistryStore()
     registry = store.read()
     if stop_all:
-        if not registry.backends:
-            console.print("[dim]No backend instances to stop.[/dim]")
+        if not registry.processes:
+            console.print("[dim]No managed processes to stop.[/dim]")
             return
-        targets = list(registry.backends.keys())
-        console.print(f"About to stop [bold]all {len(targets)} backend instance(s)[/bold]:")
+        targets = list(registry.processes.keys())
+        console.print(f"About to stop [bold]all {len(targets)} managed process(es)[/bold]:")
         for target in targets:
             console.print(f"  - {target}")
         console.print()
-        if not yes and not click.confirm("Are you sure you want to stop all backend instances?"):
+        if not yes and not click.confirm("Are you sure you want to stop all managed processes?"):
             console.print("Cancelled.")
             return
     else:
-        targets = list(dict.fromkeys(runtime_ids))
+        targets = list(dict.fromkeys(process_ids))
 
     stopped = 0
     failed = 0
     for target in targets:
-        instance = registry.backends.get(target)
-        if instance is None:
-            message, tip_lines, commands = _runtime_stop_target_error(target)
+        process = registry.processes.get(target)
+        if process is None:
+            message, tip_lines, commands = _process_stop_target_error(target)
             _print_error_with_optional_tip(message, tip_lines, commands)
             failed += 1
             if len(targets) == 1:
                 sys.exit(1)
             continue
 
-        was_pidless = instance.pid is None
+        was_pidless = process.pid is None
         try:
-            _stop_runtime_instance(instance)
+            _stop_managed_process(process)
         except Exception as e:
             print_error(f"{target}: {e}")
             failed += 1
@@ -1051,9 +1061,9 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
 
         stopped += 1
         if was_pidless:
-            console.print(f"[yellow]Unregistered[/yellow] pidless instance '{target}'; no process was killed")
+            console.print(f"[yellow]Unregistered[/yellow] pidless managed process '{target}'; no process was killed")
         else:
-            console.print(f"[green]Stopped[/green] backend '{target}'")
+            console.print(f"[green]Stopped[/green] managed process '{target}'")
 
     if len(targets) > 1:
         summary = f"{stopped} stopped"
@@ -1070,18 +1080,18 @@ def stop_cmd(runtime_ids: tuple[str, ...], stop_all: bool, yes: bool) -> None:
 def delete_cmd(adapter: str, yes: bool) -> None:
     """Delete a local backend adapter config.
 
-    Stops matching backend instances first, but the command's object is the
-    adapter config. Use 'stop' for backend instances.
+    Stops matching managed processes first, but the command's object is the
+    adapter config. Use 'stop' for managed processes.
     """
     import shutil
 
     console = Console(width=200)
     store = BackendRegistryStore()
     registry = store.read()
-    if adapter in registry.backends:
+    if adapter in registry.processes:
         print_error_with_tip(
-            f"'{adapter}' is a backend instance id, not an adapter config.",
-            f"Use '{_BACKEND_COMMAND} stop {adapter}' to stop a backend instance.",
+            f"'{adapter}' is a managed process id, not an adapter config.",
+            f"Use '{_BACKEND_COMMAND} stop {adapter}' to stop a managed process.",
         )
         sys.exit(1)
 
@@ -1099,29 +1109,29 @@ def delete_cmd(adapter: str, yes: bool) -> None:
         )
         sys.exit(1)
 
-    if not yes and not click.confirm(f"Delete backend config for '{adapter}' (stops matching backend instances)?"):
+    if not yes and not click.confirm(f"Delete backend config for '{adapter}' (stops matching managed processes)?"):
         console.print("Cancelled.")
         return
 
     stopped = []
     registry = store.read()
-    for instance in list(registry.backends.values()):
-        if instance.adapter_type == adapter:
+    for process in list(registry.processes.values()):
+        if process.adapter_type == adapter:
             try:
-                _stop_runtime_instance(instance)
-                stopped.append(instance.backend_id)
+                _stop_managed_process(process)
+                stopped.append(process.process_id)
             except Exception:
                 pass
 
     if stopped:
-        console.print(f"Stopped instances: {', '.join(stopped)}")
+        console.print(f"Stopped managed processes: {', '.join(stopped)}")
 
     shutil.rmtree(backend_dir)
     console.print(f"[green]Deleted[/green] backend config for '{adapter}'")
 
 
 @backend.command("reconcile")
-@click.argument("source_id", metavar="BACKEND")
+@click.argument("backend_identifier", metavar="BACKEND")
 @click.option(
     "--request-id",
     "request_id",
@@ -1143,7 +1153,7 @@ def delete_cmd(adapter: str, yes: bool) -> None:
     help="Remote lookup timeout (seconds).",
 )
 def reconcile_cmd(
-    source_id: str,
+    backend_identifier: str,
     request_id: str | None,
     remote_id: str | None,
     as_json: bool,
@@ -1176,7 +1186,7 @@ def reconcile_cmd(
     try:
         result = reconcile_generation(
             ctx=ExecutionContext.from_cwd(),
-            source_id=source_id,
+            backend_instance_id=backend_identifier,
             request_id=request_id,
             remote_id=remote_id,
             timeout_s=timeout,

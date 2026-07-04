@@ -442,7 +442,7 @@ tiers:
         (tpl_dir / "bad-referenced.yaml").write_text(
             "proxy:\n"
             "  family: openai\n"
-            "  source: openrouter\n"
+            "  backend: openrouter\n"
             "  default_port: 8085\n"
             "  openrouter:\n"
             "    tier_overrides: []\n"
@@ -1519,7 +1519,7 @@ class TestProxyCreateNoStart:
         (tpl_dir / "bad-overrides.yaml").write_text(
             "proxy:\n"
             "  family: openai\n"
-            "  source: openrouter\n"
+            "  backend: openrouter\n"
             "  default_port: 9911\n"
             "  openrouter:\n"
             "    tier_overrides: []\n"

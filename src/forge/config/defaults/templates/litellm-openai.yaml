@@ -10,7 +10,7 @@
 proxy:
   family: openai
   preferred_provider: litellm
-  source: litellm-remote
+  backend: litellm-remote
   default_port: 8085
 
   litellm:

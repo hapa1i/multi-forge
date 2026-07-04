@@ -21,14 +21,16 @@ def _isolated_traces_home(tmp_path, monkeypatch):
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     ptl._warned_newer_schema = False
     downstream_telemetry._warned_newer_schema = False
+    downstream_telemetry._warned_older_schema = False
     yield
     ptl._warned_newer_schema = False
     downstream_telemetry._warned_newer_schema = False
+    downstream_telemetry._warned_older_schema = False
 
 
 def _record(backend_id: str | None = "openrouter", **kw: Any) -> None:
     # dict[str, Any] so the **splat into record_provider_trace's typed kwargs typechecks.
-    # backend_id defaults to the capable "openrouter" source: the source-capability gate is the
+    # backend_id defaults to the capable "openrouter" backend instance: the capability gate is the
     # only thing that turns provider-trace writes on now (no provider-name fallback).
     params: dict[str, Any] = dict(
         request_mode="streaming",
@@ -75,21 +77,21 @@ class TestGateAndRoundTrip:
         assert rec.request_mode == "streaming"
         assert rec.timeout_seen is False  # never proxy-populated
 
-    def test_source_capability_can_enable_trace(self):
+    def test_backend_capability_can_enable_trace(self):
         _record(backend_id="openrouter")
         recs = ptl.read_provider_traces()
         assert len(recs) == 1
         assert recs[0].backend_id == "openrouter"
 
-    def test_non_capable_source_suppresses_trace(self):
-        # litellm-remote is a real source that does not declare provider-trace capability, so an
+    def test_non_capable_backend_suppresses_trace(self):
+        # litellm-remote is a real backend instance that does not declare provider-trace capability, so an
         # otherwise well-formed downstream record writes no trace.
         _record(backend_id="litellm-remote")
         assert ptl.read_provider_traces() == []
 
-    def test_absent_or_unknown_source_writes_no_trace_by_design(self):
-        # A source must opt in to provider-trace via a capability. A route with no backend_id
-        # (proxy.yaml without source:) and unknown sources write nothing by default.
+    def test_absent_or_unknown_backend_writes_no_trace_by_design(self):
+        # A backend instance must opt in to provider-trace via a capability. A route with no backend_id
+        # (proxy.yaml without backend:) and unknown backend instances write nothing by default.
         _record(backend_id=None)
         _record(backend_id="unknown-source")
         assert ptl.read_provider_traces() == []
@@ -166,7 +168,7 @@ class TestMetadataOnly:
 
 class TestPlaneRobustness:
     def test_newer_schema_skipped_with_one_warning(self, caplog):
-        _record()  # a valid v1 record
+        _record()  # a valid current downstream record
         path = _downstream_path()
         with open(path, "a") as f:
             f.write(
@@ -181,7 +183,7 @@ class TestPlaneRobustness:
             )
         with caplog.at_level("WARNING"):
             recs = ptl.read_provider_traces()
-        assert all(r.schema_version == 1 for r in recs)
+        assert all(r.schema_version == ptl.PROVIDER_TRACE_SCHEMA_VERSION for r in recs)
         assert "future" not in {r.request_id for r in recs}
         assert sum("newer Forge" in m for m in caplog.messages) == 1
 
