@@ -100,12 +100,12 @@ name or by the `litellm --port <port>` adapter form. Stop live local backend pro
 in `forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered managed
 process with `forge model backend stop --all`.
 
-The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
-adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local backend whose credential it is
-configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
-`forge model backend list` shows that managed process under each matching backend and marks it `(shared)`; starting a
-second matching backend reuses the running process rather than launching a new one. This is expected -- there is one
-local LiteLLM process, not one per backend.
+The local LiteLLM backends (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`, and
+`codex-responses-local`) all share one adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every
+local backend whose credential it is configured for. The default config serves Gemini and OpenAI models from one
+`litellm-4000` process, so `forge model backend list` shows that managed process under each matching backend and marks
+it `(shared)`; starting a second matching backend reuses the running process rather than launching a new one. This is
+expected -- there is one local LiteLLM process, not one per backend.
 
 ---
 
@@ -418,8 +418,8 @@ costs:
 ```
 
 **What you'll typically edit:** `default_tier`, `tier_overrides`, and sometimes `provider_settings`. Leave
-`proxy_format`, `template`, `provider`, `source`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
-unless you know what you're doing — those are set from the template/source catalog at creation.
+`proxy_format`, `template`, `provider`, `backend`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
+unless you know what you're doing — those are set from the template/backend catalog at creation.
 
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.
@@ -501,6 +501,10 @@ Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry
 `~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads, writes, or cleans them -- delete
 them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
 run ids instead of writing verb snapshot files.
+
+If you upgrade across a backend-identity telemetry break, older downstream records are skipped rather than reattributed
+under the new backend-instance contract. `forge telemetry costs show --json` reports `skipped_legacy_schema`, and the
+human cost/activity views print a note when records in the selected window were fenced.
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb
@@ -677,10 +681,10 @@ from an incident -- a supervised fork's checks timed out before the final stream
 locally or in OpenRouter's dashboard.
 
 Records live inside owner-only downstream telemetry under `~/.forge/telemetry/downstream/` and carry **no** prompt,
-completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider
-generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose backend source
-declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through non-capable sources
-writes nothing.
+completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, backend instance,
+model, provider generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose
+backend instance declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through
+non-capable backend instances writes nothing.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)

@@ -148,7 +148,8 @@ consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` 
 
 `forge telemetry` groups operator observability surfaces: per-session activity, proxy-scoped cost telemetry, and local
 provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
-view.
+view. JSON output from activity/cost views includes `skipped_legacy_schema` when older downstream telemetry was fenced
+from the current backend-instance schema instead of reattributed.
 
 | Command                                      | Purpose                                                                                                                    |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |

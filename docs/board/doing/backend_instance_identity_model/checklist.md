@@ -2,9 +2,7 @@
 
 **Branch**: `feat/backend-instance-identity-model` - **Card**: [`card.md`](card.md)
 
-**Current focus**: S6 docs and closeout. S5 keeps downstream telemetry `backend_id` as logical backend-instance
-attribution, bumps new downstream writes to `schema_version=2`, and skips missing/older downstream schemas in current
-read paths with activity/cost skip counts instead of silently reattributing historical records.
+**Current focus**: S6 docs and closeout ready for review. Remaining ceremony after review: move the card to `done/`.
 
 ## Invariants (do not violate during migration)
 
@@ -145,24 +143,24 @@ ambiguous until explicit `backend_kind` values are assigned per instance.
 
 ### S6 -- Docs and closeout
 
-- [ ] Update shipped docs for implemented behavior only. **Assertion:** `docs/design.md`, `docs/design_appendix.md`,
+- [x] Update shipped docs for implemented behavior only. **Assertion:** `docs/design.md`, `docs/design_appendix.md`,
   `docs/end-user/proxy.md`, and `docs/cli_reference.md` match the final CLI/config/telemetry behavior.
-- [ ] Add board closeout entries. **Assertion:** `docs/board/change_log.md` records shipped behavior, and
-  `docs/board/impl_notes.md` receives only durable invariants after review.
+- [x] Add board closeout entries. **Assertion:** `docs/board/change_log.md` records shipped behavior, and
+  `docs/board/impl_notes.md` records only durable invariants for review.
 
 ## Verification
 
-| Test area                 | Fixture                                | Assertion                                                                                                                   | Test File                                                                                                    |
-| ------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Clean-break failures      | old `proxy.source` / old JSON fields   | old shapes fail loudly with a migration/recreate tip naming the successor                                                   | `tests/src/config/test_loader.py`, `tests/src/cli/test_backend_commands.py`                                  |
-| Remote duplicate identity | two instances of one remote kind       | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                                            | `tests/src/backend/test_sources.py`                                                                          |
-| Local LiteLLM sharing     | one process backs multiple source rows | `list`/`show` still mark the process `(shared)`; telemetry attribution follows the OQ-2 decision                            | `tests/src/cli/test_backend_commands.py`                                                                     |
-| Runtime terminology guard | CLI/docs help surfaces                 | `runtime` never labels a backend instance or managed local process                                                          | `tests/src/cli/test_backend_commands.py` or focused grep test                                                |
-| Telemetry clean break     | pre- and post-break records            | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution or empty-without-count view | `tests/src/cli/test_activity.py`, `tests/src/cli/test_proxy_costs.py`, `tests/src/proxy/test_cost_logger.py` |
+| Test area                 | Fixture                              | Assertion                                                                                                                   | Test File                                                                                                    |
+| ------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Clean-break failures      | old `proxy.source` / old JSON fields | old shapes fail loudly with a migration/recreate tip naming the successor                                                   | `tests/src/config/test_loader.py`, `tests/src/cli/test_backend_commands.py`                                  |
+| Remote duplicate identity | two instances of one remote kind     | exact instance ids resolve; ambiguous unmatched shorthand errors, not mis-routes                                            | `tests/src/backend/test_sources.py`                                                                          |
+| Local LiteLLM sharing     | one process backs multiple backends  | `list`/`show` still mark the process `(shared)`; telemetry attribution follows the OQ-2 decision                            | `tests/src/cli/test_backend_commands.py`                                                                     |
+| Runtime terminology guard | CLI/docs help surfaces               | `runtime` never labels a backend instance or managed local process                                                          | `tests/src/cli/test_backend_commands.py` or focused grep test                                                |
+| Telemetry clean break     | pre- and post-break records          | historical records follow the documented legacy/ignore/migrate outcome; no silent reattribution or empty-without-count view | `tests/src/cli/test_activity.py`, `tests/src/cli/test_proxy_costs.py`, `tests/src/proxy/test_cost_logger.py` |
 
 ## Closeout
 
-- [ ] Design docs and end-user docs updated for shipped behavior.
-- [ ] `docs/board/impl_notes.md` updated only with durable invariants after human review.
-- [ ] `docs/board/change_log.md` entry added when code ships.
+- [x] Design docs and end-user docs updated for shipped behavior.
+- [x] `docs/board/impl_notes.md` updated with durable invariants only.
+- [x] `docs/board/change_log.md` entry added when code ships.
 - [ ] Card moved to `done/` after verification and review.
