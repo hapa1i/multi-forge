@@ -354,7 +354,7 @@ This returns JSON with:
     **Default debug logging**: the walkthrough sandbox exports `FORGE_DEBUG=1` via `.forge/walkthrough/env.sh`, so Forge
     commands write debug logs to `$FORGE_TEST_REPO/.forge-home/logs/...`.
 
-    **Before a block that contains `forge logs --clean`** and only when `--report` is enabled, snapshot the current
+    **Before a block that contains `forge logs clean --yes`** and only when `--report` is enabled, snapshot the current
     sandbox Forge logs so evidence survives the cleanup step:
 
     ```bash

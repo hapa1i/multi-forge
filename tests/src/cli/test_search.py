@@ -14,7 +14,9 @@ from forge.cli.main import main
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
 from forge.search.content_store import ContentStore
 from forge.search.engine import BM25
+from forge.search.exceptions import SearchDocumentStoreCorruptedError
 from forge.search.extractor import SearchDocumentMeta
+from forge.search.index_state import IndexedFileEntry, IndexState, IndexStateStore
 from forge.search.store import SearchDocumentStore
 from forge.search.tokenizer import tokenize
 
@@ -146,6 +148,13 @@ class TestSearchCommand:
         assert "Usage:" in result.stderr
         assert "query" in result.stderr
         assert "rebuild-index" in result.stderr
+
+    def test_query_help_mentions_multi_word_quoting(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["search", "query", "--help"])
+        output = " ".join(result.output.split())
+
+        assert result.exit_code == 0
+        assert 'forge search query "timeout config"' in output
 
     def test_search_default_renders_table(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Default (no --json) renders a human table with a result-count footer, not JSON."""
@@ -472,12 +481,29 @@ class TestEndToEndPipeline:
 class TestPruneCmd:
     """Tests for forge search clean."""
 
+    def _seed_orphans(self, project_root: Path) -> tuple[SearchDocumentStore, IndexStateStore, str]:
+        missing_path = "/nonexistent/ghost.jsonl"
+        store = SearchDocumentStore(forge_root=project_root)
+        store.write(
+            [
+                SearchDocumentMeta(
+                    transcript_path=missing_path,
+                    session_name="ghost",
+                    session_id="g1",
+                    extracted_at="2026-01-01T00:00:00+00:00",
+                    metadata={},
+                ),
+            ]
+        )
+
+        index_store = IndexStateStore(forge_root=project_root)
+        index_store.write(IndexState(indexed_files={missing_path: IndexedFileEntry(mtime=0, size=0, indexed_at="")}))
+        return store, index_store, missing_path
+
     def test_prune_removes_orphans_from_both_stores(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Prune removes orphans from both document store and index state."""
-        from forge.search.index_state import IndexStateStore
-
         project_root = tmp_path / "project"
         project_root.mkdir()
         (project_root / ".git").mkdir()
@@ -500,8 +526,6 @@ class TestPruneCmd:
         # Stale entry in index state
         index_store = IndexStateStore(forge_root=project_root)
         # Write a stale entry directly (can't use mark_indexed — file doesn't exist)
-        from forge.search.index_state import IndexedFileEntry, IndexState
-
         state = IndexState(indexed_files={"/nonexistent/ghost.jsonl": IndexedFileEntry(mtime=0, size=0, indexed_at="")})
         index_store.write(state)
 
@@ -517,12 +541,6 @@ class TestPruneCmd:
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Bare `clean` previews orphans and offers --yes, removing nothing."""
-        from forge.search.index_state import (
-            IndexedFileEntry,
-            IndexState,
-            IndexStateStore,
-        )
-
         project_root = tmp_path / "project"
         project_root.mkdir()
         (project_root / ".git").mkdir()
@@ -552,6 +570,84 @@ class TestPruneCmd:
         # Nothing removed by the preview
         assert len(store.read()) == 1
         assert index_store.read().indexed_files != {}
+
+    def test_clean_json_previews_by_default_without_pruning(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`search clean --json` previews with a stable JSON shape and no mutation."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        store, index_store, missing_path = self._seed_orphans(project_root)
+
+        result = runner.invoke(main, ["search", "clean", "--json"])
+
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        data = json.loads(result.stdout)
+        assert data["scope"] == "project"
+        assert data["dry_run"] is True
+        assert data["total"] == 2
+        categories = {row["category"]: row for row in data["categories"]}
+        assert categories["orphaned_documents"]["count"] == 1
+        assert categories["orphaned_documents"]["items"] == [missing_path]
+        assert categories["stale_index_entries"]["count"] == 1
+        assert categories["stale_index_entries"]["items"] == [missing_path]
+        assert len(store.read()) == 1
+        assert index_store.read().indexed_files != {}
+
+    def test_clean_json_with_yes_reports_deleted_counts(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`search clean --yes --json` reports pruned counts on stdout."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        store, index_store, _ = self._seed_orphans(project_root)
+
+        result = runner.invoke(main, ["search", "clean", "--yes", "--json"])
+
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        data = json.loads(result.stdout)
+        assert data == {
+            "scope": "project",
+            "dry_run": False,
+            "total": 2,
+            "deleted": 2,
+            "failed": [],
+            "categories_cleaned": {
+                "orphaned_documents": 1,
+                "stale_index_entries": 1,
+            },
+        }
+        assert store.read() == []
+        assert index_store.read().indexed_files == {}
+
+    def test_clean_json_error_uses_stderr(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`search clean --json` reports cleanup errors as JSON on stderr."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        def _raise_corrupt(_store: SearchDocumentStore) -> list[str]:
+            raise SearchDocumentStoreCorruptedError("documents.json", "invalid JSON")
+
+        monkeypatch.setattr(SearchDocumentStore, "find_missing", _raise_corrupt)
+
+        result = runner.invoke(main, ["search", "clean", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        data = json.loads(result.stderr)
+        assert data["error"] == "'documents.json': invalid JSON"
 
     def test_prune_nothing_to_do(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Prune with all valid documents reports nothing to do."""

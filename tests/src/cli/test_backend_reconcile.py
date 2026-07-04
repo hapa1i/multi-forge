@@ -28,7 +28,7 @@ def _result(**overrides: Any) -> ReconcileResult:
         remote_cancelled=False,
         remote_http_status=200,
     )
-    base = dict(source_id="openrouter", mode="request-id", entries=[entry], counts={"joined": 1})
+    base = dict(backend_instance_id="openrouter", mode="request-id", entries=[entry], counts={"joined": 1})
     base.update(overrides)
     return ReconcileResult(**base)  # type: ignore[arg-type]
 
@@ -62,7 +62,8 @@ def test_json_shape_has_counts_and_entries_no_secrets(monkeypatch):
     res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--request-id", "req-1", "--json"))
     assert res.exit_code == 0
     data = json.loads(res.output)
-    assert data["source_id"] == "openrouter"
+    assert data["backend_instance_id"] == "openrouter"
+    assert "source_id" not in data
     assert isinstance(data["entries"], list) and data["counts"] == {"joined": 1}
     assert "sk-" not in res.output and "Bearer" not in res.output
     for forbidden in ("messages", "prompt", "completion", "content"):
@@ -75,7 +76,8 @@ def test_timeout_and_ids_forwarded(monkeypatch):
         main, _backend_args("reconcile", "openrouter", "--request-id", "req-1", "--timeout", "2.5")
     )
     assert res.exit_code == 0
-    assert captured["source_id"] == "openrouter"
+    assert captured["backend_instance_id"] == "openrouter"
+    assert "source_id" not in captured
     assert captured["request_id"] == "req-1"
     assert captured["remote_id"] is None
     assert captured["timeout_s"] == 2.5
@@ -100,13 +102,16 @@ def test_no_id_prints_tip_exit_1(monkeypatch):
     res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter"))
     assert res.exit_code == 1
     assert "Tip:" in res.output
+    assert "Use --request-id <id>" in res.output
+    assert "use --remote-id <id>" in res.output
 
 
 def test_forge_op_error_exits_1_with_backend_list_tip(monkeypatch):
-    _patch_op(monkeypatch, exc=ForgeOpError("Unknown backend source 'nope'"))
+    _patch_op(monkeypatch, exc=ForgeOpError("Unknown backend 'nope'"))
     res = CliRunner().invoke(main, _backend_args("reconcile", "nope", "--remote-id", "gen-x"))
     assert res.exit_code == 1
-    assert "Unknown backend source" in res.output
+    assert "Unknown backend" in res.output
+    assert "backend source" not in res.output.lower()
     assert "forge model backend list" in res.output
 
 
@@ -124,7 +129,7 @@ def test_not_authorized_renders_credential_hint(monkeypatch):
         bucket="not-queryable", remote_outcome="not_authorized", remote_id="gen-x", remote_http_status=401
     )
     result = ReconcileResult(
-        source_id="openrouter",
+        backend_instance_id="openrouter",
         mode="remote-id",
         entries=[entry],
         counts={"not-queryable": 1},

@@ -17,8 +17,8 @@ agents.**
 
 Forge sits between you and your coding agent (Claude Code by default, with Codex as an alternate runtime and Gemini
 next), adding persistent sessions, multi-provider model routing, cost visibility with spend caps, and autonomous
-verification. You run `forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen
-model provider, tracking state across sessions, and enforcing policies.
+verification. You run `forge session start` instead of `claude`; Forge then routes to your chosen model provider, tracks
+state across sessions, and enforces configured policies.
 
 ```bash
 # Use Claude with session tracking (no proxy needed)
@@ -108,7 +108,7 @@ forge extension enable
 # Launch Claude with session tracking (no proxy needed)
 forge session start
 
-# Or with multi-model routing via OpenRouter (easiest, no LiteLLM):
+# Or with multi-model routing via OpenRouter (no LiteLLM):
 forge auth login -c openrouter                        # Store OPENROUTER_API_KEY
 forge proxy create openrouter-anthropic               # Create and start a Claude-family proxy
 forge session start --proxy openrouter-anthropic
@@ -166,10 +166,10 @@ forge session fork planner --into ../executor-worktree  # Path to executor's wor
 git push origin feature-branch
 ```
 
-Each step uses the best model for the job. The `--supervise` flag wires the planner as a semantic supervisor -- every
-code change is checked against the approved plan. Sessions track artifacts and transcripts automatically, so context
-flows across forks and resumes. See the [end-user guide](docs/end-user/) for the full tour, or run `/forge:walkthrough`
-inside Claude Code for an interactive walkthrough.
+This workflow can assign different model roles to planning, execution, and review. The `--supervise` flag wires the
+planner as a semantic supervisor -- every code change is checked against the approved plan. Sessions track artifacts and
+transcripts automatically, so forks and resumes can reuse that context. See the [end-user guide](docs/end-user/) for the
+full tour, or run `/forge:walkthrough` inside Claude Code for an interactive walkthrough.
 
 ## CLI Overview
 

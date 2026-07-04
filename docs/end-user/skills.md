@@ -3,7 +3,7 @@
 Forge installs skills that teach Claude how to compose Forge capabilities into workflows. Skills are invoked with
 `/forge:<name>` in a Claude Code session.
 
-- Canonical architecture: [`docs/design.md`](../design.md) SS5.5
+- Canonical architecture: [`docs/design.md` §5](../design.md#5-extensions-workflows-and-testing)
 - Workflow CLI (engine): [`workflow.md`](workflow.md)
 - Session context (model detection): [`session.md`](session.md)
 
@@ -224,12 +224,11 @@ Single-model skills also print the resolved model when Forge can identify it. In
 Claude Code may not expose the exact selected model to Forge; in that case the preflight says the exact model is not
 available instead of reporting `none`.
 
-**No manual configuration needed.** The right instructions are selected automatically based on which proxy you're
-connected to.
+**No extra skill configuration is needed.** Forge selects the resource from the detected model family.
 
-For per-role guidance on which family to choose for `/forge:review` (one-shot capability gains favor Opus 4.8) vs
-`/forge:panel` (mix families for diverse independent perspectives) vs the supervisor (multi-needle retrieval favors Opus
-4.6, with Gemini useful for mid-long or multimodal planner contexts), see [model_selection.md](model_selection.md).
+For per-role guidance on when to use Opus 4.8 or Opus 4.6, when to mix families for `/forge:panel`, and when to
+cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
+long-context retrieval and citation fidelity as the checks to validate locally.
 
 ---
 

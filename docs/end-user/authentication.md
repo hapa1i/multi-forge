@@ -294,7 +294,7 @@ forge auth status
 ```
 
 You can also keep using `.env` — environment variables take precedence over the credential file, so both approaches
-work. The credential file is convenient when you want profile switching or don't want to manage `.env` files across
+work. The credential file is useful when you want profile switching or don't want to manage `.env` files across
 projects.
 
 ### Migrating from old credential names
@@ -306,7 +306,7 @@ If you used `--provider anthropic` or `--provider litellm-local`, the new names 
 | `anthropic`     | `anthropic-api` | Pay-per-token API key, not Claude Code login                      |
 | `litellm-local` | *(removed)*     | Configure `gemini-api`, `openai-api`, or `anthropic-api` directly |
 
-The old names produce a helpful error with migration instructions.
+The old names produce an error with migration instructions.
 
 ---
 

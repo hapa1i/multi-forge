@@ -282,8 +282,8 @@ how the work runs.
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 
 Every supervisor check replays the planning session's full context — expensive when most checks come back "aligned". The
-cascade adds a fast, cheap tier-1 check that approves clearly-aligned actions and reserves the full supervisor for the
-uncertain ones:
+cascade adds a lower-cost tier-1 check against the approved plan snapshot and reserves the full supervisor for uncertain
+actions:
 
 ```bash
 # Enable when setting the supervisor, or toggle later

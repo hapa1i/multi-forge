@@ -91,7 +91,7 @@ def codex_start_options(f: Callable[..., Any]) -> Callable[..., Any]:
             "--sandbox",
             type=click.Choice(["read-only", "workspace-write", "danger-full-access"]),
             default=None,
-            help="Codex sandbox mode (requires --runtime codex; default: workspace-write)",
+            help="Codex sandbox mode for the launched TUI (requires --runtime codex; default: workspace-write)",
         ),
         # Click default stays None: reject_codex_flags_for_claude rejects any non-None
         # codex-only value on the Claude path, so the real default resolves below.

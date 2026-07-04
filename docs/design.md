@@ -154,8 +154,8 @@ checkout and leaves final cleanup to the user.
 
 This workflow motivates Forge's separation of **Session** and **Proxy**.
 
-**Goal:** Combine deep planning/review from one proxy (e.g., OpenAI-based) with fast/high-quality implementation from
-another, while keeping artifacts and the working directory shared.
+**Goal:** Combine planning/review through one proxy (e.g., OpenAI-based) with implementation through another, while
+keeping artifacts and the working directory shared.
 
 > See [diagrams.md §7: Multi-Proxy Workflow](diagrams.md#7-multi-proxy-workflow).
 
@@ -503,7 +503,7 @@ of a lookup-only `resolve_proxy()`. This makes a template name with no running p
 (revive with `forge proxy start <id>`); a name matching neither a proxy nor a template fails with a
 `forge proxy template list` hint.
 
-**Key principle:** You do NOT edit internal templates/model catalog—only your proxy overlay.
+**Overlay boundary:** You do NOT edit internal templates/model catalog—only your proxy overlay.
 
 > **Configuration reference details** — proxy overlay schema, template inventory, confusion traps, secrets, runtime
 > config (`~/.forge/config.yaml`), model catalog, and status line guidance are in
@@ -594,11 +594,11 @@ The proxy exposes runtime truth via `GET /`:
 - `wire_shape: openai_responses_passthrough` is the **Codex-facing** shape: it serves the OpenAI **Responses** API on
   `/v1/responses*` (create + retrieve/cancel/input_items/delete/compact/input_tokens), forwarding Codex's raw traffic
   byte-for-byte so reasoning items survive (signature-safe; like `anthropic_passthrough`, `can_inspect.*` is uniformly
-  false). The route is served only when `wire_shape == openai_responses_passthrough` **and** the proxy's model source
-  declares the `responses_ingress` capability — the same conjunction `GET /`'s `capabilities.responses_ingress` field
-  advertises and the codex preflight's `proxy_supported` posture mirrors. Dollar cost is recorded only when the upstream
-  reports it (`x-litellm-response-cost`, USD→micros); an OpenAI-direct upstream is token-telemetry-only. The launcher
-  that consumes this shape is `forge codex start --proxy` (§3.4, Bare launch (Codex)).
+  false). The route is served only when `wire_shape == openai_responses_passthrough` **and** the proxy's backend
+  instance declares the `responses_ingress` capability — the same conjunction `GET /`'s `capabilities.responses_ingress`
+  field advertises and the codex preflight's `proxy_supported` posture mirrors. Dollar cost is recorded only when the
+  upstream reports it (`x-litellm-response-cost`, USD→micros); an OpenAI-direct upstream is token-telemetry-only. The
+  launcher that consumes this shape is `forge codex start --proxy` (§3.4, Bare launch (Codex)).
 
 **Tier selection precedence:**
 
@@ -742,8 +742,8 @@ unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
 runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while
 shaping what propagates. `structured` stays the CLI default; `ai-curated` emits the full schema
-([design_appendix.md §H](design_appendix.md#h-transfer-context-schema)) and is the substrate for genuine cross-boundary
-moves.
+([design_appendix.md §H](design_appendix.md#h-transfer-context-schema)) and is the substrate for cross-worktree,
+cross-project, and cross-runtime moves.
 
 **Native mode** (`--resume-mode native`): no context assembly; the full conversation history is carried over via
 Claude's `--fork-session`.
@@ -786,7 +786,7 @@ The child snapshot is a **pure AI artifact**: `forge session resume --fresh --re
 write user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
 `--append-system-prompt-file`). You can resume the same parent with different strategies — the parent cache is
 regenerated, while existing per-child snapshots **and** their notes are never overwritten. Inspect and reshape transfer
-context with `forge session transfer show|regenerate|edit|diff` (§4.0).
+context with `forge session transfer show|regenerate|edit|diff`; §4 links the CLI inventory.
 
 **Session derivation tracking:**
 
@@ -888,8 +888,8 @@ Stop Pipeline:
   return verification_decision
 ```
 
-The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent—fine since they
-benefit future sessions.
+The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent; this is
+acceptable because they benefit future sessions, not the exiting session.
 
 **Idempotency rules** (verification can trigger Stop multiple times per session):
 
@@ -998,19 +998,22 @@ a route actually reported — OpenRouter's response-body `usage.cost` (`confiden
 `confidence="unavailable"` when no route reported one (Anthropic passthrough always; LiteLLM streaming, whose header
 predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
 `reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). Downstream records also carry a nullable
-`backend_id`: the canonical model-source catalog id from `forge.backend.sources` (`openrouter`, `litellm-remote`,
-`anthropic-direct`, etc.). Proxy-origin writers populate it from `proxy.source`; direct emitters populate it only where
-the provider/reporter maps unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1.
-`source_id`/`source_kind` remain the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with
-local/remote source kind. The proxy bootstraps its in-memory `CostTracker` from downstream attempts on startup, then
-reconciles with `telemetry/caps/<proxy_id>.json` using the larger monthly total so a clean-cut path migration or dropped
-best-effort JSONL write does not silently reset spend caps to `$0`. Live request handling remains in-memory
-authoritative: a downstream write failure warns but does not block successful model traffic. The fail-closed posture
-lives at bootstrap via the durable cap checkpoint, not by turning a transient telemetry write failure into a
-live-request denial. Cap-state writes are coalesced by request count/time and flushed on graceful proxy shutdown so the
-request path does not fsync on every costed request. Downstream retention preserves current-calendar-month shards even
-when their mtime is old or the size budget is tight, so unkeyed/template-mode caps that have no cap snapshot do not lose
-the active month's JSONL spend on restart.
+`backend_id`: the canonical backend instance id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.). For local
+LiteLLM this is the logical backend instance (`litellm-gemini-local`), not the managed process id (`litellm-4000`).
+Proxy-origin writers populate it from `proxy.backend`; direct emitters populate it only where the provider/reporter maps
+unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1. `source_id`/`source_kind` remain
+the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with backend identity. New downstream writes
+use `schema_version=2`; current readers skip missing/older downstream schemas with a one-time warning and surface
+`skipped_legacy_schema` counts in activity/cost views rather than silently reattributing historical records. The proxy
+bootstraps its in-memory `CostTracker` from downstream attempts on startup, then reconciles with
+`telemetry/caps/<proxy_id>.json` using the larger monthly total so a clean-cut path migration or dropped best-effort
+JSONL write does not silently reset spend caps to `$0`. Live request handling remains in-memory authoritative: a
+downstream write failure warns but does not block successful model traffic. The fail-closed posture lives at bootstrap
+via the durable cap checkpoint, not by turning a transient telemetry write failure into a live-request denial. Cap-state
+writes are coalesced by request count/time and flushed on graceful proxy shutdown so the request path does not fsync on
+every costed request. Downstream retention preserves current-calendar-month shards even when their mtime is old or the
+size budget is tight, so unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend
+on restart.
 
 The legacy `costs/verbs/` writer and reader have been removed. The default `forge telemetry costs show` by-verb view
 derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests remain
@@ -1073,25 +1076,26 @@ mints a run-tree root, so there the curation event and the `codex exec` run shar
 routed through an OpenRouter proxy, timed out before the final streaming usage chunk, and left no trace locally or in
 OpenRouter's UI. The proxy `on_complete` seam writes one downstream attempt record per request
 ([§A.14](design_appendix.md#a14-provider-trace-plane-schema-314), owner-only 0600, versioned). It is gated by the
-selected backend/source capability (`ModelSource.capabilities.provider_trace`), with `openrouter` enabled in v1 and
-gateway-routed OpenRouter through non-capable sources kept quiet. The record carries the provider/generation id (probe
-1: OpenRouter's `gen-…` id rides every stream `chunk.id`), the selected upstream, allowlisted correlation headers (never
-auth/cookie), stream lifecycle flags (`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and
-a local `local_usage_status` (`available` when the proxy saw a final usage/cost figure, else `unavailable`). The
-generation id is captured on the **first** stream event, so a stream **cancelled before the final usage chunk** — the
-incident — still surfaces its id. `timeout_seen` is always `false` at the proxy boundary: the proxy observes only its
-own client disconnect, never the parent's `subprocess.run` timeout (that is a later run-tree-correlation join target).
-Traces join the cost/usage planes by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an
-aborted stream is not remotely retrievable, which is why the plane answers from local evidence only (no remote
-`/generation` lookup). The read surface is `forge telemetry trace list|show|explain` (op-backed
-`core/ops/provider_trace.py`; no in-session `%` mirror); `explain` answers the incident's five questions from the trace
-plus a bounded (±5m) cost-plane join for confidence, never a remote lookup. An opt-in
-`provider_trace.inject_provider_user` (default off, a **global** toggle in `~/.forge/config.yaml`) also records the
-Forge session grouping id in the provider's top-level `user` field for OpenRouter routes — probe 3 confirmed `user` (not
-a custom `session_id`) survives in the indexed `/generation` record for account-side lookup; observability only (probe 4
-stickiness-neutral). One toggle governs **both** proxied routes (server-gated `_provider_user_value`) and direct
-`core.llm` callers (plan-check, curation); both planes derive the id from the same `derive_provider_session_id` hash, so
-a run's proxied and direct OpenRouter calls group identically account-side.
+selected backend instance's provider-trace capability (`ModelSource.capabilities.provider_trace`), with `openrouter`
+enabled in v1 and gateway-routed OpenRouter through non-capable backend instances kept quiet. The record carries the
+provider/generation id (probe 1: OpenRouter's `gen-…` id rides every stream `chunk.id`), the selected upstream,
+allowlisted correlation headers (never auth/cookie), stream lifecycle flags
+(`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and a local `local_usage_status`
+(`available` when the proxy saw a final usage/cost figure, else `unavailable`). The generation id is captured on the
+**first** stream event, so a stream **cancelled before the final usage chunk** — the incident — still surfaces its id.
+`timeout_seen` is always `false` at the proxy boundary: the proxy observes only its own client disconnect, never the
+parent's `subprocess.run` timeout (that is a later run-tree-correlation join target). Traces join the cost/usage planes
+by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely
+retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup). The read surface
+is `forge telemetry trace list|show|explain` (op-backed `core/ops/provider_trace.py`; no in-session `%` mirror);
+`explain` answers the incident's five questions from the trace plus a bounded (±5m) cost-plane join for confidence,
+never a remote lookup. An opt-in `provider_trace.inject_provider_user` (default off, a **global** toggle in
+`~/.forge/config.yaml`) also records the Forge session grouping id in the provider's top-level `user` field for
+OpenRouter routes — probe 3 confirmed `user` (not a custom `session_id`) survives in the indexed `/generation` record
+for account-side lookup; observability only (probe 4 stickiness-neutral). One toggle governs **both** proxied routes
+(server-gated `_provider_user_value`) and direct `core.llm` callers (plan-check, curation); both planes derive the id
+from the same `derive_provider_session_id` hash, so a run's proxied and direct OpenRouter calls group identically
+account-side.
 
 Each proxy may define:
 
@@ -1137,7 +1141,8 @@ memory writer, supervisor shadow drain, shadow curation, workflows/workers, tran
 transitional source for session-tagged run correlation, labels, legacy error counts, and fallback cost.
 `downstream_only` therefore means "downstream/model-call evidence whose run tree is known to this session but has no
 matching upstream outcome"; fully orphaned downstream records with no session-known run tree are not attributable to a
-session.
+session. When older downstream schemas are fenced during an upgrade, the activity downstream pane reports
+`skipped_legacy_schema` so a fully legacy window does not look like ordinary empty data.
 
 The manifest's **`confirmed.policy.decisions`** remains a compatibility fallback for success/cached policy counts and
 warning text that upstream suppresses at the default `upstream_event_volume=non_success`; it is capped at
@@ -1280,9 +1285,9 @@ operational, not a security sandbox.
 
 A Forge proxy can be a user-controlled chokepoint that **observes** and optionally **controls** the wire between Claude
 Code and the model provider. The audit/intercept fields default to inert, so existing proxies are unchanged; the shipped
-`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). It is motivated by a simple
-property: agent quality can change at the harness boundary without leaving the user local evidence. Owning the wire
-gives Forge a durable observation point and a signature-safe control point.
+`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). The motivation is operational:
+agent quality can change at the harness boundary without leaving local evidence. A Forge-controlled proxy gives Forge a
+durable observation point and a signature-safe control point.
 
 **Two orthogonal axes** (kept distinct everywhere):
 

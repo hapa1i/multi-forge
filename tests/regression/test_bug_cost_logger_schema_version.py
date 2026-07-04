@@ -21,6 +21,7 @@ import logging
 import pytest
 
 from forge.core.telemetry import downstream as downstream_telemetry
+from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION
 from forge.proxy.cost_logger import (
     COST_SCHEMA_VERSION,
     log_request_cost,
@@ -51,19 +52,19 @@ def test_log_request_cost_stamps_schema_version() -> None:
     assert records[0]["request_id"] == "req-1"
 
 
-def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
+def test_read_cost_logs_skips_non_current_schema_keeps_current(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """A record from a newer Forge (schema_version > COST_SCHEMA_VERSION) is skipped with a warning;
-    current and legacy-unversioned records are still read."""
-    monkeypatch.setattr(downstream_telemetry, "_warned_newer_schema", False)  # reset the one-time latch
+    """Older/missing and newer downstream schemas are skipped; current schema records are read."""
+    monkeypatch.setattr(downstream_telemetry, "_warned_older_schema", False)
+    monkeypatch.setattr(downstream_telemetry, "_warned_newer_schema", False)
 
     telemetry_dir = downstream_telemetry._downstream_dir()
     telemetry_dir.mkdir(parents=True, exist_ok=True)
     shard = telemetry_dir / "2026-06_testshard.jsonl"
     rows = [
         {
-            "schema_version": COST_SCHEMA_VERSION,
+            "schema_version": DOWNSTREAM_SCHEMA_VERSION,
             "kind": "attempt",
             "downstream_event_id": "ds_current",
             "ts": "2026-06-01T00:00:00Z",
@@ -78,7 +79,7 @@ def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
             "cost_micros": 200,
         },  # pre-versioning record
         {
-            "schema_version": COST_SCHEMA_VERSION + 1,
+            "schema_version": DOWNSTREAM_SCHEMA_VERSION + 1,
             "kind": "attempt",
             "downstream_event_id": "ds_future",
             "ts": "2026-06-01T00:00:02Z",
@@ -92,8 +93,9 @@ def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
         records = read_cost_logs()
 
     seen = {r["request_id"] for r in records}
-    assert seen == {"current", "legacy"}, "newer-schema record must be skipped; current+legacy kept"
-    assert "newer Forge" in caplog.text, "skipping a newer-schema record must warn"
+    assert seen == {"current"}, "only current downstream schema records are projected into cost logs"
+    assert "older Forge backend-identity schema" in caplog.text
+    assert "newer Forge" in caplog.text
 
 
 def test_read_cost_logs_warns_only_once_for_newer_schema(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,7 +107,7 @@ def test_read_cost_logs_warns_only_once_for_newer_schema(monkeypatch: pytest.Mon
     (telemetry_dir / "2026-06_future.jsonl").write_text(
         json.dumps(
             {
-                "schema_version": COST_SCHEMA_VERSION + 1,
+                "schema_version": DOWNSTREAM_SCHEMA_VERSION + 1,
                 "kind": "attempt",
                 "downstream_event_id": "ds_future",
                 "ts": "2026-06-01T00:00:00Z",

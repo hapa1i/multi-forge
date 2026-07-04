@@ -829,7 +829,7 @@ class TestActivityCommand:
             """,
         )
 
-        result = mock_claude_workspace.exec("cd /workspace && forge telemetry activity usage-test --all --json")
+        result = mock_claude_workspace.exec("cd /workspace && forge telemetry activity usage-test --period all --json")
         assert result.returncode == 0, result.stderr
 
         data = json.loads(result.stdout)

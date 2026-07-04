@@ -72,9 +72,28 @@ class TestRunHelp:
     def test_panel_help(self):
         runner = CliRunner()
         result = runner.invoke(main, ["workflow", "panel", "--help"])
+        output = " ".join(result.output.split())
         assert result.exit_code == 0
-        assert "--check" in result.output
-        assert "--context" in result.output
+        assert "Gate on verdicts: exit 0 if all accepting, exit 1 otherwise" in output
+        assert "Review prompt (alternative to positional)" in output
+        assert "resume:<uuid>" in output
+        assert "Claude resume id" in output
+
+    def test_shared_verdict_help_wording(self):
+        runner = CliRunner()
+
+        for verb in ("panel", "analyze", "debate"):
+            result = runner.invoke(main, ["workflow", verb, "--help"])
+            output = " ".join(result.output.split())
+            assert result.exit_code == 0
+            assert "Output as JSON" in output
+            assert "Gate on verdicts: exit 0 if all accepting, exit 1 otherwise" in output
+
+        consensus = runner.invoke(main, ["workflow", "consensus", "--help"])
+        consensus_output = " ".join(consensus.output.split())
+        assert consensus.exit_code == 0
+        assert "Output as JSON" in consensus_output
+        assert "Gate on positions: exit 0 if all supporting, exit 1 otherwise" in consensus_output
 
     def test_unknown_workflow_exits_error(self):
         runner = CliRunner()
@@ -207,6 +226,13 @@ class TestListModels:
         result = runner.invoke(main, ["workflow", "list-models", "--json", "--available"])
         data = json.loads(result.output)
         assert data == []
+
+    def test_available_help_defines_ready(self):
+        result = CliRunner().invoke(main, ["workflow", "list-models", "--help"])
+        output = " ".join(result.output.split())
+
+        assert result.exit_code == 0
+        assert "credentials configured and routing usable" in output
 
     @patch("forge.review.models.check_model_availability")
     def test_grouped_display_shows_credential(self, mock_avail):

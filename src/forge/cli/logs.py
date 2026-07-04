@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import sys
 import time
 from pathlib import Path
 
 import click
 from rich.console import Console
 
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.logging import get_effective_log_level
 from forge.core.paths import display_path, get_forge_home
 
@@ -178,7 +180,60 @@ def _oldest_file_age_days(logs_root: Path) -> float | None:
     return oldest
 
 
-def _remove_files(logs_root: Path, older_than_days: int | None = None) -> tuple[int, int, int]:
+def _log_status(logs_root: Path) -> dict[str, object]:
+    """Collect log directory status for human and JSON rendering."""
+    level = get_effective_log_level()
+    retention_days: int | None = None
+    try:
+        from forge.runtime_config import get_runtime_config
+
+        retention_days = get_runtime_config().log_retention_days
+    except Exception:
+        pass
+
+    directories: list[dict[str, object]] = []
+    total_files = 0
+    total_bytes = 0
+    for subdir, description, exists in _discover_log_dirs(logs_root):
+        dir_path = logs_root / subdir
+        count, size = _count_files(dir_path) if exists else (0, 0)
+        total_files += count
+        total_bytes += size
+        directories.append(
+            {
+                "name": subdir,
+                "description": description,
+                "path": str(dir_path),
+                "exists": exists,
+                "file_count": count,
+                "bytes": size,
+            }
+        )
+
+    return {
+        "log_directory": str(logs_root),
+        "log_level": level,
+        "retention": {
+            "days": retention_days,
+            "enabled": retention_days is not None and retention_days > 0,
+        },
+        "request_diagnostics": {
+            "scope": "per_proxy",
+            "config_key": "logging.requests",
+            "plaintext": False,
+        },
+        "directories": directories,
+        "total": {
+            "files": total_files,
+            "bytes": total_bytes,
+            "oldest_file_age_days": _oldest_file_age_days(logs_root),
+        },
+    }
+
+
+def _remove_files(
+    logs_root: Path, older_than_days: int | None = None, *, preview: bool = False
+) -> tuple[int, int, int]:
     """Remove log files from all subdirectories.
 
     Skips files that belong to a running process (PID extracted from filename)
@@ -188,9 +243,10 @@ def _remove_files(logs_root: Path, older_than_days: int | None = None) -> tuple[
         logs_root: Root logs directory.
         older_than_days: If set, only remove files older than this many days.
             None means remove all files.
+        preview: If True, count files that would be removed without unlinking.
 
     Returns:
-        (removed_count, failed_count, skipped_active_count)
+        (removed_or_preview_count, failed_count, skipped_active_count)
     """
     if not logs_root.is_dir():
         return 0, 0, 0
@@ -205,6 +261,9 @@ def _remove_files(logs_root: Path, older_than_days: int | None = None) -> tuple[
             return
         if _is_active_log_file(f):
             skipped_active += 1
+            return
+        if preview:
+            removed += 1
             return
         try:
             f.unlink()
@@ -248,58 +307,72 @@ def auto_clean_old_logs() -> None:
         logger.debug("Log auto-cleanup error (non-fatal): %s", e)
 
 
-@click.command("logs")
-@click.option("--clean", is_flag=True, help="Remove log files")
+@click.group("logs", no_args_is_help=True)
+def logs_cmd() -> None:
+    """Inspect and clean Forge log files."""
+
+
+@logs_cmd.command("show")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def logs_show_cmd(as_json: bool) -> None:
+    """Show log file locations and status.
+
+    \b
+    Examples:
+        forge logs show                   # Show log locations and file counts
+        forge logs show --json            # Show log status as JSON
+    """
+    logs_root = get_forge_home() / "logs"
+    _show_logs(logs_root, as_json=as_json)
+
+
+@logs_cmd.command("clean")
 @click.option(
     "--older-than",
     type=int,
     default=None,
     metavar="DAYS",
-    help="Only remove files older than DAYS days (requires --clean)",
+    help="Only remove files older than DAYS days",
 )
-def logs_cmd(clean: bool, older_than: int | None) -> None:
-    """Show log file locations and status.
+@click.option("--yes", "-y", is_flag=True, help="Actually remove logs (default is a preview)")
+def logs_clean_cmd(older_than: int | None, yes: bool) -> None:
+    """Preview or remove log files.
 
     \b
     Examples:
-        forge logs                        # Show log locations and file counts
-        forge logs --clean                # Remove all log files
-        forge logs --clean --older-than 7 # Remove logs older than 7 days
+        forge logs clean                  # Preview all removable log files
+        forge logs clean --yes            # Remove all log files
+        forge logs clean --older-than 7   # Preview logs older than 7 days
     """
-    if older_than is not None and not clean:
-        print_error("--older-than requires --clean")
-        raise SystemExit(1)
-
     if older_than is not None and older_than < 1:
-        print_error("--older-than must be >= 1")
-        raise SystemExit(1)
+        print_error_with_tip(
+            "--older-than must be >= 1",
+            "Use --older-than <days> with a value of 1 or greater.",
+        )
+        sys.exit(1)
 
     logs_root = get_forge_home() / "logs"
+    _clean_logs(logs_root, older_than_days=older_than, preview=not yes)
 
-    if clean:
-        _clean_logs(logs_root, older_than_days=older_than)
+
+def _show_logs(logs_root: Path, *, as_json: bool = False) -> None:
+    """Display log directory status."""
+    status = _log_status(logs_root)
+    if as_json:
+        click.echo(json.dumps(status, indent=2))
         return
 
-    _show_logs(logs_root)
-
-
-def _show_logs(logs_root: Path) -> None:
-    """Display log directory status."""
-    level = get_effective_log_level()
+    level = str(status["log_level"])
     console.print(f"\n[bold]Log directory:[/bold]  {display_path(logs_root)}")
     console.print(f"[bold]Log level:[/bold]      {level}")
 
-    # Show retention config if set
-    try:
-        from forge.runtime_config import get_runtime_config
-
-        rc = get_runtime_config()
-        if rc.log_retention_days > 0:
-            console.print(f"[bold]Retention:[/bold]      {rc.log_retention_days} days (auto-cleanup on startup)")
+    retention = status["retention"]
+    if isinstance(retention, dict):
+        retention_days = retention.get("days")
+        if isinstance(retention_days, int) and retention_days > 0:
+            console.print(f"[bold]Retention:[/bold]      {retention_days} days (auto-cleanup on startup)")
         else:
             console.print("[bold]Retention:[/bold]      unlimited")
-    except Exception:
-        pass
 
     # Request diagnostics are configured per-proxy (the global retention above is a coarse
     # floor over all of logs/). Surface the capture model without printing any secret values.
@@ -310,13 +383,15 @@ def _show_logs(logs_root: Path) -> None:
 
     console.print()
 
-    total_files = 0
-    total_bytes = 0
-    for subdir, description, exists in _discover_log_dirs(logs_root):
-        dir_path = logs_root / subdir
-        count, size = _count_files(dir_path) if exists else (0, 0)
-        total_files += count
-        total_bytes += size
+    directories = status["directories"]
+    assert isinstance(directories, list)
+    for row in directories:
+        assert isinstance(row, dict)
+        subdir = str(row["name"])
+        description = str(row["description"])
+        dir_path = Path(str(row["path"]))
+        count = int(row["file_count"])
+        size = int(row["bytes"])
         if count > 0:
             console.print(f"  [cyan]{subdir}/[/cyan]  {count} files ({_format_size(size)})")
         else:
@@ -327,8 +402,13 @@ def _show_logs(logs_root: Path) -> None:
         console.print()
 
     # Summary with oldest file age
+    total = status["total"]
+    assert isinstance(total, dict)
+    total_files = int(total["files"])
+    total_bytes = int(total["bytes"])
     if total_files > 0:
-        oldest = _oldest_file_age_days(logs_root)
+        oldest_raw = total["oldest_file_age_days"]
+        oldest = float(oldest_raw) if isinstance(oldest_raw, (int, float)) else None
         age_str = f", oldest {oldest:.0f}d ago" if oldest is not None and oldest >= 1 else ""
         console.print(f"  [bold]Total:[/bold] {total_files} files ({_format_size(total_bytes)}{age_str})")
         console.print()
@@ -363,15 +443,15 @@ def _show_logs(logs_root: Path) -> None:
             print_tip(
                 "Clean up old logs:",
                 commands=[
-                    "forge logs --clean                         # remove all",
-                    "forge logs --clean --older-than 30         # older than 30 days",
+                    "forge logs clean --yes                     # remove all",
+                    "forge logs clean --older-than 30 --yes     # older than 30 days",
                     "forge config set log_retention_days=30     # auto-cleanup on startup",
                 ],
                 console=console,
             )
         else:
             print_tip(
-                "Run 'forge logs --clean --older-than 7' for manual one-off cleanup.",
+                "Run 'forge logs clean --older-than 7 --yes' for manual one-off cleanup.",
                 console=console,
             )
 
@@ -417,9 +497,9 @@ def _show_logs(logs_root: Path) -> None:
             pass
 
 
-def _clean_logs(logs_root: Path, older_than_days: int | None = None) -> None:
-    """Remove log files from all subdirectories."""
-    removed, failed, skipped_active = _remove_files(logs_root, older_than_days=older_than_days)
+def _clean_logs(logs_root: Path, older_than_days: int | None = None, *, preview: bool = False) -> None:
+    """Preview or remove log files from all subdirectories."""
+    removed, failed, skipped_active = _remove_files(logs_root, older_than_days=older_than_days, preview=preview)
 
     if removed == 0 and failed == 0 and skipped_active == 0:
         if older_than_days is not None:
@@ -429,9 +509,24 @@ def _clean_logs(logs_root: Path, older_than_days: int | None = None) -> None:
         return
 
     if older_than_days is not None:
-        console.print(f"Removed {removed} log file{'s' if removed != 1 else ''} older than {older_than_days} days.")
+        if preview:
+            console.print(
+                f"Would remove {removed} log file{'s' if removed != 1 else ''} " f"older than {older_than_days} days."
+            )
+        else:
+            console.print(f"Removed {removed} log file{'s' if removed != 1 else ''} older than {older_than_days} days.")
     else:
-        console.print(f"Removed {removed} log file{'s' if removed != 1 else ''}.")
+        if preview:
+            console.print(f"Would remove {removed} log file{'s' if removed != 1 else ''}.")
+        else:
+            console.print(f"Removed {removed} log file{'s' if removed != 1 else ''}.")
+    if preview and removed:
+        command = (
+            f"forge logs clean --older-than {older_than_days} --yes"
+            if older_than_days is not None
+            else "forge logs clean --yes"
+        )
+        print_tip(f"Run '{command}' to remove them.", blank_before=False, console=console)
     if skipped_active:
         console.print(
             f"[dim]Kept {skipped_active} file{'s' if skipped_active != 1 else ''}"

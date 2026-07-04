@@ -160,10 +160,11 @@ forge session list --scope all      # All sessions globally
 
 # What a session did (operation outcomes + model calls)
 forge telemetry activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
-forge telemetry activity [name] --json --days N --all
+forge telemetry activity [name] --period week --json
+forge telemetry activity [name] --period all
 
 # Fork (conversation branching)
-forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
+forge session fork <parent> [--name <name>] [--proxy <proxy_id>] [--no-proxy] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
 
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
@@ -426,10 +427,10 @@ supervision, memory, and other Claude-only flags are rejected. `--task` selects 
 first turn fails before Codex opens a thread, resume refuses with guidance — delete the session and start again.
 
 **Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
-prompt — zero setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead (`additionalContext`):
-register `forge hook codex-session-start` in your Codex config and complete the one-time trust ceremony first (see
-[hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment can't be verified up front, so Forge checks
-delivery **after** the turn via the hook's receipt and records the outcome in the manifest
+prompt without Codex hook setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead
+(`additionalContext`): register `forge hook codex-session-start` in your Codex config and complete the one-time trust
+ceremony first (see [hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment can't be verified up front,
+so Forge checks delivery **after** the turn via the hook's receipt and records the outcome in the manifest
 (`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran without the
 parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
 
@@ -807,8 +808,8 @@ rejection. The line is best-effort and prints only when the session had activity
 ```bash
 forge telemetry activity                      # current session ($FORGE_SESSION)
 forge telemetry activity my-feature           # a named session (or Claude UUID)
-forge telemetry activity my-feature --days 7  # last 7 days (default: 30)
-forge telemetry activity my-feature --all     # full history
+forge telemetry activity my-feature --period week  # this week (default: today)
+forge telemetry activity my-feature --period all   # full history
 forge telemetry activity my-feature --json    # machine-readable
 ```
 
@@ -827,7 +828,7 @@ The Supervisor line appends `failing open: N timeout, N error` when recent front
 always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
 may be proceeding without frontier review). The two are scoped differently, so the counts can differ: `SUP!N` is the
 **current consecutive** fail-open streak (it resets on the supervisor's next successful check), while
-`forge telemetry activity` totals fail-opens across the selected window (`--days`/`--all`).
+`forge telemetry activity` totals fail-opens across the selected `--period` window.
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

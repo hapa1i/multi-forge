@@ -105,8 +105,8 @@ def memory() -> None:
     default=None,
     help="Augmentation strategy.",
 )
-@click.option("--intent", default=None, help="Doc intent description for passport synthesis.")
-@click.option("--writers", default=None, help="Writer spec (default: all-sessions).")
+@click.option("--intent", default=None, help="Doc intent for passport synthesis (why this doc is memory).")
+@click.option("--writers", default=None, help="Writer spec: all-sessions or comma-separated session names (default).")
 @click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
 @click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
 def track_cmd(
@@ -411,7 +411,7 @@ def _track_propose(
 
 
 @memory.command("list")
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def list_cmd(as_json: bool) -> None:
     """List passported memory docs under scan roots."""
     import json
@@ -513,9 +513,9 @@ def _collect_shadow_entries(
     type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
-    help="Scope for discovery.",
+    help="Scope for shadow discovery.",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def shadows_list_cmd(scope: str, as_json: bool) -> None:
     """List shadow proposals discovered from passports."""
     try:
@@ -572,15 +572,20 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
 
 
 @shadows_group.command("show")
-@click.option("--for", "for_doc", required=True, help="Official doc to show shadow content for.")
+@click.option(
+    "--for",
+    "for_doc",
+    required=True,
+    help="Official doc path relative to the Forge root (e.g. docs/impl_notes.md).",
+)
 @click.option(
     "--scope",
     type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
-    help="Scope for discovery.",
+    help="Scope for shadow discovery.",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     """Show shadow proposal content for an official doc."""
     try:
@@ -673,7 +678,12 @@ def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
 
 
 @shadows_group.command("review")
-@click.option("--for", "for_doc", required=True, help="Official doc to review.")
+@click.option(
+    "--for",
+    "for_doc",
+    required=True,
+    help="Official doc path relative to the Forge root (e.g. docs/impl_notes.md).",
+)
 @click.option("--curate", is_flag=True, default=False, help="Run LLM curation.")
 @click.option("--show-latest", is_flag=True, default=False, help="Show latest curation report.")
 @click.option("--session", "-s", "session_name", default=None, help="Session name.")
@@ -684,7 +694,7 @@ def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     show_default=True,
     help="Scope for shadow discovery.",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 @click.option(
     "--effort",
     "effort",
@@ -978,7 +988,7 @@ def passport_group() -> None:
 
 @passport_group.command("show")
 @click.argument("path")
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def passport_show_cmd(path: str, as_json: bool) -> None:
     """Show the passport embedded in a memory doc."""
     from dataclasses import asdict
@@ -1058,7 +1068,7 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
 
 @passport_group.command("remove")
 @click.argument("path")
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def passport_remove_cmd(path: str, as_json: bool) -> None:
     """Remove the project-memory passport from a doc."""
     try:

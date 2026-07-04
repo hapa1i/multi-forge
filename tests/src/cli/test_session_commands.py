@@ -1356,6 +1356,8 @@ class TestSessionStart:
 
         assert result.exit_code == 0
         assert "[NAME]" in result.output
+        assert "[1m]" not in result.output
+        assert "claude-sonnet-4-6)" in result.output
 
     def test_start_sidecar_persists_launch_preferences(self, runner: CliRunner, temp_env: Path) -> None:
         """Sidecar start should persist relaunch image/mount settings."""

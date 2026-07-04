@@ -288,9 +288,16 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         forge policy enable --bundle tdd --permissive
     """
     if not bundles:
-        console.print("[yellow]Warning:[/yellow] No bundles specified. Use --bundle to enable policies.")
-        console.print("Available bundles: tdd, coding_standards")
-        return
+        # Fail loud, not a silent no-op: the CLI is the explicit surface and requires
+        # the bundles to enable. Restore-from-intent (re-enable the session's configured
+        # bundles) is the interactive `%policy enable` shortcut's job, not the CLI's --
+        # see design_workflows.md "Re-enable enforcement".
+        print_error_with_tip(
+            "No policy bundles specified.",
+            "Use --bundle tdd and/or --bundle coding_standards.",
+            console=err_console,
+        )
+        sys.exit(1)
 
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
@@ -616,7 +623,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
     "--json",
     "as_json",
     is_flag=True,
-    help="Output structured JSON",
+    help="Output as JSON",
 )
 def check(
     bundles: tuple[str, ...],
@@ -831,7 +838,7 @@ def _resolve_supervisor_session(
     "--json",
     "as_json",
     is_flag=True,
-    help="Output structured JSON",
+    help="Output as JSON",
 )
 def supervisor_evaluate(
     file_path: str,

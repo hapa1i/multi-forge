@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from click.testing import CliRunner
 
@@ -32,6 +33,15 @@ def _usage_event(run_id: str, command: str) -> None:
     )
 
 
+def _patch_cost_logs(monkeypatch, records: list[dict[str, Any]], *, skipped_legacy_schema: int = 0) -> None:
+    from forge.proxy.cost_logger import CostLogReadResult
+
+    monkeypatch.setattr(
+        "forge.proxy.cost_logger.read_cost_logs_with_stats",
+        lambda *a, **k: CostLogReadResult(records=records, skipped_legacy_schema=skipped_legacy_schema),
+    )
+
+
 class TestFormatUsd:
     def test_normal_dollar_amount(self) -> None:
         assert _format_usd(1_500_000) == "$1.50"
@@ -55,7 +65,7 @@ class TestFormatUsd:
 def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
     _usage_event("run_panel", "panel")
     _usage_event("run_supervisor", "supervisor")
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {
             "proxy_id": "openrouter",
             "model": "anthropic/claude-sonnet-4.6",
@@ -82,7 +92,7 @@ def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
         },
     ]
 
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *args, **kwargs: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "openrouter", "--json"))
 
@@ -102,9 +112,15 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
     The present-but-null cost_micros must NOT be summed as 0 (and `sum` must not
     crash on it): it's excluded from the total and counted as unavailable.
     """
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         # Legacy catalog record (pre-rename: int cost, no provenance fields).
-        {"proxy_id": "p", "model": "m-legacy", "cost_micros": 30_000, "input_tokens": 100, "output_tokens": 50},
+        {
+            "proxy_id": "p",
+            "model": "m-legacy",
+            "cost_micros": 30_000,
+            "input_tokens": 100,
+            "output_tokens": 50,
+        },
         # New reported record.
         {
             "proxy_id": "p",
@@ -126,7 +142,7 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
             "output_tokens": 120,
         },
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
@@ -143,10 +159,16 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
 
 def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
     """A cost-unavailable request renders 'unavailable', not $0.00, without crashing."""
-    request_records = [
-        {"proxy_id": "p", "model": "m-unavail", "cost_micros": None, "input_tokens": 10, "output_tokens": 5},
+    request_records: list[dict[str, Any]] = [
+        {
+            "proxy_id": "p",
+            "model": "m-unavail",
+            "cost_micros": None,
+            "input_tokens": 10,
+            "output_tokens": 5,
+        },
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     by_model = CliRunner().invoke(main, _costs_args("show", "--by-model"))
     assert by_model.exit_code == 0, by_model.output
@@ -158,10 +180,16 @@ def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
 
 
 def test_costs_human_output_uses_stdout(monkeypatch) -> None:
-    request_records = [
-        {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
+    request_records: list[dict[str, Any]] = [
+        {
+            "proxy_id": "p",
+            "model": "m",
+            "cost_micros": 25_000,
+            "input_tokens": 10,
+            "output_tokens": 5,
+        },
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--by-model"))
 
@@ -171,16 +199,41 @@ def test_costs_human_output_uses_stdout(monkeypatch) -> None:
 
 
 def test_costs_json_output_uses_stdout(monkeypatch) -> None:
-    request_records = [
-        {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
+    request_records: list[dict[str, Any]] = [
+        {
+            "proxy_id": "p",
+            "model": "m",
+            "cost_micros": 25_000,
+            "input_tokens": 10,
+            "output_tokens": 5,
+        },
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["total_cost_micros"] == 25_000
     assert result.stderr == ""
+
+
+def test_costs_json_reports_legacy_downstream_identity_schema(monkeypatch) -> None:
+    _patch_cost_logs(monkeypatch, [], skipped_legacy_schema=2)
+
+    result = CliRunner().invoke(main, _costs_args("show", "--json"))
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["skipped_legacy_schema"] == 2
+
+
+def test_costs_human_reports_legacy_downstream_identity_schema(monkeypatch) -> None:
+    _patch_cost_logs(monkeypatch, [], skipped_legacy_schema=1)
+
+    result = CliRunner().invoke(main, _costs_args("show", "--by-verb"))
+
+    assert result.exit_code == 0, result.output
+    assert "No cost data" in result.output
+    assert "Skipped 1 downstream telemetry record from an older Forge schema" in result.output
 
 
 class TestVerbCostReported:
@@ -218,12 +271,12 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
     _usage_event("run_passthrough", "passthrough")
     _usage_event("run_freebie", "freebie")
     _usage_event("run_panel", "panel")
-    request_records = [
+    request_records: list[dict[str, Any]] = [
         {"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"},
         {"model": "m", "cost_micros": 0, "forge_run_id": "run_freebie"},
         {"model": "m", "cost_micros": 15_000, "forge_run_id": "run_panel"},
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
@@ -239,8 +292,8 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
 def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None:
     """Human view shows 'unavailable' for a cost_measured=False verb, not $0.00."""
     _usage_event("run_passthrough", "passthrough")
-    request_records = [{"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    request_records: list[dict[str, Any]] = [{"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}]
+    _patch_cost_logs(monkeypatch, request_records)
 
     result = CliRunner().invoke(main, _costs_args("show", "--by-verb"))
 

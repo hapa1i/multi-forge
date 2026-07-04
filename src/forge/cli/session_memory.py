@@ -188,7 +188,7 @@ def _set_memory_activation(
     show_default=True,
     help="Scope for discovery.",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 def status_cmd(scope: str, as_json: bool) -> None:
     """Show memory activation status across sessions."""
     import json

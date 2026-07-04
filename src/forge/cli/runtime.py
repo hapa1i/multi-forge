@@ -204,6 +204,8 @@ def _write_direct_preflight_cache(result: CodexPreflight) -> None:
 def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bool, as_json: bool) -> None:
     """Preflight a runtime for headless runs: auth, hooks, and Responses readiness.
 
+    Supported runtime: codex. Run `forge runtime list` to inspect all runtimes.
+
     Runs the dynamic, per-machine checks the static `forge runtime list` matrix cannot:
     resolves a non-interactive credential, reads `codex doctor`, checks hook state, and
     -- with --proxy -- whether that proxy can serve Codex its Responses API. Exits

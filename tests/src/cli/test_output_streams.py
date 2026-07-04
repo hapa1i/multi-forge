@@ -24,6 +24,7 @@ from forge.core.ops.session_context import SessionContextError
 
 # --json success paths that need no seeded data: empty logs still yield valid JSON.
 _JSON_STDOUT_LEAVES = [
+    ["logs", "show", "--json"],
     ["telemetry", "costs", "show", "--json"],
     ["telemetry", "trace", "list", "--json"],
     ["proxy", "audit", "show", "--json"],
@@ -94,7 +95,10 @@ def test_activity_json_error_on_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     result = CliRunner().invoke(main, ["telemetry", "activity", "--json"])
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert json.loads(result.stderr) == {"error": "no session"}
+    assert json.loads(result.stderr) == {
+        "error": "no session",
+        "tip": "Run 'forge session list' to see sessions.",
+    }
 
 
 def _seed_audit_logs(monkeypatch: pytest.MonkeyPatch, records: list[dict]) -> None:
@@ -249,7 +253,7 @@ _JSON_ERROR_PATH_CASES = [
     (["proxy", "create", "no-such-template-xyz", "--json"], "not found"),
     (
         ["model", "backend", "test-auth", "no-such-source-xyz", "--json"],
-        "Unknown backend source",
+        "Unknown backend",
     ),
     (
         ["model", "backend", "reconcile", "no-such-source-xyz", "--json"],

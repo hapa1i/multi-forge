@@ -140,7 +140,7 @@ def test_forge_headers_not_forwarded_upstream() -> None:
     assert headers["anthropic-version"] == "2023-06-01"  # allowlisted header still forwarded
 
 
-# --- The provider `user`-field injection value (opt-in + source-capability gate) ---
+# --- The provider `user`-field injection value (opt-in + backend-capability gate) ---
 
 
 def test_provider_user_value_uses_session_when_present() -> None:
@@ -184,7 +184,7 @@ def test_provider_user_value_none_when_flag_off() -> None:
 
 
 def test_provider_user_value_none_when_no_backend_id() -> None:
-    # No resolved source (e.g. proxy.yaml without source:) -> no grouping id even with the flag
+    # No resolved backend (e.g. proxy.yaml without backend:) -> no grouping id even with the flag
     # on. Guards the deliberate removal of the provider-name fallback.
     assert (
         _provider_user_value(
@@ -198,7 +198,7 @@ def test_provider_user_value_none_when_no_backend_id() -> None:
     )
 
 
-def test_provider_user_value_uses_capable_source() -> None:
+def test_provider_user_value_uses_capable_backend() -> None:
     assert (
         _provider_user_value(
             backend_id="openrouter",
@@ -211,7 +211,7 @@ def test_provider_user_value_uses_capable_source() -> None:
     )
 
 
-def test_provider_user_value_suppressed_by_non_capable_source() -> None:
+def test_provider_user_value_suppressed_by_non_capable_backend() -> None:
     assert (
         _provider_user_value(
             backend_id="litellm-remote",

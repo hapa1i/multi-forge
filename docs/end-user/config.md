@@ -162,8 +162,8 @@ forge config set statusline.palette=earthy
 forge config set statusline.cost_mode=subscription
 ```
 
-**Billing-aware cost.** Claude Code runs on either a per-token API key (dollars are real) or a subscription/OAuth login
-(dollars are a phantom; quota burn is the real signal). `cost_mode` picks the honest view:
+**Billing-aware cost.** Claude Code runs on either a per-token API key (dollar spend is the usage signal) or a
+subscription/OAuth login (quota burn is the usage signal). `cost_mode` picks which signal to show:
 
 - `api` — show real `$` spend.
 - `subscription` — show quota burn instead of dollars.

@@ -182,7 +182,7 @@ async def _capture_openrouter_request(
     *,
     inject_flag: bool,
     forge_session: str | None,
-    source: str = "",
+    backend: str = "",
 ) -> dict:
     """Drive create_message down the OpenRouter route; return the dict handed to the client adapter."""
     import forge.proxy.server as server
@@ -207,7 +207,7 @@ async def _capture_openrouter_request(
     class ProxyCfg:
         default_tier = "haiku"
         preferred_provider = "openrouter"
-        source = ""
+        backend = ""
 
         @staticmethod
         def get_model_for_tier(_tier: str) -> str:
@@ -217,7 +217,7 @@ async def _capture_openrouter_request(
         default_tier = "opus"
 
     proxy_config = ProxyCfg()
-    proxy_config.source = source
+    proxy_config.backend = backend
     monkeypatch.setattr(server.config, "proxy", proxy_config)
     # The inject_provider_user toggle is now the global runtime-config setting (governs both the
     # proxied and direct paths), not the per-proxy proxy.yaml block. Drive the gate at its source.
@@ -249,12 +249,12 @@ async def _capture_openrouter_request(
 
 @pytest.mark.asyncio
 async def test_create_message_injects_forge_user_when_openrouter_flag_on(monkeypatch):
-    """Flag ON + capable source: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
+    """Flag ON + capable backend: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
     openai_request = await _capture_openrouter_request(
         monkeypatch,
         inject_flag=True,
         forge_session="forge_sess_7e81a1bb765d_supervisor",
-        source="openrouter",
+        backend="openrouter",
     )
     assert openai_request["_forge_user"] == "forge_sess_7e81a1bb765d_supervisor"
 
@@ -271,13 +271,13 @@ async def test_create_message_no_forge_user_when_flag_off(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_create_message_no_forge_user_when_source_not_capable(monkeypatch):
-    """A configured non-capable backend source suppresses the provider user field."""
+async def test_create_message_no_forge_user_when_backend_not_capable(monkeypatch):
+    """A configured non-capable backend instance suppresses the provider user field."""
     openai_request = await _capture_openrouter_request(
         monkeypatch,
         inject_flag=True,
         forge_session="forge_sess_7e81a1bb765d_supervisor",
-        source="litellm-remote",
+        backend="litellm-remote",
     )
     assert "_forge_user" not in openai_request
 

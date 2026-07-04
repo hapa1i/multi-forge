@@ -207,6 +207,13 @@ class TestStartFlagMatrix:
         assert result.exit_code == 0
         launch.assert_called_once()
 
+    def test_start_help_describes_codex_sandbox_as_tui_mode(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["session", "start", "--help"])
+
+        assert result.exit_code == 0
+        assert "Codex sandbox mode for the launched TUI" in result.output
+        assert "requires --runtime codex" in result.output
+
 
 class TestStartCodexDispatch:
     def test_defaults_reach_launcher(self, runner: CliRunner, project: Path) -> None:

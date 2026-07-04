@@ -29,7 +29,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from forge.core.run_id import derive_provider_session_id
-from forge.core.telemetry.downstream import DownstreamRecord, read_downstream_records
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    read_downstream_records_with_stats,
+)
 from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
@@ -203,6 +206,7 @@ class ModelCallPane:
     cost_partial: bool = False
     cost_estimated: bool = True
     downstream_records: int = 0
+    skipped_legacy_schema: int = 0
 
     @property
     def has_content(self) -> bool:
@@ -506,7 +510,13 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
 def _supervisor_health_events(session: str, since: datetime | None) -> list[_HealthEvent]:
     """Merge new upstream outcomes with legacy usage events for supervisor health."""
     events: list[_HealthEvent] = [
-        _HealthEvent(ts=e.ts, status=e.status, failure_type=e.failure_type, run_id=e.run_id, source="legacy")
+        _HealthEvent(
+            ts=e.ts,
+            status=e.status,
+            failure_type=e.failure_type,
+            run_id=e.run_id,
+            source="legacy",
+        )
         for e in read_usage_events(session=session, command="supervisor", period_start=since)
     ]
     for outcome in read_upstream_outcomes(
@@ -749,14 +759,17 @@ def _build_activity_panes(
     provider_prefix = derive_provider_session_id(session_name, root_run_id="", role=None)
 
     try:
+        downstream_read = read_downstream_records_with_stats(period_start=since, kind="attempt")
         records = [
             rec
-            for rec in read_downstream_records(period_start=since, kind="attempt")
+            for rec in downstream_read.records
             if _downstream_visible_to_session(rec, known_roots, known_runs, provider_prefix)
         ]
+        skipped_legacy_schema = downstream_read.stats.skipped_legacy_schema
     except Exception as e:
         logger.debug("activity panes: downstream read failed for %s: %s", session_name, e)
         records = []
+        skipped_legacy_schema = 0
 
     downstream_roots = {rec.forge_root_run_id for rec in records if rec.forge_root_run_id}
     downstream_roots.update(event.root_run_id for event in events if event.root_run_id)
@@ -766,6 +779,7 @@ def _build_activity_panes(
 
     summary.upstream = _build_operation_pane(outcomes, downstream_roots, downstream_runs, summary.policy)
     summary.downstream = _build_model_call_pane(summary, events, records, upstream_roots)
+    summary.downstream.skipped_legacy_schema = skipped_legacy_schema
     if summary.downstream.rows:
         summary.total_cost_micro_usd = summary.downstream.total_cost_micro_usd
         summary.total_input_tokens = summary.downstream.total_input_tokens
@@ -956,7 +970,9 @@ def _build_model_call_pane(
     )
 
 
-def _group_downstream_records(records: list[DownstreamRecord]) -> dict[str, list[DownstreamRecord]]:
+def _group_downstream_records(
+    records: list[DownstreamRecord],
+) -> dict[str, list[DownstreamRecord]]:
     grouped: dict[str, list[DownstreamRecord]] = {}
     for record in records:
         label = record.provider_command or record.source_id or record.provider or "downstream"
@@ -990,7 +1006,9 @@ def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[n
         return None
 
 
-def _policy_activity(manifest, since: datetime | None, session_name: str) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
+def _policy_activity(
+    manifest, since: datetime | None, session_name: str
+) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
     try:
         decisions = manifest.confirmed.policy.decisions if manifest is not None else []
     except Exception:

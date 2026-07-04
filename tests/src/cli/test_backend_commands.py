@@ -15,9 +15,9 @@ import pytest
 from click.testing import CliRunner
 
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryStore,
+    ManagedBackendProcess,
 )
 from forge.cli import backend as backend_cli
 from forge.cli.main import main
@@ -57,15 +57,15 @@ def _backend_args(*args: str) -> list[str]:
     return ["model", "backend", *args]
 
 
-def _backend_instance(
-    backend_id: str = "litellm-4000",
+def _managed_process(
+    process_id: str = "litellm-4000",
     *,
     adapter_type: str = "litellm",
     port: int = 4000,
     pid: int | None = None,
-) -> BackendInstance:
-    return BackendInstance(
-        backend_id=backend_id,
+) -> ManagedBackendProcess:
+    return ManagedBackendProcess(
+        process_id=process_id,
         adapter_type=adapter_type,
         port=port,
         pid=pid,
@@ -73,9 +73,9 @@ def _backend_instance(
     )
 
 
-def _write_backend_registry(forge_home: Path, *instances: BackendInstance) -> BackendRegistryStore:
+def _write_backend_registry(forge_home: Path, *instances: ManagedBackendProcess) -> BackendRegistryStore:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
-    store.write(BackendRegistry(backends={instance.backend_id: instance for instance in instances}))
+    store.write(BackendRegistry(processes={instance.process_id: instance for instance in instances}))
     return store
 
 
@@ -113,7 +113,7 @@ def test_start_missing_config_errors_with_create_tip(runner: CliRunner, tmp_path
     assert "forge model backend create litellm" in result.output
 
 
-def test_list_json_includes_static_sources_and_local_runtime(
+def test_list_json_includes_static_sources_and_managed_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
@@ -129,9 +129,9 @@ def test_list_json_includes_static_sources_and_local_runtime(
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -144,29 +144,33 @@ def test_list_json_includes_static_sources_and_local_runtime(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    payload = _json_output(result)
+    assert all({"backend_id", "source_id", "runtime_instance"}.isdisjoint(item) for item in payload)
+    records = {item["backend_instance_id"]: item for item in payload}
     assert records["openrouter"]["kind"] == "remote"
     assert records["openrouter"]["endpoint"]["env_var"] == "OPENROUTER_BASE_URL"
-    assert records["openrouter"]["runtime_instance"] is None
+    assert records["openrouter"]["managed_process"] is None
     assert records["litellm-gemini-local"]["kind"] == "local"
-    assert records["litellm-gemini-local"]["runtime_instance"]["backend_id"] == "litellm-4000"
+    gemini_process = records["litellm-gemini-local"]["managed_process"]
+    assert gemini_process["process_id"] == "litellm-4000"
+    assert "backend_id" not in gemini_process
     assert records["litellm-gemini-local"]["health"] == "healthy"
     # A gemini-only config means only one source matches, so the instance is not shared.
-    assert records["litellm-gemini-local"]["runtime_instance"]["shared_with"] == []
-    assert records["litellm-openai-local"]["runtime_instance"] is None
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+    assert records["litellm-gemini-local"]["managed_process"]["shared_with"] == []
+    assert records["litellm-openai-local"]["managed_process"] is None
+    assert records["litellm-anthropic-local"]["managed_process"] is None
 
     registry = store.read()
-    assert set(registry.backends) == {"litellm-4000"}
+    assert set(registry.processes) == {"litellm-4000"}
 
 
-def test_list_json_marks_shared_local_runtime_instance(
+def test_list_json_marks_shared_managed_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     """A multi-provider config mirrors the shipped default: one litellm-4000 process
     serves both Gemini and OpenAI, so every local source backed by it (Gemini, OpenAI,
-    and the OpenAI-credentialed codex-responses source) matches the single instance and
+    and the OpenAI-credentialed codex-responses source) matches the single process and
     the list marks it as shared rather than implying separate backends."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
@@ -184,9 +188,9 @@ def test_list_json_marks_shared_local_runtime_instance(
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -199,25 +203,25 @@ def test_list_json_marks_shared_local_runtime_instance(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
 
-    gemini = records["litellm-gemini-local"]["runtime_instance"]
-    openai = records["litellm-openai-local"]["runtime_instance"]
-    # Both sources are backed by the single running instance.
-    assert gemini["backend_id"] == "litellm-4000"
-    assert openai["backend_id"] == "litellm-4000"
-    # Each row names the sibling sources it shares the instance with (catalog order),
+    gemini = records["litellm-gemini-local"]["managed_process"]
+    openai = records["litellm-openai-local"]["managed_process"]
+    # Both sources are backed by the single running process.
+    assert gemini["process_id"] == "litellm-4000"
+    assert openai["process_id"] == "litellm-4000"
+    # Each row names the sibling sources it shares the process with (catalog order),
     # never itself. codex-responses-local is an OpenAI-credentialed co-tenant on 4000.
     assert gemini["shared_with"] == ["litellm-openai-local", "codex-responses-local"]
     assert openai["shared_with"] == ["litellm-gemini-local", "codex-responses-local"]
     # anthropic-local is not in the config, so it stays unmatched.
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
-    # The shared instance is still a single registry entry, not duplicated.
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert records["litellm-anthropic-local"]["managed_process"] is None
+    # The shared process is still a single registry entry, not duplicated.
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
-def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home: Path) -> None:
-    """The human table flags a shared instance in the RUNTIME column."""
+def test_list_human_marks_shared_managed_process(runner: CliRunner, forge_home: Path) -> None:
+    """The human table flags a shared managed process in the PROCESS column."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -234,9 +238,9 @@ def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -252,26 +256,26 @@ def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home:
     assert "shared" in result.output
 
 
-def test_list_human_shows_sources_even_without_runtime(runner: CliRunner, forge_home: Path) -> None:
+def test_list_human_shows_backends_even_without_instances(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("list"))
 
     assert result.exit_code == 0
-    assert "Forge Backend Sources" in result.output
+    assert "Forge Model Backends" in result.output
     assert "openrouter" in result.output
     assert "litellm-remote" in result.output
     assert "No backends found" not in result.output
 
 
-def test_list_human_shows_unmatched_runtime_without_source_match(
+def test_list_human_shows_unmatched_managed_process_without_backend_match(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -284,22 +288,22 @@ def test_list_human_shows_unmatched_runtime_without_source_match(
     result = runner.invoke(main, _backend_args("list"))
 
     assert result.exit_code == 0
-    assert "Unmatched Runtime Instances" in result.output
+    assert "Unmatched Managed Processes" in result.output
     assert "litellm-4000" in result.output
 
     json_result = runner.invoke(main, _backend_args("list", "--json"))
     assert json_result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(json_result)}
-    assert records["litellm-gemini-local"]["runtime_instance"] is None
-    assert records["litellm-openai-local"]["runtime_instance"] is None
-    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+    records = {item["backend_instance_id"]: item for item in _json_output(json_result)}
+    assert records["litellm-gemini-local"]["managed_process"] is None
+    assert records["litellm-openai-local"]["managed_process"] is None
+    assert records["litellm-anthropic-local"]["managed_process"] is None
 
 
 def test_show_remote_source_details(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("show", "openrouter"))
 
     assert result.exit_code == 0
-    assert "Backend source:" in result.output
+    assert "Backend:" in result.output
     assert "openrouter" in result.output
     assert "Kind:" in result.output
     assert "remote" in result.output
@@ -317,7 +321,7 @@ def test_remote_source_lifecycle_errors_before_registry_mutation(
 
     assert result.exit_code == 1
     assert "no local lifecycle" in result.output
-    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().backends == {}
+    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().processes == {}
 
 
 def test_delete_remote_source_has_intentional_error(runner: CliRunner, forge_home: Path) -> None:
@@ -326,7 +330,7 @@ def test_delete_remote_source_has_intentional_error(runner: CliRunner, forge_hom
     assert result.exit_code == 1
     assert "remote" in result.output
     assert "no local config" in result.output
-    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().backends == {}
+    assert BackendRegistryStore(forge_home / "backends" / "index.json").read().processes == {}
 
 
 def test_local_source_start_uses_default_lifecycle_port(
@@ -344,12 +348,12 @@ def test_local_source_start_uses_default_lifecycle_port(
     assert "forge model backend create litellm" in result.output
 
 
-def test_stop_runtime_id_stops_instance_and_keeps_config(
+def test_stop_process_id_stops_process_and_keeps_config(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-4000"))
@@ -358,35 +362,35 @@ def test_stop_runtime_id_stops_instance_and_keeps_config(
     assert "Stopped" in result.output
     assert "litellm-4000" in result.output
     kill.assert_called_once_with(12345, 15)
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert config_path.exists()
 
 
-def test_stop_multiple_runtime_ids_continues_after_failure(
+def test_stop_multiple_process_ids_continues_after_failure(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill"):
         result = runner.invoke(main, _backend_args("stop", "litellm-4000", "missing-9999"))
 
     assert result.exit_code == 1
     assert "Stopped" in result.output
-    assert "Unknown runtime instance 'missing-9999'" in result.output
+    assert "Unknown managed process 'missing-9999'" in result.output
     assert "1 stopped, 1 failed" in result.output
-    assert store.read().backends == {}
+    assert store.read().processes == {}
 
 
-def test_stop_all_yes_stops_every_runtime_and_keeps_configs(
+def test_stop_all_yes_stops_every_process_and_keeps_configs(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
     store = _write_backend_registry(
         forge_home,
-        _backend_instance(pid=12345),
-        _backend_instance("litellm-4001", port=4001, pid=12346),
+        _managed_process(pid=12345),
+        _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
@@ -398,15 +402,15 @@ def test_stop_all_yes_stops_every_runtime_and_keeps_configs(
     assert "litellm-4001" in result.output
     assert "2 stopped" in result.output
     assert kill.call_count == 2
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert config_path.exists()
 
 
-def test_stop_all_unregisters_pidless_instance(
+def test_stop_all_unregisters_pidless_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=None))
+    store = _write_backend_registry(forge_home, _managed_process(pid=None))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "--all", "--yes"))
@@ -414,63 +418,63 @@ def test_stop_all_unregisters_pidless_instance(
     assert result.exit_code == 0
     assert "no process was killed" in result.output
     kill.assert_not_called()
-    assert store.read().backends == {}
+    assert store.read().processes == {}
 
 
 def test_stop_all_empty_registry_is_noop(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("stop", "--all"))
 
     assert result.exit_code == 0
-    assert "No runtime instances to stop" in result.output
+    assert "No managed processes to stop" in result.output
 
 
 def test_stop_all_conflicts_with_explicit_targets(runner: CliRunner, forge_home: Path) -> None:
-    _write_backend_registry(forge_home, _backend_instance())
+    _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("stop", "litellm-4000", "--all"))
 
     assert result.exit_code == 1
-    assert "Cannot combine --all with explicit runtime instance IDs" in result.output
+    assert "Cannot combine --all with explicit managed process IDs" in result.output
 
 
 def test_stop_requires_target_or_all(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, _backend_args("stop"))
 
     assert result.exit_code == 1
-    assert "Provide runtime instance ID(s) or use --all" in result.output
+    assert "Provide managed process ID(s) or use --all" in result.output
     assert "forge model backend list" in result.output
 
 
-def test_stop_rejects_local_source_without_stopping_shared_runtime(
+def test_stop_rejects_local_source_without_stopping_shared_process(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm-openai-local"))
 
     assert result.exit_code == 1
-    assert "not a runtime instance id" in result.output
+    assert "not a managed process id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_stop_rejects_bare_adapter_without_legacy_port_resolution(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance(pid=12345))
+    store = _write_backend_registry(forge_home, _managed_process(pid=12345))
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("stop", "litellm"))
 
     assert result.exit_code == 1
-    assert "Backend adapter 'litellm' is not a runtime instance id" in result.output
+    assert "Backend adapter 'litellm' is not a managed process id" in result.output
     assert "forge model backend list" in result.output
     kill.assert_not_called()
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_stop_port_option_is_clean_break(runner: CliRunner, forge_home: Path) -> None:
@@ -481,14 +485,14 @@ def test_stop_port_option_is_clean_break(runner: CliRunner, forge_home: Path) ->
     assert "--port" in result.output
 
 
-def test_start_runtime_id_stays_config_oriented(runner: CliRunner, forge_home: Path) -> None:
-    store = _write_backend_registry(forge_home, _backend_instance())
+def test_start_process_id_stays_config_oriented(runner: CliRunner, forge_home: Path) -> None:
+    store = _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("start", "litellm-4000"))
 
     assert result.exit_code == 1
-    assert "Unknown backend source or adapter 'litellm-4000'" in result.output
-    assert set(store.read().backends) == {"litellm-4000"}
+    assert "Unknown backend or adapter 'litellm-4000'" in result.output
+    assert set(store.read().processes) == {"litellm-4000"}
 
 
 def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, forge_home: Path) -> None:
@@ -496,12 +500,37 @@ def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, for
 
     assert result.exit_code == 1
     payload = _json_output(result)
-    assert payload["backend_id"] == "openrouter"
-    assert payload["source_id"] == "openrouter"
+    assert "backend_id" not in payload
+    assert "source_id" not in payload
+    assert payload["backend_instance_id"] == "openrouter"
     assert payload["auth_status"] == "missing"
     assert payload["missing_required_env_vars"] == ["OPENROUTER_API_KEY"]
     assert payload["probe"]["status"] == "skipped"
     assert "sk-" not in result.output
+
+
+def test_test_auth_unique_backend_kind_shorthand_resolves(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("test-auth", "openai", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert payload["backend_instance_id"] == "chatgpt"
+    assert payload["probe"]["status"] == "skipped"
+
+
+def test_test_auth_ambiguous_backend_kind_fails_loudly(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("test-auth", "anthropic", "--json"))
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Ambiguous backend instance shorthand 'anthropic'" in result.stderr
+    assert "Use a concrete backend instance id" in result.stderr
 
 
 def test_test_auth_unknown_source_uses_cli_error_helper(runner: CliRunner, forge_home: Path) -> None:
@@ -524,7 +553,7 @@ def test_local_only_unknown_adapter_names_valid_choices(
     )
 
     assert result.exit_code == 1
-    assert "Unknown backend adapter or source 'foobar'" in result.output
+    assert "Unknown backend or adapter 'foobar'" in result.output
     assert "Valid adapters: litellm" in result.output
     assert "forge model backend list" in result.output
 
@@ -599,16 +628,16 @@ def test_delete_missing_config_errors_with_create_tip(
     assert "forge model backend create litellm" in result.output
 
 
-def test_delete_runtime_id_points_to_stop(
+def test_delete_process_id_points_to_stop(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    _write_backend_registry(forge_home, _backend_instance())
+    _write_backend_registry(forge_home, _managed_process())
 
     result = runner.invoke(main, _backend_args("delete", "litellm-4000"))
 
     assert result.exit_code == 1
-    assert "runtime instance id" in result.output
+    assert "managed process id" in result.output
     assert "forge model backend stop litellm-4000" in result.output
 
 
@@ -620,25 +649,25 @@ def test_delete_port_option_is_clean_break(runner: CliRunner, forge_home: Path) 
     assert "--port" in result.output
 
 
-def test_delete_adapter_config_stops_matching_instances_first(
+def test_delete_adapter_config_stops_matching_processes_first(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
     config_path = _write_litellm_config(forge_home)
     store = _write_backend_registry(
         forge_home,
-        _backend_instance(pid=12345),
-        _backend_instance("litellm-4001", port=4001, pid=12346),
+        _managed_process(pid=12345),
+        _managed_process("litellm-4001", port=4001, pid=12346),
     )
 
     with patch("forge.backend.adapters.litellm.os.kill") as kill:
         result = runner.invoke(main, _backend_args("delete", "litellm", "--yes"))
 
     assert result.exit_code == 0
-    assert "Stopped instances: litellm-4000, litellm-4001" in result.output
+    assert "Stopped managed processes: litellm-4000, litellm-4001" in result.output
     assert "Deleted" in result.output
     assert kill.call_count == 2
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert not config_path.parent.exists()
 
 
@@ -646,8 +675,8 @@ def test_backend_group_help_defines_id_spaces(runner: CliRunner) -> None:
     result = runner.invoke(main, _backend_args("--help"))
 
     assert result.exit_code == 0
-    assert "Source id: openrouter" in result.output
-    assert "Runtime instance id: litellm-4000" in result.output
+    assert "Backend: openrouter" in result.output
+    assert "Managed process: litellm-4000" in result.output
     assert "Adapter: litellm" in result.output
 
 
@@ -655,29 +684,59 @@ def test_backend_leaf_help_examples_are_valid_id_spaces(runner: CliRunner) -> No
     show_help = runner.invoke(main, _backend_args("show", "--help"))
     test_auth_help = runner.invoke(main, _backend_args("test-auth", "--help"))
     reconcile_help = runner.invoke(main, _backend_args("reconcile", "--help"))
+    start_help = runner.invoke(main, _backend_args("start", "--help"))
     stop_help = runner.invoke(main, _backend_args("stop", "--help"))
     delete_help = runner.invoke(main, _backend_args("delete", "--help"))
 
     assert show_help.exit_code == 0
+    assert "BACKEND_OR_PROCESS" in show_help.output
     assert "forge model backend show openrouter" in show_help.output
     assert "forge model backend show litellm-4000" in show_help.output
     assert test_auth_help.exit_code == 0
+    assert "BACKEND" in test_auth_help.output
+    assert "SOURCE_ID" not in test_auth_help.output
     assert "forge model backend test-auth openrouter" in test_auth_help.output
     assert reconcile_help.exit_code == 0
+    assert "BACKEND" in reconcile_help.output
+    assert "SOURCE_ID" not in reconcile_help.output
     assert "forge model backend reconcile openrouter --request-id" in reconcile_help.output
     reconcile_text = _normalized_output(reconcile_help)
     assert "forge model backend list" in reconcile_text
-    assert "source ids" in reconcile_text
+    assert "backends" in reconcile_text
+    assert start_help.exit_code == 0
+    assert "BACKEND_OR_ADAPTER" in start_help.output
+    assert "forge model backend start litellm-openai-local" in start_help.output
+    assert "forge model backend start litellm --port 4000" in start_help.output
+    assert "backend names use their default port unless overridden" in start_help.output
     assert stop_help.exit_code == 0
-    assert "RUNTIME_ID..." in stop_help.output
+    assert "PROCESS_ID..." in stop_help.output
+    assert "RUNTIME_ID..." not in stop_help.output
+    assert "forge model backend list" in stop_help.output
     assert "--port" not in stop_help.output
     assert delete_help.exit_code == 0
     assert "--port" not in delete_help.output
 
 
+def test_backend_help_does_not_label_processes_as_runtime(runner: CliRunner) -> None:
+    help_commands = [
+        _backend_args("--help"),
+        _backend_args("list", "--help"),
+        _backend_args("show", "--help"),
+        _backend_args("start", "--help"),
+        _backend_args("stop", "--help"),
+        _backend_args("delete", "--help"),
+    ]
+
+    for args in help_commands:
+        result = runner.invoke(main, args)
+        assert result.exit_code == 0
+        help_text = result.output.lower()
+        assert "runtime instance" not in help_text
+        assert "runtime id" not in help_text
+
+
 _SOURCE_RECORD_KEYS = {
-    "backend_id",
-    "source_id",
+    "backend_instance_id",
     "kind",
     "provider",
     "endpoint",
@@ -687,26 +746,25 @@ _SOURCE_RECORD_KEYS = {
     "missing_required_env_vars",
     "health",
     "has_lifecycle",
-    "runtime_instance",
+    "managed_process",
 }
 
 _REGISTRY_FALLBACK_KEYS = {
-    "backend_id",
-    "source_id",
+    "managed_process_id",
     "found",
     "adapter_type",
-    "runtime_instance",
+    "managed_process",
     "config_path",
 }
 
 
-def test_show_json_configured_source_emits_source_record(
+def test_show_json_configured_backend_emits_source_record(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <source-id> --json dispatches through _source_record (path 1).
+    """show <backend> --json dispatches through _source_record (path 1).
 
-    A built-in source like openrouter resolves via _source_for_identifier, so the
+    A built-in backend like openrouter resolves via _source_for_identifier, so the
     payload carries the full source-record shape, not the registry-fallback shape.
     """
     result = runner.invoke(main, _backend_args("show", "openrouter", "--json"))
@@ -714,32 +772,56 @@ def test_show_json_configured_source_emits_source_record(
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _SOURCE_RECORD_KEYS
-    assert payload["backend_id"] == "openrouter"
-    assert payload["source_id"] == "openrouter"
+    assert payload["backend_instance_id"] == "openrouter"
     assert payload["kind"] == "remote"
-    # Remote source has no local lifecycle, so no runtime instance is matched.
-    assert payload["runtime_instance"] is None
+    # Remote backend has no local lifecycle, so no managed process is matched.
+    assert payload["managed_process"] is None
     assert payload["has_lifecycle"] is False
     assert isinstance(payload["credentials"], list)
     assert "OPENROUTER_API_KEY" in payload["missing_required_env_vars"]
+
+
+def test_show_json_unique_backend_kind_shorthand_uses_source_record(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("show", "openai", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert set(payload) == _SOURCE_RECORD_KEYS
+    assert payload["backend_instance_id"] == "chatgpt"
+    assert payload["endpoint"]["kind"] == "runtime_native"
+
+
+def test_show_json_ambiguous_backend_kind_fails_loudly(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    result = runner.invoke(main, _backend_args("show", "anthropic", "--json"))
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Ambiguous backend instance shorthand 'anthropic'" in result.stderr
+    assert "Use a concrete backend instance id" in result.stderr
 
 
 def test_show_json_registry_only_fallback_when_not_a_source(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <registry-id> --json uses the registry fallback shape (path 2).
+    """show <process-id> --json uses the registry fallback shape (path 2).
 
-    litellm-4000 is a registry backend_id but not a model source, so the command
+    litellm-4000 is a registry process_id but not a model source, so the command
     falls through to the registry-only branch and reports found=true with a
-    populated runtime_instance record.
+    populated managed_process record.
     """
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                     pid=None,
@@ -754,35 +836,33 @@ def test_show_json_registry_only_fallback_when_not_a_source(
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _REGISTRY_FALLBACK_KEYS
-    assert payload["backend_id"] == "litellm-4000"
-    assert payload["source_id"] is None
+    assert payload["managed_process_id"] == "litellm-4000"
     assert payload["found"] is True
     assert payload["adapter_type"] == "litellm"
-    runtime = payload["runtime_instance"]
-    assert runtime is not None
-    assert runtime["backend_id"] == "litellm-4000"
-    assert runtime["adapter_type"] == "litellm"
-    assert runtime["port"] == 4000
-    assert runtime["status"] == "healthy"
-    assert runtime["alive"] is False
+    process = payload["managed_process"]
+    assert process is not None
+    assert process["process_id"] == "litellm-4000"
+    assert process["adapter_type"] == "litellm"
+    assert process["port"] == 4000
+    assert process["status"] == "healthy"
+    assert process["alive"] is False
 
 
 def test_show_json_unknown_id_reports_not_found(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
-    """show <unknown-id> --json reports found=false with empty runtime/config (path 3)."""
+    """show <unknown-id> --json reports found=false with empty process/config (path 3)."""
     result = runner.invoke(main, _backend_args("show", "nope-9999", "--json"))
 
     assert result.exit_code == 0
     payload = _json_output(result)
     assert set(payload) == _REGISTRY_FALLBACK_KEYS
-    assert payload["backend_id"] == "nope-9999"
-    assert payload["source_id"] is None
+    assert payload["managed_process_id"] == "nope-9999"
     assert payload["found"] is False
     # rsplit("-", 1) on "nope-9999" yields adapter "nope".
     assert payload["adapter_type"] == "nope"
-    assert payload["runtime_instance"] is None
+    assert payload["managed_process"] is None
     assert payload["config_path"] is None
 
 
@@ -796,7 +876,7 @@ def test_list_json_renders_runtime_native_source_as_runtime_owned(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
     chatgpt = records["chatgpt"]
     assert chatgpt["provider"] == "openai"
     assert chatgpt["kind"] == "remote"
@@ -804,7 +884,7 @@ def test_list_json_renders_runtime_native_source_as_runtime_owned(
     assert chatgpt["auth_status"] == "runtime_native"
     assert chatgpt["health"] == "runtime-owned"
     assert chatgpt["required_credentials"] == []
-    assert chatgpt["runtime_instance"] is None
+    assert chatgpt["managed_process"] is None
 
 
 def test_test_auth_runtime_native_source_is_skipped_not_failed(
@@ -833,7 +913,7 @@ def test_list_json_renders_claude_max_as_runtime_owned(
     result = runner.invoke(main, _backend_args("list", "--json"))
 
     assert result.exit_code == 0
-    records = {item["source_id"]: item for item in _json_output(result)}
+    records = {item["backend_instance_id"]: item for item in _json_output(result)}
     claude_max = records["claude-max"]
     assert claude_max["provider"] == "anthropic"
     assert claude_max["kind"] == "remote"
@@ -841,7 +921,7 @@ def test_list_json_renders_claude_max_as_runtime_owned(
     assert claude_max["auth_status"] == "runtime_native"
     assert claude_max["health"] == "runtime-owned"
     assert claude_max["required_credentials"] == []
-    assert claude_max["runtime_instance"] is None
+    assert claude_max["managed_process"] is None
 
 
 def test_test_auth_claude_max_skipped_with_claude_hint_not_codex(

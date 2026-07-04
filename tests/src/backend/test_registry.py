@@ -6,44 +6,44 @@ from pathlib import Path
 import pytest
 
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryCorruptedError,
     BackendRegistryStore,
+    ManagedBackendProcess,
     is_pid_alive,
 )
 
 
-class TestBackendInstance:
-    """Tests for BackendInstance dataclass."""
+class TestManagedBackendProcess:
+    """Tests for ManagedBackendProcess dataclass."""
 
     def test_create_with_required_fields(self) -> None:
-        """Verify BackendInstance can be created with required fields."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        """Verify ManagedBackendProcess can be created with required fields."""
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        assert instance.backend_id == "litellm-4000"
-        assert instance.adapter_type == "litellm"
-        assert instance.port == 4000
-        assert instance.pid is None
-        assert instance.status == "unknown"
-        assert instance.created_at is None
+        assert process.process_id == "litellm-4000"
+        assert process.adapter_type == "litellm"
+        assert process.port == 4000
+        assert process.pid is None
+        assert process.status == "unknown"
+        assert process.created_at is None
 
     def test_create_with_all_fields(self) -> None:
-        """Verify BackendInstance can be created with all fields."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        """Verify ManagedBackendProcess can be created with all fields."""
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=12345,
             status="healthy",
             created_at="2026-02-03T10:00:00Z",
         )
-        assert instance.pid == 12345
-        assert instance.status == "healthy"
-        assert instance.created_at == "2026-02-03T10:00:00Z"
+        assert process.pid == 12345
+        assert process.status == "healthy"
+        assert process.created_at == "2026-02-03T10:00:00Z"
 
 
 class TestBackendRegistry:
@@ -52,19 +52,19 @@ class TestBackendRegistry:
     def test_empty_registry(self) -> None:
         """Verify empty registry has correct defaults."""
         registry = BackendRegistry()
-        assert registry.version == 1
-        assert registry.backends == {}
+        assert registry.version == 2
+        assert registry.processes == {}
 
-    def test_registry_with_backends(self) -> None:
-        """Verify registry can store backends."""
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+    def test_registry_with_processes(self) -> None:
+        """Verify registry can store managed processes."""
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
-        registry = BackendRegistry(backends={"litellm-4000": instance})
-        assert "litellm-4000" in registry.backends
-        assert registry.backends["litellm-4000"].port == 4000
+        registry = BackendRegistry(processes={"litellm-4000": process})
+        assert "litellm-4000" in registry.processes
+        assert registry.processes["litellm-4000"].port == 4000
 
 
 class TestBackendRegistryStore:
@@ -74,8 +74,8 @@ class TestBackendRegistryStore:
         """Verify reading missing file returns empty registry."""
         store = BackendRegistryStore(tmp_path / "backends" / "index.json")
         registry = store.read()
-        assert registry.backends == {}
-        assert registry.version == 1
+        assert registry.processes == {}
+        assert registry.version == 2
 
     def test_write_and_read_roundtrip(self, tmp_path: Path) -> None:
         """Verify write/read roundtrip preserves data."""
@@ -83,20 +83,20 @@ class TestBackendRegistryStore:
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=12345,
             status="healthy",
             created_at="2026-02-03T10:00:00Z",
         )
-        registry = BackendRegistry(backends={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         loaded = store.read()
-        assert "litellm-4000" in loaded.backends
-        backend = loaded.backends["litellm-4000"]
+        assert "litellm-4000" in loaded.processes
+        backend = loaded.processes["litellm-4000"]
         assert backend.port == 4000
         assert backend.pid == 12345
         assert backend.status == "healthy"
@@ -134,41 +134,69 @@ class TestBackendRegistryStore:
             store.read()
         assert "incompatible version" in str(exc_info.value)
 
+    def test_read_v1_backend_id_process_records_clean_breaks(self, tmp_path: Path) -> None:
+        """Old v1 records used backend_id for managed processes and must fail loudly."""
+        registry_path = tmp_path / "backends" / "index.json"
+        registry_path.parent.mkdir(parents=True)
+        registry_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "backends": {
+                        "litellm-4000": {
+                            "backend_id": "litellm-4000",
+                            "adapter_type": "litellm",
+                            "port": 4000,
+                        }
+                    },
+                }
+            )
+        )
+
+        store = BackendRegistryStore(registry_path)
+        with pytest.raises(BackendRegistryCorruptedError) as exc_info:
+            store.read()
+        message = str(exc_info.value)
+        assert "old backend_id records" in message
+        assert "stop local backends first" in message
+        assert "free their ports" in message
+        assert "delete ~/.forge/backends/index.json" in message
+
     def test_update_applies_mutation(self, tmp_path: Path) -> None:
         """Verify update applies mutation function."""
         registry_path = tmp_path / "backends" / "index.json"
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
         )
 
-        def add_backend(reg: BackendRegistry) -> None:
-            reg.backends["litellm-4000"] = instance
+        def add_process(reg: BackendRegistry) -> None:
+            reg.processes["litellm-4000"] = process
 
-        store.update(timeout_s=5.0, mutate=add_backend)
+        store.update(timeout_s=5.0, mutate=add_process)
 
         loaded = store.read()
-        assert "litellm-4000" in loaded.backends
+        assert "litellm-4000" in loaded.processes
 
     def test_prune_dead_pids_removes_dead(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify prune_dead_pids removes backends with dead PIDs."""
+        """Verify prune_dead_pids removes managed processes with dead PIDs."""
         registry_path = tmp_path / "backends" / "index.json"
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        # Create registry with a backend that has a "dead" PID
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        # Create registry with a managed process that has a "dead" PID
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=99999999,  # Very unlikely to be a real PID
             status="healthy",
         )
-        registry = BackendRegistry(backends={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         # Mock is_pid_alive to return False
@@ -178,32 +206,32 @@ class TestBackendRegistryStore:
         assert "litellm-4000" in pruned
 
         loaded = store.read()
-        assert "litellm-4000" not in loaded.backends
+        assert "litellm-4000" not in loaded.processes
 
     def test_prune_dead_pids_keeps_none_pid(self, tmp_path: Path) -> None:
-        """Verify prune_dead_pids keeps backends with pid=None (adopted)."""
+        """Verify prune_dead_pids keeps managed processes with pid=None (adopted)."""
         registry_path = tmp_path / "backends" / "index.json"
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
 
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        process = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
-            pid=None,  # Adopted backend
+            pid=None,  # Adopted managed process
             status="healthy",
         )
-        registry = BackendRegistry(backends={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": process})
         store.write(registry)
 
         pruned = store.prune_dead_pids()
         assert pruned == []
 
         loaded = store.read()
-        assert "litellm-4000" in loaded.backends
+        assert "litellm-4000" in loaded.processes
 
-    def test_list_backends_returns_sorted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify list_backends returns backends sorted by created_at."""
+    def test_list_processes_returns_sorted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify list_processes returns managed processes sorted by created_at."""
         registry_path = tmp_path / "backends" / "index.json"
         registry_path.parent.mkdir(parents=True)
         store = BackendRegistryStore(registry_path)
@@ -212,30 +240,30 @@ class TestBackendRegistryStore:
         monkeypatch.setattr(store, "prune_dead_pids", lambda: [])
 
         instances = [
-            BackendInstance(
-                backend_id="litellm-4002",
+            ManagedBackendProcess(
+                process_id="litellm-4002",
                 adapter_type="litellm",
                 port=4002,
                 created_at="2026-02-03T12:00:00Z",
             ),
-            BackendInstance(
-                backend_id="litellm-4000",
+            ManagedBackendProcess(
+                process_id="litellm-4000",
                 adapter_type="litellm",
                 port=4000,
                 created_at="2026-02-03T10:00:00Z",
             ),
-            BackendInstance(
-                backend_id="litellm-4001",
+            ManagedBackendProcess(
+                process_id="litellm-4001",
                 adapter_type="litellm",
                 port=4001,
                 created_at="2026-02-03T11:00:00Z",
             ),
         ]
-        registry = BackendRegistry(backends={i.backend_id: i for i in instances})
+        registry = BackendRegistry(processes={i.process_id: i for i in instances})
         store.write(registry)
 
-        backends = store.list_backends()
-        assert [b.backend_id for b in backends] == [
+        processes = store.list_processes()
+        assert [process.process_id for process in processes] == [
             "litellm-4000",
             "litellm-4001",
             "litellm-4002",

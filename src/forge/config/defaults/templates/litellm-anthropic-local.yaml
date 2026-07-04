@@ -15,7 +15,7 @@
 proxy:
   family: anthropic
   preferred_provider: litellm
-  source: litellm-anthropic-local
+  backend: litellm-anthropic-local
   default_port: 8091
 
   litellm:

@@ -9,11 +9,13 @@ from typing import cast
 import pytest
 
 from forge.backend.registry import (
-    BackendInstance,
     BackendRegistry,
     BackendRegistryStore,
+    ManagedBackendProcess,
 )
 from forge.backend.sources import (
+    BackendInstanceAmbiguousError,
+    BackendInstanceNotFoundError,
     BillingPosture,
     LocalBackendLifecycle,
     ModelSource,
@@ -21,9 +23,12 @@ from forge.backend.sources import (
     ModelSourceKind,
     ModelSourceNotFoundError,
     SourceEndpoint,
+    backend_kind_for_source,
     get_model_source,
     list_model_sources,
     model_source_for_template,
+    resolve_backend_instance,
+    resolve_backend_instance_id,
     resolve_model_source_id,
     validate_model_sources,
 )
@@ -76,7 +81,7 @@ def test_all_shipped_templates_resolve_to_a_source(tmp_path: Path, monkeypatch: 
 
 
 def test_local_sources_map_to_lifecycle_without_using_instance_ids() -> None:
-    """Local source ids stay disjoint from BackendInstance-style adapter-port ids."""
+    """Local source ids stay disjoint from ManagedBackendProcess-style adapter-port ids."""
 
     local_sources = [source for source in list_model_sources() if source.kind == "local"]
     assert local_sources
@@ -101,7 +106,10 @@ def test_source_required_env_vars_derive_from_credentials_and_endpoint() -> None
     assert get_model_source("litellm-gemini-local").required_env_vars == ("GEMINI_API_KEY",)
     assert get_model_source("litellm-openai-local").required_env_vars == ("OPENAI_API_KEY",)
     assert get_model_source("litellm-anthropic-local").required_env_vars == ("ANTHROPIC_API_KEY",)
-    assert get_model_source("litellm-remote").required_env_vars == ("LITELLM_API_KEY", "LITELLM_BASE_URL")
+    assert get_model_source("litellm-remote").required_env_vars == (
+        "LITELLM_API_KEY",
+        "LITELLM_BASE_URL",
+    )
     assert get_model_source("openrouter").required_env_vars == ("OPENROUTER_API_KEY",)
 
 
@@ -112,14 +120,14 @@ def test_remote_sources_do_not_enter_runtime_registry(tmp_path: Path) -> None:
     remote_sources = [source for source in list_model_sources() if source.kind == "remote"]
 
     assert remote_sources
-    assert store.read().backends == {}
+    assert store.read().processes == {}
     assert all(source.local_lifecycle is None for source in remote_sources)
 
     store.write(
         BackendRegistry(
-            backends={
-                "litellm-4000": BackendInstance(
-                    backend_id="litellm-4000",
+            processes={
+                "litellm-4000": ManagedBackendProcess(
+                    process_id="litellm-4000",
                     adapter_type="litellm",
                     port=4000,
                 )
@@ -128,8 +136,8 @@ def test_remote_sources_do_not_enter_runtime_registry(tmp_path: Path) -> None:
     )
 
     registry = store.read()
-    assert set(registry.backends) == {"litellm-4000"}
-    assert not ({source.id for source in remote_sources} & set(registry.backends))
+    assert set(registry.processes) == {"litellm-4000"}
+    assert not ({source.id for source in remote_sources} & set(registry.processes))
 
 
 def test_duplicate_source_identifiers_are_rejected() -> None:
@@ -246,6 +254,115 @@ def test_resolve_model_source_id_accepts_aliases() -> None:
         resolve_model_source_id("does-not-exist")
 
     assert str(exc_info.value) == "Unknown model source or alias: does-not-exist"
+
+
+def test_backend_kind_defaults_are_provider_families_not_endpoint_kinds() -> None:
+    """The new backend-kind axis is distinct from local/remote and EndpointKind."""
+
+    assert backend_kind_for_source(get_model_source("openrouter")) == "openrouter"
+    assert backend_kind_for_source(get_model_source("litellm-remote")) == "litellm"
+    assert backend_kind_for_source(get_model_source("litellm-gemini-local")) == "litellm"
+
+    claude_max = get_model_source("claude-max")
+    chatgpt = get_model_source("chatgpt")
+
+    assert claude_max.endpoint.kind == "runtime_native"
+    assert backend_kind_for_source(claude_max) == "anthropic"
+    assert chatgpt.endpoint.kind == "runtime_native"
+    assert backend_kind_for_source(chatgpt) == "openai"
+
+
+def test_resolve_backend_instance_uses_exact_id_before_kind_shorthand() -> None:
+    """A singleton id remains concrete after a sibling of the same kind exists."""
+
+    openrouter = get_model_source("openrouter")
+    openrouter_work = replace(openrouter, id="openrouter-work", template_names=())
+
+    resolution = resolve_backend_instance("openrouter", sources=(openrouter, openrouter_work))
+
+    assert resolution.instance_id == "openrouter"
+    assert resolution.source is openrouter
+    assert resolution.matched_by == "instance_id"
+
+
+def test_resolve_backend_instance_uses_explicit_alias_before_kind_shorthand() -> None:
+    """Explicit aliases outrank unique kind/name shorthand."""
+
+    openrouter = get_model_source("openrouter")
+    aliased = replace(
+        openrouter,
+        id="openrouter-primary",
+        template_names=("openrouter",),
+        backend_kind="primary-router",
+    )
+    shorthand = replace(openrouter, id="openrouter-work", template_names=(), backend_kind="openrouter")
+
+    resolution = resolve_backend_instance("openrouter", sources=(aliased, shorthand))
+
+    assert resolution.instance_id == "openrouter-primary"
+    assert resolution.source is aliased
+    assert resolution.matched_by == "alias"
+
+
+def test_resolve_backend_instance_uses_unique_kind_shorthand() -> None:
+    """Unique backend-kind shorthand is the third-tier success path."""
+
+    openrouter = get_model_source("openrouter")
+    primary = replace(
+        openrouter,
+        id="openrouter-primary",
+        template_names=(),
+        backend_kind="router-family",
+    )
+
+    resolution = resolve_backend_instance("router-family", sources=(primary,))
+
+    assert resolution.instance_id == "openrouter-primary"
+    assert resolution.source is primary
+    assert resolution.matched_by == "kind"
+
+
+def test_resolve_backend_instance_rejects_ambiguous_unmatched_kind_shorthand() -> None:
+    """A bare kind/name that is not an exact id or alias must fail when duplicated."""
+
+    openrouter = get_model_source("openrouter")
+    primary = replace(
+        openrouter,
+        id="openrouter-primary",
+        template_names=(),
+        backend_kind="openrouter",
+    )
+    work = replace(openrouter, id="openrouter-work", template_names=(), backend_kind="openrouter")
+
+    with pytest.raises(
+        BackendInstanceAmbiguousError,
+        match="Ambiguous backend instance shorthand 'openrouter'",
+    ):
+        resolve_backend_instance_id("openrouter", sources=(primary, work))
+
+
+def test_resolve_backend_instance_duplicate_ids_are_catalog_corruption() -> None:
+    """Duplicate exact ids should not look like a user ambiguity."""
+
+    openrouter = get_model_source("openrouter")
+    first = replace(openrouter, template_names=())
+    duplicate = replace(openrouter, template_names=(), backend_kind="router-family")
+
+    with pytest.raises(
+        ModelSourceCatalogError,
+        match="duplicate backend instance id 'openrouter'",
+    ):
+        resolve_backend_instance_id("openrouter", sources=(first, duplicate))
+
+
+def test_managed_local_process_id_is_not_a_backend_instance_id() -> None:
+    """Adapter-port local process ids stay out of logical backend instance resolution."""
+
+    with pytest.raises(
+        BackendInstanceNotFoundError,
+        match="Unknown backend instance, alias, or kind: litellm-4000",
+    ):
+        resolve_backend_instance_id("litellm-4000")
 
 
 def test_model_source_lookup_misses_raise_domain_error_without_keyerror_quotes() -> None:

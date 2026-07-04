@@ -216,16 +216,17 @@ code:
 | Supervisor     | "Does this match the plan?" | Plan alignment |
 | Review / panel | "Is this code good?"        | Code quality   |
 
-These can have opposite answers — code can be plan-aligned but suboptimal, or plan-divergent but better. Having both
-signals lets you make an informed call. A typical pattern:
+These can have opposite answers — code can be plan-aligned but suboptimal, or plan-divergent but better. Use the
+supervisor as the plan-alignment gate and review output as evidence for an explicit plan change or approved deviation. A
+typical pattern:
 
 1. Executor implements with supervision enabled (drift is blocked)
 2. `forge workflow panel` or `forge workflow consensus` reviews the implemented code
 3. Reviewers recommend improvements that weren't in the plan
 4. You suspend the supervisor (`%policy supervisor off`), apply the improvement, then reload an updated plan if needed
 
-The review provides the evidence ("frozen dataclasses would be better here"), the supervisor ensures the deviation is
-your decision rather than the executor freelancing.
+The review provides the evidence ("frozen dataclasses would be better here"); the supervisor keeps the deviation as your
+decision instead of an unapproved executor change.
 
 ---
 

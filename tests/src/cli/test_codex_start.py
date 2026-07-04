@@ -67,6 +67,12 @@ def _invoke_start(
 
 
 class TestHappyPath:
+    def test_start_help_describes_sandbox_as_tui_mode(self) -> None:
+        result = CliRunner().invoke(main, ["codex", "start", "--help"])
+
+        assert result.exit_code == 0
+        assert "Codex sandbox mode for the launched TUI" in result.output
+
     def test_wires_args_and_exits_zero(self) -> None:
         result, ensure, capable, invoke = _invoke_start(["--proxy", "codex-responses-local"])
         assert result.exit_code == 0

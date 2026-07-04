@@ -25,17 +25,17 @@ Claude Code doesn't send session IDs downstream. The proxy identifies requests b
 
 If you want different model mappings or thinking defaults: use a different proxy.
 
-### Full model capabilities
+### API model capabilities
 
 Provider CLIs sometimes limit the models they serve. For example, OpenAI's Codex CLI caps GPT-5.5 at 400K tokens as a
 serving-budget decision, even though the model supports 1,050,000 tokens via the API. Forge proxies route through the
-API directly, so you get the model's full context window and the complete set of reasoning effort levels.
+API directly, so a proxy can use API context windows and reasoning effort levels that a product CLI may not expose.
 
-This also means access to models that product CLIs don't expose at all -- like `gpt-5.5-pro` (1M context, higher
-reasoning quality) or mixing providers within a single workflow (GPT for planning, Claude for execution).
+It can also route to API models that product CLIs don't expose at all -- like `gpt-5.5-pro` (1M context) -- or to
+different providers within a single workflow (GPT for planning, Claude for execution).
 
-The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Forge's
-[spend caps](#cost-tracking-and-spend-caps) make this manageable.
+The tradeoff is cost: you pay API rates instead of bundled subscription pricing. Use Forge
+[spend caps](#cost-tracking-and-spend-caps) when you want warn/reject limits on that spend.
 
 ### System prompt addendums
 
@@ -83,29 +83,29 @@ Forge provides ready-to-use proxy configurations (internal templates):
 
 `litellm-gemini-test` also exists internally, but it is hidden from normal end-user template lists.
 
-Built-in templates declare `proxy.source`, the canonical model-source id that owns endpoint and credential requirements.
-If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.source` set to an existing source id
-such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend auto-start and remote
-upstream URLs from that source at proxy creation time.
+Built-in templates declare `proxy.backend`, the config field that names the backend owning endpoint and credential
+requirements. If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.backend` set to an
+existing backend such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend
+auto-start and remote upstream URLs from that backend at proxy creation time.
 
 OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_BASE_URL` only when you intentionally
 route OpenRouter-compatible traffic through a different endpoint; new proxies created from OpenRouter templates will
 copy that resolved upstream URL into `proxy.yaml`.
 
-Use `forge model backend list` to inspect the built-in source catalog, required credentials, and any matching local
-LiteLLM runtime instance. Use `forge model backend test-auth <source-id>` when you want Forge to resolve the source's
-credentials and probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and
-`litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id
-or by the `litellm --port <port>` adapter form. Stop live local backend processes by the runtime instance id shown in
-`forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered local
-runtime instance with `forge model backend stop --all`.
+Use `forge model backend list` to inspect built-in backends, required credentials, and any matching local LiteLLM
+managed process. Use `forge model backend test-auth <backend>` when you want Forge to resolve the backend's credentials
+and probe the upstream endpoint without printing secret values. Remote backends such as `openrouter` and
+`litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM backends can be started by backend
+name or by the `litellm --port <port>` adapter form. Stop live local backend processes by the managed process id shown
+in `forge model backend list` (for example, `forge model backend stop litellm-4000`), or flush every registered managed
+process with `forge model backend stop --all`.
 
-The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
-adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local source whose credential it is
-configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
-`forge model backend list` shows that instance under both sources and marks it `(shared)`; starting a second matching
-source reuses the running process rather than launching a new one. This is expected — there is one local LiteLLM
-process, not one per source.
+The local LiteLLM backends (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`, and
+`codex-responses-local`) all share one adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every
+local backend whose credential it is configured for. The default config serves Gemini and OpenAI models from one
+`litellm-4000` process, so `forge model backend list` shows that managed process under each matching backend and marks
+it `(shared)`; starting a second matching backend reuses the running process rather than launching a new one. This is
+expected -- there is one local LiteLLM process, not one per backend.
 
 ---
 
@@ -281,7 +281,7 @@ Use `--smoke-test` after first setup or credential changes to verify the proxy c
 Without it, health checks only confirm the local proxy process is alive.
 
 If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
-`forge model backend stop --all --yes` in automation) before restarting proxies. This clears local backend runtime
+`forge model backend stop --all --yes` in automation) before restarting proxies. This clears managed local backend
 processes and registry rows without deleting adapter config files.
 
 ### Start Claude with a proxy
@@ -386,7 +386,7 @@ template: openrouter-openai
 template_digest: abc123...
 
 provider: openrouter
-source: openrouter
+backend: openrouter
 proxy_endpoint: http://localhost:8096
 port: 8096
 upstream_base_url: https://openrouter.ai/api/v1
@@ -418,8 +418,8 @@ costs:
 ```
 
 **What you'll typically edit:** `default_tier`, `tier_overrides`, and sometimes `provider_settings`. Leave
-`proxy_format`, `template`, `provider`, `source`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
-unless you know what you're doing — those are set from the template/source catalog at creation.
+`proxy_format`, `template`, `provider`, `backend`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
+unless you know what you're doing — those are set from the template/backend catalog at creation.
 
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.
@@ -455,8 +455,8 @@ forge proxy edit shared-proxy
 
 1. Create a **planning proxy** (`openrouter-openai`) and start Session A with that template.
 2. Approve plan; stop.
-3. Fork to Session B and relaunch Claude against an **execution proxy** (`forge claude start --proxy <proxy_id>`).
-4. Fork to Session C and relaunch Claude against a **review proxy** the same way.
+3. Fork to Session B with an **execution proxy** (`forge session fork <parent> --name <session_b> --proxy <proxy_id>`).
+4. Fork to Session C with a **review proxy** (`forge session fork <parent> --name <session_c> --proxy <proxy_id>`).
 5. Use A and C for independent reviews; have B synthesize and fix.
 
 Proxies make this deterministic: each session's requests hit a specific base URL, so routing defaults are stable.
@@ -501,6 +501,10 @@ Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry
 `~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads, writes, or cleans them -- delete
 them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
 run ids instead of writing verb snapshot files.
+
+If you upgrade across a backend-identity telemetry break, older downstream records are skipped rather than reattributed
+under the new backend-instance contract. `forge telemetry costs show --json` reports `skipped_legacy_schema`, and the
+human cost/activity views print a note when records in the selected window were fenced.
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb
@@ -665,7 +669,7 @@ logging:
 Like audit, this **never** writes plaintext: there is no `full` mode — `body_capture=full` is rejected with a pointer to
 the audit policy, and `redacted` reuses the same redaction as audit (roles, block types, lengths — no prompt/completion/
 tool text). `enabled: on` is the way to capture diagnostics without turning on full `log_level=debug` spam. Retention is
-enforced at proxy startup. `forge logs` notes the current capture mode; `forge proxy show <id> --raw` shows the
+enforced at proxy startup. `forge logs show` notes the current capture mode; `forge proxy show <id> --raw` shows the
 configured block.
 
 ---
@@ -677,10 +681,10 @@ from an incident -- a supervised fork's checks timed out before the final stream
 locally or in OpenRouter's dashboard.
 
 Records live inside owner-only downstream telemetry under `~/.forge/telemetry/downstream/` and carry **no** prompt,
-completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider
-generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose backend source
-declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through non-capable sources
-writes nothing.
+completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, backend instance,
+model, provider generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose
+backend instance declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through
+non-capable backend instances writes nothing.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)
@@ -735,7 +739,7 @@ toggle. Observability only (not routing -- recognition is stickiness-neutral); n
 
 ### Remote reconciliation
 
-`forge model backend reconcile <source-id>` answers the *other* half of "what happened to this request?": it joins your
+`forge model backend reconcile <backend>` answers the *other* half of "what happened to this request?": it joins your
 local provider-trace evidence to the **backend's own account-side record**. The mechanism is generic over any backend
 with a remote adapter; **OpenRouter is the first adapter**.
 

@@ -122,7 +122,7 @@ class TestLoadConfig:
 
         assert config.proxy.active_template == "litellm-gemini-local"
         assert config.proxy.preferred_provider == "litellm"
-        assert config.proxy.source == "litellm-gemini-local"
+        assert config.proxy.backend == "litellm-gemini-local"
         assert config.proxy.default_port == 8086
         assert config.proxy.litellm.base_url == ""
         assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.1-pro-preview"
@@ -191,7 +191,7 @@ class TestLoadConfig:
 
         assert config.proxy.active_template == "openrouter-anthropic"
         assert config.proxy.preferred_provider == "openrouter"
-        assert config.proxy.source == "openrouter"
+        assert config.proxy.backend == "openrouter"
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5"
@@ -214,7 +214,7 @@ class TestLoadConfig:
 
         config = load_config(template="openrouter-anthropic")
 
-        assert config.proxy.source == "openrouter"
+        assert config.proxy.backend == "openrouter"
         assert config.proxy.openrouter.base_url == "https://openrouter.internal.example.com/api/v1"
 
     def test_remote_litellm_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
@@ -223,7 +223,7 @@ class TestLoadConfig:
 
         config = load_config(template="litellm-gemini")
 
-        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.env.example.com"
 
     def test_remote_litellm_source_endpoint_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch):
@@ -235,7 +235,7 @@ class TestLoadConfig:
         ):
             config = load_config(template="litellm-gemini")
 
-        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.file.example.com"
 
     def test_remote_litellm_source_endpoint_respects_auth_ignore_env(self, monkeypatch: pytest.MonkeyPatch):
@@ -248,7 +248,7 @@ class TestLoadConfig:
         ):
             config = load_config(template="litellm-gemini")
 
-        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == "https://litellm.file.example.com"
 
     def test_remote_litellm_source_endpoint_missing_is_empty(self, monkeypatch: pytest.MonkeyPatch):
@@ -257,7 +257,7 @@ class TestLoadConfig:
         with patch("forge.core.auth.template_secrets._get_file_secrets", return_value={}):
             config = load_config(template="litellm-gemini")
 
-        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == ""
 
     def test_litellm_anthropic_templates_default_opus_to_4_8(self):
@@ -282,7 +282,7 @@ class TestLoadConfig:
         """Passthrough forwards the client model unchanged; opus tier default is Opus 4.8 (no alternatives map)."""
         config = load_config(template="anthropic-passthrough")
 
-        assert config.proxy.source == "anthropic-passthrough"
+        assert config.proxy.backend == "anthropic-passthrough"
         assert config.proxy.litellm.base_url == "https://api.anthropic.com"
         assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5"
         assert config.proxy.litellm.tiers.opus == "claude-opus-4-8"
@@ -378,7 +378,7 @@ class TestTemplateFamilyMetadata:
             template="openrouter-gemini",
             template_digest="sha256:test",
             provider="openrouter",
-            source="openrouter",
+            backend="openrouter",
             proxy_endpoint="http://localhost:8097",
             port=8097,
             upstream_base_url="https://openrouter.ai/api/v1",
@@ -390,7 +390,7 @@ class TestTemplateFamilyMetadata:
 
         forge_config = _proxy_instance_to_forge_config(config)
         assert forge_config.proxy.family == "gemini"
-        assert forge_config.proxy.source == "openrouter"
+        assert forge_config.proxy.backend == "openrouter"
 
     @pytest.fixture()
     def user_templates_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -431,7 +431,7 @@ class TestTemplateFamilyMetadata:
         bad.write_text(
             "proxy:\n"
             "  family: openai\n"
-            "  source: openrouter\n"
+            "  backend: openrouter\n"
             "  default_port: 9911\n"
             "  openrouter:\n"
             "    tier_overrides: []\n"
@@ -439,39 +439,46 @@ class TestTemplateFamilyMetadata:
         with pytest.raises(ValueError, match="must be a mapping"):
             load_config(template="bad-overrides")
 
-    def test_template_source_validation_rejects_non_string(self, user_templates_dir):
-        """proxy.source must be a string before strict schema loading."""
-        bad = user_templates_dir / "bad-source-shape.yaml"
+    def test_template_backend_validation_rejects_non_string(self, user_templates_dir):
+        """proxy.backend must be a string before strict schema loading."""
+        bad = user_templates_dir / "bad-backend-shape.yaml"
         bad.write_text(
             "proxy:\n"
             "  family: gemini\n"
             "  preferred_provider: litellm\n"
-            "  source:\n"
+            "  backend:\n"
             "    id: litellm-gemini-local\n"
             "  default_port: 9999\n"
         )
-        with pytest.raises(ValueError, match="proxy.source"):
-            load_config(template="bad-source-shape")
+        with pytest.raises(ValueError, match="proxy.backend"):
+            load_config(template="bad-backend-shape")
 
-    def test_template_source_validation_rejects_unknown_source(self, user_templates_dir):
-        """proxy.source must resolve to a catalog source id or alias."""
-        bad = user_templates_dir / "bad-source-unknown.yaml"
+    def test_template_backend_validation_rejects_unknown_backend(self, user_templates_dir):
+        """proxy.backend must resolve to a backend instance id, alias, or unique kind."""
+        bad = user_templates_dir / "bad-backend-unknown.yaml"
         bad.write_text(
             "proxy:\n"
             "  family: gemini\n"
             "  preferred_provider: litellm\n"
-            "  source: missing-source\n"
+            "  backend: missing-backend\n"
             "  default_port: 9999\n"
         )
-        with pytest.raises(ValueError, match="unknown proxy.source"):
-            load_config(template="bad-source-unknown")
+        with pytest.raises(ValueError, match="unknown proxy.backend"):
+            load_config(template="bad-backend-unknown")
 
-    def test_custom_template_without_source_is_rejected(self, user_templates_dir):
-        """Custom templates need proxy.source when their name is not a built-in source alias."""
-        bad = user_templates_dir / "custom-no-source.yaml"
+    def test_template_source_clean_break_rejects_old_field(self, user_templates_dir):
+        """proxy.source fails loudly instead of silently aliasing the old template field."""
+        bad = user_templates_dir / "old-source.yaml"
+        bad.write_text("proxy:\n  family: gemini\n  preferred_provider: litellm\n  source: openrouter\n")
+        with pytest.raises(ValueError, match="proxy.source is no longer supported"):
+            load_config(template="old-source")
+
+    def test_custom_template_without_backend_is_rejected(self, user_templates_dir):
+        """Custom templates need proxy.backend."""
+        bad = user_templates_dir / "custom-no-backend.yaml"
         bad.write_text("proxy:\n  family: gemini\n  preferred_provider: litellm\n  default_port: 9999\n")
-        with pytest.raises(ValueError, match="must declare proxy.source"):
-            load_config(template="custom-no-source")
+        with pytest.raises(ValueError, match="must declare non-blank 'proxy.backend'"):
+            load_config(template="custom-no-backend")
 
     def test_remote_source_rejects_inline_backend_dependency(self, user_templates_dir):
         """Remote sources cannot smuggle local lifecycle back into templates."""
@@ -480,7 +487,7 @@ class TestTemplateFamilyMetadata:
             "proxy:\n"
             "  family: openai\n"
             "  preferred_provider: openrouter\n"
-            "  source: openrouter\n"
+            "  backend: openrouter\n"
             "  default_port: 9999\n"
             "  backend_dependency:\n"
             "    adapter: litellm\n"
@@ -501,7 +508,7 @@ class TestTemplateFamilyMetadata:
             "proxy:\n"
             "  family: openai\n"
             "  preferred_provider: litellm\n"
-            "  source: chatgpt\n"
+            "  backend: chatgpt\n"
             "  default_port: 9999\n"
         )
         with pytest.raises(ValueError, match="runtime-native source 'chatgpt'"):
@@ -512,7 +519,8 @@ class TestTemplateFamilyMetadata:
         for template in self._shipped_template_names():
             data = yaml.safe_load(read_shipped_template(template))
             proxy = data["proxy"]
-            assert "source" in proxy, template
+            assert "backend" in proxy, template
+            assert "source" not in proxy, template
             assert "backend_dependency" not in proxy, template
             if proxy["preferred_provider"] == "openrouter":
                 assert "base_url" not in proxy["openrouter"], template
@@ -573,6 +581,31 @@ class TestProxyFileIO:
         assert loaded.port == 8085
         assert loaded.tiers.haiku == "gemini/gemini-3-flash-preview"
         assert loaded.default_tier == "opus"
+
+    def test_proxy_instance_config_writes_backend_not_source(self, tmp_path, monkeypatch):
+        """proxy.yaml uses the canonical backend key."""
+        from forge.config.loader import write_proxy_instance_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="openrouter-openai",
+            template_digest="sha256:test",
+            provider="openrouter",
+            proxy_endpoint="http://localhost:8096",
+            port=8096,
+            upstream_base_url="https://openrouter.ai/api/v1",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            backend="openrouter",
+        )
+
+        path = write_proxy_instance_config("backend-key", config)
+        data = yaml.safe_load(path.read_text())
+
+        assert data["backend"] == "openrouter"
+        assert "source" not in data
 
     def test_proxy_instance_config_round_trips_costs(self, tmp_path, monkeypatch):
         """Cost cap config survives write/load of proxy.yaml."""
@@ -739,6 +772,41 @@ class TestProxyFileIO:
         }
         with pytest.raises(ValueError, match="Unsupported proxy provider"):
             load_proxy_instance_config_from_dict(data)
+
+    def test_from_dict_rejects_old_source_field(self):
+        """Old runtime proxy.source clean-breaks with a recreate tip."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+            "source": "litellm-remote",
+        }
+
+        with pytest.raises(ValueError, match="proxy.source is no longer supported"):
+            load_proxy_instance_config_from_dict(data)
+
+    def test_from_dict_accepts_unknown_backend_for_runtime_boundary(self):
+        """Unknown proxy.backend is accepted here; the running proxy warns/degrades."""
+        from forge.config.loader import load_proxy_instance_config_from_dict
+
+        data = {
+            "template": "litellm-gemini",
+            "provider": "litellm",
+            "proxy_endpoint": "http://localhost:8084",
+            "port": 8084,
+            "upstream_base_url": "https://litellm.test.example.com",
+            "tiers": {"haiku": "h", "sonnet": "s", "opus": "o"},
+            "backend": "no-such-backend",
+        }
+
+        config = load_proxy_instance_config_from_dict(data)
+
+        assert config.backend == "no-such-backend"
 
     def test_write_proxy_instance_config_atomic_and_permissions(self, tmp_path, monkeypatch):
         """write_proxy_instance_config uses atomic write and sets 0600 permissions."""

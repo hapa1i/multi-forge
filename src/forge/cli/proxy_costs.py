@@ -132,26 +132,39 @@ def show_cmd(
     Pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
     metered provider usage within a monthly budget.
     """
-    from forge.proxy.cost_logger import read_cost_logs
+    from forge.proxy.cost_logger import read_cost_logs_with_stats
 
     start, end = _local_period_bounds(period)
     if period == "all":
-        request_records = read_cost_logs()
+        cost_read = read_cost_logs_with_stats()
     else:
-        request_records = read_cost_logs(period_start=start, period_end=end)
+        cost_read = read_cost_logs_with_stats(period_start=start, period_end=end)
+    request_records = cost_read.records
 
     if proxy_id:
         request_records = [r for r in request_records if r.get("proxy_id") == proxy_id]
     verb_records = _verb_records_from_request_records(request_records, period_start=None if period == "all" else start)
 
     if as_json:
-        _output_json(request_records, verb_records, period, proxy_id)
+        _output_json(
+            request_records,
+            verb_records,
+            period,
+            proxy_id,
+            cost_read.skipped_legacy_schema,
+        )
         return
 
     if by_model:
-        _display_by_model(request_records, period, proxy_id)
+        _display_by_model(request_records, period, proxy_id, cost_read.skipped_legacy_schema)
     else:
-        _display_by_verb(request_records, verb_records, period, proxy_id)
+        _display_by_verb(
+            request_records,
+            verb_records,
+            period,
+            proxy_id,
+            cost_read.skipped_legacy_schema,
+        )
 
 
 def _verb_records_from_request_records(
@@ -214,7 +227,12 @@ def _aggregate_by_verb(verb_records: list[dict]) -> dict[str, dict]:
     for v in verb_records:
         verb = v.get("verb", "unknown")
         if verb not in verb_costs:
-            verb_costs[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
+            verb_costs[verb] = {
+                "cost_micros": 0,
+                "reported": False,
+                "request_count": 0,
+                "invocations": 0,
+            }
         if _verb_cost_reported(v):
             verb_costs[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
             verb_costs[verb]["reported"] = True
@@ -256,6 +274,7 @@ def _display_by_verb(
     verb_records: list[dict],
     period: str,
     proxy_id: str | None,
+    skipped_legacy_schema: int = 0,
 ) -> None:
     total_cost, unavailable_requests = _request_cost_totals(request_records)
     total_requests = len(request_records)
@@ -267,6 +286,7 @@ def _display_by_verb(
     if total_cost == 0 and unavailable_requests == 0 and not verb_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
         console.print(f"[dim]No cost data for {period}{scope}.[/dim]")
+        _print_legacy_schema_notice(skipped_legacy_schema)
         return
 
     scope = f" ({proxy_id})" if proxy_id else ""
@@ -298,6 +318,7 @@ def _display_by_verb(
         table.add_row(verb, cost_cell, detail, "~" if info["reported"] else "")
 
     console.print(table)
+    _print_legacy_schema_notice(skipped_legacy_schema)
     console.print()
 
 
@@ -305,12 +326,14 @@ def _display_by_model(
     request_records: list[dict],
     period: str,
     proxy_id: str | None,
+    skipped_legacy_schema: int = 0,
 ) -> None:
     model_costs = _aggregate_by_model(request_records)
 
     if not model_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
         console.print(f"[dim]No cost data for {period}{scope}.[/dim]")
+        _print_legacy_schema_notice(skipped_legacy_schema)
         return
 
     scope = f" ({proxy_id})" if proxy_id else ""
@@ -328,6 +351,7 @@ def _display_by_model(
         table.add_row(model, cost_cell, tokens)
 
     console.print(table)
+    _print_legacy_schema_notice(skipped_legacy_schema)
     console.print()
 
 
@@ -336,6 +360,7 @@ def _output_json(
     verb_records: list[dict],
     period: str,
     proxy_id: str | None,
+    skipped_legacy_schema: int = 0,
 ) -> None:
     total_cost, unavailable_requests = _request_cost_totals(request_records)
 
@@ -354,11 +379,19 @@ def _output_json(
         "total_requests": len(request_records),
         "reported_requests": len(request_records) - unavailable_requests,
         "unavailable_requests": unavailable_requests,
+        "skipped_legacy_schema": skipped_legacy_schema,
         "interactive_cost_micros": max(0, total_cost - verb_total),
         "by_verb": verb_summary,
         "by_model": model_summary,
     }
     click.echo(json.dumps(output, indent=2))
+
+
+def _print_legacy_schema_notice(skipped: int) -> None:
+    if not skipped:
+        return
+    plural = "" if skipped == 1 else "s"
+    console.print(f"[dim]Skipped {skipped} downstream telemetry record{plural} from an older Forge schema.[/dim]")
 
 
 # Reset wipes the on-disk planes Forge records spend/usage/outcome telemetry into, plus the derived

@@ -14,7 +14,7 @@
 proxy:
   family: anthropic
   preferred_provider: litellm
-  source: anthropic-passthrough
+  backend: anthropic-passthrough
   default_port: 8096
   wire_shape: anthropic_passthrough
 

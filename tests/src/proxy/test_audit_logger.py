@@ -21,8 +21,12 @@ def _isolated_audit_home(tmp_path, monkeypatch):
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
     audit_logger._warned_newer_schema = False
+    downstream_telemetry._warned_newer_schema = False
+    downstream_telemetry._warned_older_schema = False
     yield
     audit_logger._drift_state.clear()
+    downstream_telemetry._warned_newer_schema = False
+    downstream_telemetry._warned_older_schema = False
 
 
 def _meta(request_id="r", proxy_id="p", **kw):
@@ -215,7 +219,7 @@ class TestWriteRead:
             f.write(
                 json.dumps(
                     {
-                        "schema_version": 1,
+                        "schema_version": downstream_telemetry.DOWNSTREAM_SCHEMA_VERSION,
                         "kind": "audit",
                         "downstream_event_id": "ds_ok",
                         "proxy_id": "ok",

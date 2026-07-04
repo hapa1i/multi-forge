@@ -29,12 +29,12 @@ class TestBackendCLI:
     """Integration tests for forge model backend commands."""
 
     def test_backend_list_empty(self, isolated_forge_home: Path) -> None:
-        """Verify backend list shows built-in sources when no local runtime is running."""
+        """Verify backend list shows built-in backends when no local backend is running."""
         runner = CliRunner()
         result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
-        assert "Forge Backend Sources" in result.output
+        assert "Forge Model Backends" in result.output
         assert "openrouter" in result.output
         assert "litellm-remote" in result.output
         assert "No backends found" not in result.output
@@ -109,15 +109,15 @@ class TestBackendRegistry:
     ) -> None:
         """Verify registry state persists across CLI invocations."""
         from forge.backend.registry import (
-            BackendInstance,
             BackendRegistry,
             BackendRegistryStore,
+            ManagedBackendProcess,
         )
 
         # Manually add a backend to registry (simulating a running backend)
         store = BackendRegistryStore()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             pid=None,  # No PID - won't be pruned
@@ -126,7 +126,7 @@ class TestBackendRegistry:
         )
 
         def add_backend(reg: BackendRegistry) -> None:
-            reg.backends["litellm-4000"] = instance
+            reg.processes["litellm-4000"] = instance
 
         store.update(timeout_s=5.0, mutate=add_backend)
 
@@ -135,32 +135,33 @@ class TestBackendRegistry:
         result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
-        assert "Unmatched Runtime Instances" in result.output
+        assert "Unmatched Managed Processes" in result.output
         assert "litellm-4000" in result.output
         assert "4000" in result.output
 
     def test_registry_file_format(self, isolated_forge_home: Path) -> None:
         """Verify registry file has correct JSON structure."""
         from forge.backend.registry import (
-            BackendInstance,
             BackendRegistry,
             BackendRegistryStore,
+            ManagedBackendProcess,
         )
 
         store = BackendRegistryStore()
-        instance = BackendInstance(
-            backend_id="litellm-4000",
+        instance = ManagedBackendProcess(
+            process_id="litellm-4000",
             adapter_type="litellm",
             port=4000,
             status="healthy",
         )
-        registry = BackendRegistry(backends={"litellm-4000": instance})
+        registry = BackendRegistry(processes={"litellm-4000": instance})
         store.write(registry)
 
         # Read raw JSON
         registry_path = isolated_forge_home / "backends" / "index.json"
         data = json.loads(registry_path.read_text())
 
-        assert data["version"] == 1
-        assert "litellm-4000" in data["backends"]
-        assert data["backends"]["litellm-4000"]["port"] == 4000
+        assert data["version"] == 2
+        assert "litellm-4000" in data["processes"]
+        assert data["processes"]["litellm-4000"]["process_id"] == "litellm-4000"
+        assert data["processes"]["litellm-4000"]["port"] == 4000
