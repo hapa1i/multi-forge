@@ -78,9 +78,10 @@ of the dropped window `(T-N)..T`.
   rewrite needed** (live-pinned, Claude Code 2.1.197, `parent_has_signature=yes`). This is the load-bearing empirical
   fact with **zero in-tree precedent** (`relocate_transcript` always produced `<uuid>.jsonl` where stem == embedded
   sessionId). It lets rewind write the truncated head under a fresh UUID while leaving the parent's embedded `sessionId`
-  and signed `thinking`/`tool_result` blocks byte-intact. Re-pin with a live probe if a future codex-cli/claude version
-  changes resume lookup. **Still unproven at integration tier**: the *truncated clean-prefix* resume (vs the whole-copy
-  stem probe) needs a `@pytest.mark.slow` real-`claude` test -- unit tests cannot cover it (`design.md:765`).
+  and signed `thinking`/`tool_result` blocks byte-intact. Re-pin with the slow real-Claude gate if a future
+  codex-cli/claude version changes resume lookup. The in-tree gate is
+  `tests/integration/docker/test_rewind_native_contract.py`: it covers the full truncated clean-prefix `<R>.jsonl`
+  rewind shape, not just the original whole-copy stem probe.
 - **Fresh rewind-owned UUID `<R>` makes cleanup unshared by construction -- no reference counting.** The truncated head
   is written as `<R>.jsonl` and tracked by a **distinct** `Derivation.rewind_relocated_session_id` (not
   `relocated_parent_session_id`, which byte-for-byte native-relocate uses for the *parent* UUID). Because `<R>` is

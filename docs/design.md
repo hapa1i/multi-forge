@@ -761,8 +761,9 @@ The null-strategy native rows are a writer convention, not a schema guard: stric
 `native-relocate` with non-null `strategy` and `context_file`. The shipped `rewind` strategy uses that extension point:
 it writes a fresh truncated Claude JSONL under a rewind-owned UUID and launches `--resume <R> --fork-session` together
 with a generated code-delta prompt file. A live Slice-1 probe on Claude Code 2.1.197 confirmed the filename stem may be
-`R` while embedded JSONL `sessionId` remains the parent UUID; no envelope rewrite is required. That probe isolated stem
-tolerance; clean-prefix truncated resume remains an integration assertion for the rewind implementation. If code-delta
+`R` while embedded JSONL `sessionId` remains the parent UUID; no envelope rewrite is required. The slow real-Claude gate
+`tests/integration/docker/test_rewind_native_contract.py` extends that probe to the full rewind shape: a fresh `<R>`
+stem holding a truncated clean-prefix JSONL resumes across CWD and stays unmutated under `--fork-session`. If code-delta
 curation fails or returns unusable output, Forge removes the temporary `<R>.jsonl`, falls back to plain native resume /
 native-relocate, and tells the user that the code delta is unavailable. When rewind does send dropped-window content to
 the curation model, Forge emits the same style of privacy warning as `ai-curated`.
