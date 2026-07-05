@@ -471,6 +471,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
                 {
                     "name": item.name,
                     "proxy_template": item.proxy_template,
+                    "model": item.model,
+                    "models": list(item.models),
                     "last_accessed_at": item.entry.last_accessed_at,
                     "is_active": item.is_active,
                     "worktree_path": item.entry.worktree_path,
@@ -500,6 +502,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
     if duplicate_names:
         table.add_column("LOCATION")
     table.add_column("TEMPLATE")
+    table.add_column("MODEL")
     table.add_column("LAST USED")
 
     for item in items:
@@ -509,7 +512,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
         row = [item.name]
         if duplicate_names:
             row.append(_session_list_location(entry))
-        row.extend([proxy_template, last_used])
+        row.extend([proxy_template, item.model or "-", last_used])
         table.add_row(*row)
 
     console.print(table)

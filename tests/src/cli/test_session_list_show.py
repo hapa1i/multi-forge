@@ -113,6 +113,84 @@ class TestSessionList:
         assert result.exit_code == 0
         assert "test-session" in result.output
 
+    def test_list_shows_direct_model_pin(self, runner: CliRunner, temp_env: Path) -> None:
+        """Should show persisted --model pins in human and JSON output."""
+        import json
+
+        state = create_session_state("model-pinned", worktree_path=str(temp_env), direct_model="claude-opus-4-8")
+        SessionStore(str(temp_env), "model-pinned").write(state)
+        IndexStore().add_session(
+            name="model-pinned",
+            worktree_path=str(temp_env),
+            project_root=str(temp_env),
+            forge_root=str(temp_env),
+            checkout_root=str(temp_env),
+            relative_path=".",
+        )
+
+        result = runner.invoke(main, ["session", "list"])
+
+        assert result.exit_code == 0
+        assert "MODEL" in result.output
+        assert "direct" in result.output
+        assert "claude-opus-4-8" in result.output
+
+        json_result = runner.invoke(main, ["session", "list", "--json"])
+
+        assert json_result.exit_code == 0
+        entry = next(row for row in json.loads(json_result.output) if row["name"] == "model-pinned")
+        assert entry["proxy_template"] == "direct"
+        assert entry["model"] == "claude-opus-4-8"
+        assert entry["models"] == ["claude-opus-4-8"]
+
+    def test_list_shows_direct_model_history_from_artifacts(self, runner: CliRunner, temp_env: Path) -> None:
+        """Should show observed direct model transitions when transcript artifacts are available."""
+        import json
+
+        first_rel = Path(".forge") / "artifacts" / "model-history" / "transcripts" / "first.jsonl"
+        second_rel = Path(".forge") / "artifacts" / "model-history" / "transcripts" / "second.jsonl"
+        first_path = temp_env / first_rel
+        second_path = temp_env / second_rel
+        first_path.parent.mkdir(parents=True)
+        first_path.write_text(json.dumps({"message": {"model": "claude-fable-5"}}) + "\n")
+        second_path.write_text(
+            "\n".join(
+                [
+                    json.dumps({"message": {"model": "claude-fable-5"}}),
+                    json.dumps({"message": {"model": "claude-sonnet-5"}}),
+                    json.dumps({"message": {"model": "claude-opus-4-8"}}),
+                ]
+            )
+            + "\n"
+        )
+
+        state = create_session_state("model-history", worktree_path=str(temp_env), direct_model="claude-opus-4-8")
+        state.confirmed.artifacts["transcripts"] = [
+            {"copied_path": str(first_rel)},
+            {"copied_path": str(second_rel)},
+        ]
+        SessionStore(str(temp_env), "model-history").write(state)
+        IndexStore().add_session(
+            name="model-history",
+            worktree_path=str(temp_env),
+            project_root=str(temp_env),
+            forge_root=str(temp_env),
+            checkout_root=str(temp_env),
+            relative_path=".",
+        )
+
+        result = runner.invoke(main, ["session", "list"])
+
+        assert result.exit_code == 0
+        assert "claude-fable-5 -> claude-sonnet-5 -> claude-opus-4-8" in result.output
+
+        json_result = runner.invoke(main, ["session", "list", "--json"])
+
+        assert json_result.exit_code == 0
+        entry = next(row for row in json.loads(json_result.output) if row["name"] == "model-history")
+        assert entry["model"] == "claude-fable-5 -> claude-sonnet-5 -> claude-opus-4-8"
+        assert entry["models"] == ["claude-fable-5", "claude-sonnet-5", "claude-opus-4-8"]
+
     def test_list_json_reports_active_liveness(self, runner: CliRunner, temp_env: Path) -> None:
         """`session list --json` emits is_active=True for a session the active registry lists as live."""
         import json
