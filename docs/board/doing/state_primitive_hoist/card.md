@@ -1,9 +1,22 @@
 # state_primitive_hoist -- hoist durable-state + JSONL-plane primitives to core leaves
 
-**Lane**: `proposed/` -- accepted-candidate refactor batch, not yet scheduled. Primitive extraction; mostly
-behavior-preserving, with **two defect-fix slices** (Slice 3 adds fsync durability the copies lack; Slice 5 converges
-the `OSError -> Corrupted` misclassification). Independently shippable slices. Highest-priority audit output (drift
-already shipped on state/money paths).
+**Lane**: `doing/` -- accepted 2026-07-05, branch `refactor/state-primitive-hoist`; executing as one batch card with a
+phased checklist (each slice ships as its own commit/PR). Primitive extraction; mostly behavior-preserving, with **two
+defect-fix slices** (Slice 3 adds fsync durability the copies lack; Slice 5 converges the `OSError -> Corrupted`
+misclassification). Independently shippable slices. Highest-priority audit output (drift already shipped on state/money
+paths).
+
+> **Execution note (2026-07-05):** the card's "When accepted" section suggested per-slice member cards or an
+> `epic_state_primitives` coordinator. We are instead running the batch as a **single `doing/` card with a phased
+> checklist** (see `checklist.md`) per the operator's request; each slice still lands as an independent commit/PR, so
+> the "not one atomic batch" intent is preserved. During checklist verification two card anchors were corrected:
+> `backend/adapters/litellm.py:24` already imports the canonical `now_iso` (it is **not** a duplicate def, so Slice 1's
+> repoint set is `install/models.py` + the four private `_now_iso` only); and `prune_jsonl_shards` has three import
+> sites, not four. The Slice 5 `OSError -> Corrupted` divergence was re-verified as real across all three search stores.
+
+> **Superseded (2026-07-05):** historical. Accepted as a **single `doing/` card with a phased checklist** (see the
+> Execution note under **Lane** and `checklist.md`); each slice still ships independently. Do **not** treat the
+> per-member-card / epic suggestion below as a live instruction.
 
 **When accepted**: a batch of independent primitive hoists, not one seam. Per `docs/developer/board_contract.md`,
 promote as **separate member cards per slice** (or an `epic_state_primitives` coordinator if the leaf-module moves need
