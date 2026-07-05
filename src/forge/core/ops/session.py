@@ -30,11 +30,11 @@ from forge.session import (
     set_override,
 )
 from forge.session.active import ActiveSessionStore
+from forge.session.artifacts import resolve_artifact_path
 from forge.session.exceptions import (
     InvalidOverrideKeyError,
     InvalidOverrideValueError,
 )
-from forge.session.artifacts import resolve_artifact_path
 from forge.session.overrides import parse_value, validate_key
 
 from .context import ExecutionContext
