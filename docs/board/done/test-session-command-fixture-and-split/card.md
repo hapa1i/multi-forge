@@ -1,6 +1,7 @@
 # Test session command fixture and split
 
-**Status**: Doing. Spun out of the repo-level `refactor-audit` quick scan on 2026-07-05.
+**Status**: Done (`done/`). Spun out of the repo-level `refactor-audit` quick scan on 2026-07-05; shipped via PR #77
+(`08e4a787`) and moved `doing/ -> done/` at closeout.
 
 **Type**: Behavior-preserving test refactor. This is a single card, not an epic.
 

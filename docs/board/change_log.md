@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-05
 
+### test-session-command-fixture-and-split closeout: Session CLI test split
+
+**Goal**: Close the session CLI test refactor after PR #77 split the 4,933-line catch-all file without changing command
+behavior.
+
+**Key changes**:
+
+- Moved `test-session-command-fixture-and-split` from `doing/` to `done/` and marked the card/checklist closeout items
+  complete.
+- Confirmed PR #77 (`08e4a787`) deleted `tests/src/cli/test_session_commands.py`, added command-family files for
+  list/show, start/delete, fork, resume, and overrides, and introduced the narrow `successful_claude_launch` helper in
+  `tests/src/cli/session_command_support.py`.
+- No durable `impl_notes.md` promotion was needed; the shipped behavior is test organization only.
+
+**Verification**: PR #77 recorded `uv run pytest tests/src/cli/test_session_*.py -q`, `make pre-commit-md`,
+`git diff --check`, and `make pre-commit`; closeout re-verified the merged file layout on `main` and ran
+`make pre-commit-md` plus `git diff --check`.
+
 ### rewind_resume_strategy follow-up: Real-Claude clean-prefix gate
 
 **Goal**: Close the disclosed rewind gap by proving a fresh-UUID truncated prefix is resumable by real Claude Code, not

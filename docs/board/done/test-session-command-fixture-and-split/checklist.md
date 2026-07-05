@@ -2,8 +2,8 @@
 
 ## Current focus
 
-Split the large session CLI test file into command-oriented files and add a narrow shared launch stub for successful
-Claude session starts, without changing CLI behavior or weakening tests.
+**DONE** (2026-07-05). PR #77 (`08e4a787`) split the large session CLI test file into command-oriented files and added a
+narrow shared launch stub for successful Claude session starts, without changing CLI behavior or weakening tests.
 
 ## Phase 1: Fixture seam
 
@@ -48,5 +48,5 @@ Claude session starts, without changing CLI behavior or weakening tests.
 
 - [x] Record pre-merge verification results.
 - [x] Confirm current diff only includes intended board/test files.
-- [ ] Add a compact final entry to `docs/board/change_log.md` when this work is complete.
-- [ ] Move `doing/test-session-command-fixture-and-split/` to `done/` after the final merge to `main`.
+- [x] Add a compact final entry to `docs/board/change_log.md` when this work is complete.
+- [x] Move `doing/test-session-command-fixture-and-split/` to `done/` after the final merge to `main`.
