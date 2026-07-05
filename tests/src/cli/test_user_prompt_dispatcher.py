@@ -14,7 +14,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.hooks import hooks
-from forge.session import SessionStore
+from forge.session import IndexStore, SessionStore, create_session_state
 
 
 @pytest.mark.parametrize(
@@ -121,6 +121,31 @@ class TestUserPromptSubmitDispatcher:
         out = json.loads(result.output)
         assert out["decision"] == "block"
         assert "sessions" in out["reason"].lower()
+
+    def test_session_list_includes_model_pin(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.chdir(tmp_path)
+        SessionStore(str(tmp_path), "model-pinned").write(
+            create_session_state("model-pinned", worktree_path=str(tmp_path), direct_model="claude-opus-4-8")
+        )
+        IndexStore().add_session(
+            name="model-pinned",
+            worktree_path=str(tmp_path),
+            project_root=str(tmp_path),
+            forge_root=str(tmp_path),
+            checkout_root=str(tmp_path),
+            relative_path=".",
+        )
+
+        runner = CliRunner()
+        payload = {"prompt": "%session list", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "model-pinned" in out["reason"]
+        assert "claude-opus-4-8" in out["reason"]
 
     def test_help_blocks_with_help_text(self, tmp_path: Path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)

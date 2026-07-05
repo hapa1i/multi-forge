@@ -168,7 +168,8 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
     lines = ["Sessions:"]
     for item in result.sessions:
         template = item.proxy_template or "-"
-        lines.append(f"  {item.name}  ({template})")
+        model = f", model: {item.model}" if item.model else ""
+        lines.append(f"  {item.name}  ({template}{model})")
 
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 

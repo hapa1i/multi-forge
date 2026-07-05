@@ -10,9 +10,11 @@ They return structured data and raise typed exceptions on failure.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -32,6 +34,7 @@ from forge.session.exceptions import (
     InvalidOverrideKeyError,
     InvalidOverrideValueError,
 )
+from forge.session.artifacts import resolve_artifact_path
 from forge.session.overrides import parse_value, validate_key
 
 from .context import ExecutionContext
@@ -48,6 +51,8 @@ class ListSessionsItem:
     name: str
     entry: SessionIndexEntry
     proxy_template: str | None
+    model: str | None
+    models: tuple[str, ...]
     is_active: bool
 
 
@@ -123,13 +128,18 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
     items: list[ListSessionsItem] = []
     for name, entry in sessions:
         proxy_template: str | None = None
+        model: str | None = None
+        models: tuple[str, ...] = ()
 
         try:
-            manifest = manager.get_session(name, forge_root=entry.forge_root or entry.worktree_path)
+            session_forge_root = entry.forge_root or entry.worktree_path
+            manifest = manager.get_session(name, forge_root=session_forge_root)
             if manifest.intent.proxy:
                 proxy_template = manifest.intent.proxy.template
             else:
                 proxy_template = "direct"
+                models = _direct_model_history(manifest, forge_root=Path(session_forge_root))
+                model = _display_model_history(models)
         except ForgeSessionError as e:
             # Best-effort: listing should not fail if a manifest is missing/corrupt.
             _log.debug("Failed to read manifest for session %r: %s", name, e)
@@ -146,11 +156,96 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
                 name=name,
                 entry=entry,
                 proxy_template=proxy_template,
+                model=model,
+                models=models,
                 is_active=is_active,
             )
         )
 
     return ListSessionsResult(sessions=items)
+
+
+def _display_model_history(models: tuple[str, ...]) -> str | None:
+    if not models:
+        return None
+    return " -> ".join(models)
+
+
+def _direct_model_history(manifest: SessionState, *, forge_root: Path) -> tuple[str, ...]:
+    """Return observed direct-model transitions, falling back to the launch pin."""
+    observed = _direct_model_history_from_transcript_artifacts(manifest, forge_root=forge_root)
+    if observed:
+        return observed
+
+    if manifest.intent.launch and manifest.intent.launch.direct_model:
+        return (manifest.intent.launch.direct_model,)
+    return ()
+
+
+def _direct_model_history_from_transcript_artifacts(manifest: SessionState, *, forge_root: Path) -> tuple[str, ...]:
+    transcript_paths = _transcript_artifact_paths(manifest.confirmed.artifacts, forge_root=forge_root)
+    if not transcript_paths:
+        return ()
+
+    models: list[str] = []
+    for transcript_path in transcript_paths:
+        try:
+            with transcript_path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    model = _extract_transcript_model(line)
+                    if model is None:
+                        continue
+                    if not models or models[-1] != model:
+                        models.append(model)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            _log.debug("Failed to scan transcript artifact for model history: %s", transcript_path, exc_info=True)
+
+    return tuple(models)
+
+
+def _transcript_artifact_paths(artifacts: dict[str, Any], *, forge_root: Path) -> list[Path]:
+    raw_transcripts = artifacts.get("transcripts")
+    if not isinstance(raw_transcripts, list):
+        return []
+
+    paths: list[Path] = []
+    seen: set[str] = set()
+    for item in raw_transcripts:
+        if not isinstance(item, dict):
+            continue
+        stored_path = item.get("copied_path") or item.get("source_path")
+        if not isinstance(stored_path, (str, Path)):
+            continue
+        resolved = resolve_artifact_path(forge_root, stored_path)
+        if resolved is None:
+            continue
+        key = str(resolved.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        paths.append(resolved)
+    return paths
+
+
+def _extract_transcript_model(line: str) -> str | None:
+    try:
+        entry = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(entry, dict):
+        return None
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return None
+    model = message.get("model")
+    if not isinstance(model, str):
+        return None
+
+    model = model.strip()
+    if not model or model == "<synthetic>":
+        return None
+    return model
 
 
 def list_sessions_older_than(

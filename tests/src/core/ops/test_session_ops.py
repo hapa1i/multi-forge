@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -43,6 +44,87 @@ def test_list_sessions_reads_index(tmp_path: Path, monkeypatch) -> None:
     result = list_sessions(ctx=ctx, include_incognito=True)
 
     assert [s.name for s in result.sessions] == ["alpha"]
+
+
+def test_list_sessions_reports_direct_model_pin(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    wt = tmp_path / "wt"
+    state = create_session_state("alpha", worktree_path=str(wt), direct_model="claude-opus-4-8")
+    SessionStore(str(wt), "alpha").write(state)
+    IndexStore().add_session(
+        name="alpha",
+        worktree_path=str(wt),
+        project_root=str(tmp_path),
+        forge_root=str(wt),
+        checkout_root=str(wt),
+        relative_path=".",
+    )
+
+    ctx = ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path)
+    result = list_sessions(ctx=ctx, include_incognito=True)
+
+    assert len(result.sessions) == 1
+    item = result.sessions[0]
+    assert item.proxy_template == "direct"
+    assert item.model == "claude-opus-4-8"
+    assert item.models == ("claude-opus-4-8",)
+
+
+def test_list_sessions_reports_direct_model_history_from_transcripts(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    wt = tmp_path / "wt"
+    first_rel = Path(".forge") / "artifacts" / "alpha" / "transcripts" / "first.jsonl"
+    second_rel = Path(".forge") / "artifacts" / "alpha" / "transcripts" / "second.jsonl"
+    first_path = wt / first_rel
+    second_path = wt / second_rel
+    first_path.parent.mkdir(parents=True)
+    first_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"type": "assistant", "message": {"model": "claude-fable-5"}}),
+                json.dumps({"type": "assistant", "message": {"model": "claude-fable-5"}}),
+            ]
+        )
+        + "\n"
+    )
+    second_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"type": "assistant", "message": {"model": "claude-fable-5"}}),
+                json.dumps({"type": "assistant", "message": {"model": "<synthetic>"}}),
+                json.dumps({"type": "assistant", "message": {"model": "claude-sonnet-5"}}),
+                json.dumps({"type": "assistant", "message": {"model": "claude-opus-4-8"}}),
+            ]
+        )
+        + "\n"
+    )
+
+    state = create_session_state("alpha", worktree_path=str(wt), direct_model="claude-opus-4-8")
+    state.confirmed.artifacts["transcripts"] = [
+        {"copied_path": str(first_rel)},
+        {"copied_path": str(second_rel)},
+        {"copied_path": str(second_rel)},
+    ]
+    SessionStore(str(wt), "alpha").write(state)
+    IndexStore().add_session(
+        name="alpha",
+        worktree_path=str(wt),
+        project_root=str(tmp_path),
+        forge_root=str(wt),
+        checkout_root=str(wt),
+        relative_path=".",
+    )
+
+    ctx = ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path)
+    result = list_sessions(ctx=ctx, include_incognito=True)
+
+    assert len(result.sessions) == 1
+    item = result.sessions[0]
+    assert item.proxy_template == "direct"
+    assert item.models == ("claude-fable-5", "claude-sonnet-5", "claude-opus-4-8")
+    assert item.model == "claude-fable-5 -> claude-sonnet-5 -> claude-opus-4-8"
 
 
 def test_list_sessions_is_active_reflects_active_store(tmp_path: Path, monkeypatch) -> None:
