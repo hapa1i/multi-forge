@@ -7,8 +7,8 @@ coding_standards §5). Independently shippable slices.
 
 **When accepted**: this card bundles **two separable seams** (Seam A = the `core/ops` policy surface; Seam B = the proxy
 tier/model resolvers). Per `docs/developer/board_contract.md`, promote them as **two member cards** (`ops_policy_seam`
-and `proxy_tier_resolvers`) -- or an `epic_ops_seam_completion` coordinator if they need shared sequencing -- rather than
-moving the whole batch to `doing/` at once. They share only a theme, not a load-bearing contract, so an epic is
+and `proxy_tier_resolvers`) -- or an `epic_ops_seam_completion` coordinator if they need shared sequencing -- rather
+than moving the whole batch to `doing/` at once. They share only a theme, not a load-bearing contract, so an epic is
 optional.
 
 **Origin**: full-codebase refactor audit, 2026-07-05 (`/refactor_audit whole repo --full`; areas core-ops, cli-other,
@@ -47,8 +47,8 @@ exists to prevent. Three smaller ops-boundary leaks travel with it:
 
 **Seam B -- one tier/model-resolution authority in the proxy.** Tier-word detection is hand-edited in lockstep across
 `proxy/data_models.py:_detect_tier`, `proxy/server.py:_tier_from_model_name` (docstring: "Mirrors
-data_models._detect_tier"), and `cli/status_line.py:explicit_tier_from_model` (docstring: "1:1 mirror of the proxy's
-_tier_from_model_name"). When Fable shipped, all three needed the `fable -> opus` line by hand; a parity test comment
+data_models.\_detect_tier"), and `cli/status_line.py:explicit_tier_from_model` (docstring: "1:1 mirror of the proxy's
+\_tier_from_model_name"). When Fable shipped, all three needed the `fable -> opus` line by hand; a parity test comment
 already says *"Follow-up: extract a shared helper."* Alongside it: `create_message` and `count_tokens` hand-sync a
 ~50-line tier + explicit-backend resolution block (`server.py:1097-1163` vs `:1767-1813`, the second's comment: "Match
 the /v1/messages model resolution"); the LiteLLM provider-prefix vocabulary is inlined 5x while `core/llm/detection.py`
@@ -74,33 +74,33 @@ security fix had to be hand-applied to both in commit `ba0a83e3`).
 
 **Seam A:**
 
-| Op (new/changed) | Replaces |
-| --- | --- |
-| `core/ops/policy.py::supervisor_{set,off,on,remove,reload}` | direct_commands.py:842-934,1049 + cli/policy.py:1413-1489 |
-| `resolve_effective_proxy` / routing-override in ops only | claude_session.py:841/870/905 + cli/session.py:121/152/253 |
+| Op (new/changed)                                                      | Replaces                                                                                        |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `core/ops/policy.py::supervisor_{set,off,on,remove,reload}`           | direct_commands.py:842-934,1049 + cli/policy.py:1413-1489                                       |
+| `resolve_effective_proxy` / routing-override in ops only              | claude_session.py:841/870/905 + cli/session.py:121/152/253                                      |
 | `recover_proxy_id_from_base_url(...)` (one helper, one error posture) | claude_session.py:1204/1388; session_context.py:476; session_start.py:335; proxy/proxies.py:332 |
-| `list_sessions_older_than(ctx, scope)` (match sibling contract) | cli/session_manage.py:437 importing `_scope_filters` |
-| `ActiveSessionStore.is_live` (public) | gc.py:424 reaching `_entry_is_live` |
+| `list_sessions_older_than(ctx, scope)` (match sibling contract)       | cli/session_manage.py:437 importing `_scope_filters`                                            |
+| `ActiveSessionStore.is_live` (public)                                 | gc.py:424 reaching `_entry_is_live`                                                             |
 
 **Seam B:**
 
-| Resolver | Target home | Copies |
-| --- | --- | --- |
-| Tier-word detection (`fable->opus`) | `core/tiers.py` leaf | data_models.py:20/226; server.py:764; status_line.py:351 (NOT :339) |
-| Tier + explicit-backend model resolution | `server._resolve_model_with_alternatives` extended (`:492`) | server.py:1097-1163, :1767-1813 |
-| LiteLLM provider-prefix vocabulary | `core/llm/detection.py:10-20` (existing home) | data_models.py:250; client_factory.py:170; server.py:1131/1791 |
-| `find_available_port` | one home shared by server + orchestrator | orchestrator.py:1217; server.py:2288 |
+| Resolver                                 | Target home                                                 | Copies                                                              |
+| ---------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| Tier-word detection (`fable->opus`)      | `core/tiers.py` leaf                                        | data_models.py:20/226; server.py:764; status_line.py:351 (NOT :339) |
+| Tier + explicit-backend model resolution | `server._resolve_model_with_alternatives` extended (`:492`) | server.py:1097-1163, :1767-1813                                     |
+| LiteLLM provider-prefix vocabulary       | `core/llm/detection.py:10-20` (existing home)               | data_models.py:250; client_factory.py:170; server.py:1131/1791      |
+| `find_available_port`                    | one home shared by server + orchestrator                    | orchestrator.py:1217; server.py:2288                                |
 
 ---
 
 ## Phased plan
 
-| Slice | Scope | Exit signal |
-| --- | --- | --- |
-| A1 | `core/ops/policy.py` supervisor lifecycle; repoint `cli/policy.py` + `%direct`. | a supervisor mutation lives once; both surfaces delegate; no Click/print in the op |
-| A2 | Routing-override + `recover_proxy_id_from_base_url` (single error posture) + `_scope_filters`/`is_live` contract fixes. | CLI imports no op-private symbol; proxy-id recovery has one logging posture |
-| B1 | `core/tiers.py` tier-word leaf; repoint the three 1:1-mirror sites; keep `get_tier_from_display_name`. | one tier-word function (+ the preserved divergent one); parity test drops its "extract a shared helper" TODO |
-| B2 | Shared model-resolution helper for create_message/count_tokens; import `detection.py` prefixes; one `find_available_port`. | `server.py` LOC drops below cap comfortably; the ~50-line block lives once |
+| Slice | Scope                                                                                                                      | Exit signal                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A1    | `core/ops/policy.py` supervisor lifecycle; repoint `cli/policy.py` + `%direct`.                                            | a supervisor mutation lives once; both surfaces delegate; no Click/print in the op                           |
+| A2    | Routing-override + `recover_proxy_id_from_base_url` (single error posture) + `_scope_filters`/`is_live` contract fixes.    | CLI imports no op-private symbol; proxy-id recovery has one logging posture                                  |
+| B1    | `core/tiers.py` tier-word leaf; repoint the three 1:1-mirror sites; keep `get_tier_from_display_name`.                     | one tier-word function (+ the preserved divergent one); parity test drops its "extract a shared helper" TODO |
+| B2    | Shared model-resolution helper for create_message/count_tokens; import `detection.py` prefixes; one `find_available_port`. | `server.py` LOC drops below cap comfortably; the ~50-line block lives once                                   |
 
 ## Blast radius
 
@@ -113,7 +113,7 @@ security fix had to be hand-applied to both in commit `ba0a83e3`).
 
 - **Adversarially verified SURVIVES:** tier-word lockstep ([38]); routing-override twins ([17]); proxy-id recovery
   ([12]); `_scope_filters` contract ([15]); `gc._entry_is_live` ([16]).
-- **First-pass, re-verify (Medium):** policy `%direct` <-> `cli/policy.py` supervisor duplication ([27]/[03]);
+- **First-pass, re-verify (Medium):** policy `%direct` \<-> `cli/policy.py` supervisor duplication ([27]/[03]);
   create_message/count_tokens block ([39]); litellm prefix vocab ([41]); port probe ([40]).
 
 ## Adversarial verification (survived where run)

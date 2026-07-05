@@ -130,7 +130,9 @@ class TestRewindNativeContract:
                 f"not assumed to be a signature failure -- inspect the output.{tail}"
             )
 
-        assert signals["new_fork_jsonls"], "child exited 0 but no new fork transcript appeared in the child's encoded dir"
+        assert signals[
+            "new_fork_jsonls"
+        ], "child exited 0 but no new fork transcript appeared in the child's encoded dir"
         tool_use_count = signals["fork_tool_use_count"]
         assert isinstance(tool_use_count, int) and tool_use_count >= 2, (
             "forked transcript should carry >= 2 tool_use blocks (kept parent Read + child Read); "

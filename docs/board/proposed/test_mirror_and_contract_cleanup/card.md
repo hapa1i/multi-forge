@@ -20,8 +20,8 @@ violation," not one contract; each is independently shippable (see When accepted
 **References**: `docs/developer/testing_guidelines.md` (1:1 test mirroring; 3+ identical monkeypatches -> shared
 fixture); `docs/developer/coding_standards.md` §5 (internal clean-break -- delete shims, update callers atomically);
 `CLAUDE.md` (recovery output only via `forge.cli.output`; test-enforced); `docs/design.md` §3.5;
-`docs/board/impl_notes.md` (memory/transfer vocabulary -- `core/transcript.py` as the documented dual-format seam);
-PR #77 (`08e4a787`, the session-test split -- see item 1).
+`docs/board/impl_notes.md` (memory/transfer vocabulary -- `core/transcript.py` as the documented dual-format seam); PR
+#77 (`08e4a787`, the session-test split -- see item 1).
 
 ---
 
@@ -35,37 +35,37 @@ a mandatory regression test.
 1. **(Resolved by PR #77 -- context, no action.)** The 4933-line `tests/src/cli/test_session_commands.py` monolith was
    split in `08e4a787` into 15 focused files (`test_session_fork.py`, `test_session_resume.py`,
    `test_session_start_delete.py`, ...) plus a shared `session_command_support.py` (`successful_claude_launch()`). #77
-   split by **behavior**, not strict source-mirror (there is no `test_session_lifecycle.py`), which resolves the monolith
-   concern; re-splitting to a strict source mirror would only churn #77's fresh work. Retained so the next audit does not
-   re-flag it.
+   split by **behavior**, not strict source-mirror (there is no `test_session_lifecycle.py`), which resolves the
+   monolith concern; re-splitting to a strict source mirror would only churn #77's fresh work. Retained so the next
+   audit does not re-flag it.
 2. **Two source subpackages have no mirrored test directory.** `cli/statusline/` (5 modules) and `session/claude/` (4
    modules) are tested by flat files in the parent test dir (`tests/src/cli/test_statusline_registry.py`,
    `tests/src/session/test_claude_paths.py`) instead of `tests/src/cli/statusline/` and `tests/src/session/claude/`.
    (Unaffected by #77 -- its new files are all flat in `tests/src/cli/`.)
 3. **Monkeypatch clustering above the documented 3+ threshold with no shared fixture.** A credential stub + proxy-server
-   stubs are patched identically across `tests/src/proxy/test_passthrough.py:212`,
-   `test_responses_transport.py:549`, `tests/src/review/test_models.py:273`, `tests/src/policy/team/test_handlers.py:372`,
+   stubs are patched identically across `tests/src/proxy/test_passthrough.py:212`, `test_responses_transport.py:549`,
+   `tests/src/review/test_models.py:273`, `tests/src/policy/team/test_handlers.py:372`,
    `tests/src/session/test_memory_writer.py:735` while `tests/src/proxy/conftest.py:136` (`server_stubs`) lacks them.
 4. **Recovery `Tip:` lines hand-rolled below the output-helper floor.** `review/routing.py:336,360` build recovery hints
-   in exception messages instead of via `forge.cli.output` (the CLAUDE.md-enforced surface); `cli/workflow.py:193` is the
-   render site.
+   in exception messages instead of via `forge.cli.output` (the CLAUDE.md-enforced surface); `cli/workflow.py:193` is
+   the render site.
 5. **A back-compat re-export shim on an internal surface.** `sidecar/secrets.py:8` re-exports for compatibility;
    `coding_standards.md` §5 says internal surfaces take a clean break (delete + repoint callers atomically), not a shim.
-6. **Codex `HeadlessResult` test factory copied across three consumer suites.** `tests/src/policy/semantic/test_supervisor.py:55`,
-   `tests/src/session/test_shadow_curation.py:626`, and `tests/src/session/test_memory_writer.py:1791` each define a
-   near-identical `_codex_result(**overrides)` helper for `CodexHeadlessInvoker.run` results. The only meaningful
-   differences are call-site labels/comments and stdout defaults; a future `HeadlessResult` field change would require a
-   three-file test update.
+6. **Codex `HeadlessResult` test factory copied across three consumer suites.**
+   `tests/src/policy/semantic/test_supervisor.py:55`, `tests/src/session/test_shadow_curation.py:626`, and
+   `tests/src/session/test_memory_writer.py:1791` each define a near-identical `_codex_result(**overrides)` helper for
+   `CodexHeadlessInvoker.run` results. The only meaningful differences are call-site labels/comments and stdout
+   defaults; a future `HeadlessResult` field change would require a three-file test update.
 7. **Transcript-entry primitives re-implemented divergently while `core/transcript.py` is the documented seam.**
    `session/transfer.py:257-309` owns `_normalize_transcript_role` / `_resolve_entry_role` / `_extract_entry_blocks` /
    `_group_entries_into_turns`; `cli/status_line.py:410-421` has a **divergent** local `_resolve_entry_role` (no
-   `human`/`ai` alias normalization -- Surfaced Defect); `session/rewind.py:17-19` imports transfer's private
-   `_`-named helpers. `core/transcript.py:1-9` documents itself as the shared home for "low-level parsing of Claude Code
+   `human`/`ai` alias normalization -- Surfaced Defect); `session/rewind.py:17-19` imports transfer's private `_`-named
+   helpers. `core/transcript.py:1-9` documents itself as the shared home for "low-level parsing of Claude Code
    transcript files."
 
-Plus two placement smells: the byte-identical `_find_git_root` walkers (`cli/extensions.py:47`, `core/ops/context.py:65`,
-`cli/codex.py:131`, `session/claude/paths.py:181`) and the `direct_model` env-pin helper living in the session domain
-while serving review/ops/CLI.
+Plus two placement smells: the byte-identical `_find_git_root` walkers (`cli/extensions.py:47`,
+`core/ops/context.py:65`, `cli/codex.py:131`, `session/claude/paths.py:181`) and the `direct_model` env-pin helper
+living in the session domain while serving review/ops/CLI.
 
 ---
 
@@ -90,34 +90,34 @@ while serving review/ops/CLI.
 
 ## Target shape
 
-| Contract | Target | Current violation |
-| --- | --- | --- |
-| Session-test monolith | session monolith split -- **done in #77** (behavior-based) | -- (resolved) |
-| Test subpackage mirror | `tests/src/cli/statusline/`, `tests/src/session/claude/` | flat files in parent dir |
-| 3+ monkeypatch -> fixture | credential/server stub in `tests/src/proxy/conftest.py` | 5 identical inline patches |
-| Codex `HeadlessResult` test factory | one shared test helper | 3 `_codex_result(**overrides)` copies |
-| Recovery output via `forge.cli.output` | `print_error_with_tip` / `handle_session_error` | review/routing.py:336,360 hand-rolled `Tip:` |
-| No internal back-compat shim | delete `sidecar/secrets.py`, repoint `__init__.py:17` + tests | re-export shim |
-| Transcript parsing in `core/transcript.py` | move the 4 helpers; converge status_line + rewind onto it | 3 divergent/private copies |
-| Git-root walker | one home (a `core/paths` leaf) | 4 copies |
+| Contract                                   | Target                                                        | Current violation                            |
+| ------------------------------------------ | ------------------------------------------------------------- | -------------------------------------------- |
+| Session-test monolith                      | session monolith split -- **done in #77** (behavior-based)    | -- (resolved)                                |
+| Test subpackage mirror                     | `tests/src/cli/statusline/`, `tests/src/session/claude/`      | flat files in parent dir                     |
+| 3+ monkeypatch -> fixture                  | credential/server stub in `tests/src/proxy/conftest.py`       | 5 identical inline patches                   |
+| Codex `HeadlessResult` test factory        | one shared test helper                                        | 3 `_codex_result(**overrides)` copies        |
+| Recovery output via `forge.cli.output`     | `print_error_with_tip` / `handle_session_error`               | review/routing.py:336,360 hand-rolled `Tip:` |
+| No internal back-compat shim               | delete `sidecar/secrets.py`, repoint `__init__.py:17` + tests | re-export shim                               |
+| Transcript parsing in `core/transcript.py` | move the 4 helpers; converge status_line + rewind onto it     | 3 divergent/private copies                   |
+| Git-root walker                            | one home (a `core/paths` leaf)                                | 4 copies                                     |
 
 ---
 
 ## Phased plan (each slice independently landable; each promotable to its own member card)
 
-| Slice | Scope | Kind | Exit signal |
-| --- | --- | --- | --- |
-| 1 | Move `cli/statusline/` + `session/claude/` tests into mirrored dirs (`tests/src/cli/statusline/`, `tests/src/session/claude/`). Tests moved, never skipped. (Session monolith already done in #77.) | refactor | mirror-check (source -> test path) clean for the two subpackage areas |
-| 2 | Extract the credential/server stubs into `tests/src/proxy/conftest.py`; repoint the 5 inline patches. | refactor | `rg 'monkeypatch'` cluster gone; one fixture |
-| 3 | Add a shared Codex `HeadlessResult` test factory; repoint supervisor, shadow-curation, and memory-writer tests. | refactor | one helper builds Codex headless results; per-consumer tests keep only behavior-specific stdout/label values |
-| 4 | Route `review/routing.py` recovery hints through `forge.cli.output`; delete the `sidecar/secrets.py` shim + repoint. | refactor | `test_cli_rich_tips_go_through_output_helpers` scope satisfied; no re-export shim |
-| 5 | Move the 4 transcript helpers to `core/transcript.py`; converge `status_line` + `rewind` onto it (**fixes the alias gap**). | **defect-fix** | one transcript parser; **regression test for the `human`/`ai` alias normalization** is required to tick this slice |
-| 6 | One git-root walker leaf; relocate `direct_model` helper if a neutral home is warranted. | refactor | `rg 'def _find_git_root\|_detect_git_project_root'` -> one home |
+| Slice | Scope                                                                                                                                                                                               | Kind           | Exit signal                                                                                                        |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1     | Move `cli/statusline/` + `session/claude/` tests into mirrored dirs (`tests/src/cli/statusline/`, `tests/src/session/claude/`). Tests moved, never skipped. (Session monolith already done in #77.) | refactor       | mirror-check (source -> test path) clean for the two subpackage areas                                              |
+| 2     | Extract the credential/server stubs into `tests/src/proxy/conftest.py`; repoint the 5 inline patches.                                                                                               | refactor       | `rg 'monkeypatch'` cluster gone; one fixture                                                                       |
+| 3     | Add a shared Codex `HeadlessResult` test factory; repoint supervisor, shadow-curation, and memory-writer tests.                                                                                     | refactor       | one helper builds Codex headless results; per-consumer tests keep only behavior-specific stdout/label values       |
+| 4     | Route `review/routing.py` recovery hints through `forge.cli.output`; delete the `sidecar/secrets.py` shim + repoint.                                                                                | refactor       | `test_cli_rich_tips_go_through_output_helpers` scope satisfied; no re-export shim                                  |
+| 5     | Move the 4 transcript helpers to `core/transcript.py`; converge `status_line` + `rewind` onto it (**fixes the alias gap**).                                                                         | **defect-fix** | one transcript parser; **regression test for the `human`/`ai` alias normalization** is required to tick this slice |
+| 6     | One git-root walker leaf; relocate `direct_model` helper if a neutral home is warranted.                                                                                                            | refactor       | `rg 'def _find_git_root\|_detect_git_project_root'` -> one home                                                    |
 
 ## Blast radius
 
-- **Test moves are the safest churn** (moving tests, not code). Slice 1 must *move*, never skip (testing_guidelines). The
-  larger session-monolith split already landed in #77, so this card's Slice 1 is the smaller subpackage-mirror move.
+- **Test moves are the safest churn** (moving tests, not code). Slice 1 must *move*, never skip (testing_guidelines).
+  The larger session-monolith split already landed in #77, so this card's Slice 1 is the smaller subpackage-mirror move.
 - Slice 3 is test-only but touches three hot consumer suites; keep the helper in test support code and do not move
   production `HeadlessResult` adaptation behavior.
 - Slice 5 touches `status_line.py` (lazy-I/O sensitive) and `rewind.py` (durable-resume) -- converge carefully; rewind
@@ -140,8 +140,8 @@ period owed).
 ## Risks
 
 - **Skipping is forbidden** (testing_guidelines) -- Slice 1 moves tests, it never disables them.
-- **Slice 5 is a defect-fix, not a pure move** -- the alias-normalization convergence changes an observable and must ship
-  with a regression test; do not wave it through as behavior-preserving.
+- **Slice 5 is a defect-fix, not a pure move** -- the alias-normalization convergence changes an observable and must
+  ship with a regression test; do not wave it through as behavior-preserving.
 - **Slice 3 must stay test-support only** -- sharing the factory must not tempt a production unification of the three
   Codex consumer contracts, which intentionally differ.
 - Low overall risk; sequence Slice 1 after any in-flight session-test edits to avoid rebase churn (lanes are empty
@@ -156,9 +156,9 @@ transcript-parsing PR.
 
 ## Acceptance (per-slice)
 
-Tick only when: (a) a source->test mirror-path check is clean for the scoped area; (b) tests were moved, not skipped; (c)
-the output-helper enforcement tests pass; (d) Slice 3 keeps consumer-specific assertions local while sharing only the
-`HeadlessResult` construction; (e) **Slice 5 carries the alias-normalization regression test** (defect-fix gate).
+Tick only when: (a) a source->test mirror-path check is clean for the scoped area; (b) tests were moved, not skipped;
+(c) the output-helper enforcement tests pass; (d) Slice 3 keeps consumer-specific assertions local while sharing only
+the `HeadlessResult` construction; (e) **Slice 5 carries the alias-normalization regression test** (defect-fix gate).
 
 ## Closeout
 
