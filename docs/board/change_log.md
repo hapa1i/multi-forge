@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-05
+
+### rewind_resume_strategy follow-up: Real-Claude clean-prefix gate
+
+**Goal**: Close the disclosed rewind gap by proving a fresh-UUID truncated prefix is resumable by real Claude Code, not
+only unit-covered.
+
+**Key changes**:
+
+- Added `tests/integration/docker/test_rewind_native_contract.py`, a slow Docker real-Claude gate that creates a parent
+  conversation, writes a rewind-owned fresh `<R>.jsonl` prefix with `write_rewind_transcript_prefix`, resumes it with
+  `claude --resume <R> --fork-session` from another CWD, and asserts the prefix is not mutated.
+- Extended the shared real-Claude Docker helper with `rewind_prefix_and_resume`.
+- Updated design and board memory to replace the old disclosed clean-prefix caveat with the new integration-test anchor.
+
+**Verification**: `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q`;
+`uv run ruff check tests/integration/docker/conftest.py tests/integration/docker/test_rewind_native_contract.py`;
+`./scripts/test-integration.sh tests/integration/docker/test_rewind_native_contract.py -v`; `git diff --check`.
+
 ## 2026-07-04
 
 ### accidental_complexity_cleanup Phase C: finishing phase (Defect B, #17, Gap A, WorkflowPolicy demote, dedups)

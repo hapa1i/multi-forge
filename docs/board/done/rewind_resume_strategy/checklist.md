@@ -7,11 +7,9 @@ design points, and risks; this file is the ordered execution plan with observabl
 
 **DONE** (2026-07-02). All six slices implemented and merged to `main` via PR #66 (`107b9251`); card moved
 `doing/ -> done/`. Unit coverage green: 26 rewind tests (`test_rewind_strategy.py` + `test_session_rewind_cli.py`) and
-30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`). **One disclosed gap remains**: the "Resume
-tolerates fresh UUID" acceptance row — a real-`claude` resume against a truncated `<R>.jsonl` — was **not** implemented
-as a `@pytest.mark.slow` integration test; `design.md:765` records the same caveat ("clean-prefix truncated resume
-remains an integration assertion"). The Slice-1 stem probe proved stem-tolerance live, but the truncated-prefix resume
-is unit-covered only. File that integration test before relying on rewind in production.
+30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`). Follow-up closed the disclosed "Resume
+tolerates fresh UUID" acceptance gap with `tests/integration/docker/test_rewind_native_contract.py`, a
+`@pytest.mark.slow` real-Claude gate for a truncated clean-prefix `<R>.jsonl` resumed under a fresh UUID.
 
 ## Verified code anchors (re-checked 2026-07-01, card line numbers had drifted)
 
@@ -72,8 +70,9 @@ plumbing. Nothing below this line proceeds until this slice is reviewed.
 - [x] **Probe result:** Claude Code 2.1.197, isolated `HOME`, parent `parent_has_signature=yes`, copied parent JSONL to
   child encoded dir as `<R>.jsonl` with embedded `sessionId=<parent_uuid>`, then ran
   `claude --bare --print --allowed-tools Read --permission-mode bypassPermissions --resume R --fork-session`. Result:
-  `mismatch_exit=0`, parent copy unchanged. **No envelope rewrite needed.** This proves stem tolerance only; a truncated
-  clean-prefix `<R>.jsonl` remains a Slice 5 integration assertion.
+  `mismatch_exit=0`, parent copy unchanged. **No envelope rewrite needed.** This proved stem tolerance only; follow-up
+  coverage in `tests/integration/docker/test_rewind_native_contract.py` exercises the clean-prefix truncated JSONL
+  resume.
 - [x] **`Derivation` shape decision.** Decide and document: `strategy="rewind"` coexisting with
   `resume_mode="native-relocate"`; a new `dropped_turns: int | None = None`; and the closed GC-id field decision
   (refinement #3 above — use `rewind_relocated_session_id`). **Assertion:** the chosen field set is written into

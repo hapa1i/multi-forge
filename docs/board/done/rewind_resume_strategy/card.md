@@ -164,8 +164,8 @@ parent's original impossible.
 **Probe result (2026-07-01)**: JSONL entries carry an internal `sessionId`, but Claude Code 2.1.197 accepts `--resume R`
 when the filename stem is `R` and embedded `sessionId` remains the parent UUID. The parent transcript in the probe
 carried a signature and the relocated copy stayed unchanged, so Slice 5 does **not** need an envelope `sessionId`
-rewrite. This probe isolated stem tolerance on a whole-copy JSONL; clean-prefix truncated JSONL resume remains a Slice 5
-integration assertion.
+rewrite. This probe isolated stem tolerance on a whole-copy JSONL; follow-up coverage in
+`tests/integration/docker/test_rewind_native_contract.py` exercises the clean-prefix truncated JSONL resume.
 
 ## Proposed surface
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import uuid
 from typing import Any, Generator
 
 import pytest
@@ -34,6 +35,7 @@ __all__ = [
     "precompact_workspace",
     "read_container_usage_events",
     "relocate_and_resume",
+    "rewind_prefix_and_resume",
     "run_claude_print",
     "setup_real_claude",
     "synced_container",
@@ -201,6 +203,7 @@ import sys
 
 from forge.session.claude.paths import get_project_encoded_dir, get_transcript_path
 from forge.session.claude.relocate import relocate_transcript
+from forge.session.rewind import write_rewind_transcript_prefix
 
 _Q = chr(34)
 
@@ -246,6 +249,39 @@ elif cmd == "relocate":
         dest_project_root=sys.argv[4],
     )
     print(str(res.dest_path))
+elif cmd == "rewind-prefix":
+    source_root = sys.argv[2]
+    source_session_id = sys.argv[3]
+    dest_root = sys.argv[4]
+    rewind_session_id = sys.argv[5]
+    drop_last = int(sys.argv[6])
+    source_path = get_transcript_path(source_root, source_session_id)
+    dest_dir = get_project_encoded_dir(dest_root)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / (rewind_session_id + ".jsonl")
+    res = write_rewind_transcript_prefix(
+        source_path=source_path,
+        dest_path=dest_path,
+        drop_last=drop_last,
+    )
+    text = dest_path.read_text(errors="replace")
+    with open(dest_path, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()
+    print(
+        json.dumps(
+            {
+                "dest": str(dest_path),
+                "total_turns": res.total_turns,
+                "kept_turns": res.kept_turns,
+                "actual_dropped_turns": res.actual_dropped_turns,
+                "entries_written": res.entries_written,
+                "contains_head_fixture": "REWIND_FIXTURE_HEAD.txt" in text,
+                "contains_tail_fixture": "REWIND_FIXTURE_TAIL.txt" in text,
+                "sha": digest,
+            },
+            sort_keys=True,
+        )
+    )
 elif cmd == "snapshot":
     d = get_project_encoded_dir(sys.argv[2])
     stems = sorted(p.name for p in d.glob("*.jsonl"))
@@ -372,6 +408,119 @@ def relocate_and_resume(
         "reloc_dest": reloc_dest,
         "reloc_sha_before": before["sha"],
         "reloc_sha_after": after["sha"],
+        "child_exit": child_exit,
+        "child_stdout": child_out,
+        "child_stderr": child_err,
+        "new_fork_jsonls": after["new"],
+        "fork_tool_use_count": int(after["tool_use"]),
+        "container_claude_version": version,
+    }
+
+
+def rewind_prefix_and_resume(
+    workspace: ContainerLike,
+    *,
+    parent_head_prompt: str,
+    parent_tail_prompt: str,
+    child_prompt: str,
+    parent_root: str = "/workspace",
+    child_root: str = "/tmp/rewind_child_wt",
+    parent_session: str = "rewind-parent",
+    model: str = "claude-opus-4-6",
+    thinking_tokens: int = 2048,
+    drop_last: int = 2,
+    timeout: int = 180,
+) -> dict[str, object]:
+    """Drive the rewind clean-prefix contract: parent turns -> truncated fresh UUID -> child resume.
+
+    Returns raw signals only; the TEST owns all pass/fail decisions. This is the
+    rewind-specific sibling of ``relocate_and_resume``: it writes a raw prefix
+    under a fresh resume UUID with ``write_rewind_transcript_prefix`` instead of
+    copying the whole parent transcript under the parent UUID.
+    """
+    pin = {**direct_model_env(model), "MAX_THINKING_TOKENS": str(thinking_tokens)}
+    _write_relocate_helper(workspace)
+
+    setup_real_claude(workspace, session_name=parent_session, root=parent_root)
+    workspace.exec(f"printf 'HEAD_MARKER' > {shlex.quote(parent_root + '/REWIND_FIXTURE_HEAD.txt')}")
+    workspace.exec(f"printf 'TAIL_MARKER' > {shlex.quote(parent_root + '/REWIND_FIXTURE_TAIL.txt')}")
+
+    parent_head_exit, _head_out, head_err = run_claude_print(
+        workspace,
+        parent_head_prompt,
+        session_name=parent_session,
+        cwd=parent_root,
+        extra_env=pin,
+        timeout=timeout,
+    )
+    parent_uuid = _relocate_helper(workspace, "parent-uuid", parent_root).stdout.strip()
+    if not parent_uuid:
+        raise AssertionError(
+            f"No parent session transcript under {parent_root}'s encoded dir "
+            f"(head claude exit={parent_head_exit}); stderr: {head_err[:600]!r}"
+        )
+
+    parent_tail_exit, _tail_out, tail_err = run_claude_print(
+        workspace,
+        parent_tail_prompt,
+        session_name=parent_session,
+        cwd=parent_root,
+        resume_id=parent_uuid,
+        extra_env=pin,
+        timeout=timeout,
+    )
+    if parent_tail_exit != 0:
+        raise AssertionError(f"Parent tail turn failed (exit={parent_tail_exit}); stderr: {tail_err[:1000]!r}")
+
+    meta = json.loads(_relocate_helper(workspace, "parent-meta", parent_root, parent_uuid).stdout.strip())
+
+    wt = workspace.exec(f"cd {shlex.quote(parent_root)} && git worktree add --detach {shlex.quote(child_root)}")
+    if wt.returncode != 0:
+        raise AssertionError(f"git worktree add failed: {wt.stderr}")
+    workspace.exec(f"mkdir -p {shlex.quote(child_root + '/.claude')}")
+    workspace.exec(f"printf 'CHILD_MARKER' > {shlex.quote(child_root + '/REWIND_FIXTURE_CHILD.txt')}")
+
+    rewind_uuid = str(uuid.uuid4())
+    prefix = _relocate_helper(
+        workspace,
+        "rewind-prefix",
+        parent_root,
+        parent_uuid,
+        child_root,
+        rewind_uuid,
+        str(drop_last),
+    )
+    if prefix.returncode != 0:
+        raise AssertionError(f"rewind-prefix helper failed: {prefix.stderr}")
+    prefix_info = json.loads(prefix.stdout.strip())
+    rewind_dest = str(prefix_info["dest"])
+
+    before = json.loads(_relocate_helper(workspace, "snapshot", child_root, rewind_dest).stdout.strip())
+
+    child_exit, child_out, child_err = run_claude_print(
+        workspace,
+        child_prompt,
+        session_name=None,
+        cwd=child_root,
+        resume_id=rewind_uuid,
+        fork_session=True,
+        extra_env=pin,
+        timeout=timeout,
+    )
+
+    after = json.loads(
+        _relocate_helper(workspace, "inspect", child_root, json.dumps(before["stems"]), rewind_dest).stdout.strip()
+    )
+    version = workspace.exec("claude --version").stdout.strip()
+
+    return {
+        "parent_uuid": parent_uuid,
+        "rewind_uuid": rewind_uuid,
+        "parent_jsonl": meta["path"],
+        "parent_has_signature": bool(meta["has_sig"]),
+        "prefix": prefix_info,
+        "rewind_sha_before": before["sha"],
+        "rewind_sha_after": after["sha"],
         "child_exit": child_exit,
         "child_stdout": child_out,
         "child_stderr": child_err,
