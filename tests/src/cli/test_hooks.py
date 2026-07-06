@@ -330,6 +330,41 @@ class TestHookDisableCommand:
         commands = _extract_hook_commands(settings["hooks"]["SessionStart"][0])
         assert any("other-hook" in c for c in commands)
 
+    def test_uninstall_preserves_contains_only_commands(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Contains-only strings must not be removed by the destructive disable path."""
+        monkeypatch.chdir(tmp_path)
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+
+        expected_remaining = [
+            {"type": "command", "command": "other-hook"},
+            {"type": "command", "command": "echo forge hook stop"},
+            {"hooks": [{"type": "shell", "command": "forge hook session-start"}]},
+            {"hooks": None},
+        ]
+        existing_settings = {
+            "hooks": {
+                "SessionStart": [
+                    expected_remaining[0],
+                    {"type": "command", "command": "forge hook session-start"},
+                    {"hooks": [{"type": "command", "command": "forge hook stop"}]},
+                    expected_remaining[1],
+                    expected_remaining[2],
+                    expected_remaining[3],
+                ]
+            }
+        }
+        settings_file = claude_dir / SETTINGS_FILENAME
+        settings_file.write_text(json.dumps(existing_settings))
+
+        runner = CliRunner()
+        result = runner.invoke(hooks, ["disable"])
+
+        assert result.exit_code == 0
+        assert "Disabled" in result.output
+        settings = json.loads(settings_file.read_text())
+        assert settings["hooks"]["SessionStart"] == expected_remaining
+
     def test_uninstall_no_settings_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should handle missing settings file gracefully."""
         monkeypatch.chdir(tmp_path)

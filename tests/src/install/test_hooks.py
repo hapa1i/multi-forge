@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from forge.install.hooks import has_forge_hook, has_forge_hooks
+from forge.install.hooks import (
+    entry_is_forge_hook,
+    has_forge_hook,
+    has_forge_hooks,
+    is_forge_hook_command,
+)
 
 
 @pytest.fixture()
@@ -33,6 +38,59 @@ FORGE_PRE_TOOL_USE = {
 }
 
 FORGE_STOP = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "forge hook stop"}]}]}}
+
+
+class TestForgeHookPredicate:
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "forge hook stop",
+            "/opt/multi-forge/bin/forge hook stop",
+            '"/opt/my tools/forge" hook stop',
+        ],
+    )
+    def test_matches_forge_hook_invocation(self, command: str) -> None:
+        assert is_forge_hook_command(command) is True
+
+    def test_matches_specific_handler(self) -> None:
+        assert is_forge_hook_command("forge hook policy-check", "policy-check") is True
+        assert is_forge_hook_command("/opt/bin/forge hook policy-check --json", "policy-check") is True
+        assert is_forge_hook_command("forge hook exit-plan-mode", "policy-check") is False
+        assert is_forge_hook_command("forge hook", "policy-check") is False
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "echo forge hook stop",
+            "myforge hook stop",
+            "forge-hook stop",
+            "forge",
+            "",
+            '"unterminated',
+        ],
+    )
+    def test_rejects_non_invocations(self, command: str) -> None:
+        assert is_forge_hook_command(command) is False
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            {"type": "command", "command": "forge hook session-start"},
+            {"hooks": [{"type": "command", "command": "forge hook session-start"}]},
+        ],
+    )
+    def test_entry_helper_matches_supported_settings_shapes(self, entry: dict) -> None:
+        assert entry_is_forge_hook(entry, "session-start") is True
+
+    def test_entry_helper_can_require_command_type(self) -> None:
+        entry = {"command": "forge hook session-start"}
+
+        assert entry_is_forge_hook(entry) is True
+        assert entry_is_forge_hook(entry, require_command_type=True) is False
+
+    @pytest.mark.parametrize("hooks_value", [None, 5, True])
+    def test_entry_helper_ignores_malformed_nested_hooks_value(self, hooks_value: object) -> None:
+        assert entry_is_forge_hook({"hooks": hooks_value}, require_command_type=True) is False
 
 
 class TestHasForgeHook:
@@ -121,8 +179,22 @@ class TestHasForgeHook:
         _write_settings(project / ".claude" / "settings.local.json", data)
         assert has_forge_hook(project, "SessionStart") is True
 
-    def test_command_needle_filters_specific_handler(self, project: Path) -> None:
-        """Specific needle should not match a different forge hook handler."""
+    def test_absolute_path_forge_command_matches(self, project: Path) -> None:
+        data = {
+            "hooks": {
+                "SessionStart": [{"hooks": [{"type": "command", "command": "/opt/bin/forge hook session-start"}]}]
+            }
+        }
+        _write_settings(project / ".claude" / "settings.local.json", data)
+        assert has_forge_hook(project, "SessionStart") is True
+
+    def test_contains_only_command_is_not_a_forge_hook(self, project: Path) -> None:
+        data = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo forge hook stop"}]}]}}
+        _write_settings(project / ".claude" / "settings.local.json", data)
+        assert has_forge_hook(project, "Stop") is False
+
+    def test_handler_filters_specific_handler(self, project: Path) -> None:
+        """Specific handler should not match a different forge hook handler."""
         data = {
             "hooks": {
                 "PreToolUse": [
@@ -131,10 +203,14 @@ class TestHasForgeHook:
             }
         }
         _write_settings(project / ".claude" / "settings.local.json", data)
-        # Generic needle matches
+        # Generic check matches
         assert has_forge_hook(project, "PreToolUse") is True
-        # Specific needle does NOT match exit-plan-mode
-        assert has_forge_hook(project, "PreToolUse", "forge hook policy-check") is False
+        # Specific handler does NOT match exit-plan-mode
+        assert has_forge_hook(project, "PreToolUse", handler="policy-check") is False
+
+    def test_handler_matches_specific_handler(self, project: Path) -> None:
+        _write_settings(project / ".claude" / "settings.local.json", FORGE_PRE_TOOL_USE)
+        assert has_forge_hook(project, "PreToolUse", handler="policy-check") is True
 
 
 class TestHasForgeHooks:
