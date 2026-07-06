@@ -30,10 +30,10 @@ from forge.cli.output import console, err_console
 from forge.cli.output import handle_session_error as handle_session_error
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session_routing import ResolvedRouting
+from forge.core.ops import claude_session as claude_session_ops
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
 from forge.session import (
-    LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
     ActiveSessionEntry,
     ForgeSessionError,
@@ -47,6 +47,10 @@ from forge.session.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+_apply_routing_override_to_state = claude_session_ops.apply_resume_routing_override_to_state
+_persist_routing_override = claude_session_ops.persist_resume_routing_override
+_get_effective_proxy_for_session = claude_session_ops.get_effective_proxy_for_resume
 
 
 # --- Routing resolution ---
@@ -118,83 +122,6 @@ def _resolve_routing_from_cli(
     )
 
 
-def _apply_routing_override_to_state(
-    *,
-    state: SessionState,
-    routing: ResolvedRouting | None,
-    direct: bool,
-) -> None:
-    """Apply a CLI routing override to an in-memory session state."""
-    if not routing and not direct:
-        return
-
-    from forge.session.models import LaunchIntent, ProxyIntent
-
-    # Explicit CLI routing beats any stale last-launch proxy snapshot.
-    state.confirmed.started_with_proxy = None
-
-    if direct:
-        state.intent.proxy = None
-        if state.intent.launch is None:
-            state.intent.launch = LaunchIntent(mode=LAUNCH_MODE_HOST)
-        else:
-            state.intent.launch.mode = LAUNCH_MODE_HOST
-            state.intent.launch.sidecar = None
-        return
-
-    assert routing is not None
-    state.intent.proxy = ProxyIntent(
-        template=routing.template or "",
-        base_url=routing.base_url or "",
-    )
-
-
-def _persist_routing_override(
-    *,
-    forge_root: Path,
-    session_name: str,
-    routing: ResolvedRouting | None,
-    direct: bool,
-) -> None:
-    """Persist a --proxy/--no-proxy CLI override into the session manifest.
-
-    Called after manager.fork_session()/resume_session() creates the child
-    so the intent reflects the override, not the inherited parent routing.
-    This ensures --no-launch forks retain the requested proxy.
-
-    Only persists intent changes -- confirmed.started_with_proxy is hook-owned
-    and must not be cleared on disk before a successful launch. The in-memory
-    clearing in _apply_routing_override_to_state() is sufficient for the
-    current launch; the SessionStart hook will update confirmed on success.
-    """
-    if not routing and not direct:
-        return
-
-    from forge.session import SessionStore
-    from forge.session.models import LaunchIntent, ProxyIntent
-
-    store = SessionStore(str(forge_root), session_name)
-
-    def _mutate(m: SessionState) -> None:
-        if direct:
-            m.intent.proxy = None
-            if m.intent.launch is None:
-                m.intent.launch = LaunchIntent(mode=LAUNCH_MODE_HOST)
-            else:
-                m.intent.launch.mode = LAUNCH_MODE_HOST
-                m.intent.launch.sidecar = None
-        elif routing is not None:
-            m.intent.proxy = ProxyIntent(
-                template=routing.template or "",
-                base_url=routing.base_url or "",
-            )
-
-    try:
-        store.update(timeout_s=5.0, mutate=_mutate)
-    except Exception:
-        logger.debug("Failed to persist routing override to manifest", exc_info=True)
-
-
 def _session_scope_key(name: str, entry: SessionIndexEntry) -> tuple[str, str]:
     """Return the list/cleanup identity tuple for a session entry."""
     return (name, entry.forge_root or entry.worktree_path)
@@ -248,28 +175,6 @@ def _get_session_type(
     if is_fork and parent_session:
         return f"fork of {parent_session}"
     return "session"
-
-
-def _get_effective_proxy_for_session(
-    state: SessionState,
-) -> tuple[str | None, str | None, str | None]:
-    """Resolve the best-known template/base_url/proxy_id for a session.
-
-    Returns (template, base_url, proxy_id). The proxy_id (when available)
-    enables deterministic context limit computation via exact registry
-    lookup, avoiding active-only template resolution.
-    """
-    if state.confirmed.started_with_proxy:
-        return (
-            state.confirmed.started_with_proxy.template,
-            state.confirmed.started_with_proxy.base_url,
-            state.confirmed.started_with_proxy.proxy_id,
-        )
-
-    if state.intent.proxy:
-        return state.intent.proxy.template, state.intent.proxy.base_url, None
-
-    return None, None, None
 
 
 def _template_display_label(template: str | None) -> str:

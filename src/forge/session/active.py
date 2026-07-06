@@ -274,6 +274,10 @@ class ActiveSessionStore:
         """
         return self.get_session(session_name, forge_root=forge_root) is not None
 
+    def is_live(self, entry: ActiveSessionEntry) -> bool:
+        """Return True when a runtime entry still points at a live launch."""
+        return self._entry_is_live(entry)
+
     def _entry_is_live(self, entry: ActiveSessionEntry) -> bool:
         """Return True when the runtime entry still points at a live launch."""
         if entry.launch_mode == LAUNCH_MODE_SIDECAR and entry.container_name:

@@ -1,8 +1,8 @@
 # ops_policy_seam -- complete the core/ops split for the policy surface
 
-**Lane**: `doing/` -- split from the `ops_seam_completion` batch (2026-07-06) per its own acceptance guidance (two
-member cards, no epic). Sibling: [`proxy_tier_resolvers`](../proxy_tier_resolvers/card.md) (Seam B). They share a theme,
-not a load-bearing contract, and ship independently.
+**Lane**: `done/` -- split from the `ops_seam_completion` batch (2026-07-06) per its own acceptance guidance (two member
+cards, no epic). Sibling: [`proxy_tier_resolvers`](../../doing/proxy_tier_resolvers/card.md) (Seam B). They share a
+theme, not a load-bearing contract, and ship independently.
 
 **Type**: behavior-preserving refactor + one **small defect fix** (A2: converge the drifted proxy-id-recovery error
 posture -- two copies silently swallow, two log -- to a single logged fail-open posture per coding_standards §5).
@@ -99,4 +99,12 @@ fix lands **once**. Confirm on the next supervisor-UX PR.
 
 ## Closeout
 
-(pending)
+Shipped 2026-07-06 on `refactor/ops-policy-seam`.
+
+Verification:
+
+- Focused unit/regression suites: 390 passed, 48 passed, and 90 passed across policy ops/supervisor, `%direct`,
+  session/gc contract, proxy recovery, session-start hook, and policy-shadow coupling coverage.
+- Integration: `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py -k TestSessionStartHook`
+  (7 passed, 9 deselected).
+- Hygiene: touched-file `uv run ruff check`; `make pre-commit`.

@@ -12,7 +12,8 @@ as their own PRs.
 
 ## Current focus
 
-**Board split under review; implementation not started.** Awaiting go-ahead to start A1.
+**Closed 2026-07-06.** A1 and A2 shipped together on `refactor/ops-policy-seam`; the sibling `proxy_tier_resolvers`
+remains independent work.
 
 ### Recorded review decisions (2026-07-06)
 
@@ -51,38 +52,38 @@ as their own PRs.
 
 ## Slice A1 — `core/ops/policy.py` supervisor lifecycle
 
-- [ ] **A1.0 Enumerate real blast radius + confirm the mutation set.** Confirm the duplicated supervisor mutations are
+- [x] **A1.0 Enumerate real blast radius + confirm the mutation set.** Confirm the duplicated supervisor mutations are
   exactly {set, off, on, remove, reload, cascade} across both surfaces (none missed — `status`/`evaluate` are
   read/one-shot, out of scope). Grep fully-qualified `monkeypatch.setattr("forge.cli.policy.…")` (e.g.
   `test_policy_supervisor.py:773/789/1134`, `test_policy_shadow.py:56/63/66`) and any on
   `forge.cli.hooks.direct_commands` (currently none). Assertion: a written list of the mutation ops + every patched
   symbol in a moved path + whether it stays importable at `forge.cli.policy` or the test is repointed.
-- [ ] **A1.1 Create `core/ops/policy.py`** with `supervisor_{set,off,on,remove,reload,cascade}(...)` returning
+- [x] **A1.1 Create `core/ops/policy.py`** with `supervisor_{set,off,on,remove,reload,cascade}(...)` returning
   structured results + typed errors (cascade's eager plan-resolution failure is a typed error the CLI/`%` responder
   renders — no `sys.exit`/print in the op). Assertion:
   `rg -n "click|rich|sys\.exit|print\(" src/forge/core/ops/policy.py` empty (test-guarded).
-- [ ] **A1.2 Repoint `cli/policy.py`** supervisor leaves (incl. `cascade` `:1488`) to delegate; CLI keeps all rendering
+- [x] **A1.2 Repoint `cli/policy.py`** supervisor leaves (incl. `cascade` `:1488`) to delegate; CLI keeps all rendering
   \+ exit codes (incl. cascade's exit-1-when-no-plan).
-- [ ] **A1.3 Repoint `%direct` `_handle_policy_supervisor` (`direct_commands.py:753`, cascade branch `:938`)** to the
+- [x] **A1.3 Repoint `%direct` `_handle_policy_supervisor` (`direct_commands.py:753`, cascade branch `:938`)** to the
   same op; the `%` responder keeps block/allow JSON.
-- [ ] **A1.4 Behavior parity across all six verbs.** Same manifest mutation and same `%direct` JSON before/after for
+- [x] **A1.4 Behavior parity across all six verbs.** Same manifest mutation and same `%direct` JSON before/after for
   set/off/on/remove/reload/cascade (row A1-a).
 
 **Exit signal:** every supervisor mutation lives once; both surfaces delegate; no Click/print in the op.
 
 ## Slice A2 — routing-override + one-posture proxy-id recovery + contract fixes
 
-- [ ] **A2.1 `recover_proxy_id_from_base_url(...)` — best-effort wrapper in `proxy/proxies.py`** beside
+- [x] **A2.1 `recover_proxy_id_from_base_url(...)` — best-effort wrapper in `proxy/proxies.py`** beside
   `find_by_base_url` (Q3). Posture: return `None` + `logger.debug(..., exc_info=True)` on failure. Repoint all 4 sites
   (`claude_session.py:1205`, `:1389`; `session_context.py:476`; `session_start.py:335`). **Do not change
   `find_by_base_url`'s fail-loud primitive posture.** Assertion: **regression test** proves the wrapper logs (caplog) +
   returns None when the registry raises, while `find_by_base_url` still propagates the error.
-- [ ] **A2.2 Routing-override / effective-proxy helpers live in ops only.** Collapse `claude_session.py:909` (+
+- [x] **A2.2 Routing-override / effective-proxy helpers live in ops only.** Collapse `claude_session.py:909` (+
   routing-override) vs `cli/session.py` twins; CLI imports the op. Assertion: no local routing-override/effective- proxy
   helper in `cli/session.py`.
-- [ ] **A2.3 `list_sessions_older_than(ctx, scope)` matches its sibling contract** so `cli/session_manage.py:437` stops
+- [x] **A2.3 `list_sessions_older_than(ctx, scope)` matches its sibling contract** so `cli/session_manage.py:437` stops
   importing op-private `_scope_filters`. Assertion: `rg "_scope_filters" src/forge/cli/` empty.
-- [ ] **A2.4 `ActiveSessionStore.is_live` public** so `core/ops/gc.py:424` uses the public method. Assertion:
+- [x] **A2.4 `ActiveSessionStore.is_live` public** so `core/ops/gc.py:424` uses the public method. Assertion:
   `rg "_entry_is_live" src/forge/core/ops/gc.py` empty.
 
 **Exit signal:** CLI imports no op-private symbol; proxy-id recovery has one logging posture.
@@ -102,16 +103,21 @@ as their own PRs.
 
 ## Design-doc / memory sync
 
-- [ ] Note `core/ops/policy.py` as the supervisor-lifecycle op home in `design.md` §3.12; verify §3.5 ownership wording
+- [x] Note `core/ops/policy.py` as the supervisor-lifecycle op home in `design.md` §3.12; verify §3.5 ownership wording
   still holds (hooks write `confirmed`; ops are UI-agnostic).
-- [ ] **impl_notes candidate (human-review gate):** proxy-id recovery has one logged fail-open wrapper in `proxies.py`;
+- [x] **impl_notes candidate (human-review gate):** proxy-id recovery has one logged fail-open wrapper in `proxies.py`;
   `find_by_base_url` stays fail-loud — do not reintroduce a bare `except: pass` copy or merge the two postures.
 
-## Closeout (pending)
+## Closeout
 
-- [ ] A1-a/b + A2-a/b green; focused suites pass.
-- [ ] `make pre-commit` clean; touched-file `ruff`.
-- [ ] Integration run for the session-start recovery site (A2.1 touches `session_start.py`) —
+- [x] A1-a/b + A2-a/b green; focused suites pass:
+  `uv run pytest tests/src/core/ops/test_policy_ops.py tests/src/cli/test_policy_supervisor.py tests/src/cli/test_user_prompt_dispatcher.py tests/src/core/ops/test_session_ops.py tests/src/core/ops/test_gc.py tests/src/cli/test_session_start_delete.py tests/src/cli/test_session_fork.py tests/src/cli/test_session_list_show.py tests/src/cli/test_session_resume_review.py tests/regression/test_bug_proxy_id_recovery_error_posture.py -q`
+  (390 passed);
+  `uv run pytest tests/src/session/hooks/test_session_start.py tests/src/proxy/test_proxies.py tests/regression/test_bug_proxy_id_recovery_error_posture.py -q`
+  (48 passed); `uv run pytest tests/src/cli/test_policy_shadow.py tests/src/cli/test_policy_supervisor.py -q` (90
+  passed).
+- [x] `make pre-commit` clean; touched-file `ruff`.
+- [x] Integration run for the session-start recovery site (A2.1 touches `session_start.py`) —
   `./scripts/test-integration.sh` on the artifact/session-start path.
-- [ ] `change_log.md` entry per shipped slice.
-- [ ] Move card `doing/ → done/`.
+- [x] `change_log.md` entry per shipped slice.
+- [x] Move card `doing/ → done/`.

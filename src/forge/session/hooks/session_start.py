@@ -333,16 +333,13 @@ def handle_session_start(
 
                 # Derive proxy_id from registry (current truth, not stale env)
                 if base_url:
-                    try:
-                        from forge.proxy.proxies import ProxyRegistryStore
+                    from forge.proxy.proxies import recover_proxy_entry_from_base_url
 
-                        entry = ProxyRegistryStore().find_by_base_url(base_url)
-                        if entry:
-                            proxy_id = entry.proxy_id
-                            if not template:
-                                template = entry.template
-                    except Exception:
-                        pass  # Fail-open: registry unavailable
+                    entry = recover_proxy_entry_from_base_url(base_url)
+                    if entry:
+                        proxy_id = entry.proxy_id
+                        if not template:
+                            template = entry.template
 
                 if base_url:
                     confirmed.started_with_proxy = StartedWithProxy(

@@ -250,10 +250,10 @@ def _extract_transcript_model(line: str) -> str | None:
 
 def list_sessions_older_than(
     *,
+    ctx: ExecutionContext,
     older_than_days: int,
     include_incognito: bool = True,
-    project_root_filter: str | None = None,
-    forge_root_filter: str | None = None,
+    scope: str = "workspace",
 ) -> list[tuple[str, SessionIndexEntry]]:
     """List sessions whose last_accessed_at is older than the threshold.
 
@@ -265,7 +265,11 @@ def list_sessions_older_than(
 
     from forge.core.state import parse_iso
 
+    if scope not in VALID_SCOPES:
+        raise ForgeOpError(f"Invalid scope: {scope!r}. Must be one of {VALID_SCOPES}")
+
     manager = SessionManager()
+    project_root_filter, forge_root_filter = _scope_filters(ctx, scope)
     all_sessions = manager.list_sessions(
         include_incognito=include_incognito,
         project_root_filter=project_root_filter,

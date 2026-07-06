@@ -1310,6 +1310,33 @@ def _make_bare_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Sessi
 class TestGuardSupervisorToggle:
     """Test %policy supervisor off/on/remove/reload toggle commands."""
 
+    def test_bare_target_sets_supervisor(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+
+        store = _make_bare_session(tmp_path, monkeypatch)
+        source_state = SimpleNamespace(
+            forge_root=str(tmp_path),
+            confirmed=SimpleNamespace(started_with_proxy=None),
+        )
+        monkeypatch.setattr(
+            "forge.policy.semantic.supervisor.validate_supervisor_target",
+            lambda _target, forge_root=None: source_state,
+        )
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervisor planner", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["reason"] == "Supervisor set to 'planner'"
+
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.resume_id == "planner"
+        assert updated.intent.policy.supervisor.direct is True
+
     def test_old_supervise_verb_falls_through_to_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Slice 10 clean break: the old `%policy supervise` verb is no longer recognized."""
         store = _make_supervised_session(tmp_path, monkeypatch)
