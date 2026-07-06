@@ -44,6 +44,10 @@ from forge.cli.session_supervisor_options import (
     supervisor_option_error,
     supervisor_options,
 )
+from forge.core.models.direct_model import (
+    DirectModelPin,
+    resolve_direct_model_pin,
+)
 from forge.core.ops.claude_session import (
     ClaudeForkResult,
     ClaudeLaunchPreferences,
@@ -64,10 +68,6 @@ from forge.session import (
     SessionState,
 )
 from forge.session.context_limit import _resolve_context_limit
-from forge.session.direct_model import (
-    DirectModelPin,
-    resolve_direct_model_pin,
-)
 from forge.session.exceptions import (
     BranchExistsError,
     BranchInUseError,

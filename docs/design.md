@@ -1241,7 +1241,9 @@ multi-forge/
 │   │   ├── core/        # Shared libraries
 │   │   │   ├── llm/     # LLM client abstraction (see design_appendix.md §E)
 │   │   │   ├── auth/    # Auth flows (LiteLLM, credential store)
-│   │   │   ├── models/  # Model catalog (forge.models.yaml)
+│   │   │   ├── models/  # Model catalog (forge.models.yaml) + direct-model pins
+│   │   │   ├── paths.py # Cross-cutting path helpers, including git-root discovery
+│   │   │   ├── transcript.py # Shared Claude transcript parsing primitives
 │   │   │   └── state/   # File-based state helpers
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system

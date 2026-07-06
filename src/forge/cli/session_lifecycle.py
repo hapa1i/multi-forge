@@ -38,6 +38,11 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
+from forge.core.models.direct_model import (
+    DirectModelPin,
+    resolve_direct_model_pin,
+    token_estimate_multiplier_for_direct_model,
+)
 from forge.core.naming import generate_unique_name
 from forge.core.ops.claude_session import (
     ClaudeLaunchPreferences,
@@ -71,11 +76,6 @@ from forge.session import (
     SessionStore,
 )
 from forge.session.context_limit import _resolve_context_limit
-from forge.session.direct_model import (
-    DirectModelPin,
-    resolve_direct_model_pin,
-    token_estimate_multiplier_for_direct_model,
-)
 from forge.session.exceptions import (
     BranchExistsError,
     SessionNotFoundError,

@@ -201,9 +201,9 @@ Run these when living board docs start to feel bulky:
 
 ```bash
 wc -l docs/board/*.md docs/board/*/*/*.md
-./scripts/count-tokens.py --model <agent-model> docs/board/change_log.md
-./scripts/count-tokens.py --model <agent-model> docs/board/impl_notes.md
-./scripts/count-tokens.py --model <agent-model> docs/board/doing/<slug>/checklist.md
+./scripts/count-tokens.py docs/board/change_log.md
+./scripts/count-tokens.py docs/board/impl_notes.md
+./scripts/count-tokens.py docs/board/doing/<slug>/checklist.md
 ```
 
 Compact `change_log.md` by summarizing the oldest tail entries first. Preserve dates, goals, decisions, verification,

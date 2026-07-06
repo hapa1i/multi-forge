@@ -81,21 +81,42 @@ diff size. Every sentence must earn its place by actively helping someone review
 Before committing or opening or updating a PR re-read your generated description. **Delete any sentence** that is
 filler, states the obvious, or would not change how a human reviews, tests, or understands the commit or the PR.
 
-## Release Process
+## GitHub CLI Auth
 
-Version is in `pyproject.toml`. Publishing is tag-triggered via GitHub Actions (trusted publishing, no local credentials
-needed):
+`gh` authenticates with `GH_TOKEN`, sourced by direnv from `~/.keys/github_token`. Long-lived shells can keep a stale
+token after that file changes, so `gh` reports `Bad credentials` even though SSH `git push` still works (SSH auth is
+separate). Re-evaluate `.envrc` per command rather than trusting the already-loaded environment:
 
 ```bash
-# 1. Bump version in pyproject.toml on main
-# 2. Create an annotated tag and push
-git tag -a v0.X.Y -m "Release v0.X.Y"
-git push origin v0.X.Y
-# 3. Create a GitHub release
-gh release create v0.X.Y --title "v0.X.Y" --notes "..."
+direnv exec . gh auth status
+direnv exec . gh pr create --base main ...
+direnv exec . gh release create vX.Y.Z --notes-file <notes.md> --latest
 ```
 
-The `Publish to PyPI` workflow (`.github/workflows/publish.yml`) builds and publishes on any `v*` tag push.
+`gh` gives `GH_TOKEN` precedence over stored credentials, so unsetting it makes `gh` look logged out even when
+`git push` works — re-source `.envrc`, don't clear the token. Never print token values; probe with status-only calls
+through `direnv exec .`.
+
+With multiple remotes (this clone has `origin` plus a parent upstream), `gh pr create` can misresolve the branch or
+target the wrong repo. Pin coordinates explicitly: `gh pr create --repo <owner>/<repo> --base main --head <branch>`.
+
+## Release Process
+
+Version lives in `pyproject.toml`. PyPI publishing is automated: pushing an annotated `v*` tag triggers
+`.github/workflows/publish.yml` (trusted publishing via OIDC — no local PyPI credentials needed).
+
+Release checklist:
+
+1. Verify current version and latest tag: `rg -n '^version =' pyproject.toml && git tag --sort=-v:refname | head`.
+2. Bump `pyproject.toml`, then `uv lock` so `uv.lock` records the new version.
+3. Build locally before tagging: `uv build`.
+4. Run `make pre-commit` (release-appropriate checks).
+5. Commit on `main`, tag, and push both: `git commit -m "chore: release X.Y.Z"`, `git tag -a vX.Y.Z -m "Release X.Y.Z"`,
+   `git push origin main vX.Y.Z`.
+6. Confirm the `Publish to PyPI` workflow succeeds and PyPI lists the new wheel + sdist:
+   `https://pypi.org/pypi/multi-forge/X.Y.Z/json` and `https://pypi.org/simple/multi-forge/`.
+7. Create the GitHub release after the tag exists (see GitHub CLI Auth above for the `direnv exec .` prefix):
+   `direnv exec . gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes.md> --latest`.
 
 ## Work Board Quick Semantics
 

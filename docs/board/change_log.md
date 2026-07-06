@@ -27,6 +27,19 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### test_mirror_and_contract_cleanup implementation: Test mirror and shared contract cleanup
+
+**Goal**: Restore test mirrors and collapse duplicated support seams.
+
+**Key changes**:
+
+- Moved statusline, Claude session, and direct-model tests into mirrored packages.
+- Deleted the sidecar secrets shim; folded remaining coverage into core auth.
+- Shared Codex result/proxy setup, transcript parsing, git-root walking, workflow tips, and direct-model pins.
+
+**Verification**: Focused slice sweep (1045 passed); affected formatter rerun (288 passed); touched-file
+`uv run ruff check`; `make pre-commit`.
+
 ### ops_policy_seam implementation: Policy command-core seam
 
 **Goal**: Move shared policy-supervisor mutations behind a UI-agnostic op layer and close the drifted proxy-id recovery

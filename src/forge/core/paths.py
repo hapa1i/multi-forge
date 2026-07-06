@@ -25,6 +25,23 @@ def display_path(path: str | Path) -> str:
     return s
 
 
+def find_git_root(start: Path) -> Path | None:
+    """Walk up from ``start`` looking for ``.git``.
+
+    Returns the resolved directory containing ``.git`` or None when ``start``
+    is not inside a git checkout.
+    """
+    current = start.resolve()
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+
+    if (current / ".git").exists():
+        return current
+    return None
+
+
 def get_forge_home() -> Path:
     """Get the forge home directory (~/.forge).
 

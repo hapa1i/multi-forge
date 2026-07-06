@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from forge.session.direct_model import (
+from forge.core.models.direct_model import (
     apply_direct_model_env,
     apply_proxy_context_model_defaults,
     direct_model_env,

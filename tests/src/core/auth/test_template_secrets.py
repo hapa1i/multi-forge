@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
 from forge.core.auth.template_secrets import (
     TEMPLATE_ENV_VARS,
@@ -13,6 +15,21 @@ from forge.core.auth.template_secrets import (
     resolve_env_or_credential,
     resolve_env_or_credential_with_source,
 )
+
+
+@pytest.fixture
+def creds_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point FORGE_HOME to tmp_path so credential file resolution is isolated."""
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    return tmp_path / "credentials.yaml"
+
+
+def _write_creds(path: Path, profile: str, secrets: dict[str, str]) -> None:
+    """Write a minimal credentials file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {"version": 1, "profiles": {profile: secrets}}
+    with path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f)
 
 
 class TestTemplateSecrets:
@@ -26,6 +43,12 @@ class TestTemplateSecrets:
     def test_local_templates_require_provider_key(self) -> None:
         assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-local"]
         assert "OPENAI_API_KEY" in TEMPLATE_ENV_VARS["litellm-openai-local"]
+        assert "ANTHROPIC_API_KEY" in TEMPLATE_ENV_VARS["litellm-anthropic-local"]
+
+    def test_local_variant_templates_require_provider_key(self) -> None:
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-test"]
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-flash-local"]
+        assert "OPENAI_API_KEY" in TEMPLATE_ENV_VARS["litellm-openai-codex-local"]
 
     def test_openrouter_templates_require_api_key(self) -> None:
         for name in (
@@ -189,6 +212,26 @@ class TestGetSecretsForTemplate:
         result = get_secrets_for_template("litellm-gemini-local")
         assert result == {"GEMINI_API_KEY": "gkey"}
 
+    def test_remote_litellm_templates_resolve_api_key_and_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITELLM_API_KEY", "sk-test")
+        monkeypatch.setenv("LITELLM_BASE_URL", "https://litellm.corp.example.com")
+
+        for template in ("litellm-openai", "litellm-gemini"):
+            assert get_secrets_for_template(template) == {
+                "LITELLM_API_KEY": "sk-test",
+                "LITELLM_BASE_URL": "https://litellm.corp.example.com",
+            }
+
+    def test_missing_secret_not_included(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        assert get_secrets_for_template("litellm-openai") == {}
+
+    def test_empty_secret_not_included(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITELLM_API_KEY", "")
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        assert get_secrets_for_template("litellm-openai") == {}
+
     def test_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         with patch(
@@ -197,6 +240,53 @@ class TestGetSecretsForTemplate:
         ):
             result = get_secrets_for_template("litellm-gemini-local")
             assert result == {"GEMINI_API_KEY": "file-gkey"}
+
+
+class TestGetSecretsForTemplateCredentialFile:
+    """Verify template-scoped resolution through the real credential file path."""
+
+    def test_falls_back_to_credential_file(self, creds_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        _write_creds(creds_file, "default", {"GEMINI_API_KEY": "AIza-from-file"})
+
+        assert get_secrets_for_template("litellm-gemini-local") == {"GEMINI_API_KEY": "AIza-from-file"}
+
+    def test_env_overrides_credential_file(self, creds_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("GEMINI_API_KEY", "AIza-from-env")
+        _write_creds(creds_file, "default", {"GEMINI_API_KEY": "AIza-from-file"})
+
+        assert get_secrets_for_template("litellm-gemini-local") == {"GEMINI_API_KEY": "AIza-from-env"}
+
+    def test_file_fallback_uses_active_profile(self, creds_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        monkeypatch.setenv("FORGE_PROFILE", "work")
+        data = {
+            "version": 1,
+            "profiles": {
+                "default": {},
+                "work": {"LITELLM_API_KEY": "sk-from-work-profile"},
+            },
+        }
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        with creds_file.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f)
+
+        assert get_secrets_for_template("litellm-openai") == {"LITELLM_API_KEY": "sk-from-work-profile"}
+
+    def test_corrupt_file_returns_empty(self, creds_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        creds_file.write_text("{corrupt yaml: [unterminated", encoding="utf-8")
+
+        assert get_secrets_for_template("litellm-openai") == {}
+
+    def test_missing_file_returns_empty(self, creds_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+
+        assert get_secrets_for_template("litellm-openai") == {}
 
 
 class TestAuthIgnoreEnv:

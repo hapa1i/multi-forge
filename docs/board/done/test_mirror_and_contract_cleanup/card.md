@@ -1,13 +1,12 @@
 # test_mirror_and_contract_cleanup -- restore the test-mirror, fixture, output-helper, and shared-seam contracts
 
-**Lane**: `proposed/` -- accepted-candidate refactor batch, not yet scheduled. Mostly behavior-preserving structural
-corrections to test layout and contract boundaries, plus **one defect-fix slice** (Slice 5, transcript alias
-normalization). Independently shippable slices.
+**Lane**: `doing/` -- picked up 2026-07-06 as a single batch card (not per-slice member cards; rationale in
+`checklist.md` pickup decisions). Mostly behavior-preserving structural corrections to test layout and contract
+boundaries, plus **one defect-fix slice** (Slice 5, transcript alias normalization). Independently shippable slices.
 
-**When accepted**: this is a batch of independent contract fixes, not one seam. Per `docs/developer/board_contract.md`
-(epics coordinate independently shippable members), promote it as **separate member cards per slice** -- or an
-`epic_test_contracts` coordinator if they need shared sequencing -- rather than moving the whole batch to `doing/` at
-once.
+**Original acceptance note (superseded)**: the draft suggested promoting separate member cards per slice, or an
+`epic_test_contracts` coordinator if shared sequencing emerged. Pickup review chose a single batch card instead; see
+`checklist.md` "Pickup decisions" for the rationale and split-if-it-grows escape hatch.
 
 **Origin**: full-codebase refactor audit, 2026-07-05 (`/refactor_audit whole repo --full`; cross-cutting contract
 sweeper + areas cli-session, review-search-sidecar-skills). The subpackage-mirror gaps and the back-compat shim were
@@ -20,8 +19,9 @@ violation," not one contract; each is independently shippable (see When accepted
 **References**: `docs/developer/testing_guidelines.md` (1:1 test mirroring; 3+ identical monkeypatches -> shared
 fixture); `docs/developer/coding_standards.md` §5 (internal clean-break -- delete shims, update callers atomically);
 `CLAUDE.md` (recovery output only via `forge.cli.output`; test-enforced); `docs/design.md` §3.5;
-`docs/board/impl_notes.md` (memory/transfer vocabulary -- `core/transcript.py` as the documented dual-format seam); PR
-#77 (`08e4a787`, the session-test split -- see item 1).
+`docs/board/impl_notes.md` (memory/transfer vocabulary); `core/transcript.py:1-9` (module docstring -- the dual-format
+parsing seam; **named only in the code docstring today, not in design.md/impl_notes** -- Slice 5 would add it); PR #77
+(`08e4a787`, the session-test split -- see item 1).
 
 ---
 
@@ -42,10 +42,10 @@ a mandatory regression test.
    modules) are tested by flat files in the parent test dir (`tests/src/cli/test_statusline_registry.py`,
    `tests/src/session/test_claude_paths.py`) instead of `tests/src/cli/statusline/` and `tests/src/session/claude/`.
    (Unaffected by #77 -- its new files are all flat in `tests/src/cli/`.)
-3. **Monkeypatch clustering above the documented 3+ threshold with no shared fixture.** A credential stub + proxy-server
-   stubs are patched identically across `tests/src/proxy/test_passthrough.py:212`, `test_responses_transport.py:549`,
-   `tests/src/review/test_models.py:273`, `tests/src/policy/team/test_handlers.py:372`,
-   `tests/src/session/test_memory_writer.py:735` while `tests/src/proxy/conftest.py:136` (`server_stubs`) lacks them.
+3. **Monkeypatch clustering above the documented 3+ threshold with no shared fixture.** First-pass audit grouped a
+   credential stub with proxy-server state stubs, but anchor re-verification split the finding: the credential patches
+   are behavior-divergent and stay explicit; the repeated proxy runtime-state baseline belongs behind an opt-in proxy
+   test fixture (see checklist Slice 2 / D1).
 4. **Recovery `Tip:` lines hand-rolled below the output-helper floor.** `review/routing.py:336,360` build recovery hints
    in exception messages instead of via `forge.cli.output` (the CLAUDE.md-enforced surface); `cli/workflow.py:193` is
    the render site.
@@ -63,9 +63,9 @@ a mandatory regression test.
    helpers. `core/transcript.py:1-9` documents itself as the shared home for "low-level parsing of Claude Code
    transcript files."
 
-Plus two placement smells: the byte-identical `_find_git_root` walkers (`cli/extensions.py:47`,
-`core/ops/context.py:65`, `cli/codex.py:131`, `session/claude/paths.py:181`) and the `direct_model` env-pin helper
-living in the session domain while serving review/ops/CLI.
+Plus two placement smells: the true-twin `_find_git_root` walkers (`cli/extensions.py:47`, `core/ops/context.py:65`; the
+`cli/codex.py` and `session/claude/paths.py` walkers deliberately differ) and the `direct_model` env-pin helper living
+in the session domain while serving review/ops/CLI.
 
 ---
 
@@ -102,6 +102,19 @@ living in the session domain while serving review/ops/CLI.
 | Git-root walker                            | one home (a `core/paths` leaf)                                | 4 copies                                     |
 
 ---
+
+> **[!] Superseded by `checklist.md` corrections (2026-07-06 anchor re-verification).** Two claims repeated in the
+> Target shape table (above) and the Phased plan table (below) did not survive a code check:
+>
+> - **"3+ monkeypatch -> fixture / 5 identical inline patches" (Slice 2):** the 5 credential patches are
+>   behavior-divergent across 4 test packages (one is a `@patch` decorator), not one shareable fixture. The real,
+>   in-scope duplication is the proxy runtime-state baseline: `_ensure_runtime_state` repeats across both proxy test
+>   files, and is often paired with `cost_tracker=None` in passthrough tests. Slice 2 is rescoped to an opt-in
+>   runtime-state fixture; the credential patches are left alone (D1).
+> - **"Git-root walker / 4 copies" (Slice 6):** only 2 of the 4 are true twins; `cli/codex.py:_project_root` and
+>   `session/claude/paths.py:find_project_root` are intentionally divergent contracts and are PRESERVED.
+>
+> **Follow `checklist.md` (Slices 2 and 6 + "Card corrections"), not these two tables' stale cells.**
 
 ## Phased plan (each slice independently landable; each promotable to its own member card)
 

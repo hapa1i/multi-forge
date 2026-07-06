@@ -160,11 +160,11 @@ Avoid AI filler words:
 
 ## Size Limits
 
-Agents degrade when docs grow too large. Use [`scripts/count-tokens.py`](../../scripts/count-tokens.py) with the
-relevant model:
+Agents degrade when docs grow too large. Use [`scripts/count-tokens.py`](../../scripts/count-tokens.py); it defaults to
+local tiktoken counting so size checks work offline:
 
 ```bash
-./scripts/count-tokens.py --model claude-sonnet-4-6 docs/design.md
+./scripts/count-tokens.py docs/design.md
 ```
 
 Hard guidance:

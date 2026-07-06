@@ -24,6 +24,7 @@ from forge.core.invoker import (
     HeadlessRequest,
     HeadlessResult,
 )
+from forge.core.models.direct_model import direct_model_env
 from forge.core.reactive.env import (
     FORGE_COMMAND_VAR,
     build_claude_env,
@@ -36,7 +37,6 @@ from forge.review.routing import (
     resolve_invocation_routing,
     resolve_model_flag,
 )
-from forge.session.direct_model import direct_model_env
 
 from .models import (
     DEFAULT_MODELS,

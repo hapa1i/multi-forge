@@ -24,6 +24,8 @@ from typing import Any, NamedTuple
 
 import click
 
+from forge.core.transcript import resolve_entry_role
+
 # Set up minimal logging for status line (stderr to avoid polluting stdout)
 logger = logging.getLogger(__name__)
 
@@ -407,20 +409,6 @@ def _cached_scan_transcript(transcript_path: str) -> TranscriptStats:
     return stats
 
 
-def _resolve_entry_role(entry: dict[str, Any]) -> str | None:
-    """Resolve entry role from either transcript format.
-
-    Old format: top-level "type" field ("user" | "assistant")
-    New format: "message.role" field ("user" | "assistant")
-    """
-    # Old format: entry.type
-    entry_type = entry.get("type")
-    if entry_type in ("user", "assistant"):
-        return entry_type
-    # New format: entry.message.role
-    return entry.get("message", {}).get("role")
-
-
 def scan_transcript(transcript_path: str) -> TranscriptStats:
     """Single-pass transcript scan for thinking, counts, and token metrics.
 
@@ -453,7 +441,7 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
                     continue
                 try:
                     entry = json.loads(line)
-                    role = _resolve_entry_role(entry)
+                    role = resolve_entry_role(entry)
 
                     if role == "user":
                         # In new format, tool_result messages also have role=user;

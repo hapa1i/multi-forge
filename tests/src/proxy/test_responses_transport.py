@@ -15,7 +15,6 @@ import pytest
 
 import forge.proxy.responses_ingress as ri
 import forge.proxy.responses_passthrough as rp
-import forge.proxy.server as server
 from forge.core.credential_registry import Credential, EnvVar
 
 
@@ -496,8 +495,8 @@ def _proxy_cfg(*, wire_shape: str, backend: str):
         ("openai_responses_passthrough", ""),  # right shape, empty source
     ],
 )
-async def test_responses_route_501_when_not_responses_capable(monkeypatch, wire_shape, backend):
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+async def test_responses_route_501_when_not_responses_capable(monkeypatch, proxy_runtime_ready, wire_shape, backend):
+    server = proxy_runtime_ready
     monkeypatch.setattr(server.config, "proxy", _proxy_cfg(wire_shape=wire_shape, backend=backend))
 
     resp = await ri.handle_responses_passthrough(_RawReq(), method="POST", url_path="/v1/responses")
@@ -506,10 +505,10 @@ async def test_responses_route_501_when_not_responses_capable(monkeypatch, wire_
 
 
 @pytest.mark.asyncio
-async def test_responses_route_forwards_when_capable(monkeypatch):
+async def test_responses_route_forwards_when_capable(monkeypatch, proxy_runtime_ready):
     # wire_shape + responses_ingress source both satisfied -> the gate opens and the
     # handler reaches forward() (stubbed), proving the conjunction is the gate.
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -540,9 +539,9 @@ async def test_responses_route_forwards_when_capable(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("body", [b"[]", b'"oops"', b"123", b"null"])
-async def test_responses_route_rejects_non_object_post_json(monkeypatch, body):
+async def test_responses_route_rejects_non_object_post_json(monkeypatch, proxy_runtime_ready, body):
     """Regression: valid-but-non-object JSON must not be transformed into no body."""
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -562,8 +561,8 @@ async def test_responses_route_rejects_non_object_post_json(monkeypatch, body):
 
 
 @pytest.mark.asyncio
-async def test_responses_route_bodyless_get_never_reads_json(monkeypatch):
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+async def test_responses_route_bodyless_get_never_reads_json(monkeypatch, proxy_runtime_ready):
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -648,10 +647,10 @@ def test_advertise_responses_ingress_matrix(wire_shape, source_id, expected):
 
 
 @pytest.mark.asyncio
-async def test_retrieve_with_usage_is_not_accounted(monkeypatch):
+async def test_retrieve_with_usage_is_not_accounted(monkeypatch, proxy_runtime_ready):
     """Regression: GET /v1/responses/{id} echoes the original response's usage; the
     server must NOT account it (no on_complete) or it double-counts tokens."""
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -692,8 +691,10 @@ async def test_retrieve_with_usage_is_not_accounted(monkeypatch):
         ("POST", "/v1/responses/input_tokens", False),  # token-count, top-level non-{id}
     ],
 )
-async def test_accounting_only_on_generation_endpoint(monkeypatch, method, url_path, should_account):
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+async def test_accounting_only_on_generation_endpoint(
+    monkeypatch, proxy_runtime_ready, method, url_path, should_account
+):
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -867,10 +868,10 @@ def _cap_tracker(*, on_cap_hit: str):
 
 
 @pytest.mark.asyncio
-async def test_responses_warn_mode_cap_attaches_spend_warning(monkeypatch):
+async def test_responses_warn_mode_cap_attaches_spend_warning(monkeypatch, proxy_runtime_ready):
     """Issue 3 regression: warn-mode caps forward the request AND surface the cap message
     in X-Spend-Warning (design.md). The bug forwarded silently with no header."""
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -900,9 +901,9 @@ async def test_responses_warn_mode_cap_attaches_spend_warning(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_responses_reject_mode_cap_returns_429_without_forwarding(monkeypatch):
+async def test_responses_reject_mode_cap_returns_429_without_forwarding(monkeypatch, proxy_runtime_ready):
     """Issue 3 companion: reject-mode caps return 429 with X-Spend-Warning, never forward."""
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )
@@ -1194,11 +1195,11 @@ async def test_forward_streaming_still_records_streaming_trace_mode(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch, caplog):
+async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch, caplog, proxy_runtime_ready):
     """Code-scanning #29 (py/stack-trace-exposure): a bearer-secret catalog error must NOT
     surface its message (source id, env var names) to the Codex client. The client gets a
     generic configuration error; the detail is logged server-side for the operator."""
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(
         server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", backend="codex-responses-local")
     )

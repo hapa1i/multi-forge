@@ -12,11 +12,11 @@ from click.testing import CliRunner
 from forge.cli.extensions import (
     _create_claude_dir,
     _detect_git_project_root,
-    _find_git_root,
     _resolve_project_root,
     _validate_anchor,
     extensions,
 )
+from forge.core.paths import find_git_root
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallScope
 
@@ -33,21 +33,21 @@ def test_scope_help_is_shared_across_extension_commands() -> None:
 
 
 class TestFindGitRoot:
-    """Tests for _find_git_root helper."""
+    """Tests for the shared find_git_root helper."""
 
     def test_finds_git_in_current_dir(self, tmp_path: Path) -> None:
         (tmp_path / ".git").mkdir()
-        assert _find_git_root(tmp_path) == tmp_path
+        assert find_git_root(tmp_path) == tmp_path.resolve()
 
     def test_finds_git_in_parent(self, tmp_path: Path) -> None:
         (tmp_path / ".git").mkdir()
         child = tmp_path / "src" / "deep"
         child.mkdir(parents=True)
-        assert _find_git_root(child) == tmp_path
+        assert find_git_root(child) == tmp_path.resolve()
 
     def test_returns_none_outside_git(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "nonexistent")
-        assert _find_git_root(tmp_path) is None
+        assert find_git_root(tmp_path) is None
 
 
 class TestDetectGitProjectRoot:

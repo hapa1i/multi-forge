@@ -32,7 +32,13 @@ import yaml
 from forge.core.llm.detection import ProviderType
 from forge.core.state import now_iso
 from forge.core.state.io import atomic_write_text
-from forge.core.transcript import parse_jsonl_transcript, truncate
+from forge.core.transcript import (
+    extract_entry_blocks,
+    group_entries_into_turns,
+    parse_jsonl_transcript,
+    resolve_entry_role,
+    truncate,
+)
 from forge.session.artifacts import resolve_artifact_path
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import SessionState
@@ -254,106 +260,17 @@ def estimate_transcript_tokens(transcript_path: Path, *, multiplier: float = 1.0
     return int((transcript_path.stat().st_size // 4) * multiplier)
 
 
-def _normalize_transcript_role(raw_role: Any) -> str | None:
-    """Normalize transcript role names across Claude transcript formats."""
-    if raw_role in ("user", "human"):
-        return "user"
-    if raw_role in ("assistant", "ai"):
-        return "assistant"
-    return None
-
-
-def _resolve_entry_role(entry: dict[str, Any]) -> str | None:
-    """Resolve an entry role from a Claude transcript entry.
-
-    System boundary: handles both Claude Code transcript formats:
-    - Modern: {"message": {"role": "assistant", ...}}
-    - Older: {"type": "assistant", ...}
-    """
-    message = entry.get("message")
-    if isinstance(message, dict):
-        resolved = _normalize_transcript_role(message.get("role"))
-        if resolved is not None:
-            return resolved
-
-    return _normalize_transcript_role(entry.get("type"))
-
-
-def _extract_entry_blocks(entry: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract normalized content blocks from a Claude transcript entry.
-
-    System boundary: handles both modern (message.content) and older
-    (entry.content / entry.text) Claude Code transcript formats.
-    """
-    message = entry.get("message")
-    if isinstance(message, dict):
-        content = message.get("content")
-        if isinstance(content, list):
-            return [block for block in content if isinstance(block, dict)]
-        if isinstance(content, str) and content:
-            return [{"type": "text", "text": content}]
-
-    content = entry.get("content")
-    if isinstance(content, list):
-        return [block for block in content if isinstance(block, dict)]
-    if isinstance(content, str) and content:
-        return [{"type": "text", "text": content}]
-
-    text = entry.get("text")
-    if isinstance(text, str) and text:
-        return [{"type": "text", "text": text}]
-
-    return []
-
-
-def _group_entries_into_turns(entries: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    """Group transcript entries into conversational turns.
-
-    Modern Claude transcripts use request IDs to tie user/tool/assistant events
-    together. Older or alternate formats may omit request IDs entirely, so we
-    fall back to grouping sequentially from each user/human turn.
-    """
-
-    grouped_turns: list[list[dict[str, Any]]] = []
-    request_groups: dict[str, list[dict[str, Any]]] = {}
-    current_fallback_group: list[dict[str, Any]] | None = None
-
-    for entry in entries:
-        request_id = entry.get("requestId")
-        if isinstance(request_id, str) and request_id:
-            current_fallback_group = None
-            group = request_groups.get(request_id)
-            if group is None:
-                group = []
-                request_groups[request_id] = group
-                grouped_turns.append(group)
-            group.append(entry)
-            continue
-
-        role = _resolve_entry_role(entry)
-        if role == "user":
-            current_fallback_group = [entry]
-            grouped_turns.append(current_fallback_group)
-        elif current_fallback_group is not None:
-            current_fallback_group.append(entry)
-        elif role == "assistant":
-            current_fallback_group = [entry]
-            grouped_turns.append(current_fallback_group)
-
-    return grouped_turns
-
-
 def _extract_turn_summary(entry: dict[str, Any]) -> dict[str, Any] | None:
     """Extract a summarized turn from a transcript entry.
 
     Returns:
         Dict with role, text, tools (list of tool summaries), or None if not a valid message.
     """
-    role = _resolve_entry_role(entry)
+    role = resolve_entry_role(entry)
     if role is None:
         return None
 
-    content = _extract_entry_blocks(entry)
+    content = extract_entry_blocks(entry)
     if not content:
         return None
 
@@ -494,7 +411,7 @@ def _generate_structured_context(
 
     if transcript_path and transcript_path.is_file():
         entries = parse_jsonl_transcript(transcript_path)
-        turn_groups = _group_entries_into_turns(entries)
+        turn_groups = group_entries_into_turns(entries)
 
         turn_num = 0
         for group in turn_groups:
@@ -642,7 +559,7 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
     was_truncated = False
     emitted_turns: set[int] = set()
 
-    for turn_num, group in enumerate(_group_entries_into_turns(entries), start=1):
+    for turn_num, group in enumerate(group_entries_into_turns(entries), start=1):
         for entry in group:
             summary = _extract_turn_summary(entry)
             if not summary:

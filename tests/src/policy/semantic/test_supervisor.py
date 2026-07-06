@@ -12,6 +12,7 @@ Tests cover:
 
 from __future__ import annotations
 
+from functools import partial
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,7 @@ from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
 from forge.policy.semantic.verdict import verdict_to_decision
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import LaneRecord, SupervisorConfig, create_session_state
+from tests.fixtures.codex_result import codex_result
 
 # --- Fixtures ---
 
@@ -52,24 +54,7 @@ def _make_config(**overrides: object) -> SupervisorConfig:
     return SupervisorConfig(**defaults)  # type: ignore[arg-type]
 
 
-def _codex_result(**overrides: Any) -> Any:
-    """Build a HeadlessResult shaped like ``CodexHeadlessInvoker.run`` returns (T4 codex arm).
-
-    Defaults to a clean exit-0 turn; pass ``runtime_is_error``/``returncode``/``stdout`` to
-    model a failed turn. Imported lazily so the helper has no import-time cost for the
-    (majority) claude-only tests.
-    """
-    from forge.core.invoker.types import HeadlessResult
-
-    defaults: dict[str, Any] = {
-        "label": "supervisor",
-        "stdout": "",
-        "stderr": "",
-        "returncode": 0,
-        "duration_seconds": 0.1,
-    }
-    defaults.update(overrides)
-    return HeadlessResult(**defaults)
+_codex_result = partial(codex_result, label="supervisor", stdout="")
 
 
 _VALID_VERDICT_STDOUT = '```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```'

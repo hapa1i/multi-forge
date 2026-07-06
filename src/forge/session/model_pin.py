@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from forge.config.schema import ProxyInstanceConfig
-from forge.session.direct_model import (
+from forge.core.models.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
     resolve_direct_model_pin,

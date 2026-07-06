@@ -14,7 +14,7 @@ from typing import Any, Generator
 
 import pytest
 
-from forge.session.direct_model import direct_model_env
+from forge.core.models.direct_model import direct_model_env
 from tests.fixtures.docker import (
     ContainerLike,
     clean_workspace,

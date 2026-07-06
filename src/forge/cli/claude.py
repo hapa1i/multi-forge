@@ -18,6 +18,10 @@ import httpx
 from rich.console import Console
 
 from forge.cli.output import err_console, print_error, print_error_with_tip
+from forge.core.models.direct_model import (
+    apply_direct_model_env,
+    apply_proxy_context_model_defaults,
+)
 from forge.core.paths import display_path
 from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
 from forge.proxy.proxies import (
@@ -25,10 +29,6 @@ from forge.proxy.proxies import (
     ProxyResolutionError,
 )
 from forge.session.context_limit import _get_context_limit_for_proxy
-from forge.session.direct_model import (
-    apply_direct_model_env,
-    apply_proxy_context_model_defaults,
-)
 
 console = Console()
 

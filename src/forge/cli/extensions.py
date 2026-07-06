@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.cli.output import print_error, print_tip
-from forge.core.paths import display_path
+from forge.core.paths import display_path, find_git_root
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.exceptions import (
     ForgeInstallError,
@@ -44,22 +44,6 @@ _log = logging.getLogger(__name__)
 _INSTALL_SCOPE_HELP = "Installation scope: local (gitignored), project (committed), user (global)"
 
 
-def _find_git_root(start: Path) -> Path | None:
-    """Walk up from *start* looking for ``.git``.
-
-    Returns the directory containing ``.git``, or None if not in a git repo.
-    Pure detector -- no side effects.
-    """
-    current = start.resolve()
-    while current != current.parent:
-        if (current / ".git").exists():
-            return current
-        current = current.parent
-    if (current / ".git").exists():
-        return current
-    return None
-
-
 def _detect_git_project_root(start: Path | None = None) -> Path | None:
     """Find the git root suitable for auto-creating ``.claude/`` (Rule 4).
 
@@ -67,7 +51,7 @@ def _detect_git_project_root(start: Path | None = None) -> Path | None:
     git root is the user's home directory.  Pure detector -- no side effects.
     """
     cwd = (start or Path.cwd()).resolve()
-    git_root = _find_git_root(cwd)
+    git_root = find_git_root(cwd)
     if git_root is None:
         return None
 

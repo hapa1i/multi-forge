@@ -16,6 +16,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
 
+from forge.core.models.direct_model import (
+    apply_direct_model_env,
+    apply_proxy_context_model_defaults,
+)
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
@@ -37,10 +41,6 @@ from forge.session.addendum import (
 )
 from forge.session.claude import build_claude_args, invoke_claude
 from forge.session.context_limit import _resolve_context_limit
-from forge.session.direct_model import (
-    apply_direct_model_env,
-    apply_proxy_context_model_defaults,
-)
 from forge.session.exceptions import (
     BranchExistsError,
     InvalidBranchNameError,

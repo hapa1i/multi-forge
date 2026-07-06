@@ -1,20 +1,20 @@
-#!/usr/bin/env -S uv run --group provider-check python
+#!/usr/bin/env -S uv run --with tiktoken python
 """Count tokens in documents.
 
-Calls the provider's free token-counting API when available, falls back to
-local tiktoken estimation.
+Defaults to local tiktoken estimation so size checks are deterministic and
+offline. Use --provider-api to opt into provider count_tokens APIs.
 
-Provider detection from --model:
+Provider detection from --model when --provider-api is set:
     claude-*         -> Anthropic count_tokens (free, needs ANTHROPIC_API_KEY)
     gemini-*         -> Gemini count_tokens (free, needs GEMINI_API_KEY)
     gpt-*, o1-*, ... -> tiktoken (local, no key needed)
     (unknown)        -> tiktoken cl100k_base fallback
 
 Usage:
-    count-tokens docs/design.md                        # default: claude-opus-4-6
-    count-tokens --model gemini-2.5-flash file.md      # Gemini API
-    count-tokens --model gpt-4 file.md                 # tiktoken (local)
-    count-tokens --model claude-opus-4-8               # Note the same tokenizer as claude-opus-4-6
+    count-tokens docs/design.md                        # local tiktoken by default
+    count-tokens --model claude-opus-4-8 file.md       # local tiktoken, no network
+    count-tokens --provider-api --model gemini-2.5-flash file.md
+    count-tokens --provider-api --model claude-opus-4-8 file.md
     cat file.txt | count-tokens                        # stdin
     count-tokens -q file.txt                           # quiet: number only
 """
@@ -92,12 +92,16 @@ def _count_tiktoken(text: str, model: str | None = None) -> int:
     return len(encoding.encode(text))
 
 
-def count_tokens(text: str, model: str) -> tuple[int, str]:
+def count_tokens(text: str, model: str, *, provider_api: bool = False) -> tuple[int, str]:
     """Count tokens using the best available method for the model.
 
-    Returns (count, method_description). Falls back to tiktoken if
-    the provider API is unavailable.
+    Returns (count, method_description). Defaults to local tiktoken. When
+    provider_api is True, tries the provider API first and falls back to
+    tiktoken if the provider API is unavailable.
     """
+    if not provider_api:
+        return _count_tiktoken(text, model), f"tiktoken local ({model})"
+
     provider = _detect_provider(model)
 
     if provider == "anthropic":
@@ -150,6 +154,17 @@ def main() -> None:
         default=DEFAULT_MODEL,
         help=f"Model for token counting (default: {DEFAULT_MODEL})",
     )
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--local",
+        action="store_true",
+        help="Use local tiktoken counting (default; no provider API calls)",
+    )
+    mode_group.add_argument(
+        "--provider-api",
+        action="store_true",
+        help="Try provider count_tokens APIs before falling back to tiktoken",
+    )
     parser.add_argument(
         "--quiet",
         "-q",
@@ -167,7 +182,7 @@ def main() -> None:
             print("0 tokens (empty input)")
         return
 
-    token_count, method = count_tokens(text, args.model)
+    token_count, method = count_tokens(text, args.model, provider_api=args.provider_api)
 
     if args.quiet:
         print(token_count)

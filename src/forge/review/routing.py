@@ -46,6 +46,21 @@ _DIRECT_CREDENTIAL = "anthropic-api"
 _PASSTHROUGH_PROVIDERS = frozenset({"openrouter"})
 
 
+class WorkflowRoutingError(RuntimeError):
+    """Workflow routing failure with structured CLI recovery guidance."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        tip_lines: Sequence[str] = (),
+        commands: Sequence[str] = (),
+    ) -> None:
+        super().__init__(message)
+        self.tip_lines = tuple(tip_lines)
+        self.commands = tuple(commands)
+
+
 @dataclass(frozen=True)
 class WorkerRoutingPlan:
     """Pre-resolved routing for all workers in a workflow invocation.
@@ -331,10 +346,12 @@ def _raise_no_route_error(spec: RoutableSpec, routes: tuple[ModelRoute, ...]) ->
         from forge.core.auth.template_secrets import resolve_env_or_credential
 
         if not routes:
-            raise RuntimeError(
-                f"No routes derived for model '{spec.name}' (family={spec.family}).\n"
-                f"Tip: Run 'forge proxy create <template>' for a compatible proxy,\n"
-                f"     or 'forge auth login' to configure credentials."
+            raise WorkflowRoutingError(
+                f"No routes derived for model '{spec.name}' (family={spec.family}).",
+                tip_lines=(
+                    "Run 'forge proxy create <template>' for a compatible proxy,",
+                    "or 'forge auth login' to configure credentials.",
+                ),
             )
 
         cred_name = routes[0].credential
@@ -354,11 +371,13 @@ def _raise_no_route_error(spec: RoutableSpec, routes: tuple[ModelRoute, ...]) ->
         template_ids = [r.template_id for r in routes if r.template_id]
         if template_ids:
             templates_str = ", ".join(template_ids[:3])
-            raise RuntimeError(
-                f"No running proxy found for model '{spec.name}'.\n"
-                f"  Compatible templates: {templates_str}\n"
-                f"  Tip: Run 'forge proxy create {template_ids[0]}' to create one,\n"
-                f"       or 'forge proxy start <id>' if one exists."
+            message = f"No running proxy found for model '{spec.name}'.\n  Compatible templates: {templates_str}"
+            raise WorkflowRoutingError(
+                message,
+                tip_lines=(
+                    f"Run 'forge proxy create {template_ids[0]}' to create one,",
+                    "or 'forge proxy start <id>' if one exists.",
+                ),
             )
 
         raise RuntimeError(f"No route found for model '{spec.name}' (family={spec.family}).")

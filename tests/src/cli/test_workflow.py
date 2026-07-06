@@ -17,7 +17,7 @@ from forge.review.models import (
     MultiReviewOutput,
     ReviewResult,
 )
-from forge.review.routing import WorkerRoutingPlan
+from forge.review.routing import WorkerRoutingPlan, WorkflowRoutingError
 
 
 def _auto_routing_plan(specs, **_kw):
@@ -484,6 +484,25 @@ class TestProxyFlag:
         assert "Routing failed" in result.output
         assert "gpt-5.5" in result.output
 
+    def test_panel_proxy_routing_error_renders_structured_tip(self):
+        """Routing recovery hints are rendered by the CLI output helper."""
+        runner = CliRunner()
+        with patch(
+            "forge.review.routing.resolve_invocation_routing",
+            side_effect=WorkflowRoutingError(
+                "No running proxy found for model 'gpt-5.5'.",
+                tip_lines=(
+                    "Run 'forge proxy create openrouter-openai' to create one,",
+                    "or 'forge proxy start <id>' if one exists.",
+                ),
+            ),
+        ):
+            result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--proxy", "dead-proxy"])
+        assert result.exit_code == 1
+        assert "Routing failed" in result.output
+        assert "Tip: Run 'forge proxy create openrouter-openai' to create one," in result.output
+        assert "or 'forge proxy start <id>' if one exists." in result.output
+
     def test_panel_proxy_not_found_exits_1(self):
         """Proxy registry errors are rendered as routing errors."""
         runner = CliRunner()
@@ -501,13 +520,17 @@ class TestProxyFlag:
         runner = CliRunner()
         with patch(
             "forge.review.routing.resolve_invocation_routing",
-            side_effect=RuntimeError("No running proxy"),
+            side_effect=WorkflowRoutingError(
+                "No running proxy",
+                tip_lines=("Run 'forge proxy create openrouter-openai' to create one.",),
+            ),
         ):
             result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--proxy", "dead-proxy", "--json"])
         assert result.exit_code == 1
         data = json.loads(result.output)
         assert "routing_error" in data
         assert "No running proxy" in data["routing_error"]
+        assert data["routing_tip"] == ["Run 'forge proxy create openrouter-openai' to create one."]
 
     def test_panel_resolves_routing_before_preflight(self, monkeypatch):
         """Preflight validates the actual --proxy routing plan."""
