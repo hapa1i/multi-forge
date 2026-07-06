@@ -31,10 +31,10 @@ _log = logging.getLogger(__name__)
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def runtime() -> None:
-    """Inspect agent-runtime capabilities (Claude Code, Codex, Gemini).
+    """Inspect agent-runtime capabilities (Claude Code and Codex).
 
-    Claude Code is the only launchable frontend today; the Codex and Gemini
-    entries describe detected capabilities for follow-up runtime work.
+    Claude Code and Codex entries describe detected capabilities for supported
+    runtime work.
 
     \b
     Examples:

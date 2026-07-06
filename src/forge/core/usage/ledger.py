@@ -9,7 +9,7 @@ usage attribution stays separate and is joined by run ids or proxy ``request_id`
 - ``telemetry/downstream/*.jsonl`` -- model attempts plus redacted audit/drift/mutation facts
 - ``usage/events/*.jsonl`` -- THIS plane: attribution, referencing downstream via
   nullable ``source_refs`` (``{cost_request_id, audit_request_id}``). Native-runtime
-  events (Codex/Gemini) carry units directly and leave ``source_refs`` null.
+  events (Codex) carry units directly and leave ``source_refs`` null.
 
 Location: ``~/.forge/usage/events/YYYY-MM_<pid>.jsonl`` (owner-only, 0600). PID-sharded
 like its siblings so concurrent writers (e.g. review workers across processes) never
@@ -55,7 +55,7 @@ MeasurementSource = Literal[
     "provider_usage_exact",  # in-band exact tokens: a direct core.llm call, OR a direct
     # `claude -p` envelope with usage but no cost (Phase 5, e.g. OAuth: tokens, no dollars)
     "runtime_native",  # a runtime self-reported its own cost+usage: a direct `claude -p
-    # --output-format json` run (Phase 5, claude_code) or a native codex/gemini runtime
+    # --output-format json` run (Phase 5, claude_code) or a native codex runtime
     "unattributed",  # no cost/token figure available (e.g. per-worker proxied claude -p)
 ]
 
@@ -103,7 +103,7 @@ class UsageEvent:
     # Required attribution core.
     run_id: str
     root_run_id: str
-    runtime: str  # "claude_code" | "codex" | "gemini" | ...
+    runtime: str  # "claude_code" | "codex" | ...
     command: str  # verb/origin: "panel" | "memory-writer" | "supervisor" | "tagger" | ...
     status: str  # "success" | "error" | "timeout" | "skipped"
 

@@ -15,10 +15,10 @@
 **Multi-runtime agent toolkit: proxy routing, cost control, session management, and policy enforcement for coding
 agents.**
 
-Forge sits between you and your coding agent (Claude Code by default, with Codex as an alternate runtime and Gemini
-next), adding persistent sessions, multi-provider model routing, cost visibility with spend caps, and autonomous
-verification. You run `forge session start` instead of `claude`; Forge then routes to your chosen model provider, tracks
-state across sessions, and enforces configured policies.
+Forge sits between you and your coding agent (Claude Code by default, with Codex as an alternate runtime), adding
+persistent sessions, multi-provider model routing, cost visibility with spend caps, and autonomous verification. You run
+`forge session start` instead of `claude`; Forge then routes to your chosen model provider, tracks state across
+sessions, and enforces configured policies.
 
 ```bash
 # Use Claude with session tracking (no proxy needed)

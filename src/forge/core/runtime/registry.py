@@ -1,9 +1,8 @@
 """Runtime registry: a declarative capability matrix for agent runtimes (Phase 4e).
 
-Forge orchestrates work across more than one agent runtime -- Claude Code today;
-Codex and Gemini as headless workers, Codex as a future frontend. Code that has to
-branch on "can this runtime do X?" should ask this registry instead of hard-coding
-Claude Code assumptions.
+Forge orchestrates work across more than one agent runtime -- Claude Code and
+Codex today. Code that has to branch on "can this runtime do X?" should ask this
+registry instead of hard-coding Claude Code assumptions.
 
 Each runtime is a frozen :class:`RuntimeSpec` (mirrors the ``Credential`` /
 ``CREDENTIALS`` pattern in ``core/credential_registry.py``): a module-level
@@ -14,9 +13,9 @@ install scopes?
 
 Honest capability encoding: where a runtime's support is *limited* (Codex hooks are
 ``enrollment_gated`` -- they fire only after a one-time interactive trust enrollment)
-or merely *planned* (Codex interactive is a target beta, not shipped), the field is a
-multi-state ``Literal`` rather than a ``bool`` -- the type itself carries the
-limitation instead of overstating parity.
+or merely planned (a target beta), the field is a multi-state ``Literal`` rather
+than a ``bool`` -- the type itself carries the limitation instead of overstating
+parity.
 
 Layering note: the Claude version probe lives in ``forge.install.version`` and is
 imported *lazily* inside :func:`_detect_claude` (matching the ``core -> install``
@@ -64,7 +63,9 @@ PolicyEnforcement = Literal["full", "partial", "none"]
 HookSupport = Literal["full", "gated", "enrollment_gated", "none"]
 
 # Where a runtime's usage/token figures come from.
-UsageSource = Literal["transcript_proxy", "jsonl_events", "json_stats"]
+# ``json_stats`` was removed with the Gemini CLI runtime; no supported runtime
+# currently reports through that mechanism.
+UsageSource = Literal["transcript_proxy", "jsonl_events"]
 
 
 def _probe_version(argv: tuple[str, ...]) -> str | None:
@@ -101,17 +102,13 @@ def _detect_codex() -> str | None:
     return _probe_version(("codex", "--version"))
 
 
-def _detect_gemini() -> str | None:
-    return _probe_version(("gemini", "--version"))
-
-
 @dataclass(frozen=True)
 class RuntimeSpec:
     """Capabilities of one agent runtime. Read via :data:`RUNTIMES` / :func:`get_runtime`."""
 
-    id: str  # "claude_code" | "codex" | "gemini"
+    id: str  # "claude_code" | "codex"
     display_name: str
-    headless_cmd: tuple[str, ...]  # ("claude","-p") | ("codex","exec") | ("gemini","-p")
+    headless_cmd: tuple[str, ...]  # ("claude","-p") | ("codex","exec")
     detect: Callable[[], str | None]  # best-effort version probe; None if undetermined
     interactive: InteractiveSupport
     headless: bool
@@ -143,8 +140,8 @@ class RuntimeSpec:
 
 
 # The capability matrix (runtime-abstraction card, "Runtime Capability Matrix").
-# Claude Code is fully populated; Codex/Gemini declare their *limits* as capability
-# values (not omissions), so a consumer never mistakes a gap for parity.
+# Claude Code is fully populated; Codex declares its *limits* as capability values
+# (not omissions), so a consumer never mistakes a gap for parity.
 RUNTIMES: dict[str, RuntimeSpec] = {
     "claude_code": RuntimeSpec(
         id="claude_code",
@@ -213,22 +210,6 @@ RUNTIMES: dict[str, RuntimeSpec] = {
             "(custom-provider `wire_api=chat` removed ~Feb 2026); a proxy fronting Codex must serve "
             "Responses on its Codex-facing endpoint (backend may be translated)."
         ),
-    ),
-    "gemini": RuntimeSpec(
-        id="gemini",
-        display_name="Gemini CLI",
-        headless_cmd=("gemini", "-p"),
-        detect=_detect_gemini,
-        interactive="none",  # not planned initially
-        headless=True,
-        native_hooks="none",  # no comparable hook target yet
-        pretool_policy="none",  # not initially
-        usage_source="json_stats",
-        native_resume=False,  # "capability-check first" -- unverified, so claim nothing
-        install_scopes=(),  # Forge does not manage Gemini install scopes yet
-        curated_transfer_in=True,  # initial message
-        curated_transfer_out=True,  # via headless invoker
-        note="Native resume unverified (capability-check first); API/Vertex route only; no native hooks.",
     ),
 }
 

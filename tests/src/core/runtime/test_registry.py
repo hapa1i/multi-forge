@@ -2,7 +2,7 @@
 
 The registry answers the seven capability questions from the runtime-abstraction
 card (installed / interactive / headless / hooks / usage / native resume / scopes)
-and encodes Codex/Gemini *limits* as values, never as parity-implying omissions.
+and encodes Codex *limits* as values, never as parity-implying omissions.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from forge.core.runtime.registry import _probe_version
 
 
 class TestRegistryShape:
-    def test_three_known_runtimes_in_declaration_order(self) -> None:
-        assert [s.id for s in list_runtimes()] == ["claude_code", "codex", "gemini"]
+    def test_known_runtimes_in_declaration_order(self) -> None:
+        assert [s.id for s in list_runtimes()] == ["claude_code", "codex"]
 
     def test_get_runtime_returns_spec(self) -> None:
         assert get_runtime("claude_code").display_name == "Claude Code"
@@ -74,19 +74,6 @@ class TestCodexSpec:
         assert s.note is not None and "default-on" in s.note and "trust-enrolled" in s.note
 
 
-class TestGeminiSpec:
-    def test_limits(self) -> None:
-        s = get_runtime("gemini")
-        assert s.interactive == "none"
-        assert s.native_hooks == "none"
-        assert s.hook_min_version is None and s.hook_feature_flag is None
-        assert s.pretool_policy == "none"
-        assert s.native_resume is False  # capability-check first -> claim nothing
-        assert s.usage_source == "json_stats"
-        assert s.headless_cmd == ("gemini", "-p")
-        assert s.install_scopes == ()
-
-
 class TestIsInstalled:
     def test_reflects_path_presence(self, monkeypatch) -> None:
         monkeypatch.setattr(
@@ -135,12 +122,12 @@ class TestProbeVersion:
 
     def test_falls_back_to_stderr(self, monkeypatch) -> None:
         # Some CLIs print --version to stderr; the probe reads either stream.
-        monkeypatch.setattr("forge.core.runtime.registry.shutil.which", lambda _n: "/usr/bin/gemini")
+        monkeypatch.setattr("forge.core.runtime.registry.shutil.which", lambda _n: "/usr/bin/codex")
         monkeypatch.setattr(
             "forge.core.runtime.registry.subprocess.run",
-            lambda *_a, **_k: MagicMock(returncode=0, stdout="", stderr="gemini 1.2.0\n"),
+            lambda *_a, **_k: MagicMock(returncode=0, stdout="", stderr="codex 1.2.0\n"),
         )
-        assert _probe_version(("gemini", "--version")) == "1.2.0"
+        assert _probe_version(("codex", "--version")) == "1.2.0"
 
     def test_finds_version_in_stderr_despite_stdout_banner(self, monkeypatch) -> None:
         # stdout has a non-version banner; the version is on stderr. Both streams are

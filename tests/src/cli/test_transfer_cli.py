@@ -171,7 +171,7 @@ class TestTransferRegenerate:
         assert "runtime=codex" in result.output
 
     def test_regenerate_rejects_unknown_target_runtime(self, runner: CliRunner, transfer_project: Path) -> None:
-        result = runner.invoke(main, ["session", "transfer", "regenerate", "planner", "--target-runtime", "gemini"])
+        result = runner.invoke(main, ["session", "transfer", "regenerate", "planner", "--target-runtime", "bogus"])
         assert result.exit_code != 0  # click.Choice rejects before the op runs
 
 

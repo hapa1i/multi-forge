@@ -40,7 +40,6 @@ def _codex_lane(model: str = "m") -> Lane:
 def test_runtime_execution_classifies_agents_and_core_llm():
     assert runtime_execution("claude_code") == "tool_agent"
     assert runtime_execution("codex") == "tool_agent"
-    assert runtime_execution("gemini") == "tool_agent"
     assert runtime_execution("core_llm") == "single_shot"
 
 

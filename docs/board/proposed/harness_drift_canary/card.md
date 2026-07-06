@@ -39,8 +39,7 @@ it catches the one class (downstream system-prompt injection) that even wire ins
 
 - **ToS-clean**: no TLS interception, no credential handling, no fingerprint divergence -- none of the
   account-suspension risk that defers the OAuth-MITM tier.
-- **Runtime-neutral**: works for `claude -p`, proxy routes, and (later) Codex/Gemini -- it observes outputs, not a
-  specific wire.
+- **Runtime-neutral**: works for `claude -p`, proxy routes, and Codex -- it observes outputs, not a specific wire.
 - **Flight-recorder-correct**: cheap enough to keep running *before* an incident, which is the only time an observer has
   value (see the timing trap in the runtime_abstraction decision note).
 - **Not coupled to runtime abstraction**: it is an eval/observability feature, not a runtime seam -- which is why it is
