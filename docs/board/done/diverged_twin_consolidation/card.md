@@ -1,9 +1,9 @@
 # diverged_twin_consolidation -- collapse already-drifted twin copies in the session family and cli-hooks
 
-**Lane**: `doing/` -- active phased card (branch `refactor/diverged-twin-consolidation`). Consolidation of
-must-stay-identical copies, several already drifted or bug-shipping; mostly behavior-preserving, with **two defect-fix
-slices** (Slice 1 restores the transcript-artifact type guard; Slice 2 fixes the `%policy check` nested-layout
-misorder). Independently shippable slices.
+**Lane**: `done/` -- shipped via PR #81 and closed out on `main`. Consolidation of must-stay-identical copies, several
+already drifted or bug-shipping; mostly behavior-preserving, with **two defect-fix slices** (Slice 1 restores the
+transcript-artifact type guard; Slice 2 fixes the `%policy check` nested-layout misorder). Independently shippable
+slices.
 
 > **Superseded (2026-07-05):** taken into `doing/` as a **single phased card** (this directory), mirroring the
 > `state_primitive_hoist` precedent. The per-slice member-card / epic suggestion below is not the active structure; each

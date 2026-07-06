@@ -36,6 +36,25 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Diverged twins: consolidate at the concept owner, characterize weak matches first (shipped 2026-07-06)
+
+The `diverged_twin_consolidation` card closed two real drifts and dropped two false positives. Durable rules for future
+refactor audits:
+
+- **Put shared helpers at the concept owner, not the first caller.** `session_runtime(state)` belongs beside
+  `SessionState` in `session.models`, not in a runtime-specific ops module. The TDD tests-first sort key belongs in
+  `policy.deterministic.base` next to `is_under_directory`, because it exists to mirror deterministic policy path
+  relevance.
+- **Do not extract across intentionally different degrade paths.** The codex consumer arms already share
+  `read_fresh_codex_preflight`; after that, supervisor, shadow-curation, and memory-writer failures map into different
+  contracts. A helper that erases those contracts is worse than duplicate-looking code.
+- **Characterize before aligning weak drift.** Context-limit routing looked like `proxy_id` vs `proxy_id or template`,
+  but production CLI proxy routing supplies `proxy_id` on the inline paths. Keep characterization tests for these
+  boundary contracts instead of forcing no-op consolidation.
+- **For hooks, share the core but preserve the signal channel.** Stop emits JSON and can block with exit 2 on
+  verification; StopFailure is fail-open; team hooks signal through exit code and stderr. Pin those observables before
+  extracting shared hook bodies.
+
 ### State primitive hoists keep byte formats and error contracts at the caller boundary (shipped 2026-07-06)
 
 Shared state helpers now live in `core` leaves, but callers still own their domain record shape and error vocabulary.

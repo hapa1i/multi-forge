@@ -198,5 +198,7 @@ Verification run so far (2026-07-06):
 ## Closeout
 
 - [x] Change-log entry in `docs/board/change_log.md` (single board log — not a per-card file).
-- [ ] Promote durable lessons to `impl_notes.md` after human review.
-- [ ] Move `doing/diverged_twin_consolidation/` → `done/` after final merge to `main`.
+- [x] Promote durable lessons to `impl_notes.md` after human review.
+- [x] Verified design/end-user docs: no public command shape, schema, or workflow docs needed separate updates beyond
+  the existing change-log and impl-note closeout.
+- [x] Move `doing/diverged_twin_consolidation/` → `done/` after final merge to `main`.
