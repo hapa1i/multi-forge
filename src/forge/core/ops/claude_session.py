@@ -208,6 +208,16 @@ class ClaudeResumeAction(Enum):
     FRESH_DERIVED = "fresh_derived"
 
 
+class RoutingLike(Protocol):
+    """Minimal routing shape shared by CLI and command-core resume callers."""
+
+    @property
+    def template(self) -> str | None: ...
+
+    @property
+    def base_url(self) -> str | None: ...
+
+
 @dataclass(frozen=True)
 class ClaudeResumeRouting:
     """CLI-resolved routing override carried into the render-free resume op."""
@@ -842,7 +852,7 @@ def fork_claude_session(
 def apply_resume_routing_override_to_state(
     *,
     state: SessionState,
-    routing: Any | None,
+    routing: RoutingLike | None,
     direct: bool,
 ) -> None:
     """Apply a CLI routing override to the in-memory state used for launch."""
@@ -872,7 +882,7 @@ def persist_resume_routing_override(
     *,
     forge_root: Path,
     session_name: str,
-    routing: Any | None,
+    routing: RoutingLike | None,
     direct: bool,
 ) -> None:
     """Persist resume routing intent without touching hook-owned confirmation."""

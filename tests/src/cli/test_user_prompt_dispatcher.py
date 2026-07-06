@@ -1469,6 +1469,26 @@ class TestGuardSupervisorToggle:
         assert updated.intent.policy.supervisor is not None
         assert updated.intent.policy.supervisor.plan_override_path == str(plan.resolve())
 
+    def test_reload_absolute_symlink_path_is_stored_as_provided(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = _make_supervised_session(tmp_path, monkeypatch)
+        real_plan = tmp_path / "real-plan.md"
+        real_plan.write_text("# The Plan")
+        symlink_plan = tmp_path / "linked-plan.md"
+        symlink_plan.symlink_to(real_plan)
+
+        runner = CliRunner()
+        payload = {"prompt": f"%policy supervisor reload {symlink_plan}", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.plan_override_path == str(symlink_plan)
+        assert updated.intent.policy.supervisor.plan_override_path != str(real_plan.resolve())
+
     def test_reload_extra_args_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_supervised_session(tmp_path, monkeypatch)
 

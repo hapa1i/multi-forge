@@ -39,11 +39,13 @@ posture.
 - Collapsed session routing override/effective-proxy helpers into `core/ops/claude_session.py` with CLI compatibility
   aliases.
 - Added logged best-effort proxy base-url recovery wrappers in `proxy/proxies.py`; kept `find_by_base_url()` fail-loud.
+- Aligned `%policy supervisor reload <absolute-path>` with CLI reload path semantics: absolute paths are stored as
+  provided, while relative paths still resolve from cwd.
 - Matched `list_sessions_older_than(ctx, scope)` to its sibling contract and added public
   `ActiveSessionStore.is_live()`.
 
 **Verification**: Focused suites covering policy ops/supervisor, `%direct`, session/gc contracts, proxy recovery,
-session-start hook, and policy-shadow coupling (390 passed, 48 passed, 90 passed); integration
+session-start hook, and policy-shadow coupling (392 passed, 48 passed, 90 passed); integration
 `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py -k TestSessionStartHook` (7 passed, 9
 deselected); touched-file `uv run ruff check`; `make pre-commit`.
 

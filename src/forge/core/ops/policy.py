@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import forge.policy.semantic.supervisor as supervisor_semantic
@@ -110,12 +110,12 @@ def supervisor_set(
     lock_timeout_s: float = 5.0,
     confirmed_lane_func: Callable[[SessionState, Consumer], LaneRecord | None] = confirmed_lane,
 ) -> SupervisorSetResult:
-    if supervisor_proxy and supervisor_direct:
-        raise SupervisorInputError("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
-    if cascade_flag is False:
-        raise SupervisorInputError("--no-cascade is redundant on set (cascade defaults to off)")
-
-    _validate_checker_model(checker_model)
+    validate_supervisor_set_input(
+        supervisor_proxy=supervisor_proxy,
+        supervisor_direct=supervisor_direct,
+        cascade_flag=cascade_flag,
+        checker_model=checker_model,
+    )
     checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
 
     lane_record = _resolve_requested_lane(runtime=runtime, backend=backend)
@@ -204,6 +204,21 @@ def supervisor_set(
     )
 
 
+def validate_supervisor_set_input(
+    *,
+    supervisor_proxy: str | None = None,
+    supervisor_direct: bool = False,
+    cascade_flag: bool | None = None,
+    checker_model: str | None = None,
+) -> None:
+    if supervisor_proxy and supervisor_direct:
+        raise SupervisorInputError("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
+    if cascade_flag is False:
+        raise SupervisorInputError("--no-cascade is redundant on set (cascade defaults to off)")
+
+    _validate_checker_model(checker_model)
+
+
 def supervisor_off(*, store: SessionStore, manifest: SessionState, lock_timeout_s: float = 5.0) -> None:
     if not _has_supervisor_with_target(manifest):
         raise SupervisorNotConfiguredError("No supervisor configured.")
@@ -284,11 +299,13 @@ def supervisor_cascade(
     checker_effort: str | None = None,
     lock_timeout_s: float = 5.0,
 ) -> SupervisorCascadeResult:
+    validate_supervisor_cascade_input(
+        state=state,
+        checker_model=checker_model,
+        checker_provider=checker_provider,
+        checker_effort=checker_effort,
+    )
     cascade_on = state == "on"
-    if not cascade_on and (checker_model or checker_provider or checker_effort):
-        raise SupervisorInputError("Checker options only apply when enabling cascade (state 'on')")
-
-    _validate_checker_model(checker_model)
 
     sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
     if not (sup and sup.resume_id):
@@ -330,23 +347,7 @@ def supervisor_cascade(
 
     store.update(timeout_s=lock_timeout_s, mutate=_enable_cascade)
 
-    preview = SupervisorConfig(
-        resume_id=sup.resume_id,
-        forge_root=sup.forge_root,
-        proxy=sup.proxy,
-        direct=sup.direct,
-        fork_session=sup.fork_session,
-        timeout_seconds=sup.timeout_seconds,
-        throttle_seconds=sup.throttle_seconds,
-        plan_override_path=sup.plan_override_path or plan_path,
-        cascade=True,
-        checker_model=sup.checker_model,
-        checker_provider=sup.checker_provider,
-        checker_budget_tokens=sup.checker_budget_tokens,
-        checker_effort=sup.checker_effort,
-        supervisor_effort=sup.supervisor_effort,
-        shadow_sample_rate=sup.shadow_sample_rate,
-    )
+    preview = replace(sup, plan_override_path=sup.plan_override_path or plan_path, cascade=True)
     supervisor_semantic.apply_checker_options(
         preview,
         checker_model=checker_model,
@@ -354,6 +355,20 @@ def supervisor_cascade(
         checker_effort=checker_effort,
     )
     return SupervisorCascadeResult(enabled=True, config=preview, source_desc=source_desc)
+
+
+def validate_supervisor_cascade_input(
+    *,
+    state: str,
+    checker_model: str | None = None,
+    checker_provider: str | None = None,
+    checker_effort: str | None = None,
+) -> None:
+    cascade_on = state == "on"
+    if not cascade_on and (checker_model or checker_provider or checker_effort):
+        raise SupervisorInputError("Checker options only apply when enabling cascade (state 'on')")
+
+    _validate_checker_model(checker_model)
 
 
 def _validate_checker_model(checker_model: str | None) -> None:
@@ -409,4 +424,6 @@ def _source_desc(source: str, session_name: str) -> str:
 
 
 def _has_supervisor_with_target(manifest: SessionState) -> bool:
-    return bool(manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id)
+    return bool(
+        manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
+    )

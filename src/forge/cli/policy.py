@@ -40,7 +40,6 @@ from forge.policy.semantic.supervisor import (
     resolve_supervisor_lane,
     supervisor_lane_backends,
     supervisor_lane_runtimes,
-    validate_checker_model,
 )
 from forge.policy.supervisor_lane_degrade import (
     read_supervisor_degrade,
@@ -54,6 +53,7 @@ from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
 from forge.session.models import (
+    LaneRecord,
     PolicyIntent,
     SessionState,
     SupervisorConfig,
@@ -1057,7 +1057,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
         console.print(f"  Plan override: {sup.plan_override_path}")
 
 
-def _reject_supervisor_lane_change(frozen: Any) -> None:
+def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
     """Print the already-bound supervisor-lane reject (caller exits 1)."""
     print_error_with_tip(
         "Cannot change the supervisor lane for an already-bound session.",
@@ -1160,17 +1160,17 @@ def supervisor_set(
         forge policy supervisor set planner --timeout 90  # Set with a longer check timeout
         forge policy supervisor set planner --cascade     # Set with the tier-1 cascade enabled
     """
-    if supervisor_proxy and supervisor_direct:
-        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
-        sys.exit(1)
-    if cascade_flag is False:
-        print_error("--no-cascade is redundant on set (cascade defaults to off)")
-        sys.exit(1)
     try:
-        validate_checker_model(checker_model)
-    except ValueError as e:
-        print_error(f"{e}")
-        print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
+        policy_ops.validate_supervisor_set_input(
+            supervisor_proxy=supervisor_proxy,
+            supervisor_direct=supervisor_direct,
+            cascade_flag=cascade_flag,
+            checker_model=checker_model,
+        )
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
+        if exc.tip:
+            print_tip(exc.tip, blank_before=False, console=console)
         sys.exit(1)
 
     cwd = Path.cwd().resolve()
@@ -1365,6 +1365,12 @@ def supervisor_cascade(
         forge policy supervisor cascade off   # Disable it
     """
     try:
+        policy_ops.validate_supervisor_cascade_input(
+            state=state,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+        )
         store, name, manifest = _resolve_supervisor_session(session_name)
         result = policy_ops.supervisor_cascade(
             store=store,
