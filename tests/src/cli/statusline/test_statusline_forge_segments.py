@@ -40,6 +40,7 @@ from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import render_segments
 from forge.core.ops.usage_summary import SupervisorHealth
+from forge.core.tiers import detect_tier_word
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
@@ -410,11 +411,9 @@ class TestDriftProducer:
         assert any("drift:" in s for s in _stream(ctx, ["drift"]))  # custom-model != gpt-4o
 
     def test_tier_detection_parity_with_proxy(self):
-        # explicit_tier_from_model is a deliberate 1:1 mirror of the proxy's
-        # _tier_from_model_name (status_line can't import proxy.server on the hot
-        # path). If the proxy's tier logic changes and the mirror doesn't, the drift
-        # segment silently replicates the wrong route. This guard fails on drift;
-        # the proxy is the source of truth. (Follow-up: extract a shared helper.)
+        # These three sites share the tier-word leaf; get_tier_from_display_name
+        # deliberately keeps its separate display-name defaulting behavior.
+        from forge.proxy.data_models import _detect_tier
         from forge.proxy.server import _tier_from_model_name
 
         corpus = [
@@ -431,7 +430,10 @@ class TestDriftProducer:
             "opusculum-7",  # shared naive-substring quirk: both must agree (-> opus)
         ]
         for model in corpus:
-            assert explicit_tier_from_model(model) == _tier_from_model_name(model), model
+            expected = detect_tier_word(model)
+            assert explicit_tier_from_model(model) == expected, model
+            assert _tier_from_model_name(model) == expected, model
+            assert _detect_tier({"model": model})["tier"] == expected, model
 
     def test_fable_rides_opus_tier(self):
         # Fable has no tier word of its own; both the model-id and display-name

@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### proxy_tier_resolvers B1: Tier-word resolver leaf
+
+**Goal**: Single-source proxy/statusline tier-word detection while preserving the deliberate display-name fallback
+divergence.
+
+**Key changes**:
+
+- Added `forge.core.tiers.detect_tier_word` for raw model-name tier detection, including the `fable -> opus` rule and
+  the existing naive substring behavior.
+- Repointed the three 1:1 mirror sites: proxy request validation, passthrough/server tier detection, and statusline
+  explicit-model tier detection.
+- Preserved `get_tier_from_display_name` unchanged: display names still check opus/fable first and default to `sonnet`
+  when no tier word is visible.
+- Updated the active card checklist and design directory map for the new neutral leaf.
+
+**Verification**:
+`uv run pytest tests/src/core/test_tiers.py tests/src/proxy/test_data_models.py tests/src/cli/statusline/test_statusline_forge_segments.py -q`;
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py`; touched-file `uv run ruff check`;
+`make pre-commit`.
+
 ### test_mirror_and_contract_cleanup implementation: Test mirror and shared contract cleanup
 
 **Goal**: Restore test mirrors and collapse duplicated support seams.

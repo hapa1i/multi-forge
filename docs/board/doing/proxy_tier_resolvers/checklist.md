@@ -12,8 +12,8 @@ ships on a fresh branch from post-B1 main. Independent of Seam A -- no shared co
 
 ## Current focus
 
-**Plan reviewed (round 2, 2026-07-06); decisions recorded; awaiting go-ahead to start B1.** B1 is low-risk (tier-word
-leaf); B2 is the money/wire work (`create_message`/`count_tokens` resolution + the port probe).
+**B1 implemented and verified on `refactor/proxy-tier-resolvers`; ready for PR 1.** B2 remains the money/wire follow-up
+(`create_message`/`count_tokens` resolution + the port probe) and ships on a fresh post-B1 branch.
 
 ### Recorded review decisions
 
@@ -71,18 +71,18 @@ read, not just located -- but line numbers drifted and #85 moved the statusline 
 
 ## Slice B1 -- `core/tiers.py` tier-word leaf (PR 1)
 
-- [ ] **B1.1 Create `core/tiers.py`** with one `detect_tier_word(model: str) -> str | None` (haiku/sonnet/opus, plus the
+- [x] **B1.1 Create `core/tiers.py`** with one `detect_tier_word(model: str) -> str | None` (haiku/sonnet/opus, plus the
   `fable → opus` rule). Neutral leaf -- no proxy/CLI imports. New unit test `tests/src/core/test_tiers.py` (archetype:
   the leaf never imports server/CLI).
-- [ ] **B1.2 Repoint the three mirror sites** to `detect_tier_word`:
+- [x] **B1.2 Repoint the three mirror sites** to `detect_tier_word`:
   - `proxy/data_models.py:_detect_tier` (`:20`) calls the leaf, then keeps its dict fields
     (`has_explicit_tier = tier is not None`); also repoint the `:232` opus/fable line.
   - `proxy/server.py:_tier_from_model_name` (`:764`) delegates.
   - `cli/status_line.py:explicit_tier_from_model` (`:353`) delegates.
   - Assertion: no residual tier-word loop / opus-or-fable literal remains at these sites.
-- [ ] **B1.3 DO NOT TOUCH** `cli/status_line.py:get_tier_from_display_name` (`:340`). Assertion: its body is
+- [x] **B1.3 DO NOT TOUCH** `cli/status_line.py:get_tier_from_display_name` (`:340`). Assertion: its body is
   byte-identical in the diff.
-- [ ] **B1.4 Drop the parity TODO.** Replace the "Follow-up: extract a shared helper" comment in
+- [x] **B1.4 Drop the parity TODO.** Replace the "Follow-up: extract a shared helper" comment in
   `tests/src/cli/statusline/test_statusline_forge_segments.py` with one parametrized parity test over the three
   delegating sites.
 
@@ -145,7 +145,7 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 
 ## Design-doc / memory sync
 
-- [ ] **PR 1 (B1):** add `core/tiers.py` to `design.md` §6 directory structure and cross-check `design.md` §3.7
+- [x] **PR 1 (B1):** add `core/tiers.py` to `design.md` §6 directory structure and cross-check `design.md` §3.7
   tier-selection precedence still describes the now single-sourced tier-word step.
 - [ ] **PR 2 (B2):** add `src/forge/proxy/ports.py` to `design.md` §6 directory structure.
 - [ ] **impl_notes candidate (human-review gate):** tier-word detection is single-sourced in `core/tiers.py`; the
@@ -154,7 +154,7 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 
 ## Closeout (per PR)
 
-- [ ] **PR 1 (B1):** B1-a/b/c green; `make pre-commit` clean; `test_status_line_integration.py` green; `change_log.md`
+- [x] **PR 1 (B1):** B1-a/b/c green; `make pre-commit` clean; `test_status_line_integration.py` green; `change_log.md`
   entry.
 - [ ] **PR 2 (B2):** B2.0 characterization committed green before B2.1; B2-a/b/c green; count-tokens smoke + proxy
   integration green; `server.py` LOC < 2494; `change_log.md` entry.

@@ -54,6 +54,7 @@ from forge.core.run_id import (
     is_valid_run_id,
 )
 from forge.core.telemetry.downstream import mint_downstream_event_id
+from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
@@ -767,14 +768,7 @@ def _tier_from_model_name(model: str) -> str | None:
     Mirrors data_models._detect_tier without constructing a MessagesRequest, so an
     explicit `claude-opus-*` request resolves tier_overrides.opus on passthrough.
     """
-    name = (model or "").lower()
-    for tier in ("haiku", "sonnet", "opus"):
-        if tier in name:
-            return tier
-    # Fable carries no tier word of its own; it rides the opus tier.
-    if "fable" in name:
-        return "opus"
-    return None
+    return detect_tier_word(model or "")
 
 
 async def _apply_passthrough_override(
