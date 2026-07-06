@@ -16,7 +16,6 @@ import logging
 import os
 import re
 import sys
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +26,8 @@ from rich.text import Text
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
-from forge.core.lanes import LaneError
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.core.ops import policy as policy_ops
 from forge.core.paths import display_path
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.policy.queries import (
@@ -38,24 +37,17 @@ from forge.policy.queries import (
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     SUPERVISOR_CONSUMER,
-    apply_checker_options,
     resolve_supervisor_lane,
     supervisor_lane_backends,
     supervisor_lane_runtimes,
-    validate_checker_model,
 )
 from forge.policy.supervisor_lane_degrade import (
-    clear_supervisor_degrade,
     read_supervisor_degrade,
 )
 from forge.session import SessionStore
 from forge.session.consumer_lanes import (
-    clear_consumer_lane,
     confirmed_lane,
-    lane_record_for,
-    lane_record_for_runtime,
     read_bound_lane,
-    set_intent_lane,
 )
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
@@ -978,30 +970,6 @@ def supervisor_evaluate(
     sys.exit(exit_code)
 
 
-def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) -> tuple[str, str]:
-    """Resolve the approved-plan snapshot the cascade's tier-1 checker will read.
-
-    Returns (plan_path, source_description). Exits 1 with a tip when no approved
-    snapshot is resolvable -- before any manifest mutation.
-    """
-    from forge.policy.semantic.supervisor import resolve_supervisor_reload_plan_path
-
-    result = resolve_supervisor_reload_plan_path(sup_config, manifest)
-    if result is None:
-        print_error_with_tip(
-            "No approved plan snapshot found for the cascade's tier-1 checker.",
-            "Approve a plan (ExitPlanMode) in the planning session, or run "
-            "'forge policy supervisor reload --from <path>' to set one explicitly, then retry.",
-        )
-        sys.exit(1)
-    source_map = {
-        "self": "current session",
-        "fork": f"review fork '{result.session_name}'",
-        "target": "supervisor target",
-    }
-    return result.path, source_map.get(result.source, result.source)
-
-
 @supervisor.command(name="status")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @_session_option
@@ -1087,19 +1055,6 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
             console.print(f"  Checker effort: {sup.checker_effort}")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")
-
-
-class _SupervisorLaneFrozenError(Exception):
-    """Signals `set --runtime` that the lane was frozen concurrently (under-lock re-check).
-
-    Raised inside the locked mutate so ``store.update`` aborts before persisting (the write is
-    the last step after ``mutate``); the caller catches it and reuses the same reject as the
-    pre-lock fast path.
-    """
-
-    def __init__(self, frozen: LaneRecord) -> None:
-        super().__init__("supervisor lane already frozen")
-        self.frozen = frozen
 
 
 def _reject_supervisor_lane_change(frozen: LaneRecord) -> None:
@@ -1205,164 +1160,90 @@ def supervisor_set(
         forge policy supervisor set planner --timeout 90  # Set with a longer check timeout
         forge policy supervisor set planner --cascade     # Set with the tier-1 cascade enabled
     """
-    from forge.policy.semantic.supervisor import (
-        apply_supervisor_routing,
-        apply_supervisor_to_intent,
-        ensure_supervisor_proxy,
-        validate_supervisor_target,
-    )
-
-    if supervisor_proxy and supervisor_direct:
-        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
-        sys.exit(1)
-    if cascade_flag is False:
-        print_error("--no-cascade is redundant on set (cascade defaults to off)")
-        sys.exit(1)
     try:
-        validate_checker_model(checker_model)
-    except ValueError as e:
-        print_error(f"{e}")
-        print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
+        policy_ops.validate_supervisor_set_input(
+            supervisor_proxy=supervisor_proxy,
+            supervisor_direct=supervisor_direct,
+            cascade_flag=cascade_flag,
+            checker_model=checker_model,
+        )
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
+        if exc.tip:
+            print_tip(exc.tip, blank_before=False, console=console)
         sys.exit(1)
-    checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
 
     cwd = Path.cwd().resolve()
     store, _state = _resolve_policy_session(cwd, session_name)
     name = _state.name
     manifest = store.read()
-
-    # Resolve the supervisor lane before any side effect. The binding is immutable once
-    # frozen (card D2): a post-bind --runtime would write intent that dispatch ignores
-    # (read_bound_lane is confirmed-first) -- the "recorded but ignored" failure the
-    # launch.runtime reject also guards. This pre-lock check on the unlocked read is a
-    # fast path that fails before the proxy auto-start below; the authoritative guard is
-    # the under-lock re-check in _apply (a hook can freeze between this read and that
-    # write). Expanded to a full LaneRecord up front so a bad runtime also fails early.
-    lane_record: LaneRecord | None = None
-    if runtime is not None or backend is not None:
-        try:
-            # A backend constraint selects the unique lane (claude-max vs the default
-            # anthropic-direct, both claude_code); runtime alone keeps the first-match default.
-            if backend is not None:
-                lane_record = lane_record_for(SUPERVISOR_CONSUMER, runtime=runtime, backend=backend)
-            elif runtime is not None:
-                lane_record = lane_record_for_runtime(SUPERVISOR_CONSUMER, runtime)
-        except LaneError as e:
-            print_error(f"{e}")
-            sys.exit(1)
-        # Reject only a genuine *change*: re-pinning the already-frozen lane is an
-        # idempotent no-op (the user re-runs `set --runtime <same>` to also retarget
-        # the supervisor). Expanding lane_record first lets us compare full records.
-        frozen = confirmed_lane(manifest, SUPERVISOR_CONSUMER)
-        if frozen is not None and frozen != lane_record:
-            _reject_supervisor_lane_change(frozen)
-            sys.exit(1)
-
-    # Validate the target in the selected session's scope, not CWD: a cross-worktree
-    # --session would otherwise search the wrong project.
     _policy_fr = manifest.forge_root or _resolve_forge_root(cwd)
+
     try:
-        source_state = validate_supervisor_target(target, forge_root=_policy_fr)
-    except ValueError as e:
-        print_error(f"{e}")
+        result = policy_ops.supervisor_set(
+            store=store,
+            manifest=manifest,
+            target=target,
+            policy_forge_root=_policy_fr,
+            supervisor_proxy=supervisor_proxy,
+            supervisor_direct=supervisor_direct,
+            timeout_seconds=timeout_seconds,
+            cascade_flag=cascade_flag,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+            supervisor_effort=supervisor_effort,
+            runtime=runtime,
+            backend=backend,
+            lock_timeout_s=5.0,
+            confirmed_lane_func=confirmed_lane,
+        )
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
+        if exc.tip:
+            print_tip(exc.tip, blank_before=False, console=console)
         sys.exit(1)
-
-    # Resolve/auto-start the supervisor proxy only after the target validates, so a bad
-    # target can't leave a freshly started proxy running.
-    if supervisor_proxy:
-        try:
-            _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
-        except ValueError as e:
-            print_error(f"{e}")
-            sys.exit(1)
-        if _sup_started:
-            console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
-        supervisor_proxy = _sup_proxy_id
-
-    current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
-    current_proxy_id = None
-    if manifest.intent.proxy and hasattr(manifest.intent.proxy, "proxy_id"):
-        current_proxy_id = manifest.intent.proxy.proxy_id  # type: ignore[union-attr]
-    current_direct = not bool(manifest.intent.proxy)
-
-    sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _policy_fr)
-    if timeout_seconds is not None:
-        sup_config.timeout_seconds = timeout_seconds
-    if supervisor_effort is not None:
-        sup_config.supervisor_effort = supervisor_effort
-    routing_display = apply_supervisor_routing(
-        sup_config,
-        source_state,
-        supervisor_proxy=supervisor_proxy,
-        supervisor_direct=supervisor_direct,
-        current_proxy_id=current_proxy_id,
-        current_template=current_template,
-        current_direct=current_direct,
-    )
-
-    cascade_source_desc: str | None = None
-    if cascade_flag:
-        # The tier-1 checker needs plan snapshot text. Resolve it (exits 1 with a tip
-        # when unresolvable) before any manifest mutation.
-        sup_config.cascade = True
-        apply_checker_options(
-            sup_config,
-            checker_model=checker_model,
-            checker_provider=checker_provider,
-            checker_effort=checker_effort,
-        )
-        plan_path, cascade_source_desc = _resolve_cascade_plan(sup_config, manifest)
-        sup_config.plan_override_path = plan_path
-    elif checker_option_supplied:
-        apply_checker_options(
-            sup_config,
-            checker_model=checker_model,
-            checker_provider=checker_provider,
-            checker_effort=checker_effort,
-        )
-
-    def _apply(m: SessionState) -> None:
-        # Authoritative already-bound guard: re-check the *fresh* manifest under the lock. A
-        # hook may have frozen confirmed.consumer_lanes between the unlocked read above and
-        # here; writing a *different* intent lane now would be recorded-but-ignored (dispatch
-        # is confirmed-first). A same-lane re-pin (frozen == lane_record) is a permitted no-op.
-        # Raise to abort the whole update -- store.update persists only if the mutate returns,
-        # so nothing (not even the supervisor config) is written.
-        if lane_record is not None:
-            frozen = confirmed_lane(m, SUPERVISOR_CONSUMER)
-            if frozen is not None and frozen != lane_record:
-                raise _SupervisorLaneFrozenError(frozen)
-        apply_supervisor_to_intent(m, sup_config)
-        if lane_record is not None:
-            set_intent_lane(m, SUPERVISOR_CONSUMER, lane_record)
-            # T7: an explicit re-pin is the "topped up, retry codex" signal -- clear the degrade
-            # so the next check dispatches the (frozen, or re-requested) lane instead of claude.
-            clear_supervisor_degrade(m)
-
-    try:
-        store.update(timeout_s=5.0, mutate=_apply)
-    except _SupervisorLaneFrozenError as exc:
+    except policy_ops.SupervisorLaneSelectionError as exc:
+        print_error(str(exc))
+        sys.exit(1)
+    except policy_ops.SupervisorLaneFrozenError as exc:
         _reject_supervisor_lane_change(exc.frozen)
         sys.exit(1)
-    console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
-    if lane_record is not None:
+    except (policy_ops.SupervisorTargetError, policy_ops.SupervisorProxyError) as exc:
+        print_error(str(exc))
+        sys.exit(1)
+    except policy_ops.SupervisorPlanUnavailableError as exc:
+        if exc.tip:
+            print_error_with_tip(str(exc), exc.tip)
+        else:
+            print_error(str(exc))
+        sys.exit(1)
+
+    if result.started_proxy_id and result.started_proxy_template:
         console.print(
-            f"  Lane: runtime={lane_record.runtime_id} backend={lane_record.backend_id} "
-            f"model={lane_record.model} (freezes on first check)"
+            f"[dim]Started proxy '{result.started_proxy_id}' from template '{result.started_proxy_template}'.[/dim]"
         )
-    if routing_display:
-        label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
-        console.print(f"  Routing ({label}): {routing_display}")
+    console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
+    if result.lane_record is not None:
+        console.print(
+            f"  Lane: runtime={result.lane_record.runtime_id} backend={result.lane_record.backend_id} "
+            f"model={result.lane_record.model} (freezes on first check)"
+        )
+    if result.routing_display:
+        label = "explicit" if result.routing_explicit else "auto-seeded"
+        console.print(f"  Routing ({label}): {result.routing_display}")
     if timeout_seconds is not None:
         console.print(f"  Timeout: {timeout_seconds}s")
-    if sup_config.cascade:
-        route_provider, route_model, route_budget = _checker_display(sup_config)
+    if result.config.cascade:
+        route_provider, route_model, route_budget = _checker_display(result.config)
         console.print(
             f"  Cascade: on (checker: {route_model} via {route_provider}, budget: {route_budget} tokens)",
             soft_wrap=True,
         )
-        if cascade_source_desc:
-            console.print(f"  Tier-1 plan resolved from {cascade_source_desc}: {sup_config.plan_override_path}")
+        if result.cascade_source_desc:
+            console.print(
+                f"  Tier-1 plan resolved from {result.cascade_source_desc}: {result.config.plan_override_path}"
+            )
 
 
 @supervisor.command(name="off")
@@ -1370,18 +1251,12 @@ def supervisor_set(
 def supervisor_off(session_name: str | None) -> None:
     """Suspend the supervisor (preserves config)."""
     store, name, manifest = _resolve_supervisor_session(session_name)
-    has_sup = (
-        manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
-    )
-    if not has_sup:
+    try:
+        policy_ops.supervisor_off(store=store, manifest=manifest, lock_timeout_s=5.0)
+    except policy_ops.SupervisorNotConfiguredError:
         console.print("No supervisor configured.")
         return
 
-    def _suspend(m: SessionState) -> None:
-        if m.intent.policy and m.intent.policy.supervisor:
-            m.intent.policy.supervisor.suspended = True
-
-    store.update(timeout_s=5.0, mutate=_suspend)
     console.print(f"Supervisor suspended for session [cyan]{name}[/cyan]")
     print_tip(
         "Run 'forge policy supervisor on' to resume or 'forge policy supervisor remove' to delete.",
@@ -1395,18 +1270,12 @@ def supervisor_off(session_name: str | None) -> None:
 def supervisor_on(session_name: str | None) -> None:
     """Resume a suspended supervisor."""
     store, name, manifest = _resolve_supervisor_session(session_name)
-    has_sup = (
-        manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
-    )
-    if not has_sup:
+    try:
+        policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=5.0)
+    except policy_ops.SupervisorNotConfiguredError:
         console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
         return
 
-    def _resume_sup(m: SessionState) -> None:
-        if m.intent.policy and m.intent.policy.supervisor:
-            m.intent.policy.supervisor.suspended = False
-
-    store.update(timeout_s=5.0, mutate=_resume_sup)
     console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")
 
 
@@ -1415,21 +1284,12 @@ def supervisor_on(session_name: str | None) -> None:
 def supervisor_remove(session_name: str | None) -> None:
     """Remove the supervisor configuration entirely."""
     store, name, manifest = _resolve_supervisor_session(session_name)
-    has_sup = manifest.intent.policy and manifest.intent.policy.supervisor
-    if not has_sup:
+    try:
+        policy_ops.supervisor_remove(store=store, manifest=manifest, lock_timeout_s=5.0)
+    except policy_ops.SupervisorNotConfiguredError:
         console.print("No supervisor configured.")
         return
 
-    def _remove_sup(m: SessionState) -> None:
-        if m.intent.policy and m.intent.policy.supervisor:
-            m.intent.policy.supervisor = None
-        # The lane binding belongs to the supervisor consumer: removing the supervisor must
-        # orphan-clear it (intent + confirmed), else read_bound_lane resurrects it on a re-add.
-        clear_consumer_lane(m, SUPERVISOR_CONSUMER)
-        # T7: the codex binding is gone, so any sticky degrade overlay is now stale -- drop it.
-        clear_supervisor_degrade(m)
-
-    store.update(timeout_s=5.0, mutate=_remove_sup)
     console.print(f"Supervisor removed from session [cyan]{name}[/cyan]")
 
 
@@ -1446,43 +1306,25 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
     manifest = store.read()
-    effective = compute_effective_intent(manifest)
-    if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.resume_id:
+    try:
+        result = policy_ops.supervisor_reload(
+            store=store,
+            manifest=manifest,
+            cwd=cwd,
+            reload_path=reload_path,
+            lock_timeout_s=5.0,
+        )
+    except policy_ops.SupervisorNotConfiguredError:
         print_error("No supervisor configured.")
         sys.exit(1)
+    except policy_ops.SupervisorPlanFileNotFoundError as exc:
+        print_error(str(exc))
+        sys.exit(1)
+    except policy_ops.SupervisorPlanUnavailableError:
+        print_error("No approved plan found for supervisor target or related sessions.")
+        sys.exit(1)
 
-    if reload_path:
-        resolved = Path(reload_path)
-        if not resolved.is_absolute():
-            resolved = (cwd / resolved).resolve()
-        if not resolved.is_file():
-            print_error(f"Plan file not found: {resolved}")
-            sys.exit(1)
-        plan_path = str(resolved)
-        source_desc = str(resolved)
-    else:
-        from forge.policy.semantic.supervisor import (
-            resolve_supervisor_reload_plan_path,
-        )
-
-        result = resolve_supervisor_reload_plan_path(effective.policy.supervisor, manifest)
-        if result is None:
-            print_error("No approved plan found for supervisor target or related sessions.")
-            sys.exit(1)
-        plan_path = result.path
-        source_map = {
-            "self": "current session",
-            "fork": f"review fork '{result.session_name}'",
-            "target": "supervisor target",
-        }
-        source_desc = source_map.get(result.source, result.source)
-
-    def _set_plan(m: SessionState) -> None:
-        if m.intent.policy and m.intent.policy.supervisor:
-            m.intent.policy.supervisor.plan_override_path = plan_path
-
-    store.update(timeout_s=5.0, mutate=_set_plan)
-    console.print(f"Supervisor plan updated from {source_desc}")
+    console.print(f"Supervisor plan updated from {result.source_desc}")
 
 
 @supervisor.command(name="cascade")
@@ -1522,72 +1364,50 @@ def supervisor_cascade(
         forge policy supervisor cascade on    # Enable the tier-1 pre-check
         forge policy supervisor cascade off   # Disable it
     """
-    cascade_on = state == "on"
-    if not cascade_on and (checker_model or checker_provider or checker_effort):
-        print_error("Checker options only apply when enabling cascade (state 'on')")
-        sys.exit(1)
     try:
-        validate_checker_model(checker_model)
-    except ValueError as e:
-        print_error(f"{e}")
-        print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
-        sys.exit(1)
-
-    store, name, manifest = _resolve_supervisor_session(session_name)
-    sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
-    if not (sup and sup.resume_id):
+        policy_ops.validate_supervisor_cascade_input(
+            state=state,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+        )
+        store, name, manifest = _resolve_supervisor_session(session_name)
+        result = policy_ops.supervisor_cascade(
+            store=store,
+            manifest=manifest,
+            state=state,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+            lock_timeout_s=5.0,
+        )
+    except policy_ops.SupervisorNotConfiguredError:
         console.print("No supervisor configured. Use 'forge policy supervisor set <target>' to set one.")
         return
+    except policy_ops.SupervisorInputError as exc:
+        print_error(str(exc))
+        if exc.tip:
+            print_tip(exc.tip, blank_before=False, console=console)
+        sys.exit(1)
+    except policy_ops.SupervisorPlanUnavailableError as exc:
+        if exc.tip:
+            print_error_with_tip(str(exc), exc.tip)
+        else:
+            print_error(str(exc))
+        sys.exit(1)
 
-    if not cascade_on:
-
-        def _disable_cascade(m: SessionState) -> None:
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor.cascade = False
-
-        store.update(timeout_s=5.0, mutate=_disable_cascade)
+    if not result.enabled:
         console.print(f"Cascade disabled for session [cyan]{name}[/cyan]")
         return
 
-    # Enabling: the tier-1 checker needs plan snapshot text. Resolve it (exits 1 with a
-    # tip when unresolvable) before any manifest mutation.
-    plan_path: str | None = sup.plan_override_path
-    source_desc: str | None = None
-    if not plan_path:
-        effective = compute_effective_intent(manifest)
-        assert effective.policy and effective.policy.supervisor  # guarded via intent above
-        plan_path, source_desc = _resolve_cascade_plan(effective.policy.supervisor, manifest)
-
-    def _enable_cascade(m: SessionState) -> None:
-        if m.intent.policy and m.intent.policy.supervisor:
-            m.intent.policy.supervisor.cascade = True
-            apply_checker_options(
-                m.intent.policy.supervisor,
-                checker_model=checker_model,
-                checker_provider=checker_provider,
-                checker_effort=checker_effort,
-            )
-            if not m.intent.policy.supervisor.plan_override_path:
-                m.intent.policy.supervisor.plan_override_path = plan_path
-
-    store.update(timeout_s=5.0, mutate=_enable_cascade)
-
-    preview = replace(sup)
-    preview.cascade = True
-    apply_checker_options(
-        preview,
-        checker_model=checker_model,
-        checker_provider=checker_provider,
-        checker_effort=checker_effort,
-    )
-    route_provider, route_model, route_budget = _checker_display(preview)
+    route_provider, route_model, route_budget = _checker_display(result.config)
     console.print(
         f"Cascade enabled for session [cyan]{name}[/cyan] "
         f"(checker: {route_model} via {route_provider}, budget: {route_budget} tokens)",
         soft_wrap=True,
     )
-    if source_desc:
-        console.print(f"  Tier-1 plan resolved from {source_desc}: {plan_path}")
+    if result.source_desc:
+        console.print(f"  Tier-1 plan resolved from {result.source_desc}: {result.config.plan_override_path}")
 
 
 @policy.group(name="shadow")

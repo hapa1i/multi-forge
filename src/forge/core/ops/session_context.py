@@ -474,14 +474,9 @@ def _load_proxy_instance_for_context(proxy_ctx: ProxyContext) -> Any | None:
     proxy_id = proxy_ctx.proxy_id
 
     if proxy_id is None and proxy_ctx.base_url:
-        try:
-            from forge.proxy.proxies import ProxyRegistryStore
+        from forge.proxy.proxies import recover_proxy_id_from_base_url
 
-            entry = ProxyRegistryStore().find_by_base_url(proxy_ctx.base_url)
-            if entry is not None:
-                proxy_id = entry.proxy_id
-        except Exception:
-            _log.debug("Failed to resolve proxy_id from base_url %r", proxy_ctx.base_url, exc_info=True)
+        proxy_id = recover_proxy_id_from_base_url(proxy_ctx.base_url)
 
     if proxy_id is None:
         return None

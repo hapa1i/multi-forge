@@ -1332,6 +1332,16 @@ class TestSupervisorCascade:
         assert result.exit_code == 1
         assert "prefixed model id" in result.output
 
+    def test_checker_model_validation_precedes_session_resolution(
+        self, runner: CliRunner, temp_guard_env: Path
+    ) -> None:
+        result = runner.invoke(
+            main,
+            ["policy", "supervisor", "cascade", "on", "--session", "missing", "--checker-model", "flash"],
+        )
+        assert result.exit_code == 1
+        assert "prefixed model id" in result.output
+
     def test_checker_model_stored_with_standalone_cascade(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:

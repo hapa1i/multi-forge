@@ -36,6 +36,19 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Keep best-effort recovery wrappers separate from fail-loud primitives (ops_policy_seam, shipped 2026-07-06)
+
+Proxy base-url recovery now has two deliberately different contracts in `proxy/proxies.py`:
+
+- `ProxyRegistryStore.find_by_base_url()` is the primitive: it calls `read()` and propagates registry corruption or
+  unreadability. Terminal/operator commands that need registry truth should keep using the loud primitive.
+- `recover_proxy_id_from_base_url()` / `recover_proxy_entry_from_base_url()` are best-effort launch/session recovery
+  wrappers: they catch, debug-log with `exc_info=True`, and return `None`. Use these from hooks, launch confirmation,
+  and context enrichment paths where losing registry recovery must not break the session.
+
+Do not merge the two postures by burying `try/except` inside `find_by_base_url`; that would hide registry corruption
+from operator surfaces.
+
 ### Diverged twins: consolidate at the concept owner, characterize weak matches first (shipped 2026-07-06)
 
 The `diverged_twin_consolidation` card closed two real drifts and dropped two false positives. Durable rules for future
