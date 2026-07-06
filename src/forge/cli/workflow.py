@@ -20,7 +20,7 @@ from typing import Any
 import click
 from rich.console import Console
 
-from forge.cli.output import err_console, print_error, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
@@ -193,8 +193,17 @@ def _format_resolved_models(summary: dict[str, dict[str, Any]]) -> str:
 def _handle_routing_error(error: Exception, *, as_json: bool = False) -> None:
     """Handle routing resolution errors with clean CLI output. Calls sys.exit(1)."""
     msg = str(error)
+    tip_lines = tuple(getattr(error, "tip_lines", ()) or ())
+    commands = tuple(getattr(error, "commands", ()) or ())
     if as_json:
-        click.echo(json.dumps({"routing_error": msg}), err=True)
+        payload: dict[str, Any] = {"routing_error": msg}
+        if tip_lines:
+            payload["routing_tip"] = list(tip_lines)
+        if commands:
+            payload["routing_commands"] = list(commands)
+        click.echo(json.dumps(payload), err=True)
+    elif tip_lines or commands:
+        print_error_with_tip(f"Routing failed: {msg}", *tip_lines, commands=commands)
     else:
         print_error(f"Routing failed: {msg}")
     sys.exit(1)

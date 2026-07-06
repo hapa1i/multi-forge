@@ -20,7 +20,7 @@ from unittest.mock import patch
 import pytest
 
 from forge.config.schema import ProxyInstanceConfig, TierModels
-from forge.session.direct_model import resolve_direct_model_pin
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.session.model_pin import (
     _apply_direct_model_env_if_supported,
     _proxy_supports_model_pin,

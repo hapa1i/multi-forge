@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from forge.core.paths import display_path
+from forge.core.paths import display_path, find_git_root
 
 
 class TestDisplayPath:
@@ -31,3 +31,32 @@ class TestDisplayPath:
 
     def test_empty_string(self):
         assert display_path("") == ""
+
+
+class TestFindGitRoot:
+    def test_finds_git_in_current_dir(self, tmp_path: Path) -> None:
+        (tmp_path / ".git").mkdir()
+        assert find_git_root(tmp_path) == tmp_path.resolve()
+
+    def test_finds_git_in_parent(self, tmp_path: Path) -> None:
+        (tmp_path / ".git").mkdir()
+        child = tmp_path / "src" / "deep"
+        child.mkdir(parents=True)
+        assert find_git_root(child) == tmp_path.resolve()
+
+    def test_returns_none_outside_git(self, tmp_path: Path) -> None:
+        assert find_git_root(tmp_path) is None
+
+    def test_finds_git_file_worktree(self, tmp_path: Path) -> None:
+        (tmp_path / ".git").write_text("gitdir: /some/path")
+        assert find_git_root(tmp_path) == tmp_path.resolve()
+
+    def test_resolves_symlinked_nested_start(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        nested = repo / "src" / "pkg"
+        nested.mkdir(parents=True)
+        (repo / ".git").mkdir()
+        linked = tmp_path / "linked-pkg"
+        linked.symlink_to(nested, target_is_directory=True)
+
+        assert find_git_root(linked) == repo.resolve()

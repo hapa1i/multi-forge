@@ -19,8 +19,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from forge.core.auth.template_secrets import get_secrets_for_template
 from forge.sidecar.docker import is_docker_available
-from forge.sidecar.secrets import get_secrets_for_template
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
 

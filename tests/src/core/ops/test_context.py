@@ -6,37 +6,9 @@ from pathlib import Path
 
 from forge.core.ops.context import (
     ExecutionContext,
-    _find_git_root,
     _find_main_repo_root,
     find_forge_root,
 )
-
-
-class TestFindGitRoot:
-    """Tests for _find_git_root."""
-
-    def test_finds_git_directory(self, tmp_path: Path) -> None:
-        # Create a fake git repo
-        (tmp_path / ".git").mkdir()
-        subdir = tmp_path / "src" / "module"
-        subdir.mkdir(parents=True)
-
-        result = _find_git_root(subdir)
-        assert result == tmp_path
-
-    def test_returns_none_when_no_git(self, tmp_path: Path) -> None:
-        subdir = tmp_path / "some" / "dir"
-        subdir.mkdir(parents=True)
-
-        result = _find_git_root(subdir)
-        assert result is None
-
-    def test_finds_git_file_worktree(self, tmp_path: Path) -> None:
-        # In worktrees, .git is a file not a directory
-        (tmp_path / ".git").write_text("gitdir: /some/path")
-
-        result = _find_git_root(tmp_path)
-        assert result == tmp_path
 
 
 class TestFindMainRepoRoot:

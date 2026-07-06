@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from forge.core.paths import find_git_root
+
 
 @dataclass(frozen=True)
 class ExecutionContext:
@@ -47,7 +49,7 @@ class ExecutionContext:
             cwd = cwd.resolve()
 
         # Try to find git root (works for both regular repos and worktrees)
-        worktree_root = _find_git_root(cwd)
+        worktree_root = find_git_root(cwd)
         if worktree_root is None:
             # Not in a git repo: use cwd for all paths
             forge_root = find_forge_root(cwd)
@@ -60,24 +62,6 @@ class ExecutionContext:
         forge_root = find_forge_root(cwd)
 
         return cls(cwd=cwd, worktree_root=worktree_root, project_root=project_root, forge_root=forge_root)
-
-
-def _find_git_root(start: Path) -> Path | None:
-    """Find git root by walking up from start.
-
-    Returns None if not in a git repository.
-    """
-    current = start
-    while current != current.parent:
-        if (current / ".git").exists():
-            return current
-        current = current.parent
-
-    # Check root
-    if (current / ".git").exists():
-        return current
-
-    return None
 
 
 def _find_main_repo_root(worktree_root: Path) -> Path:

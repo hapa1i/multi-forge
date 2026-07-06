@@ -13,8 +13,8 @@ from forge.sidecar.container import (
     parse_mounts,
     run_sidecar_session,
 )
+from forge.core.auth.template_secrets import get_secrets_for_template
 from forge.sidecar.docker import is_container_running, is_docker_available
-from forge.sidecar.secrets import get_secrets_for_template
 
 __all__ = [
     "ContainerExistsError",

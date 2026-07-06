@@ -148,3 +148,12 @@ def server_stubs(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(server, "log_tool_failure", lambda *a, **kw: None)
     monkeypatch.setattr(server, "_check_client_tool_failures", lambda *a, **kw: None)
     return server
+
+
+@pytest.fixture
+def proxy_runtime_ready(monkeypatch: pytest.MonkeyPatch, server_stubs):
+    """Server module with proxy runtime initialized and no cost tracker."""
+    server = server_stubs
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "cost_tracker", None)
+    return server

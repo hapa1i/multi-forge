@@ -4,8 +4,8 @@ Maps proxy templates to required environment variable names and provides
 ``resolve_env_or_credential()`` — the single lookup that checks os.environ
 first, then falls back to ``~/.forge/credentials.yaml``.
 
-Extracted from ``forge.sidecar.secrets`` so proxy orchestration, review
-engine, and sidecar can all share the same resolution logic.
+Owned in core auth so proxy orchestration, review engine, and sidecar can all
+share the same resolution logic.
 """
 
 from __future__ import annotations

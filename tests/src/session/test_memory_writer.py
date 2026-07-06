@@ -7,6 +7,7 @@ multi-doc strategies, shadow/propose mode, containment guard.
 from __future__ import annotations
 
 import json
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -38,6 +39,7 @@ from forge.session.passport import (
     resolve_passport_source,
     write_passport,
 )
+from tests.fixtures.codex_result import codex_result
 
 DOC_STRATEGIES = STRATEGY_INSTRUCTIONS
 
@@ -1788,23 +1790,7 @@ _CODEX_LANE_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")  # the bound-
 _READY_PREFLIGHT = SimpleNamespace(ready=True, blocking_reason=None)
 
 
-def _codex_result(**overrides: Any) -> Any:
-    """A HeadlessResult shaped like ``CodexHeadlessInvoker.run`` returns (T6c codex arm).
-
-    Defaults to a clean exit-0 turn; pass ``returncode``/``runtime_is_error``/``stderr`` to model a
-    failed turn.
-    """
-    from forge.core.invoker.types import HeadlessResult
-
-    defaults: dict[str, Any] = {
-        "label": "memory-writer",
-        "stdout": "## Promote\n- From codex",
-        "stderr": "",
-        "returncode": 0,
-        "duration_seconds": 0.1,
-    }
-    defaults.update(overrides)
-    return HeadlessResult(**defaults)
+_codex_result = partial(codex_result, label="memory-writer", stdout="## Promote\n- From codex")
 
 
 def test_memory_writer_consumer_allows_codex_lane() -> None:

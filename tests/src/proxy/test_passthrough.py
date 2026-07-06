@@ -192,11 +192,9 @@ async def test_forward_streaming_upstream_error_preserves_status(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_handler_forwards_raw_body(monkeypatch):
+async def test_passthrough_handler_forwards_raw_body(monkeypatch, proxy_runtime_ready):
     """_handle_anthropic_passthrough (the middleware's delegate) reads the RAW body and forwards it."""
-    import forge.proxy.server as server
-
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
 
     class _Provider:
         base_url = "https://api.anthropic.com"
@@ -237,10 +235,8 @@ async def test_passthrough_handler_forwards_raw_body(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_missing_credential_returns_401(monkeypatch):
-    import forge.proxy.server as server
-
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+async def test_passthrough_missing_credential_returns_401(monkeypatch, proxy_runtime_ready):
+    server = proxy_runtime_ready
 
     class _Provider:
         base_url = "https://api.anthropic.com"
@@ -306,16 +302,14 @@ def _passthrough_config(
     return SimpleNamespace(proxy=proxy)
 
 
-def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatch):
+def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatch, proxy_runtime_ready):
     """Through the real ASGI app, the middleware forwards the raw body BEFORE FastAPI
     binds MessagesRequest — so an unknown/future content block type that the closed
     block union would 422 is forwarded byte-for-byte instead."""
-    import forge.proxy.server as server
     from forge.proxy.server import app
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         "forge.core.auth.template_secrets.resolve_env_or_credential",
         lambda var: "UPSTREAM-KEY",
@@ -353,15 +347,13 @@ def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatc
         ("null", 422),
     ],
 )
-def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, body, status_code):
+def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, proxy_runtime_ready, body, status_code):
     from fastapi.testclient import TestClient
 
-    import forge.proxy.server as server
     from forge.proxy.server import app
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         "forge.core.auth.template_secrets.resolve_env_or_credential",
         lambda var: "UPSTREAM-KEY",
@@ -374,15 +366,14 @@ def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, body, status_
     assert resp.json()["error"]["type"] == "invalid_request_error"
 
 
-def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch):
+def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch, proxy_runtime_ready):
     """A non-passthrough proxy must fall through the middleware to the normal route —
     the passthrough handler is never reached, so default routing is untouched."""
     from fastapi.testclient import TestClient
 
-    import forge.proxy.server as server
     from forge.proxy.server import app
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(server.config, "proxy", SimpleNamespace(wire_shape="openai_translated"))
 
     reached = {"passthrough": False}
@@ -402,14 +393,13 @@ def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_passthrough_inspect_mode_writes_audit_metadata(monkeypatch, tmp_path):
+async def test_passthrough_inspect_mode_writes_audit_metadata(monkeypatch, tmp_path, proxy_runtime_ready):
     """A passthrough proxy in inspect mode writes a metadata audit record (no body)."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
 
     class _Intercept:
@@ -541,13 +531,11 @@ async def test_forward_streaming_taps_usage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_logs_cost_from_response_usage(monkeypatch):
+async def test_passthrough_logs_cost_from_response_usage(monkeypatch, proxy_runtime_ready):
     """B2: non-streaming usage flows into _calc_and_log_cost (cost is logged, not bypassed)."""
-    import forge.proxy.server as server
+    server = proxy_runtime_ready
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
 
@@ -571,11 +559,10 @@ async def test_passthrough_logs_cost_from_response_usage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_enforces_spend_cap_reject(monkeypatch):
+async def test_passthrough_enforces_spend_cap_reject(monkeypatch, proxy_runtime_ready):
     """B2: a configured cap rejects with 429 instead of silently forwarding."""
-    import forge.proxy.server as server
+    server = proxy_runtime_ready
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
 
@@ -610,16 +597,14 @@ async def test_passthrough_enforces_spend_cap_reject(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp_path):
+async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp_path, proxy_runtime_ready):
     """B3/M5: full-body record includes the redacted response + request hashes, no plaintext."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",
@@ -661,17 +646,15 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_path):
+async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_path, proxy_runtime_ready):
     """Override augments the system prompt + pins reasoning, forwards the mutated body,
     and writes a redacted mutation record."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",
@@ -701,16 +684,14 @@ async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_path):
+async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_path, proxy_runtime_ready):
     """A block guard short-circuits with 403, records the block, and does not forward."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",
@@ -741,18 +722,16 @@ async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_preserves_history_through_server(monkeypatch, tmp_path):
+async def test_passthrough_override_preserves_history_through_server(monkeypatch, tmp_path, proxy_runtime_ready):
     """Through the server path, override leaves historical thinking blocks byte-identical."""
     import copy
 
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",
@@ -783,16 +762,14 @@ async def test_passthrough_override_preserves_history_through_server(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path):
+async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path, proxy_runtime_ready):
     """Override directives are inert unless intercept.mode == 'override' (no mutation)."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     # augment IS configured, but mode is inspect -> it must NOT be applied.
     monkeypatch.setattr(
         server.config,
@@ -818,16 +795,14 @@ async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp_path):
+async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp_path, proxy_runtime_ready):
     """Reasoning pin keys off the request's model tier (opus), not proxy default_tier (sonnet)."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
 
     cfg = _passthrough_config(default_tier="sonnet", intercept_mode="override")
     # opus pinned 'high', sonnet pinned 'minimal' -> an opus request must pick HIGH.
@@ -853,14 +828,12 @@ async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch):
+async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch, proxy_runtime_ready):
     """A mutation-safety fingerprint mismatch raises and never forwards (fail closed)."""
-    import forge.proxy.server as server
     from forge.proxy import intercept
 
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    server = proxy_runtime_ready
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",
@@ -894,16 +867,14 @@ async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_path):
+async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_path, proxy_runtime_ready):
     """#6: the full-body record pairs the MUTATED body with a hash recomputed from it."""
-    import forge.proxy.server as server
     from forge.proxy import audit_logger
 
+    server = proxy_runtime_ready
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     audit_logger._drift_state.clear()
-    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
-    monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
         server.config,
         "proxy",

@@ -11,6 +11,7 @@ import pytest
 from forge.core.reactive.routing import ModelRoute, RoutingResult, RoutingSource
 from forge.review.routing import (
     WorkerRoutingPlan,
+    WorkflowRoutingError,
     _TemplateMeta,
     clear_template_cache,
     derive_model_routes,
@@ -530,8 +531,13 @@ class TestResolveInvocationRouting:
             credential=None,
         )
         with self._patch_metas(), self._patch_resolver(unresolved):
-            with pytest.raises(RuntimeError, match="No running proxy"):
+            with pytest.raises(WorkflowRoutingError, match="No running proxy") as excinfo:
                 resolve_invocation_routing([spec])
+        assert "Tip:" not in str(excinfo.value)
+        assert excinfo.value.tip_lines == (
+            "Run 'forge proxy create openrouter-openai' to create one,",
+            "or 'forge proxy start <id>' if one exists.",
+        )
 
     def test_fail_closed_error_mentions_credential_when_missing(self, monkeypatch):
         """Error mentions credential when the key is not configured."""

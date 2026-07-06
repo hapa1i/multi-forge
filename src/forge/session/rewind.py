@@ -9,14 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.state.io import atomic_write_text
-from forge.core.transcript import truncate
+from forge.core.transcript import (
+    extract_entry_blocks,
+    group_entries_into_turns,
+    truncate,
+)
 from forge.session.transfer import (
     MAX_TRANSCRIPT_CHARS,
     _call_llm_for_curation_prompt,
     _emit_curation_usage,
-    _extract_entry_blocks,
     _extract_turn_summary,
-    _group_entries_into_turns,
     _validate_decision_citations,
 )
 
@@ -148,7 +150,7 @@ def write_rewind_transcript_prefix(
     source_text = source_path.read_text(encoding="utf-8")
     raw_lines = source_text.splitlines(keepends=True)
     raw_entries = _parse_raw_transcript_entries(raw_lines)
-    turn_groups = _group_entries_into_turns([raw.entry for raw in raw_entries])
+    turn_groups = group_entries_into_turns([raw.entry for raw in raw_entries])
     total_turns = len(turn_groups)
     requested_keep_turns = max(total_turns - drop_last, 0)
 
@@ -216,11 +218,11 @@ def extract_rewind_file_deltas(entries: list[dict[str, Any]], *, kept_turns: int
         raise ValueError("kept_turns must be non-negative")
 
     builders: dict[str, _FileDeltaBuilder] = {}
-    for turn_number, group in enumerate(_group_entries_into_turns(entries), start=1):
+    for turn_number, group in enumerate(group_entries_into_turns(entries), start=1):
         if turn_number <= kept_turns:
             continue
         for entry in group:
-            for block in _extract_entry_blocks(entry):
+            for block in extract_entry_blocks(entry):
                 if block.get("type") != "tool_use":
                     continue
                 tool_name = block.get("name")
@@ -254,7 +256,7 @@ def build_rewind_code_delta_source(entries: list[dict[str, Any]], *, kept_turns:
     if kept_turns < 0:
         raise ValueError("kept_turns must be non-negative")
 
-    turn_groups = _group_entries_into_turns(entries)
+    turn_groups = group_entries_into_turns(entries)
     total_turns = len(turn_groups)
     bounded_kept_turns = min(kept_turns, total_turns)
     file_deltas = extract_rewind_file_deltas(entries, kept_turns=bounded_kept_turns)
@@ -645,7 +647,7 @@ def _has_dangling_tool_use(entries: list[dict[str, Any]]) -> bool:
     tool_results: set[str] = set()
 
     for entry in entries:
-        for block in _extract_entry_blocks(entry):
+        for block in extract_entry_blocks(entry):
             block_type = block.get("type")
             if block_type == "tool_use":
                 tool_id = block.get("id")
