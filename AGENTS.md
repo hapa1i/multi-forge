@@ -131,6 +131,8 @@ diff size. Every sentence must earn its place by actively helping someone review
 
 ### Pull Requests
 
+- **Title for the code, not the author:** Do not prefix PR titles with agent/source tags such as `[codex]`; use the same
+  concise, human-readable style as commit subjects.
 - **Focus on the "Why" and "How":** Summarize the intent. Call out non-obvious design decisions, risks, limitations,
   migrations, and specific areas where the reviewer should focus.
 - **Provide Proof:** Name the commands you ran and any non-passing results (failures/skips) — not full logs.
