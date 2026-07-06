@@ -487,22 +487,24 @@ class TestSafeCacheKey:
         assert _safe_cache_key("session.2026_02") == "session.2026_02"
 
 
-# --- FORGE_HOOK_CONFIG ---
+# --- Built-in hook registration ---
 
 
 class TestHookInstallConfig:
     def test_teammate_idle_in_config(self):
-        from forge.cli.hooks.install import FORGE_HOOK_CONFIG
+        from forge.install.preset import get_builtin_preset
 
-        assert "TeammateIdle" in FORGE_HOOK_CONFIG["hooks"]
-        hooks = FORGE_HOOK_CONFIG["hooks"]["TeammateIdle"]
+        hook_config = get_builtin_preset()["hooks"]
+        assert "TeammateIdle" in hook_config
+        hooks = hook_config["TeammateIdle"]
         assert any("forge hook teammate-idle" in h.get("command", "") for group in hooks for h in group["hooks"])
 
     def test_task_completed_in_config(self):
-        from forge.cli.hooks.install import FORGE_HOOK_CONFIG
+        from forge.install.preset import get_builtin_preset
 
-        assert "TaskCompleted" in FORGE_HOOK_CONFIG["hooks"]
-        hooks = FORGE_HOOK_CONFIG["hooks"]["TaskCompleted"]
+        hook_config = get_builtin_preset()["hooks"]
+        assert "TaskCompleted" in hook_config
+        hooks = hook_config["TaskCompleted"]
         assert any("forge hook task-completed" in h.get("command", "") for group in hooks for h in group["hooks"])
 
 

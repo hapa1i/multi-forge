@@ -680,6 +680,7 @@ def merge(
     include_statusline: bool = False,
     include_hooks: bool = True,
     include_permissions: bool = True,
+    include_env: bool = True,
 ) -> list[InstalledSettingsEntry]:
     """Full settings merge.
 
@@ -690,6 +691,7 @@ def merge(
         include_statusline: If True, include statusLine setting.
         include_hooks: If True, merge hook entries.
         include_permissions: If True, merge permission entries.
+        include_env: If True, merge environment entries.
 
     Returns:
         List of InstalledSettingsEntry for all changes made.
@@ -722,7 +724,7 @@ def merge(
         if entry:
             entries.append(entry)
 
-    if forge_env := forge_settings.get("env"):
+    if include_env and (forge_env := forge_settings.get("env")):
         entries.extend(merge_env(settings, forge_env))
 
     return entries

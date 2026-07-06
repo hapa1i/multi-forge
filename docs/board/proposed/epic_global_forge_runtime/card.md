@@ -17,11 +17,10 @@ global `forge` from any hook environment.
 
 **References**: `src/forge/install/preset.py` (Claude preset hook + `statusLine` commands),
 `src/forge/install/codex_hooks.py` (`get_codex_config_path`, managed block markers `:56`, trust-byte pinning),
-`src/forge/install/hooks.py` (`has_forge_hook` substring detection `:69`), `src/forge/install/settings_merge.py` (Claude
-append+dedupe merge/`unmerge` `:505,:705,:731`), `src/forge/cli/hooks/install.py` (the second, untracked
-`forge hook enable`/`disable` writer + prefix matcher), `src/forge/install/installer.py` (scope detection, source-hooks
-load `:817`), `src/forge/sidecar/container.py` (sidecar mounts + env), `docs/design_appendix.md` §C.6,
-`board_contract.md`.
+`src/forge/install/hooks.py` (shared hook command detection), `src/forge/install/settings_merge.py` (Claude
+append+dedupe merge/`unmerge` `:505,:705,:731`), `src/forge/install/installer.py` (scope detection, source-hooks load
+`:817`, tracked hook registration), `src/forge/sidecar/container.py` (sidecar mounts + env), `docs/design_appendix.md`
+§C.6, `board_contract.md`.
 
 ---
 
@@ -42,7 +41,7 @@ so neither sits on one linear track.
 | T6    | [`forge_hook_migration_cleanup`](../forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../forge_project_compat/card.md)                   | `required_forge` fail-clear guardrail + missing-file semantics                      | --          |
 | T8    | [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
-| T9    | [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md)           | Reconcile/remove the second `forge hook enable`/`disable` writer + its matcher      | pairs T2/T6 |
+| T9    | [`forge_hook_legacy_writer`](../../doing/forge_hook_legacy_writer/card.md)  | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
 
 ## Accepted decisions
@@ -149,9 +148,9 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   T4** because the dispatcher's shipped no-op gate reads the registry. T4's shim-vs-symlink benchmark therefore measures
   the real gate, not a stub. T5's registration change is where the command *form* changes to the dispatcher shape and
   where detection is updated (gated on T4's benchmark outcome).
-- **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- decide update-or-delete before
-  T6 finalizes cleanup, or the untracked writer resurrects the state T6 removes. **T10** (sidecar resolution) pairs with
-  T2 and T5 -- it must land with whichever byte-changing member ships first, or the sidecar regresses.
+- **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- delete it before T6 finalizes
+  cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) pairs with T2 and T5
+  -- it must land with whichever byte-changing member ships first, or the sidecar regresses.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). T8 (dev override) pairs with T4.
 
 ## Grounding (verified against code, 2026-07-02)
@@ -161,9 +160,9 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 | Hooks are bare `forge hook <name>` (PATH-dependent)                   | Confirmed | `preset.py:53`; `codex_hooks.py:84`; `get_codex_config_path` `codex_hooks.py:106`     |
 | statusLine is a bare `forge status-line` command                      | Confirmed | `preset.py:218-222`                                                                   |
 | Hooks cover 13 events incl. `PreToolUse:Read` + `UserPromptSubmit`    | Confirmed | `preset.py:47-217` (fire on every Read / every prompt, in every repo at user scope)   |
-| Presence detection is a `"forge hook"` substring match                | Confirmed | `hooks.py:57,64,69`; callers `session_lifecycle.py:264`, `policy.py:309`              |
-| A third matcher exists: prefix `startswith("forge hook ")`            | Confirmed | `_is_forge_hook_entry` `install.py:139-164` (used by the legacy writer, T9)           |
-| A second, untracked writer exists: `forge hook enable`/`disable`      | Confirmed | `cli/hooks/install.py:87,130-134,182` (writes bare hooks to `settings.local.json`)    |
+| Presence detection uses the shared hook-command predicate             | Confirmed | `install/hooks.py::is_forge_hook_command` / `entry_is_forge_hook`                     |
+| A third matcher exists: prefix `startswith("forge hook ")`            | Resolved  | `forge_hook_matcher_consolidation` replaced it with the shared predicate              |
+| A second, untracked writer exists: `forge hook enable`/`disable`      | Resolved  | T9 deletes `cli/hooks/install.py`; tracked replacement uses `forge extension enable`  |
 | Claude hooks merge append+dedupe by full entry (byte change coexists) | Confirmed | `merge_hooks` `settings_merge.py:505,705`; source-only load `installer.py:817`        |
 | Default scope inside a repo is local/project, not user                | Confirmed | `installer.py:258-267`, `cli/extensions.py:585-591`                                   |
 | Codex cleanup is marker-based; Claude is tracked/per-entry            | Confirmed | markers `codex_hooks.py:56`; Claude `unmerge` via `stable_id` `settings_merge.py:731` |
@@ -176,18 +175,16 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 
 ## Cross-cutting risks (epic-owned)
 
-- **Presence detection can lie after the cutover.** If T4's benchmark picks a `forge-hook` shim (hyphen), the
-  `has_forge_hook` needle `"forge hook"` (space) stops matching, so `session_lifecycle.py:264` and `policy.py:309` warn
-  incorrectly. Separately, the **prefix** matcher `_is_forge_hook_entry` breaks on an absolute path even in T2. T5 owns
-  the detection update (gated on T4's shape); T9 owns the prefix matcher.
+- **Presence detection can lie after the cutover.** If T4's benchmark picks a `forge-hook` shim (hyphen), the current
+  shared predicate still needs an update, so `session_lifecycle.py:264` and `policy.py:309` could warn incorrectly. T5
+  owns the detection update (gated on T4's shape).
 - **Same-file coexistence, not replacement.** Because Claude hooks merge append+dedupe-by-entry
   (`settings_merge.py:505`), a changed command *adds* a sibling; without unmerge-before-merge, every byte change
   double-fires in the same file. (T2/T5/T6.)
 - **Sidecar regression.** Both byte-changing tracks break in-container hooks unless T10 exempts the sidecar: a
   host-absolute path is dead at `/workspace`, and user-scope-only is unmounted. (T10.)
-- **A second, untracked hook writer.** `forge hook enable`/`disable` (`install.py`) writes bare hooks with no
-  `installed.json` tracking and a *prefix* matcher incompatible with the absolute/dispatcher forms; it can resurrect
-  exactly the legacy state T6 cleans. Update-or-delete owed. (T9.)
+- **Legacy untracked entries still exist in the wild.** T9 removes the writer, but any entries it already wrote have no
+  `installed.json` tracking and must still be handled by T6's value-based cleanup.
 - **No-op frequency.** The user-scope dispatcher fires on every `PreToolUse:Read` and `UserPromptSubmit` in every repo
   (`preset.py`); the no-op ceiling (T4) is measured against per-Read / per-prompt frequency, not per-session.
 - **Registry read: strict in CLI, fail-open in hook.** A corrupt/newer `projects.toml` must fail loudly in the CLI
@@ -208,7 +205,7 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 | Dispatcher shim vs absolute-symlink (benchmark decides; also decides the detection update) | T4                                            |
 | Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | T4                                            |
 | Deprecate `extension enable --scope user` vs re-semantic it as dispatcher-only             | T5                                            |
-| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | T9                                            |
+| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | T9 -- delete chosen                           |
 | In-container command form: bare/image-PATH vs mounting the host dispatcher                 | T10                                           |
 | Missing `.forge/project.toml` semantics for existing projects                              | T7                                            |
 | Version-check fail-open vs fail-closed matrix per hook type                                | T7                                            |
@@ -239,15 +236,15 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 
 **Round 3 (2026-07-02, Fable 5 review, verified against code):**
 
-| Finding                                                                                            | Resolution                                                                      |
-| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Sidecar execution unaddressed; host-absolute path dead in-container; user-scope leaves it hookless | New seam 5 + new member T10 (single owner, `FORGE_SIDECAR`-keyed)               |
-| Byte contract narrower than reality: statusLine + legacy writer + all three matchers omitted       | Seam 1 broadened to all registered strings + all three matchers                 |
-| Claude merge is append+dedupe -> a byte change coexists (double-fire), not replace                 | Seam 1 unmerge-before-merge rule; risk added; T2/T5/T6 acceptance rows          |
-| Second untracked writer `forge hook enable`/`disable` with an incompatible prefix matcher          | New member T9 (update-or-delete)                                                |
-| Benchmark rule was a stub target; needs the real trade + no-op frequency + TOML-in-shim tension    | T4 benchmark rewrite                                                            |
-| Registry lifecycle (enroll / backfill / `FORGE_SESSION` / corruption split) underspecified         | T3 lifecycle section                                                            |
-| T3/T7 `project init` dangling reference                                                            | T7 points at T3's committed enrollment surface; T3 commits to owning enrollment |
+| Finding                                                                                            | Resolution                                                                          |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Sidecar execution unaddressed; host-absolute path dead in-container; user-scope leaves it hookless | New seam 5 + new member T10 (single owner, `FORGE_SIDECAR`-keyed)                   |
+| Byte contract narrower than reality: statusLine + legacy writer + all three matchers omitted       | Seam 1 broadened to all registered strings + all three matchers                     |
+| Claude merge is append+dedupe -> a byte change coexists (double-fire), not replace                 | Seam 1 unmerge-before-merge rule; risk added; T2/T5/T6 acceptance rows              |
+| Second untracked writer `forge hook enable`/`disable` with an incompatible prefix matcher          | T9 deletes the writer; matcher already shared by `forge_hook_matcher_consolidation` |
+| Benchmark rule was a stub target; needs the real trade + no-op frequency + TOML-in-shim tension    | T4 benchmark rewrite                                                                |
+| Registry lifecycle (enroll / backfill / `FORGE_SESSION` / corruption split) underspecified         | T3 lifecycle section                                                                |
+| T3/T7 `project init` dangling reference                                                            | T7 points at T3's committed enrollment surface; T3 commits to owning enrollment     |
 
 **Round 4 (2026-07-02, maintainer findings, verified against code):**
 

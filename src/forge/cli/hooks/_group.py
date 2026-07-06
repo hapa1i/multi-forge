@@ -12,8 +12,7 @@ def hooks(ctx: click.Context) -> None:
 
     Most subcommands are invoked automatically by runtime hooks: Claude Code's
     are configured in .claude/settings.local.json; Codex's (codex-policy-check)
-    are registered in a Codex config and require trust enrollment. The 'enable'
-    and 'disable' subcommands are user-facing.
+    are registered in a Codex config and require trust enrollment.
     """
     from forge.core.logging import configure_debug_logging
 

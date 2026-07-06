@@ -212,6 +212,8 @@ _REMOVED_ALIAS_ARGVS = (
     ["authentication", "status"],
     ["extensions"],
     ["extensions", "status"],
+    ["hook", "enable"],
+    ["hook", "disable"],
 )
 _CANONICAL_ALIAS_ARGVS = (
     ["auth", "--help"],

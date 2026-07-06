@@ -78,7 +78,9 @@ def setup_real_claude(
     if result.returncode != 0:
         pytest.fail(f"Failed to create .claude/.forge directories: {result.stderr}")
 
-    result = workspace.exec(f"cd {root_q} && forge hook enable")
+    result = workspace.exec(
+        f"cd {root_q} && forge extension enable --scope local --profile minimal --with hooks --without commands"
+    )
     if result.returncode != 0:
         pytest.fail(f"Failed to enable hooks: {result.stderr}")
 

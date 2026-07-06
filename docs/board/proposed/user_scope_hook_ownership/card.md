@@ -35,9 +35,9 @@ registration. Today the hazard is real and unguarded (see grounding).
 - Cross-scope double-fire detection in `doctor`/`status` (report + name the cleanup command; cleanup itself is
   `forge_hook_migration_cleanup`).
 
-**Out:** the migration of existing installs (`forge_hook_migration_cleanup`); reconciling the second
-`forge hook enable`/`disable` writer (`forge_hook_legacy_writer`); in-container hook resolution
-(`forge_hook_sidecar_resolution`); team checked-in policy (deferred, see open questions).
+**Out:** the migration of existing installs (`forge_hook_migration_cleanup`); the already-owned legacy writer cleanup
+(`forge_hook_legacy_writer`); in-container hook resolution (`forge_hook_sidecar_resolution`); team checked-in policy
+(deferred, see open questions).
 
 ## Grounding (verified 2026-07-02)
 
@@ -56,8 +56,8 @@ registration. Today the hazard is real and unguarded (see grounding).
 - **Sidecar goes hookless.** User-scope-only writes no project hook block, and the sidecar does not mount host
   `~/.claude` -- in-container Claude would have no hooks unless `forge_hook_sidecar_resolution` handles it. Cross-ref,
   not solved here.
-- **Second writer resurrects project hooks.** `forge hook enable` still writes bare project hooks; the user-scope
-  cutover is undermined until `forge_hook_legacy_writer` reconciles it.
+- **Legacy untracked project hooks remain possible.** `forge_hook_legacy_writer` removes the second writer, but entries
+  written before that cleanup still lack tracking and must be handled by `forge_hook_migration_cleanup`.
 - Existing project-scope installs need migrating (`forge_hook_migration_cleanup`) -- this ticket changes *new* installs.
 - **Team checked-in policy tension**: teams may want project-committed hook policy. Treat that as a separate
   managed/team feature, not the default install path (out of scope for v1).

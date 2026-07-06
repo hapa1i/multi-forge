@@ -111,7 +111,7 @@ class TestHasForgeHook:
         assert has_forge_hook(project, "SessionStart") is True
 
     def test_found_in_user_settings_local(self, project: Path) -> None:
-        """forge hook enable --user writes to ~/.claude/settings.local.json."""
+        """Legacy user-local hook settings are still detected for migration."""
         import os
 
         claude_home = Path(os.environ["CLAUDE_HOME"])

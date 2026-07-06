@@ -295,6 +295,15 @@ class TestMerge:
 
         assert sample_settings["statusLine"] == "/path/to/status-line.sh"
 
+    def test_can_exclude_env(self) -> None:
+        settings: dict[str, Any] = {}
+        forge_settings = {"env": {"CUSTOM": "1"}}
+
+        entries = merge(settings, forge_settings, include_env=False)
+
+        assert settings == {}
+        assert entries == []
+
     def test_raises_on_statusline_conflict(self, forge_settings: dict[str, Any]) -> None:
         settings = {"statusLine": "/existing/path"}
 

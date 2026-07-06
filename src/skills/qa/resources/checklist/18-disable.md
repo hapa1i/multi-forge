@@ -16,9 +16,6 @@ cd $FORGE_TEST_REPO
 # Uninstall only the local scope (-y: disable prompts for confirmation; non-interactive under docker exec)
 forge extension disable --scope local -y
 
-# (Optional) Uninstall hooks-only path, if you used it
-forge hook disable --local
-
 # Verify local removal (extensions install skills/, not a commands/ dir)
 ls .claude/skills/   # Should be empty or removed
 cat .claude/settings.local.json | jq '.hooks'  # Should have no Forge hooks

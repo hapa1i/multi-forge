@@ -227,7 +227,7 @@ session only through run-tree identity.
 ```mermaid
 flowchart LR
     subgraph Installation["Install Surface"]
-        Installer["forge extension enable<br/>or forge hook enable"]
+        Installer["forge extension enable"]
         Settings["Claude settings file<br/>(settings.json / settings.local.json)"]
         CodexCfg["Codex config.toml managed block<br/>(user: $CODEX_HOME; project/local: &lt;project&gt;/.codex)"]
         Installer -->|writes hook config| Settings

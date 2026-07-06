@@ -2,11 +2,11 @@
 
 **Card**: [card.md](card.md) · **Branch**: `refactor/hook-legacy-writer`
 
-**Status**: **reviewed; D1 ratified as DELETE, gated by Phase 0.** Nothing implemented yet; all boxes below are
-unchecked by design. If Phase 0 cannot produce a tested public hooks-only replacement at acceptable blast radius, the D1
-escape valve reopens.
+**Status**: **implementation complete on `refactor/hook-legacy-writer`; branch verification clean.** D1 landed as DELETE
+after Phase 0 produced a tested tracked hooks-only replacement. The post-merge closeout move remains open until this
+branch lands on `main`.
 
-**Current focus**: Reconcile the parallel `forge hook enable` / `forge hook disable` writer (`cli/hooks/install.py`) now
+**Current focus**: Verify and land the deletion of the parallel `forge hook enable` / `forge hook disable` writer now
 that the shared matcher already shipped. Pre-epic prep for
 [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation
 path so the epic's later byte change (T2/T5) lands in one place.
@@ -72,8 +72,8 @@ There is **no** tracked hooks-only path today (D1 correction: the settings merge
 unconditionally). Do **not** proceed to Phase 1/2 until a **public** command produces hooks-only settings and is covered
 by a test. This is the load-bearing gate — if it can't be met at acceptable blast radius, the D1 escape valve fires.
 
-- [ ] Choose and implement one:
-  - **Option A — module-gate the settings merge.** At `installer.py:882`, pass
+- [x] Choose and implement one:
+  - **Option A — module-gate the settings merge (chosen).** At `installer.py:882`, pass
     `include_hooks=InstallModule.HOOKS in modules`, `include_permissions=InstallModule.PERMISSIONS in modules`, and a
     new `include_env` gate (tied to `PERMISSIONS` unless a separate env module exists later). Today only
     `include_statusline` is gated. Then a hooks-only module set yields hooks-only settings. **Blast radius (must audit +
@@ -81,33 +81,43 @@ by a test. This is the load-bearing gate — if it can't be met at acceptable bl
     `--profile minimal` today writes both. Find existing installer/settings tests asserting the ungated behavior and
     update them with recorded rationale. The **standard** profile includes both modules, so its output is unchanged
     (assert this explicitly — it is the no-regression anchor).
-  - **Option B — dedicated ergonomic surface.** Add a narrow hooks-only path (a flag or small command) that runs the
-    gated merge without changing the general `merge()` defaults. Smaller blast radius; new CLI surface to name.
-- [ ] Fix the flag facts in this checklist/docs while here: the real flags are `--with` / `--without`
+  - **Option B — dedicated ergonomic surface (not chosen).** Add a narrow hooks-only path (a flag or small command) that
+    runs the gated merge without changing the general `merge()` defaults. Smaller blast radius; new CLI surface to name.
+- [x] Fix the flag facts in this checklist/docs while here: the real flags are `--with` / `--without`
   (`extensions.py:500`), not `--with-modules`/`--without-modules`.
-- [ ] Test the **actual public command** (not an internal helper) at local scope: it installs the hook entries and
+- [x] Test the **actual public command** (not an internal helper) at local scope: it installs the hook entries and
   **nothing else** — asserts `.claude/settings.local.json` gets exactly the golden 16 hook entries
   (`tests/src/install/test_registered_commands_contract.py`, don't re-pin), **no `permissions`/`env` writes**, **no**
   command/agent/skill files, and the run is recorded in `installed.json` (removable by tracked `unmerge`).
-- [ ] Record the exact replacement command string. It is what Phase 2 puts in `hook.md`/QA and what Phase 1 uses to fix
+- [x] Record the exact replacement command string. It is what Phase 2 puts in `hook.md`/QA and what Phase 1 uses to fix
   the shared docker fixture.
-- [ ] D1 sub-gate: decide whether the built path must also cover `--user` → `~/.claude/settings.local.json`, or the
+- [x] D1 sub-gate: decide whether the built path must also cover `--user` → `~/.claude/settings.local.json`, or the
   reviewer accepts dropping that exact target (the one capability with no tracked equivalent).
+
+Replacement command:
+
+```bash
+forge extension enable --scope local --profile minimal --with hooks --without commands
+```
+
+D1 sub-gate result: accepted the clean break. The tracked replacement uses normal installer scope files (`--scope user`
+-> `~/.claude/settings.json`, `--scope local` -> `.claude/settings.local.json`) and does not recreate the legacy "user
+directory + local file" target.
 
 ## Phase 1 — Clean-break delete of the second writer
 
-- [ ] Delete `src/forge/cli/hooks/install.py` in full (all of it is second-writer-only: `enable`, `disable`,
+- [x] Delete `src/forge/cli/hooks/install.py` in full (all of it is second-writer-only: `enable`, `disable`,
   `_is_forge_hook_entry`, `_find_hooks_target`, `FORGE_HOOK_CONFIG`, `SETTINGS_FILENAME`).
-- [ ] `cli/hooks/__init__.py`: drop the `.install` import (`:20`), the two `add_command(enable/disable)` (`:27-28`), and
+- [x] `cli/hooks/__init__.py`: drop the `.install` import (`:20`), the two `add_command(enable/disable)` (`:27-28`), and
   the `FORGE_HOOK_CONFIG`/`SETTINGS_FILENAME` `__all__` entries. Confirm no other module imports from
   `forge.cli.hooks.install`.
-- [ ] `cli/hooks/_group.py`: update the group docstring (`:15-16`) that advertises `enable`/`disable` as user-facing.
-- [ ] Repoint the 3 test consumers of `FORGE_HOOK_CONFIG` to the canonical `get_builtin_preset()["hooks"]`:
+- [x] `cli/hooks/_group.py`: update the group docstring (`:15-16`) that advertises `enable`/`disable` as user-facing.
+- [x] Repoint the 3 test consumers of `FORGE_HOOK_CONFIG` to the canonical `get_builtin_preset()["hooks"]`:
   `test_read_hygiene.py:174`, `test_handlers.py:495,502`.
-- [ ] `test_bug_hook_registry_drift.py`: its premise (two registries drifting) is gone. Delete it, or narrow it to the
+- [x] `test_bug_hook_registry_drift.py`: its premise (two registries drifting) is gone. Delete it, or narrow it to the
   surviving preset-vs-installer coverage — record the rationale (`testing_guidelines`: removed behavior → delete/adjust,
   never skip). Note the matcher card's `test_registered_commands_contract.py` already guards preset entry bytes.
-- [ ] Delete the second-writer test surfaces (feature removed → delete tests, `testing_guidelines`):
+- [x] Delete the second-writer test surfaces (feature removed → delete tests, `testing_guidelines`):
   - `tests/integration/cli/test_hooks_integration.py` — the **entire file** exercises `forge hook enable`/`disable`
     (`:36-167`).
   - `tests/src/install/test_version.py::TestVersionGateOnHookEnable` (`:189`) — the tracked installer keeps its own
@@ -115,44 +125,54 @@ by a test. This is the load-bearing gate — if it can't be met at acceptable bl
     gone.
   - the `enable`/`disable` behavior cases in `tests/src/cli/test_hooks.py`. **Keep** the predicate/detection tests there
     and in `tests/src/install/test_hooks.py` — those cover `install/hooks.py`, unaffected.
-- [ ] **Shared fixture (blocking, reviewer Medium-2):** `tests/integration/docker/conftest.py:81` runs
+- [x] **Shared fixture (blocking, reviewer Medium-2):** `tests/integration/docker/conftest.py:81` runs
   `forge hook enable` in the real-Claude setup used across the whole Docker integration tier — deleting the command
   breaks **every** real-Claude test. Repoint it to the Phase-0 replacement command (it only needs hooks *present*, not
   hooks-only). This is a concrete reason Phase 0 must land first.
-- [ ] **Clean-break assertion:** `forge hook enable` and `forge hook disable` exit 2 with Click "No such command".
+- [x] **Clean-break assertion:** `forge hook enable` and `forge hook disable` exit 2 with Click "No such command".
   Follow the established home/pattern (`test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks`; assert
   on `result.output`).
 
 ## Phase 2 — Migrate docs / QA / diagram + changelog
 
-- [ ] `docs/end-user/hook.md`: remove the "Advanced: install hooks only" block (`:87-98`), the settings.local.json note
+- [x] `docs/end-user/hook.md`: remove the "Advanced: install hooks only" block (`:87-98`), the settings.local.json note
   (`:96-98`), the `:341` usage, and the troubleshooting row (`:359`); replace with the tracked hooks-only invocation
   from Phase 0.
-- [ ] `docs/diagrams.md:230`: drop `or forge hook enable` from the installer node.
-- [ ] `src/skills/qa/resources/checklist/6-hook.md` (`:5,:15,:32-33`) and `18-disable.md:20`: rewrite these **runnable**
+- [x] `docs/diagrams.md:230`: drop `or forge hook enable` from the installer node.
+- [x] `src/skills/qa/resources/checklist/6-hook.md` (`:5,:15,:32-33`) and `18-disable.md:20`: rewrite these **runnable**
   QA steps to the tracked invocation (they are executed by `/forge:qa`, so they must be a working command). Bump the
   checklist index `last-updated` if required by the QA-checklist update rule.
-- [ ] `docs/board/change_log.md`: entry (Goal / Key changes / Verification) naming the removal, the replacement command,
+- [x] `docs/board/change_log.md`: entry (Goal / Key changes / Verification) naming the removal, the replacement command,
   and the one dropped capability (`--user` local-file target).
 
 ## Phase 3 — Verify + close
 
-- [ ] Focused suites green: `tests/src/cli/test_hooks.py`, `tests/src/install/test_hooks.py`,
+- [x] Focused suites green: `tests/src/cli/test_hooks.py`, `tests/src/install/test_hooks.py`,
   `tests/src/install/test_registered_commands_contract.py`, `tests/src/cli/test_read_hygiene.py`,
   `tests/src/policy/team/test_handlers.py`, and the reworked/removed drift regression.
-- [ ] `make test-unit` green (no unrelated breakage).
-- [ ] Integration (CLI surface + installer path, per `testing_guidelines`): run the reworked installer integration
+- [x] `make test-unit` green (no unrelated breakage).
+- [x] Integration (CLI surface + installer path, per `testing_guidelines`): run the reworked installer integration
   target that covers the Phase-0 replacement and the Docker installer path. Do not include
   `tests/integration/cli/test_hooks_integration.py` after Phase 1 if that file is deleted.
-- [ ] Grep sweep clean: no `forge hook enable`/`forge hook disable` outside `docs/board/**` + the changelog entry; no
+- [x] Grep sweep clean: no `forge hook enable`/`forge hook disable` outside `docs/board/**` + the changelog entry; no
   `FORGE_HOOK_CONFIG` or `from forge.cli.hooks.install` remaining.
-- [ ] Scoped pre-commit clean on changed files (ruff/black/isort/mypy/pyright/mdformat).
-- [ ] Design/end-user doc sync recorded: `hook.md`/`diagrams.md`/QA updated; no other doc references the command.
-- [ ] `impl_notes.md` candidate (after human review): "one hook mutation path — the tracked installer. The standalone
+- [x] Scoped pre-commit clean on changed files (ruff/black/isort/mypy/pyright/mdformat).
+- [x] Design/end-user doc sync recorded: `hook.md`/`diagrams.md`/QA updated; no other doc references the command.
+- [x] `impl_notes.md` candidate (after human review): "one hook mutation path — the tracked installer. The standalone
   `forge hook enable/disable` writer + its duplicate `FORGE_HOOK_CONFIG` registry were deleted (clean break); hooks-only
   installs go through `forge extension enable` (hooks module). Removing the second registry also removed the reason
   `test_bug_hook_registry_drift.py` existed."
 - [ ] Move card `doing/ -> done/` after merge to `main`.
+
+Verification log:
+
+- `uv run pytest tests/src/install/test_settings_merge.py::TestMerge tests/src/install/test_installer.py::TestInstallerInit tests/src/cli/test_extension_enable.py::TestEnableWithPath tests/src/cli/test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks tests/src/cli/test_hooks.py tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_read_hygiene.py::TestReadHygieneRegistration tests/src/policy/team/test_handlers.py::TestHookInstallConfig tests/src/install/test_version.py tests/regression/test_bug_stale_preset_hooks.py -q`
+  — 114 passed.
+- `make test-unit` — 7418 passed, 116 deselected.
+- `./scripts/test-integration.sh tests/integration/docker/test_installer.py` — 15 passed.
+- `rg -n "forge hook enable|forge hook disable|FORGE_HOOK_CONFIG|from forge\.cli\.hooks\.install" src tests docs/end-user docs/diagrams.md src/skills/qa/resources/checklist`
+  — no matches.
+- `make pre-commit` — clean after formatter updates.
 
 ---
 

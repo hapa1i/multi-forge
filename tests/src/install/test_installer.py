@@ -381,6 +381,82 @@ class TestInstallerInit:
         assert "Write" in allow
         assert "Edit" in allow
 
+    def test_init_gates_settings_by_selected_modules(
+        self,
+        setup_installer: tuple[Installer, Path, Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A hooks-only module set writes hooks without permissions or env."""
+        import json
+
+        from forge.install.preset import get_builtin_preset, get_preset_path
+
+        installer, forge_home, claude_home, src = setup_installer
+
+        monkeypatch.setenv("FORGE_HOME", str(forge_home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        preset = get_builtin_preset()
+        preset["env"] = {"CUSTOM": "1"}
+        get_preset_path().write_text(json.dumps(preset), encoding="utf-8")
+
+        with patch(
+            "forge.install.installer.get_forge_source_root",
+            return_value=src.parent,
+        ):
+            with patch(
+                "forge.install.installer.get_target_root",
+                return_value=claude_home,
+            ):
+                plan = installer.init(
+                    profile=InstallProfile.MINIMAL,
+                    with_modules={InstallModule.HOOKS},
+                    without_modules={InstallModule.COMMANDS},
+                )
+
+        settings = json.loads((claude_home / "settings.json").read_text())
+        assert settings["hooks"] == get_builtin_preset()["hooks"]
+        assert "permissions" not in settings
+        assert "env" not in settings
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None
+        assert installation.modules_enabled == ["hooks"]
+        assert {entry.key_path.split(".", 1)[0] for entry in installation.settings_entries} == {"hooks"}
+        assert plan.modules == ["hooks"]
+        assert {entry.key_path.split(".", 1)[0] for entry in plan.settings} == {"hooks"}
+
+    def test_standard_profile_still_writes_hooks_permissions_and_env(
+        self,
+        setup_installer: tuple[Installer, Path, Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Standard remains the no-regression anchor for normal installs."""
+        import json
+
+        from forge.install.preset import get_builtin_preset, get_preset_path
+
+        installer, forge_home, claude_home, src = setup_installer
+
+        monkeypatch.setenv("FORGE_HOME", str(forge_home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        preset = get_builtin_preset()
+        preset["env"] = {"CUSTOM": "1"}
+        get_preset_path().write_text(json.dumps(preset), encoding="utf-8")
+
+        with patch(
+            "forge.install.installer.get_forge_source_root",
+            return_value=src.parent,
+        ):
+            with patch(
+                "forge.install.installer.get_target_root",
+                return_value=claude_home,
+            ):
+                installer.init(profile=InstallProfile.STANDARD)
+
+        settings = json.loads((claude_home / "settings.json").read_text())
+        assert settings["hooks"] == get_builtin_preset()["hooks"]
+        assert settings["permissions"]["allow"]
+        assert settings["env"] == {"CUSTOM": "1"}
+
 
 class TestInstallerUpdate:
     """Tests for Installer.update method."""

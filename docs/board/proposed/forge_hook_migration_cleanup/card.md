@@ -28,12 +28,11 @@ uniformly:
 - **Claude -> tracked, value-based unmerge.** Claude settings are merged per hook entry and removed via
   `unmerge(settings, tracking_entries)` using each entry's `stable_id` (value-based, not index-based)
   (`settings_merge.py:702,731`), reconciled against `~/.forge/installed.json`.
-- **Legacy / manual installs (the hard case).** A hand-added Claude hook, or an install whose tracking entries were
-  lost, has **no `stable_id` to unmerge against**. Cleanup then needs a value-based fallback: match a hook entry by its
-  command form (bare `forge hook <name>`, the absolute-path form from `forge_hook_absolute_command`, or the dispatcher
-  form) and remove it, backing up first. Report anything ambiguous rather than guessing. This is also where the **second
-  writer's** entries land: `forge hook enable` (`forge_hook_legacy_writer`) writes **untracked** bare hooks with no
-  `stable_id`, so only the value-based fallback can remove them.
+- **Legacy / manual installs (the hard case).** A hand-added Claude hook, an install whose tracking entries were lost,
+  or entries created by the removed second writer have **no `stable_id` to unmerge against**. Cleanup then needs a
+  value-based fallback: match a hook entry by its command form (bare `forge hook <name>`, the absolute-path form from
+  `forge_hook_absolute_command`, or the dispatcher form) and remove it, backing up first. Report anything ambiguous
+  rather than guessing.
 
 ## Scope
 

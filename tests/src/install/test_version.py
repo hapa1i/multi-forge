@@ -184,20 +184,3 @@ class TestVersionGateOnExtensionsSync:
             result = runner.invoke(extensions, ["sync"])
             assert result.exit_code != 0
             assert "below" in result.output or "2.1.70" in result.output
-
-
-class TestVersionGateOnHookEnable:
-    """Verify that ``forge hook enable`` blocks on old Claude Code."""
-
-    def test_hook_enable_blocks_on_old_version(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from click.testing import CliRunner
-
-        from forge.cli.hooks import hooks
-
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / ".claude").mkdir()
-
-        with patch("forge.install.version.get_claude_runtime_version", return_value="2.1.70"):
-            runner = CliRunner()
-            result = runner.invoke(hooks, ["enable"])
-            assert result.exit_code != 0

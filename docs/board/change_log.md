@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### forge_hook_legacy_writer: Remove the standalone hook writer
+
+**Goal**: End the second, untracked Claude hook mutation path before `epic_global_forge_runtime` changes hook command
+bytes and ownership.
+
+**Key changes**:
+
+- Deleted the standalone `forge hook enable` / `forge hook disable` writer and its duplicate `FORGE_HOOK_CONFIG`
+  registry; hook registration now goes through the tracked extension installer.
+- Module-gated settings merges so the public replacement
+  `forge extension enable --scope local --profile minimal --with hooks --without commands` writes tracked hooks only,
+  without commands, agents, skills, permissions, or env.
+- Migrated docs, QA checklists, Docker integration setup, and removed-command assertions to the tracked replacement.
+  Clean break: the old `--user` local-file target (`~/.claude/settings.local.json`) was dropped; tracked user scope uses
+  `~/.claude/settings.json`.
+
+**Verification**:
+`uv run pytest tests/src/install/test_settings_merge.py::TestMerge tests/src/install/test_installer.py::TestInstallerInit tests/src/cli/test_extension_enable.py::TestEnableWithPath tests/src/cli/test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks tests/src/cli/test_hooks.py tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_read_hygiene.py::TestReadHygieneRegistration tests/src/policy/team/test_handlers.py::TestHookInstallConfig tests/src/install/test_version.py tests/regression/test_bug_stale_preset_hooks.py -q`;
+`make test-unit`; `./scripts/test-integration.sh tests/integration/docker/test_installer.py`; grep sweep for removed
+command/import symbols; `make pre-commit`.
+
 ### forge_hook_matcher_consolidation: Shared hook predicate and byte contract
 
 **Goal**: De-risk `epic_global_forge_runtime` Seam 1 by single-sourcing Forge hook-command detection and pinning the
