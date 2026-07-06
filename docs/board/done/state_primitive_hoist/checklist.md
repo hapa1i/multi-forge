@@ -7,8 +7,7 @@ of re-implementing them. Structure: **one batch card, phased** -- each slice bel
 atomic mega-merge). Slices 1-3 are drift-proven and inline-verified (ready). Slices 4-5 carry a **re-verify gate**
 before code moves (their audit refuters were spend-capped; both claims have now been re-verified during implementation).
 
-**Status: implemented locally; focused/unit/pre-commit/targeted integration verification green; awaiting reviewer
-sign-off.**
+**Status: shipped via PR #80, merged to `main` as `9c6186c7`, and closed out on the board.**
 
 ## Review corrections applied (2026-07-05)
 
@@ -195,7 +194,7 @@ precedent `tests/regression/test_bug_state_unreadable_not_deleted.py` (PR #50 fa
 - [x] Confirm the metric predictions: targeted fsync tests cover all 5 ex-copy paths;
   `rg -l 'from forge\.proxy\.retention' src/forge/core` empty; `rg 'def _?now_iso' src/forge` -> 1;
   `rg -n 'prune_usage_events' src/forge tests` empty.
-- [ ] Promote durable lessons to `impl_notes.md` **after human review** (e.g. the corrected now_iso set; the
+- [x] Promote durable lessons to `impl_notes.md` **after human review** (e.g. the corrected now_iso set; the
   text-vs-bytes atomic-write split; the search-store Unreadable convergence).
 - [x] `make pre-commit` clean; focused suites + the relevant integration path green.
-- [ ] Move `doing/state_primitive_hoist/` -> `done/` after the final slice merges to `main`.
+- [x] Move `doing/state_primitive_hoist/` -> `done/` after the final slice merges to `main`.

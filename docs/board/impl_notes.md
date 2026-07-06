@@ -36,6 +36,24 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### State primitive hoists keep byte formats and error contracts at the caller boundary (shipped 2026-07-06)
+
+Shared state helpers now live in `core` leaves, but callers still own their domain record shape and error vocabulary.
+When adding a new durable-state or JSONL path, import the primitive down instead of re-copying it, then preserve the
+caller-facing contract with characterization tests.
+
+- **Timestamp helpers are not interchangeable.** `core.state.now_iso()` keeps the existing offset form used by state
+  models, while `core.state.utc_timestamp_z()` preserves the second-precision `Z` bytes used by telemetry JSONL records.
+  Do not replace one with the other to chase a "single timestamp" grep result, and do not add private `_now_iso` copies.
+- **Use the bytes atomic writer for byte-owned state.** `core.state.atomic_write_bytes()` owns the file fsync,
+  `os.replace`, parent-dir fsync, and optional final mode; `atomic_write_text()` is just UTF-8 text on top of that.
+  Signed transcripts and other byte-exact payloads should call the bytes primitive directly, not decode/re-encode
+  through text.
+- **Unreadable is environmental; corrupted is content/schema.** Versioned JSON readers should map read `OSError`s to the
+  `StateUnreadableError` family, while invalid JSON, missing/wrong schema versions, and malformed payloads stay in the
+  corrupted family. Search stores keep domain-specific unreadable subclasses so CLI surfaces can say check/retry instead
+  of rebuild/delete.
+
 ### Every real provider call must emit a provider-trace; retry paths included (Defect B, shipped 2026-07-04)
 
 `proxy/server.py::create_message` has three provider-call success paths -- streaming, non-streaming, and the auth-retry

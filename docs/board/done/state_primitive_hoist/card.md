@@ -1,10 +1,9 @@
 # state_primitive_hoist -- hoist durable-state + JSONL-plane primitives to core leaves
 
-**Lane**: `doing/` -- accepted 2026-07-05, branch `refactor/state-primitive-hoist`; executing as one batch card with a
-phased checklist (each slice ships as its own commit/PR). Primitive extraction; mostly behavior-preserving, with **two
-defect-fix slices** (Slice 3 adds fsync durability the copies lack; Slice 5 converges the `OSError -> Corrupted`
-misclassification). Independently shippable slices. Highest-priority audit output (drift already shipped on state/money
-paths).
+**Lane**: `done/` -- accepted 2026-07-05, shipped via PR #80 (`9c6186c7`) on 2026-07-06; executed as one batch card with
+a phased checklist. Primitive extraction; mostly behavior-preserving, with **two defect-fix slices** (Slice 3 adds fsync
+durability the copies lack; Slice 5 converges the `OSError -> Corrupted` misclassification). Highest-priority audit
+output (drift already shipped on state/money paths).
 
 > **Execution note (2026-07-05):** the card's "When accepted" section suggested per-slice member cards or an
 > `epic_state_primitives` coordinator. We are instead running the batch as a **single `doing/` card with a phased
@@ -175,4 +174,6 @@ Slice 5 asserts a failed read classifies as `Unreadable`, not `Corrupted` (the P
 
 ## Closeout
 
-(pending)
+Shipped via PR #80 and merged to `main` as `9c6186c7`. Final closeout is recorded in `docs/board/change_log.md`, and the
+durable implementation takeaways are promoted in `docs/board/impl_notes.md` under "State primitive hoists keep byte
+formats and error contracts at the caller boundary."
