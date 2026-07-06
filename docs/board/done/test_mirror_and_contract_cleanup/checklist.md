@@ -213,10 +213,11 @@ defect-fix deliberately, direct_model last as its own commit).
   there.
 - [x] Slice 6: if a `core/paths` leaf is added, note it in `design.md` §6; note the `direct_model` relocation to
   `core.models` in §6 too.
-- [ ] **impl_notes candidate (human-review gate):** the four transcript primitives are single-sourced (public) in
+- [x] **impl_notes candidate (human-review gate):** the four transcript primitives are single-sourced (public) in
   `core/transcript.py`; `status_line`/`rewind` converge; `human`/`ai` alias normalization is now shared (defect closed).
+  Promoted to `impl_notes.md` 2026-07-06.
 
-## Closeout (pending)
+## Closeout
 
 - [x] All slice exit signals met; **S5 regression test green (gate)**.
 - [x] `make pre-commit` clean; touched-file `ruff`.

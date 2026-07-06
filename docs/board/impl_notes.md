@@ -36,6 +36,21 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Transcript role/turn parsing is single-sourced in `core/transcript.py` (test_mirror_and_contract_cleanup, shipped 2026-07-06)
+
+- The four primitives -- `normalize_transcript_role`, `resolve_entry_role`, `extract_entry_blocks`,
+  `group_entries_into_turns` -- are public in `core/transcript.py` and are the only home for transcript role/turn
+  parsing. `session/transfer.py` (curation) and `session/rewind.py` consume them; `cli/status_line.py` uses
+  `resolve_entry_role` for its role counts. New consumers must reuse these, not reimplement locally.
+- **Recurring-bug cause:** a divergent local copy in `status_line` had dropped the `human`/`ai` role-alias
+  normalization, so those entries were miscounted (raw/`None` instead of `user`/`assistant`). Bypassing the shared
+  primitive silently re-opens this class of miscount. Guard:
+  `tests/regression/test_bug_statusline_transcript_role_alias.py`.
+- **Facade vs shim (module moves):** keep a package `__init__` re-export that lets callers import a stable name while
+  the implementation moves (a *facade* -- `forge.sidecar` still re-exports `get_secrets_for_template` from
+  `core/auth/template_secrets`); delete a module that exists only to forward (a *shim* -- `sidecar/secrets.py`) and
+  repoint callers. Clean break, no compatibility layer.
+
 ### Keep best-effort recovery wrappers separate from fail-loud primitives (ops_policy_seam, shipped 2026-07-06)
 
 Proxy base-url recovery now has two deliberately different contracts in `proxy/proxies.py`:
