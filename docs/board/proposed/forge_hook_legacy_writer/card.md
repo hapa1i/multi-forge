@@ -7,8 +7,8 @@
 land **before** `forge_hook_migration_cleanup` finalizes, or this writer resurrects exactly the state cleanup removes.
 
 **Recommended as pre-epic prep (2026-07-06).** Paired with
-[`forge_hook_matcher_consolidation`](../forge_hook_matcher_consolidation/card.md), resolving this *before* the epic
-starts collapses Seam 1 to **one matcher** unconditionally. The **writer** count then follows this card's decision:
+[`forge_hook_matcher_consolidation`](../../done/forge_hook_matcher_consolidation/card.md), resolving this *before* the
+epic starts collapses Seam 1 to **one matcher** unconditionally. The **writer** count then follows this card's decision:
 **delete** and **update-by-delegation** (below) both leave a single mutation path (the tracked installer), differing
 only in whether `forge hook` survives as a thin CLI entry point; a *standalone* lockstep second writer is the fallback
 that keeps two paths. So the precise pre-epic guarantee is "one matcher, and one mutation path unless the

@@ -1,9 +1,9 @@
 # Checklist: forge_hook_matcher_consolidation
 
-**Card**: [card.md](card.md) · **Branch**: `refactor/hook-matcher-consolidation`
+**Card**: [card.md](card.md) · **Branch**: `refactor/hook-matcher-consolidation` · **PR**: #87
 
-**Status**: **implemented and verified on `refactor/hook-matcher-consolidation`; pending commit/PR/merge closeout.**
-D1/D2 resolved below; card stays in `doing/` until merge to `main`.
+**Status**: **shipped to `main` and closed 2026-07-06.** D1/D2 resolved below; historical checklist retained with the
+verification that shipped the card.
 
 **Current focus**: Lock the hook-command byte contract with a characterization golden, then collapse the two divergent
 detection matchers into one shared predicate. Byte-preserving and behavior-preserving for real Forge registrations;
@@ -92,7 +92,7 @@ Locks current behavior so the refactor is provably byte-preserving ("characteriz
 - [x] Candidate `impl_notes.md` promotion (after human review): "one hook-command predicate in `install/hooks.py`; the
   registered-entry golden keys on (event, matcher, command, timeout) tuples, **not** a set of command strings -- a
   set-of-strings snapshot has lower cardinality than the 16 real entries and is blind to timeout/matcher drift."
-- [ ] Move card `doing/ -> done/` after merge to `main`.
+- [x] Move card `doing/ -> done/` after merge to `main`.
 
 ## Acceptance tests
 
@@ -123,3 +123,6 @@ Implemented 2026-07-06 on `refactor/hook-matcher-consolidation`. Verification co
 
 Design/end-user doc sync: no matcher internals are documented in `docs/design.md`, `docs/design_appendix.md`, or
 `docs/end-user`; `docs/end-user/hook.md` only documents the public `forge hook disable` surface and needed no change.
+
+Post-merge board closeout: moved this card to `done/` and removed the stale `proposed/` duplicate left by the local
+planning commit. Verification: `make pre-commit-md`.

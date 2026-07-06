@@ -1,6 +1,6 @@
 # forge_hook_matcher_consolidation -- one hook-command matcher + a golden byte-contract, before the epic changes the bytes
 
-**Lane**: `doing/` -- active on execution branch `refactor/hook-matcher-consolidation`.
+**Lane**: `done/` -- shipped to `main` on 2026-07-06 via PR #87.
 
 **Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md)
 (its Seam 1 -- "all Forge-registered command strings + all three matchers"). Not an epic member: it is a
@@ -141,7 +141,7 @@ locked contract this card creates. Pairs loosely with T9 (shared matcher) -- lan
 
 ## Closeout
 
-Implemented 2026-07-06 on `refactor/hook-matcher-consolidation`.
+Implemented 2026-07-06 on `refactor/hook-matcher-consolidation`; merged via PR #87 and closed on `main`.
 
 - Shared predicate: `install/hooks.py::is_forge_hook_command` and `entry_is_forge_hook` now own Forge hook-command
   detection. `has_forge_hook(..., handler=...)` calls the shared entry helper directly; `forge hook disable` calls the
@@ -154,5 +154,6 @@ Implemented 2026-07-06 on `refactor/hook-matcher-consolidation`.
 
 Verification: focused hook/contract/regression suite (79 passed); `make test-unit` (7421 passed, 116 deselected);
 `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py` (16 passed); scoped pre-commit on this
-card's changed files clean. No design/end-user doc update was needed because matcher internals are not documented. Keep
-the card in `doing/` until merge to `main`, then move it to `done/`.
+card's changed files clean. No design/end-user doc update was needed because matcher internals are not documented.
+Post-merge board closeout moved the card to `done/` and removed the stale proposed duplicate. Verification:
+`make pre-commit-md`.

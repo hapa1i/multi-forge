@@ -36,7 +36,7 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
-### Forge hook-command detection is single-sourced in `install/hooks.py` (forge_hook_matcher_consolidation, pending merge 2026-07-06)
+### Forge hook-command detection is single-sourced in `install/hooks.py` (forge_hook_matcher_consolidation, shipped 2026-07-06)
 
 - `install/hooks.py::is_forge_hook_command` is the one predicate for "does this command invoke a Forge hook?". It uses
   shell-token semantics: `shlex.split`, command basename `forge`, second token `hook`, and optional third-token handler
