@@ -14,10 +14,9 @@ Uses dacite for deserialization (consistent with BackendRegistryStore).
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import dacite
 
@@ -26,9 +25,13 @@ from forge.core.state import (
     atomic_write_json,
     file_lock_for_target,
     now_iso,
+    read_versioned_json_object,
 )
 
-from .exceptions import SearchDocumentStoreCorruptedError
+from .exceptions import (
+    SearchDocumentStoreCorruptedError,
+    SearchDocumentStoreUnreadableError,
+)
 from .extractor import SearchDocumentMeta
 from .index_state import SEARCH_INDEX_DIR
 
@@ -49,6 +52,10 @@ def get_project_documents_store_path(forge_root: Path) -> Path:
     Path: <forge_root>/.forge/search-index/documents.json
     """
     return forge_root / ".forge" / SEARCH_INDEX_DIR / DOCUMENTS_FILENAME
+
+
+def _handle_document_store_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
+    raise SchemaVersionError(str(path), DOCUMENT_STORE_VERSION, version)
 
 
 class SearchDocumentStore:
@@ -100,22 +107,15 @@ class SearchDocumentStore:
 
         path_str = str(self._store_path)
 
-        try:
-            with open(self._store_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise SearchDocumentStoreCorruptedError(path_str, f"invalid JSON: {e}") from e
-        except OSError as e:
-            raise SearchDocumentStoreCorruptedError(path_str, f"read error: {e}") from e
-
-        if not isinstance(data, dict):
-            raise SearchDocumentStoreCorruptedError(path_str, f"expected JSON object, got {type(data).__name__}")
-
-        version = data.get("schema_version")
-        if version is None:
-            raise SearchDocumentStoreCorruptedError(path_str, "missing schema_version")
-        if version != DOCUMENT_STORE_VERSION:
-            raise SchemaVersionError(path_str, DOCUMENT_STORE_VERSION, version)
+        data = read_versioned_json_object(
+            self._store_path,
+            version_key="schema_version",
+            expected_version=DOCUMENT_STORE_VERSION,
+            corrupted_error=SearchDocumentStoreCorruptedError,
+            unreadable_error=SearchDocumentStoreUnreadableError,
+            missing_version_reason="missing schema_version",
+            on_version_mismatch=_handle_document_store_version_mismatch,
+        )
 
         raw_docs = data.get("documents", [])
         if not isinstance(raw_docs, list):

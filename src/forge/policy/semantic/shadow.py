@@ -26,7 +26,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from forge.install.models import now_iso
+from forge.core.state import now_iso
 from forge.policy.types import ActionContext
 from forge.session.artifacts import (
     get_artifact_paths,

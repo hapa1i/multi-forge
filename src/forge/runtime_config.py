@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from io import StringIO
@@ -26,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
+from forge.core.state import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -717,23 +717,9 @@ def write_runtime_config(config_data: Mapping[str, Any], path: Path | None = Non
     ruamel = _build_runtime_yaml()
     yaml_data = config_data if isinstance(config_data, CommentedMap) else _commented_runtime_config_map(config_data)
 
-    # Atomic write: unique temp file + os.replace (matches proxy config pattern)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(config_path.parent),
-        prefix=f".{config_path.stem}.",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            ruamel.dump(yaml_data, f)
-        os.chmod(tmp_path, 0o600)
-        os.replace(tmp_path, str(config_path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    stream = StringIO()
+    ruamel.dump(yaml_data, stream)
+    atomic_write_text(config_path, stream.getvalue(), mode=0o600)
 
     reset_runtime_config()
 

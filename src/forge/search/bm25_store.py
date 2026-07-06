@@ -12,20 +12,20 @@ atomic writes, file locking, schema versioning, self-healing on missing file.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from forge.core.state import (
     SchemaVersionError,
     atomic_write_json,
     file_lock_for_target,
     now_iso,
+    read_versioned_json_object,
 )
 
-from .exceptions import BM25IndexCorruptedError
+from .exceptions import BM25IndexCorruptedError, BM25IndexUnreadableError
 from .index_state import SEARCH_INDEX_DIR
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,10 @@ class BM25IndexData:
 
 def _get_bm25_index_path(forge_root: Path) -> Path:
     return forge_root / ".forge" / SEARCH_INDEX_DIR / BM25_INDEX_FILENAME
+
+
+def _handle_bm25_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
+    raise SchemaVersionError(str(path), BM25_INDEX_VERSION, version)
 
 
 class BM25IndexStore:
@@ -114,25 +118,15 @@ class BM25IndexStore:
 
         path_str = str(self._store_path)
 
-        try:
-            with open(self._store_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise BM25IndexCorruptedError(path_str, f"invalid JSON: {e}") from e
-        except OSError as e:
-            raise BM25IndexCorruptedError(path_str, f"read error: {e}") from e
-
-        if not isinstance(data, dict):
-            raise BM25IndexCorruptedError(
-                path_str,
-                f"expected JSON object, got {type(data).__name__}",
-            )
-
-        version = data.get("schema_version")
-        if version is None:
-            raise BM25IndexCorruptedError(path_str, "missing schema_version")
-        if version != BM25_INDEX_VERSION:
-            raise SchemaVersionError(path_str, BM25_INDEX_VERSION, version)
+        data = read_versioned_json_object(
+            self._store_path,
+            version_key="schema_version",
+            expected_version=BM25_INDEX_VERSION,
+            corrupted_error=BM25IndexCorruptedError,
+            unreadable_error=BM25IndexUnreadableError,
+            missing_version_reason="missing schema_version",
+            on_version_mismatch=_handle_bm25_version_mismatch,
+        )
 
         stored_tokenizer = data.get("tokenizer_id", "")
         if stored_tokenizer != TOKENIZER_ID:

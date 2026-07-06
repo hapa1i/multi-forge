@@ -692,9 +692,9 @@ A `proxy.yaml` block reaches the running proxy through two independent construct
   `getattr(config.proxy, "<block>", None)` / a tolerant accessor (`_request_log_config`, `_maybe_prune_*`) and degrade
   to defaults — request logging and prune must never raise into a response path. This is deliberate best-effort
   degradation, distinct from the strict durable-state coercion that rejects malformed blocks at load time.
-- **One pruner for all JSONL planes.** `proxy/retention.py::prune_jsonl_shards` (age-then-size, `0` = disable a bound)
-  backs the audit, provider-trace, and request planes. New JSONL telemetry planes should delegate to it, not re-copy the
-  delete-by-age/oldest-first loop.
+- **One pruner for all JSONL planes.** `core/state/retention.py::prune_jsonl_shards` (age-then-size, `0` = disable a
+  bound) backs the audit, provider-trace, and request planes. New JSONL telemetry planes should delegate to it, not
+  re-copy the delete-by-age/oldest-first loop.
 
 ### No caller content in proxy logs; redactor excludes caller free-text (proxy_log_hygiene review, 2026-06-16)
 

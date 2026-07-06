@@ -14,7 +14,10 @@ from forge.cli.main import main
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
 from forge.search.content_store import ContentStore
 from forge.search.engine import BM25
-from forge.search.exceptions import SearchDocumentStoreCorruptedError
+from forge.search.exceptions import (
+    SearchDocumentStoreCorruptedError,
+    SearchDocumentStoreUnreadableError,
+)
 from forge.search.extractor import SearchDocumentMeta
 from forge.search.index_state import IndexedFileEntry, IndexState, IndexStateStore
 from forge.search.store import SearchDocumentStore
@@ -262,6 +265,45 @@ class TestSearchCommand:
         data = json.loads(result.output)
         assert data["total_results"] == 0
         assert "hint" in data
+
+    def test_search_scope_all_skips_unreadable_project(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--scope all skips one unreadable project index and returns other project results."""
+        current_root = tmp_path / "current"
+        current_root.mkdir()
+        (current_root / ".git").mkdir()
+        other_root = tmp_path / "other"
+        other_root.mkdir()
+        monkeypatch.chdir(current_root)
+
+        result_row = SimpleNamespace(
+            score=1.0,
+            session_name="current-session",
+            session_id="s1",
+            snippet="timeout config",
+            transcript_path=str(current_root / "transcript.jsonl"),
+            metadata={},
+        )
+
+        def _fake_search_project(project_root: Path, _query: str, *, limit: int):
+            if project_root == other_root:
+                raise SearchDocumentStoreUnreadableError(str(other_root / ".forge/search-index/documents.json"), "nope")
+            return [result_row][:limit]
+
+        with (
+            patch(
+                "forge.session.index.IndexStore.list_sessions",
+                return_value=[("other", SimpleNamespace(forge_root=str(other_root)))],
+            ),
+            patch("forge.cli.search._search_project", side_effect=_fake_search_project),
+        ):
+            result = runner.invoke(main, ["search", "query", "timeout", "--scope", "all", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["total_results"] == 1
+        assert data["results"][0]["session_name"] == "current-session"
 
     def test_search_corrupted_store_returns_error_json(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -793,3 +835,24 @@ class TestSearchStatus:
         assert data["built"] is True
         assert data["documents_indexed"] == 3
         assert data["bm25"] is None
+
+    def test_status_json_corrupted_index_reports_rebuild_hint(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`search status --json` routes corrupt index files to rebuild guidance, not a traceback."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        index_dir = project_root / ".forge" / "search-index"
+        index_dir.mkdir(parents=True)
+        (index_dir / "documents.json").write_text("not json")
+
+        result = runner.invoke(main, ["search", "status", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        data = json.loads(result.stderr)
+        assert "corrupted" in data["error"].lower() or "invalid" in data["error"].lower()
+        assert "rebuild" in data["hint"].lower()

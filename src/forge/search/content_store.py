@@ -11,19 +11,19 @@ locking, schema versioning, self-healing on missing file.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from forge.core.state import (
     SchemaVersionError,
     atomic_write_json,
     file_lock_for_target,
     now_iso,
+    read_versioned_json_object,
 )
 
-from .exceptions import ContentStoreCorruptedError
+from .exceptions import ContentStoreCorruptedError, ContentStoreUnreadableError
 from .index_state import SEARCH_INDEX_DIR
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,10 @@ HANDLER_LOCK_TIMEOUT_S = 1.0
 
 def _get_content_store_path(forge_root: Path) -> Path:
     return forge_root / ".forge" / SEARCH_INDEX_DIR / CONTENT_FILENAME
+
+
+def _handle_content_store_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
+    raise SchemaVersionError(str(path), CONTENT_STORE_VERSION, version)
 
 
 class ContentStore:
@@ -87,25 +91,15 @@ class ContentStore:
 
         path_str = str(self._store_path)
 
-        try:
-            with open(self._store_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ContentStoreCorruptedError(path_str, f"invalid JSON: {e}") from e
-        except OSError as e:
-            raise ContentStoreCorruptedError(path_str, f"read error: {e}") from e
-
-        if not isinstance(data, dict):
-            raise ContentStoreCorruptedError(
-                path_str,
-                f"expected JSON object, got {type(data).__name__}",
-            )
-
-        version = data.get("schema_version")
-        if version is None:
-            raise ContentStoreCorruptedError(path_str, "missing schema_version")
-        if version != CONTENT_STORE_VERSION:
-            raise SchemaVersionError(path_str, CONTENT_STORE_VERSION, version)
+        data = read_versioned_json_object(
+            self._store_path,
+            version_key="schema_version",
+            expected_version=CONTENT_STORE_VERSION,
+            corrupted_error=ContentStoreCorruptedError,
+            unreadable_error=ContentStoreUnreadableError,
+            missing_version_reason="missing schema_version",
+            on_version_mismatch=_handle_content_store_version_mismatch,
+        )
 
         content = data.get("content", {})
         if not isinstance(content, dict):

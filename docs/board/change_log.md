@@ -27,6 +27,32 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-05
 
+### state_primitive_hoist implementation: Core durable-state primitive hoist
+
+**Goal**: Hoist durable-state and JSONL primitives to core leaves without merging telemetry planes or changing store
+schemas.
+
+**Key changes**:
+
+- Moved `prune_jsonl_shards` to `core/state/retention.py`, repointed live callers, and deleted the dead
+  `prune_usage_events` export.
+- Added `atomic_write_bytes`, layered `atomic_write_text` on it, and repointed four text writers plus binary transcript
+  relocation through the shared durable writer.
+- Added shared telemetry JSONL append mechanics in `core/telemetry/jsonl_io.py`.
+- Added a versioned JSON read helper and converged search read `OSError` handling to domain-specific
+  `StateUnreadableError` subclasses.
+- Review follow-up removed the unused `proxy/retention.py` shim and installer `now_iso` re-export, kept `version: null`
+  diagnostics aligned with pre-hoist readers, and made search `--scope all` skip unreadable project indexes while
+  `search status` reports corrupt indexes with rebuild guidance.
+
+**Verification**: Focused card suite
+`uv run pytest tests/src/core/state/test_timestamps.py tests/src/core/state/test_io.py tests/src/core/state/test_retention.py tests/src/core/telemetry/test_jsonl_io.py tests/regression/test_bug_state_atomic_write_fsync.py tests/regression/test_bug_search_store_oserror_unreadable.py tests/src/backend/test_registry.py tests/src/proxy/test_proxies.py tests/src/session/test_index.py tests/src/install/test_tracking.py tests/src/search/test_store.py tests/src/search/test_content_store.py tests/src/search/test_bm25_store.py tests/src/search/test_index_state.py tests/src/cli/test_search.py`;
+review follow-up suite
+`uv run pytest tests/src/core/state/test_versioned_store.py tests/src/cli/test_search.py tests/src/install/test_models.py tests/src/install/test_tracking.py tests/src/backend/test_registry.py tests/src/proxy/test_proxies.py tests/src/session/test_index.py tests/src/search/test_store.py tests/src/search/test_content_store.py tests/src/search/test_bm25_store.py tests/src/search/test_index_state.py tests/regression/test_bug_search_store_oserror_unreadable.py`;
+`make test-unit`; targeted integration
+`./scripts/test-integration.sh tests/integration/cli/test_search_workflow_integration.py tests/integration/cli/test_proxy_commands_integration.py::TestProxySet tests/integration/backend/test_backend_cli.py::TestBackendRegistry`;
+`make pre-commit`.
+
 ### test-session-command-fixture-and-split closeout: Session CLI test split
 
 **Goal**: Close the session CLI test refactor after PR #77 split the 4,933-line catch-all file without changing command

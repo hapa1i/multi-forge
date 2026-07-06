@@ -7,14 +7,18 @@ reversible update and uninstall operations.
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any, NoReturn
 
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import atomic_write_json, file_lock_for_target
+from forge.core.state import (
+    atomic_write_json,
+    file_lock_for_target,
+    read_versioned_json_object,
+)
 
 from .exceptions import TrackingCorruptedError, TrackingUnreadableError
 from .models import (
@@ -48,6 +52,14 @@ def compute_checksum(path: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             sha256.update(chunk)
     return sha256.hexdigest()
+
+
+def _handle_tracking_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
+    raise TrackingCorruptedError(
+        str(path),
+        f"incompatible version {version} (this Forge expects {TRACKING_VERSION}). "
+        f"Delete this file and run 'forge extension enable' again.",
+    )
 
 
 class TrackingStore:
@@ -94,23 +106,16 @@ class TrackingStore:
         if not self.exists():
             return InstalledManifest()
 
-        try:
-            with open(self._path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise TrackingCorruptedError(str(self._path), f"invalid JSON: {e}")
-        except OSError as e:
-            # A failed read is environmental, not corruption -- forge clean must not delete it.
-            raise TrackingUnreadableError(str(self._path), f"read error: {e}")
-
-        # Version check (no migration support)
-        version = data.get("version", 1)
-        if version != TRACKING_VERSION:
-            raise TrackingCorruptedError(
-                str(self._path),
-                f"incompatible version {version} (this Forge expects {TRACKING_VERSION}). "
-                f"Delete this file and run 'forge extension enable' again.",
-            )
+        data = read_versioned_json_object(
+            self._path,
+            version_key="version",
+            expected_version=TRACKING_VERSION,
+            corrupted_error=TrackingCorruptedError,
+            unreadable_error=TrackingUnreadableError,
+            missing_version=1,
+            none_is_missing=False,
+            on_version_mismatch=_handle_tracking_version_mismatch,
+        )
 
         try:
             return dacite.from_dict(

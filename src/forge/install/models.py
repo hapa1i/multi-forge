@@ -7,17 +7,8 @@ what Forge has installed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-
-# --- Timestamp helper (matches session/models.py pattern) ---
-
-
-def now_iso() -> str:
-    """Return current UTC time as ISO8601 string."""
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
 
 # --- Enums ---
 

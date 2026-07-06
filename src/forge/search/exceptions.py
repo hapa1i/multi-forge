@@ -8,7 +8,7 @@ Follows the forge.core.state exception hierarchy:
 
 from __future__ import annotations
 
-from forge.core.state import StateCorruptedError
+from forge.core.state import StateCorruptedError, StateUnreadableError
 
 
 class SearchError(Exception):
@@ -24,11 +24,23 @@ class IndexStateCorruptedError(StateCorruptedError):
     pass
 
 
+class IndexStateUnreadableError(StateUnreadableError):
+    """Raised when the index state file exists but cannot be read."""
+
+    pass
+
+
 class SearchDocumentStoreCorruptedError(StateCorruptedError):
     """Raised when the document store file cannot be parsed.
 
     Inherits (path, reason) signature from StateCorruptedError.
     """
+
+    pass
+
+
+class SearchDocumentStoreUnreadableError(StateUnreadableError):
+    """Raised when the document store file exists but cannot be read."""
 
     pass
 
@@ -42,10 +54,22 @@ class BM25IndexCorruptedError(StateCorruptedError):
     pass
 
 
+class BM25IndexUnreadableError(StateUnreadableError):
+    """Raised when the BM25 index file exists but cannot be read."""
+
+    pass
+
+
 class ContentStoreCorruptedError(StateCorruptedError):
     """Raised when the content store file cannot be parsed or is inconsistent.
 
     Inherits (path, reason) signature from StateCorruptedError.
     """
+
+    pass
+
+
+class ContentStoreUnreadableError(StateUnreadableError):
+    """Raised when the content store file exists but cannot be read."""
 
     pass

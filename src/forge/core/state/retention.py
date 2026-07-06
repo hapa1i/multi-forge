@@ -1,4 +1,4 @@
-"""Shared JSONL shard retention for proxy telemetry planes (proxy_log_hygiene).
+"""Shared JSONL shard retention for append-only state planes.
 
 The audit, provider-trace, and request-log planes all bound on-disk size the same way:
 delete shards older than ``retention_days``, then prune oldest-first until total size is under

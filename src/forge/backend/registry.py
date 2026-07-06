@@ -12,11 +12,10 @@ Ownership: Forge Backend Manager (`forge model backend` CLI).
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Any, Callable, Literal, NoReturn
 
 import dacite
 
@@ -26,6 +25,7 @@ from forge.core.state import (
     StateUnreadableError,
     atomic_write_json,
     file_lock_for_target,
+    read_versioned_json_object,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,16 @@ def _uses_old_backend_id_process_records(data: object) -> bool:
     return any(isinstance(entry, dict) and "backend_id" in entry for entry in entries.values())
 
 
+def _handle_registry_version_mismatch(path: Path, data: dict[str, Any], version: Any) -> NoReturn:
+    if version == 1 and _uses_old_backend_id_process_records(data):
+        raise BackendRegistryCorruptedError(str(path), OLD_BACKEND_ID_PROCESS_FIELD_TIP)
+    raise BackendRegistryCorruptedError(
+        str(path),
+        f"incompatible version {version} (this Forge expects {BACKEND_REGISTRY_VERSION}). "
+        f"Delete this file and retry.",
+    )
+
+
 class BackendRegistryStore:
     """Manage the backend registry at ~/.forge/backends/index.json.
 
@@ -121,26 +131,14 @@ class BackendRegistryStore:
         if not self.exists():
             return BackendRegistry()
 
-        try:
-            with open(self._registry_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise BackendRegistryCorruptedError(str(self._registry_path), f"invalid JSON: {e}")
-        except OSError as e:
-            # A failed read is environmental, not corruption -- forge clean must not delete it.
-            raise BackendRegistryUnreadableError(str(self._registry_path), f"read error: {e}")
-
-        version = data.get("version")
-        if version is None:
-            raise BackendRegistryCorruptedError(str(self._registry_path), "missing version field")
-        if version != BACKEND_REGISTRY_VERSION:
-            if version == 1 and _uses_old_backend_id_process_records(data):
-                raise BackendRegistryCorruptedError(str(self._registry_path), OLD_BACKEND_ID_PROCESS_FIELD_TIP)
-            raise BackendRegistryCorruptedError(
-                str(self._registry_path),
-                f"incompatible version {version} (this Forge expects {BACKEND_REGISTRY_VERSION}). "
-                f"Delete this file and retry.",
-            )
+        data = read_versioned_json_object(
+            self._registry_path,
+            version_key="version",
+            expected_version=BACKEND_REGISTRY_VERSION,
+            corrupted_error=BackendRegistryCorruptedError,
+            unreadable_error=BackendRegistryUnreadableError,
+            on_version_mismatch=_handle_registry_version_mismatch,
+        )
 
         try:
             return dacite.from_dict(

@@ -12,7 +12,6 @@ Ownership: Forge Proxy Orchestrator (`forge proxy` CLI).
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -27,6 +26,7 @@ from forge.core.state import (
     StateUnreadableError,
     atomic_write_json,
     file_lock_for_target,
+    read_versioned_json_object,
 )
 
 _log = logging.getLogger(__name__)
@@ -234,24 +234,13 @@ class ProxyRegistryStore:
         if not self.exists():
             return ProxyRegistry()
 
-        try:
-            with open(self._registry_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ProxyRegistryCorruptedError(str(self._registry_path), f"invalid JSON: {e}")
-        except OSError as e:
-            # A failed read is environmental, not corruption -- forge clean must not delete it.
-            raise ProxyRegistryUnreadableError(str(self._registry_path), f"read error: {e}")
-
-        version = data.get("version")
-        if version is None:
-            raise ProxyRegistryCorruptedError(str(self._registry_path), "missing version field")
-        if version != PROXY_REGISTRY_VERSION:
-            raise ProxyRegistryCorruptedError(
-                str(self._registry_path),
-                f"incompatible version {version} (this Forge expects {PROXY_REGISTRY_VERSION}). "
-                f"Delete this file and retry.",
-            )
+        data = read_versioned_json_object(
+            self._registry_path,
+            version_key="version",
+            expected_version=PROXY_REGISTRY_VERSION,
+            corrupted_error=ProxyRegistryCorruptedError,
+            unreadable_error=ProxyRegistryUnreadableError,
+        )
 
         try:
             return dacite.from_dict(

@@ -14,20 +14,20 @@ Follows the BackendRegistry/BackendRegistryStore pattern from forge.backend.regi
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, NoReturn
 
 from forge.core.state import (
     SchemaVersionError,
     atomic_write_json,
     file_lock_for_target,
     now_iso,
+    read_versioned_json_object,
 )
 
-from .exceptions import IndexStateCorruptedError
+from .exceptions import IndexStateCorruptedError, IndexStateUnreadableError
 
 # Directory and file names
 SEARCH_INDEX_DIR = "search-index"
@@ -47,6 +47,10 @@ def get_project_index_state_path(forge_root: Path) -> Path:
     Path: <forge_root>/.forge/search-index/state.json
     """
     return forge_root / ".forge" / SEARCH_INDEX_DIR / STATE_FILENAME
+
+
+def _handle_index_state_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
+    raise SchemaVersionError(str(path), INDEX_STATE_VERSION, version)
 
 
 def _require_absolute(path: Path) -> None:
@@ -190,24 +194,15 @@ class IndexStateStore:
         if not self.exists():
             return IndexState()
 
-        path_str = str(self._state_path)
-
-        try:
-            with open(self._state_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise IndexStateCorruptedError(path_str, f"invalid JSON: {e}") from e
-        except OSError as e:
-            raise IndexStateCorruptedError(path_str, f"read error: {e}") from e
-
-        if not isinstance(data, dict):
-            raise IndexStateCorruptedError(path_str, f"expected JSON object, got {type(data).__name__}")
-
-        version = data.get("schema_version")
-        if version is None:
-            raise IndexStateCorruptedError(path_str, "missing schema_version")
-        if version != INDEX_STATE_VERSION:
-            raise SchemaVersionError(path_str, INDEX_STATE_VERSION, version)
+        data = read_versioned_json_object(
+            self._state_path,
+            version_key="schema_version",
+            expected_version=INDEX_STATE_VERSION,
+            corrupted_error=IndexStateCorruptedError,
+            unreadable_error=IndexStateUnreadableError,
+            missing_version_reason="missing schema_version",
+            on_version_mismatch=_handle_index_state_version_mismatch,
+        )
 
         # Deserialize indexed_files: dict[str, dict] → dict[str, IndexedFileEntry]
         indexed_files: dict[str, IndexedFileEntry] = {}
@@ -226,7 +221,7 @@ class IndexStateStore:
                         continue
 
         return IndexState(
-            schema_version=version,
+            schema_version=INDEX_STATE_VERSION,
             updated_at=data.get("updated_at", ""),
             indexed_files=indexed_files,
         )

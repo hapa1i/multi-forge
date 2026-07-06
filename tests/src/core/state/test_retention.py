@@ -1,4 +1,4 @@
-"""Slice 5 (proxy_log_hygiene): shared shard pruning + per-file rotation.
+"""Shared JSONL shard pruning plus request-log per-file rotation.
 
 ``prune_jsonl_shards`` is the one pruner shared by the audit, provider-trace, and request-log
 planes (delete-by-age, then oldest-first over a size budget; 0 disables a bound).
@@ -11,7 +11,7 @@ import os
 import time
 from pathlib import Path
 
-from forge.proxy.retention import prune_jsonl_shards
+from forge.core.state import prune_jsonl_shards
 from forge.proxy.utils import _active_request_log_shard, prune_request_logs
 
 

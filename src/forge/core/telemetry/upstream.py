@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -15,7 +14,8 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.state import decode_json_object, utc_timestamp_z
+from forge.core.telemetry.jsonl_io import append_jsonl_record
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,6 @@ UpstreamStatus = Literal["success", "warning", "fail_open", "deny", "needs_revie
 
 _lock = threading.Lock()
 _warned_newer_schema = False
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _upstream_dir() -> Path:
@@ -65,7 +61,7 @@ class UpstreamOutcome:
     cached: bool = False
     latency_ms: float | None = None
     schema_version: int = UPSTREAM_SCHEMA_VERSION
-    ts: str = field(default_factory=_now_iso)
+    ts: str = field(default_factory=utc_timestamp_z)
 
 
 def should_record_upstream_outcome(status: str, *, cached: bool = False) -> bool:
@@ -87,22 +83,16 @@ def write_upstream_outcome(outcome: UpstreamOutcome) -> None:
     """Append an upstream outcome when the volume policy allows it."""
     if not should_record_upstream_outcome(outcome.status, cached=outcome.cached):
         return
-    try:
-        from forge.core.state import open_secure_append
-
-        data = {k: v for k, v in asdict(outcome).items() if v is not None}
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        for secure_dir in (log_path.parent.parent, log_path.parent):
-            try:
-                os.chmod(secure_dir, 0o700)
-            except OSError:
-                pass
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(data, separators=(",", ":"), default=str) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write upstream telemetry: %s", e)
+    data = {k: v for k, v in asdict(outcome).items() if v is not None}
+    log_path = _current_log_path()
+    append_jsonl_record(
+        log_path,
+        data,
+        secure_dirs=(log_path.parent.parent, log_path.parent),
+        lock=_lock,
+        logger=logger,
+        warning_message="Failed to write upstream telemetry: %s",
+    )
 
 
 def record_upstream_operation(

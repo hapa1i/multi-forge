@@ -18,7 +18,6 @@ contend on a single file.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -31,7 +30,8 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.state import decode_json_object, utc_timestamp_z
+from forge.core.telemetry.jsonl_io import append_jsonl_record
 from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
@@ -70,10 +70,6 @@ BillingMode = Literal[
     "subscription_quota",
     "unknown",
 ]
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _mint_event_id() -> str:
@@ -143,7 +139,7 @@ class UsageEvent:
     # Auto-stamped envelope (defaulted, so they come last per dataclass ordering).
     schema_version: int = USAGE_SCHEMA_VERSION
     event_id: str = field(default_factory=_mint_event_id)
-    ts: str = field(default_factory=_now_iso)
+    ts: str = field(default_factory=utc_timestamp_z)
 
 
 def _events_dir() -> Path:
@@ -164,24 +160,18 @@ def log_usage_event(event: UsageEvent) -> None:
     Best-effort: write failures are logged at warning and swallowed -- attribution
     telemetry must never break the work it measures.
     """
-    try:
-        from forge.core.state import open_secure_append
-
-        record = asdict(event)
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+    record = asdict(event)
+    log_path = _current_log_path()
+    append_jsonl_record(
+        log_path,
+        record,
         # Owner-only on both `usage/` and `usage/events/` so neither the records nor the
         # file-name timestamps leak to other local users (mirrors audit_logger).
-        for secure_dir in (_events_dir().parent, _events_dir()):
-            try:
-                os.chmod(secure_dir, 0o700)
-            except OSError:
-                pass
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(record, separators=(",", ":"), default=str) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write usage event: %s", e)
+        secure_dirs=(_events_dir().parent, _events_dir()),
+        lock=_lock,
+        logger=logger,
+        warning_message="Failed to write usage event: %s",
+    )
 
 
 # --- Read path ---------------------------------------------------------------
@@ -265,45 +255,3 @@ def read_usage_events(
 
     events.sort(key=lambda e: e.ts)
     return events
-
-
-# --- Retention ---------------------------------------------------------------
-
-
-def prune_usage_events(*, retention_days: int, max_total_mb: int) -> None:
-    """Delete usage shards older than ``retention_days``, then prune oldest-first over
-    ``max_total_mb``. Best-effort: errors are ignored (telemetry, not critical path)."""
-    events_dir = _events_dir()
-    if not events_dir.is_dir():
-        return
-    try:
-        shards = sorted(events_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-    except OSError:
-        return
-
-    now = datetime.now(timezone.utc).timestamp()
-    if retention_days > 0:
-        cutoff = now - retention_days * 86400
-        for shard in list(shards):
-            try:
-                if shard.stat().st_mtime < cutoff:
-                    shard.unlink()
-                    shards.remove(shard)
-            except OSError:
-                pass
-
-    if max_total_mb > 0:
-        limit = max_total_mb * 1024 * 1024
-        try:
-            total = sum(p.stat().st_size for p in shards)
-        except OSError:
-            return
-        for shard in shards:  # oldest first
-            if total <= limit:
-                break
-            try:
-                size = shard.stat().st_size
-                shard.unlink()
-                total -= size
-            except OSError:
-                pass

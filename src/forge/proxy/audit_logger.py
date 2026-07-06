@@ -18,11 +18,12 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
+from forge.core.state import utc_timestamp_z
 from forge.core.telemetry.downstream import (
     DownstreamKind,
     DownstreamRecord,
@@ -45,10 +46,6 @@ _drift_state_frozen: set[str] = set()
 
 # One-time warning latch for records written by a newer Forge.
 _warned_newer_schema = False
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # --- Hashing (pure; shared with the core pipeline) ---------------------------
@@ -121,7 +118,7 @@ def log_audit_record(record: dict[str, Any]) -> None:
     write failures are logged at warning and never block the request.
     """
     record.setdefault("schema_version", AUDIT_SCHEMA_VERSION)
-    record.setdefault("ts", _now_iso())
+    record.setdefault("ts", utc_timestamp_z())
     try:
         record_type = str(record.get("record_type") or "request")
         kind: DownstreamKind
@@ -338,7 +335,7 @@ def _persist_drift_baseline(proxy_id: str, baseline: dict[str, str]) -> None:
             {
                 "schema_version": AUDIT_SCHEMA_VERSION,
                 "last_seen": baseline,
-                "updated_at": _now_iso(),
+                "updated_at": utc_timestamp_z(),
             },
         )
         try:

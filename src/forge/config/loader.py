@@ -16,9 +16,9 @@ import hashlib
 import logging
 import os
 import re
-import tempfile
 from collections.abc import Mapping
 from importlib.resources.abc import Traversable
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,7 @@ from forge.config.schema import (
     TierOverrides,
 )
 from forge.core.paths import get_forge_home
+from forge.core.state import atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError
 
 logger = logging.getLogger(__name__)
@@ -510,32 +511,12 @@ def write_proxy_instance_config(proxy_id: str, config: "ProxyInstanceConfig") ->
     ruamel.default_flow_style = False
     ruamel.preserve_quotes = True
 
-    # Write to unique temp file in same directory (same filesystem for atomic rename)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(path.parent),
-        prefix=f".{path.stem}.",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            # Add header comment
-            f.write("# Forge Proxy Configuration\n")
-            f.write("# This file is owned by the user - edit freely\n")
-            f.write("# Use `forge proxy edit` or edit directly\n\n")
-            ruamel.dump(data, f)
-
-        # Set permissions before rename (more secure)
-        os.chmod(tmp_path, 0o600)
-
-        # Atomic replace (works across filesystems, unlike Path.rename)
-        os.replace(tmp_path, str(path))
-
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    stream = StringIO()
+    stream.write("# Forge Proxy Configuration\n")
+    stream.write("# This file is owned by the user - edit freely\n")
+    stream.write("# Use `forge proxy edit` or edit directly\n\n")
+    ruamel.dump(data, stream)
+    atomic_write_text(path, stream.getvalue(), mode=0o600)
 
     logger.debug(f"Wrote proxy config to {path}")
     return path

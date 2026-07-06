@@ -1,6 +1,7 @@
 """Tests for core.state.io module."""
 
 import json
+import stat
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ import pytest
 from forge.core.state import (
     StateCorruptedError,
     StateNotFoundError,
+    atomic_write_bytes,
     atomic_write_json,
     atomic_write_text,
     decode_json_object,
@@ -103,6 +105,27 @@ class TestAtomicWriteText:
         atomic_write_text(target, content)
         # Read with explicit UTF-8 to verify
         assert target.read_text(encoding="utf-8") == content
+
+    def test_sets_mode_when_requested(self, tmp_path: Path) -> None:
+        target = tmp_path / "secure.txt"
+        atomic_write_text(target, "secret", mode=0o600)
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+class TestAtomicWriteBytes:
+    """Tests for atomic_write_bytes function."""
+
+    def test_writes_raw_bytes(self, tmp_path: Path) -> None:
+        target = tmp_path / "data.bin"
+        data = b"\xff\x00raw\nbytes"
+        atomic_write_bytes(target, data)
+        assert target.read_bytes() == data
+
+    def test_sets_mode_when_requested(self, tmp_path: Path) -> None:
+        target = tmp_path / "secure.bin"
+        atomic_write_bytes(target, b"secret", mode=0o600)
+        assert target.read_bytes() == b"secret"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
 
 
 class TestAtomicWriteJson:
