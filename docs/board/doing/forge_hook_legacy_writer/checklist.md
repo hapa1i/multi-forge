@@ -118,8 +118,13 @@ directory + local file" target.
   surviving preset-vs-installer coverage — record the rationale (`testing_guidelines`: removed behavior → delete/adjust,
   never skip). Note the matcher card's `test_registered_commands_contract.py` already guards preset entry bytes.
 - [x] Delete the second-writer test surfaces (feature removed → delete tests, `testing_guidelines`):
-  - `tests/integration/cli/test_hooks_integration.py` — the **entire file** exercises `forge hook enable`/`disable`
-    (`:36-167`).
+  - `tests/integration/cli/test_hooks_integration.py` — delete the obsolete `TestHookEnableDisable` coverage. The same
+    file also had subprocess-level `session-start` / `stop` handler checks, so record the replacement coverage rather
+    than treating the whole file as obsolete for one reason: `tests/src/cli/test_hooks.py::TestSessionStartCommand`
+    covers handler edge cases,
+    `tests/regression/test_bug_21x_fork_launch_handoff.py::test_deferred_same_dir_fork_session_start_reconciles_child_uuid`
+    covers fork + `SessionStart` reconciliation, and `tests/integration/docker/test_real_claude_hooks.py` covers the
+    real-Claude entry point. The accepted loss is only the subprocess-level CLI edge invocation for surviving handlers.
   - `tests/src/install/test_version.py::TestVersionGateOnHookEnable` (`:189`) — the tracked installer keeps its own
     version gate (`test_version.py:151,165`), so the hook-enable-specific gate test is redundant once the command is
     gone.
@@ -152,8 +157,9 @@ directory + local file" target.
   `tests/src/policy/team/test_handlers.py`, and the reworked/removed drift regression.
 - [x] `make test-unit` green (no unrelated breakage).
 - [x] Integration (CLI surface + installer path, per `testing_guidelines`): run the reworked installer integration
-  target that covers the Phase-0 replacement and the Docker installer path. Do not include
-  `tests/integration/cli/test_hooks_integration.py` after Phase 1 if that file is deleted.
+  target that covers the Phase-0 replacement and the Docker installer path, plus one slow real-Claude hook test that
+  exercises the repointed `setup_real_claude` fixture. Do not include `tests/integration/cli/test_hooks_integration.py`
+  after Phase 1 if that file is deleted.
 - [x] Grep sweep clean: no `forge hook enable`/`forge hook disable` outside `docs/board/**` + the changelog entry; no
   `FORGE_HOOK_CONFIG` or `from forge.cli.hooks.install` remaining.
 - [x] Scoped pre-commit clean on changed files (ruff/black/isort/mypy/pyright/mdformat).
@@ -170,6 +176,8 @@ Verification log:
   — 114 passed.
 - `make test-unit` — 7418 passed, 116 deselected.
 - `./scripts/test-integration.sh tests/integration/docker/test_installer.py` — 15 passed.
+- `./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py::TestRealClaudeHooks::test_session_start_hook_sets_session_id`
+  — 1 passed.
 - `rg -n "forge hook enable|forge hook disable|FORGE_HOOK_CONFIG|from forge\.cli\.hooks\.install" src tests docs/end-user docs/diagrams.md src/skills/qa/resources/checklist`
   — no matches.
 - `make pre-commit` — clean after formatter updates.

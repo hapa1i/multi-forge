@@ -11,8 +11,9 @@ def hooks(ctx: click.Context) -> None:
     """Hook handlers invoked by agent runtimes.
 
     Most subcommands are invoked automatically by runtime hooks: Claude Code's
-    are configured in .claude/settings.local.json; Codex's (codex-policy-check)
-    are registered in a Codex config and require trust enrollment.
+    are configured in settings.json / settings.local.json depending on scope;
+    Codex's (codex-policy-check) are registered in a Codex config and require
+    trust enrollment.
     """
     from forge.core.logging import configure_debug_logging
 

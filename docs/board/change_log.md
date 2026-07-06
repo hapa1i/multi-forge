@@ -45,8 +45,9 @@ bytes and ownership.
 
 **Verification**:
 `uv run pytest tests/src/install/test_settings_merge.py::TestMerge tests/src/install/test_installer.py::TestInstallerInit tests/src/cli/test_extension_enable.py::TestEnableWithPath tests/src/cli/test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks tests/src/cli/test_hooks.py tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_read_hygiene.py::TestReadHygieneRegistration tests/src/policy/team/test_handlers.py::TestHookInstallConfig tests/src/install/test_version.py tests/regression/test_bug_stale_preset_hooks.py -q`;
-`make test-unit`; `./scripts/test-integration.sh tests/integration/docker/test_installer.py`; grep sweep for removed
-command/import symbols; `make pre-commit`.
+`make test-unit`; `./scripts/test-integration.sh tests/integration/docker/test_installer.py`;
+`./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py::TestRealClaudeHooks::test_session_start_hook_sets_session_id`;
+grep sweep for removed command/import symbols; `make pre-commit`.
 
 ### forge_hook_matcher_consolidation: Shared hook predicate and byte contract
 
