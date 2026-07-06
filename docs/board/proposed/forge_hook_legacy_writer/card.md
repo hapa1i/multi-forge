@@ -9,11 +9,11 @@ land **before** `forge_hook_migration_cleanup` finalizes, or this writer resurre
 **Recommended as pre-epic prep (2026-07-06).** Paired with
 [`forge_hook_matcher_consolidation`](../forge_hook_matcher_consolidation/card.md), resolving this *before* the epic
 starts collapses Seam 1 to **one matcher** unconditionally. The **writer** count then follows this card's decision:
-**delete** and **update-by-delegation** (below) both leave a single mutation path (the tracked installer), differing only
-in whether `forge hook` survives as a thin CLI entry point; a *standalone* lockstep second writer is the fallback that
-keeps two paths. So the precise pre-epic guarantee is "one matcher, and one mutation path unless the standalone-writer
-fallback is chosen." The update branch adopts the shared matcher from that card; the delete branch is epic-independent.
-Land either first.
+**delete** and **update-by-delegation** (below) both leave a single mutation path (the tracked installer), differing
+only in whether `forge hook` survives as a thin CLI entry point; a *standalone* lockstep second writer is the fallback
+that keeps two paths. So the precise pre-epic guarantee is "one matcher, and one mutation path unless the
+standalone-writer fallback is chosen." The update branch adopts the shared matcher from that card; the delete branch is
+epic-independent. Land either first.
 
 ## Goal
 
@@ -43,17 +43,17 @@ That second writer is a drift source the epic cannot ignore:
 
 ## Decision (update or delete)
 
-- **Delete.** Fold enable/disable into `forge extension enable`, remove the command and `_is_forge_hook_entry`.
-  Clean break (`coding_standards` §5): removed Click command errors natively; name the replacement in the changelog.
+- **Delete.** Fold enable/disable into `forge extension enable`, remove the command and `_is_forge_hook_entry`. Clean
+  break (`coding_standards` §5): removed Click command errors natively; name the replacement in the changelog.
   Preconditions: migrate `docs/end-user/hook.md`, and decide whether the "hooks-only, `settings.local.json`" affordance
   is preserved via `forge extension enable` flags or dropped.
 - **Update.** If the command must stay, **prefer delegating it through the tracked installer path** (`merge_hooks` +
-  `installed.json`) so `forge hook enable`/`disable` becomes a thin CLI entry point over the **one** mutation path -- not
-  a second writer -- inheriting the shipped command form, tracking, and the shared matcher for free. This needs the
-  tracked path to support the documented `settings.local.json`-only target (see the open question); if that affordance is
-  dropped instead, delete is cleaner. Re-implementing it as a **standalone** writer that merely stays lockstep (its own
-  emit + `installed.json` write + adopted matcher) is the fallback of last resort -- it keeps a third code path alive at a
-  standing lockstep-maintenance cost.
+  `installed.json`) so `forge hook enable`/`disable` becomes a thin CLI entry point over the **one** mutation path --
+  not a second writer -- inheriting the shipped command form, tracking, and the shared matcher for free. This needs the
+  tracked path to support the documented `settings.local.json`-only target (see the open question); if that affordance
+  is dropped instead, delete is cleaner. Re-implementing it as a **standalone** writer that merely stays lockstep (its
+  own emit + `installed.json` write + adopted matcher) is the fallback of last resort -- it keeps a third code path
+  alive at a standing lockstep-maintenance cost.
 
 The epic direction ("one hook source") favored **delete** on the assumption this was an internal leftover. **Exposure is
 now verified and cuts against a free delete:** `forge hook enable`/`disable` is a *documented* end-user surface
@@ -66,8 +66,8 @@ against update-via-tracked-path on that basis, not on "leftover" assumptions.
 ## Scope
 
 **In:** audit callers/exposure of `forge hook enable`/`disable`; execute delete or update; if delete, remove
-`_is_forge_hook_entry` and its tests and migrate `hook.md`; if keep, align command form + add tracking + adopt the shared
-matcher.
+`_is_forge_hook_entry` and its tests and migrate `hook.md`; if keep, align command form + add tracking + adopt the
+shared matcher.
 
 **Out:** the main installer byte change (`forge_hook_absolute_command` / `user_scope_hook_ownership`); the migration
 sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`).
@@ -79,10 +79,10 @@ sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`
 - Prefix matcher, incompatible with absolute/dispatcher forms: `_is_forge_hook_entry` `install.py:139-164`
   (`cmd.strip().startswith("forge hook ")` `:152`).
 - Tracked path it diverges from: `merge_hooks`/`unmerge` `settings_merge.py:505,731`; `installed.json` tracking.
-- Documented UX surface with a distinct semantic (verified 2026-07-06): `docs/end-user/hook.md:90-96` (the enable/disable
-  commands), `:96` (the "always writes `settings.local.json`" note vs `forge extension enable`), `:341,:359`
-  (troubleshooting), `diagrams.md:230`. Group is `hidden=True` but the docstring marks enable/disable "user-facing"
-  (`cli/hooks/_group.py:8,15-16`).
+- Documented UX surface with a distinct semantic (verified 2026-07-06): `docs/end-user/hook.md:90-96` (the
+  enable/disable commands), `:96` (the "always writes `settings.local.json`" note vs `forge extension enable`),
+  `:341,:359` (troubleshooting), `diagrams.md:230`. Group is `hidden=True` but the docstring marks enable/disable
+  "user-facing" (`cli/hooks/_group.py:8,15-16`).
 
 ## Risks
 
