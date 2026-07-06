@@ -1,10 +1,19 @@
 # Reconcile the second hook writer (`forge hook enable`/`disable`)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../../proposed/epic_global_forge_runtime/card.md)
 
-**Lane**: `proposed/`. Cross-cutting -- pairs with `forge_hook_absolute_command` (the byte form it must match) and
-`forge_hook_migration_cleanup` (which it can undo). No hard ordering dependency, but the update-or-delete decision must
-land **before** `forge_hook_migration_cleanup` finalizes, or this writer resurrects exactly the state cleanup removes.
+**Lane**: `doing/` -- active on execution branch `refactor/hook-legacy-writer`. Cross-cutting -- pairs with
+`forge_hook_absolute_command` (the byte form it must match) and `forge_hook_migration_cleanup` (which it can undo). No
+hard ordering dependency, but the update-or-delete decision must land **before** `forge_hook_migration_cleanup`
+finalizes, or this writer resurrects exactly the state cleanup removes.
+
+**Status (2026-07-06, post-matcher-merge):**
+[`forge_hook_matcher_consolidation`](../../done/forge_hook_matcher_consolidation/card.md) shipped, so
+`_is_forge_hook_entry` already delegates to the shared `entry_is_forge_hook` predicate -- the "third incompatible
+matcher" concern in **Why** below is **resolved**. This card's remaining scope is the *writer* itself: bare command
+bytes, no `installed.json` tracking, a wholesale key-overwrite that clobbers sibling hooks, a duplicate
+`_find_hooks_target` scope walk, and the second-copy `FORGE_HOOK_CONFIG` registry. The execution plan and the
+delete-vs-update decision live in [`checklist.md`](checklist.md).
 
 **Recommended as pre-epic prep (2026-07-06).** Paired with
 [`forge_hook_matcher_consolidation`](../../done/forge_hook_matcher_consolidation/card.md), resolving this *before* the
@@ -18,8 +27,7 @@ epic-independent. Land either first.
 ## Goal
 
 Decide and execute: **update or delete** the parallel `forge hook enable` / `forge hook disable` writer so it stops
-being a second, untracked hook-registration path whose command form and matcher are incompatible with every other
-member.
+being a second, untracked hook-registration path that writes a bare, PATH-dependent command form no other member emits.
 
 ## Why
 
@@ -27,21 +35,27 @@ Forge has **two** hook writers, not one:
 
 1. `forge extension enable` -- the tracked installer path (`installer.py` -> `merge_hooks`, `installed.json`), which T2
    and T5 rewrite.
-2. `forge hook enable` / `disable` (`cli/hooks/install.py`) -- a separate command that writes bare `forge hook <name>`
-   entries straight into `settings.local.json` with **no `installed.json` tracking** (`install.py:130-134`), and cleans
-   up with `_is_forge_hook_entry`, a **prefix** match on `cmd.strip().startswith("forge hook ")` (`install.py:139-164`).
+2. `forge hook enable` / `disable` (`cli/hooks/install.py`) -- a separate command that overwrites each hook key
+   wholesale with bare `forge hook <name>` entries in `settings.local.json`, with **no `installed.json` tracking**
+   (`install.py:131-135`). Its cleanup matcher now delegates to the shared `entry_is_forge_hook` predicate
+   (`install.py:140-147`), so only the *writer* remains a drift source.
 
 That second writer is a drift source the epic cannot ignore:
 
 - **It resurrects the legacy state.** It emits bare, PATH-dependent `forge hook <name>` -- exactly the exit-127 form T2
   fixes and T6 cleans. A user who runs it post-migration reintroduces the incident and a double-fire.
-- **Its matcher is a third, incompatible form.** The prefix `startswith("forge hook ")` does **not** match T2's
-  `/abs/.../forge hook <name>` and does not match a `forge-hook` dispatcher shim. So it neither detects nor cleans the
-  forms the rest of the epic ships (epic shared contract, seam 1).
+- **It clobbers sibling hooks.** `enable` writes `settings["hooks"][key] = value` (`install.py:131-132`), replacing each
+  Forge-owned hook key wholesale rather than the tracked path's `merge_hooks` append-and-dedupe
+  (`settings_merge.py:505`). A user who keeps their own entry under one of those keys (e.g. `SessionStart`) loses it on
+  enable.
 - **It is untracked**, so T6's tracked `unmerge` (`settings_merge.py:731`, keyed on `stable_id`) cannot remove its
   entries -- they only fall to T6's value-based fallback.
 
 ## Decision (update or delete)
+
+**Decision landed (2026-07-06): DELETE**, conditional on the Phase 0 hooks-only gate (see
+[`checklist.md`](checklist.md), D1). The options below are preserved as the decision space -- why delete was chosen over
+update-by-delegation, and the standalone-lockstep fallback that was rejected.
 
 - **Delete.** Fold enable/disable into `forge extension enable`, remove the command and `_is_forge_hook_entry`. Clean
   break (`coding_standards` §5): removed Click command errors natively; name the replacement in the changelog.
@@ -72,12 +86,13 @@ shared matcher.
 **Out:** the main installer byte change (`forge_hook_absolute_command` / `user_scope_hook_ownership`); the migration
 sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`).
 
-## Grounding (verified 2026-07-02)
+## Grounding (verified 2026-07-02; matcher + line refs refreshed 2026-07-06 post-merge)
 
-- Second writer, bare + untracked: `cli/hooks/install.py:87` (`enable`), `:130-134` (writes `settings["hooks"][key]`
-  into `settings.local.json`, no tracking), `:182` (`disable`).
-- Prefix matcher, incompatible with absolute/dispatcher forms: `_is_forge_hook_entry` `install.py:139-164`
-  (`cmd.strip().startswith("forge hook ")` `:152`).
+- Second writer, bare + untracked: `cli/hooks/install.py:88` (`enable`), `:131-132` (writes `settings["hooks"][key]`
+  into `settings.local.json`, no `installed.json`), `:165` (`disable`).
+- Matcher already shared (post-`forge_hook_matcher_consolidation`): `_is_forge_hook_entry` `install.py:140-147`
+  delegates to `entry_is_forge_hook(entry, require_command_type=True)` -- no separate prefix form remains; only
+  `disable` (`:201`) calls it.
 - Tracked path it diverges from: `merge_hooks`/`unmerge` `settings_merge.py:505,731`; `installed.json` tracking.
 - Documented UX surface with a distinct semantic (verified 2026-07-06): `docs/end-user/hook.md:90-96` (the
   enable/disable commands), `:96` (the "always writes `settings.local.json`" note vs `forge extension enable`),
@@ -105,9 +120,7 @@ sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`
 
 ## Acceptance tests
 
-| Test                           | Fixture                                  | Assertion                                                                    | Test File                             |
-| ------------------------------ | ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
-| Second writer no longer bare   | run the enable path (or its replacement) | no bare `forge hook <name>` written; entry matches the shipped command form  | `tests/src/cli/test_hooks_install.py` |
-| Prefix matcher gone or aligned | absolute-path / dispatcher entry present | detection/cleanup recognizes it (matcher deleted, or updated to shared form) | same                                  |
-| Delete is a clean break        | `forge hook enable` after removal        | Click reports "no such command"; changelog names the replacement             | same                                  |
-| Tracked if kept                | enable path retained                     | entry is recorded in `installed.json` and removable by tracked `unmerge`     | `tests/src/install/test_installer.py` |
+The active, decision-committed acceptance table lives in [`checklist.md`](checklist.md) (delete path). It supersedes the
+earlier update-or-delete draft that sat here: the "prefix matcher" row is gone (the matcher is already shared
+post-merge), the clean-break assertion is owned by `tests/src/cli/test_command_tree_invariants.py`, and the hooks-only
+replacement is gated by Phase 0.
