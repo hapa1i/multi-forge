@@ -41,7 +41,7 @@ so neither sits on one linear track.
 | T6    | [`forge_hook_migration_cleanup`](../forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../forge_project_compat/card.md)                   | `required_forge` fail-clear guardrail + missing-file semantics                      | --          |
 | T8    | [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
-| T9    | [`forge_hook_legacy_writer`](../../doing/forge_hook_legacy_writer/card.md)  | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
+| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)   | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
 
 ## Accepted decisions
@@ -77,7 +77,7 @@ so neither sits on one linear track.
 
 The members touch five seams that MUST stay consistent. Drift here is the reason this is an epic:
 
-### 1. All Forge-registered command strings + all three matchers
+### 1. All Forge-registered command strings + shared matcher
 
 Not just the Claude/Codex *hook* commands -- **every** string Forge writes into a runtime config is a byte-identity
 contract, and byte-identity is the API:
@@ -88,10 +88,9 @@ contract, and byte-identity is the API:
   `test_codex_hooks.py:71`). T2 rewrites all of these to absolute paths; the T4/T5 cutover rewrites the **hook**
   commands again (to the dispatcher form). **statusLine is the exception (D3):** it stays project-scoped, so it is
   rewritten **once** (T2 absolute path) and never moves to the dispatcher form or user scope.
-- **Three matchers move in lockstep or they lie:** substring `has_forge_hook` (`"forge hook"`, `hooks.py:69`), the
-  specific needle `"forge hook policy-check"` (`policy.py:309`), and the **prefix** matcher `_is_forge_hook_entry`
-  (`cmd.strip().startswith("forge hook ")`, `install.py:152`, used by the T9 legacy writer). An absolute path preserves
-  the *substring* but breaks the *prefix* -- "detection-safe" is only two-thirds true.
+- **Detection moves in lockstep or it lies:** `forge_hook_matcher_consolidation` single-sourced command detection in
+  `install/hooks.py`, and T9 deleted the old prefix matcher with the legacy writer. T5 may still need to extend the
+  shared predicate for the dispatcher form, but there is now one predicate to update.
 - **Claude merge is append + dedupe by full entry, not replace.** Hooks are written via `merge_hooks`
   (`settings_merge.py:505`, called `:705`); `_load_forge_settings` only sets the *source* block (`installer.py:817`).
   Dedup is on the whole canonical entry, so a changed command string is a **new sibling entry that coexists** with the
@@ -236,15 +235,15 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 
 **Round 3 (2026-07-02, Fable 5 review, verified against code):**
 
-| Finding                                                                                            | Resolution                                                                          |
-| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Sidecar execution unaddressed; host-absolute path dead in-container; user-scope leaves it hookless | New seam 5 + new member T10 (single owner, `FORGE_SIDECAR`-keyed)                   |
-| Byte contract narrower than reality: statusLine + legacy writer + all three matchers omitted       | Seam 1 broadened to all registered strings + all three matchers                     |
-| Claude merge is append+dedupe -> a byte change coexists (double-fire), not replace                 | Seam 1 unmerge-before-merge rule; risk added; T2/T5/T6 acceptance rows              |
-| Second untracked writer `forge hook enable`/`disable` with an incompatible prefix matcher          | T9 deletes the writer; matcher already shared by `forge_hook_matcher_consolidation` |
-| Benchmark rule was a stub target; needs the real trade + no-op frequency + TOML-in-shim tension    | T4 benchmark rewrite                                                                |
-| Registry lifecycle (enroll / backfill / `FORGE_SESSION` / corruption split) underspecified         | T3 lifecycle section                                                                |
-| T3/T7 `project init` dangling reference                                                            | T7 points at T3's committed enrollment surface; T3 commits to owning enrollment     |
+| Finding                                                                                            | Resolution                                                                                  |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Sidecar execution unaddressed; host-absolute path dead in-container; user-scope leaves it hookless | New seam 5 + new member T10 (single owner, `FORGE_SIDECAR`-keyed)                           |
+| Byte contract narrower than reality: statusLine + legacy writer + matcher drift omitted            | Seam 1 broadened to all registered strings; prep cards collapsed detection to one predicate |
+| Claude merge is append+dedupe -> a byte change coexists (double-fire), not replace                 | Seam 1 unmerge-before-merge rule; risk added; T2/T5/T6 acceptance rows                      |
+| Second untracked writer `forge hook enable`/`disable` with an incompatible prefix matcher          | T9 deletes the writer; matcher already shared by `forge_hook_matcher_consolidation`         |
+| Benchmark rule was a stub target; needs the real trade + no-op frequency + TOML-in-shim tension    | T4 benchmark rewrite                                                                        |
+| Registry lifecycle (enroll / backfill / `FORGE_SESSION` / corruption split) underspecified         | T3 lifecycle section                                                                        |
+| T3/T7 `project init` dangling reference                                                            | T7 points at T3's committed enrollment surface; T3 commits to owning enrollment             |
 
 **Round 4 (2026-07-02, maintainer findings, verified against code):**
 

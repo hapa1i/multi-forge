@@ -2,18 +2,18 @@
 
 **Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../../proposed/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/` -- active on execution branch `refactor/hook-legacy-writer`. Cross-cutting -- pairs with
-`forge_hook_absolute_command` (the byte form it must match) and `forge_hook_migration_cleanup` (which it can undo). No
-hard ordering dependency, but the update-or-delete decision must land **before** `forge_hook_migration_cleanup`
-finalizes, or this writer resurrects exactly the state cleanup removes.
+**Lane**: `done/` -- shipped via PR #88, merged to `main` as `0458a5ae` on 2026-07-06.
 
-**Status (2026-07-06, post-matcher-merge):**
-[`forge_hook_matcher_consolidation`](../../done/forge_hook_matcher_consolidation/card.md) shipped, so
-`_is_forge_hook_entry` already delegates to the shared `entry_is_forge_hook` predicate -- the "third incompatible
-matcher" concern in **Why** below is **resolved**. This card's remaining scope is the *writer* itself: bare command
-bytes, no `installed.json` tracking, a wholesale key-overwrite that clobbers sibling hooks, a duplicate
-`_find_hooks_target` scope walk, and the second-copy `FORGE_HOOK_CONFIG` registry. The execution plan and the
-delete-vs-update decision live in [`checklist.md`](checklist.md).
+**Status (2026-07-06 closeout):** DELETE shipped. The standalone `forge hook enable` / `forge hook disable` writer,
+duplicate `FORGE_HOOK_CONFIG` registry, and local scope walk were removed. Hook registration now has one mutation path:
+the tracked extension installer. The hooks-only replacement is:
+
+```bash
+forge extension enable --scope local --profile minimal --with hooks --without commands
+```
+
+[`forge_hook_matcher_consolidation`](../forge_hook_matcher_consolidation/card.md) shipped first, so the matcher concern
+was already resolved before this writer cleanup landed. The execution record lives in [`checklist.md`](checklist.md).
 
 **Recommended as pre-epic prep (2026-07-06).** Paired with
 [`forge_hook_matcher_consolidation`](../../done/forge_hook_matcher_consolidation/card.md), resolving this *before* the
@@ -31,7 +31,7 @@ being a second, untracked hook-registration path that writes a bare, PATH-depend
 
 ## Why
 
-Forge has **two** hook writers, not one:
+Before this card, Forge had **two** hook writers, not one:
 
 1. `forge extension enable` -- the tracked installer path (`installer.py` -> `merge_hooks`, `installed.json`), which T2
    and T5 rewrite.
@@ -124,3 +124,12 @@ The active, decision-committed acceptance table lives in [`checklist.md`](checkl
 earlier update-or-delete draft that sat here: the "prefix matcher" row is gone (the matcher is already shared
 post-merge), the clean-break assertion is owned by `tests/src/cli/test_command_tree_invariants.py`, and the hooks-only
 replacement is gated by Phase 0.
+
+## Closeout
+
+Shipped via PR #88 and closed out on `main` 2026-07-06.
+
+- D1 landed as **delete**, gated by the tracked hooks-only replacement above.
+- The old `--user` local-file target (`~/.claude/settings.local.json`) was intentionally not recreated; tracked user
+  scope writes `~/.claude/settings.json`, and tracked local scope writes `.claude/settings.local.json`.
+- `forge_hook_migration_cleanup` still owns legacy/manual/untracked entries that may already exist in user settings.

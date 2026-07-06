@@ -1,13 +1,12 @@
 # Checklist: forge_hook_legacy_writer
 
-**Card**: [card.md](card.md) · **Branch**: `refactor/hook-legacy-writer`
+**Card**: [card.md](card.md) · **Branch**: `refactor/hook-legacy-writer` · **PR**: #88
 
-**Status**: **implementation complete on `refactor/hook-legacy-writer`; branch verification clean.** D1 landed as DELETE
-after Phase 0 produced a tested tracked hooks-only replacement. The post-merge closeout move remains open until this
-branch lands on `main`.
+**Status**: **shipped to `main` and closed 2026-07-06.** D1 landed as DELETE after Phase 0 produced a tested tracked
+hooks-only replacement. PR #88 merged as `0458a5ae`; this closeout moved the card to `done/`.
 
-**Current focus**: Verify and land the deletion of the parallel `forge hook enable` / `forge hook disable` writer now
-that the shared matcher already shipped. Pre-epic prep for
+**Current focus**: Done. The parallel `forge hook enable` / `forge hook disable` writer is deleted, and the tracked
+hooks-only replacement is documented and tested. Pre-epic prep for
 [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation
 path so the epic's later byte change (T2/T5) lands in one place.
 
@@ -19,7 +18,7 @@ path so the epic's later byte change (T2/T5) lands in one place.
 the shared `entry_is_forge_hook(entry, require_command_type=True)`. **The matcher is already unified** — this card does
 **not** touch matcher logic.
 
-Remaining second-writer drift, verified on `main` (`cli/hooks/install.py`):
+Historical second-writer drift, verified before deletion (`cli/hooks/install.py`):
 
 - **Bare command bytes.** `enable` writes `FORGE_HOOK_CONFIG["hooks"]` = `get_builtin_preset()["hooks"]` verbatim — bare
   `forge hook <name>` (`:131-132`). PATH-dependent; the exact exit-127 form the epic (T2) fixes.
@@ -168,7 +167,7 @@ directory + local file" target.
   `forge hook enable/disable` writer + its duplicate `FORGE_HOOK_CONFIG` registry were deleted (clean break); hooks-only
   installs go through `forge extension enable` (hooks module). Removing the second registry also removed the reason
   `test_bug_hook_registry_drift.py` existed."
-- [ ] Move card `doing/ -> done/` after merge to `main`.
+- [x] Move card `doing/ -> done/` after merge to `main`.
 
 Verification log:
 
@@ -218,4 +217,5 @@ drops the duplicate `FORGE_HOOK_CONFIG` (delegation reads the preset via the ins
 
 ## Closeout
 
-(pending — implementation begins after D1 is ratified in review)
+Closed on `main` 2026-07-06 after PR #88 merged. Card moved to `docs/board/done/forge_hook_legacy_writer/`; active
+epic/prep links now point at the done snapshot.

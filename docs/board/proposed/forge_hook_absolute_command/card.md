@@ -41,8 +41,8 @@ migration": it is independent of the dispatcher/registry/user-scope model, which
   detection stays valid (`has_forge_hook` needle `"forge hook"`, `hooks.py:69`).
 
 **Out:** the dispatcher shim (`forge_hook_dispatcher`), the registry (`forge_project_registry`), user-scope-only
-(`user_scope_hook_ownership`), legacy cleanup (`forge_hook_migration_cleanup`), the sidecar exemption
-(`forge_hook_sidecar_resolution`), the second untracked writer (`forge_hook_legacy_writer`).
+(`user_scope_hook_ownership`), legacy cleanup (`forge_hook_migration_cleanup`), and the sidecar exemption
+(`forge_hook_sidecar_resolution`). The second untracked writer is already removed by `forge_hook_legacy_writer`.
 
 ## Which absolute path (open question, owned here)
 
@@ -62,11 +62,9 @@ not merely a global binary.
 
 - **One command-byte change -> one Codex re-trust event.** The bytes are part of Codex's `trusted_hash`
   (`codex_hooks.py:66-67`), so the golden block changes once; name the re-trust in release notes.
-- **Detection is only two-thirds safe.** `/abs/.../forge hook policy-check` still contains the generic substring
-  `"forge hook"` and the specific `"forge hook policy-check"` (`policy.py:309`), so `has_forge_hook` and the
-  session-launch / policy-enable warnings stay correct. **But** the **prefix** matcher `_is_forge_hook_entry`
-  (`cmd.strip().startswith("forge hook ")`, `install.py:152`) does **not** match an absolute path. That matcher belongs
-  to the second writer, reconciled in `forge_hook_legacy_writer` -- flag the interaction; do not fix it here.
+- **Detection is safe for the interim absolute path.** `/abs/.../forge hook policy-check` still invokes a basename
+  `forge` followed by `hook`, so the shared `install/hooks.py` predicate and the session-launch / policy-enable warnings
+  stay correct. The old prefix matcher belonged to the deleted second writer.
 - **Sidecar exemption is not ours.** A host-absolute path is a dead path at `/workspace` in the sidecar
   (`container.py`); config destined for the container must keep the bare/image-PATH form. That exemption is owned by
   `forge_hook_sidecar_resolution`; this ticket must defer to it, not write host-absolute bytes into container-bound
@@ -81,8 +79,8 @@ not merely a global binary.
 
 - Bare command today: `preset.py:53`; statusLine `preset.py:218-222`; Codex `codex_hooks.py:84`.
 - Merge is append+dedupe by full entry: `merge_hooks` `settings_merge.py:505,705`; tracked `unmerge` `:731`.
-- Detection needle `"forge hook"` substring: `hooks.py:57,64,69`; specific-needle caller `policy.py:309`; presence
-  caller `session_lifecycle.py:264`; incompatible prefix matcher `_is_forge_hook_entry` `install.py:139-164`.
+- Detection uses the shared `install/hooks.py` predicate; specific-hook caller `policy.py:309`; presence caller
+  `session_lifecycle.py:264`; the old second-writer prefix matcher is deleted.
 - `trusted_hash` covers command bytes: `codex_hooks.py:66-67`; golden test `test_codex_hooks.py:71`.
 
 ## Risks
@@ -92,7 +90,6 @@ not merely a global binary.
   resolution fallback) sooner.
 - **Double-fire on re-enable** if unmerge-before-merge is missed (the append+dedupe merge coexists rather than
   replaces).
-- **Prefix matcher blind to the new form** -- reconciled in `forge_hook_legacy_writer`, not here.
 - **Codex re-trust** on the byte change.
 
 ## Open questions

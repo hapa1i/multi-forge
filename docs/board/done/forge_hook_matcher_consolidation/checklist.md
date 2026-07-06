@@ -9,7 +9,7 @@ verification that shipped the card.
 detection matchers into one shared predicate. Byte-preserving and behavior-preserving for real Forge registrations;
 contains-only false positives are intentionally tightened. Pre-epic prep for
 [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md) Seam 1; enables the update branch of
-[`forge_hook_legacy_writer`](../../doing/forge_hook_legacy_writer/card.md) (T9).
+[`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) (T9).
 
 ---
 

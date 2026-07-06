@@ -5,8 +5,8 @@
 **Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md)
 (its Seam 1 -- "all Forge-registered command strings + all three matchers"). Not an epic member: it is a
 behavior-preserving consolidation that makes the epic *inherit* a locked contract instead of coordinating it across six
-members. It enables the **update** branch of [`forge_hook_legacy_writer`](../../doing/forge_hook_legacy_writer/card.md)
-(T9) by providing the shared matcher that writer would adopt, and it shrinks
+members. It enabled the update branch that [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) ultimately
+did not need because T9 chose delete, and it shrinks
 [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md) (T5) from "update three matchers in
 lockstep" to "update one predicate."
 
