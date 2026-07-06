@@ -7,7 +7,6 @@ under ``~/.forge/telemetry/downstream``.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -20,7 +19,8 @@ from typing import Any, Literal
 import dacite
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.state import decode_json_object, utc_timestamp_z
+from forge.core.telemetry.jsonl_io import append_jsonl_record
 
 # Reporter/Confidence live in the neutral telemetry leaf so the usage ledger can share the
 # one definition without a cycle; re-exported here (records below carry both fields, and
@@ -39,10 +39,6 @@ _lock = threading.Lock()
 _warned_newer_schema = False
 _warned_older_schema = False
 _DOWNSTREAM_EVENT_NAMESPACE = uuid.UUID("4fbcae84-0d9e-5b1b-b46d-f647dc8183f5")
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _downstream_dir() -> Path:
@@ -125,7 +121,7 @@ class DownstreamRecord:
     payload: dict[str, Any] | None = None
 
     schema_version: int = DOWNSTREAM_SCHEMA_VERSION
-    ts: str = field(default_factory=_now_iso)
+    ts: str = field(default_factory=utc_timestamp_z)
 
 
 @dataclass(frozen=True)
@@ -142,22 +138,16 @@ class DownstreamReadResult:
 
 def write_downstream_record(record: DownstreamRecord) -> None:
     """Append one downstream record. Best-effort; never raises into callers."""
-    try:
-        from forge.core.state import open_secure_append
-
-        data = {k: v for k, v in asdict(record).items() if v is not None}
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        for secure_dir in (log_path.parent.parent, log_path.parent):
-            try:
-                os.chmod(secure_dir, 0o700)
-            except OSError:
-                pass
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(data, separators=(",", ":"), default=str) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write downstream telemetry: %s", e)
+    data = {k: v for k, v in asdict(record).items() if v is not None}
+    log_path = _current_log_path()
+    append_jsonl_record(
+        log_path,
+        data,
+        secure_dirs=(log_path.parent.parent, log_path.parent),
+        lock=_lock,
+        logger=logger,
+        warning_message="Failed to write downstream telemetry: %s",
+    )
 
 
 def _merge_attempt_records(records: list[DownstreamRecord]) -> list[DownstreamRecord]:
@@ -322,7 +312,7 @@ def read_downstream_records_with_stats(
 
 def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> None:
     """Apply shard retention to the shared downstream telemetry directory."""
-    from forge.proxy.retention import prune_jsonl_shards
+    from forge.core.state import prune_jsonl_shards
 
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 

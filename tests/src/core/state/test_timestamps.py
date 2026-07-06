@@ -1,10 +1,12 @@
 """Tests for core.state.timestamps module."""
 
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
-from forge.core.state import iso_to_timestamp, now_iso, parse_iso
+from forge.core.state import iso_to_timestamp, now_iso, parse_iso, utc_timestamp_z
 
 
 class TestNowIso:
@@ -35,6 +37,23 @@ class TestNowIso:
 
         parsed = datetime.fromisoformat(result)
         assert before <= parsed <= after
+
+
+class TestUtcTimestampZ:
+    """Tests for the compact telemetry timestamp helper."""
+
+    def test_returns_second_precision_z_timestamp(self) -> None:
+        result = utc_timestamp_z()
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", result)
+        assert parse_iso(result).tzinfo is UTC
+
+    def test_now_iso_has_single_def(self) -> None:
+        repo_root = Path(__file__).resolve().parents[4]
+        matches: list[Path] = []
+        for path in (repo_root / "src" / "forge").rglob("*.py"):
+            if re.search(r"def _?now_iso", path.read_text(encoding="utf-8")):
+                matches.append(path.relative_to(repo_root))
+        assert matches == [Path("src/forge/core/state/timestamps.py")]
 
 
 class TestParseIso:

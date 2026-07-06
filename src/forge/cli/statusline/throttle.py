@@ -15,14 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable, cast
 
 from forge.core.ops.usage_summary import SupervisorHealth
 from forge.core.paths import get_forge_home
+from forge.core.state import atomic_write_text
 
 CACHE_VERSION = 1
 
@@ -48,17 +47,7 @@ def _read(path: Path) -> dict[str, Any] | None:
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.stem}.", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(payload, f)
-            os.replace(tmp, str(path))
-        except Exception:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+        atomic_write_text(path, json.dumps(payload))
     except OSError:
         # Best-effort: a failed cache write just means recompute next time.
         pass

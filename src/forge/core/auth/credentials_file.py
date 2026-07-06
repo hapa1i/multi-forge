@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import os
 import re
-import tempfile
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from forge.core.paths import get_forge_home
+from forge.core.state import atomic_write_text
 from forge.core.state.lock import file_lock_for_target
 
 CREDENTIALS_FILENAME = "credentials.yaml"
@@ -225,20 +226,7 @@ def _write_credentials(creds_path: Path, profiles: dict[str, dict[str, str]]) ->
         "profiles": profiles,
     }
 
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(creds_path.parent),
-        prefix=f".{creds_path.stem}.",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("# Forge Credential Store — managed by `forge auth login`\n\n")
-            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-        os.chmod(tmp_path, 0o600)
-        os.replace(tmp_path, str(creds_path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    stream = StringIO()
+    stream.write("# Forge Credential Store — managed by `forge auth login`\n\n")
+    yaml.safe_dump(data, stream, default_flow_style=False, sort_keys=False)
+    atomic_write_text(creds_path, stream.getvalue(), mode=0o600)

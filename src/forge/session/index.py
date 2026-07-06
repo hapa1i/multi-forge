@@ -8,7 +8,6 @@ in different Forge projects. All external APIs accept display names
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
@@ -21,6 +20,7 @@ from forge.core.state import (
     file_lock_for_target,
     iso_to_timestamp,
     now_iso,
+    read_versioned_json_object,
 )
 
 from .exceptions import (
@@ -99,24 +99,13 @@ class IndexStore:
         if not self.exists():
             return SessionIndex()
 
-        try:
-            with open(self._index_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise IndexCorruptedError(str(self._index_path), f"invalid JSON: {e}")
-        except OSError as e:
-            # A failed read is environmental, not corruption -- forge clean must not delete it.
-            raise IndexUnreadableError(str(self._index_path), f"read error: {e}")
-
-        # Validate version
-        version = data.get("version")
-        if version is None:
-            raise IndexCorruptedError(str(self._index_path), "missing version field")
-        if version != INDEX_VERSION:
-            raise IndexCorruptedError(
-                str(self._index_path),
-                f"incompatible version {version} (this Forge expects {INDEX_VERSION}). " f"Delete this file and retry.",
-            )
+        data = read_versioned_json_object(
+            self._index_path,
+            version_key="version",
+            expected_version=INDEX_VERSION,
+            corrupted_error=IndexCorruptedError,
+            unreadable_error=IndexUnreadableError,
+        )
         self._validate_key_shape(data)
 
         # Deserialize using dacite

@@ -12,9 +12,13 @@ from .content_store import ContentStore
 from .engine import SearchResult, search_from_index
 from .exceptions import (
     BM25IndexCorruptedError,
+    BM25IndexUnreadableError,
     ContentStoreCorruptedError,
+    ContentStoreUnreadableError,
     IndexStateCorruptedError,
+    IndexStateUnreadableError,
     SearchDocumentStoreCorruptedError,
+    SearchDocumentStoreUnreadableError,
     SearchError,
 )
 from .extractor import (
@@ -47,7 +51,11 @@ __all__ = [
     # Exceptions
     "SearchError",
     "IndexStateCorruptedError",
+    "IndexStateUnreadableError",
     "SearchDocumentStoreCorruptedError",
+    "SearchDocumentStoreUnreadableError",
     "BM25IndexCorruptedError",
+    "BM25IndexUnreadableError",
     "ContentStoreCorruptedError",
+    "ContentStoreUnreadableError",
 ]

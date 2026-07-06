@@ -14,6 +14,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from forge.core.state import now_iso
+
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
 
@@ -48,7 +50,6 @@ from .models import (
     InstallProfile,
     InstallScope,
     SettingsPlan,
-    now_iso,
 )
 from .settings_merge import (
     backup_settings,

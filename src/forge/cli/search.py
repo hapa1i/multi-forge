@@ -28,11 +28,50 @@ from forge.search.content_store import ContentStore
 from forge.search.engine import search_from_index
 from forge.search.exceptions import (
     BM25IndexCorruptedError,
+    BM25IndexUnreadableError,
     ContentStoreCorruptedError,
+    ContentStoreUnreadableError,
     IndexStateCorruptedError,
+    IndexStateUnreadableError,
     SearchDocumentStoreCorruptedError,
+    SearchDocumentStoreUnreadableError,
 )
 from forge.search.store import SearchDocumentStore
+
+SEARCH_CORRUPTED_ERRORS = (
+    SearchDocumentStoreCorruptedError,
+    BM25IndexCorruptedError,
+    ContentStoreCorruptedError,
+    IndexStateCorruptedError,
+    SchemaVersionError,
+)
+SEARCH_UNREADABLE_ERRORS = (
+    SearchDocumentStoreUnreadableError,
+    BM25IndexUnreadableError,
+    ContentStoreUnreadableError,
+    IndexStateUnreadableError,
+)
+SEARCH_CLEAN_ERRORS = (*SEARCH_CORRUPTED_ERRORS, FileLockTimeoutError)
+
+
+def _search_unreadable_payload(error: BaseException, *, query: str | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "error": f"Search index unreadable: {error}",
+        "hint": "Check file permissions or retry; do not modify the index until the file can be read.",
+    }
+    if query is not None:
+        payload.update({"query": query, "total_results": 0, "results": []})
+    return payload
+
+
+def _search_corrupted_payload(error: BaseException, *, query: str | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "error": f"Search index corrupted or outdated: {error}",
+        "hint": "Run 'forge search rebuild-index' to rebuild.",
+    }
+    if query is not None:
+        payload.update({"query": query, "total_results": 0, "results": []})
+    return payload
 
 
 def _resolve_forge_root() -> Path:
@@ -85,34 +124,33 @@ def query_cmd(terms: tuple[str, ...], limit: int, scope: str, as_json: bool) -> 
 def _run_search(query: str, *, limit: int, scope: str, as_json: bool) -> None:
     """Execute a project-scoped search; render a table, or the stable JSON with --json."""
     if scope == "all":
-        _run_search_all_projects(query, limit=limit, as_json=as_json)
+        try:
+            _run_search_all_projects(query, limit=limit, as_json=as_json)
+        except SEARCH_UNREADABLE_ERRORS as e:
+            if as_json:
+                click.echo(json.dumps(_search_unreadable_payload(e, query=query), indent=2))
+                return
+            raise
         return
 
     project_root = _resolve_forge_root()
 
     try:
         results = _search_project(project_root, query, limit=limit)
-    except (
-        SearchDocumentStoreCorruptedError,
-        BM25IndexCorruptedError,
-        ContentStoreCorruptedError,
-        SchemaVersionError,
-    ) as e:
+    except SEARCH_CORRUPTED_ERRORS as e:
         if as_json:
-            output = {
-                "query": query,
-                "total_results": 0,
-                "results": [],
-                "error": f"Search index corrupted or outdated: {e}",
-                "hint": "Run 'forge search rebuild-index' to rebuild.",
-            }
-            click.echo(json.dumps(output, indent=2))
+            click.echo(json.dumps(_search_corrupted_payload(e, query=query), indent=2))
             return
         print_error_with_tip(
             f"Search index corrupted or outdated: {e}",
             "Run 'forge search rebuild-index' to rebuild.",
         )
         return
+    except SEARCH_UNREADABLE_ERRORS as e:
+        if as_json:
+            click.echo(json.dumps(_search_unreadable_payload(e, query=query), indent=2))
+            return
+        raise
 
     if results is None:
         hint = "No transcripts indexed for this project. Run 'forge search rebuild-index' or use --scope all."
@@ -163,13 +201,11 @@ def _run_search_all_projects(query: str, *, limit: int, as_json: bool) -> None:
             if results is not None:
                 searched_any_index = True
                 all_results.extend(results)
-        except (
-            SearchDocumentStoreCorruptedError,
-            BM25IndexCorruptedError,
-            ContentStoreCorruptedError,
-            SchemaVersionError,
-        ) as e:
+        except SEARCH_CORRUPTED_ERRORS as e:
             logger.warning("Skipping corrupted search index in %s: %s", root, e)
+            continue
+        except SEARCH_UNREADABLE_ERRORS as e:
+            logger.warning("Skipping unreadable search index in %s: %s", root, e)
             continue
         except Exception as e:
             logger.debug("Skipping project %s: %s", root, e)
@@ -392,16 +428,14 @@ def clean_cmd(yes: bool, as_json: bool) -> None:
     """
     try:
         _run_clean(yes=yes, as_json=as_json)
-    except (
-        BM25IndexCorruptedError,
-        ContentStoreCorruptedError,
-        FileLockTimeoutError,
-        IndexStateCorruptedError,
-        SchemaVersionError,
-        SearchDocumentStoreCorruptedError,
-    ) as e:
+    except SEARCH_CLEAN_ERRORS as e:
         if as_json:
             click.echo(json.dumps({"error": str(e)}), err=True)
+            raise SystemExit(1) from e
+        raise
+    except SEARCH_UNREADABLE_ERRORS as e:
+        if as_json:
+            click.echo(json.dumps(_search_unreadable_payload(e)), err=True)
             raise SystemExit(1) from e
         raise
 
@@ -534,11 +568,33 @@ def status_cmd(as_json: bool) -> None:
         print_tip("Run 'forge search rebuild-index' to build.", console=console)
         return
 
-    documents = doc_store.read()
-    state = index_store.read()
+    try:
+        documents = doc_store.read()
+        state = index_store.read()
+    except SEARCH_CORRUPTED_ERRORS as e:
+        if as_json:
+            click.echo(json.dumps(_search_corrupted_payload(e), indent=2), err=True)
+            raise SystemExit(1) from e
+        print_error_with_tip(
+            f"Search index corrupted or outdated: {e}",
+            "Run 'forge search rebuild-index' to rebuild.",
+        )
+        return
+    except SEARCH_UNREADABLE_ERRORS as e:
+        if as_json:
+            click.echo(json.dumps(_search_unreadable_payload(e), indent=2), err=True)
+            raise SystemExit(1) from e
+        raise
 
     if as_json:
-        bm25_index = bm25_store.read()
+        try:
+            bm25_index = bm25_store.read()
+        except SEARCH_CORRUPTED_ERRORS as e:
+            click.echo(json.dumps(_search_corrupted_payload(e), indent=2), err=True)
+            raise SystemExit(1) from e
+        except SEARCH_UNREADABLE_ERRORS as e:
+            click.echo(json.dumps(_search_unreadable_payload(e), indent=2), err=True)
+            raise SystemExit(1) from e
         click.echo(
             json.dumps(
                 {
@@ -573,7 +629,16 @@ def status_cmd(as_json: bool) -> None:
         console.print(f"Sessions: [cyan]{len(session_names)}[/cyan]")
 
     # BM25 index stats
-    bm25_index = bm25_store.read()
+    try:
+        bm25_index = bm25_store.read()
+    except SEARCH_CORRUPTED_ERRORS as e:
+        print_error_with_tip(
+            f"Search index corrupted or outdated: {e}",
+            "Run 'forge search rebuild-index' to rebuild.",
+        )
+        return
+    except SEARCH_UNREADABLE_ERRORS:
+        raise
     if bm25_index is not None:
         console.print(
             f"BM25 index: [cyan]{len(bm25_index.doc_keys)}[/cyan] documents, "

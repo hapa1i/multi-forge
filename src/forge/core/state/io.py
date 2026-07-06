@@ -59,6 +59,7 @@ def atomic_write_text(
     path: Path,
     content: str,
     *,
+    mode: int | None = None,
     create_parents: bool = True,
 ) -> None:
     """Write text to a file atomically.
@@ -70,6 +71,32 @@ def atomic_write_text(
     Args:
         path: Target file path.
         content: Text content to write.
+        mode: Optional final file mode (for example, 0o600).
+        create_parents: Create parent directories if they don't exist.
+
+    Raises:
+        OSError: If the write or rename fails.
+    """
+    atomic_write_bytes(path, content.encode("utf-8"), mode=mode, create_parents=create_parents)
+
+
+def atomic_write_bytes(
+    path: Path,
+    content: bytes,
+    *,
+    mode: int | None = None,
+    create_parents: bool = True,
+) -> None:
+    """Write bytes to a file atomically.
+
+    Uses tempfile + os.replace() pattern to ensure readers never see
+    partial writes. The temp file is created in the same directory as
+    the target to ensure atomic rename works (same filesystem).
+
+    Args:
+        path: Target file path.
+        content: Bytes to write.
+        mode: Optional final file mode (for example, 0o600).
         create_parents: Create parent directories if they don't exist.
 
     Raises:
@@ -85,9 +112,11 @@ def atomic_write_text(
         suffix=".tmp",
     )
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "wb") as f:
             f.write(content)
             f.flush()
+            if mode is not None:
+                os.fchmod(f.fileno(), mode)
             os.fsync(f.fileno())
         os.replace(temp_path, str(path))
         try:
@@ -98,7 +127,7 @@ def atomic_write_text(
                 os.close(dir_fd)
         except OSError:
             pass
-    except Exception:
+    except BaseException:
         # Clean up temp file on failure
         try:
             os.unlink(temp_path)

@@ -29,7 +29,6 @@ from .ledger import (
     SourceRefs,
     UsageEvent,
     log_usage_event,
-    prune_usage_events,
     read_usage_events,
 )
 from .vocabulary import Confidence, Reporter, Route
@@ -52,7 +51,6 @@ __all__ = [
     "infer_billing_mode",
     "log_usage_event",
     "mint_request_id",
-    "prune_usage_events",
     "read_usage_events",
     "resolve_client_base_url",
     "resolve_direct_provider_user",

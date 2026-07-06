@@ -19,7 +19,6 @@ from forge.install.models import (
     InstallProfile,
     InstallScope,
     SettingsPlan,
-    now_iso,
 )
 
 
@@ -240,13 +239,3 @@ class TestInstallPlan:
         )
         assert plan.has_conflicts
         assert len(plan.conflicts) == 1
-
-
-class TestNowIso:
-    """Tests for now_iso helper."""
-
-    def test_returns_iso_string(self) -> None:
-        result = now_iso()
-        assert isinstance(result, str)
-        assert "T" in result  # ISO format has T separator
-        assert "+" in result or "Z" in result  # Has timezone

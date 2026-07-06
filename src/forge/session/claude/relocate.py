@@ -17,9 +17,10 @@ See ``docs/board/doing/runtime_abstraction/`` (Phase 3 native-relocate spike).
 from __future__ import annotations
 
 import os
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from forge.core.state import atomic_write_bytes
 
 from .paths import get_transcript_path
 
@@ -146,20 +147,9 @@ def relocate_transcript(
     if created_dir:
         os.chmod(dest_dir, _PROJECT_DIR_MODE)
 
-    # Atomic, owner-only: write a unique temp beside the target (same filesystem;
-    # mkstemp is 0600), then os.replace. A unique name avoids collisions between
-    # concurrent same-UUID relocations, and the temp is removed if anything fails
-    # before the rename. Transcripts carry source code and prompts -> keep 0600.
-    fd, tmp_name = tempfile.mkstemp(dir=dest_dir, prefix=f".{session_id}.", suffix=".jsonl.tmp")
-    tmp_path = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(source_bytes)
-        os.chmod(tmp_path, _TRANSCRIPT_MODE)
-        os.replace(tmp_path, dest_path)
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
+    # Atomic, owner-only, byte-preserving: transcripts carry signed blocks,
+    # source code, and prompts, so never decode/re-encode them.
+    atomic_write_bytes(dest_path, source_bytes, mode=_TRANSCRIPT_MODE, create_parents=False)
 
     return RelocateResult(
         session_id=session_id,

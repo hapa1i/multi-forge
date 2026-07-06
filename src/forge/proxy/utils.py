@@ -506,7 +506,7 @@ def prune_request_logs(*, retention_days: int, max_total_mb: int) -> None:
 
     Per-proxy budget enforced at proxy startup; the global ``log_retention_days`` sweep remains a
     coarse floor over all of ``logs/``. Best-effort (shared pruner swallows errors)."""
-    from forge.proxy.retention import prune_jsonl_shards
+    from forge.core.state import prune_jsonl_shards
 
     prune_jsonl_shards(
         get_forge_home() / "logs" / "requests",
