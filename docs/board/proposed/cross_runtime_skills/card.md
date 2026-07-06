@@ -2,7 +2,7 @@
 
 **Lane**: `proposed/` -- design sketch, not yet accepted for execution. Relates to the runtime-abstraction lineage
 (`core/runtime/registry.py`; `done/codex_frontend/`, `done/runtime_abstraction/`) and the installer/scope redesign in
-[`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md).
+[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md).
 
 **Type**: portability + install-surface work, structured as a **compile model, not a strip pass**: neutral skill content
 

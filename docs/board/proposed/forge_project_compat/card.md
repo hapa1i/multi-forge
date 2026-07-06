@@ -1,6 +1,6 @@
 # Project compatibility guardrail (`required_forge`)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Independent -- a check layered on project state. Can land any time, even before the
 hook-ownership tickets.

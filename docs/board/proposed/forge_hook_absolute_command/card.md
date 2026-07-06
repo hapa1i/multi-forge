@@ -1,6 +1,6 @@
 # Absolute-path hook command (the reachability fix)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Depends on `global_forge_install` -- **for a PATH-stable target to point at**, not just for a
 global `forge` to exist. This is the D2 reachability fix: it ships early and closes the exit-127 incident **without**

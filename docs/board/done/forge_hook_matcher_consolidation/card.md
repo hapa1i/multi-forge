@@ -2,7 +2,7 @@
 
 **Lane**: `done/` -- shipped to `main` on 2026-07-06 via PR #87.
 
-**Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md)
+**Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md)
 (its Seam 1 -- "all Forge-registered command strings + all three matchers"). Not an epic member: it is a
 behavior-preserving consolidation that makes the epic *inherit* a locked contract instead of coordinating it across six
 members. It enabled the update branch that [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) ultimately

@@ -1,6 +1,6 @@
 # Dev-mode runtime override (checkout-local Forge)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Off the critical path; pairs with `forge_hook_dispatcher` (the override is honored in the same
 resolution contract).

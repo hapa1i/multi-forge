@@ -7,8 +7,8 @@ hooks-only replacement. PR #88 merged as `0458a5ae`; this closeout moved the car
 
 **Current focus**: Done. The parallel `forge hook enable` / `forge hook disable` writer is deleted, and the tracked
 hooks-only replacement is documented and tested. Pre-epic prep for
-[`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation
-path so the epic's later byte change (T2/T5) lands in one place.
+[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation path
+so the epic's later byte change (T2/T5) lands in one place.
 
 ---
 

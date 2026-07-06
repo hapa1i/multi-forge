@@ -1,6 +1,6 @@
 # Project registry + enrollment (`~/.forge/projects.toml`)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. **Precedes `forge_hook_dispatcher`** -- the dispatcher's shipped no-op gate reads this registry,
 so the schema + read half must land first (correction from the first decomposition, which called it parallel). On the

@@ -1,6 +1,6 @@
 # In-container (sidecar) hook resolution
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Cross-cutting -- pairs with `forge_hook_absolute_command` (host-absolute path is dead
 in-container) and `user_scope_hook_ownership` (user scope is unmounted in-container). Owns the epic's seam 5.
