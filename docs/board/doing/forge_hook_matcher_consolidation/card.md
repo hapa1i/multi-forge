@@ -53,12 +53,16 @@ full entry tuple.
 
 ## Target shape
 
-1. **One predicate.** Extract a dependency-light `is_forge_hook_command(command: str, needle: str = "forge hook") -> bool`
-   (plus an entry-level `entry_is_forge_hook(entry, needle=...)`) as the single home for "does this command invoke a Forge
-   hook?". Canonical semantics = the current substring behavior (it survives the absolute-path form; T5 later updates this
-   **one** predicate for the dispatcher shim form). Repoint `_entry_has_command` to it. If T9 keeps the second writer,
-   `_is_forge_hook_entry` calls it too (dropping the prefix divergence); if T9 deletes the writer, the prefix matcher
-   simply vanishes -- either way the epic ends with one matcher.
+1. **One predicate.** Extract a dependency-light
+   `is_forge_hook_command(command: str, handler: str | None = None) -> bool` (plus an entry-level
+   `entry_is_forge_hook(entry, handler=None)`) as the single home for "does this command invoke a Forge hook?". Canonical
+   semantics = an **invocation token** match: `shlex.split(command.strip())`, length-guarded, with
+   `Path(tokens[0]).name == "forge"` and `tokens[1] == "hook"`; an optional `handler` matches `tokens[2]`. This survives
+   bare `forge hook ...` and absolute `/abs/.../forge hook ...` forms while rejecting contains-only strings such as
+   `echo forge hook stop`. T5 later updates this **one** predicate for the dispatcher shim form. Repoint
+   `_entry_has_command` to it. If T9 keeps the second writer, `_is_forge_hook_entry` calls it too (dropping the prefix
+   divergence); if T9 deletes the writer, the prefix matcher simply vanishes -- either way the epic ends with one
+   matcher.
 2. **Byte-contract golden.** A characterization test that snapshots, at today's bytes:
    - all 16 rendered Claude hook entries keyed on the full **(event key, matcher, command, timeout)** tuple -- not a set
      of command strings, so the two `policy-check` entries (Write vs Edit) and per-entry timeouts cannot collapse,
@@ -74,8 +78,9 @@ full entry tuple.
 - Extract + adopt the single shared predicate; delete `_entry_has_command`'s and (if the writer is kept)
   `_is_forge_hook_entry`'s bespoke bodies in favor of it.
 - Add the registered-string + round-trip golden characterization test at current bytes.
-- Keep all five `has_forge_hook` callers behaviorally identical (the `policy.py` specific-needle call still works via the
-  `needle` param).
+- Keep all five `has_forge_hook` callers behaviorally identical for real Forge registrations (the `policy.py`
+  specific-needle call still works by mapping `"forge hook policy-check"` to `handler="policy-check"`). Contains-only
+  false positives such as `echo forge hook stop` are intentionally tightened to `False`.
 
 **Out:**
 
@@ -100,9 +105,9 @@ full entry tuple.
 
 ## Risks
 
-- **Predicate semantics drift.** Substring vs prefix differ for future byte forms; choosing substring as canonical is a
-  deliberate call (survives the absolute-path form). Record it so T5 knows to update this one predicate for the
-  dispatcher shim, not re-fork it.
+- **Predicate semantics drift.** Substring vs prefix differ for future byte forms and for destructive cleanup. The
+  invocation-token predicate is the deliberate middle path: it survives the absolute-path form, preserves today's
+  disable removal set for contains-only entries, and gives T5 one predicate to extend for the dispatcher shim.
 - **Golden brittleness.** Snapshotting rendered entries can turn every intentional command change into a failing golden.
   That is the point pre-epic (the change must be conscious), but the test must be trivially re-baseline-able and name the
   epic member that will legitimately churn it.
@@ -120,11 +125,12 @@ full entry tuple.
 
 | Test | Fixture | Assertion | Test File |
 | ---- | ------- | --------- | --------- |
-| One predicate, five callers unchanged | settings with bare `forge hook <name>` entries | all five `has_forge_hook` call sites return today's result via the shared predicate | `tests/src/install/test_hooks.py` |
-| Specific-needle preserved | `PreToolUse` with `forge hook policy-check` present + absent | `has_forge_hook(..., "forge hook policy-check")` still discriminates | `tests/src/install/test_hooks.py` |
+| Invocation-token predicate | `forge hook stop`, `/abs/forge hook stop`, `echo forge hook stop`, `myforge hook stop`, `forge-hook stop` | first two match; contains-only and dispatcher-shim forms do not yet match | `tests/src/install/test_hooks.py` |
+| One predicate, five callers unchanged | real settings with registered `forge hook <name>` entries | all five `has_forge_hook` call sites return today's result via the shared predicate | `tests/src/install/test_hooks.py` |
+| Specific handler preserved | `PreToolUse` with `forge hook policy-check` present + absent | `has_forge_hook(..., "forge hook policy-check")` maps to `handler="policy-check"` and still discriminates | `tests/src/install/test_hooks.py` |
 | Registered-entry golden | rendered preset + statusLine + Codex block | all 16 hook entries pinned as `(event, matcher, command, timeout)` tuples (Write/Edit `policy-check` stay distinct) + statusLine + Codex block match the frozen baseline | `tests/src/install/test_registered_commands_contract.py` |
 | Merge -> unmerge round-trip | settings pre-install, then `merge_hooks`, then `unmerge` | Forge-owned keys return to pre-install bytes; non-Forge settings untouched | `tests/src/install/test_registered_commands_contract.py` |
-| Second-writer matcher shares the predicate (only if T9 keeps the writer) | `forge hook disable` over mixed entries | removal decision comes from `is_forge_hook_command`, prefix body deleted | `tests/src/cli/test_hooks.py` |
+| Second-writer matcher shares the predicate (only if T9 keeps the writer) | `forge hook disable` over mixed entries including `echo forge hook stop` | removal decision comes from `is_forge_hook_command`, prefix body deleted, contains-only entry preserved | `tests/src/cli/test_hooks.py` |
 
 ## Sequencing
 

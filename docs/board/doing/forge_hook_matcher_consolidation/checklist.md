@@ -6,7 +6,8 @@
 only the lane move + this checklist exist on the branch. D1/D2 resolved below.
 
 **Current focus**: Lock the hook-command byte contract with a characterization golden, then collapse the two divergent
-detection matchers into one shared predicate. Behavior-preserving -- **no command bytes change**. Pre-epic prep for
+detection matchers into one shared predicate. Byte-preserving and behavior-preserving for real Forge registrations;
+contains-only false positives are intentionally tightened. Pre-epic prep for
 [`epic_global_forge_runtime`](../../proposed/epic_global_forge_runtime/card.md) Seam 1; enables the update branch of
 [`forge_hook_legacy_writer`](../../proposed/forge_hook_legacy_writer/card.md) (T9).
 
@@ -18,9 +19,10 @@ detection matchers into one shared predicate. Behavior-preserving -- **no comman
   in cmd` would remove a user hook like `echo forge hook stop` that today's prefix matcher preserves -- a silent delete
   on a *destructive* settings path (reviewer's Medium finding). The predicate matches a `forge hook ...` **invocation**:
   `forge` as the command token (bare **or** a path basename `.../forge`) immediately followed by `hook`.
-  - **Target (recommended):** `shlex.split(cmd.strip())`, then `Path(tokens[0]).name == "forge" and tokens[1] == "hook"`;
-    optional `handler` == `tokens[2]` for the specific-handler case; malformed `shlex` (`ValueError`) -> `False`. Chosen
-    over the interim string rule (`startswith("forge hook ") or "/forge hook " in stripped`) because it also gets
+  - **Target (recommended):** `shlex.split(cmd.strip())`, then length-guard before indexing:
+    `len(tokens) >= 2 and Path(tokens[0]).name == "forge" and tokens[1] == "hook"`; optional `handler == tokens[2]`
+    requires `len(tokens) >= 3`. Empty/single-token commands and malformed `shlex` (`ValueError`) -> `False`. Chosen over
+    the interim string rule (`startswith("forge hook ") or "/forge hook " in stripped`) because it also gets
     quoted/space-in-path commands right (e.g. `"/opt/my tools/forge" hook stop`).
   - Matches: bare `forge hook stop`, `/abs/forge hook stop`. Rejects: `echo forge hook stop`, `myforge hook stop`, and
     -- for now -- the `forge-hook` dispatcher shim (that hyphen form is **T5**'s later extension of this one predicate).
@@ -54,7 +56,8 @@ Locks current behavior so the refactor is provably byte-preserving ("characteriz
 
 - [ ] Add `is_forge_hook_command(command: str, handler: str | None = None) -> bool` (+ entry-level
   `entry_is_forge_hook(entry, handler=None)`) in `install/hooks.py` (dependency-light home). D1 invocation-token
-  semantics: `forge` bare-or-basename + `hook`; `handler` matches the 3rd token; malformed `shlex` -> `False`.
+  semantics: `forge` bare-or-basename + `hook`; length-guard before token indexing; `handler` matches the 3rd token;
+  empty/single-token/malformed `shlex` -> `False`.
 - [ ] Repoint `install/hooks.py::_entry_has_command` to it, and map `has_forge_hook`'s `command_needle` argument onto the
   predicate: `"forge hook"` -> `handler=None`; `"forge hook policy-check"` -> `handler="policy-check"`.
   - Assertion: all **5** `has_forge_hook` callers return today's booleans on real settings -- `session_manage.py:1075`,
