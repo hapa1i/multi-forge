@@ -2,8 +2,7 @@
 
 ## 6. Hooks Testing
 
-Note: Install hooks via `forge extension enable` (full) or `forge hook enable` (hooks-only; writes to
-`settings.local.json`).
+Note: Install hooks via `forge extension enable` (full) or the tracked hooks-only replacement.
 
 ### 6.1 Verify Hook Configuration
 
@@ -11,8 +10,7 @@ Note: Install hooks via `forge extension enable` (full) or `forge hook enable` (
 
 ```bash
 # Check hooks in whichever settings file was used during enable.
-# `forge extension enable` writes to the scope's settings file;
-# `forge hook enable --local` always writes to settings.local.json.
+# `forge extension enable --scope local` writes to settings.local.json.
 cat $CLAUDE_HOME/settings.local.json | jq '.hooks' 2>/dev/null || \
   cat $CLAUDE_HOME/settings.json | jq '.hooks'
 ```
@@ -29,11 +27,10 @@ cat $CLAUDE_HOME/settings.local.json | jq '.hooks' 2>/dev/null || \
 
 ```bash
 # Install hooks only (no commands/skills)
-forge hook enable --user
-forge hook enable --local
+forge extension enable --scope local --profile minimal --with hooks --without commands
 ```
 
-- [ ] Hooks-only install works (writes to settings.local.json)
+- [ ] Hooks-only install works (writes tracked hooks to settings.local.json)
 
 ### 6.3 Test Hook Manually
 

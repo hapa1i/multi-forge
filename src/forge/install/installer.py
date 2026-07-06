@@ -773,26 +773,27 @@ class Installer:
                             )
                         )
 
-        # Env vars (dict merge - Forge overrides)
-        if forge_env := forge_settings.get("env"):
-            for key in sorted(forge_env):
-                if scalar_already_set(current_settings.get("env", {}), key, forge_env[key]):
-                    plans.append(
-                        SettingsPlan(
-                            action="skip",
-                            key_path=f"env.{key}",
-                            value=forge_env[key],
-                            reason="already set",
+        # Env vars currently ride with permissions until they have a first-class module.
+        if InstallModule.PERMISSIONS in modules:
+            if forge_env := forge_settings.get("env"):
+                for key in sorted(forge_env):
+                    if scalar_already_set(current_settings.get("env", {}), key, forge_env[key]):
+                        plans.append(
+                            SettingsPlan(
+                                action="skip",
+                                key_path=f"env.{key}",
+                                value=forge_env[key],
+                                reason="already set",
+                            )
                         )
-                    )
-                else:
-                    plans.append(
-                        SettingsPlan(
-                            action="merge",
-                            key_path=f"env.{key}",
-                            value=forge_env[key],
+                    else:
+                        plans.append(
+                            SettingsPlan(
+                                action="merge",
+                                key_path=f"env.{key}",
+                                value=forge_env[key],
+                            )
                         )
-                    )
 
         return plans
 
@@ -876,11 +877,15 @@ class Installer:
             modules = resolve_modules(profile, with_modules, without_modules)
         settings = read_settings(settings_path)
         forge_settings = self._load_forge_settings()
+        include_permissions = InstallModule.PERMISSIONS in modules
         entries = merge(
             settings,
             forge_settings,
             force=force,
             include_statusline=InstallModule.STATUSLINE in modules,
+            include_hooks=InstallModule.HOOKS in modules,
+            include_permissions=include_permissions,
+            include_env=include_permissions,
         )
         write_settings(settings_path, settings)
 

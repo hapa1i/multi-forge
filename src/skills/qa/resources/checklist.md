@@ -6,19 +6,21 @@
 
 <!-- test-count: 543 -->
 
-<!-- last-updated: 2026-07-01 -->
+<!-- last-updated: 2026-07-06 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-15 (same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and
-the `--strategy`/`--inline-plan` auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12:
-codex-hooks installer module: registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex
-binary (2.11). Earlier 2026-06-06: clean-break tombstone purge: removed the `forge usage`->`forge telemetry activity`
-rename probe (old §7.14) along with the CLI tombstone commands themselves; `forge telemetry costs reset` telemetry-wipe
-coverage renumbered to 7.14. Earlier: cost CLI is now a group: `forge telemetry costs` -> `forge telemetry costs show`;
-metric-evidence cost-honesty coverage: `forge telemetry activity` cost footnotes/`~` marker (7.12), cost provenance
+**Last updated**: 2026-07-06 (hook-only QA now uses tracked
+`forge extension enable --scope local --profile minimal --with hooks --without commands`; earlier 2026-06-15:
+same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
+auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:
+registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex binary (2.11). Earlier
+2026-06-06: clean-break tombstone purge: removed the `forge usage`->`forge telemetry activity` rename probe (old §7.14)
+along with the CLI tombstone commands themselves; `forge telemetry costs reset` telemetry-wipe coverage renumbered to
+7.14. Earlier: cost CLI is now a group: `forge telemetry costs` -> `forge telemetry costs show`; metric-evidence
+cost-honesty coverage: `forge telemetry activity` cost footnotes/`~` marker (7.12), cost provenance
 reported-vs-`unavailable` split (7.13), the `forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5),
 session-end `~` marker (5.21), and the §3.4 secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full);
 earlier: renamed the per-session command to `forge telemetry activity` (7.12/5.21), status-line customization checks

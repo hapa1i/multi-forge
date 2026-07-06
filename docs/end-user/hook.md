@@ -74,7 +74,7 @@ that may update session overrides.
 
 ## Installing hooks
 
-Hooks are installed as part of `forge extension enable`, or can be managed separately:
+Hooks are installed as part of `forge extension enable`:
 
 **Recommended:** Use the full installer, which handles hooks along with everything else:
 
@@ -84,18 +84,15 @@ forge extension enable --scope user              # Personal install → ~/.claud
 forge extension enable --scope local             # Local install → .claude/settings.local.json
 ```
 
-**Advanced:** Install hooks only (without commands, agents, etc.):
+**Advanced:** Install tracked hooks only (without commands, agents, skills, permissions, or env):
 
 ```bash
-forge hook enable --user     # Install hooks to ~/.claude/settings.local.json
-forge hook enable --local    # Install hooks to .claude/settings.local.json
-forge hook disable --user   # Remove hooks
-forge hook disable --local  # Remove hooks
+forge extension enable --scope local --profile minimal --with hooks --without commands
+forge extension disable --scope local
 ```
 
-> **Note:** `forge hook enable` always writes to `settings.local.json`. `forge extension enable` uses the scope's main
-> settings file, which may be `settings.json` or `settings.local.json` depending on scope. Both approaches work — the
-> installer is recommended for most users.
+> **Note:** The tracked replacement uses normal installer scope files: user scope writes `~/.claude/settings.json`;
+> local scope writes `.claude/settings.local.json`.
 
 ---
 
@@ -338,7 +335,6 @@ forge hook stop                # Stop handler
 forge hook policy-check        # PreToolUse:Write/Edit handler (Claude)
 forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; installed to Codex config)
 forge hook codex-session-start # SessionStart transfer delivery (Codex; installed to Codex config)
-forge hook enable --local      # Install to .claude/settings.local.json
 ```
 
 ### Files to inspect (debugging)
@@ -352,8 +348,8 @@ forge hook enable --local      # Install to .claude/settings.local.json
 
 ### Gotchas
 
-| Trap                    | Explanation                                                                                                    |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
-| "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                |
-| "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                         |
-| "Wrong settings file"   | `forge hook enable` targets `settings.local.json`; `forge extension enable` uses scope-specific settings files |
+| Trap                    | Explanation                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                              |
+| "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                                       |
+| "Wrong settings file"   | `forge extension enable --scope user` writes `~/.claude/settings.json`; `--scope local` writes `.claude/settings.local.json` |

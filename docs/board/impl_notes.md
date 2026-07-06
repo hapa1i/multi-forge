@@ -42,12 +42,24 @@ wc -l docs/board/impl_notes.md
   shell-token semantics: `shlex.split`, command basename `forge`, second token `hook`, and optional third-token handler
   matching. This intentionally accepts bare `forge hook ...` and absolute-path `/.../forge hook ...`, while rejecting
   contains-only strings such as `echo forge hook stop`.
-- Entry-level settings scans should use `entry_is_forge_hook`. Destructive cleanup (`forge hook disable`) must pass
-  `require_command_type=True` so non-command entries are preserved while still sharing the same command predicate.
+- Entry-level settings scans should use `entry_is_forge_hook`. Any cleanup path that removes hook entries from Claude
+  settings must pass `require_command_type=True` so non-command entries are preserved while still sharing the same
+  command predicate.
 - The registered-command contract lives in `tests/src/install/test_registered_commands_contract.py` and must key Claude
   hook rows on `(event, matcher, command, timeout)`, not a set of command strings. The two `policy-check` rows share
   bytes under different matchers/timeouts; a string set is blind to that drift. T5 may extend the predicate for
   dispatcher-shim bytes, but should update this one predicate and the golden together.
+
+### Claude hook registration is owned by the tracked installer (forge_hook_legacy_writer, 2026-07-06)
+
+- The standalone `forge hook enable` / `forge hook disable` writer was removed as a clean break. Claude hook
+  registration now goes through `forge extension enable`, so writes are tracked in `installed.json` and uninstalled via
+  the settings unmerge path instead of a second hand-written settings mutator.
+- The public hooks-only replacement is
+  `forge extension enable --scope local --profile minimal --with hooks --without commands`. This writes tracked hooks to
+  `.claude/settings.local.json` without commands, agents, skills, permissions, or env.
+- The old user-directory/local-file combination was intentionally not recreated. Tracked `--scope user` writes
+  `~/.claude/settings.json`; tracked `--scope local` writes `.claude/settings.local.json`.
 
 ### Transcript role/turn parsing is single-sourced in `core/transcript.py` (test_mirror_and_contract_cleanup, shipped 2026-07-06)
 

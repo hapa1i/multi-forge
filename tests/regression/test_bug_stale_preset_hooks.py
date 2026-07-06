@@ -1,15 +1,12 @@
-"""Regression: hook registry drift between FORGE_HOOK_CONFIG and preset.
+"""Regression: stale preset files must not suppress built-in Forge hooks.
 
-Root cause: Two independent hook registries were maintained manually, causing
-FORGE_HOOK_CONFIG (forge hook enable) and get_builtin_preset() (forge ext sync)
-to diverge -- missing hooks, timeout mismatches. Existing preset files also
-preserved the stale hook set indefinitely, so sync never picked up new hooks.
+Root cause: existing preset files preserved the stale hook set indefinitely, so
+sync never picked up new hooks added to the built-in preset.
 
-Fix: FORGE_HOOK_CONFIG now derives from get_builtin_preset(), and installer
-hooks come from the builtin preset even when the user's preset file is stale.
+Fix: installer hooks come from the built-in preset even when the user's preset
+file is stale.
 
-Affected: src/forge/cli/hooks/install.py, src/forge/install/preset.py,
-src/forge/install/installer.py
+Affected: src/forge/install/preset.py, src/forge/install/installer.py
 """
 
 from __future__ import annotations
@@ -26,13 +23,6 @@ from forge.install.preset import ensure_preset, get_preset_path
 from forge.install.tracking import TrackingStore
 
 pytestmark = pytest.mark.regression
-
-
-def test_forge_hook_config_matches_builtin_preset():
-    from forge.cli.hooks.install import FORGE_HOOK_CONFIG
-    from forge.install.preset import get_builtin_preset
-
-    assert FORGE_HOOK_CONFIG["hooks"] == get_builtin_preset()["hooks"]
 
 
 @pytest.fixture

@@ -579,6 +579,55 @@ class TestEnableWithPath:
         assert result.exit_code != 0
         assert "inside a .claude directory" in result.output
 
+    def test_public_hooks_only_command_writes_only_tracked_hooks(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+        from unittest.mock import MagicMock, patch
+
+        from forge.cli.extensions import enable_cmd
+        from forge.install.preset import get_builtin_preset, get_preset_path
+        from forge.install.tracking import TrackingStore
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+
+        home = tmp_path / "home"
+        forge_home = tmp_path / "forge-home"
+        claude_home = tmp_path / "claude-home"
+        home.mkdir()
+        forge_home.mkdir()
+        claude_home.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("FORGE_HOME", str(forge_home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.chdir(repo)
+
+        preset = get_builtin_preset()
+        preset["env"] = {"CUSTOM": "1"}
+        get_preset_path().write_text(json.dumps(preset), encoding="utf-8")
+
+        with patch("forge.install.version.check_minimum_version") as mock_ver:
+            mock_ver.return_value = MagicMock(ok=True)
+            result = CliRunner().invoke(
+                enable_cmd,
+                ["--scope", "local", "--profile", "minimal", "--with", "hooks", "--without", "commands"],
+            )
+
+        assert result.exit_code == 0, result.output
+        settings = json.loads((repo / ".claude" / "settings.local.json").read_text(encoding="utf-8"))
+        assert settings == {"hooks": get_builtin_preset()["hooks"]}
+        assert not (repo / ".claude" / "commands").exists()
+        assert not (repo / ".claude" / "agents").exists()
+        assert not (repo / ".claude" / "skills").exists()
+        assert (repo / ".forge").is_dir()
+
+        installation = TrackingStore().get_installation("local", str(repo.resolve()))
+        assert installation is not None
+        assert installation.modules_enabled == ["hooks"]
+        assert {entry.key_path.split(".", 1)[0] for entry in installation.settings_entries} == {"hooks"}
+
 
 class TestScopeAllConflict:
     """Tests for --all + --scope mutual exclusivity."""

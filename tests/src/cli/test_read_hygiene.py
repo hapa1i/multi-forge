@@ -171,9 +171,9 @@ class TestReadHygieneCLI:
 
 class TestReadHygieneRegistration:
     def test_registered_in_hook_config(self):
-        from forge.cli.hooks.install import FORGE_HOOK_CONFIG
+        from forge.install.preset import get_builtin_preset
 
-        pre_tool_use = FORGE_HOOK_CONFIG["hooks"]["PreToolUse"]
+        pre_tool_use = get_builtin_preset()["hooks"]["PreToolUse"]
         read_entries = [e for e in pre_tool_use if e.get("matcher") == "Read"]
         assert len(read_entries) == 1, "Expected exactly one Read matcher in PreToolUse"
         commands = [h["command"] for h in read_entries[0]["hooks"]]
