@@ -492,7 +492,7 @@ def test_reachable_via_rejects_unknown_runtime() -> None:
 def test_reachable_via_accepts_lane_runtime_vocabulary() -> None:
     """Every id in the lane runtime axis (agent RUNTIMES + core_llm) is a valid pin."""
 
-    for runtime_id in ("codex", "claude_code", "gemini", "core_llm"):
+    for runtime_id in ("codex", "claude_code", "core_llm"):
         source = ModelSource(
             id=f"pinned-{runtime_id}",
             kind="remote",

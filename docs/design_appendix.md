@@ -644,8 +644,8 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   guessing. `provider_usage_exact` = exact in-band token usage from either a direct `core.llm` call **or** a direct
   `claude -p` envelope that reported `usage` but no cost (Phase 5, e.g. OAuth). `runtime_native` (Phase 5, emitted) = a
   runtime self-reported its own cost+usage: a direct `claude -p --output-format json` run (`reporter=claude_code`), or a
-  native `codex`/`gemini` runtime later. `proxy_request_exact` (Phase 4g) is the provenance of a **read-time** figure,
-  not a stored event source: a proxied `claude -p` event keeps `verb_snapshot_estimated` in the ledger, but
+  native `codex` runtime. `proxy_request_exact` (Phase 4g) is the provenance of a **read-time** figure, not a stored
+  event source: a proxied `claude -p` event keeps `verb_snapshot_estimated` in the ledger, but
   `forge telemetry activity` / `forge +$Y` recompute that run tree's cost exactly from the cost plane (sum of cost
   records by `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
   double-counting. Suppression is **per-run-subtree** (the snapshot's own run, or a verb whose direct children produced
@@ -659,11 +659,10 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   lane (`resolve_billing_mode`, gated on the bound backend's `subscription_quota` posture); `subscription_interactive`
   and `subscription_headless_credit` stay reserved.
 - `attribution_granularity`: `worker` | `verb` | `session`.
-- `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` | `gemini_headless` — how the
-  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm`/`codex_exec` (plus `None` on an
-  aggregate spanning mixed routes); `claude_interactive`/`gemini_headless` stay reserved, like the unemitted
-  `subscription_*` billing modes. `forge_proxy` is reserved **here** — it is emitted now as a `reporter`, not yet as a
-  `route` (it appears in both literals).
+- `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` — how the work reached the
+  model (invocation channel). Emitted now: `claude_p`/`core_llm`/`codex_exec` (plus `None` on an aggregate spanning
+  mixed routes); `claude_interactive` stays reserved, like the unemitted `subscription_*` billing modes. `forge_proxy`
+  is reserved **here** — it is emitted now as a `reporter`, not yet as a `route` (it appears in both literals).
 - `reporter`: `claude_code` | `forge_proxy` | `openrouter` | `litellm` | `provider` | `codex_jsonl` — the source of the
   **metric** evidence (tokens **and/or** a cost figure, *not* specifically cost), so `reporter=provider` alongside
   `confidence=unavailable` is coherent: the provider reported tokens, just no dollars. Emitted now: `provider`,

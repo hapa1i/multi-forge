@@ -57,7 +57,7 @@ TRANSFER_SCHEMA_VERSION = 1
 TRANSFER_TARGET_RUNTIME = "claude"
 # Single source for the valid target runtimes: the ops layer and the CLI Choice both
 # consume this tuple, and assemble_transfer_context validates against it, so a new
-# runtime (e.g. gemini) is added in exactly one place.
+# runtime target is added in exactly one place.
 TRANSFER_TARGET_RUNTIMES: tuple[str, ...] = ("claude", "codex")
 
 # AI-curated strategy constants. Use OpenRouter directly for the OSS default path;
