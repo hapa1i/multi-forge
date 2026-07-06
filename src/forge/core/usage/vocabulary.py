@@ -23,17 +23,15 @@ from forge.core.telemetry.vocabulary import Confidence, Reporter
 __all__ = ["ROUTE_CLAUDE_INTERACTIVE", "Confidence", "Reporter", "Route"]
 
 # How the work reached a model/runtime (the invocation channel).
-# Emitted now: claude_p, core_llm (plus None on an aggregate spanning mixed routes).
-# Reserved (declared up front, like the ledger's unemitted subscription_* billing modes):
-# forge_proxy -- emitted now as a Reporter, NOT yet as a Route (it sits in both literals) --
-# plus claude_interactive (Phase 4 status line) and codex_exec / gemini_headless (Phase 5).
+# Emitted now: claude_p, core_llm, codex_exec (plus None on an aggregate spanning
+# mixed routes). Reserved here: forge_proxy -- emitted now as a Reporter, NOT yet as
+# a Route (it sits in both literals) -- plus claude_interactive (Phase 4 status line).
 Route = Literal[
     "claude_interactive",
     "claude_p",
     "forge_proxy",
     "core_llm",
     "codex_exec",
-    "gemini_headless",
 ]
 
 # --- named tokens referenced in code (typed against ``Route`` above) ---

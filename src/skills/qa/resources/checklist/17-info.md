@@ -61,6 +61,6 @@ forge runtime list --json
 
 - [ ] A `claude_code` row is present in the capability matrix
 - [ ] `--json` emits a valid JSON array (one object per runtime, each with `id` and `installed`)
-- [ ] Codex/Gemini rows are roadmap (detected capabilities), not launchable frontends today
+- [ ] A `codex` row is present with honest hook/pretool capability values
 
 ---

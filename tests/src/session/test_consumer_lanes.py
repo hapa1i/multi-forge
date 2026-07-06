@@ -24,8 +24,9 @@ from forge.session.models import (
     SessionState,
 )
 
-# The codex lane is the one declared override on SUPERVISOR_CONSUMER (T4); a gemini lane
-# constructs as a Lane but is NOT a declared candidate, so resolve_lane rejects it.
+# The codex lane is the one declared override on SUPERVISOR_CONSUMER (T4); an
+# openrouter claude_code lane constructs as a Lane but is NOT a declared candidate,
+# so resolve_lane rejects it.
 _CODEX_RECORD = LaneRecord("codex", "chatgpt", "gpt-5-codex")
 _DEFAULT = SUPERVISOR_CONSUMER.default_lane
 _DEFAULT_RECORD = LaneRecord(_DEFAULT.runtime_id, _DEFAULT.backend_id, _DEFAULT.model)
@@ -113,7 +114,7 @@ class TestEnsureConsumerLaneBinding:
         # A valid Lane that is not one of SUPERVISOR_CONSUMER's declared candidates is rejected by
         # resolve_lane (overrides are an allow-list), so it must not freeze either.
         state = _state()
-        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("gemini", "openrouter", "m"))
+        ensure_consumer_lane_binding(state, SUPERVISOR_CONSUMER, LaneRecord("claude_code", "openrouter", "m"))
         assert state.confirmed.consumer_lanes is None
 
 

@@ -1,7 +1,7 @@
 """Tests for the `forge runtime` CLI (Phase 4e).
 
 Hermetic: PATH presence and the Claude version probe are stubbed so no real
-``claude/codex/gemini --version`` subprocess runs.
+``claude/codex --version`` subprocess runs.
 """
 
 from __future__ import annotations
@@ -26,8 +26,9 @@ def _no_real_probes(monkeypatch) -> None:
 def test_list_renders_all_runtimes() -> None:
     result = CliRunner().invoke(runtime, ["list"])
     assert result.exit_code == 0
-    for rid in ("claude_code", "codex", "gemini"):
+    for rid in ("claude_code", "codex"):
         assert rid in result.output
+    assert "gemini" not in result.output.lower()
     # Hooks render as the honest multi-state value: Codex hooks are enrollment_gated
     # (fire only once trust-enrolled), not a bare "yes".
     assert "enrollment_gated" in result.output
@@ -39,7 +40,7 @@ def test_list_json_carries_capability_fields() -> None:
     result = CliRunner().invoke(runtime, ["list", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert {d["id"] for d in data} == {"claude_code", "codex", "gemini"}
+    assert {d["id"] for d in data} == {"claude_code", "codex"}
 
     codex = next(d for d in data if d["id"] == "codex")
     assert (

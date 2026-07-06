@@ -1379,7 +1379,7 @@ class TestTransferFrontmatter:
     def test_unknown_target_runtime_rejected(self, tmp_path: Path) -> None:
         """Internal boundary: assemble validates against TRANSFER_TARGET_RUNTIMES (the
         single source the ops layer and the CLI Choice also consume)."""
-        with pytest.raises(ValueError, match="Unknown target runtime 'gemini'"):
+        with pytest.raises(ValueError, match="Unknown target runtime 'bogus'"):
             assemble_transfer_context(
                 parent_name="parent",
                 parent_state=self._parent(tmp_path),
@@ -1387,7 +1387,7 @@ class TestTransferFrontmatter:
                 strategy=ResumeStrategy.MINIMAL,
                 depth=1,
                 get_session=lambda _: None,
-                target_runtime="gemini",
+                target_runtime="bogus",
             )
 
     def test_frontmatter_has_no_child_field(self, tmp_path: Path) -> None:
