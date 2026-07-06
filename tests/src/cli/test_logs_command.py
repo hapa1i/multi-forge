@@ -92,9 +92,11 @@ def test_logs_surfaces_per_proxy_request_diagnostics_note(tmp_path, monkeypatch)
     runner = CliRunner()
     result = runner.invoke(main, ["logs", "show"])
     assert result.exit_code == 0
-    assert "Request diagnostics:" in result.output
-    assert "per-proxy logging.requests" in result.output
-    assert "no plaintext" in result.output
+    output = " ".join(result.output.split())
+    assert "Request diagnostics:" in output
+    assert "controlled per proxy" in output
+    assert "saved only when debug logging is on" in output
+    assert "plaintext bodies are never written" in output
 
 
 def test_logs_command_does_not_create_self_log_file(tmp_path, monkeypatch):
