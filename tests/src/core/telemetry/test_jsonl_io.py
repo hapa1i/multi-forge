@@ -11,9 +11,17 @@ from pathlib import Path
 
 import pytest
 
-from forge.core.telemetry.downstream import DOWNSTREAM_SCHEMA_VERSION, DownstreamRecord, write_downstream_record
+from forge.core.telemetry.downstream import (
+    DOWNSTREAM_SCHEMA_VERSION,
+    DownstreamRecord,
+    write_downstream_record,
+)
 from forge.core.telemetry.jsonl_io import append_jsonl_record
-from forge.core.telemetry.upstream import UPSTREAM_SCHEMA_VERSION, UpstreamOutcome, write_upstream_outcome
+from forge.core.telemetry.upstream import (
+    UPSTREAM_SCHEMA_VERSION,
+    UpstreamOutcome,
+    write_upstream_outcome,
+)
 from forge.core.usage.ledger import USAGE_SCHEMA_VERSION, UsageEvent, log_usage_event
 
 

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from forge.core.state import StateCorruptedError, StateUnreadableError, read_versioned_json_object
+from forge.core.state import (
+    StateCorruptedError,
+    StateUnreadableError,
+    read_versioned_json_object,
+)
 
 
 def test_null_version_defaults_to_missing_version(tmp_path) -> None:

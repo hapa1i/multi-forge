@@ -29,7 +29,7 @@ class FsyncSpy:
         real_open = state_io.os.open
         real_fsync = state_io.os.fsync
 
-        def open_spy(path: str | bytes, flags: int, *args: Any, **kwargs: Any) -> int:
+        def open_spy(path: str, flags: int, *args: Any, **kwargs: Any) -> int:
             fd = real_open(path, flags, *args, **kwargs)
             if Path(path).is_dir():
                 self._dir_fds.add(fd)
@@ -125,7 +125,11 @@ def test_relocate_transcript_uses_fsynced_atomic_bytes(
     source_path.parent.mkdir(parents=True, exist_ok=True)
     source_path.write_bytes(source_bytes)
 
-    result = relocate_transcript(session_id=session_id, source_project_root=source_root, dest_project_root=dest_root)
+    result = relocate_transcript(
+        session_id=session_id,
+        source_project_root=str(source_root),
+        dest_project_root=str(dest_root),
+    )
 
     fsync_spy.assert_file_and_dir_fsynced()
     assert result.dest_path.read_bytes() == source_bytes

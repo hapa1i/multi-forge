@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -34,8 +35,22 @@ pytestmark = pytest.mark.regression
 StoreFactory = Callable[[Path], tuple[Callable[[], object], type[StateUnreadableError], type[StateCorruptedError]]]
 
 
+def _matches_path(file: Any, target: Path) -> bool:
+    try:
+        value = os.fspath(file)
+    except TypeError:
+        return False
+    if isinstance(value, bytes):
+        value = value.decode()
+    return Path(value) == target
+
+
 def _document_store(path: Path) -> tuple[Callable[[], object], type[StateUnreadableError], type[StateCorruptedError]]:
-    return SearchDocumentStore(store_path=path).read, SearchDocumentStoreUnreadableError, SearchDocumentStoreCorruptedError
+    return (
+        SearchDocumentStore(store_path=path).read,
+        SearchDocumentStoreUnreadableError,
+        SearchDocumentStoreCorruptedError,
+    )
 
 
 def _content_store(path: Path) -> tuple[Callable[[], object], type[StateUnreadableError], type[StateCorruptedError]]:
@@ -46,7 +61,9 @@ def _bm25_store(path: Path) -> tuple[Callable[[], object], type[StateUnreadableE
     return BM25IndexStore(store_path=path).read, BM25IndexUnreadableError, BM25IndexCorruptedError
 
 
-def _index_state_store(path: Path) -> tuple[Callable[[], object], type[StateUnreadableError], type[StateCorruptedError]]:
+def _index_state_store(
+    path: Path,
+) -> tuple[Callable[[], object], type[StateUnreadableError], type[StateCorruptedError]]:
     return IndexStateStore(state_path=path).read, IndexStateUnreadableError, IndexStateCorruptedError
 
 
@@ -59,8 +76,8 @@ def test_search_store_oserror_is_unreadable(
     read, unreadable_error, _corrupted_error = factory(path)
     real_open = builtins.open
 
-    def open_spy(file: object, *args: Any, **kwargs: Any) -> object:
-        if Path(file) == path:
+    def open_spy(file: Any, *args: Any, **kwargs: Any) -> object:
+        if _matches_path(file, path):
             raise OSError("permission denied")
         return real_open(file, *args, **kwargs)
 
@@ -83,17 +100,15 @@ def test_search_store_invalid_json_stays_corrupted(tmp_path: Path, factory: Stor
         read()
 
 
-def test_search_clean_json_routes_unreadable_as_check_retry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_search_clean_json_routes_unreadable_as_check_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "project"
     store_path = project / ".forge" / "search-index" / "documents.json"
     store_path.parent.mkdir(parents=True)
     store_path.write_text(json.dumps({"schema_version": 1, "documents": []}), encoding="utf-8")
     real_open = builtins.open
 
-    def open_spy(file: object, *args: Any, **kwargs: Any) -> object:
-        if Path(file) == store_path:
+    def open_spy(file: Any, *args: Any, **kwargs: Any) -> object:
+        if _matches_path(file, store_path):
             raise OSError("permission denied")
         return real_open(file, *args, **kwargs)
 
