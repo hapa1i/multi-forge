@@ -132,8 +132,10 @@ B2 changes proxy request-path resolution (`create_message`/`count_tokens`) and p
 `testing_guidelines.md` require integration -- not just unit -- for proxy-runtime changes; do not defer to closeout.
 Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count_tokens half needs its own smoke (F1):
 
-- [ ] **Add a count-tokens E2E smoke** (post `/v1/messages/count_tokens` through the real proxy; assert resolved
-  model/response) beside `tests/integration/proxy/test_session_routing_e2e.py`. (F1)
+- [ ] **Add a count-tokens E2E smoke** (post `/v1/messages/count_tokens` through the real proxy; assert a successful
+  token-count response for explicit-tier and default-tier cases) beside
+  `tests/integration/proxy/test_session_routing_e2e.py`. Do not require resolved-model/tier headers on this endpoint;
+  B2.0 unit characterization pins the internal resolved model. (F1)
 - [ ] `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`
   -- create_message tier/model resolution.
 - [ ] `./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py` -- port allocation across
@@ -143,8 +145,9 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 
 ## Design-doc / memory sync
 
-- [ ] Add `core/tiers.py` (B1) and `src/forge/proxy/ports.py` (B2.3) to `design.md` §6 directory structure. Cross-check
-  `design.md` §3.7 tier-selection precedence still describes the (now single-sourced) tier-word step.
+- [ ] **PR 1 (B1):** add `core/tiers.py` to `design.md` §6 directory structure and cross-check `design.md` §3.7
+  tier-selection precedence still describes the now single-sourced tier-word step.
+- [ ] **PR 2 (B2):** add `src/forge/proxy/ports.py` to `design.md` §6 directory structure.
 - [ ] **impl_notes candidate (human-review gate):** tier-word detection is single-sourced in `core/tiers.py`; the
   statusline `get_tier_from_display_name` divergence (opus-first, defaults `sonnet`) is deliberate and NOT collapsed;
   the port probe lives in `proxy/ports.py` with caller-specific exception translation (RuntimeError vs ProxyStartError).
