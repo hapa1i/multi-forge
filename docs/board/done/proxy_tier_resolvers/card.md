@@ -1,8 +1,8 @@
 # proxy_tier_resolvers -- one tier/model-resolution authority in the proxy
 
-**Lane**: `doing/` -- split from the `ops_seam_completion` batch (2026-07-06) per its own acceptance guidance (two
-member cards, no epic). Sibling: [`ops_policy_seam`](../ops_policy_seam/card.md) (Seam A). Independent -- **money/wire
-caution zone** (see Risks), decoupled from Seam A so A can ship without waiting on B2's characterization work.
+**Lane**: `done/` -- split from the `ops_seam_completion` batch (2026-07-06) per its own acceptance guidance (two member
+cards, no epic). Sibling: [`ops_policy_seam`](../ops_policy_seam/card.md) (Seam A). Independent -- **money/wire caution
+zone** (see Risks), decoupled from Seam A so A can ship without waiting on B2's characterization work.
 
 **Type**: behavior-preserving refactor. No wire/cost decision changes -- only extraction of named resolvers, which
 incidentally relieves `server.py` cap pressure.
@@ -74,4 +74,7 @@ The next new tier (post-Fable) touches **1 leaf, not 3**. Confirm on the next mo
 
 ## Closeout
 
-(pending)
+- Shipped via PR #86 on 2026-07-06.
+- B1/B2 verification and integration coverage are recorded in `checklist.md` and `docs/board/change_log.md`.
+- Durable resolver notes promoted to `docs/board/impl_notes.md`.
+- Card moved `doing/ -> done/` after merge to `main`.

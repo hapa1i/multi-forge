@@ -488,6 +488,21 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   keeping `ProxyMetrics` decoupled from `CostTracker`. Cap amounts use `_fmt_cap_money` (four decimals below a cent),
   NOT `_fmt_dollars` (whose `int(usd*100)` collapses sub-cent caps to `0c`).
 
+### Proxy tier/model resolver seams (proxy_tier_resolvers, shipped 2026-07-06)
+
+- **Raw model-name tier words are single-sourced** in `forge.core.tiers.detect_tier_word()`. Proxy request validation,
+  server passthrough tier detection, and statusline explicit-model tier detection delegate there. The helper preserves
+  the existing naive substring behavior, including `fable -> opus`.
+- **Statusline display names are deliberately different**: `get_tier_from_display_name()` still checks opus/fable first
+  and defaults to `sonnet` when no tier word is visible. Do not fold display-name fallback behavior into the raw
+  model-name tier helper.
+- **LiteLLM provider-prefix vocabulary is shared only at detector sites** via `LITELLM_PROVIDER_PREFIXES`.
+  `data_models._normalize()` intentionally keeps its narrower canonical-prefix stripper (`anthropic/`, `openai/`,
+  `gemini/`); using the full LiteLLM prefix tuple there would over-strip and change forced-provider mapping.
+- **Proxy port probing is shared, caller contracts are not**: `forge.proxy.ports.find_available_loopback_port()` owns
+  the `127.0.0.1` bind probe and raises neutral `NoAvailablePortError`; `server.find_available_port()` still translates
+  to `RuntimeError`, while `proxy_orchestrator._find_available_port()` still translates to `ProxyStartError`.
+
 ### Codex runtime (codex_frontend epic, shipped 2026-06-12)
 
 Durable invariants for Forge's first alternate agent runtime. Sources: `src/forge/core/runtime/` (registry, preflight),

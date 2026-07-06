@@ -27,6 +27,17 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### proxy_tier_resolvers closeout
+
+**Goal**: Close the shipped proxy tier/model-resolution card after PR #86 merged to `main`.
+
+**Key changes**:
+
+- Promoted the durable resolver invariants to `docs/board/impl_notes.md`.
+- Marked the final checklist closeout items and moved the card from `doing/` to `done/`.
+
+**Verification**: `make pre-commit-md`.
+
 ### proxy_tier_resolvers B2: Shared proxy resolution and port probe
 
 **Goal**: Collapse the duplicated proxy model-resolution and port-probing paths without changing routing, cost, or

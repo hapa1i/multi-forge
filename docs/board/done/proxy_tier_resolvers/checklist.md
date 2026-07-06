@@ -12,9 +12,7 @@ ships on a fresh branch from post-B1 main. Independent of Seam A -- no shared co
 
 ## Current focus
 
-**B1 implemented and verified on `refactor/proxy-tier-resolvers`; B2 implemented and verified on
-`refactor/proxy-tier-resolvers-b2`.** B2 carries the money/wire follow-up (`create_message`/`count_tokens` resolution +
-the port probe) and is ready for PR 2.
+**Done.** Shipped via PR #86, merged to `main` on 2026-07-06. Closeout moved the card to `done/`.
 
 ### Recorded review decisions
 
@@ -154,7 +152,7 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 - [x] **PR 1 (B1):** add `core/tiers.py` to `design.md` §6 directory structure and cross-check `design.md` §3.7
   tier-selection precedence still describes the now single-sourced tier-word step.
 - [x] **PR 2 (B2):** add `src/forge/proxy/ports.py` to `design.md` §6 directory structure.
-- [ ] **impl_notes candidate (human-review gate):** tier-word detection is single-sourced in `core/tiers.py`; the
+- [x] **impl_notes candidate (human-review gate):** tier-word detection is single-sourced in `core/tiers.py`; the
   statusline `get_tier_from_display_name` divergence (opus-first, defaults `sonnet`) is deliberate and NOT collapsed;
   the port probe lives in `proxy/ports.py` with caller-specific exception translation (RuntimeError vs ProxyStartError).
 
@@ -164,4 +162,4 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
   entry.
 - [x] **PR 2 (B2):** B2.0 characterization committed green before B2.1; B2-a/b/c green; count-tokens smoke + proxy
   integration green; `server.py` LOC < 2494; `change_log.md` entry.
-- [ ] After both merge: design docs synced; move card `doing/ -> done/`.
+- [x] After both merge: design docs synced; move card `doing/ -> done/`.
