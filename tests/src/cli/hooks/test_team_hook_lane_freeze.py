@@ -48,6 +48,12 @@ def _skipping_handler(
     return (0, "")
 
 
+def _blocking_handler(
+    data: Any, config: Any, cache: Any, backend_id: str | None = None, on_dispatch: Callable[[], None] | None = None
+) -> tuple[int, str]:
+    return (2, "keep working")
+
+
 def _seed(tmp_path: Path, *, declared: bool) -> SessionStore:
     manifest = create_session_state("session")
     if declared:
@@ -92,3 +98,11 @@ def test_undeclared_lane_does_not_freeze(command: str, tmp_path: Path) -> None:
     store = _seed(tmp_path, declared=False)
     _invoke(command, store, _dispatching_handler)
     assert store.read().confirmed.consumer_lanes is None
+
+
+@pytest.mark.parametrize("command", ["teammate-idle", "task-completed"])
+def test_exit_2_writes_feedback_to_stderr(command: str, tmp_path: Path) -> None:
+    store = _seed(tmp_path, declared=True)
+    result = _invoke(command, store, _blocking_handler)
+    assert result.exit_code == 2
+    assert "keep working" in result.stderr

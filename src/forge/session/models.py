@@ -687,6 +687,12 @@ class SessionIndex:
 # --- Factory functions ---
 
 
+def session_runtime(state: SessionState) -> str:
+    """Return the session's runtime registry id (default ``claude_code``)."""
+    launch = state.intent.launch
+    return launch.runtime if launch is not None else "claude_code"
+
+
 def create_session_state(
     name: str,
     *,

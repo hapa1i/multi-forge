@@ -23,7 +23,7 @@ from typing import Any
 
 from forge.cli.hooks.codex_patch import PatchFileOp, parse_apply_patch
 from forge.cli.hooks.policy import format_deny_text, format_needs_review_text
-from forge.policy.deterministic.base import is_under_directory
+from forge.policy.deterministic.base import tests_first_sort_key
 from forge.policy.types import ActionContext, CompositeDecision
 
 _MAX_CONTENT_CHARS = 5000  # same truncation convention as ClaudeHookAdapter
@@ -186,12 +186,4 @@ def sort_contexts_tests_first(contexts: list[ActionContext]) -> list[ActionConte
     patch order is preserved within each bucket.
     """
 
-    def _key(ctx: ActionContext) -> int:
-        path = ctx.target_path or ""
-        if is_under_directory(path, "tests"):
-            return 0
-        if is_under_directory(path, "src"):
-            return 2
-        return 1
-
-    return sorted(contexts, key=_key)
+    return sorted(contexts, key=lambda ctx: tests_first_sort_key(ctx.target_path))

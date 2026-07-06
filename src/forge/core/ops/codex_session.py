@@ -55,7 +55,12 @@ from forge.session.codex_handoff import (
     pending_context_path,
     read_receipt,
 )
-from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
+from forge.session.models import (
+    CodexConfirmed,
+    Derivation,
+    SessionIndexEntry,
+    session_runtime,
+)
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import parse_transfer_context_strategy
 
@@ -106,12 +111,6 @@ class CodexSessionResumeResult:
     codex: HeadlessResult
     rollout_path: str | None
     warnings: tuple[str, ...] = ()
-
-
-def session_runtime(state: SessionState) -> str:
-    """Return the session's runtime registry id (default ``claude_code``)."""
-    launch = state.intent.launch
-    return launch.runtime if launch is not None else "claude_code"
 
 
 def resolve_codex_session(

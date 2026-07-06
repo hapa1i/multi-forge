@@ -25,6 +25,32 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-06
+
+### diverged_twin_consolidation implementation: Session and hook twin consolidation
+
+**Goal**: Collapse must-stay-identical twins in session inheritance, runtime/lane helpers, supervisor options, TDD sort,
+and hook capture paths while fixing the two verified drift bugs.
+
+**Key changes**:
+
+- Added one session intent inheritance helper and routed native-resume transcript artifact lookup through the guarded
+  helper, closing the malformed `copied_path` type leak.
+- Moved `session_runtime` to `session.models`, promoted `record_to_lane`, and shared the TDD tests-first sort key from
+  `policy.deterministic.base`.
+- Shared the start/fork supervisor option family and dependency error text while keeping their distinct `--supervise`
+  command shapes.
+- Extracted the Stop/StopFailure transcript capture core and the teammate/task team-supervisor hook body without folding
+  their intentionally different failure channels.
+- Verified-and-dropped 3c and 4b: codex preflight arms diverge immediately after the already-shared read, and
+  template-only context routing is not reachable through the production inline CLI resolver paths.
+
+**Verification**: Focused slice suite
+`uv run pytest tests/regression/test_bug_transcript_artifact_type_guard.py tests/regression/test_bug_consumer_lane_fork_resume_inherit.py tests/regression/test_bug_policy_check_nested_tdd_sort.py tests/regression/test_bug_codex_tdd_nested_layout.py tests/src/cli/test_user_prompt_dispatcher.py::TestGuardCheck tests/src/session/test_consumer_lanes.py tests/src/session/test_shadow_curation.py tests/src/session/test_memory_writer.py tests/src/core/ops/test_codex_session.py tests/src/cli/test_session_codex.py tests/src/cli/test_session_list_show.py tests/src/cli/test_session_start_delete.py tests/src/cli/test_session_fork.py tests/regression/test_characterize_context_limit_routing_ref_template_only.py tests/src/cli/test_artifact_hooks.py tests/src/cli/hooks/test_team_hook_lane_freeze.py tests/src/cli/test_stop_verification.py tests/regression/test_bug_walkthrough_stale_stop_snapshot.py tests/regression/test_bug_supervisor_fork_uuid_drift.py`
+(510 passed); hook integration
+`./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py tests/integration/cli/test_stop_verification_integration.py tests/integration/docker/test_policy_hooks.py`
+(42 passed); `make test-unit` (7,379 passed, 116 deselected); touched-file `uv run ruff check`.
+
 ## 2026-07-05
 
 ### state_primitive_hoist implementation: Core durable-state primitive hoist

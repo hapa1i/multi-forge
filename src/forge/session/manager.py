@@ -81,6 +81,17 @@ def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
     return None
 
 
+def _inherit_intent_fields(child_state: SessionState, parent_state: SessionState) -> None:
+    """Copy intent fields that derived sessions inherit from their parent."""
+    for field_name in ("subprocess_proxy", "policy", "memory", "system_prompt", "verification", "consumer_lanes"):
+        parent_val = getattr(parent_state.intent, field_name, None)
+        if parent_val is not None:
+            setattr(child_state.intent, field_name, deepcopy(parent_val))
+    inherited_launch = _inherited_launch_intent(parent_state)
+    if inherited_launch is not None:
+        child_state.intent.launch = inherited_launch
+
+
 def _tracked_transcript_session_ids(state: SessionState) -> list[str]:
     """Return distinct Claude session IDs referenced by transcript artifacts."""
     return _tracked_transcript_session_ids_from_artifacts(state.confirmed.artifacts)
@@ -750,12 +761,7 @@ class SessionManager:
                 warnings_sink=inh_warnings_native,
             )
             # Resolve parent transcript path for traceability (best-effort)
-            transcript_artifact_path: str | None = None
-            transcripts = parent_state.confirmed.artifacts.get("transcripts", [])
-            if transcripts and isinstance(transcripts, list) and len(transcripts) > 0:
-                latest = transcripts[-1]
-                if isinstance(latest, dict):
-                    transcript_artifact_path = latest.get("copied_path")
+            transcript_artifact_path = _latest_transcript_artifact_path(parent_state)
 
             child_state.confirmed.derivation = Derivation(
                 parent_session=parent_name,
@@ -893,13 +899,7 @@ class SessionManager:
             worktree_branch=parent_state.worktree.branch if parent_state.worktree else None,
         )
 
-        for field_name in ("subprocess_proxy", "policy", "memory", "system_prompt", "verification", "consumer_lanes"):
-            parent_val = getattr(parent_state.intent, field_name, None)
-            if parent_val is not None:
-                setattr(child_state.intent, field_name, deepcopy(parent_val))
-        inherited_launch = _inherited_launch_intent(parent_state)
-        if inherited_launch is not None:
-            child_state.intent.launch = inherited_launch
+        _inherit_intent_fields(child_state, parent_state)
 
         child_state.parent_session = parent_name
         child_state.is_fork = False  # Same worktree, context continuation (not a fork)
@@ -1306,13 +1306,7 @@ class SessionManager:
             worktree_branch=fork_branch,
         )
 
-        for field_name in ("subprocess_proxy", "policy", "memory", "system_prompt", "verification", "consumer_lanes"):
-            parent_val = getattr(parent.intent, field_name, None)
-            if parent_val is not None:
-                setattr(fork_state.intent, field_name, deepcopy(parent_val))
-        inherited_launch = _inherited_launch_intent(parent)
-        if inherited_launch is not None:
-            fork_state.intent.launch = inherited_launch
+        _inherit_intent_fields(fork_state, parent)
         # Direct mode: force host launch (sidecar requires a proxy)
         if direct and fork_state.intent.launch and fork_state.intent.launch.mode != LAUNCH_MODE_HOST:
             fork_state.intent.launch.mode = LAUNCH_MODE_HOST
@@ -1545,13 +1539,7 @@ class SessionManager:
             worktree_branch=parent.worktree.branch if parent.worktree else None,
         )
 
-        for field_name in ("subprocess_proxy", "policy", "memory", "system_prompt", "verification", "consumer_lanes"):
-            parent_val = getattr(parent.intent, field_name, None)
-            if parent_val is not None:
-                setattr(child_state.intent, field_name, deepcopy(parent_val))
-        inherited_launch = _inherited_launch_intent(parent)
-        if inherited_launch is not None:
-            child_state.intent.launch = inherited_launch
+        _inherit_intent_fields(child_state, parent)
         child_state.overrides = deepcopy(parent.overrides)
 
         # Propagate identity from parent

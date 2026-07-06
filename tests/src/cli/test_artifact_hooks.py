@@ -150,8 +150,10 @@ class TestStopHook:
         transcripts = updated.confirmed.artifacts.get("transcripts")
         assert isinstance(transcripts, list)
         assert transcripts
+        assert transcripts[-1]["reason"] == "stop"
         assert transcripts[-1]["session_id"] == "uuid-123"
         assert str(transcripts[-1]["copied_path"]).endswith("/uuid-123.jsonl")
+        assert updated.confirmed.confirmed_by == "hook:stop"
 
         # Verify pending-work marker was created
         from forge.core.workqueue import pending_work_dir
@@ -387,6 +389,23 @@ class TestStopHook:
         assert not (run_dir / "transcript.jsonl").exists()
         assert marker.exists()
 
+    def test_copy_failure_reports_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+
+        manifest = store.read()
+        manifest.confirmed.transcript_path = str(tmp_path / "nonexistent.jsonl")
+        manifest.confirmed.claude_session_id = "uuid-copy-fail"
+        store.write(manifest)
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert output["success"] is False
+        assert output["error"] == "copy_failed"
+
 
 class TestStopFailureHook:
     def test_empty_stdin(self) -> None:
@@ -448,6 +467,7 @@ class TestStopFailureHook:
         assert transcripts
         assert transcripts[-1]["reason"] == "stop-failure"
         assert transcripts[-1]["session_id"] == "uuid-fail-123"
+        assert updated.confirmed.confirmed_by == "hook:stop-failure"
 
     def test_never_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """StopFailure must always exit 0, even with missing transcript."""
@@ -483,6 +503,7 @@ class TestStopFailureHook:
         assert result.exit_code == 0
         output = json.loads(result.output)
         assert output["success"] is True
+        assert output["action"] == "attempted"
         assert output["copied"] is False
         assert output["queued"] is False
         assert output["queued_index"] is False
