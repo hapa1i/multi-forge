@@ -7,7 +7,9 @@ used by CLI commands to warn when features depend on hooks that aren't present.
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
+from typing import Any
 
 
 def _find_claude_dir(start: Path) -> Path | None:
@@ -44,40 +46,72 @@ def _settings_paths(worktree_path: Path) -> list[Path]:
     ]
 
 
-def _entry_has_command(entry: dict, needle: str) -> bool:
-    """Check if a hook entry contains a command matching the needle.
+def is_forge_hook_command(command: str, handler: str | None = None) -> bool:
+    """Return True when *command* invokes ``forge hook``.
+
+    The match is command-token based: bare ``forge hook ...`` and absolute-path
+    ``/path/to/forge hook ...`` commands match, while contains-only strings like
+    ``echo forge hook stop`` do not.
+    """
+    try:
+        tokens = shlex.split(command.strip())
+    except ValueError:
+        return False
+
+    if len(tokens) < 2:
+        return False
+    if Path(tokens[0]).name != "forge" or tokens[1] != "hook":
+        return False
+    if handler is not None:
+        return len(tokens) >= 3 and tokens[2] == handler
+    return True
+
+
+def entry_is_forge_hook(entry: Any, handler: str | None = None, *, require_command_type: bool = False) -> bool:
+    """Check whether a Claude Code hook entry invokes a Forge hook.
 
     System boundary: reads Claude Code settings.json which may contain
     either format depending on when the user last ran forge extension sync.
     - Current: {"hooks": [{"type": "command", "command": "..."}]}
     - Pre-sync: {"type": "command", "command": "..."}
     """
+    if not isinstance(entry, dict):
+        return False
+
     # Pre-sync format: command at entry top level
-    cmd = entry.get("command")
-    if isinstance(cmd, str) and needle in cmd:
+    if _entry_command_matches(entry, handler, require_command_type=require_command_type):
         return True
+
     # Current format: nested hooks array
-    for hook in entry.get("hooks", []):
-        if not isinstance(hook, dict):
-            continue
-        cmd = hook.get("command", "")
-        if isinstance(cmd, str) and needle in cmd:
-            return True
+    hooks = entry.get("hooks")
+    if isinstance(hooks, list):
+        for hook in hooks:
+            if isinstance(hook, dict) and _entry_command_matches(
+                hook, handler, require_command_type=require_command_type
+            ):
+                return True
     return False
 
 
-def has_forge_hook(worktree_path: Path, hook_type: str, command_needle: str = "forge hook") -> bool:
+def _entry_command_matches(entry: dict[str, Any], handler: str | None, *, require_command_type: bool) -> bool:
+    if require_command_type and entry.get("type") != "command":
+        return False
+
+    command = entry.get("command")
+    return isinstance(command, str) and is_forge_hook_command(command, handler)
+
+
+def has_forge_hook(worktree_path: Path, hook_type: str, handler: str | None = None) -> bool:
     """Check if a specific Forge hook type is installed in any settings scope.
 
     Scans local, project, and user settings files for a hook entry whose
-    command contains *command_needle*. The default needle ``"forge hook"``
-    matches any Forge hook; pass a more specific string like
-    ``"forge hook policy-check"`` to require a particular handler.
+    command invokes ``forge hook``. Leave *handler* unset to match any Forge
+    hook; pass ``"policy-check"`` to require that handler.
 
     Args:
         worktree_path: Project/worktree root to resolve local/project settings.
         hook_type: Claude Code hook event name (e.g., "SessionStart", "PreToolUse", "Stop").
-        command_needle: Substring to look for in the command string.
+        handler: Forge hook handler name to require, or None for any handler.
     """
     for settings_path in _settings_paths(worktree_path):
         try:
@@ -93,7 +127,7 @@ def has_forge_hook(worktree_path: Path, hook_type: str, command_needle: str = "f
             for entry in hook_entries:
                 if not isinstance(entry, dict):
                     continue
-                if _entry_has_command(entry, command_needle):
+                if entry_is_forge_hook(entry, handler):
                     return True
         except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, AttributeError):
             continue

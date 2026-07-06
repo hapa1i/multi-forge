@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### forge_hook_matcher_consolidation: Shared hook predicate and byte contract
+
+**Goal**: De-risk `epic_global_forge_runtime` Seam 1 by single-sourcing Forge hook-command detection and pinning the
+registered command bytes before the epic changes them.
+
+**Key changes**:
+
+- Added `install/hooks.py::is_forge_hook_command` / `entry_is_forge_hook` with invocation-token semantics: command
+  basename `forge`, second token `hook`, optional handler token; contains-only strings like `echo forge hook stop` no
+  longer satisfy presence checks or destructive disable removal.
+- Repointed both existing matcher sites through the shared predicate; `forge hook disable` keeps its `type == "command"`
+  guard while dropping the bespoke prefix body.
+- Added a contract golden for the 16 rendered Claude hook entries as `(event, matcher, command, timeout)` tuples, plus
+  statusLine, Codex hook registrations, and a `merge_hooks -> unmerge` sibling-preservation round-trip.
+- Promoted the durable matcher/golden invariant to `docs/board/impl_notes.md`; no design or end-user doc change was
+  needed because matcher internals are not documented.
+
+**Verification**:
+`uv run pytest tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_hooks.py tests/regression/test_bug_hook_registry_drift.py -q`;
+`make test-unit`; `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py`; scoped
+`uv run pre-commit run --files ...` over this card's changed files.
+
 ### proxy_tier_resolvers closeout
 
 **Goal**: Close the shipped proxy tier/model-resolution card after PR #86 merged to `main`.
