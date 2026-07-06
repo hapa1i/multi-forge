@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
-from forge.proxy.data_models import MessagesRequest, TokenCountRequest
+from forge.proxy.data_models import Message, MessagesRequest, TokenCountRequest
 
 
 @dataclass(frozen=True)
@@ -167,10 +167,10 @@ async def test_create_message_resolves_model_tier_and_cost_target(
     request_data = MessagesRequest(
         model=case.model,
         max_tokens=1,
-        messages=[{"role": "user", "content": "hello"}],
+        messages=[Message(role="user", content="hello")],
     )
 
-    response = await server.create_message(request_data, _RawRequest())
+    response = await server.create_message(request_data, cast(Any, _RawRequest()))
 
     assert response.status_code == 200
     assert response.headers["X-Resolved-Tier"] == case.expected_tier
@@ -203,10 +203,10 @@ async def test_count_tokens_resolves_model_and_tier_like_messages(
     captured = _install_server_stubs(monkeypatch, case)
     request_data = TokenCountRequest(
         model=case.model,
-        messages=[{"role": "user", "content": "hello"}],
+        messages=[Message(role="user", content="hello")],
     )
 
-    response = await server.count_tokens(request_data, _RawRequest())
+    response = await server.count_tokens(request_data, cast(Any, _RawRequest()))
 
     assert response.status_code == 200
     assert json.loads(response.body) == {"input_tokens": 42}

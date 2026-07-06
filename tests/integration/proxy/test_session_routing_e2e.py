@@ -91,6 +91,36 @@ class TestSessionConfigRouting:
             # (litellm-gemini-test family: haiku → gemini/gemini-3-flash-preview)
             assert resp.headers.get("X-Resolved-Model") == "gemini/gemini-3-flash-preview"
 
+    def test_count_tokens_accepts_default_tier_request(self, proxy_server: str, temp_session: dict[str, Any]) -> None:
+        """Token counting should resolve ambiguous requests through proxy.default_tier."""
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(
+                f"{proxy_server}/v1/messages/count_tokens",
+                json={
+                    "model": "claude-3",  # No tier substring → proxy.default_tier
+                    "messages": [{"role": "user", "content": "test"}],
+                },
+                headers={"x-api-key": "test"},
+            )
+            assert resp.status_code == 200
+            assert resp.headers.get("X-Request-ID")
+            assert resp.json()["input_tokens"] > 0
+
+    def test_count_tokens_accepts_explicit_tier_request(self, proxy_server: str, temp_session: dict[str, Any]) -> None:
+        """Token counting should accept explicit tier requests through the same resolver."""
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(
+                f"{proxy_server}/v1/messages/count_tokens",
+                json={
+                    "model": "claude-3-5-haiku-20241022",
+                    "messages": [{"role": "user", "content": "test"}],
+                },
+                headers={"x-api-key": "test"},
+            )
+            assert resp.status_code == 200
+            assert resp.headers.get("X-Request-ID")
+            assert resp.json()["input_tokens"] > 0
+
     def test_no_session_uses_family_default(self, proxy_server: str, no_active_session: None) -> None:
         """With no active session and ambiguous model, use template default.
 

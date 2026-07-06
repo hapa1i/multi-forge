@@ -27,6 +27,30 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### proxy_tier_resolvers B2: Shared proxy resolution and port probe
+
+**Goal**: Collapse the duplicated proxy model-resolution and port-probing paths without changing routing, cost, or
+startup contracts.
+
+**Key changes**:
+
+- Added characterization coverage for `/v1/messages` and `/v1/messages/count_tokens` before refactoring, including
+  explicit-backend, OpenRouter slash-passthrough, tier-alternative, and ambiguous-default cases.
+- Repointed message creation and token counting through one server resolver for
+  tier/default/alternative/explicit-backend decisions, with cost logging still receiving the same resolved model and
+  tier.
+- Added `LITELLM_PROVIDER_PREFIXES` for LiteLLM detector sites while intentionally leaving `data_models._normalize` on
+  its narrower canonical-prefix contract.
+- Added `forge.proxy.ports` as the shared loopback probe and kept caller-specific exception contracts for the server CLI
+  and proxy orchestrator.
+- Added real proxy `/v1/messages/count_tokens` integration smoke coverage for default-tier and explicit-tier requests.
+
+**Verification**:
+`uv run pytest tests/src/proxy/test_server_model_resolution.py tests/src/proxy/test_model_alternatives.py tests/src/proxy/test_routing_invariants.py tests/src/proxy/test_data_models.py tests/src/proxy/test_ports.py tests/src/proxy/test_proxy_orchestrator.py tests/src/proxy/test_server_cost.py -q`;
+`./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`;
+`./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py`;
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py`; `make pre-commit`.
+
 ### proxy_tier_resolvers B1: Tier-word resolver leaf
 
 **Goal**: Single-source proxy/statusline tier-word detection while preserving the deliberate display-name fallback

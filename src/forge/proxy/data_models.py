@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, model_validator
 
 from forge.config import config, is_openai_model
+from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
 from forge.core.tiers import detect_tier_word
 
 logger = logging.getLogger(__name__)
@@ -230,18 +231,7 @@ def map_model_name(anthropic_model_name: str) -> str:
 
     def _is_litellm(name: str) -> bool:
         """Check if model name is a LiteLLM model (has provider prefix)."""
-        return "/" in name and any(
-            name.startswith(prefix)
-            for prefix in [
-                "openai/",
-                "anthropic/",
-                "vertex_ai/",
-                "bedrock/",
-                "replicate/",
-                "together_ai/",
-                "gemini/",  # Local LiteLLM with Google GenAI SDK
-            ]
-        )
+        return "/" in name and any(name.startswith(prefix) for prefix in LITELLM_PROVIDER_PREFIXES)
 
     def _get_provider_models(provider_name: str) -> dict[str, str]:
         """Get tier->model mappings from unified config."""

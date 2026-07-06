@@ -12,8 +12,9 @@ ships on a fresh branch from post-B1 main. Independent of Seam A -- no shared co
 
 ## Current focus
 
-**B1 implemented and verified on `refactor/proxy-tier-resolvers`; ready for PR 1.** B2 remains the money/wire follow-up
-(`create_message`/`count_tokens` resolution + the port probe) and ships on a fresh post-B1 branch.
+**B1 implemented and verified on `refactor/proxy-tier-resolvers`; B2 implemented and verified on
+`refactor/proxy-tier-resolvers-b2`.** B2 carries the money/wire follow-up (`create_message`/`count_tokens` resolution +
+the port probe) and is ready for PR 2.
 
 ### Recorded review decisions
 
@@ -60,8 +61,10 @@ read, not just located -- but line numbers drifted and #85 moved the statusline 
 - **B2 resolution anchors (drifted; re-pin exact block ranges under B2.0):** `_resolve_model_with_alternatives`
   (`:492`); `create_message` def `:1066`, tier/explicit-backend block ~`:1117-1159` (call `:1159`); `count_tokens` def
   `:1754`, block ~`:1784-1812` (hand-sync marker "Match the /v1/messages model resolution" at `:1784`, call `:1812`).
-- **Inline litellm prefixes (drifted):** `data_models.py:253` (plus a second prefix check at `:220`),
-  `client_factory.py:171`, `server.py:1139` + `:1799`.
+- **Inline litellm prefixes (drifted):** `data_models.py:_is_litellm`, `client_factory.py:detect_provider_for_model`,
+  and the server explicit-backend checks. The nearby `data_models.py:_normalize` tuple is **not** a LiteLLM
+  provider-prefix detector; expanding it to every LiteLLM prefix would change forced-provider mapping for prefixed
+  non-target models.
 - **Port-probe divergence:** `server.py:find_available_port` (`:2288`, public, positional, `max_attempts=10` default,
   inline bind, raises `RuntimeError`) vs `proxy_orchestrator.py:_find_available_port` (`:1217`, keyword-only, no
   default, delegates to `_is_port_in_use`, raises `ProxyStartError`). Both bind `127.0.0.1`. See F2 for the
@@ -90,24 +93,25 @@ read, not just located -- but line numbers drifted and #85 moved the statusline 
 
 ## Slice B2 -- shared model resolution + prefixes + one port probe (PR 2)
 
-- [ ] **B2.0 Characterization test FIRST (money/wire gate).** Before touching resolution, pin tier + resolved model +
+- [x] **B2.0 Characterization test FIRST (money/wire gate).** Before touching resolution, pin tier + resolved model +
   cost decision for `create_message` and `count_tokens` across representative inputs (explicit backend, tier alias,
   passthrough), and re-pin the exact current block line ranges. **Land as a green commit before B2.1.** Home: new
-  `tests/src/proxy/test_server_model_resolution.py`.
-- [ ] **B2.1 Extend `server._resolve_model_with_alternatives` (`:492`)** to own the shared tier + explicit-backend
+  `tests/src/proxy/test_server_model_resolution.py`. Green commit: `aaf3b1d9`.
+- [x] **B2.1 Extend `server._resolve_model_with_alternatives` (`:492`)** to own the shared tier + explicit-backend
   block; `create_message` (~`:1117-1159`) and `count_tokens` (~`:1784-1812`) both call it. Assertion: the block lives
   once; characterization test unchanged.
-- [ ] **B2.2 Import prefix vocab from `core/llm/detection.py`** at the inline sites (`data_models.py:253` and `:220`,
-  `client_factory.py:171`, `server.py:1139` + `:1799`). Assertion: no inline prefix tuple literal remains in those
-  files.
-- [ ] **B2.3 One shared port probe in `src/forge/proxy/ports.py`** (new; socket-only + a local neutral exception, e.g.
+- [x] **B2.2 Import prefix vocab from `core/llm/detection.py`** at the LiteLLM provider-prefix detector sites
+  (`data_models.py:_is_litellm`, `client_factory.py:detect_provider_for_model`, server explicit-backend helper).
+  Assertion: no inline LiteLLM provider-prefix tuple literal remains in those files. `data_models.py:_normalize`
+  intentionally keeps its narrower canonical-prefix tuple (not the same contract).
+- [x] **B2.3 One shared port probe in `src/forge/proxy/ports.py`** (new; socket-only + a local neutral exception, e.g.
   `NoAvailablePortError`). Repoint `server.find_available_port` (`:2288`) and `orchestrator._find_available_port`
   (`:1217`) to it. Each caller **keeps its current public signature** and **translates the neutral exception to its own
   contract**: `server → RuntimeError` (message `{start}-{start+max}`), `orchestrator → ProxyStartError` (message
   `{start}-{start+max-1}`). Both bind `127.0.0.1`. Assertion: single scan primitive; each caller's exception type +
   exact message preserved (test-guarded); the message off-by-one is preserved unless we explicitly decide to normalize
   it (that would be a documented behavior change, out of scope here).
-- [ ] **B2.4 `server.py` LOC drops.** Assertion: `wc -l src/forge/proxy/server.py` < 2494.
+- [x] **B2.4 `server.py` LOC drops.** Assertion: `wc -l src/forge/proxy/server.py` < 2494. Observed: 2441.
 
 **Exit signal:** `server.py` LOC drops below cap comfortably; the resolution block and the port probe each live once.
 
@@ -132,22 +136,22 @@ B2 changes proxy request-path resolution (`create_message`/`count_tokens`) and p
 `testing_guidelines.md` require integration -- not just unit -- for proxy-runtime changes; do not defer to closeout.
 Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count_tokens half needs its own smoke (F1):
 
-- [ ] **Add a count-tokens E2E smoke** (post `/v1/messages/count_tokens` through the real proxy; assert a successful
+- [x] **Add a count-tokens E2E smoke** (post `/v1/messages/count_tokens` through the real proxy; assert a successful
   token-count response for explicit-tier and default-tier cases) beside
   `tests/integration/proxy/test_session_routing_e2e.py`. Do not require resolved-model/tier headers on this endpoint;
   B2.0 unit characterization pins the internal resolved model. (F1)
-- [ ] `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`
+- [x] `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`
   -- create_message tier/model resolution.
-- [ ] `./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py` -- port allocation across
+- [x] `./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py` -- port allocation across
   proxies (B2.3).
-- [ ] `./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` -- statusline tier display
+- [x] `./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` -- statusline tier display
   (B1).
 
 ## Design-doc / memory sync
 
 - [x] **PR 1 (B1):** add `core/tiers.py` to `design.md` §6 directory structure and cross-check `design.md` §3.7
   tier-selection precedence still describes the now single-sourced tier-word step.
-- [ ] **PR 2 (B2):** add `src/forge/proxy/ports.py` to `design.md` §6 directory structure.
+- [x] **PR 2 (B2):** add `src/forge/proxy/ports.py` to `design.md` §6 directory structure.
 - [ ] **impl_notes candidate (human-review gate):** tier-word detection is single-sourced in `core/tiers.py`; the
   statusline `get_tier_from_display_name` divergence (opus-first, defaults `sonnet`) is deliberate and NOT collapsed;
   the port probe lives in `proxy/ports.py` with caller-specific exception translation (RuntimeError vs ProxyStartError).
@@ -156,6 +160,6 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 
 - [x] **PR 1 (B1):** B1-a/b/c green; `make pre-commit` clean; `test_status_line_integration.py` green; `change_log.md`
   entry.
-- [ ] **PR 2 (B2):** B2.0 characterization committed green before B2.1; B2-a/b/c green; count-tokens smoke + proxy
+- [x] **PR 2 (B2):** B2.0 characterization committed green before B2.1; B2-a/b/c green; count-tokens smoke + proxy
   integration green; `server.py` LOC < 2494; `change_log.md` entry.
 - [ ] After both merge: design docs synced; move card `doing/ -> done/`.

@@ -26,6 +26,7 @@ import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import Any
 
@@ -37,6 +38,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 from forge.config import TierOverride, config, init_config, reload
 from forge.config.schema import RequestLogConfig
+from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
 from forge.core.llm.errors import AuthenticationError
 from forge.core.logging import (
     configure_console_logging,
@@ -73,6 +75,12 @@ from forge.proxy.data_models import (
 )
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
+from forge.proxy.ports import (
+    NoAvailablePortError,
+)
+from forge.proxy.ports import (
+    find_available_loopback_port as _find_available_loopback_port,
+)
 from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
@@ -490,13 +498,26 @@ def _get_tier_override(tier: str) -> TierOverride | None:
         return None
 
 
-def _resolve_model_with_alternatives(tier: str, original_model_name: str | None, fallback_model: str) -> str:
-    """Resolve backend model, checking per-tier alternatives before the tier default.
+@dataclass(frozen=True)
+class _ResolvedModelRoute:
+    tier: str
+    tier_source: str
+    model: str
+    explicit_backend: bool
 
-    Used by both message routing and token counting so model resolution is
-    consistent across both paths.  Strips ``[1m]`` context-window suffix before
-    lookup since it is a Claude Code hint, not a routing decision.
-    """
+
+def _is_explicit_backend_model(original_model_name: str | None) -> bool:
+    """Whether a client model string should be preserved as an explicit backend id."""
+    if original_model_name is None or "/" not in original_model_name:
+        return False
+    if config.proxy.preferred_provider == "openrouter":
+        # OpenRouter accepts arbitrary provider/model slugs.
+        return True
+    return any(original_model_name.startswith(prefix) for prefix in LITELLM_PROVIDER_PREFIXES)
+
+
+def _model_alternative_or_default(tier: str, original_model_name: str | None, fallback_model: str) -> str:
+    """Check per-tier alternatives before falling back to the configured tier model."""
     try:
         provider_cfg = config.proxy.get_provider()
         alt_models = provider_cfg.model_alternatives.get(tier, {})
@@ -508,6 +529,41 @@ def _resolve_model_with_alternatives(tier: str, original_model_name: str | None,
         # Best-effort: degrade to fallback_model if provider config is unavailable
         logger.debug("model_alternatives lookup failed, using tier default", exc_info=True)
     return fallback_model
+
+
+def _resolve_model_with_alternatives(request_data: MessagesRequest | TokenCountRequest) -> _ResolvedModelRoute:
+    """Resolve request tier and backend model for message and token-count routes."""
+    if request_data.has_explicit_tier and request_data.tier:
+        resolved_tier: str = request_data.tier
+        resolved_tier_source = "request"
+    elif config.proxy.default_tier:
+        resolved_tier = config.proxy.default_tier
+        resolved_tier_source = "proxy.default_tier"
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "type": "configuration_error",
+                "message": "config.proxy.default_tier is required for ambiguous requests under proxy-only routing",
+            },
+        )
+
+    request_data.tier = resolved_tier
+    original_model_name = request_data.original_model_name
+    mapped_model = map_model_name(request_data.model)
+    is_explicit_backend = _is_explicit_backend_model(original_model_name)
+    if is_explicit_backend:
+        actual_model_id = mapped_model
+    else:
+        tier_default = config.proxy.get_model_for_tier(resolved_tier)
+        actual_model_id = _model_alternative_or_default(resolved_tier, original_model_name, tier_default)
+
+    return _ResolvedModelRoute(
+        tier=resolved_tier,
+        tier_source=resolved_tier_source,
+        model=actual_model_id,
+        explicit_backend=is_explicit_backend,
+    )
 
 
 @asynccontextmanager
@@ -1085,72 +1141,19 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
 
     spend_warning: str | None = None
 
-    # Resolve effective tier (routing invariants):
-    # Precedence: request explicit tier > config.proxy.default_tier
-    # If neither is available, fail fast (misconfiguration).
-    if request_data.has_explicit_tier and request_data.tier:
-        # Request explicitly specified a tier (haiku/sonnet/opus in model name)
-        resolved_tier: str = request_data.tier
-        resolved_tier_source = "request"
-    elif config.proxy.default_tier:
-        resolved_tier = config.proxy.default_tier
-        resolved_tier_source = "proxy.default_tier"
-    else:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "type": "configuration_error",
-                "message": "config.proxy.default_tier is required for ambiguous requests under proxy-only routing",
-            },
-        )
+    resolved_route = _resolve_model_with_alternatives(request_data)
+    resolved_tier = resolved_route.tier
+    resolved_tier_source = resolved_route.tier_source
+    actual_model_id = resolved_route.model
+    original_model_name = request_data.original_model_name
 
     logger.debug(f"[{request_id}] Resolved tier: {resolved_tier} (source={resolved_tier_source})")
 
-    request_data.tier = resolved_tier
-
-    # Determine if this is an explicit backend model or needs tier-based resolution
-    # Only re-resolve model based on tier if:
-    #   1. Model was mapped from Anthropic-style (contains haiku/sonnet/opus), OR
-    #   2. Model is truly ambiguous (no provider prefix and not a known backend model)
-    # Do NOT override explicit backend models like "openai/gpt-5.5" or "vertex_ai/gemini-3.1-pro"
-    original_model_name = request_data.original_model_name
-    mapped_model = map_model_name(request_data.model)  # Map AFTER reload() for fresh config
-
-    # Check if original model is an explicit backend model (has provider prefix)
-    # These should be passed through, not tier-resolved
-    if config.proxy.preferred_provider == "openrouter":
-        # OpenRouter: any provider/model format is explicit (google/, meta-llama/, etc.)
-        is_explicit_backend = original_model_name is not None and "/" in original_model_name
-    else:
-        is_explicit_backend = (
-            original_model_name is not None
-            and "/" in original_model_name
-            and any(
-                original_model_name.startswith(prefix)
-                for prefix in [
-                    "openai/",
-                    "anthropic/",
-                    "vertex_ai/",
-                    "bedrock/",
-                    "gemini/",
-                    "together_ai/",
-                    "replicate/",
-                ]
-            )
-        )
-
-    # Only use tier-resolved model for Anthropic-style or ambiguous requests
-    # For explicit backend models, use what map_model_name() returned (usually pass-through)
-    if is_explicit_backend:
-        # Explicit backend model - preserve it (map_model_name already handled it)
-        actual_model_id = mapped_model
+    if resolved_route.explicit_backend:
         logger.debug(
             f"[{request_id}] Explicit backend model '{original_model_name}' - preserving as '{actual_model_id}'"
         )
     else:
-        # Anthropic-style or ambiguous — check alternatives, then fall back to tier default
-        tier_default = config.proxy.get_model_for_tier(resolved_tier)
-        actual_model_id = _resolve_model_with_alternatives(resolved_tier, original_model_name, tier_default)
         logger.debug(f"[{request_id}] Tier-resolved model: tier={resolved_tier} -> '{actual_model_id}'")
 
     # Spend cap check — post-event enforcement from accumulated spend.
@@ -1756,54 +1759,10 @@ async def count_tokens(request_data: TokenCountRequest, raw_request: Request):
 
     try:
         original_model_name = request_data.original_model_name
-
-        # Resolve tier FIRST (same precedence as message routing)
-        if request_data.has_explicit_tier and request_data.tier:
-            resolved_tier: str = request_data.tier
-            resolved_tier_source = "request"
-        elif config.proxy.default_tier:
-            resolved_tier = config.proxy.default_tier
-            resolved_tier_source = "proxy.default_tier"
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "type": "configuration_error",
-                    "message": "config.proxy.default_tier is required for ambiguous requests under proxy-only routing",
-                },
-            )
-
-        request_data.tier = resolved_tier
-
-        # Match the /v1/messages model resolution: explicit backend models are
-        # preserved; Anthropic-style or ambiguous models go through tier + alternatives.
-        mapped_model = map_model_name(request_data.model)
-
-        if config.proxy.preferred_provider == "openrouter":
-            is_explicit_backend = original_model_name is not None and "/" in original_model_name
-        else:
-            is_explicit_backend = (
-                original_model_name is not None
-                and "/" in original_model_name
-                and any(
-                    original_model_name.startswith(p)
-                    for p in [
-                        "openai/",
-                        "anthropic/",
-                        "vertex_ai/",
-                        "bedrock/",
-                        "gemini/",
-                        "together_ai/",
-                        "replicate/",
-                    ]
-                )
-            )
-
-        if is_explicit_backend:
-            actual_model_id = mapped_model
-        else:
-            tier_default = config.proxy.get_model_for_tier(resolved_tier)
-            actual_model_id = _resolve_model_with_alternatives(resolved_tier, original_model_name, tier_default)
+        resolved_route = _resolve_model_with_alternatives(request_data)
+        resolved_tier = resolved_route.tier
+        resolved_tier_source = resolved_route.tier_source
+        actual_model_id = resolved_route.model
 
         logger.info(f"[{request_id}] Token counting: original='{original_model_name}', target='{actual_model_id}'")
         logger.debug(f"[{request_id}] Token count resolved tier: {resolved_tier} (source={resolved_tier_source})")
@@ -2281,16 +2240,10 @@ def _find_tool_use_info(messages, current_msg, tool_use_id) -> tuple[str | None,
 
 def find_available_port(start_port: int, max_attempts: int = 10) -> int:
     """Find an available port starting from start_port."""
-    for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            try:
-                # Probe loopback only; proxies bind 127.0.0.1 by default.
-                sock.bind(("127.0.0.1", port))
-                sock.close()
-                return port
-            except OSError:
-                continue
-    raise RuntimeError(f"Could not find available port in range {start_port}-{start_port + max_attempts}")
+    try:
+        return _find_available_loopback_port(start_port, max_attempts)
+    except NoAvailablePortError:
+        raise RuntimeError(f"Could not find available port in range {start_port}-{start_port + max_attempts}") from None
 
 
 @click.command()

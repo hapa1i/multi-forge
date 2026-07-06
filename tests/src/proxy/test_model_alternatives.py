@@ -1,8 +1,12 @@
 """Tests for model_alternatives proxy routing."""
 
+from types import SimpleNamespace
+
 import pytest
 
 import forge.proxy.server as server
+
+_UNSET = object()
 
 
 @pytest.fixture(autouse=True)
@@ -35,25 +39,36 @@ def _ensure_runtime(monkeypatch):
 class TestResolveModelWithAlternatives:
     """Tests for _resolve_model_with_alternatives shared helper."""
 
+    @staticmethod
+    def _request(model: str, *, tier: str = "opus", original_model_name: str | None | object = _UNSET):
+        return SimpleNamespace(
+            has_explicit_tier=True,
+            tier=tier,
+            original_model_name=model if original_model_name is _UNSET else original_model_name,
+            model=model,
+        )
+
     def test_routes_to_alternative_when_matched(self):
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8", "o-model")
-        assert result == "anthropic/claude-opus-4.8"
+        result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8"))
+        assert result.model == "anthropic/claude-opus-4.8"
+        assert result.tier == "opus"
+        assert result.tier_source == "request"
 
     def test_routes_to_fallback_when_no_match(self):
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-6", "o-model")
-        assert result == "o-model"
+        result = server._resolve_model_with_alternatives(self._request("claude-opus-4-6"))
+        assert result.model == "o-model"
 
     def test_routes_to_fallback_when_no_original_model(self):
-        result = server._resolve_model_with_alternatives("opus", None, "o-model")
-        assert result == "o-model"
+        result = server._resolve_model_with_alternatives(self._request("claude-opus-4-6", original_model_name=None))
+        assert result.model == "o-model"
 
     def test_routes_to_fallback_for_tier_without_alternatives(self):
-        result = server._resolve_model_with_alternatives("sonnet", "claude-sonnet-4-6", "s-model")
-        assert result == "s-model"
+        result = server._resolve_model_with_alternatives(self._request("claude-sonnet-4-6", tier="sonnet"))
+        assert result.model == "s-model"
 
     def test_strips_1m_suffix_before_lookup(self):
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8[1m]", "o-model")
-        assert result == "anthropic/claude-opus-4.8"
+        result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8[1m]"))
+        assert result.model == "anthropic/claude-opus-4.8"
 
     def test_provider_error_degrades_to_fallback(self, monkeypatch):
         def _broken_provider(name=None):
@@ -61,5 +76,6 @@ class TestResolveModelWithAlternatives:
 
         proxy_cfg = server.config.proxy
         monkeypatch.setattr(proxy_cfg, "get_provider", _broken_provider)
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8", "o-model")
-        assert result == "o-model"
+        monkeypatch.setattr(server, "map_model_name", lambda _: "o-model")
+        result = server._resolve_model_with_alternatives(self._request("claude-opus-4-8"))
+        assert result.model == "o-model"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import httpx
 import pytest
 
 from forge.config.loader import load_proxy_instance_config
+from forge.proxy.ports import NoAvailablePortError
 from forge.proxy.proxies import ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import (
     ProxyIdentityMismatchError,
@@ -60,6 +62,19 @@ def test_load_template_for_proxy_wraps_malformed_template(tmp_path: Path, monkey
 
     with pytest.raises(ProxyStartError, match="Invalid template 'bad-overrides'"):
         _load_template_for_proxy("bad-overrides")
+
+
+def test_find_available_port_wrapper_preserves_contract(orchestrator, monkeypatch: pytest.MonkeyPatch) -> None:
+    signature = inspect.signature(orchestrator._find_available_port)
+    assert str(signature) == "(*, start_port: 'int', max_attempts: 'int') -> 'int'"
+
+    def _no_port(start_port: int, max_attempts: int) -> int:
+        raise NoAvailablePortError
+
+    monkeypatch.setattr(orchestrator, "_find_available_loopback_port", _no_port)
+
+    with pytest.raises(ProxyStartError, match="Could not find an available port in range 8100-8102"):
+        orchestrator._find_available_port(start_port=8100, max_attempts=3)
 
 
 # ---------------------------------------------------------------------------

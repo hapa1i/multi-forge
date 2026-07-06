@@ -1253,6 +1253,7 @@ multi-forge/
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm
+│   │   │   └── ports.py # Loopback port probing shared by proxy startup paths
 │   │   ├── policy/      # Policy - uses core.llm
 │   │   └── status/      # Status dashboard
 │   │
