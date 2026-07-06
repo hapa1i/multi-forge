@@ -435,14 +435,13 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
     ctx = ExecutionContext.from_cwd()
 
     if older_than is not None:
-        from forge.core.ops.session import _scope_filters, list_sessions_older_than
+        from forge.core.ops.session import list_sessions_older_than
 
-        pr_filter, fr_filter = _scope_filters(ctx, scope)
         old_sessions = list_sessions_older_than(
+            ctx=ctx,
             older_than_days=older_than,
             include_incognito=include_incognito,
-            project_root_filter=pr_filter,
-            forge_root_filter=fr_filter,
+            scope=scope,
         )
         old_scope_keys = {_session_scope_key(name, entry) for name, entry in old_sessions}
     else:

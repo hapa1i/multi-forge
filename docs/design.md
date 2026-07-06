@@ -952,7 +952,10 @@ Forge implements "Shared" operations once in a UI-agnostic command-core layer an
 **Contract:** ops contain pure logic (no Click, no printing, no hook JSON). They return structured data and raise typed
 exceptions on failure.
 
-This avoids duplicating business logic between terminal and in-session entry points.
+`core/ops/policy.py` owns the semantic supervisor lifecycle mutations shared by `forge policy supervisor ...` and
+`%policy supervisor ...` (set/off/on/remove/reload/cascade); the terminal CLI and hook responder own only rendering,
+exit codes, and JSON response shape. This avoids duplicating business logic between terminal and in-session entry
+points.
 
 ### 3.13 Async work queue
 

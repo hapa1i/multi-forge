@@ -332,3 +332,26 @@ class ProxyRegistryStore:
         """
         registry = self.read()
         return lookup_proxy_by_base_url(registry, base_url)
+
+
+def recover_proxy_entry_from_base_url(
+    base_url: str,
+    *,
+    store: ProxyRegistryStore | None = None,
+) -> ProxyEntry | None:
+    """Best-effort reverse lookup for launch/session recovery paths."""
+    try:
+        return (store or ProxyRegistryStore()).find_by_base_url(base_url)
+    except Exception:
+        _log.debug("proxy_id recovery from base_url failed", exc_info=True)
+        return None
+
+
+def recover_proxy_id_from_base_url(
+    base_url: str,
+    *,
+    store: ProxyRegistryStore | None = None,
+) -> str | None:
+    """Best-effort proxy_id recovery from a base_url."""
+    entry = recover_proxy_entry_from_base_url(base_url, store=store)
+    return entry.proxy_id if entry is not None else None

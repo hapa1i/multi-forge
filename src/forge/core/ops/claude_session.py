@@ -208,6 +208,16 @@ class ClaudeResumeAction(Enum):
     FRESH_DERIVED = "fresh_derived"
 
 
+class RoutingLike(Protocol):
+    """Minimal routing shape shared by CLI and command-core resume callers."""
+
+    @property
+    def template(self) -> str | None: ...
+
+    @property
+    def base_url(self) -> str | None: ...
+
+
 @dataclass(frozen=True)
 class ClaudeResumeRouting:
     """CLI-resolved routing override carried into the render-free resume op."""
@@ -671,15 +681,15 @@ def resume_claude_session(
     store = SessionStore(str(forge_root), manifest.name)
 
     try:
-        _persist_resume_routing_override(
+        persist_resume_routing_override(
             forge_root=forge_root,
             session_name=manifest.name,
             routing=plan.routing,
             direct=plan.direct,
         )
-        _apply_resume_routing_override_to_state(state=manifest, routing=plan.routing, direct=plan.direct)
+        apply_resume_routing_override_to_state(state=manifest, routing=plan.routing, direct=plan.direct)
 
-        effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_resume(manifest)
+        effective_template, effective_url, effective_proxy_id = get_effective_proxy_for_resume(manifest)
         if plan.routing and plan.routing.proxy_id:
             effective_proxy_id = plan.routing.proxy_id
 
@@ -839,10 +849,10 @@ def fork_claude_session(
     )
 
 
-def _apply_resume_routing_override_to_state(
+def apply_resume_routing_override_to_state(
     *,
     state: SessionState,
-    routing: ClaudeResumeRouting | None,
+    routing: RoutingLike | None,
     direct: bool,
 ) -> None:
     """Apply a CLI routing override to the in-memory state used for launch."""
@@ -868,11 +878,11 @@ def _apply_resume_routing_override_to_state(
     )
 
 
-def _persist_resume_routing_override(
+def persist_resume_routing_override(
     *,
     forge_root: Path,
     session_name: str,
-    routing: ClaudeResumeRouting | None,
+    routing: RoutingLike | None,
     direct: bool,
 ) -> None:
     """Persist resume routing intent without touching hook-owned confirmation."""
@@ -903,7 +913,7 @@ def _persist_resume_routing_override(
         logger.debug("Failed to persist routing override to manifest", exc_info=True)
 
 
-def _get_effective_proxy_for_resume(
+def get_effective_proxy_for_resume(
     state: SessionState,
 ) -> tuple[str | None, str | None, str | None]:
     """Resolve template/base_url/proxy_id without depending on the CLI module."""
@@ -1203,14 +1213,9 @@ def _run_sidecar_claude_session(
         raise ForgeOpError("Direct sessions are not supported with --sidecar")
 
     if proxy_id is None and runtime_base_url is not None:
-        try:
-            from forge.proxy.proxies import ProxyRegistryStore as _PStore
+        from forge.proxy.proxies import recover_proxy_id_from_base_url
 
-            _entry = _PStore().find_by_base_url(runtime_base_url)
-            if _entry is not None:
-                proxy_id = _entry.proxy_id
-        except Exception:
-            pass
+        proxy_id = recover_proxy_id_from_base_url(runtime_base_url)
 
     from forge.sidecar import get_secrets_for_template, run_sidecar_session
     from forge.sidecar.container import ContainerExistsError, parse_mounts
@@ -1387,14 +1392,9 @@ def _run_host_claude_session(
     )
 
     if proxy_id is None and runtime_base_url is not None:
-        try:
-            from forge.proxy.proxies import ProxyRegistryStore as _PRS
+        from forge.proxy.proxies import recover_proxy_id_from_base_url
 
-            _entry = _PRS().find_by_base_url(runtime_base_url)
-            if _entry is not None:
-                proxy_id = _entry.proxy_id
-        except Exception:
-            logger.debug("proxy_id recovery from base_url failed", exc_info=True)
+        proxy_id = recover_proxy_id_from_base_url(runtime_base_url)
 
     routing_mode = _routing_mode_for(runtime_base_url, proxy_id)
     _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)

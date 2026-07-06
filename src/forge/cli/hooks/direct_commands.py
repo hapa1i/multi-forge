@@ -11,6 +11,7 @@ from typing import Any
 
 import click
 
+from forge.core.ops import policy as policy_ops
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
@@ -768,8 +769,6 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     flag (``forge policy supervisor set --runtime``) so the binding stays write-once. This path
     only shows the bound lane.
     """
-    from forge.session.models import SessionState
-
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
     if store is None:
@@ -784,296 +783,140 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     cmd = argv[0].lower() if argv else ""
 
+    def _block(reason: str) -> None:
+        click.echo(json.dumps({"decision": "block", "reason": reason}))
+
     # %policy supervisor off — suspend
     if cmd == "off":
-        has_sup = (
-            manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
-        )
-        if not has_sup:
-            click.echo(json.dumps({"decision": "block", "reason": "No supervisor configured"}))
-            return
-
-        def _suspend(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor.suspended = True
-
         try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_suspend)
-        except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            policy_ops.supervisor_off(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
+        except policy_ops.SupervisorNotConfiguredError:
+            _block("No supervisor configured")
             return
-        click.echo(
-            json.dumps({"decision": "block", "reason": "Supervisor suspended (use 'on' to resume, 'remove' to delete)"})
-        )
+        except Exception as e:
+            _block(f"Error: {e}")
+            return
+        _block("Supervisor suspended (use 'on' to resume, 'remove' to delete)")
         return
 
     # %policy supervisor on — resume
     if cmd == "on":
-
-        def _resume(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor.suspended = False
-
-        has_sup = (
-            manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
-        )
-        if not has_sup:
-            click.echo(
-                json.dumps(
-                    {
-                        "decision": "block",
-                        "reason": "No supervisor configured. Use '%policy supervisor <target>' to set one.",
-                    }
-                )
-            )
-            return
-
         try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_resume)
-        except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
+        except policy_ops.SupervisorNotConfiguredError:
+            _block("No supervisor configured. Use '%policy supervisor <target>' to set one.")
             return
-        click.echo(json.dumps({"decision": "block", "reason": "Supervisor resumed"}))
+        except Exception as e:
+            _block(f"Error: {e}")
+            return
+        _block("Supervisor resumed")
         return
 
     # %policy supervisor remove — destructive
     if cmd == "remove":
-        has_sup = manifest.intent.policy and manifest.intent.policy.supervisor
-        if not has_sup:
-            click.echo(json.dumps({"decision": "block", "reason": "No supervisor configured"}))
-            return
-
-        def _remove(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
-            from forge.policy.supervisor_lane_degrade import clear_supervisor_degrade
-            from forge.session.consumer_lanes import clear_consumer_lane
-
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor = None
-            # Orphan-clear the supervisor consumer lane (intent + confirmed) so a re-add
-            # starts from the default lane, not a resurrected binding (matches `policy
-            # supervisor remove`).
-            clear_consumer_lane(m, SUPERVISOR_CONSUMER)
-            # T7: the codex binding is gone -- drop any stale sticky-degrade overlay too.
-            clear_supervisor_degrade(m)
-
         try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_remove)
-        except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            policy_ops.supervisor_remove(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
+        except policy_ops.SupervisorNotConfiguredError:
+            _block("No supervisor configured")
             return
-        click.echo(json.dumps({"decision": "block", "reason": "Supervisor removed"}))
+        except Exception as e:
+            _block(f"Error: {e}")
+            return
+        _block("Supervisor removed")
         return
 
     # %policy supervisor reload [path]
     if cmd == "reload":
         if len(argv) > 2:
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervisor reload [path]"}))
+            _block("Usage: %policy supervisor reload [path]")
             return
 
-        from forge.session.effective import compute_effective_intent
-
-        effective = compute_effective_intent(manifest)
-        if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.resume_id:
-            click.echo(json.dumps({"decision": "block", "reason": "No supervisor configured"}))
-            return
-
-        plan_path: str | None = None
-
-        if len(argv) == 2:
-            # Explicit path — resolve to absolute from CWD
-            resolved = Path(argv[1])
-            if not resolved.is_absolute():
-                resolved = cwd / resolved
-            resolved = resolved.resolve()
-            if not resolved.is_file():
-                click.echo(json.dumps({"decision": "block", "reason": f"Plan file not found: {resolved}"}))
-                return
-            plan_path = str(resolved)
-            source_desc = str(resolved)
-        else:
-            from forge.policy.semantic.supervisor import (
-                resolve_supervisor_reload_plan_path,
-            )
-
-            result = resolve_supervisor_reload_plan_path(effective.policy.supervisor, manifest)
-            if result is None:
-                click.echo(
-                    json.dumps(
-                        {
-                            "decision": "block",
-                            "reason": "No approved plan found for supervisor target or related sessions",
-                        }
-                    )
-                )
-                return
-            plan_path = result.path
-            source_map = {
-                "self": "current session",
-                "fork": f"review fork '{result.session_name}'",
-                "target": "supervisor target",
-            }
-            source_desc = source_map.get(result.source, result.source)
-
-        def _set_plan(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor.plan_override_path = plan_path
-
+        reload_path = argv[1] if len(argv) == 2 else None
         try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_set_plan)
-        except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            reload_result = policy_ops.supervisor_reload(
+                store=store,
+                manifest=manifest,
+                cwd=cwd,
+                reload_path=reload_path,
+                lock_timeout_s=HOOK_LOCK_TIMEOUT_S,
+            )
+        except policy_ops.SupervisorNotConfiguredError:
+            _block("No supervisor configured")
             return
-        click.echo(json.dumps({"decision": "block", "reason": f"Supervisor plan updated from {source_desc}"}))
+        except policy_ops.SupervisorPlanFileNotFoundError as e:
+            _block(str(e))
+            return
+        except policy_ops.SupervisorPlanUnavailableError:
+            _block("No approved plan found for supervisor target or related sessions")
+            return
+        except Exception as e:
+            _block(f"Error: {e}")
+            return
+        _block(f"Supervisor plan updated from {reload_result.source_desc}")
         return
 
     # %policy supervisor cascade on|off — toggle the tier-1 plan check
     if cmd == "cascade":
         sub = argv[1].lower() if len(argv) == 2 else None
         if sub not in ("on", "off"):
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervisor cascade on|off"}))
+            _block("Usage: %policy supervisor cascade on|off")
             return
-
-        sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
-        if not (sup and sup.resume_id):
-            click.echo(
-                json.dumps(
-                    {
-                        "decision": "block",
-                        "reason": "No supervisor configured. Use '%policy supervisor <target>' to set one.",
-                    }
-                )
-            )
-            return
-
-        if sub == "off":
-
-            def _cascade_off(m: object) -> None:
-                if not isinstance(m, SessionState):
-                    raise TypeError(f"Expected SessionState, got {type(m)}")
-                if m.intent.policy and m.intent.policy.supervisor:
-                    m.intent.policy.supervisor.cascade = False
-
-            try:
-                store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_cascade_off)
-            except Exception as e:
-                click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
-                return
-            click.echo(json.dumps({"decision": "block", "reason": "Cascade disabled"}))
-            return
-
-        # Enabling: the tier-1 checker needs plan snapshot text. Resolve before mutating.
-        plan_path = sup.plan_override_path
-        cascade_source: str | None = None
-        if not plan_path:
-            from forge.policy.semantic.supervisor import (
-                resolve_supervisor_reload_plan_path,
-            )
-            from forge.session.effective import compute_effective_intent
-
-            effective = compute_effective_intent(manifest)
-            sup_effective = effective.policy.supervisor if effective.policy else None
-            result = resolve_supervisor_reload_plan_path(sup_effective, manifest) if sup_effective else None
-            if result is None:
-                click.echo(
-                    json.dumps(
-                        {
-                            "decision": "block",
-                            "reason": (
-                                "No approved plan snapshot found for the cascade's tier-1 checker. "
-                                "Approve a plan (ExitPlanMode), or use '%policy supervisor reload <path>' "
-                                "to set one explicitly, then retry."
-                            ),
-                        }
-                    )
-                )
-                return
-            plan_path = result.path
-            source_map = {
-                "self": "current session",
-                "fork": f"review fork '{result.session_name}'",
-                "target": "supervisor target",
-            }
-            cascade_source = source_map.get(result.source, result.source)
-
-        def _cascade_on(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            if m.intent.policy and m.intent.policy.supervisor:
-                m.intent.policy.supervisor.cascade = True
-                if not m.intent.policy.supervisor.plan_override_path:
-                    m.intent.policy.supervisor.plan_override_path = plan_path
 
         try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_cascade_on)
+            cascade_result = policy_ops.supervisor_cascade(
+                store=store,
+                manifest=manifest,
+                state=sub,
+                lock_timeout_s=HOOK_LOCK_TIMEOUT_S,
+            )
+        except policy_ops.SupervisorNotConfiguredError:
+            _block("No supervisor configured. Use '%policy supervisor <target>' to set one.")
+            return
+        except policy_ops.SupervisorPlanUnavailableError as e:
+            _block(e.direct_reason)
+            return
         except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            _block(f"Error: {e}")
+            return
+
+        if not cascade_result.enabled:
+            _block("Cascade disabled")
             return
         msg = "Cascade enabled"
-        if cascade_source:
-            msg += f" (tier-1 plan from {cascade_source})"
-        click.echo(json.dumps({"decision": "block", "reason": msg}))
+        if cascade_result.source_desc:
+            msg += f" (tier-1 plan from {cascade_result.source_desc})"
+        _block(msg)
         return
 
     # %policy supervisor <target> — set supervisor
     if argv:
         target = argv[0]
-
-        from forge.policy.semantic.supervisor import (
-            apply_supervisor_to_intent,
-            auto_seed_supervisor_proxy,
-            should_supervisor_use_direct,
-            validate_supervisor_target,
-        )
-        from forge.session.models import SupervisorConfig
-
-        _dc_forge_root = manifest.forge_root
         try:
-            source_state = validate_supervisor_target(target, forge_root=_dc_forge_root)
-        except ValueError as e:
-            click.echo(json.dumps({"decision": "block", "reason": str(e)}))
+            set_result = policy_ops.supervisor_set(
+                store=store,
+                manifest=manifest,
+                target=target,
+                policy_forge_root=manifest.forge_root,
+                lock_timeout_s=HOOK_LOCK_TIMEOUT_S,
+            )
+        except (
+            policy_ops.SupervisorInputError,
+            policy_ops.SupervisorTargetError,
+            policy_ops.SupervisorProxyError,
+            policy_ops.SupervisorLaneSelectionError,
+            policy_ops.SupervisorLaneFrozenError,
+            policy_ops.SupervisorPlanUnavailableError,
+        ) as e:
+            _block(str(e))
             return
-
-        sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _dc_forge_root)
-        current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
-        current_proxy_id = None
-        if manifest.intent.proxy and hasattr(manifest.intent.proxy, "proxy_id"):
-            current_proxy_id = manifest.intent.proxy.proxy_id  # type: ignore[union-attr]
-
-        seeded_proxy = auto_seed_supervisor_proxy(
-            source_state,
-            current_proxy_id=current_proxy_id,
-            current_template=current_template,
-            current_direct=not bool(manifest.intent.proxy),
-        )
-        if seeded_proxy:
-            sup_config.proxy = seeded_proxy
-        if should_supervisor_use_direct(source_state):
-            sup_config.direct = True
-
-        def _set(m: object) -> None:
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-            apply_supervisor_to_intent(m, sup_config)
-
-        try:
-            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_set)
         except Exception as e:
-            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            _block(f"Error: {e}")
             return
 
         msg = f"Supervisor set to '{target}'"
-        if seeded_proxy:
-            msg += f" (proxy: {seeded_proxy})"
-        click.echo(json.dumps({"decision": "block", "reason": msg}))
+        if set_result.config.proxy:
+            msg += f" (proxy: {set_result.config.proxy})"
+        _block(msg)
         return
 
     # %policy supervisor (no args) — show current config

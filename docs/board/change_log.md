@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### ops_policy_seam implementation: Policy command-core seam
+
+**Goal**: Move shared policy-supervisor mutations behind a UI-agnostic op layer and close the drifted proxy-id recovery
+posture.
+
+**Key changes**:
+
+- Added `core/ops/policy.py` for supervisor set/off/on/remove/reload/cascade and repointed both terminal CLI and
+  `%policy supervisor` to it while preserving CLI output and hook JSON contracts.
+- Collapsed session routing override/effective-proxy helpers into `core/ops/claude_session.py` with CLI compatibility
+  aliases.
+- Added logged best-effort proxy base-url recovery wrappers in `proxy/proxies.py`; kept `find_by_base_url()` fail-loud.
+- Aligned `%policy supervisor reload <absolute-path>` with CLI reload path semantics: absolute paths are stored as
+  provided, while relative paths still resolve from cwd.
+- Matched `list_sessions_older_than(ctx, scope)` to its sibling contract and added public
+  `ActiveSessionStore.is_live()`.
+
+**Verification**: Focused suites covering policy ops/supervisor, `%direct`, session/gc contracts, proxy recovery,
+session-start hook, and policy-shadow coupling (392 passed, 48 passed, 90 passed); integration
+`./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py -k TestSessionStartHook` (7 passed, 9
+deselected); touched-file `uv run ruff check`; `make pre-commit`.
+
 ### diverged_twin_consolidation implementation: Session and hook twin consolidation
 
 **Goal**: Collapse must-stay-identical twins in session inheritance, runtime/lane helpers, supervisor options, TDD sort,

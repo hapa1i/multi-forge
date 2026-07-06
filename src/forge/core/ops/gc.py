@@ -421,7 +421,7 @@ def _detect_stale_active_entries(scope_roots: set[Path]) -> OrphanCategory:
         entry_path = Path(entry.worktree_path)
         if not _path_in_roots(entry_path, scope_roots):
             continue
-        if not store._entry_is_live(entry):
+        if not store.is_live(entry):
             # Encode display_name::forge_root so the clean phase can
             # pass forge_root to clear_session for exact scoped deletion.
             display_name = session_name_from_key(key)
