@@ -56,8 +56,8 @@ The current implementation already separates model gateways and subprocess routi
   cost decisions.
 - `derive_model_routes()`, `resolve_subprocess_routing()`, and `WorkerRoutingPlan` move workflow routing toward a
   capability-based contract that can later feed non-Claude invokers (see
-  [design.md §3.6.12](../design.md#3612-subprocess-routing-resolution-normative) and
-  [design_appendix.md §L](../design_appendix.md#l-subprocess-routing-reference) for the current contract).
+  [design.md §3.6.12](../../../design.md#3612-subprocess-routing-resolution-normative) and
+  [design_appendix.md §L](../../../design_appendix.md#l-subprocess-routing-reference) for the current contract).
 - `--subprocess-proxy` lets a direct Claude Code frontend route headless child work through an API-backed proxy, which
   is an important transitional bridge.
 - Proxy request logs, verb-level cost attribution, `forge proxy costs`, and per-proxy spend caps provide an initial
@@ -573,7 +573,7 @@ identical requests with identical token counts begin producing a more sycophanti
 alone cannot identify that drift without an eval or golden-prompt layer.
 
 **Implementation path: lean on sidecar mode.** Forge already has `--sidecar` mode (see
-[design.md §7](../design.md#7-isolation-and-proxy-modes)) which bundles Claude Code + Forge proxy in a single Docker
+[design.md §7](../../../design.md#7-isolation-and-proxy-modes)) which bundles Claude Code + Forge proxy in a single Docker
 container, sharing networking and lifecycle. This is the cleanest implementation surface for an always-on proxy because:
 
 - The proxy is guaranteed to be running when Claude Code is running (lifecycle coupling, not advisory).
@@ -711,9 +711,9 @@ because such rewrites might be cryptographically allowed.
 ### Curated Transfer as Cross-Runtime Substrate
 
 > **Vocabulary (reconciled with the shipped transfer taxonomy, 2026-05-30).** This card was drafted using "curated
-> handoff." The shipped taxonomy ([design.md §3.9](../design.md#39-session-resume-context-management)) calls resume/fork
+> handoff." The shipped taxonomy ([design.md §3.9](../../../design.md#39-session-resume-context-management)) calls resume/fork
 > context assembly **transfer** (`transfer.py`, `--resume-mode transfer`, `assemble_transfer_context`), and the separate
-> Stop-time project-doc updater the **memory writer** ([design.md §5.6](../design.md#56-designated-memory-docs)). The
+> Stop-time project-doc updater the **memory writer** ([design.md §5.6](../../../design.md#56-designated-memory-docs)). The
 > concept this card calls "curated handoff" is therefore **curated transfer** -- the `ai-curated` transfer strategy,
 > repositioned as the primary cross-runtime/cross-topology substrate. The removed `forge session handoff` CLI surface is
 > a tombstone (it redirects to `forge memory report show`) and hosts no transfer verbs; the canonical surface is the
@@ -733,11 +733,11 @@ level of decisions, current work, and intent. It:
 - Strips dead-end exploration that consumed parent tokens but produced no value for the child.
 - Is auditable, diffable, and editable by the user before launch.
 - Is runtime-neutral -- any runtime that can read markdown can consume it.
-- Mitigates the underspecification problem ([design.md §4.1.2](../design.md#412-semantic-policy-the-supervisor)) by
+- Mitigates the underspecification problem ([design.md §4.1.2](../../../design.md#412-semantic-policy-the-supervisor)) by
   making implicit intent explicit.
 
 **Fidelity-vs-agency reframe.** The existing transfer strategies in
-[design.md §3.9](../design.md#39-session-resume-context-management) (`minimal`, `structured`, `full`, `ai-curated`) are
+[design.md §3.9](../../../design.md#39-session-resume-context-management) (`minimal`, `structured`, `full`, `ai-curated`) are
 positioned as a fidelity spectrum where native is the lossless ideal and curated is the lossy fallback. This proposal
 reframes the trade-off:
 
@@ -832,7 +832,7 @@ the payoff that justifies Phase 4. Phase 6 is reserved for once everything else 
 
 No new architecture; mostly documentation and small CLI additions.
 
-- Reposition `ai-curated` in [design.md §3.9](../design.md#39-session-resume-context-management) as the cross-everything
+- Reposition `ai-curated` in [design.md §3.9](../../../design.md#39-session-resume-context-management) as the cross-everything
   primary substrate rather than one strategy among four.
 - Add `forge session resume <parent> --fresh --review` (opens the per-child user-notes overlay in `$EDITOR` before child
   launch; `--review` requires `--fresh` transfer mode). This stays the ergonomic workflow entry point -- a convenience
