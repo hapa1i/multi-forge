@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import time
@@ -45,6 +44,13 @@ from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
 from forge.core.state import now_iso
+from forge.proxy.ports import (
+    NoAvailablePortError,
+)
+from forge.proxy.ports import (
+    find_available_loopback_port as _find_available_loopback_port,
+)
+from forge.proxy.ports import is_loopback_port_in_use
 from forge.proxy.proxies import (
     AmbiguousProxyError,
     ProxyEntry,
@@ -1215,21 +1221,16 @@ def _extract_responses_text(data: object) -> str:
 
 
 def _find_available_port(*, start_port: int, max_attempts: int) -> int:
-    for port in range(start_port, start_port + max_attempts):
-        if not _is_port_in_use(port):
-            return port
-
-    raise ProxyStartError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
+    try:
+        return _find_available_loopback_port(start_port, max_attempts)
+    except NoAvailablePortError:
+        raise ProxyStartError(
+            f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}"
+        ) from None
 
 
 def _is_port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        try:
-            # Probe loopback only; proxies bind 127.0.0.1 by default.
-            sock.bind(("127.0.0.1", port))
-        except OSError:
-            return True
-        return False
+    return is_loopback_port_in_use(port)
 
 
 def _check_proxy_dependencies(*, provider: str = "") -> None:

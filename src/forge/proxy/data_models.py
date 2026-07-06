@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, model_validator
 
 from forge.config import config, is_openai_model
+from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
+from forge.core.tiers import detect_tier_word
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +29,9 @@ def _detect_tier(values: dict) -> dict:
         model_name = values["model"]
         values["original_model_name"] = model_name
 
-        model_lower = model_name.lower()
-        if "haiku" in model_lower:
-            values["tier"] = "haiku"
-            values["has_explicit_tier"] = True
-        elif "sonnet" in model_lower:
-            values["tier"] = "sonnet"
-            values["has_explicit_tier"] = True
-        elif "opus" in model_lower or "fable" in model_lower:
-            # Fable carries no tier word of its own; it rides the opus tier.
-            values["tier"] = "opus"
-            values["has_explicit_tier"] = True
-        else:
-            values["tier"] = None
-            values["has_explicit_tier"] = False
+        tier = detect_tier_word(model_name)
+        values["tier"] = tier
+        values["has_explicit_tier"] = tier is not None
 
     return values
 
@@ -217,6 +208,7 @@ def map_model_name(anthropic_model_name: str) -> str:
 
     def _normalize(name: str) -> str:
         n = name.strip().lower().split("@", 1)[0]
+        # Deliberately not LITELLM_PROVIDER_PREFIXES: this strips only canonical model prefixes.
         for prefix in ("anthropic/", "openai/", "gemini/"):
             if n.startswith(prefix):
                 n = n[len(prefix) :]
@@ -224,14 +216,7 @@ def map_model_name(anthropic_model_name: str) -> str:
         return n
 
     def _anthropic_flavor(name: str) -> str | None:
-        if "haiku" in name:
-            return "haiku"
-        if "sonnet" in name:
-            return "sonnet"
-        # Fable carries no tier word of its own; it rides the opus tier.
-        if "opus" in name or "fable" in name:
-            return "opus"
-        return None
+        return detect_tier_word(name)
 
     def _is_openai(name: str) -> bool:
         return is_openai_model(name)
@@ -247,18 +232,7 @@ def map_model_name(anthropic_model_name: str) -> str:
 
     def _is_litellm(name: str) -> bool:
         """Check if model name is a LiteLLM model (has provider prefix)."""
-        return "/" in name and any(
-            name.startswith(prefix)
-            for prefix in [
-                "openai/",
-                "anthropic/",
-                "vertex_ai/",
-                "bedrock/",
-                "replicate/",
-                "together_ai/",
-                "gemini/",  # Local LiteLLM with Google GenAI SDK
-            ]
-        )
+        return "/" in name and any(name.startswith(prefix) for prefix in LITELLM_PROVIDER_PREFIXES)
 
     def _get_provider_models(provider_name: str) -> dict[str, str]:
         """Get tier->model mappings from unified config."""

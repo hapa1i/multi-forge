@@ -15,6 +15,9 @@ and port probe are auditor first-pass evidence with strong anchors (re-verify at
 tier-precedence mirror -- the divergence to PRESERVE); `src/forge/core/llm/detection.py:10-20` (existing prefix-vocab
 home).
 
+**Anchors**: the line numbers below are illustrative and from `052a37c0`. `checklist.md` carries anchors RE-VERIFIED
+against current main (post-#84/#85, 2026-07-06) -- trust the checklist for exact lines.
+
 ---
 
 ## Why

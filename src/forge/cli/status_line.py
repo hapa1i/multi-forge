@@ -24,6 +24,7 @@ from typing import Any, NamedTuple
 
 import click
 
+from forge.core.tiers import detect_tier_word
 from forge.core.transcript import resolve_entry_role
 
 # Set up minimal logging for status line (stderr to avoid polluting stdout)
@@ -359,14 +360,7 @@ def explicit_tier_from_model(model_id: str) -> str | None:
     falls back to its default), so the drift producer can replicate the real route
     instead of comparing against the proxy default tier.
     """
-    name = (model_id or "").lower()
-    for tier in ("haiku", "sonnet", "opus"):
-        if tier in name:
-            return tier
-    # Fable carries no tier word of its own; it rides the opus tier.
-    if "fable" in name:
-        return "opus"
-    return None
+    return detect_tier_word(model_id or "")
 
 
 class TranscriptStats(NamedTuple):

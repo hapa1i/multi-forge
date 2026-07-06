@@ -19,6 +19,9 @@ LITELLM_REMOTE_PREFIXES = (
 # Prefixes that route to local LiteLLM (personal API keys)
 LITELLM_LOCAL_PREFIXES = ("gemini/",)
 
+# All model-id prefixes owned by LiteLLM routing.
+LITELLM_PROVIDER_PREFIXES = LITELLM_REMOTE_PREFIXES + LITELLM_LOCAL_PREFIXES
+
 
 def detect_provider(model: str) -> ProviderType:
     """Detect provider from prefixed model ID.
@@ -64,7 +67,7 @@ def detect_provider(model: str) -> ProviderType:
         )
 
     # Unknown prefix -- fail-closed (reject rather than silently route to wrong backend)
-    known = sorted({*LITELLM_REMOTE_PREFIXES, *LITELLM_LOCAL_PREFIXES})
+    known = sorted(LITELLM_PROVIDER_PREFIXES)
     raise ValueError(
         f"Unknown model prefix in '{model}'. Known prefixes: {', '.join(known)}. "
         "Use a prefixed canonical ID like 'openai/gpt-5.2' or 'gemini/gemini-3.1-pro-preview'."

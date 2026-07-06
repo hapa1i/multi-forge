@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from forge.config import config
+from forge.core.llm.detection import LITELLM_PROVIDER_PREFIXES
 from forge.core.llm.types import ModelHyperparameters
 from forge.core.models import (
     ModelCatalogError,
@@ -165,18 +166,7 @@ class TierClientFactory:
 
         clean_name = model_name.lower()
 
-        if "/" in clean_name and any(
-            clean_name.startswith(prefix)
-            for prefix in [
-                "openai/",
-                "anthropic/",
-                "vertex_ai/",
-                "bedrock/",
-                "replicate/",
-                "together_ai/",
-                "gemini/",
-            ]
-        ):
+        if "/" in clean_name and any(clean_name.startswith(prefix) for prefix in LITELLM_PROVIDER_PREFIXES):
             return ModelProvider.LITELLM
 
         if model_family == "LITELLM":

@@ -605,6 +605,10 @@ The proxy exposes runtime truth via `GET /`:
 1. Request explicit tier (model name contains `haiku|sonnet|opus`)
 2. Proxy default tier (configured for that base URL)
 
+Tier-word detection for raw model names is single-sourced in `forge.core.tiers.detect_tier_word()`. The status line's
+display-name helper remains separate because it has different display fallback behavior (defaults to `sonnet` when no
+tier word is visible).
+
 This applies to tier selection *within* a resolved proxy. Which proxy a subprocess uses is decided by the resolution
 chain (§3.6.12).
 
@@ -1244,10 +1248,12 @@ multi-forge/
 │   │   │   ├── models/  # Model catalog (forge.models.yaml) + direct-model pins
 │   │   │   ├── paths.py # Cross-cutting path helpers, including git-root discovery
 │   │   │   ├── transcript.py # Shared Claude transcript parsing primitives
+│   │   │   ├── tiers.py # Shared tier-word detection primitives
 │   │   │   └── state/   # File-based state helpers
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm
+│   │   │   └── ports.py # Loopback port probing shared by proxy startup paths
 │   │   ├── policy/      # Policy - uses core.llm
 │   │   └── status/      # Status dashboard
 │   │
