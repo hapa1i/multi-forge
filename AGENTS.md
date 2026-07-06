@@ -107,11 +107,40 @@ touching hooks, sessions (including Codex runtime/frontend), the memory writer, 
 consumer-lane bindings, telemetry/cost/provider-trace paths, rewind resume/fork behavior, or the installer — don't defer
 them to closeout.
 
+## GitHub CLI Auth
+
+GitHub CLI operations use `GH_TOKEN` from direnv. This repo's `.envrc` reads `~/.keys/github_token`, but long-lived
+shells can keep a stale token after that file changes. When `gh` reports `Bad credentials` even though direnv is
+configured, re-evaluate `.envrc` for the command instead of trusting the already loaded environment:
+
+```bash
+direnv exec . gh auth status
+direnv exec . gh pr view
+direnv exec . gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes.md> --latest
+```
+
+Do not print token values while debugging. To diagnose safely, compare presence/length or make a status-only API probe
+through `direnv exec .`; `gh` gives `GH_TOKEN` precedence over stored credentials, and unsetting `GH_TOKEN` may make
+`gh` appear logged out even though SSH-based `git push` still works.
+
 ## Release Process
 
 Version lives in `pyproject.toml`. PyPI publishing is automated: push an annotated `v*` tag to trigger the
-`.github/workflows/publish.yml` workflow (trusted publishing via OIDC). After tagging, create a GitHub release with
-`gh release create`. No local PyPI credentials are needed.
+`.github/workflows/publish.yml` workflow (trusted publishing via OIDC). No local PyPI credentials are needed.
+
+Release checklist:
+
+1. Verify the current version and latest tag: `rg -n '^version =' pyproject.toml && git tag --sort=-v:refname | head`.
+2. Bump `pyproject.toml`, then run `uv lock` so `uv.lock` records the project version.
+3. Build locally before tagging: `uv build`.
+4. Run release-appropriate checks, normally `make pre-commit` for a package release.
+5. Commit on `main`, create an annotated tag, and push both: `git commit -m "chore: release X.Y.Z"`,
+   `git tag -a vX.Y.Z -m "Release X.Y.Z"`, `git push origin main vX.Y.Z`.
+6. Confirm the `Publish to PyPI` workflow succeeds and verify PyPI lists the new wheel and sdist. The public JSON and
+   simple-index endpoints are useful checks: `https://pypi.org/pypi/multi-forge/X.Y.Z/json` and
+   `https://pypi.org/simple/multi-forge/`.
+7. Create the GitHub release after the tag exists:
+   `gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes.md> --latest`.
 
 ## Commit and PR Writing Style
 
