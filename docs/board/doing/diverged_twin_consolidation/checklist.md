@@ -3,8 +3,8 @@
 ## Current focus
 
 Collapse must-stay-identical twin copies in the session family + `cli/hooks/`, fixing the two shipped defects (Slice 1
-transcript type-guard gap; Slice 2 `%policy check` nested-layout misorder) along the way. **Awaiting review on this
-checklist before any implementation.** Each phase is independently landable as its own commit.
+transcript type-guard gap; Slice 2 `%policy check` nested-layout misorder) along the way. Implementation complete for
+Slices 1, 2, 3a, 3b, 4a, and 5; Slices 3c and 4b were verified-and-dropped. Each phase is independently landable.
 
 Structure: one phased `doing/` card (not member cards), per the `state_primitive_hoist` precedent. Behavior-preserving
 on Slices 3, 4a, and 5; Slice 4b is characterize-then-no-op or a scoped defect-fix; deliberate defect-fixes (with
@@ -76,54 +76,54 @@ duplicated `session_fork.py:216-269` vs `session_lifecycle.py:932-985`; `--super
 
 ## Phase 1 (defect-fix): intent inheritance + transcript-artifact guard
 
-- [ ] Diff the **full** blocks at `manager.py:896`, `:1309`, `:1548` (not just the allowlist tuple) to confirm the
+- [x] Diff the **full** blocks at `manager.py:896`, `:1309`, `:1548` (not just the allowlist tuple) to confirm the
   surrounding logic is identical. Note the Codex caveat at `:1124` (`_inherited_launch_intent` must not copy
   `runtime=codex`) — confirm it lives outside the extracted block so consolidation preserves it.
   - Assertion: the three sites reduce to one `_inherit_intent_fields(child, parent)` with no per-site conditional lost.
-- [ ] Extract `_inherit_intent_fields(child, parent)` (single allowlist + `_inherited_launch_intent` call); repoint the
+- [x] Extract `_inherit_intent_fields(child, parent)` (single allowlist + `_inherited_launch_intent` call); repoint the
   3 sites (resume-child, fork, into-fork).
   - Assertion: `rg '"consumer_lanes"' src/forge/session/manager.py` shows **one** allowlist definition.
-- [ ] Fix the guard gap: replace the inline `:753-758` block with
+- [x] Fix the guard gap: replace the inline `:753-758` block with
   `transcript_artifact_path = _latest_transcript_artifact_path(parent_state)` (`parent_state` is in scope at `:753`; the
   block is the helper's logic minus the `isinstance` guard).
   - Assertion: a non-`str` `copied_path` in a malformed manifest yields `None`, never a non-str in the `str | None`
     field.
-- [ ] Regression test (defect-fix gate): malformed manifest with non-str `copied_path` on the native-resume path.
+- [x] Regression test (defect-fix gate): malformed manifest with non-str `copied_path` on the native-resume path.
   - Assertion: no crash / no non-str leak; test fails on the pre-fix code.
 
 ## Phase 2 (defect-fix): TDD tests-first sort
 
-- [ ] Extract `tests_first_sort_key(path: str) -> int` (0=tests, 2=src, 1=other) keyed on `is_under_directory`, in the
+- [x] Extract `tests_first_sort_key(path: str) -> int` (0=tests, 2=src, 1=other) keyed on `is_under_directory`, in the
   home decided in review (Scope #2).
-- [ ] Repoint `direct_commands.py:_sort_tests_first` (currently `startswith`) and
+- [x] Repoint `direct_commands.py:_sort_tests_first` (currently `startswith`) and
   `codex_policy.py:sort_contexts_tests_first` to call it; each keeps its own element→path extraction (`item[0]` vs
   `ctx.target_path or ""`).
   - Assertion: `rg 'startswith\("tests' src/forge/cli/hooks/` returns nothing; both callers use the shared key.
-- [ ] Confirm the `is_under_directory` migration doesn't silently drop the `tests\\`/`src\\` backslash handling the CLI
+- [x] Confirm the `is_under_directory` migration doesn't silently drop the `tests\\`/`src\\` backslash handling the CLI
   copy has today (POSIX-focused repo, likely moot — assert the intended behavior explicitly).
-- [ ] Regression test (defect-fix gate): `%policy check` orders a nested `pkg/tests` + `pkg/src` diff tests-first
+- [x] Regression test (defect-fix gate): `%policy check` orders a nested `pkg/tests` + `pkg/src` diff tests-first
   (mirror `test_bug_codex_tdd_nested_layout.py` for the CLI diagnostic path).
   - Assertion: nested layout no longer false-denies an impl-first atomic patch; fails on pre-fix `startswith` code.
 
 ## Phase 3: runtime default + lane conversion + preflight gate (behavior-preserving)
 
-- [ ] **3a** Move the existing `session_runtime(state)` accessor from `core/ops/codex_session.py` to `session/models.py`
+- [x] **3a** Move the existing `session_runtime(state)` accessor from `core/ops/codex_session.py` to `session/models.py`
   (beside `SessionState`); repoint the 4 inline `... else "claude_code"` copies (`session_manage.py:881/1209`,
   `session_lifecycle.py:1391`, `claude_session.py:384`) plus the original `codex_session.py` call to it.
   - Assertion: `rg 'else "claude_code"' src/forge` returns only the accessor definition; `codex_session.py` imports it
     from `session.models`.
-- [ ] **3b** Rename `consumer_lanes._record_to_lane` to the public `record_to_lane`; update its existing internal
+- [x] **3b** Rename `consumer_lanes._record_to_lane` to the public `record_to_lane`; update its existing internal
   callers (`consumer_lanes.py:75/220`) and repoint the **4** inlined conversions (`supervisor.py:734/810`,
   `shadow_curation.py:333`, `memory_writer.py:420` — the last is multiline). No private shim unless compatibility
   evidence appears during implementation.
   - Assertion: `rg '_record_to_lane' src/forge` returns nothing, and `rg -U 'Lane\(\s*runtime_id=lane_record' src/forge`
     returns nothing (multiline-safe; catches all 4 forms).
-- [ ] **3c — DEFERRED** (Decision 3). Accessor already shared; the only identical remainder is a 1-line reason
+- [x] **3c — DEFERRED** (Decision 3). Accessor already shared; the only identical remainder is a 1-line reason
   expression, after which the three arms' failure behavior diverges by design (T6b/T6c). Not extracting. No task.
 
 ## Phase 4: supervisor flag family + context-limit ref
 
-- [ ] **4a** Extract a shared Click option-group decorator for the **8**-flag supervisor family (mirror the codex
+- [x] **4a** Extract a shared Click option-group decorator for the **8**-flag supervisor family (mirror the codex
   `*_options` composite exemplar); share the option **definition + validation strings**, not the Rich presenters.
   `--supervise` stays **per-command** (start `type=str` `:925-931`, fork `is_flag` `:209-215`) — it is not in the shared
   group. Repoint `start` (`session_lifecycle.py:932-985` + validation `:1072-1080`) and `fork`
@@ -132,7 +132,7 @@ duplicated `session_fork.py:216-269` vs `session_lifecycle.py:932-985`; `--super
     `--checker-model/-provider/-effort`, `--supervisor-effort`, `--supervisor-runtime`) and the mutually-exclusive /
     require-`--supervise` messages live once and render byte-identically across both commands; whole-help output is
     **not** identical (the `--supervise` line differs by design).
-- [ ] **4b — CHARACTERIZE, do not consolidate** (Decision 4). Divergence already confirmed: `_resume_context_ref`
+- [x] **4b — CHARACTERIZE, do not consolidate** (Decision 4). Divergence already confirmed: `_resume_context_ref`
   returns `routing.proxy_id or routing.template`; the 3 inline sites (`session_resume_modes.py:42/148`,
   `session_lifecycle.py:1850`) use `routing.proxy_id` only. Task: determine whether a template-only `ResolvedRouting`
   (`proxy_id=None, template=set`) is **reachable** on the inline-site paths.
@@ -140,19 +140,22 @@ duplicated `session_fork.py:216-269` vs `session_lifecycle.py:932-985`; `--super
     regression test** (different context limit for template-only routing), not a pure move.
   - Assertion (intentional): if unreachable, record why (proxy_id always set when routing is truthy on these paths) and
     drop 4b — no code change.
+  - Result: characterized in `tests/regression/test_characterize_context_limit_routing_ref_template_only.py`.
+    Template-only routing is constructible at the dataclass level, but the production CLI proxy resolver supplies
+    `proxy_id` whenever routing is truthy on these inline-site paths. No consolidation or behavior change.
 
 ## Phase 5: teammate/task hook bodies + Stop/StopFailure capture (behavior-preserving)
 
-- [ ] Characterization test first, **by channel** (the hook families signal differently): Stop / StopFailure normally
+- [x] Characterization test first, **by channel** (the hook families signal differently): Stop / StopFailure normally
   emit **hook JSON**, but Stop's verification-deny path exits 2 with stderr feedback; TeammateIdle / TaskCompleted
   signal via **exit code + stderr feedback** (no JSON) plus the lane-freeze side effect. Capture the right observable
   for each before touching either.
-- [ ] Share the TeammateIdle (`commands.py:1722`) / TaskCompleted (`:1773`) body — it is **structurally** identical but
+- [x] Share the TeammateIdle (`commands.py:1722`) / TaskCompleted (`:1773`) body — it is **structurally** identical but
   **not** byte-identical (the log label and the `handle_*` function differ). Extract a shared body parameterized by
   `(log_label, handler_fn)`; the freeze wiring and exit/stderr contract stay identical.
   - Assertion: both commands delegate to one shared body; exit code + stderr + freeze behavior unchanged
     (characterization).
-- [ ] Share the Stop / StopFailure transcript capture+reconcile core (`~:400` Stop vs `:601-729` StopFailure) — extract
+- [x] Share the Stop / StopFailure transcript capture+reconcile core (`~:400` Stop vs `:601-729` StopFailure) — extract
   only the identical capture core, preserving StopFailure's last-chance semantics.
   - Assertion: one capture helper; Stop/StopFailure **hook JSON** byte-identical pre/post (characterization).
 
@@ -160,29 +163,40 @@ duplicated `session_fork.py:216-269` vs `session_lifecycle.py:932-985`; `--super
 
 ## Acceptance test table
 
-| Test                                        | Fixture                                                          | Assertion                                                                                       | Test File                                                     |
-| ------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Transcript guard (Slice 1)                  | manifest with non-str `copied_path`, native-resume path          | resolves to `None`, no non-str leak; fails pre-fix                                              | `tests/regression/test_bug_transcript_artifact_type_guard.py` |
-| Nested TDD sort (Slice 2)                   | `%policy check` diff with `pkg/tests/*` + `pkg/src/*`            | tests bucket before src; impl-first atomic patch not false-denied; fails pre-fix                | `tests/regression/test_bug_policy_check_nested_tdd_sort.py`   |
-| Inheritance single-source (Slice 1)         | fork/into/resume-child of a parent with all 6 inheritable fields | child inherits identically via one allowlist                                                    | existing `test_session_fork.py` / `test_session_resume.py`    |
-| Supervisor flags parity (Slice 4a)          | `start`/`fork` help, shared 8-option fragment only               | the 8-option fragment + validation strings byte-identical; `--supervise` line differs by design | `test_session_start_delete.py` / `test_session_fork.py`       |
-| Stop/StopFailure JSON + Stop deny (Slice 5) | Stop / StopFailure payloads, plus Stop verification-deny         | hook JSON byte-identical pre/post for JSON paths; Stop deny exit 2 + stderr unchanged           | characterization test in `tests/src/cli/hooks/`               |
-| Team-hook parity (Slice 5)                  | TeammateIdle / TaskCompleted (exit 0 and exit-2 paths)           | exit code + stderr feedback + lane-freeze side effect unchanged pre/post                        | characterization test in `tests/src/cli/hooks/`               |
+| Test                                        | Fixture                                                          | Assertion                                                                                       | Test File                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Transcript guard (Slice 1)                  | manifest with non-str `copied_path`, native-resume path          | resolves to `None`, no non-str leak; fails pre-fix                                              | `tests/regression/test_bug_transcript_artifact_type_guard.py`       |
+| Nested TDD sort (Slice 2)                   | `%policy check` diff with `pkg/tests/*` + `pkg/src/*`            | tests bucket before src; impl-first atomic patch not false-denied; fails pre-fix                | `tests/regression/test_bug_policy_check_nested_tdd_sort.py`         |
+| Inheritance single-source (Slice 1)         | fork/into/resume-child of a parent with all 6 inheritable fields | child inherits identically via one allowlist                                                    | existing `test_session_fork.py` / `test_session_resume.py`          |
+| Supervisor flags parity (Slice 4a)          | `start`/`fork` help, shared 8-option fragment only               | the 8-option fragment + validation strings byte-identical; `--supervise` line differs by design | `test_session_start_delete.py` / `test_session_fork.py`             |
+| Stop/StopFailure JSON + Stop deny (Slice 5) | Stop / StopFailure payloads, plus Stop verification-deny         | hook JSON byte-identical pre/post for JSON paths; Stop deny exit 2 + stderr unchanged           | `tests/src/cli/test_artifact_hooks.py`; `test_stop_verification.py` |
+| Team-hook parity (Slice 5)                  | TeammateIdle / TaskCompleted (exit 0 and exit-2 paths)           | exit code + stderr feedback + lane-freeze side effect unchanged pre/post                        | characterization test in `tests/src/cli/hooks/`                     |
 
 ---
 
 ## Verification (per slice)
 
-- [ ] Focused unit modules for the touched area pass (`tests/src/session/`, `tests/src/cli/test_session_*.py`,
+- [x] Focused unit modules for the touched area pass (`tests/src/session/`, `tests/src/cli/test_session_*.py`,
   `tests/src/cli/hooks/`, `tests/src/policy/`).
-- [ ] Slices 2 & 5 touch hooks → run the hook **integration** path (real `claude -p`/Docker), not just unit
+- [x] Slices 2 & 5 touch hooks → run the hook **integration** path (real `claude -p`/Docker), not just unit
   (testing_guidelines.md).
-- [ ] `rg` of each collapsed pattern shows one definition (per-slice exit signals above).
-- [ ] `make pre-commit` clean.
-- [ ] Full unit suite before closeout.
+- [x] `rg` of each collapsed pattern shows one definition (per-slice exit signals above).
+- [x] `make pre-commit` clean.
+- [x] Full unit suite before closeout.
+
+Verification run so far (2026-07-06):
+
+- `uv run pytest ...` focused slice suite: 510 passed.
+- `./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py tests/integration/cli/test_stop_verification_integration.py tests/integration/docker/test_policy_hooks.py`:
+  42 passed.
+- `make test-unit`: 7,379 passed, 116 deselected.
+- `uv run ruff check ...` on touched Python files: clean.
+- `make pre-commit`: clean.
+- Pattern assertions: one inheritance allowlist; no hook `startswith("tests")`; runtime default only in
+  `session.models.session_runtime`; no `_record_to_lane`; no multiline `Lane(runtime_id=lane_record...)`.
 
 ## Closeout
 
-- [ ] Change-log entry in `docs/board/change_log.md` (single board log — not a per-card file).
+- [x] Change-log entry in `docs/board/change_log.md` (single board log — not a per-card file).
 - [ ] Promote durable lessons to `impl_notes.md` after human review.
 - [ ] Move `doing/diverged_twin_consolidation/` → `done/` after final merge to `main`.

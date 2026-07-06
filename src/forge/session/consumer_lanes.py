@@ -72,7 +72,7 @@ def read_bound_backend_id(state: SessionState, consumer: Consumer) -> str | None
     if record is None:
         return None
     try:
-        return resolve_lane(consumer, override=_record_to_lane(record)).backend_id
+        return resolve_lane(consumer, override=record_to_lane(record)).backend_id
     except LaneError:
         return None
 
@@ -217,7 +217,7 @@ def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_r
         return
 
     try:
-        resolved = resolve_lane(consumer, override=_record_to_lane(lane_record))
+        resolved = resolve_lane(consumer, override=record_to_lane(lane_record))
     except LaneError as e:
         # Best-effort durable write: a drifted/invalid lane must not freeze a binding the
         # dispatch path can't execute. Dispatch already fails open (no-call); leaving
@@ -230,7 +230,7 @@ def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_r
     _set_confirmed_binding(state, consumer, binding)
 
 
-def _record_to_lane(record: LaneRecord) -> Lane:
+def record_to_lane(record: LaneRecord) -> Lane:
     """Validate a stored LaneRecord against today's catalogs (raises LaneError on drift)."""
     # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not
     # constructor order, so positional construction would silently swap a reordered field.

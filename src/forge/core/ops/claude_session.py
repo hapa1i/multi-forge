@@ -65,6 +65,7 @@ from forge.session.launch_confirmation import (
     record_launch_confirmed,
 )
 from forge.session.model_pin import _apply_direct_model_env_if_supported
+from forge.session.models import session_runtime
 
 from .session import ForgeOpError
 
@@ -381,7 +382,7 @@ def launch_claude_session(
     run_active: Callable[..., int] | None = None,
 ) -> ClaudeSessionLaunchResult:
     """Launch Claude for a session, handling sidecar/host split without rendering."""
-    _runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
+    _runtime = session_runtime(manifest)
     if _runtime != "claude_code":
         raise ForgeOpError(
             f"session '{manifest.name}' has runtime '{_runtime}' "

@@ -40,8 +40,10 @@ from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E40
 from forge.cli.session_model_pin import (  # noqa: E402
     _apply_and_persist_direct_model_override,
 )
-from forge.core.effort import CLAUDE_EFFORT_LEVELS
-from forge.core.llm.types import REASONING_EFFORT_LEVELS
+from forge.cli.session_supervisor_options import (
+    supervisor_option_error,
+    supervisor_options,
+)
 from forge.core.ops.claude_session import (
     ClaudeForkResult,
     ClaudeLaunchPreferences,
@@ -54,11 +56,7 @@ from forge.core.ops.claude_session import (
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.core.paths import display_path
-from forge.policy.semantic.supervisor import (
-    CHECKER_PROVIDER_CHOICES,
-    supervisor_lane_runtimes,
-    validate_checker_model,
-)
+from forge.policy.semantic.supervisor import validate_checker_model
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
     ForgeSessionError,
@@ -213,60 +211,7 @@ def _render_claude_fork_result(result: ClaudeForkResult) -> int:
     default=False,
     help="Set parent as plan supervisor for the fork (enables policy enforcement)",
 )
-@click.option(
-    "--supervisor-proxy",
-    type=str,
-    default=None,
-    help="Proxy for supervisor routing (requires --supervise)",
-)
-@click.option(
-    "--no-supervisor-proxy",
-    "supervisor_direct",
-    is_flag=True,
-    default=False,
-    help="Force supervisor to use direct Anthropic routing (requires --supervise)",
-)
-@click.option(
-    "--cascade",
-    "cascade_flag",
-    is_flag=True,
-    default=False,
-    help="Enable the tier-1 plan check before the frontier supervisor (requires --supervise)",
-)
-@click.option(
-    "--checker-model",
-    "checker_model",
-    default=None,
-    help="Tier-1 checker model (prefixed id; requires --supervise)",
-)
-@click.option(
-    "--checker-provider",
-    "checker_provider",
-    type=click.Choice(list(CHECKER_PROVIDER_CHOICES)),
-    default=None,
-    help="Tier-1 checker provider (requires --supervise)",
-)
-@click.option(
-    "--checker-effort",
-    "checker_effort",
-    type=click.Choice(list(REASONING_EFFORT_LEVELS)),
-    default=None,
-    help="Tier-1 checker reasoning effort (none/low/medium/high/xhigh; requires --supervise)",
-)
-@click.option(
-    "--supervisor-effort",
-    "supervisor_effort",
-    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
-    default=None,
-    help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
-)
-@click.option(
-    "--supervisor-runtime",
-    "supervisor_runtime",
-    type=click.Choice(list(supervisor_lane_runtimes())),
-    default=None,
-    help="Supervisor lane runtime (claude_code/codex; requires --supervise)",
-)
+@supervisor_options
 @click.option(
     "--force",
     "-f",
@@ -335,22 +280,19 @@ def fork(
     if direct and proxy_name:
         print_error("--no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
-    if supervisor_proxy and supervisor_direct:
-        print_error(
-            "--supervisor-proxy and --no-supervisor-proxy are mutually exclusive",
-        )
-        sys.exit(1)
-    if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        print_error(
-            "--supervisor-proxy/--no-supervisor-proxy require --supervise",
-        )
-        sys.exit(1)
-    if (
-        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort or supervisor_runtime
-    ) and not supervise_target:
-        print_error(
-            "--cascade/--checker-*/--supervisor-effort/--supervisor-runtime require --supervise",
-        )
+    supervisor_error = supervisor_option_error(
+        supervise_target=supervise_target,
+        supervisor_proxy=supervisor_proxy,
+        supervisor_direct=supervisor_direct,
+        cascade_flag=cascade_flag,
+        checker_model=checker_model,
+        checker_provider=checker_provider,
+        checker_effort=checker_effort,
+        supervisor_effort=supervisor_effort,
+        supervisor_runtime=supervisor_runtime,
+    )
+    if supervisor_error:
+        print_error(supervisor_error)
         sys.exit(1)
     try:
         validate_checker_model(checker_model)

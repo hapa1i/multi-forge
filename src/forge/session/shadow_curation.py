@@ -19,6 +19,7 @@ from pathlib import Path
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.ops.context import ExecutionContext
 from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+from forge.session.consumer_lanes import record_to_lane
 from forge.session.models import LaneRecord
 
 logger = logging.getLogger(__name__)
@@ -325,13 +326,7 @@ def run_shadow_curation(
     # never silently dispatch the wrong arm or degrade to claude. A None binding (no placement)
     # resolves to the default claude lane with no error.
     try:
-        # Keyword args, not positional: the LaneRecord/Lane field-parity test guards names, not
-        # constructor order (matches consumer_lanes._record_to_lane + the supervisor path).
-        override = (
-            None
-            if lane_record is None
-            else Lane(runtime_id=lane_record.runtime_id, backend_id=lane_record.backend_id, model=lane_record.model)
-        )
+        override = None if lane_record is None else record_to_lane(lane_record)
         runtime_id = resolve_lane(SHADOW_CURATION_CONSUMER, override=override).runtime_id
     except LaneError as e:
         logger.warning("Shadow-curation lane binding invalid for %s (session %s): %s", official_path, session_name, e)

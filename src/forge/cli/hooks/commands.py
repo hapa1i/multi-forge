@@ -79,6 +79,109 @@ from .verification import _run_verification_check
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _TranscriptCaptureResult:
+    copied: bool
+    dst_abs: Path
+    dst_rel: Path
+    manifest_updated: bool
+    manifest_error: str | None
+
+
+def _capture_transcript_artifact(
+    *,
+    cwd: Path,
+    store: Any,
+    manifest: Any,
+    transcript_path: str,
+    session_id: str,
+    reason: str,
+    confirmed_by: str,
+    event_label: str,
+    fail_on_copy_error: bool,
+) -> _TranscriptCaptureResult:
+    """Copy a transcript into artifacts and reconcile the manifest."""
+    project_root = resolve_forge_root(cwd)
+    paths = get_artifact_paths(project_root, manifest.name)
+
+    src = Path(transcript_path)
+    dst_abs = paths.transcripts_abs / f"{session_id}.jsonl"
+    dst_rel = paths.transcripts_rel / f"{session_id}.jsonl"
+
+    try:
+        copied = safe_copy_file(src, dst_abs, overwrite=True)
+    except Exception:
+        if fail_on_copy_error:
+            raise
+        copied = False
+
+    if dst_abs.is_file():
+        _copy_transcript_to_pending_runs(dst_abs, session_id=session_id)
+
+    manifest_updated = True
+    manifest_error: str | None = None
+
+    try:
+
+        def _mutate(m: object) -> None:
+            from forge.session.models import SessionState
+
+            if not isinstance(m, SessionState):
+                raise TypeError(f"Expected SessionState, got {type(m)}")
+
+            artifacts = m.confirmed.artifacts
+            _append_artifact_entry(
+                artifacts,
+                kind="transcripts",
+                entry={
+                    "captured_at": now_iso(),
+                    "reason": reason,
+                    "source_path": transcript_path,
+                    "session_id": session_id,
+                    "copied_path": str(dst_rel),
+                    "copied": copied,
+                },
+            )
+
+            m.confirmed.claude_session_id = session_id
+            m.confirmed.transcript_path = transcript_path
+
+            from forge import __version__
+            from forge.session.models import PolicyConfirmed
+
+            if m.confirmed.policy:
+                m.confirmed.policy.forge_version = __version__
+            else:
+                m.confirmed.policy = PolicyConfirmed(forge_version=__version__)
+
+            m.confirmed.confirmed_at = now_iso()
+            m.confirmed.confirmed_by = confirmed_by
+
+        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+        try:
+            from forge.session.index import IndexStore
+
+            IndexStore().update_uuid(manifest.name, session_id, forge_root=str(store.forge_root))
+        except Exception:
+            logger.debug("%s hook: index UUID sync failed", event_label, exc_info=True)
+
+    except FileLockTimeoutError:
+        manifest_updated = False
+        manifest_error = "lock_contended"
+
+    except Exception as e:
+        manifest_updated = False
+        manifest_error = str(e)
+
+    return _TranscriptCaptureResult(
+        copied=copied,
+        dst_abs=dst_abs,
+        dst_rel=dst_rel,
+        manifest_updated=manifest_updated,
+        manifest_error=manifest_error,
+    )
+
+
 @hooks.command(name="session-start")
 @click.option(
     "--cwd",
@@ -397,85 +500,31 @@ def stop() -> None:
         _output_json({"success": False, "error": "missing_session_id"})
         return
 
-    project_root = resolve_forge_root(cwd)
-    paths = get_artifact_paths(project_root, manifest.name)
-
-    src = Path(transcript_path)
-    dst_abs = paths.transcripts_abs / f"{session_id}.jsonl"
-    dst_rel = paths.transcripts_rel / f"{session_id}.jsonl"
-
     try:
         # Claude can invoke Stop repeatedly for the same session UUID as the
         # transcript grows turn by turn. Refresh the UUID-named artifact so
         # search/index consumers see the latest snapshot instead of the first
         # turn that happened to be copied.
-        copied = safe_copy_file(src, dst_abs, overwrite=True)
+        capture = _capture_transcript_artifact(
+            cwd=cwd,
+            store=store,
+            manifest=manifest,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            reason="stop",
+            confirmed_by="hook:stop",
+            event_label="Stop",
+            fail_on_copy_error=True,
+        )
     except Exception as e:
         _output_json({"success": False, "error": "copy_failed", "message": str(e)})
         return
 
-    # Copy transcript to pending run directories (QA/walkthrough artifacts)
-    _copy_transcript_to_pending_runs(dst_abs, session_id=session_id)
-
-    # Track manifest update outcome (but don't return early - we still want to enqueue)
-    manifest_updated = True
-    manifest_error: str | None = None
-
-    try:
-
-        def _mutate(m: object) -> None:
-            from forge.session.models import SessionState
-
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-
-            artifacts = m.confirmed.artifacts
-            _append_artifact_entry(
-                artifacts,
-                kind="transcripts",
-                entry={
-                    "captured_at": now_iso(),
-                    "reason": "stop",
-                    "source_path": transcript_path,
-                    "session_id": session_id,
-                    "copied_path": str(dst_rel),
-                    "copied": copied,
-                },
-            )
-
-            # Stop carries the live conversation identity. SessionStart can
-            # lag or report an inherited UUID for native fork launches, so
-            # reconcile from Stop before later cleanup/resume code reads it.
-            m.confirmed.claude_session_id = session_id
-            m.confirmed.transcript_path = transcript_path
-
-            # Record policy provenance (always on Stop, per design §4.1.6)
-            from forge import __version__
-            from forge.session.models import PolicyConfirmed
-
-            if m.confirmed.policy:
-                m.confirmed.policy.forge_version = __version__
-            else:
-                m.confirmed.policy = PolicyConfirmed(forge_version=__version__)
-
-            m.confirmed.confirmed_at = now_iso()
-            m.confirmed.confirmed_by = "hook:stop"
-
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
-        try:
-            from forge.session.index import IndexStore
-
-            IndexStore().update_uuid(manifest.name, session_id, forge_root=str(store.forge_root))
-        except Exception:
-            logger.debug("Stop hook: index UUID sync failed", exc_info=True)
-
-    except FileLockTimeoutError:
-        manifest_updated = False
-        manifest_error = "lock_contended"
-
-    except Exception as e:
-        manifest_updated = False
-        manifest_error = str(e)
+    copied = capture.copied
+    dst_abs = capture.dst_abs
+    dst_rel = capture.dst_rel
+    manifest_updated = capture.manifest_updated
+    manifest_error = capture.manifest_error
 
     # Run verification check (Ralph-Wiggum pattern)
     # This must happen AFTER transcript copy so we have the artifact to check
@@ -658,75 +707,22 @@ def stop_failure() -> None:
         _output_json({"success": True, "action": "skip", "reason": "no_session_id"})
         return
 
-    project_root = resolve_forge_root(cwd)
-    paths = get_artifact_paths(project_root, manifest.name)
-
-    src = Path(transcript_path)
-    dst_abs = paths.transcripts_abs / f"{session_id}.jsonl"
-    dst_rel = paths.transcripts_rel / f"{session_id}.jsonl"
-
-    try:
-        # Keep the session artifact aligned with the latest transcript snapshot
-        # here too; StopFailure can arrive after earlier Stop captures.
-        copied = safe_copy_file(src, dst_abs, overwrite=True)
-    except Exception:
-        copied = False
-
-    # Only fan out and enqueue if the artifact actually exists on disk.
-    # Otherwise we'd consume pending-transcript markers and create index
-    # markers that retry until poison handling kicks in.
-    if dst_abs.is_file():
-        _copy_transcript_to_pending_runs(dst_abs, session_id=session_id)
-
-    # Best-effort manifest update
-    try:
-
-        def _mutate(m: object) -> None:
-            from forge.session.models import SessionState
-
-            if not isinstance(m, SessionState):
-                raise TypeError(f"Expected SessionState, got {type(m)}")
-
-            artifacts = m.confirmed.artifacts
-            _append_artifact_entry(
-                artifacts,
-                kind="transcripts",
-                entry={
-                    "captured_at": now_iso(),
-                    "reason": "stop-failure",
-                    "source_path": transcript_path,
-                    "session_id": session_id,
-                    "copied_path": str(dst_rel),
-                    "copied": copied,
-                },
-            )
-
-            # StopFailure is a last-chance transcript capture. If it carries a
-            # newer Claude session ID than SessionStart recorded, reconcile the
-            # manifest the same way Stop does.
-            m.confirmed.claude_session_id = session_id
-            m.confirmed.transcript_path = transcript_path
-
-            from forge import __version__
-            from forge.session.models import PolicyConfirmed
-
-            if m.confirmed.policy:
-                m.confirmed.policy.forge_version = __version__
-            else:
-                m.confirmed.policy = PolicyConfirmed(forge_version=__version__)
-
-            m.confirmed.confirmed_at = now_iso()
-            m.confirmed.confirmed_by = "hook:stop-failure"
-
-        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
-        try:
-            from forge.session.index import IndexStore
-
-            IndexStore().update_uuid(manifest.name, session_id, forge_root=str(store.forge_root))
-        except Exception:
-            logger.debug("StopFailure hook: index UUID sync failed", exc_info=True)
-    except Exception:
-        pass  # Best-effort: never fail on StopFailure
+    # Keep the session artifact aligned with the latest transcript snapshot
+    # here too; StopFailure can arrive after earlier Stop captures.
+    capture = _capture_transcript_artifact(
+        cwd=cwd,
+        store=store,
+        manifest=manifest,
+        transcript_path=transcript_path,
+        session_id=session_id,
+        reason="stop-failure",
+        confirmed_by="hook:stop-failure",
+        event_label="StopFailure",
+        fail_on_copy_error=False,
+    )
+    copied = capture.copied
+    dst_abs = capture.dst_abs
+    dst_rel = capture.dst_rel
 
     # Only enqueue work markers if the artifact exists on disk.
     # Enqueuing for a nonexistent artifact wastes retries until poison handling.
@@ -1719,17 +1715,11 @@ def _copy_transcript_to_pending_runs(transcript_path: Path, *, session_id: str |
 # --- Team Hook Handlers ---
 
 
-@hooks.command(name="teammate-idle")
-def teammate_idle() -> None:
-    """Handle TeammateIdle hook from Claude Code.
-
-    Exit 0: allow teammate to go idle.
-    Exit 2: teammate continues working (stderr = feedback).
-    """
-    data, err = _read_stdin_json()
+def _team_supervisor_hook(log_label: str, handler: Callable[..., tuple[int, str]]) -> None:
+    data, _err = _read_stdin_json()
     if data is None:
         sys.exit(0)
-    logger.debug("teammate-idle: session=%s", str(data.get("session_id", "?"))[:12])
+    logger.debug("%s: session=%s", log_label, str(data.get("session_id", "?"))[:12])
 
     try:
         cwd = Path.cwd().resolve()
@@ -1746,10 +1736,7 @@ def teammate_idle() -> None:
         sys.exit(0)
 
     from forge.cli.consumer_lane_freeze import persist_lane_freeze
-    from forge.policy.team.handlers import (
-        TEAM_SUPERVISOR_CONSUMER,
-        handle_teammate_idle,
-    )
+    from forge.policy.team.handlers import TEAM_SUPERVISOR_CONSUMER
     from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
 
     dispatched_lane = read_bound_lane(manifest, TEAM_SUPERVISOR_CONSUMER)
@@ -1763,11 +1750,23 @@ def teammate_idle() -> None:
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(
         cache_key,
-        lambda cache: handle_teammate_idle(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
+        lambda cache: handler(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
     )
     if exit_code == 2 and feedback:
         print(feedback, file=sys.stderr)
     sys.exit(exit_code)
+
+
+@hooks.command(name="teammate-idle")
+def teammate_idle() -> None:
+    """Handle TeammateIdle hook from Claude Code.
+
+    Exit 0: allow teammate to go idle.
+    Exit 2: teammate continues working (stderr = feedback).
+    """
+    from forge.policy.team.handlers import handle_teammate_idle
+
+    _team_supervisor_hook("teammate-idle", handle_teammate_idle)
 
 
 @hooks.command(name="task-completed")
@@ -1777,48 +1776,9 @@ def task_completed() -> None:
     Exit 0: task marked as completed.
     Exit 2: task stays open (stderr = feedback to teammate).
     """
-    data, err = _read_stdin_json()
-    if data is None:
-        sys.exit(0)
-    logger.debug("task-completed: session=%s", str(data.get("session_id", "?"))[:12])
+    from forge.policy.team.handlers import handle_task_completed
 
-    try:
-        cwd = Path.cwd().resolve()
-        store = resolve_session_store(cwd, session_id=data.get("session_id"))
-        if store is None:
-            sys.exit(0)
-        manifest = store.read()
-        effective = compute_effective_intent(manifest)
-    except Exception:
-        sys.exit(0)
-
-    config = effective.policy.team_supervisor if effective.policy else None
-    if not config or not config.enabled:
-        sys.exit(0)
-
-    from forge.cli.consumer_lane_freeze import persist_lane_freeze
-    from forge.policy.team.handlers import (
-        TEAM_SUPERVISOR_CONSUMER,
-        handle_task_completed,
-    )
-    from forge.session.consumer_lanes import read_bound_backend_id, read_bound_lane
-
-    dispatched_lane = read_bound_lane(manifest, TEAM_SUPERVISOR_CONSUMER)
-    backend_id = read_bound_backend_id(manifest, TEAM_SUPERVISOR_CONSUMER)
-
-    def _freeze() -> None:
-        # Fires from _run_supervisor's on_dispatch, so the lane freezes only on a real dispatch
-        # (not a cache/tagger/depth skip). Short HOOK_LOCK_TIMEOUT_S keeps the hook responsive (T6a).
-        persist_lane_freeze(store, TEAM_SUPERVISOR_CONSUMER, dispatched_lane, timeout_s=HOOK_LOCK_TIMEOUT_S)
-
-    cache_key = _safe_cache_key(data.get("session_id"))
-    exit_code, feedback = _run_team_handler(
-        cache_key,
-        lambda cache: handle_task_completed(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
-    )
-    if exit_code == 2 and feedback:
-        print(feedback, file=sys.stderr)
-    sys.exit(exit_code)
+    _team_supervisor_hook("task-completed", handle_task_completed)
 
 
 @hooks.command(name="read-hygiene")

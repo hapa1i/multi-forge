@@ -14,6 +14,7 @@ import click
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.policy.deterministic.base import tests_first_sort_key
 from forge.session import set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.hooks import resolve_session_store
@@ -1193,21 +1194,12 @@ def _split_diff_per_file(diff: str) -> list[tuple[str, str]]:
 
 
 def _sort_tests_first(file_diffs: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Sort file diffs so tests/ paths come before src/ paths.
+    """Sort file diffs so tests paths come before src paths.
 
     Optimistic ordering for TDD stateful evaluation: test files populate
     ``_tests_touched`` before implementation files are checked.
     """
-
-    def _sort_key(item: tuple[str, str]) -> int:
-        path = item[0]
-        if path.startswith("tests/") or path.startswith("tests\\"):
-            return 0
-        if path.startswith("src/") or path.startswith("src\\"):
-            return 2
-        return 1
-
-    return sorted(file_diffs, key=_sort_key)
+    return sorted(file_diffs, key=lambda item: tests_first_sort_key(item[0]))
 
 
 def _handle_policy_check(argv: list[str]) -> None:

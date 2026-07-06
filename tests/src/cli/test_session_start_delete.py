@@ -23,6 +23,48 @@ from tests.src.cli.session_command_support import (
 )
 
 
+def _help_line(output: str, option: str) -> str:
+    return next(line.strip() for line in output.splitlines() if option in line)
+
+
+def test_start_and_fork_share_supervisor_option_fragment(runner: CliRunner) -> None:
+    start = runner.invoke(main, ["session", "start", "--help"])
+    fork = runner.invoke(main, ["session", "fork", "--help"])
+
+    assert start.exit_code == 0
+    assert fork.exit_code == 0
+
+    for option in (
+        "--supervisor-proxy",
+        "--no-supervisor-proxy",
+        "--cascade",
+        "--checker-model",
+        "--checker-provider",
+        "--checker-effort",
+        "--supervisor-effort",
+        "--supervisor-runtime",
+    ):
+        assert _help_line(start.output, option) == _help_line(fork.output, option)
+
+    assert _help_line(start.output, "--supervise") != _help_line(fork.output, "--supervise")
+
+
+@pytest.mark.parametrize(
+    ("_command", "args"),
+    [
+        ("start", ["session", "start", "child", "--supervisor-proxy", "p"]),
+        ("fork", ["session", "fork", "parent", "--supervisor-proxy", "p"]),
+    ],
+)
+def test_start_and_fork_share_supervisor_option_dependency_errors(
+    runner: CliRunner, _command: str, args: list[str]
+) -> None:
+    result = runner.invoke(main, args)
+
+    assert result.exit_code == 1
+    assert "--supervisor-proxy/--no-supervisor-proxy require --supervise" in result.output
+
+
 class TestSessionStart:
     """Tests for 'forge session start' command."""
 

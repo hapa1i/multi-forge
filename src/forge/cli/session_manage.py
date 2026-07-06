@@ -43,6 +43,7 @@ from forge.session import (
     SessionManager,
     SessionState,
 )
+from forge.session.models import session_runtime
 
 session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
@@ -878,7 +879,7 @@ def _build_show_json(
         data["last_accessed_at"] = state.last_accessed_at
         data["intent"] = {
             "agent": state.intent.agent,
-            "runtime": (state.intent.launch.runtime if state.intent.launch else "claude_code"),
+            "runtime": session_runtime(state),
             "proxy": (
                 {
                     "template": state.intent.proxy.template,
@@ -1206,13 +1207,13 @@ def _print_session_detail(
     console.print()
 
     console.print("[bold]Configuration (Intent)[/bold]")
-    session_runtime = state.intent.launch.runtime if state.intent.launch else "claude_code"
-    if session_runtime == "claude_code":
+    runtime = session_runtime(state)
+    if runtime == "claude_code":
         # intent.agent is a display-only vestige superseded by Runtime: it always
         # says "claude-code", which would misread on non-Claude runtimes.
         console.print(f"  Agent:        {state.intent.agent}")
-    console.print(f"  Runtime:      {session_runtime}")
-    if session_runtime == "codex":
+    console.print(f"  Runtime:      {runtime}")
+    if runtime == "codex":
         console.print("  Routing:      direct (OpenAI via codex CLI)")
     elif state.intent.proxy:
         console.print(f"  Routing:      {_template_display_label(state.intent.proxy.template)}")
@@ -1292,7 +1293,7 @@ def _print_session_detail(
     # Computed Context is Claude routing/tier/policy state; on other runtimes the
     # model family and tier mapping don't apply (a Codex session would render the
     # direct-mode "anthropic" default while actually running OpenAI models).
-    if ctx and session_runtime == "claude_code":
+    if ctx and runtime == "claude_code":
         console.print()
         console.print("[bold]Computed Context[/bold]")
         console.print(f"  Model Family: [cyan]{ctx.model_family}[/cyan]")

@@ -33,6 +33,7 @@ from forge.core.reactive.session_runner import run_claude_session
 from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 from forge.core.transcript import parse_jsonl_transcript
 from forge.session.claude.invoke import is_claude_available
+from forge.session.consumer_lanes import record_to_lane
 from forge.session.exceptions import PassportError
 from forge.session.models import DesignatedDoc, LaneRecord, MemoryWriterConfig
 from forge.session.passport import (
@@ -414,18 +415,9 @@ def run_memory_writer(
     # Resolve the bound lane -> runtime (epic consumer_lanes T6c). Validate the LaneRecord against
     # the consumer's declared candidates (mirror shadow_curation's guard): a stale/corrupt explicit
     # binding fails as a no-call degrade (best-effort async), never a silent wrong-arm dispatch.
-    # None -> the default claude lane. Keyword args (the LaneRecord/Lane field-parity test guards
-    # field names, not constructor order).
+    # None -> the default claude lane.
     try:
-        override = (
-            None
-            if lane_record is None
-            else Lane(
-                runtime_id=lane_record.runtime_id,
-                backend_id=lane_record.backend_id,
-                model=lane_record.model,
-            )
-        )
+        override = None if lane_record is None else record_to_lane(lane_record)
         runtime_id = resolve_lane(MEMORY_WRITER_CONSUMER, override=override).runtime_id
     except LaneError as e:
         logger.warning("Memory writer lane binding invalid for %s: %s", session_name, e)

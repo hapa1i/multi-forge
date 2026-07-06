@@ -24,6 +24,15 @@ def is_under_directory(path: str | None, directory: str) -> bool:
     return normalized.startswith(f"{directory}/") or f"/{directory}/" in normalized
 
 
+def tests_first_sort_key(path: str | None) -> int:
+    """Return a stable TDD ordering bucket for path-like policy targets."""
+    if is_under_directory(path, "tests"):
+        return 0
+    if is_under_directory(path, "src"):
+        return 2
+    return 1
+
+
 class DeterministicPolicy(ABC):
     """Base class for deterministic (non-LLM) policies.
 
