@@ -10,6 +10,7 @@ from typing import Any
 import click
 
 from forge.cli.output import err_console, print_error_with_tip, print_tip
+from forge.install.hooks import entry_is_forge_hook
 from forge.install.preset import get_builtin_preset
 from forge.session.claude.paths import get_claude_home
 
@@ -140,28 +141,10 @@ def _is_forge_hook_entry(entry: Any) -> bool:
     """Check if a hook entry is a Forge hook.
 
     Matches entries where:
-    - type == "command" AND command starts with "forge hook "
+    - type == "command" AND command invokes "forge hook"
     - OR nested hooks contain such an entry
     """
-    if not isinstance(entry, dict):
-        return False
-
-    # Direct command format: {type: "command", command: "forge hook ..."}
-    if entry.get("type") == "command":
-        cmd = entry.get("command", "")
-        if isinstance(cmd, str) and cmd.strip().startswith("forge hook "):
-            return True
-
-    # Nested hooks format: {hooks: [{type: "command", command: "forge hook ..."}]}
-    hooks_list = entry.get("hooks")
-    if isinstance(hooks_list, list):
-        for h in hooks_list:
-            if isinstance(h, dict) and h.get("type") == "command":
-                nested_cmd = h.get("command", "")
-                if isinstance(nested_cmd, str) and nested_cmd.strip().startswith("forge hook "):
-                    return True
-
-    return False
+    return entry_is_forge_hook(entry, require_command_type=True)
 
 
 @click.command(name="disable")

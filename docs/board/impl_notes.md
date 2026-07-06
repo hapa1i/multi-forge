@@ -36,6 +36,19 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Forge hook-command detection is single-sourced in `install/hooks.py` (forge_hook_matcher_consolidation, pending merge 2026-07-06)
+
+- `install/hooks.py::is_forge_hook_command` is the one predicate for "does this command invoke a Forge hook?". It uses
+  shell-token semantics: `shlex.split`, command basename `forge`, second token `hook`, and optional third-token handler
+  matching. This intentionally accepts bare `forge hook ...` and absolute-path `/.../forge hook ...`, while rejecting
+  contains-only strings such as `echo forge hook stop`.
+- Entry-level settings scans should use `entry_is_forge_hook`. Destructive cleanup (`forge hook disable`) must pass
+  `require_command_type=True` so non-command entries are preserved while still sharing the same command predicate.
+- The registered-command contract lives in `tests/src/install/test_registered_commands_contract.py` and must key Claude
+  hook rows on `(event, matcher, command, timeout)`, not a set of command strings. The two `policy-check` rows share
+  bytes under different matchers/timeouts; a string set is blind to that drift. T5 may extend the predicate for
+  dispatcher-shim bytes, but should update this one predicate and the golden together.
+
 ### Transcript role/turn parsing is single-sourced in `core/transcript.py` (test_mirror_and_contract_cleanup, shipped 2026-07-06)
 
 - The four primitives -- `normalize_transcript_role`, `resolve_entry_role`, `extract_entry_blocks`,

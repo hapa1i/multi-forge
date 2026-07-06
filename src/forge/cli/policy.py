@@ -320,7 +320,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
 
     from forge.install.hooks import has_forge_hook
 
-    if not has_forge_hook(cwd, "PreToolUse", "forge hook policy-check"):
+    if not has_forge_hook(cwd, "PreToolUse", handler="policy-check"):
         console.print(
             "\n[yellow]Warning:[/yellow] Policy configured but PreToolUse hook is not installed. "
             "Enforcement will not be active."
