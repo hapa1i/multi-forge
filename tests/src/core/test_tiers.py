@@ -21,10 +21,11 @@ from forge.core.tiers import detect_tier_word
         ("Claude-OPUS-4", "opus"),
         ("gpt-4o", None),
         ("", None),
+        (None, None),
         ("opusculum-7", "opus"),
     ],
 )
-def test_detect_tier_word_preserves_existing_substring_behavior(model: str, expected: str | None) -> None:
+def test_detect_tier_word_preserves_existing_substring_behavior(model: str | None, expected: str | None) -> None:
     assert detect_tier_word(model) == expected
 
 

@@ -102,8 +102,9 @@ read, not just located -- but line numbers drifted and #85 moved the statusline 
   once; characterization test unchanged.
 - [x] **B2.2 Import prefix vocab from `core/llm/detection.py`** at the LiteLLM provider-prefix detector sites
   (`data_models.py:_is_litellm`, `client_factory.py:detect_provider_for_model`, server explicit-backend helper).
-  Assertion: no inline LiteLLM provider-prefix tuple literal remains in those files. `data_models.py:_normalize`
-  intentionally keeps its narrower canonical-prefix tuple (not the same contract).
+  Assertion: no inline LiteLLM provider-prefix tuple literal remains in those files. The original `data_models.py:220`
+  checklist target was intentionally skipped: `_normalize` keeps its narrower canonical-prefix tuple and deliberately
+  does **not** use `LITELLM_PROVIDER_PREFIXES`.
 - [x] **B2.3 One shared port probe in `src/forge/proxy/ports.py`** (new; socket-only + a local neutral exception, e.g.
   `NoAvailablePortError`). Repoint `server.find_available_port` (`:2288`) and `orchestrator._find_available_port`
   (`:1217`) to it. Each caller **keeps its current public signature** and **translates the neutral exception to its own
@@ -139,7 +140,8 @@ Docker must be up. Existing proxy E2Es post only to `/v1/messages`, so the count
 - [x] **Add a count-tokens E2E smoke** (post `/v1/messages/count_tokens` through the real proxy; assert a successful
   token-count response for explicit-tier and default-tier cases) beside
   `tests/integration/proxy/test_session_routing_e2e.py`. Do not require resolved-model/tier headers on this endpoint;
-  B2.0 unit characterization pins the internal resolved model. (F1)
+  B2.0 unit characterization pins the internal resolved model, so count_tokens resolution parity is unit-only by
+  necessity. (F1)
 - [x] `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`
   -- create_message tier/model resolution.
 - [x] `./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py` -- port allocation across

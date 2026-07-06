@@ -40,10 +40,11 @@ startup contracts.
   tier/default/alternative/explicit-backend decisions, with cost logging still receiving the same resolved model and
   tier.
 - Added `LITELLM_PROVIDER_PREFIXES` for LiteLLM detector sites while intentionally leaving `data_models._normalize` on
-  its narrower canonical-prefix contract.
+  its narrower canonical-prefix contract; the code comment now marks that as a deliberate non-unification.
 - Added `forge.proxy.ports` as the shared loopback probe and kept caller-specific exception contracts for the server CLI
   and proxy orchestrator.
-- Added real proxy `/v1/messages/count_tokens` integration smoke coverage for default-tier and explicit-tier requests.
+- Added real proxy `/v1/messages/count_tokens` integration smoke coverage for default-tier and explicit-tier requests;
+  resolved-model parity stays unit-pinned because that endpoint emits no resolved-model/tier headers.
 
 **Verification**:
 `uv run pytest tests/src/proxy/test_server_model_resolution.py tests/src/proxy/test_model_alternatives.py tests/src/proxy/test_routing_invariants.py tests/src/proxy/test_data_models.py tests/src/proxy/test_ports.py tests/src/proxy/test_proxy_orchestrator.py tests/src/proxy/test_server_cost.py -q`;

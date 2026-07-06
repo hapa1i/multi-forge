@@ -208,6 +208,7 @@ def map_model_name(anthropic_model_name: str) -> str:
 
     def _normalize(name: str) -> str:
         n = name.strip().lower().split("@", 1)[0]
+        # Deliberately not LITELLM_PROVIDER_PREFIXES: this strips only canonical model prefixes.
         for prefix in ("anthropic/", "openai/", "gemini/"):
             if n.startswith(prefix):
                 n = n[len(prefix) :]
