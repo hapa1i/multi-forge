@@ -9,7 +9,7 @@ the string rewrites, and the guard's allowlist — sources from Phase 0's invent
 starts. **Docs + strings + one new test only; no behavior change** (no env var renamed, removed, or re-resolved;
 resolution order `FORGE_FORK_NAME -> FORGE_SESSION -> UUID` untouched).
 
-**Status: plan folded review rounds 1-2; awaiting go-ahead before implementation.**
+**Status: implemented, verified, and moved to `done/` on 2026-07-07.**
 
 ## Grounding delta (verified 2026-07-07 on this branch)
 
@@ -41,26 +41,26 @@ Findings shaping the plan:
 
 ## Phase 0 — Exhaustive inventory + decisions (GATE)
 
-- [ ] **Real env-var inventory.** Enumerate every `FORGE_*` name read/written via environment APIs or launch env
+- [x] **Real env-var inventory.** Enumerate every `FORGE_*` name read/written via environment APIs or launch env
   construction in `src/`: `os.environ[...]` / `.get()` / `.pop()` / `.setdefault()`, `os.getenv`, `os.putenv` if
   present, explicit env dict keys, subprocess/container env strings (for example Docker `-e FORGE_...=...`), and
   `*_VAR = "FORGE_*"` constants that are actually used as environment keys. Separate these from regex-only tokens
   (constants like `FORGE_MAX_DEPTH`, headers `FORGE_*_HEADER`, `_FORGE_*` module constants that are not env keys,
   QA-shell vars). Assertion: a written list tagging each entry real-env-var vs regex-only, with the three card-named
   false positives (`FORGE_MAX_DEPTH`, `WT_FORGE_LOG_SNAPSHOTS`, `FORGE_REV`) in the excluded column.
-- [ ] **Exhaustive rewrite worklist.** From the inventory, list *every* user-visible string (Click `help=`/`short_help=`
+- [x] **Exhaustive rewrite worklist.** From the inventory, list *every* user-visible string (Click `help=`/`short_help=`
   /`epilog=`, command/group docstrings, error/tip text, op-layer `raise` messages, `%` payload `reason`) that names an
   internal-class env var. Assertion: worklist is a superset of the seeded table below; each row marks normal-flow
   (rewrite) vs diagnostic (keep).
-- [ ] **Decision D-EV-1 — `FORGE_STATUS_TRUNCATE` class.** Recommend **public-diagnostic** (genuine user value: the only
+- [x] **Decision D-EV-1 — `FORGE_STATUS_TRUNCATE` class.** Recommend **public-diagnostic** (genuine user value: the only
   way a wide-terminal user disables truncation — read at `status_line.py:1712`, `=0` disables). **But it is undocumented
   in `docs/` today**, so public-diagnostic requires the Phase 2 doc task below, or the table is self-inconsistent day
   one. Assertion: recorded in the table with rationale + a linked Phase 2 doc task.
-- [ ] **Decision D-EV-2 — classification-table home.** New `design_appendix.md` section (reference material) + a
+- [x] **Decision D-EV-2 — classification-table home.** New `design_appendix.md` section (reference material) + a
   one-line pointer from `design.md` §3.10 (one-authority rule). The card's own table becomes a stale snapshot after
   Phase 1 — fine (cards are context, design docs are contract); Phase 1 does **not** update the card table. Assertion:
   one authority, no duplicated live table.
-- [ ] **Decision D-EV-3 — guard mechanics: two-layer.** Assertion: approach recorded with the false-positive tradeoff.
+- [x] **Decision D-EV-3 — guard mechanics: two-layer.** Assertion: approach recorded with the false-positive tradeoff.
   - **Layer 1 — Python AST walk** over `src/forge/cli/**` + `src/forge/core/ops/**`, targeting user-visible sinks only:
     (i) Click help kwargs `help=`/`short_help=`/`epilog=`; (ii) Click command/group **docstrings** —
     `ast.get_docstring()` on any `FunctionDef` whose decorators include a `.command(`/`.group(` call (includes
@@ -113,19 +113,19 @@ docstring), `proxy/server.py:1836` (internal docstring), `status_line.py:1653/17
 
 ## Phase 1 — Classification table (the durable deliverable)
 
-- [ ] Write the classification table (Public / Public-diagnostic / Internal-wiring / Test-QA / decided
+- [x] Write the classification table (Public / Public-diagnostic / Internal-wiring / Test-QA / decided
   `FORGE_STATUS_TRUNCATE`) in the D-EV-2 home, populated from the Phase 0 inventory. Assertion: every real env var from
   the inventory appears exactly once; `FORGE_HOME`/`FORGE_PROFILE`/`FORGE_DEBUG` public, the session family internal.
-- [ ] Add the owned cross-reference pointer (design.md §3.10, optionally §3.4). Assertion: one authority, no duplicated
+- [x] Add the owned cross-reference pointer (design.md §3.10, optionally §3.4). Assertion: one authority, no duplicated
   live table.
 
 ## Phase 2 — Normal-flow string rewrites + implied doc
 
-- [ ] Rewrite every normal-flow error/raise site from the worklist (unsupported "Set FORGE_SESSION" advice eliminated).
+- [x] Rewrite every normal-flow error/raise site from the worklist (unsupported "Set FORGE_SESSION" advice eliminated).
   Assertion: `rg "Set FORGE_SESSION|set \$FORGE_SESSION" src/` returns nothing in user-visible strings.
-- [ ] Rewrite every normal-flow `help=`/docstring/example site. Assertion: no `--session` help text or
+- [x] Rewrite every normal-flow `help=`/docstring/example site. Assertion: no `--session` help text or
   `# current session` example names an env var.
-- [ ] Rewrite the full user-facing **doc** worklist (complete internal-class sweep 2026-07-07):
+- [x] Rewrite the full user-facing **doc** worklist (complete internal-class sweep 2026-07-07):
   - `cli_reference.md:101` — "resolves `$FORGE_SESSION`" -> "resolves the current session".
   - `end-user/README.md:17`, `skills.md:219` — concept: depend-on-`FORGE_SESSION` -> "a Forge-managed session's launch
     environment".
@@ -134,20 +134,20 @@ docstring), `proxy/server.py:1836` (internal docstring), `status_line.py:1653/17
   - `session.md:730` — **`FORGE_SUBPROCESS_PROXY`** (not the session family): "sets `FORGE_SUBPROCESS_PROXY` for child
     jobs" -> "routes child jobs through the proxy".
   - Assertion: none of these name an internal-class env var; the docs scan is green.
-- [ ] **Mark diagnostic blocks that legitimately keep internal names** with paired
+- [x] **Mark diagnostic blocks that legitimately keep internal names** with paired
   `<!-- forge-env-vocab: diagnostic:start -->` / `<!-- forge-env-vocab: diagnostic:end -->` comments: `session.md:44`
   (resolution-order reference — keep explicit; optionally slim to a pointer to `hook.md`'s canonical table),
   `session.md:891` (troubleshooting table), and the specific `hook.md` resolution/troubleshooting blocks (`:36-48`,
   `:57-58`, `:304-309`, `:323-326`, `:349-353` as of this branch). No whole-file `hook.md` exemption. The
   `status_line.py` debug log is a non-sink (untouched). Assertion: marked blocks retain their names and the guard
   exempts them; an internal-class name elsewhere in `hook.md` still fails the docs scan.
-- [ ] **D-EV-1 doc task:** add one line documenting `FORGE_STATUS_TRUNCATE` as a public-diagnostic toggle (statusline
+- [x] **D-EV-1 doc task:** add one line documenting `FORGE_STATUS_TRUNCATE` as a public-diagnostic toggle (statusline
   section of `config.md` or the end-user statusline doc). Assertion: the var the table calls "documented" is actually
   documented.
 
 ## Phase 3 — Two-layer guard test
 
-- [ ] Add `tests/src/cli/test_env_vocabulary.py` implementing D-EV-3, with the guard's Python `{name: class}` mapping as
+- [x] Add `tests/src/cli/test_env_vocabulary.py` implementing D-EV-3, with the guard's Python `{name: class}` mapping as
   the allowlist source. Assertions:
   - (a) a planted internal name in a `help=` string, a Click-command docstring, and an op-layer `raise` is each flagged;
   - (b) a legitimate env read such as `os.environ.get("FORGE_SESSION")` or `os.getenv("FORGE_PROXY_ID")` is **not**
@@ -175,15 +175,15 @@ docstring), `proxy/server.py:1836` (internal docstring), `status_line.py:1653/17
 
 ## Closeout
 
-- [ ] Grep the suite for assertions on old strings and update them alongside the rewrites:
+- [x] Grep the suite for assertions on old strings and update them alongside the rewrites:
   `rg -n "FORGE_SESSION" tests/ | rg -i "assert|help|error|reason"`.
-- [ ] Focused suites green:
+- [x] Focused suites green:
   `uv run pytest tests/src/cli/test_env_vocabulary.py tests/src/cli/test_memory.py tests/src/cli/test_session_memory.py tests/src/cli/test_session_lane.py tests/src/cli/test_output.py -q`
   plus the session/ops resolution tests; `make pre-commit` clean.
-- [ ] Integration not required (docs + strings + a source-scan test; no hook/session/proxy runtime behavior changes).
+- [x] Integration not required (docs + strings + a source-scan test; no hook/session/proxy runtime behavior changes).
   Record the rationale in the change-log entry.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Promotion candidate for `impl_notes.md` after review: the `FORGE_*` classification (internal-wiring vs public) and
+- [x] `change_log.md` entry (Goal / Key changes / Verification).
+- [x] Promotion candidate for `impl_notes.md` after review: the `FORGE_*` classification (internal-wiring vs public) and
   the two-layer guard as the drift check — durable because T4/T5/T6 will author new surfaces against it.
-- [ ] Lane move `doing/ -> done/`; repoint the epic card's inbound link (`../env_var_interface_boundary/card.md`) if
+- [x] Lane move `doing/ -> done/`; repoint the epic card's inbound link (`../env_var_interface_boundary/card.md`) if
   closeout changes it.

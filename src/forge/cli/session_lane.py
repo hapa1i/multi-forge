@@ -115,7 +115,7 @@ def _reject_frozen(consumer: Consumer, frozen: LaneRecord) -> None:
 
 
 _SESSION_OPTION = click.option(
-    "--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION)."
+    "--session", "-s", "session_name", default=None, help="Target session (default: the current session)."
 )
 
 

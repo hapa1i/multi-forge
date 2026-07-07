@@ -14,8 +14,8 @@ Running `claude` directly works, but you lose session tracking. Forge wraps Clau
 - **Search** -- `forge search` across past sessions
 - **Memory writer** -- auto-updates project docs on session exit
 
-These features require launching through Forge because they depend on `FORGE_SESSION` being set, hooks being wired, and
-the session manifest existing. Running `claude` directly bypasses all of this.
+These features require launching through Forge because they depend on a Forge-managed session's launch environment,
+hooks being wired, and the session manifest existing. Running `claude` directly bypasses all of this.
 
 **You don't need a proxy to benefit.** `forge session start` defaults to direct mode (Anthropic API), giving you
 everything above without any proxy setup.

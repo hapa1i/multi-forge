@@ -1,6 +1,6 @@
 # Env-var interface boundary (`FORGE_SESSION` out of user vocabulary)
 
-**Lane**: `doing/`. Independent of `epic_global_forge_runtime` (no member link), but **sequence-sensitive to it**: land
+**Lane**: `done/`. Independent of `epic_global_forge_runtime` (no member link), but **sequence-sensitive to it**: land
 before T4/T5/T6 author new user-facing strings (dispatcher messages, doctor extensions, migration output), so those
 surfaces are born speaking "managed session" instead of needing a later sweep.
 

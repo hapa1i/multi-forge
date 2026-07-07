@@ -1475,7 +1475,7 @@ def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
 
     \b
     Examples:
-        forge policy shadow show              # current session ($FORGE_SESSION)
+        forge policy shadow show              # current session
         forge policy shadow show planner      # a named session
         forge policy shadow show --all --json
     """
@@ -1525,7 +1525,7 @@ def shadow_status_cmd(session: str | None, as_json: bool) -> None:
 
     \b
     Examples:
-        forge policy shadow status            # current session ($FORGE_SESSION)
+        forge policy shadow status            # current session
         forge policy shadow status planner --json
     """
     from forge.policy.semantic.shadow import count_pending_candidates, read_done_records

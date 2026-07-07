@@ -70,6 +70,7 @@ Environment overrides:
 
 - `FORGE_DEBUG` overrides `log_level`. Accepted values: `1/true/yes` -> `debug`, `0/false/no/off` -> `off`, or explicit
   `debug/info/warning`
+- `FORGE_STATUS_TRUNCATE=0` disables status-line truncation for troubleshooting wide-terminal rendering.
 - Do not export `CLAUDE_CODE_ATTRIBUTION_HEADER=0` globally. Forge sets it only for translated/third-party proxy routes
   that need the prompt-cache workaround, and scrubs it from direct Anthropic and `anthropic_passthrough` launches
   because global inheritance can break Claude Code auto-mode classification.

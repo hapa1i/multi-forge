@@ -41,8 +41,12 @@ A session is **not** a proxy routing identity.
 - Global session index: `~/.forge/sessions/index.json` (name, forge_root, project_root, last-used-at, UUID)
 - Active-session registry: `~/.forge/sessions/active.json` (runtime-only live launches; self-heals stale entries)
 
+<!-- forge-env-vocab: diagnostic:start -->
+
 > **Session identity:** Hooks use Forge launch env vars only. Resolution order is: `FORGE_FORK_NAME` -> `FORGE_SESSION`
 > -> IndexStore UUID lookup. No CWD-based directory scan.
+
+<!-- forge-env-vocab: diagnostic:end -->
 
 Multiple sessions can coexist in the same Forge project, each with its own directory under
 `<forge_root>/.forge/sessions/`.
@@ -83,8 +87,8 @@ forge claude start --proxy openrouter-anthropic
 forge claude start --no-proxy
 ```
 
-No `FORGE_SESSION` set, no session manifest, no artifacts. Session-specific hooks and status line are no-ops. Does not
-require `.forge/`. Use `forge session start` for managed sessions.
+No managed-session environment, no session manifest, no artifacts. Session-specific hooks and status line are no-ops.
+Does not require `.forge/`. Use `forge session start` for managed sessions.
 
 **Bare Codex proxy launch** (`forge codex start --proxy`) — Responses proxy routing only, no session state:
 
@@ -152,7 +156,7 @@ forge session resume <name>                        # reattach the codex TUI to t
 forge session resume <name> --task "<next task>"   # next headless turn on the same Codex thread
 
 # Show / list
-forge session show            # Current session (from $FORGE_SESSION)
+forge session show            # Current session
 forge session show <name>     # Named session details
 forge session list            # Sessions across the workspace (default: --scope workspace)
 forge session list --scope project  # Sessions in current Forge project only
@@ -284,7 +288,7 @@ Typical effects:
 - creates/updates the session manifest: `<forge_root>/.forge/sessions/auth-refactor/forge.session.json`
 - updates the global index: `~/.forge/sessions/index.json` (including last-used time)
 - registers a runtime live-session entry: `~/.forge/sessions/active.json` (cleared when the launch exits)
-- sets `FORGE_SESSION=auth-refactor` env var
+- records the session identity in the launch environment
 - launches Claude Code
 
 ### Start a session in a worktree (optional for filesystem isolation)
@@ -727,8 +731,8 @@ subprocesses such as supervisor, panel, or memory-writer jobs should use a proxy
 forge session start my-session --subprocess-proxy openrouter
 ```
 
-This records `intent.subprocess_proxy` and sets `FORGE_SUBPROCESS_PROXY` for child jobs. It is mutually exclusive with
-`--proxy`: use `--proxy` when the main session itself should route through the proxy.
+This records `intent.subprocess_proxy` and routes child jobs through the proxy. It is mutually exclusive with `--proxy`:
+use `--proxy` when the main session itself should route through the proxy.
 
 ---
 
@@ -806,7 +810,7 @@ rejection. The line is best-effort and prints only when the session had activity
 **`forge telemetry activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
 
 ```bash
-forge telemetry activity                      # current session ($FORGE_SESSION)
+forge telemetry activity                      # current session
 forge telemetry activity my-feature           # a named session (or Claude UUID)
 forge telemetry activity my-feature --period week  # this week (default: today)
 forge telemetry activity my-feature --period all   # full history
@@ -888,5 +892,12 @@ same way.
 | Trap                              | Explanation                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | "Session didn't pick up my proxy" | `--proxy` resolves by proxy_id first, then active template match. If ambiguous, use the exact proxy_id. |
-| "Hooks lost session identity"     | Hooks resolve via `FORGE_FORK_NAME` -> `FORGE_SESSION` -> UUID lookup (no dir scanning)                 |
-| "Can't shell into session"        | `forge session shell` only works for `--sidecar` sessions                                               |
+
+<!-- forge-env-vocab: diagnostic:start -->
+
+| "Hooks lost session identity" | Hooks resolve via `FORGE_FORK_NAME` -> `FORGE_SESSION` -> UUID lookup (no dir
+scanning) |
+
+<!-- forge-env-vocab: diagnostic:end -->
+
+| "Can't shell into session" | `forge session shell` only works for `--sidecar` sessions |

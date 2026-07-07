@@ -330,7 +330,7 @@ def resolve_session(*, ctx: ExecutionContext, session_name: str | None = None) -
                 store = manager.get_session_store(env_name)
                 state = store.read()
             else:
-                raise ForgeOpError("No session specified. Use --session or set $FORGE_SESSION.")
+                raise ForgeOpError("No session specified. Use --session <name> or run inside a Forge-managed session.")
     except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeSessionError as e:

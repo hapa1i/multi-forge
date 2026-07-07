@@ -59,6 +59,10 @@ Forge uses a **three-part** contract:
 > **Parallel sessions:** Multiple sessions can run in the same Forge project. Each session has its own subdirectory
 > under `.forge/sessions/`. Hooks identify the session via `FORGE_SESSION` set at launch.
 
+The `FORGE_*` launch environment is a tiered interface: a few names are public or public-diagnostic, while launcher
+wiring remains internal vocabulary. The classification table lives in
+[design_appendix.md §A.7b](design_appendix.md#a7b-forge-env-var-vocabulary).
+
 #### Project identity model
 
 Forge has four scoping levels. They must be explicitly defined to avoid path confusion:

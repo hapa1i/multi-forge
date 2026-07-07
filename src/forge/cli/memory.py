@@ -750,7 +750,9 @@ def _review_show_latest(
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt state -> top-level reset handler, not a generic ClickException
     except (ForgeSessionError, ForgeOpError) as e:
-        raise click.ClickException(f"Could not resolve session: {e}. Set FORGE_SESSION or pass --session.")
+        raise click.ClickException(
+            f"Could not resolve session: {e}. Use --session <name> or run inside a Forge-managed session."
+        )
 
     state = resolved.state
     forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)
@@ -814,7 +816,9 @@ def _review_curate(
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt state -> top-level reset handler, not a generic ClickException
     except (ForgeSessionError, ForgeOpError) as e:
-        raise click.ClickException(f"Curation requires an active session: {e}. Set FORGE_SESSION or pass --session.")
+        raise click.ClickException(
+            f"Curation requires an active session: {e}. Use --session <name> or run inside a Forge-managed session."
+        )
 
     state = resolved.state
     forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)

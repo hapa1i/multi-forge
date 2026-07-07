@@ -54,7 +54,7 @@ def activity_cmd(session: str | None, as_json: bool, period: str) -> None:
 
     \b
     Examples:
-        forge telemetry activity                  # current session ($FORGE_SESSION)
+        forge telemetry activity                  # current session
         forge telemetry activity planner          # a named session (or Claude UUID)
         forge telemetry activity --period week    # this week
         forge telemetry activity --period all --json

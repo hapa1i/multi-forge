@@ -36,6 +36,20 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### `FORGE_*` env vars are a classified interface, not general user vocabulary (env_var_interface_boundary, shipped 2026-07-07)
+
+- The human authority is `docs/design_appendix.md` §A.7b. Public names are `FORGE_HOME` and `FORGE_PROFILE`;
+  public-diagnostic names are `FORGE_DEBUG` and `FORGE_STATUS_TRUNCATE`; launcher/proxy/run-tree/session names such as
+  `FORGE_SESSION`, `FORGE_FORK_NAME`, `FORGE_RUN_ID`, and `FORGE_SUBPROCESS_*` are internal wiring; `FORGE_QA_*` and
+  `FORGE_TEST_REPO` are test/QA harness variables.
+- Normal-flow user surfaces should say "current session", "Forge-managed session", and `--session <name>`, not tell
+  users to set launcher-owned env vars. Troubleshooting docs may name internal wiring only inside paired
+  `forge-env-vocab: diagnostic:start/end` markers.
+- `tests/src/cli/test_env_vocabulary.py` is the drift guard: live product-env inventory coverage, AST scan over CLI/op
+  user-visible sinks (including `console.print` and Click echo/exception aliases), literal scan over `docs/end-user/**`
+  - `docs/cli_reference.md`, boundary-matched internal names, and parity between its mapping and the appendix table. Add
+    future public `FORGE_*` vars to both the appendix and the guard before documenting them in normal-flow help/docs.
+
 ### Project registry trust keys preserve filesystem boundaries; compatibility pins are opt-in guardrails (T3/T7, shipped 2026-07-07)
 
 - `~/.forge/projects.json` is Forge-owned machine state, not a hand-edit surface. Keep it versioned JSON, write it via

@@ -142,7 +142,7 @@ class TestResolveSessionIdentifier:
 
     def test_no_session_raises(self, monkeypatch):
         monkeypatch.delenv("FORGE_SESSION", raising=False)
-        with pytest.raises(SessionContextError, match="No session found.*no .FORGE_SESSION"):
+        with pytest.raises(SessionContextError, match="No session found.*Use --session <name>"):
             resolve_session_identifier(None)
 
     def test_unknown_name_and_uuid_raises(self):
