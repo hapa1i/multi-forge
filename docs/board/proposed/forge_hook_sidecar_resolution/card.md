@@ -16,7 +16,7 @@ The sidecar is a second execution environment the original design did not accoun
 
 - The container mounts the **project** at `/workspace` and sets `HOME=/root`, `FORGE_SIDECAR=1`,
   `FORGE_LAUNCH_MODE=sidecar` (`container.py:125-169`). It does **not** mount host `~/.claude`,
-  `~/.forge/projects.toml`, or `~/.local/bin`.
+  `~/.forge/projects.json`, or `~/.local/bin`.
 - In-container Claude reads `/workspace/.claude/settings*` (the project config, which rides in via the mount) and today
   resolves bare `forge` from the **image PATH** -- `forge` is installed globally in the container image.
 
@@ -54,7 +54,7 @@ file**: editing it in-container mutates host config and persists after the `--rm
   host `~/.claude` is not mounted -- so the container must be *given* hooks by injection, not by rewriting an existing
   block. The injected command uses the **bare / image-PATH** form (`forge` is installed globally in the image).
 - **Enrollment is moot in-container (resolved).** The sidecar always sets `FORGE_SESSION` (`container.py:132`) and
-  always runs a managed session, so "in-sidecar => always active" is the correct gate: host-only `projects.toml`
+  always runs a managed session, so "in-sidecar => always active" is the correct gate: host-only `projects.json`
   enrollment is irrelevant in the container **regardless of command form** -- a dispatcher would short-circuit on
   `FORGE_SESSION` (`forge_hook_dispatcher` step 0), and a bare image-PATH hook has no gate at all. Only the **command
   form** remains an open decision.
@@ -77,7 +77,7 @@ plumbing (unrelated).
   writable from inside the container.
 - Env: `FORGE_SESSION`, `FORGE_SIDECAR=1`, `FORGE_LAUNCH_MODE=sidecar` set (`container.py:132-136`); `HOME` is a
   sidecar-specific home, not the host `~` (`:144`).
-- Host `~/.claude`, `~/.forge/projects.toml`, and `~/.local/bin` are **not** among the mounts; only a `~/.forge` subset
+- Host `~/.claude`, `~/.forge/projects.json`, and `~/.local/bin` are **not** among the mounts; only a `~/.forge` subset
   is mounted, and only when `proxy_id` is set (`:164`). Sidecar mounts `.claude`/`.forge`, not all of host `~/.forge`
   (`design.md` §7).
 
@@ -95,7 +95,7 @@ plumbing (unrelated).
 
 - Bare/image-PATH form vs mounting the host runtime (this card decides).
 
-(Resolved: whether the container needs `projects.toml` enrollment -- no; `FORGE_SESSION` is always set in-sidecar, so
+(Resolved: whether the container needs `projects.json` enrollment -- no; `FORGE_SESSION` is always set in-sidecar, so
 "in sidecar => always active" holds. See Design.)
 
 ## Acceptance tests

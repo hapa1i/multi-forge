@@ -44,7 +44,7 @@ uniformly:
   atomically (write-temp + rename). Report the window; do not claim there is none.
 - **Discover projects to migrate via `installed.json` backfill.** `installed.json` keys tracked installs by root
   (`local:` / `project:<abs>`, `install/models.py`); enumerate those roots to enroll existing projects into
-  `projects.toml` (`forge_project_registry`), so migration finds installs without a manual per-project step.
+  `projects.json` (`forge_project_registry`), so migration finds installs without a manual per-project step.
 - `forge extension cleanup-project`: Codex marker removal + Claude tracked/value-based removal (above).
 - `doctor`/`status` detection for legacy project hooks that could **not** be auto-cleaned (report, do not silently
   pass).
@@ -83,7 +83,7 @@ uniformly:
 | Test                      | Fixture                                                             | Assertion                                                                                                       | Test File                                |
 | ------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | No persistent double-fire | legacy project hook + new user hook                                 | end state has exactly one active Forge hook source; the transient window is reported, not silently assumed away | `tests/src/cli/test_extension_enable.py` |
-| Backfill from installed   | existing `installed.json` roots, empty `projects.toml`              | migration enrolls those roots into the registry without manual steps (moved from `forge_project_registry`)      | `tests/src/cli/test_extension_enable.py` |
+| Backfill from installed   | existing `installed.json` roots, empty `projects.json`              | migration enrolls those roots into the registry without manual steps (moved from `forge_project_registry`)      | `tests/src/cli/test_extension_enable.py` |
 | Codex marker cleanup      | project `.codex/config.toml` with a Forge block + unrelated entries | only the marker-delimited Forge block is removed                                                                | `tests/src/install/test_codex_hooks.py`  |
 | Claude tracked unmerge    | project `.claude/settings.json` with tracked Forge hooks            | `unmerge` removes only Forge entries by `stable_id`; unrelated entries kept                                     | `tests/src/install/test_installer.py`    |
 | Claude legacy fallback    | Claude hook present with no tracking entry                          | value-based match removes it (or reports it if ambiguous)                                                       | same                                     |
