@@ -5,10 +5,11 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-Active member: **T1 [`global_forge_install`](../global_forge_install/card.md)** (in `doing/`, branch
-`global-forge-install`). Chosen as the first ticket because it is dependency-free (card: "Ship first") and is a
-prerequisite for **both** the incident track (T1 -> T2) and the user-scope-model track (T1 -> T3 -> T4 -> T5 -> T6), so
-starting it does **not** force the still-open D2 timing decision.
+Most recent member: **T1 [`global_forge_install`](../../done/global_forge_install/card.md)** -- shipped (merged in #89,
+now in `done/`). No member is currently active; the next pick awaits the **D2 timing decision** (T2 on the incident
+track vs T3 to open the user-scope-model track), now ripe on T1's doctor evidence. T1 was chosen first because it is
+dependency-free (card: "Ship first") and a prerequisite for **both** tracks (T1 -> T2; T1 -> T3 -> T4 -> T5 -> T6), so
+starting it did **not** force D2.
 
 ## Activation bookkeeping (this branch)
 
@@ -55,9 +56,9 @@ Record outcomes here as members are picked up.
     not by itself put `forge` on a Dock/IDE-launched hook's PATH. The decision now reduces to the *usage* question the
     criterion names: is a GUI/Dock launch actually in use, or is launch terminal-only (which inherits the shell PATH and
     resolves `forge`)?
-  - **Decision: ready for the epic owner at T1 merge.** Per the stated lean (presumptive skip) + the "launch from a
-    terminal" workaround: terminal-only usage -> **skip T2, next member T3**; if GUI/Dock launch is a supported path ->
-    T2 stays. Not resolved unilaterally here.
+  - **Decision: actionable now (T1 merged in #89), awaiting the epic owner.** Per the stated lean (presumptive skip) +
+    the "launch from a terminal" workaround: terminal-only usage -> **skip T2, next member T3**; if GUI/Dock launch is a
+    supported path -> T2 stays. Not resolved unilaterally here.
 - [ ] **T4 benchmark (owner T4):** dispatcher shim (`forge-hook`, hyphen) vs absolute-symlink. Outcome decides whether
   T5 must update presence detection (the `has_forge_hook` needle is `"forge hook"`, with a space).
 - [ ] **T3 trust model (owner T3):** explicit enroll only vs auto-enroll on enable / worktree-create for

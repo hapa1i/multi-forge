@@ -1,6 +1,6 @@
 # Checklist: global_forge_install (T1)
 
-Epic: [`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md) -- first member ("Ship first"). Card:
+Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) -- first member ("Ship first"). Card:
 [`card.md`](card.md). Branch: `global-forge-install`.
 
 ## Current focus
@@ -88,11 +88,11 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
   unit-covered (faithful seams) but not container-verified; low-risk (it is the "no editable marker" default branch). No
   Docker run warranted for this change.
 - [x] `docs/board/change_log.md` entry added (Goal / Key changes / Verification).
-- [x] impl_notes candidate recorded (see below) -- promotion deferred to human review per board contract.
-- [ ] Move `doing/global_forge_install -> done/`; update the epic checklist (tick T1; record the D2 next-member
-  decision). **Deferred to post-merge** (board contract: lane move happens after the final merge to `main`).
+- [x] impl_notes candidate recorded (see below); promoted to `impl_notes.md` at closeout (human-reviewed).
+- [x] Move `doing/global_forge_install -> done/` (post-merge #89); repointed the 5 cross-lane links (T1 \<-> epic); epic
+  checklist updated (T1 shipped, no active member, D2 now actionable). Closeout entry added to `change_log.md`.
 
-### impl_notes candidate (for human review -- not yet promoted)
+### impl_notes candidate (promoted to `impl_notes.md` at closeout)
 
 - **Install-kind detection rule** (`src/forge/install/doctor.py`): editable (PEP 610 `direct_url.json`
   `dir_info.editable`) is checked *first* -- a dev checkout's launcher lives in a venv `bin`, but "editable" is the more

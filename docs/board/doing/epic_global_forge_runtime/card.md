@@ -3,11 +3,12 @@
 **This is an epic.** It coordinates the shared contract, sequencing, and drift control across the member cards below.
 Each member is an independently shippable implementation unit; the epic ships no code itself.
 
-**Lane**: `doing/` -- active coordinator. First member **T1 [`global_forge_install`](../global_forge_install/card.md)**
-is in `doing/` on branch `global-forge-install`, and the epic's coordination [`checklist.md`](checklist.md) (sequencing,
-seam drift-watch, the owed D2/T3/T4 decisions) is live. Remaining members stay in `proposed/` and spin out to their own
-`doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/` (or the shared contract is folded into
-normative design docs).
+**Lane**: `doing/` -- active coordinator. First member **T1
+[`global_forge_install`](../../done/global_forge_install/card.md)** shipped (merged in #89, now in `done/`); no member
+is currently active, and the next pick awaits the D2 timing decision (now ripe on T1's doctor evidence). The epic's
+coordination [`checklist.md`](checklist.md) (sequencing, seam drift-watch, the owed D2/T3/T4 decisions) stays live.
+Remaining members stay in `proposed/` and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when
+every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -35,7 +36,7 @@ so neither sits on one linear track.
 
 | Label | Card                                                                                    | Ships                                                                               | Depends on  |
 | ----- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
-| T1    | [`global_forge_install`](../global_forge_install/card.md)                               | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
+| T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                       | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
 | T3    | [`forge_project_registry`](../../proposed/forge_project_registry/card.md)               | `~/.forge/projects.toml` trusted-root registry (schema + read + enroll + lifecycle) | --          |
 | T4    | [`forge_hook_dispatcher`](../../proposed/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |

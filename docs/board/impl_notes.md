@@ -36,6 +36,26 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Install-kind detection: editable-first, launcher-symlink-not-realpath, minimal-PATH is a fact (global_forge_install, shipped 2026-07-06)
+
+`src/forge/install/doctor.py` (`diagnose_install`) classifies how the `forge` binary is installed. Durable rules:
+
+- **Editable is checked before venv.** A dev checkout's launcher lives in a venv `bin`, but `editable` (PEP 610
+  `direct_url.json` `dir_info.editable`) is the more actionable label than `venv`.
+- **Global keys on the launcher's on-PATH symlink location, not its realpath target** (`~/.local/bin` /
+  `UV_TOOL_BIN_DIR` / `XDG_BIN_HOME` / `PIPX_BIN_DIR`). Resolving the symlink would land inside a `uv tool` tool-venv
+  and mis-classify a global install.
+- **`on_path_minimal` is a reported fact, never a fault.** A healthy `~/.local/bin` global install reads `false`
+  (launchd's minimal PATH excludes `~/.local/bin`); it is the mechanical signal for GUI/Dock hook reachability (epic
+  D2), so `advice` keys on `on_path`/kind, not on it.
+- **Advice distinguishes "not installed" from "installed, off PATH."** Both read `on_path=false`; the latter gets
+  PATH-setup (`uv tool update-shell` / `pipx ensurepath`), not a reinstall.
+- **`install_kind` and `forge_path` are different subjects.** kind reads the running interpreter's metadata;
+  `forge_path`/`on_path` read PATH resolution — they can describe different installs in a mixed dev+global setup (owned
+  by T8 `forge_dev_runtime_override`).
+- **Two install layers**: the `forge` tool (global-tool install, on PATH) is distinct from extensions
+  (`forge extension enable` -> `.claude/`). Docs: `design.md §5.1`, `design_appendix §C`.
+
 ### Forge hook-command detection is single-sourced in `install/hooks.py` (forge_hook_matcher_consolidation, shipped 2026-07-06)
 
 - `install/hooks.py::is_forge_hook_command` is the one predicate for "does this command invoke a Forge hook?". It uses

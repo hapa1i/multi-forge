@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### global_forge_install closeout
+
+**Goal**: Close the shipped T1 member after PR #89 merged to `main`.
+
+**Key changes**:
+
+- Moved the card `doing/ -> done/`; repointed the 5 cross-lane links (T1 \<-> epic).
+- Promoted the install-kind detection invariants to `impl_notes.md` (editable-first, launcher-symlink-not-realpath,
+  `on_path_minimal` as a reported fact, kind-vs-path seam).
+- Updated the epic coordinator: T1 shipped, no active member, D2 timing decision now actionable (awaiting the epic
+  owner); epic stays in `doing/` with 8 members remaining.
+
+**Verification**: `make pre-commit` clean.
+
 ### global_forge_install (epic T1): Global-tool Day-1 install + `forge extension doctor`
 
 **Goal**: Make global-tool install the documented Day-1 path and add a read-only `forge extension doctor` reporting how
