@@ -192,9 +192,9 @@ When a card is fully executed:
 3. Promote durable lessons to `docs/board/impl_notes.md` after human review.
 4. Verify relevant design docs and end-user docs reflect shipped behavior.
 5. Move the card directory from `doing/<slug>/` to `done/<slug>/`.
-6. Repoint inbound board links to the card's new lane path: any card or checklist that links the moved card must
-   use its new lane path, and no broken relative link may remain (a lane move breaks every inbound
-   `../<lane>/<slug>/...` link that pointed at the old lane).
+6. Repoint inbound board links to the card's new lane path: any card or checklist that links the moved card must use its
+   new lane path, and no broken relative link may remain (a lane move breaks every inbound `../<lane>/<slug>/...` link
+   that pointed at the old lane).
 
 If the card is merged before the lane move, perform the move immediately after the final merge to `main`.
 

@@ -102,9 +102,8 @@ coupling -- contract item 2) then PR 2 (MVP single-id `forge backend reconcile`)
 closes to `done/`. The shared contract held end to end: remote reconciliation consumed the shipped
 downstream/`backend_id` + `core/usage/measurement.py` seam (contract item 4) rather than re-authoring it, and
 provider-trace is fully source-capability gated (contract item 2). Normative architecture lives in design.md §3.14 and
-design_appendix §A.14; the standalone
-[`openrouter_user_direct_callers`](../openrouter_user_direct_callers/card.md) follow-on is an independent card,
-not an epic member.
+design_appendix §A.14; the standalone [`openrouter_user_direct_callers`](../openrouter_user_direct_callers/card.md)
+follow-on is an independent card, not an epic member.
 
 ## Not in scope here
 
