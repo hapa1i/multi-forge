@@ -130,6 +130,12 @@ Fixes applied from review (verified by `test_doctor.py`):
   path and points to PATH setup, not reinstall. `advice_commands` selects `PATH_SETUP_COMMANDS` for this state,
   `GLOBAL_INSTALL_COMMANDS` otherwise.
 - **`UV_TOOL_BIN_DIR`** (Finding 3, fixed): added to `_global_bin_dirs` (uv honors it before `XDG_BIN_HOME`).
+- **Hook-reachability overclaim** (2nd review, fixed): five strings said a global install makes `forge` resolve "from
+  hooks" unqualified, contradicting the PR's own model (a healthy `~/.local/bin` global install reads
+  `on_path_minimal=false`). Caveated to shell-inherited/terminal-launched hooks in `doctor.py` (3 advice strings),
+  `design.md §5.1`, and `end-user/README.md`; the GUI/launchd minimal-PATH gap now points at `on_path_minimal` (docs)
+  and the T2/T4 hook-reachability decision (epic D2 row). Accurate statements (doctor module docstring, appendix §C)
+  left unchanged.
 - **Test name** (Nit 1, fixed): `test_install_doctor.py -> test_doctor.py` (1:1 mirror); refs repointed in card,
   checklist, and the T2 card (`forge_hook_absolute_command`).
 - **JSON key wording** (Nit 2, fixed): `advice` is always present (nullable), not optional.

@@ -150,16 +150,16 @@ def _advice(install_kind: str, on_path: bool, forge_path: str | None) -> str | N
         location = forge_path or "its install directory"
         return (
             f"Forge is installed at {location}, but that directory is not on your PATH. Add it so "
-            "`forge` resolves in every shell and from hooks."
+            "`forge` resolves in every shell and the hooks launched from one."
         )
     if install_kind == "editable":
         return (
             "Editable/development install (contributor setup). End users should install Forge as a "
-            "global tool so hooks and other shells resolve it reliably."
+            "global tool so shells and the hooks they launch resolve it."
         )
     return (
-        "Forge is not installed as a globally reachable tool. Install it as a global tool so hooks "
-        "and other shells resolve it reliably."
+        "Forge is not installed as a globally reachable tool. Install it as a global tool so shells "
+        "and the hooks they launch resolve it."
     )
 
 

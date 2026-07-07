@@ -24,7 +24,7 @@ starting it does **not** force the still-open D2 timing decision.
   - Verified: link-resolver sweep reports **0** move-related broken relative links. (7 unrelated pre-existing broken
     board links were left untouched -- candidate for a separate board-hygiene pass, not this branch.)
 - [x] T1 checklist reviewed; execution complete on branch `global-forge-install` (Phases 0--3 shipped + verified;
-  `make pre-commit` clean, 12 new doctor tests + 2584 touched-suite tests pass). Lane move `doing/ -> done/` deferred to
+  `make pre-commit` clean, 14 new doctor tests + 2586 touched-suite tests pass). Lane move `doing/ -> done/` deferred to
   post-merge. doctor's minimal-PATH probe now provides the D2 evidence (recorded below).
 
 ## Decisions owed (coordination -- none block T1)

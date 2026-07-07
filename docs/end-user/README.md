@@ -33,9 +33,10 @@ uv tool install multi-forge     # recommended -- puts `forge` on your PATH
 forge extension doctor          # confirm install kind + PATH reachability
 ```
 
-A global tool keeps `forge` on `PATH` for every shell (and for hooks), avoiding the "activate a project venv first"
-trap. Contributors working on Forge itself use an editable install instead (`uv sync`); see
-[CONTRIBUTING.md](../../CONTRIBUTING.md).
+A global tool keeps `forge` on `PATH` for every shell and the hooks launched from one, avoiding the "activate a project
+venv first" trap. Claude launched from the Dock or an IDE inherits a minimal `PATH` that can still miss bare `forge` --
+`forge extension doctor` reports that case as `on_path_minimal`. Contributors working on Forge itself use an editable
+install instead (`uv sync`); see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ### A. Install extensions
 
