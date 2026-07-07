@@ -997,6 +997,14 @@ def worktree_create() -> None:
         # Best-effort: install Forge extensions in the new worktree.
         # Suppress stdout to protect the path-only stdout contract.
         try:
+            from forge.install.project_registry import ProjectRegistryStore
+
+            # Managed worktree creation is the trust event; extension install may conflict or be skipped.
+            ProjectRegistryStore().enroll(worktree_path, "worktree")
+        except Exception as registry_err:
+            logger.debug("worktree-create: registry enrollment failed: %s", registry_err)
+
+        try:
             import contextlib
             import os as _os
 

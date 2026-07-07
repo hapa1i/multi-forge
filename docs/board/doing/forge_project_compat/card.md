@@ -1,9 +1,9 @@
 # Project compatibility guardrail (`required_forge`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
 
-**Lane**: `proposed/`. Independent -- a check layered on project state. Can land any time, even before the
-hook-ownership tickets.
+**Lane**: `doing/`. Independent -- a check layered on project state. Can land any time, even before the hook-ownership
+tickets.
 
 ## Goal
 
@@ -33,9 +33,10 @@ existing Forge project lacks the file.** The guardrail must therefore treat abse
 - **Absence is never an error.** This keeps the change backward-compatible with the current identity model, which does
   not require `project.toml`.
 
-Forge's enrollment surface (`forge_project_registry`) MAY offer an opt-in path that authors this file with an explicit
-`required_forge`; that is an authoring choice, not the guardrail's behavior. The exact command is owned by
-`forge_project_registry` (its existence is committed there; the name is still open) -- do not assume one here.
+**v1 authoring is hand-edit only** (a human writes `required_forge`); T3 ships **no** authoring command for this file
+(the `forge_project_registry` checklist scope-boundary confirms it). An opt-in "author this file for me" convenience is
+**deferred** and, if ever built, would attach to T3's enrollment surface -- do not assume one here or plan T3/T7 work
+around it.
 
 ## Design
 

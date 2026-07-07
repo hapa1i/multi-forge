@@ -184,10 +184,28 @@ def test_doctor_json_shape_is_stable() -> None:
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert set(data) == {"install_kind", "forge_path", "on_path", "on_path_minimal", "advice"}
+    assert set(data) == {
+        "install_kind",
+        "forge_path",
+        "on_path",
+        "on_path_minimal",
+        "advice",
+        "project_registry",
+        "project_compatibility",
+    }
     assert isinstance(data["on_path"], bool)
     assert isinstance(data["on_path_minimal"], bool)
     assert data["install_kind"] in {"global", "editable", "venv", "unknown"}
+    assert set(data["project_registry"]) == {"path", "status", "enrolled_count", "stale_roots", "error", "advice"}
+    assert set(data["project_compatibility"]) == {
+        "path",
+        "state",
+        "compatible",
+        "required_forge",
+        "running_forge",
+        "reason",
+        "degraded",
+    }
 
 
 def test_doctor_human_output_names_install_kind() -> None:
@@ -197,6 +215,8 @@ def test_doctor_human_output_names_install_kind() -> None:
     assert result.exit_code == 0, result.output
     assert "Install kind" in result.output
     assert "On PATH" in result.output
+    assert "Project registry" in result.output
+    assert "Project compatibility" in result.output
 
 
 def test_is_editable_install_returns_bool() -> None:

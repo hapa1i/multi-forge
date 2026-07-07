@@ -113,6 +113,11 @@ assert wt_manifest.exists(), f'Worktree manifest missing at {wt_manifest}'
 wt_data = json.loads(wt_manifest.read_text())
 assert wt_data['name'] == 'worktree-session', f'Expected worktree-session, got {wt_data[\"name\"]}'
 
+registry = json.loads((Path.home() / '.forge' / 'projects.json').read_text())
+registry_paths = {entry['canonical_path'] for entry in registry['projects']}
+expected_root = str(Path(wt_entry['worktree_path']).resolve())
+assert expected_root in registry_paths, f'Worktree root {expected_root} not enrolled: {registry_paths}'
+
 print('isolated')
 "
         """)
@@ -335,6 +340,11 @@ fork_entry = find_entry(index, 'fork-sess')
 wt_path = Path(fork_entry['worktree_path'])
 assert wt_path.exists(), f'Worktree dir missing: {wt_path}'
 assert wt_path != Path('/workspace'), f'Fork should have its own worktree, not /workspace'
+
+registry = json.loads((Path.home() / '.forge' / 'projects.json').read_text())
+registry_paths = {entry['canonical_path'] for entry in registry['projects']}
+expected_root = str(Path(fork_entry['worktree_path']).resolve())
+assert expected_root in registry_paths, f'Fork worktree root {expected_root} not enrolled: {registry_paths}'
 
 # project_root points to main repo
 assert fork_entry['project_root'] == '/workspace', f'project_root wrong: {fork_entry[\"project_root\"]}'

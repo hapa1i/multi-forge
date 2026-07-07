@@ -69,9 +69,11 @@ editing. Set an **absolute no-op ceiling** (propose ~15-30 ms cold, but justify 
 once-per-session cost). At that frequency, paying full Forge startup on every no-op is likely non-viable, so the shim is
 the probable answer.
 
-**TOML-parse-in-shim tension.** The no-op gate must read `projects.toml` (`forge_project_registry`). Parsing TOML in a
-minimal shim is itself startup cost. If a stdlib `tomllib` shim cannot hit the ceiling, the fallback is a **derived
-plain-list cache** (a flat, cheap-to-read file the CLI keeps in sync with `projects.toml`) -- not "fall back to the
+**TOML-parse-in-shim tension -- dissolved by D-T3-c (registry is JSON).** The no-op gate reads `~/.forge/projects.json`
+(`forge_project_registry`), **not** TOML: the epic's D-T3-c decision settled the registry format as JSON, so the shim
+parses stdlib `json` (lighter than the earlier-planned `tomllib`) and the original TOML-parse cost concern is gone.
+Parsing is still some startup cost, so if even a `json` shim cannot hit the ceiling, the fallback stays a **derived
+plain-list cache** (a flat, cheap-to-read file the CLI keeps in sync with `projects.json`) -- not "fall back to the
 slower symlink." Do not resolve a missed shim budget by reintroducing full-startup-per-hook.
 
 Because `forge_project_registry` (schema + read) precedes this ticket, the benchmark measures the **real** gate, not a
@@ -122,7 +124,7 @@ If the shim shape wins, the detection update (`has_forge_hook` + callers) is **r
 | Dispatcher resolves global Forge | dispatcher installed, no venv on `PATH` | hook command exits 0 and dispatches to the global `forge`                                                                    | `tests/src/install/test_hook_dispatcher.py` (new) |
 | Outside project no-ops           | cwd outside enrolled roots              | exits 0 without loading project state / importing Forge                                                                      | same                                              |
 | Managed session short-circuits   | `FORGE_SESSION` set, cwd not enrolled   | dispatches anyway (managed session keeps hooks)                                                                              | same                                              |
-| Corrupt registry fails open      | corrupt/newer `projects.toml`, hook run | dispatcher degrades to not-enrolled, exits 0, does not error (integration; the read-helper unit is `forge_project_registry`) | same                                              |
+| Corrupt registry fails open      | corrupt/newer `projects.json`, hook run | dispatcher degrades to not-enrolled, exits 0, does not error (integration; the read-helper unit is `forge_project_registry`) | same                                              |
 | Literal absolute path            | user hook install                       | config contains `/abs/home/.forge/bin/...`, not `~`                                                                          | same                                              |
 | Stale target resolved            | recorded `forge` path stale             | tries known tool locations or reports an actionable resolution error                                                         | same                                              |
 | No-op path is cheap              | non-Forge repo, per-Read cadence        | no-op exits under the benchmark ceiling; no Forge import                                                                     | same (perf assertion)                             |

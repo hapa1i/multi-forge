@@ -915,7 +915,7 @@ Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` — so a healthy global
 install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the mechanical signal
 for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
-`{install_kind, forge_path, on_path, on_path_minimal, advice}`.
+`{install_kind, forge_path, on_path, on_path_minimal, advice, project_registry, project_compatibility}`.
 
 ### C.1 Scope model
 
@@ -955,12 +955,69 @@ Profiles:
 
 All settings modifications must be backed up first (`settings.json.forge-backup`).
 
-### C.4 Tracking file (`~/.forge/installed.json`)
+### C.4 Durable install/project files
+
+#### Installed manifest (`~/.forge/installed.json`)
 
 The installer must track what it changed so:
 
 - `forge extension sync` updates only tracked items
 - `forge extension disable` removes only tracked files and reverts only Forge-added settings entries
+
+#### Trusted project registry (`~/.forge/projects.json`)
+
+The project registry is user-global, machine-written JSON owned by Forge. It is not a hand-edit configuration surface.
+Schema version 1 is:
+
+```json
+{
+  "schema_version": 1,
+  "projects": [
+    {
+      "canonical_path": "/absolute/path/to/forge_root",
+      "enrolled_at": "2026-07-07T00:00:00Z",
+      "enrollment_source": "enable"
+    }
+  ]
+}
+```
+
+`enrollment_source` is one of `manual`, `enable`, `worktree`, or `backfill`. Project/local `forge extension enable`
+enrolls the target Forge project root; user-scope enable enrolls nothing by itself. Managed worktree/session creation
+enrolls the new Forge project root with source `worktree`.
+
+All writers perform read-modify-write under the registry `.lock` via `file_lock_for_target(...)`, then persist with an
+atomic JSON write. The canonical lookup form is the absolute, symlink-resolved path string. Matching first compares that
+string exactly; if both paths currently exist, `samefile()` may confirm that spelling/case/normalization variants are
+the same directory. Deleted/stale roots match only by exact canonical string. This avoids granting trust to a distinct
+case-variant checkout on case-sensitive filesystems while still handling case/normalization-insensitive filesystems when
+the path can be stat'd.
+
+Registry reads have two postures from the same parser:
+
+- **Command/doctor path:** strict. Corrupt or newer-schema content is an error with a reset path.
+- **Hook/dispatcher path:** fail open with a `degraded` reason. The routing decision treats this as not enrolled, while
+  `forge extension doctor` is the authoritative surfacing point.
+
+Doctor reports corrupt/newer registry state and basic stale roots. Reconcile/prune actions stay with the cleanup
+tickets. A managed session remains active while its session identity is present in the hook environment; the dispatcher
+gate is implemented in the hook-dispatcher ticket.
+
+#### Project compatibility pin (`<forge_root>/.forge/project.toml`)
+
+The compatibility pin is repo-local, user-authored TOML. It is intentionally distinct from the machine-written
+`~/.forge/projects.json` registry. Schema version 1 is:
+
+```toml
+schema_version = 1
+required_forge = ">=1.2,<2"
+```
+
+Missing file means compatible/unconstrained and is silent. Malformed or unsupported-schema files fail clear on command
+paths and are surfaced by doctor. A valid but incompatible `required_forge` blocks covered project-local command
+mutations with an "upgrade the global Forge or reset project state" hint. Hook-style reads use the lenient posture:
+degrade to unconstrained and report a diagnostic rather than bricking an active coding session. The guardrail is a
+fail-clear warning system for D1's accepted one-global-Forge version coupling; it is not a version manager.
 
 ### C.5 Multi-scope installation (skill resolution)
 

@@ -1055,6 +1055,15 @@ def fork(
             except Exception:
                 pass
 
+        if extension_root is not None:
+            try:
+                from forge.install.project_registry import ProjectRegistryStore
+
+                # Managed worktree creation is the trust event; extension install may be skipped.
+                ProjectRegistryStore().enroll(extension_root, "worktree")
+            except Exception:
+                logger.debug("Worktree registry enrollment failed", exc_info=True)
+
         if not _skip_extensions and extension_root is not None:
             # Use forge_root (where .claude/ and .forge/ live), not checkout_root.
             # The tracking store keys by forge_root, so get_repo_root() misses when

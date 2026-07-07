@@ -5,11 +5,18 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-Most recent member: **T1 [`global_forge_install`](../../done/global_forge_install/card.md)** -- shipped (merged in #89,
-now in `done/`). No member is currently active; the next pick awaits the **D2 timing decision** (T2 on the incident
-track vs T3 to open the user-scope-model track), now ripe on T1's doctor evidence. T1 was chosen first because it is
-dependency-free (card: "Ship first") and a prerequisite for **both** tracks (T1 -> T2; T1 -> T3 -> T4 -> T5 -> T6), so
-starting it did **not** force D2.
+**D2 resolved (2026-07-06): skip T2.** The epic owner confirmed **terminal-only** Claude launches, which inherit the
+shell PATH and already resolve `forge` -- so the exit-127 incident is latent and the interim absolute-path fix (T2) has
+no residual value (its hook bytes would be superseded by T5 anyway; its statusLine rewrite is the only orphan, recorded
+under D2 below). Two members are now **active in `doing/`**, picked up together on branch `forge-project-registry`:
+
+- **T3 [`forge_project_registry`](../forge_project_registry/card.md)** -- critical path; opens the user-scope-model
+  track (T3 -> T4 -> T5 -> T6). Its shipped read half is the dependency for T4's no-op gate.
+- **T7 [`forge_project_compat`](../forge_project_compat/card.md)** -- off-path `required_forge` guardrail; independent,
+  can land any time.
+
+Both carry execution checklists; implementation is **pending review** (no code yet). T1
+[`global_forge_install`](../../done/global_forge_install/card.md) shipped in #89 and remains the only merged member.
 
 ## Activation bookkeeping (this branch)
 
@@ -32,12 +39,13 @@ starting it did **not** force D2.
 
 Record outcomes here as members are picked up.
 
-- [ ] **D2 timing (owner T2) -- presumptive SKIP of T2, with a named criterion:** after T1, ship the interim
-  absolute-path fix `forge_hook_absolute_command` (T2), or jump straight to the user-scope model (T3 -> T4 -> T5 -> T6)?
-  Cost weighs against T2: it re-runs the epic's riskiest maneuver (registered-byte changes under append+dedupe merge,
-  the statusLine scalar conflict-abort path, a paired T10 sidecar exemption, one Codex re-trust) -- the same seams T5
-  must touch -- to produce bytes T5 deletes and a second re-trust supersedes. T2's only residual value after T1 is a
-  hook subprocess on a minimal PATH that lacks `~/.local/bin`.
+- [x] **D2 timing (owner T2) -- RESOLVED 2026-07-06: SKIP T2.** Epic owner confirmed terminal-only launch; resolution in
+  the Decision bullet at the end of this block. Rationale kept for the record: after T1, ship the interim absolute-path
+  fix `forge_hook_absolute_command` (T2), or jump straight to the user-scope model (T3 -> T4 -> T5 -> T6)? Cost weighs
+  against T2: it re-runs the epic's riskiest maneuver (registered-byte changes under append+dedupe merge, the statusLine
+  scalar conflict-abort path, a paired T10 sidecar exemption, one Codex re-trust) -- the same seams T5 must touch -- to
+  produce bytes T5 deletes and a second re-trust supersedes. T2's only residual value after T1 is a hook subprocess on a
+  minimal PATH that lacks `~/.local/bin`.
   - **Criterion (decide via T1 doctor evidence):** skip T2 unless, post-T1, `forge` is unreachable in a launch
     environment actually in use -- probed mechanically by doctor's minimal-PATH check
     (`PATH=/usr/bin:/bin:/usr/sbin:/sbin`, the GUI/launchd case that excludes `~/.local/bin`). Terminal-launched Claude
@@ -56,14 +64,27 @@ Record outcomes here as members are picked up.
     not by itself put `forge` on a Dock/IDE-launched hook's PATH. The decision now reduces to the *usage* question the
     criterion names: is a GUI/Dock launch actually in use, or is launch terminal-only (which inherits the shell PATH and
     resolves `forge`)?
-  - **Decision: actionable now (T1 merged in #89), awaiting the epic owner.** Per the stated lean (presumptive skip) +
-    the "launch from a terminal" workaround: terminal-only usage -> **skip T2, next member T3**; if GUI/Dock launch is a
-    supported path -> T2 stays. Not resolved unilaterally here.
+  - **Decision (2026-07-06): SKIP T2 -- epic owner confirmed terminal-only launch.** Claude is launched from a terminal,
+    which inherits the shell PATH and already resolves `forge`, so the minimal-PATH hook reachability gap (T2's only
+    residual value after T1) does not apply. Next members: **T3** (critical path) + **T7** (off-path guardrail), picked
+    up together. **Recorded consequences:** (a) `forge status-line` stays bare permanently -- T2 was its only
+    absolute-path rewriter, D3 keeps it project-scoped, and it self-gates on `FORGE_SESSION` (acceptable); (b) **T2-card
+    disposition** -- fold its unmerge-before-merge groundwork + paired T10 sidecar exemption into T5; the T2 card stays
+    in `proposed/` as superseded-not-abandoned. Reopen only if a GUI/Dock/IDE launch becomes a supported path.
 - [ ] **T4 benchmark (owner T4):** dispatcher shim (`forge-hook`, hyphen) vs absolute-symlink. Outcome decides whether
   T5 must update presence detection (the `has_forge_hook` needle is `"forge hook"`, with a space).
-- [ ] **T3 trust model (owner T3):** explicit enroll only vs auto-enroll on enable / worktree-create for
-  `~/.forge/projects.toml`.
-- [ ] Next member after T1: pick per the D2 decision (T2 on the incident track, or T3 to open the model track).
+- [x] **T3 trust model (owner T3) -- RESOLVED 2026-07-07:** enroll-on-enable + auto-enroll-on-managed-worktree, keeping
+  `enrollment_source` provenance. Explicit-only rejected -- `extension enable` is itself the consent and a managed
+  worktree/fork is derived consent, so explicit-only adds friction without a safety property (the dangerous design,
+  enroll-on-*detection*, was never proposed) while creating the unenrolled-managed-session failure mode. Detail in the
+  T3 checklist Phase 0.
+- [x] **T3 file format (owner T3) -- RESOLVED 2026-07-07 (D-T3-c):** `~/.forge/projects.json` (machine-written JSON,
+  house pattern; reuses the versioned-JSON helpers; dissolves T4's TOML-parse-in-shim tension), not `.toml`. Seam 2
+  amended. Detail in the T3 checklist Phase 0.
+- [x] Next member after T1: **T3 `forge_project_registry`** (critical path) + **T7 `forge_project_compat`** (off-path
+  companion), picked up together 2026-07-06; both `git mv` `proposed/ -> doing/` on branch `forge-project-registry`,
+  epic/member links repointed, execution checklists added. T3 Phase 1--3 implementation and T7's first command-path
+  guard slice landed 2026-07-07; T7's broader mutator sweep remains tracked in its member checklist before closeout.
 
 ## Shared-contract seams (drift watch)
 
@@ -71,7 +92,7 @@ Each seam is honored **per-member** (seam 1 alone binds T2/T5/T6), so a single m
 boxes tick at **epic closeout**; interim per-member verification lives in the member checklists.
 
 - [ ] Seam 1 -- all registered command strings + shared matcher (byte-identity is the API; unmerge-before-merge).
-- [ ] Seam 2 -- `~/.forge/projects.toml` schema + one canonicalization rule.
+- [ ] Seam 2 -- `~/.forge/projects.json` schema (JSON, D-T3-c) + one canonicalization rule.
 - [ ] Seam 3 -- Forge-binary resolution contract (+ `FORGE_SESSION` / managed-session short-circuit).
 - [ ] Seam 4 -- runtime hooks live only at user scope (statusLine is the D3 exception -- stays project-scoped).
 - [ ] Seam 5 -- host vs sidecar execution (T10 owns in-container resolution, `FORGE_SIDECAR`-keyed).

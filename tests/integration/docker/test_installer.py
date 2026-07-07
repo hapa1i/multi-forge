@@ -124,6 +124,19 @@ print('hooks present')
         forge_check = synced_container.exec("test -d ~/repo-forge-anchor/.forge && echo forge-ok")
         assert "forge-ok" in forge_check.stdout, ".forge/ should exist after enable (Rule 1 anchor)"
 
+        registry_check = synced_container.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+registry = json.loads((Path.home() / '.forge' / 'projects.json').read_text())
+paths = {entry['canonical_path'] for entry in registry['projects']}
+expected = str((Path.home() / 'repo-forge-anchor').resolve())
+assert expected in paths, f'{expected} not enrolled: {paths}'
+print('registry-ok')
+"
+        """)
+        assert "registry-ok" in registry_check.stdout, f"Project registry check failed: {registry_check.stderr}"
+
     def test_init_project_dry_run_does_not_create_claude_anchor(self, synced_container: ContainerLike) -> None:
         """--dry-run should not create .claude/ as a side effect."""
         synced_container.exec("rm -rf ~/.claude ~/.forge ~/repo-dry-run")

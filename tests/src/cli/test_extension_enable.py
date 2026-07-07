@@ -19,6 +19,7 @@ from forge.cli.extensions import (
 from forge.core.paths import find_git_root
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallScope
+from forge.install.project_registry import ProjectRegistryStore
 
 
 def test_scope_help_is_shared_across_extension_commands() -> None:
@@ -213,6 +214,87 @@ class TestEnableFailureCleanup:
 
         assert result.exit_code != 0
         assert not (repo / ".forge").is_dir()
+
+
+class TestEnableProjectRegistry:
+    """Tests for trusted-project enrollment during extension enable."""
+
+    def _successful_plan(self) -> Any:
+        from unittest.mock import MagicMock
+
+        plan = MagicMock()
+        plan.has_conflicts = False
+        plan.conflicts = []
+        plan.files = []
+        plan.settings = []
+        plan.codex = None
+        plan.modules = []
+        plan.profile = "minimal"
+        return plan
+
+    def test_local_enable_enrolls_project_root(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.cli.extensions import enable_cmd
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        (repo / ".claude").mkdir()
+
+        with (
+            patch("forge.cli.extensions.Installer") as MockInstaller,
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+        ):
+            MockInstaller.return_value.init.return_value = self._successful_plan()
+            mock_ver.return_value = MagicMock(ok=True)
+            result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
+
+        assert result.exit_code == 0, result.output
+        assert (repo / ".forge").is_dir()
+        assert ProjectRegistryStore().contains_root(repo)
+
+    def test_user_enable_does_not_enroll_project_root(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.cli.extensions import enable_cmd
+
+        with (
+            patch("forge.cli.extensions.Installer") as MockInstaller,
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+        ):
+            MockInstaller.return_value.init.return_value = self._successful_plan()
+            mock_ver.return_value = MagicMock(ok=True)
+            result = CliRunner().invoke(enable_cmd, ["--scope", "user"])
+
+        assert result.exit_code == 0, result.output
+        assert not ProjectRegistryStore().path.exists()
+
+    def test_incompatible_project_pin_blocks_enable_before_install(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.cli.extensions import enable_cmd
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        (repo / ".claude").mkdir()
+        (repo / ".forge").mkdir()
+        (repo / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+
+        with (
+            patch("forge.cli.extensions.Installer") as MockInstaller,
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+        ):
+            mock_ver.return_value = MagicMock(ok=True)
+            result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
+
+        assert result.exit_code == 1
+        assert "requires Forge >=9999" in result.output
+        MockInstaller.assert_not_called()
 
 
 class TestEmptyModuleWarning:

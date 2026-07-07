@@ -19,13 +19,13 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 
 ### Installation
 
-| Command                   | Purpose                                                      |
-| ------------------------- | ------------------------------------------------------------ |
-| `forge extension enable`  | Install Forge extensions (commands, agents, hooks, settings) |
-| `forge extension sync`    | Update existing installation to current version              |
-| `forge extension disable` | Remove Forge installation cleanly                            |
-| `forge extension status`  | Show installation status (`--json`)                          |
-| `forge extension doctor`  | Report install kind + `forge` PATH reachability (`--json`)   |
+| Command                   | Purpose                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `forge extension enable`  | Install Forge extensions; project/local installs enroll the trusted project root |
+| `forge extension sync`    | Update existing installation to current version                                  |
+| `forge extension disable` | Remove Forge installation cleanly                                                |
+| `forge extension status`  | Show installation status (`--json`)                                              |
+| `forge extension doctor`  | Report install, project registry, and compatibility status (`--json`)            |
 
 ### Session management
 

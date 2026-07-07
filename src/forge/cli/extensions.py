@@ -38,6 +38,11 @@ from forge.install.models import (
     InstallScope,
     get_gated_skills,
 )
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    enforce_project_compatibility,
+)
+from forge.install.project_registry import EnrollmentSource, ProjectRegistryStore
 from forge.install.tracking import TrackingStore
 
 console = Console()
@@ -145,6 +150,38 @@ def _warn_if_modules_have_no_files(
         "Your Forge installation may be missing bundled extensions. "
         "Try reinstalling: 'pip install --force-reinstall <wheel>'."
     )
+
+
+def _enforce_project_compatibility(project_root: Path | None) -> None:
+    """Block project-local mutations when `.forge/project.toml` requires it."""
+
+    if project_root is None:
+        return
+    try:
+        enforce_project_compatibility(project_root)
+    except ProjectCompatibilityError as e:
+        print_error(f"{e.reason}")
+        print_tip(
+            "Edit .forge/project.toml, upgrade the global Forge, or reset project state.",
+            console=console,
+        )
+        sys.exit(1)
+
+
+def _enroll_project_root(
+    project_root: Path | None,
+    source: EnrollmentSource,
+    *,
+    announce: bool = False,
+) -> None:
+    """Enroll a project/local install target in the trusted-project registry."""
+
+    if project_root is None:
+        return
+    result = ProjectRegistryStore().enroll(project_root, source)
+    if announce:
+        state = "enrolled" if result.created else "already enrolled"
+        console.print(f"[dim]Project registry: {state} {display_path(result.entry.canonical_path)}[/dim]")
 
 
 def _print_completion_message(
@@ -419,6 +456,8 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
             install_scope = InstallScope(scope)
             project_root = Path(project_path) if project_path else None
 
+            _enforce_project_compatibility(project_root)
+
             installer = Installer(scope=install_scope, project_root=project_root)
             installer.uninstall()
             console.print("  [green]✓ Done[/green]")
@@ -585,6 +624,8 @@ def enable_cmd(
             if project_root is not None:
                 needs_create = not (project_root / ".claude").is_dir()
 
+        _enforce_project_compatibility(project_root)
+
         # Create .claude/ only when not dry-run
         if needs_create and project_root is not None:
             if dry_run:
@@ -633,6 +674,7 @@ def enable_cmd(
                     (project_root / ".forge").mkdir(exist_ok=True)
                     _log.info("Created %s for session state", project_root / ".forge")
 
+                _enroll_project_root(project_root, "enable", announce=True)
                 _print_completion_message(plan, install_scope, project_root, TrackingStore())
 
     except click.UsageError:
@@ -701,6 +743,8 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             install_scope = InstallScope(scope)
             # Use canonical project root (finds .claude/ and resolves symlinks)
             project_root = _resolve_project_root(install_scope)
+
+        _enforce_project_compatibility(project_root)
 
         installer = Installer(scope=install_scope, project_root=project_root)
         plan = installer.update(force=force)
@@ -799,6 +843,8 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             install_scope = InstallScope(scope)
             # Use canonical project root (finds .claude/ and resolves symlinks)
             project_root = _resolve_project_root(install_scope)
+
+        _enforce_project_compatibility(project_root)
 
         project_path_str = str(project_root) if project_root else None
         existing = tracking.get_installation(install_scope.value, project_path_str)
@@ -1075,15 +1121,24 @@ def doctor_cmd(as_json: bool) -> None:
     """
     import json
 
+    from forge.core.ops.context import find_forge_root
     from forge.install.doctor import diagnose_install
+    from forge.install.project_compat import diagnose_project_compatibility
+    from forge.install.project_registry import diagnose_project_registry
 
     # Diagnostic: always exits 0 -- health lives in the payload (install_kind,
     # on_path*, advice), not the exit code. A non-zero-on-unhealthy mode is a
     # future question if hooks/CI ever gate on doctor (epic T2/T5).
     diag = diagnose_install()
+    registry_diag = diagnose_project_registry()
+    compat_root = find_forge_root(Path.cwd().resolve())
+    compat_diag = diagnose_project_compatibility(compat_root)
 
     if as_json:
-        click.echo(json.dumps(diag.to_dict(), indent=2))
+        payload = diag.to_dict()
+        payload["project_registry"] = registry_diag.to_dict()
+        payload["project_compatibility"] = compat_diag.to_dict()
+        click.echo(json.dumps(payload, indent=2))
         return
 
     console.print("\n[bold]Forge install doctor[/bold]")
@@ -1100,3 +1155,26 @@ def doctor_cmd(as_json: bool) -> None:
 
     if diag.advice:
         print_tip(diag.advice, commands=list(diag.advice_commands), console=console)
+
+    console.print("\n[bold]Project registry[/bold]")
+    console.print(f"  Path:           {display_path(registry_diag.path)}")
+    console.print(f"  Status:         {registry_diag.status}")
+    console.print(f"  Enrolled roots: {registry_diag.enrolled_count}")
+    if registry_diag.stale_roots:
+        console.print("  Stale roots:")
+        for root in registry_diag.stale_roots:
+            console.print(f"    - {display_path(root)}")
+    if registry_diag.error:
+        console.print(f"  Error:          {registry_diag.error}")
+    if registry_diag.advice:
+        print_tip(registry_diag.advice, console=console)
+
+    console.print("\n[bold]Project compatibility[/bold]")
+    console.print(f"  Status:         {compat_diag.state}")
+    if compat_diag.path:
+        console.print(f"  File:           {display_path(compat_diag.path)}")
+    if compat_diag.required_forge:
+        console.print(f"  Required Forge: {compat_diag.required_forge}")
+    console.print(f"  Running Forge:  {compat_diag.running_forge}")
+    if compat_diag.reason:
+        console.print(f"  Detail:         {compat_diag.reason}")
