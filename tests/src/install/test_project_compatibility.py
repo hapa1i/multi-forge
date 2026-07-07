@@ -40,6 +40,15 @@ def test_compatible_specifier_is_no_op(tmp_path: Path) -> None:
     assert result.required_forge == ">=1,<2"
 
 
+def test_prerelease_running_forge_satisfies_matching_range(tmp_path: Path) -> None:
+    _write_project_toml(tmp_path, 'schema_version = 1\nrequired_forge = ">=0.9"\n')
+
+    result = enforce_project_compatibility(tmp_path, running_forge="0.10.0.dev1")
+
+    assert result.compatible is True
+    assert result.required_forge == ">=0.9"
+
+
 def test_incompatible_pin_blocks_command_path(tmp_path: Path) -> None:
     _write_project_toml(tmp_path, 'schema_version = 1\nrequired_forge = ">=9"\n')
 

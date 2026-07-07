@@ -36,14 +36,33 @@ def test_enroll_canonicalizes_symlink_and_lookup_hits_inside_root(tmp_path: Path
     assert lookup.enrolled_root == str(repo.resolve())
 
 
-def test_case_variant_lookup_key_unifies(tmp_path: Path) -> None:
+def test_case_variant_samefile_unifies_on_case_insensitive_filesystem(tmp_path: Path) -> None:
     repo = tmp_path / "Repo"
     repo.mkdir()
+    variant = repo.with_name("repo")
+    if not variant.exists():
+        pytest.skip("filesystem is case-sensitive")
     store = ProjectRegistryStore(tmp_path / "projects.json")
 
     store.enroll(repo, "enable")
 
-    assert store.contains_root(str(repo).swapcase())
+    assert store.contains_root(variant)
+
+
+def test_case_variant_distinct_roots_do_not_collide_on_case_sensitive_filesystem(tmp_path: Path) -> None:
+    trusted = tmp_path / "Repo"
+    hostile = tmp_path / "repo"
+    (trusted / ".forge").mkdir(parents=True)
+    try:
+        (hostile / ".forge").mkdir(parents=True)
+    except FileExistsError:
+        pytest.skip("filesystem is case-insensitive")
+    store = ProjectRegistryStore(tmp_path / "projects.json")
+
+    store.enroll(trusted, "enable")
+
+    assert not store.contains_root(hostile)
+    assert store.lookup_enrolled_root(hostile).enrolled is False
 
 
 def test_relative_and_trailing_paths_are_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -258,6 +258,7 @@ def _auto_install_extensions(
         try:
             from forge.install.project_registry import ProjectRegistryStore
 
+            # Managed worktree creation is the trust event; extension install may be skipped.
             ProjectRegistryStore().enroll(install_root, "worktree")
         except Exception:
             logger.debug("Worktree registry enrollment failed", exc_info=True)

@@ -75,7 +75,8 @@ isolation is out of scope.
   not warn.
 - [ ] **Remaining mutator sweep:** wire or explicitly split follow-up coverage for hook confirmed-state writes,
   memory-writer doc writes, and proxy/backend registry mutations. This is the remaining condition before claiming every
-  state-mutating path observes `.forge/project.toml`.
+  state-mutating path observes `.forge/project.toml`. If the sweep splits to a follow-up card before release, move the
+  lenient hook helper with its first production caller rather than shipping unused contract code indefinitely.
 
 Acceptance (Phases 1--2):
 

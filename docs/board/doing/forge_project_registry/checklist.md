@@ -79,12 +79,12 @@ Record hand-offs so the ticket does not creep:
   the mechanism** here rather than "account for":
   - Tradeoff -- **inode / `os.path.samefile`** is robust against macOS default case-insensitivity and APFS's
     normalization-insensitive matching, **but requires the path to exist** (a moved/deleted root can't be stat'd, which
-    collides with Phase-2 stale-root handling). **Resolved-string comparison** is existence-independent **but must
-    explicitly case-fold + Unicode-normalize**: note APFS preserves the caller's spelling/normalization,
-    `posixpath.normcase` is a **no-op** on POSIX, and `Path.resolve()` preserves case, so none unifies `/Users/x` vs
-    `/users/x` on its own.
-  - **Lean:** store a canonical *resolved string* for lookup (existence-independent) with documented case/Unicode
-    handling; reserve `samefile` for existence-confirmed reconciles only.
+    collides with Phase-2 stale-root handling). **Folded resolved-string comparison** is existence-independent but would
+    falsely unify distinct case/Unicode variants on case-sensitive filesystems.
+  - **Resolved:** store the canonical resolved string; match by exact canonical string first, then `samefile()` only
+    when both paths exist. Deleted/stale roots intentionally match only exact strings. This preserves trust boundaries
+    on case-sensitive filesystems while still supporting same-directory spelling variants on case-insensitive
+    filesystems.
 - [x] **Dual read semantics from one parser:**
   - **CLI path -> strict.** Unsupported `schema_version` fails with a clear "written by newer Forge -- upgrade" message;
     unknown fields are corruption (coding_standards §5).

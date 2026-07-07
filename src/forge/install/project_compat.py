@@ -112,7 +112,7 @@ def check_project_compatibility(
             state="malformed",
         ) from e
 
-    if running not in specifier:
+    if not specifier.contains(running, prereleases=True):
         reason = (
             f"project requires Forge {required}, but running Forge is {running_forge}. "
             "Upgrade the global Forge or reset project state."

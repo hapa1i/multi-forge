@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, NoReturn, cast
 
 from forge.core.paths import get_forge_home
-from forge.core.state import atomic_write_json, file_lock_for_target, now_iso, read_versioned_json_object
+from forge.core.state import (
+    atomic_write_json,
+    file_lock_for_target,
+    now_iso,
+    read_versioned_json_object,
+)
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.exceptions import ForgeInstallError
 
@@ -111,10 +115,28 @@ def canonicalize_project_path(path: str | Path) -> str:
 
 
 def project_path_lookup_key(path: str | Path) -> str:
-    """Return the comparison key shared by registry writes and reads."""
+    """Return the exact canonical comparison key shared by registry writes and reads."""
 
-    resolved = canonicalize_project_path(path)
-    return unicodedata.normalize("NFC", resolved).casefold()
+    return canonicalize_project_path(path)
+
+
+def _same_existing_path(left: str | Path, right: str | Path) -> bool:
+    try:
+        return Path(left).samefile(Path(right))
+    except OSError:
+        return False
+
+
+def project_paths_match(enrolled_path: str | Path, candidate_path: str | Path) -> bool:
+    """Return whether two project roots refer to the same trusted root."""
+
+    enrolled_key = project_path_lookup_key(enrolled_path)
+    candidate_key = project_path_lookup_key(candidate_path)
+    if enrolled_key == candidate_key:
+        return True
+    if _same_existing_path(enrolled_key, candidate_key):
+        return True
+    return False
 
 
 def _handle_registry_version_mismatch(path: Path, _data: dict[str, Any], version: Any) -> NoReturn:
@@ -206,11 +228,10 @@ class ProjectRegistryStore:
             raise ValueError(f"unsupported enrollment source: {source}")
 
         canonical_path = canonicalize_project_path(root)
-        key = project_path_lookup_key(canonical_path)
         with file_lock_for_target(target_path=self.path, timeout_s=5.0):
             registry = self.read_strict()
             for entry in registry.projects:
-                if project_path_lookup_key(entry.canonical_path) == key:
+                if project_paths_match(entry.canonical_path, canonical_path):
                     return EnrollmentResult(entry=entry, created=False)
 
             entry = EnrolledProject(
@@ -224,9 +245,8 @@ class ProjectRegistryStore:
     def contains_root(self, root: str | Path) -> bool:
         """Return True when *root* is an enrolled canonical root."""
 
-        key = project_path_lookup_key(root)
         registry = self.read_strict()
-        return any(project_path_lookup_key(entry.canonical_path) == key for entry in registry.projects)
+        return any(project_paths_match(entry.canonical_path, root) for entry in registry.projects)
 
     def lookup_enrolled_root(self, start: str | Path) -> EnrolledRootLookup:
         """Return whether *start* is inside an enrolled Forge project root."""
@@ -241,9 +261,8 @@ class ProjectRegistryStore:
         if read.degraded is not None:
             return EnrolledRootLookup(enrolled=False, enrolled_root=None, degraded=read.degraded)
 
-        key = project_path_lookup_key(root)
         for entry in read.registry.projects:
-            if project_path_lookup_key(entry.canonical_path) == key:
+            if project_paths_match(entry.canonical_path, root):
                 return EnrolledRootLookup(enrolled=True, enrolled_root=entry.canonical_path)
         return EnrolledRootLookup(enrolled=False, enrolled_root=None)
 
@@ -304,5 +323,7 @@ def diagnose_project_registry(path: Path | None = None) -> ProjectRegistryDiagno
         enrolled_count=len(registry.projects),
         stale_roots=stale,
         error=None,
-        advice="Stale roots are report-only here; reconcile/prune is handled by the cleanup tickets." if stale else None,
+        advice=(
+            "Stale roots are report-only here; reconcile/prune is handled by the cleanup tickets." if stale else None
+        ),
     )

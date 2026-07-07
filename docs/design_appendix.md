@@ -987,9 +987,11 @@ enrolls the target Forge project root; user-scope enable enrolls nothing by itse
 enrolls the new Forge project root with source `worktree`.
 
 All writers perform read-modify-write under the registry `.lock` via `file_lock_for_target(...)`, then persist with an
-atomic JSON write. The canonical lookup form is the absolute, symlink-resolved path string, compared with explicit
-Unicode NFC normalization and case-folding. This keeps stale-root reporting possible without relying on `samefile()` for
-deleted paths; APFS preserves the caller's spelling/normalization even when matching is case/normalization-insensitive.
+atomic JSON write. The canonical lookup form is the absolute, symlink-resolved path string. Matching first compares that
+string exactly; if both paths currently exist, `samefile()` may confirm that spelling/case/normalization variants are
+the same directory. Deleted/stale roots match only by exact canonical string. This avoids granting trust to a distinct
+case-variant checkout on case-sensitive filesystems while still handling case/normalization-insensitive filesystems when
+the path can be stat'd.
 
 Registry reads have two postures from the same parser:
 

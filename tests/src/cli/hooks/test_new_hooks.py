@@ -379,6 +379,7 @@ class TestWorktreeCreate:
                 "forge.install.installer.Installer.init",
                 side_effect=RuntimeError("install failed"),
             ),
+            patch("forge.install.project_registry.ProjectRegistryStore.enroll") as mock_enroll,
         ):
             payload = {"session_id": "abc12345", "cwd": str(repo_root), "name": "ext-fail-wt"}
             runner = CliRunner()
@@ -387,6 +388,8 @@ class TestWorktreeCreate:
         # Should still succeed — extensions are non-fatal
         assert result.exit_code == 0
         assert "ext-fail-wt" in result.output
+        mock_enroll.assert_called_once()
+        assert mock_enroll.call_args.args[1] == "worktree"
 
 
 # ---------------------------------------------------------------------------

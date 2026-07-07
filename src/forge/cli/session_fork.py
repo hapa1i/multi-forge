@@ -1059,6 +1059,7 @@ def fork(
             try:
                 from forge.install.project_registry import ProjectRegistryStore
 
+                # Managed worktree creation is the trust event; extension install may be skipped.
                 ProjectRegistryStore().enroll(extension_root, "worktree")
             except Exception:
                 logger.debug("Worktree registry enrollment failed", exc_info=True)
