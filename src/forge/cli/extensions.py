@@ -5,6 +5,7 @@ Commands:
 - forge extension sync    - Sync existing extensions
 - forge extension disable - Disable extensions
 - forge extension status  - Show extensions status
+- forge extension doctor  - Report install kind + PATH reachability
 """
 
 from __future__ import annotations
@@ -1055,3 +1056,44 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                 )
             else:
                 print_tip("Run 'forge extension enable' to set up Forge.", console=console)
+
+
+@extensions.command("doctor")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def doctor_cmd(as_json: bool) -> None:
+    """Report how Forge is installed and whether it is globally reachable.
+
+    Answers "how was ``forge`` installed, and can a hook subprocess find it?" --
+    the install kind (global tool / editable / venv), the resolved ``forge``
+    launcher path, and PATH reachability including a GUI/launchd-style minimal
+    PATH. Distinct from ``forge info`` (the general dashboard).
+
+    \b
+    Examples:
+        forge extension doctor
+        forge extension doctor --json
+    """
+    import json
+
+    from forge.install.doctor import GLOBAL_INSTALL_COMMANDS, diagnose_install
+
+    diag = diagnose_install()
+
+    if as_json:
+        click.echo(json.dumps(diag.to_dict(), indent=2))
+        return
+
+    console.print("\n[bold]Forge install doctor[/bold]")
+    console.print(f"  Install kind:    {diag.install_kind}")
+    forge_path = display_path(diag.forge_path) if diag.forge_path else "[yellow]not found[/yellow]"
+    console.print(f"  forge path:      {forge_path}")
+    console.print(f"  On PATH:         {'[green]yes[/green]' if diag.on_path else '[red]no[/red]'}")
+    # on_path_minimal=no is expected even for a healthy global install (~/.local/bin
+    # is not on launchd's PATH), so it is shown plainly, not as a health failure.
+    console.print(
+        f"  On minimal PATH: {'yes' if diag.on_path_minimal else 'no'} "
+        "[dim](GUI/launchd default -- excludes ~/.local/bin)[/dim]"
+    )
+
+    if diag.advice:
+        print_tip(diag.advice, commands=list(GLOBAL_INSTALL_COMMANDS), console=console)

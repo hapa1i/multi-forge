@@ -19,62 +19,87 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
 
 ## Phase 0 -- Grounding (verify landing points before coding)
 
-- [ ] Confirm the `forge extension` group and how leaves register (`src/forge/cli/extensions.py`); confirm
-  `enable/sync/disable/status` are today's leaves (cli_reference Installation table).
-- [ ] Define the install-kind detection rule with no guessing: resolved `forge` path (`shutil.which`,
-  `sys.argv[0]`/`sys.executable`), editable marker (PEP 610 `direct_url.json` `dir_info.editable`, `*.pth`,
-  `__editable__`), and location (`~/.local/bin` launcher vs project `.venv/bin`). **Assertion:** a documented rule per
-  kind -- `global` / `editable-or-venv` / `unknown`.
-- [ ] Confirm `uv tool` (`~/.local/bin`) vs `pipx` layouts so `doctor` resolves both (card risk).
+- [x] Confirm the `forge extension` group and how leaves register (`src/forge/cli/extensions.py`); confirm
+  `enable/sync/disable/status` are today's leaves. Verified: `extensions()` group, leaves via
+  `@extensions.command(...)`; `status_cmd` is the `--json` template (`click.echo(json.dumps(...))`).
+- [x] Define the install-kind detection rule with no guessing. Documented in `src/forge/install/doctor.py`: **editable**
+  (PEP 610 `direct_url.json` `dir_info.editable`) > **global** (launcher parent in `~/.local/bin` / `XDG_BIN_HOME` /
+  `PIPX_BIN_DIR`) > **venv** (`bin`/`Scripts` dir with sibling `pyvenv.cfg`) > **unknown**. Launcher path is the on-PATH
+  symlink a user sees (not its target), so `uv tool`'s `~/.local/bin` link classifies as global.
+- [x] Confirm `uv tool` (`~/.local/bin`) vs `pipx` layouts so `doctor` resolves both. `_global_bin_dirs` honors
+  `~/.local/bin` + `XDG_BIN_HOME` + `PIPX_BIN_DIR`; `test_global_tool_layouts_resolve_global` parametrizes all three.
 - Note: keep `doctor` distinct from `forge info` -- it answers "how was Forge installed and is it globally reachable?",
   not the general dashboard.
 
 ## Phase 1 -- `forge extension doctor`
 
-- [ ] Add the `doctor` leaf under `forge extension`: report install kind, resolved `forge` path, on-PATH-in-plain-shell
-  boolean, and (venv-only) advice to `uv tool install` / `pipx install`.
-- [ ] **Minimal-PATH probe (feeds epic D2):** doctor also reports reachability under a GUI/launchd-like minimal PATH
-  (`PATH=/usr/bin:/bin:/usr/sbin:/sbin`, which excludes `~/.local/bin`) as a second boolean `on_path_minimal`. This is
-  the mechanical evidence for whether the interim T2 fix is still needed after T1 (terminal launch resolves `forge`;
-  GUI/Dock launch may not).
-- [ ] `--json` emits a stable shape (`install_kind`, `forge_path`, `on_path`, `on_path_minimal`, optional `advice`);
-  human output routes through `forge.cli.output` helpers (no hand-rolled `Tip:` / `[red]Error:[/red]` -- CLI style
-  guards scan for these).
-- [ ] Unit tests `tests/src/install/test_install_doctor.py` (new).
-- **Assertion:** `forge extension doctor --json` on a global install returns `install_kind="global"` + the resolved
-  launcher path + `on_path=true`; on an editable/venv-not-on-PATH install returns the venv path + `on_path=false` +
-  advice. Detection is asserted, never "works".
+- [x] Add the `doctor` leaf under `forge extension` (`extensions.py` `doctor_cmd`): reports install kind, resolved
+  `forge` path, on-PATH-in-plain-shell boolean, and advice. Detection logic lives in `src/forge/install/doctor.py`
+  (`diagnose_install`, injectable seams), keeping the CLI leaf thin.
+- [x] **Minimal-PATH probe (feeds epic D2):** `on_path_minimal` probes `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. Verified on
+  the real editable dev install: `on_path=true`, `on_path_minimal=false` -- the mechanical GUI/launchd gap. Advice is
+  keyed on `on_path`/kind (user-actionable), **not** `on_path_minimal` (a T2 signal), so a correct global install is not
+  nagged.
+- [x] `--json` emits the stable shape (`install_kind`, `forge_path`, `on_path`, `on_path_minimal`, `advice`) via
+  `click.echo(json.dumps(...))`; human advice routes through `print_tip` (no hand-rolled `Tip:` / `[red]Error:[/red]`).
+- [x] Unit tests `tests/src/install/test_install_doctor.py` (new) -- 12 tests, all install kinds + both probe outcomes +
+  CLI JSON shape/human smoke.
+- **Assertion (met):** global install -> `install_kind="global"` + launcher path + `on_path=true`
+  (`test_global_install_on_local_bin`); editable/venv-not-on-PATH -> venv path + `on_path=false` + advice
+  (`test_venv_only_not_on_path_advises_global`). `uv run pytest tests/src/install/test_install_doctor.py -q` -> 12
+  passed.
 
 ## Phase 2 -- Day-1 docs
 
-- [ ] `README.md`: recommend `uv tool install multi-forge` / `pipx install multi-forge` (today `pip install`, ~`:99`);
-  fix uninstall (~`:211`) to the tool form; keep the contributor `uv sync` path present and clearly labeled.
-- [ ] `docs/end-user/` setup / quickstart updated to the global Day-1 path; contributor path (`CLAUDE.md` /
-  `CONTRIBUTING.md` `uv sync`) stays distinct.
-- **Assertion:** rendered end-user docs show both `uv tool install` and `pipx install multi-forge`; the contributor
-  `uv sync` path is present and not conflated with the end-user path.
+- [x] `README.md`: Quick Start leads with `uv tool install multi-forge` / `pipx install multi-forge` +
+  `forge extension doctor`; dev sub-note switched `pip install -e .` -> `uv sync` (matches CONTRIBUTING/CLAUDE);
+  uninstall -> `uv tool uninstall` / `pipx uninstall`; added an "Installer: uv or pipx" line to Requirements.
+- [x] `docs/end-user/README.md`: added an **"Install Forge (once)"** prerequisite ahead of the lettered A--F session
+  steps (the workflow previously assumed `forge` was already on PATH). Shows both installers + `forge extension doctor`;
+  points contributors to CONTRIBUTING.md `uv sync`. No renumbering churn (install is a one-time prereq, not a step).
+- **Assertion (met):** `grep` confirms both docs show `uv tool install` and `pipx install multi-forge`; contributor
+  `uv sync` present and labeled distinctly (README dev note + end-user "Contributors ... use an editable install").
 
 ## Phase 3 -- Design-doc sync (required: CLI + installer + Day-1 behavior change)
 
-- [ ] `docs/cli_reference.md`: add `forge extension doctor` to the Installation table.
-- [ ] `docs/design_appendix.md` §C (install model) and/or `docs/design.md` §5.1: record global-tool as the recommended
-  install target and `forge extension doctor` as the install-kind/PATH reporter (design docs describe shipped behavior).
-- [ ] `docs/end-user/*` install guide reflects Day-1 global install.
-- **Assertion:** cli_reference + install-model docs name `forge extension doctor` and the global-install Day-1 path;
-  board_contract "Design Doc Sync" satisfied.
+- [x] `docs/cli_reference.md`: added `forge extension doctor` to the Installation table (`--json`).
+- [x] `docs/design.md` §5.1: new opening paragraph frames the two install layers -- the `forge` tool (global-tool
+  install, prerequisite) vs extensions into `.claude/`; names `forge extension doctor`. `docs/design_appendix.md` §C:
+  lead-in documents the tool distribution, the four install kinds + detection rules, the minimal-PATH probe semantics,
+  and the `--json` shape (anchor-safe -- no §C.1--C.6 renumbering).
+- [x] `docs/end-user/README.md` install guide reflects the Day-1 global install (done in Phase 2).
+- **Assertion (met):** cli_reference + design.md §5.1 + appendix §C name `forge extension doctor` and the global-install
+  Day-1 path; board_contract "Design Doc Sync" satisfied (CLI + installer + Day-1 behavior all covered).
 
 ## Phase 4 -- Verify + closeout
 
-- [ ] `uv run pytest tests/src/install/test_install_doctor.py -q` + touched CLI/install suites green.
-- [ ] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat).
-- [ ] Integration consideration: the installer is a "run integration tests" area (CLAUDE.md). `doctor` is read-only, but
-  install-kind detection is environment-sensitive -- run a targeted installer integration
-  (`./scripts/test-integration.sh tests/integration/docker/test_installer.py`) if detection reads real install layout;
-  record the result or an explicit skip rationale.
-- [ ] `docs/board/change_log.md` entry (Goal / Key changes / Verification).
-- [ ] impl_notes candidate: the install-kind detection rule, if it proves non-obvious.
+- [x] `uv run pytest tests/src/install/test_install_doctor.py -q` -> 12 passed. Touched suites green:
+  `tests/src/install/ tests/src/cli/ -m "not integration"` -> 2584 passed, 10 deselected.
+- [x] `make pre-commit` clean (isort/ruff/black/mypy/pyright/mdformat all Passed; mypy + pyright cover the new
+  `doctor.py` + `extensions.py`).
+- [x] Integration consideration -- **explicit skip rationale.** `doctor` is a read-only diagnostic appended as a new
+  `forge extension` leaf; it does **not** touch the installer write path (`enable`/`disable`/`sync` -> `.claude/`) that
+  CLAUDE.md's "run installer integration" mandate targets, and the existing `test_installer.py` integration exercises
+  that write path, not `doctor`. Environment-sensitive detection is covered two ways: unit tests across all four kinds +
+  both probe outcomes + uv-tool/pipx/XDG layouts (12 tests), **and** a real-environment smoke --
+  `forge extension doctor` run against the actual editable dev install correctly reported `editable`, the real launcher
+  path, `on_path=true`, `on_path_minimal=false` (exercises the real `importlib.metadata` read, `shutil.which`, and
+  PATH). Residual gap: the `global` kind against a real wheel/`uv tool` install is unit-covered (faithful seams) but not
+  container-verified; low-risk (it is the "no editable marker" default branch). No Docker run warranted for this change.
+- [x] `docs/board/change_log.md` entry added (Goal / Key changes / Verification).
+- [x] impl_notes candidate recorded (see below) -- promotion deferred to human review per board contract.
 - [ ] Move `doing/global_forge_install -> done/`; update the epic checklist (tick T1; record the D2 next-member
-  decision).
+  decision). **Deferred to post-merge** (board contract: lane move happens after the final merge to `main`).
+
+### impl_notes candidate (for human review -- not yet promoted)
+
+- **Install-kind detection rule** (`src/forge/install/doctor.py`): editable (PEP 610 `direct_url.json`
+  `dir_info.editable`) is checked *first* -- a dev checkout's launcher lives in a venv `bin`, but "editable" is the more
+  actionable label than "venv". Global is keyed on the launcher's *parent dir* (`~/.local/bin` / `XDG_BIN_HOME` /
+  `PIPX_BIN_DIR`), using the on-PATH symlink a user sees -- **not** its realpath target (realpath would resolve a
+  `uv tool` launcher into its tool-venv and mis-classify it). The minimal-PATH probe reads `on_path_minimal=false` for a
+  *healthy* global install (`~/.local/bin` is not on launchd's PATH); it is a reported fact feeding epic D2, never a
+  fault, so `advice` is keyed on `on_path`/kind, not on `on_path_minimal`.
 
 ## Acceptance tests
 

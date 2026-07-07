@@ -22,6 +22,21 @@ everything above without any proxy setup.
 
 ## The "Day 1" Workflow
 
+Forge is a global CLI. Install it once (below), then follow the per-session steps A--F.
+
+### Install Forge (once)
+
+```bash
+uv tool install multi-forge     # recommended -- puts `forge` on your PATH
+# or: pipx install multi-forge
+
+forge extension doctor          # confirm install kind + PATH reachability
+```
+
+A global tool keeps `forge` on `PATH` for every shell (and for hooks), avoiding the "activate a project venv first"
+trap. Contributors working on Forge itself use an editable install instead (`uv sync`); see
+[CONTRIBUTING.md](../../CONTRIBUTING.md).
+
 ### A. Install extensions
 
 ```bash

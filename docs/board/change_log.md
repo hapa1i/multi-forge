@@ -27,6 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-06
 
+### global_forge_install (epic T1): Global-tool Day-1 install + `forge extension doctor`
+
+**Goal**: Make global-tool install the documented Day-1 path and add a read-only `forge extension doctor` reporting how
+Forge is installed and whether it is globally reachable -- the epic's first, dependency-free member.
+
+**Key changes**:
+
+- New `src/forge/install/doctor.py` (`diagnose_install`, injectable seams): classifies the install as
+  `global`/`editable`/`venv`/`unknown`, resolves the `forge` launcher path, and reports PATH reachability. Adds a
+  GUI/launchd minimal-PATH probe (`on_path_minimal`) -- the mechanical signal for epic D2 (a healthy global install
+  still reads `false`, since `~/.local/bin` is off launchd's PATH; advice is keyed on `on_path`/kind, not the probe).
+- New `forge extension doctor` leaf (thin CLI over `doctor.py`; `--json` for scripting, `print_tip` advice).
+- Day-1 docs: README Quick Start leads with `uv tool install` / `pipx install` (dev sub-note -> `uv sync`); uninstall ->
+  tool form; end-user README gains an "Install Forge (once)" prerequisite (the workflow previously assumed `forge` was
+  already on PATH).
+- Design sync: cli_reference Installation table, design.md §5.1 (two install layers), design_appendix §C (tool
+  distribution, kinds, probe semantics, `--json` shape).
+
+**Verification**: `tests/src/install/test_install_doctor.py` (12 new tests) covers all kinds + both probe outcomes + CLI
+JSON shape; `tests/src/{install,cli} -m "not integration"` -> 2584 passed; `make pre-commit` clean; live
+`forge extension doctor` on the editable dev install reported `editable` + real path + `on_path_minimal=false`.
+Installer Docker integration skipped with rationale (read-only diagnostic, no write-path change).
+
 ### forge_hook_legacy_writer: Remove the standalone hook writer
 
 **Goal**: End the second, untracked Claude hook mutation path before `epic_global_forge_runtime` changes hook command

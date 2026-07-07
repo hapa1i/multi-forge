@@ -87,6 +87,8 @@ tracking, hooks, and all Forge features except multi-model routing. Use `--proxy
 
 - **Platform**: macOS or Linux
 - **Python**: 3.11–3.13 (3.14 blocked on upstream `uvloop` wheels — see #1)
+- **Installer**: [`uv`](https://docs.astral.sh/uv/) or [`pipx`](https://pipx.pypa.io/) for the recommended global
+  install
 - **Claude Code**: installed and on PATH
 - **Provider auth**: Claude Code login is enough for direct interactive sessions. Proxies and headless workflows need a
   supported API or gateway credential such as `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
@@ -95,12 +97,16 @@ tracking, hooks, and all Forge features except multi-model routing. Use `--proxy
 ## Quick Start
 
 ```bash
-# Install Forge
-pip install multi-forge
+# Install Forge as a global tool (recommended -- puts `forge` on your PATH)
+uv tool install multi-forge
+# or: pipx install multi-forge
 
-# Or for development (editable install from local clone):
+# Confirm how forge is installed and whether it is globally reachable
+forge extension doctor
+
+# For development on Forge itself (editable install from a local clone):
 git clone https://github.com/hapa1i/multi-forge.git
-cd multi-forge && pip install -e .
+cd multi-forge && uv sync
 
 # Install extensions (hooks, skills, status line) into Claude Code
 forge extension enable
@@ -208,7 +214,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and PR guidelines.
 
 ```bash
 forge extension disable
-pip uninstall multi-forge
+uv tool uninstall multi-forge   # or: pipx uninstall multi-forge
 ```
 
 ## License

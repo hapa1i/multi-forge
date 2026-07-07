@@ -907,6 +907,16 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
 Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 
+**Forge tool distribution.** Forge ships on PyPI; the recommended install is a global tool
+(`uv tool install multi-forge` / `pipx install multi-forge`), which puts the `forge` launcher on `PATH` (typically
+`~/.local/bin`). `forge extension doctor` classifies the install as `global` (launcher in `~/.local/bin`,
+`XDG_BIN_HOME`, or `PIPX_BIN_DIR`), `editable` (PEP 610 `direct_url.json` `dir_info.editable`, e.g. `uv sync`), `venv`
+(launcher in a `bin`/`Scripts` dir with a sibling `pyvenv.cfg`), or `unknown`. It also probes reachability under a
+GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` — so a healthy global
+install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the mechanical signal
+for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
+`{install_kind, forge_path, on_path, on_path_minimal, advice}`.
+
 ### C.1 Scope model
 
 | Scope     | Extensions Path                       | Settings Path                 | Use case                                           |

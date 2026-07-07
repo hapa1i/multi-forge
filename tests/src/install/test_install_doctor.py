@@ -1,0 +1,181 @@
+"""Unit tests for `forge extension doctor` install diagnosis.
+
+Covers install-kind classification, PATH reachability, the D2 minimal-PATH
+probe, and the CLI leaf's JSON/human output. Detection seams (`argv0`, `which`,
+`environ`, `editable`) are injected so tests never depend on how the test
+runner itself was installed.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+from click.testing import CliRunner
+
+from forge.cli.extensions import extensions
+from forge.install.doctor import (
+    MINIMAL_PATH,
+    diagnose_install,
+    is_editable_install,
+)
+
+
+def _fake_which(bindir_to_forge: dict[str, str]) -> Callable[..., str | None]:
+    """Return a `shutil.which` stand-in.
+
+    `bindir_to_forge` maps a directory string that may appear in the search PATH
+    to the launcher path returned when that dir is present -- so the same fake
+    answers both the full-PATH and minimal-PATH probes by substring match.
+    """
+
+    def _which(cmd: str, path: str | None = None) -> str | None:
+        assert cmd == "forge"
+        search = path or ""
+        for bindir, forge_path in bindir_to_forge.items():
+            if bindir and bindir in search:
+                return forge_path
+        return None
+
+    return _which
+
+
+def test_global_install_on_local_bin(tmp_path: Path) -> None:
+    home = tmp_path
+    bindir = home / ".local" / "bin"
+    bindir.mkdir(parents=True)
+    forge = bindir / "forge"
+    environ = {"HOME": str(home), "PATH": f"{bindir}:/usr/bin:/bin"}
+    which = _fake_which({str(bindir): str(forge)})
+
+    diag = diagnose_install(argv0="/opt/pytest", which=which, environ=environ, editable=False)
+
+    assert diag.install_kind == "global"
+    assert diag.forge_path == str(forge)
+    assert diag.on_path is True
+    # ~/.local/bin is absent from the launchd minimal PATH -- expected, not a fault.
+    assert diag.on_path_minimal is False
+    assert diag.advice is None
+
+
+def test_editable_install_labeled_editable(tmp_path: Path) -> None:
+    venv_bin = tmp_path / "repo" / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    forge = venv_bin / "forge"
+    environ = {"HOME": str(tmp_path), "PATH": f"{venv_bin}:/usr/bin"}
+    which = _fake_which({str(venv_bin): str(forge)})
+
+    diag = diagnose_install(which=which, environ=environ, editable=True)
+
+    assert diag.install_kind == "editable"
+    assert diag.forge_path == str(forge)
+    assert diag.on_path is True
+    assert diag.advice is not None
+    assert "global tool" in diag.advice
+
+
+def test_venv_only_not_on_path_advises_global(tmp_path: Path) -> None:
+    venv = tmp_path / "proj" / ".venv"
+    venv_bin = venv / "bin"
+    venv_bin.mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr\n")  # marks this as a real venv bin
+    forge = venv_bin / "forge"
+    environ = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}  # forge NOT on PATH
+    which = _fake_which({})  # never resolves forge
+
+    diag = diagnose_install(argv0=str(forge), which=which, environ=environ, editable=False)
+
+    assert diag.install_kind == "venv"
+    assert diag.forge_path == str(forge)  # falls back to the running launcher (argv0)
+    assert diag.on_path is False
+    assert diag.on_path_minimal is False
+    assert diag.advice is not None
+    assert "global tool" in diag.advice
+
+
+@pytest.mark.parametrize("env_var", [None, "XDG_BIN_HOME", "PIPX_BIN_DIR"])
+def test_global_tool_layouts_resolve_global(tmp_path: Path, env_var: str | None) -> None:
+    """uv tool (~/.local/bin) and pipx/XDG override dirs both classify as global."""
+    home = tmp_path
+    environ: dict[str, str] = {"HOME": str(home)}
+    if env_var is None:
+        bindir = home / ".local" / "bin"
+    else:
+        bindir = tmp_path / "custom" / "bin"
+        environ[env_var] = str(bindir)
+    bindir.mkdir(parents=True)
+    forge = bindir / "forge"
+    environ["PATH"] = f"{bindir}:/usr/bin"
+    which = _fake_which({str(bindir): str(forge)})
+
+    diag = diagnose_install(which=which, environ=environ, editable=False)
+
+    assert diag.install_kind == "global"
+    assert diag.forge_path == str(forge)
+
+
+def test_unknown_when_forge_not_found() -> None:
+    environ = {"HOME": "/home/u", "PATH": "/usr/bin:/bin"}
+    which = _fake_which({})
+    # Bare argv0 (no path separator) is not a usable launcher path.
+    diag = diagnose_install(argv0="forge", which=which, environ=environ, editable=False)
+
+    assert diag.install_kind == "unknown"
+    assert diag.forge_path is None
+    assert diag.on_path is False
+    assert diag.advice is not None
+
+
+def test_minimal_path_probe_flags_gui_launch_gap(tmp_path: Path) -> None:
+    """D2 evidence: forge on the user PATH but absent from the launchd minimal PATH."""
+    bindir = tmp_path / ".local" / "bin"
+    bindir.mkdir(parents=True)
+    forge = bindir / "forge"
+    environ = {"HOME": str(tmp_path), "PATH": f"{bindir}:/usr/bin"}
+    which = _fake_which({str(bindir): str(forge)})
+
+    diag = diagnose_install(which=which, environ=environ, editable=False)
+
+    assert diag.on_path is True
+    assert diag.on_path_minimal is False
+
+
+def test_minimal_path_probe_true_when_in_system_bin() -> None:
+    """The probe genuinely reflects PATH contents: a system-bin forge is reachable."""
+    environ = {"HOME": "/home/u", "PATH": "/usr/local/bin:/usr/bin:/bin"}
+    # /usr/bin is on BOTH the full PATH and the minimal PATH.
+    which = _fake_which({"/usr/bin": "/usr/bin/forge"})
+    assert "/usr/bin" in MINIMAL_PATH  # guards the fixture's premise
+
+    diag = diagnose_install(which=which, environ=environ, editable=False)
+
+    assert diag.on_path is True
+    assert diag.on_path_minimal is True
+
+
+def test_doctor_json_shape_is_stable() -> None:
+    runner = CliRunner()
+    result = runner.invoke(extensions, ["doctor", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert set(data) == {"install_kind", "forge_path", "on_path", "on_path_minimal", "advice"}
+    assert isinstance(data["on_path"], bool)
+    assert isinstance(data["on_path_minimal"], bool)
+    assert data["install_kind"] in {"global", "editable", "venv", "unknown"}
+
+
+def test_doctor_human_output_names_install_kind() -> None:
+    runner = CliRunner()
+    result = runner.invoke(extensions, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+    assert "Install kind" in result.output
+    assert "On PATH" in result.output
+
+
+def test_is_editable_install_returns_bool() -> None:
+    # Env-independent contract: never raises, always a bool.
+    assert isinstance(is_editable_install(), bool)

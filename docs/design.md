@@ -1180,6 +1180,13 @@ Full command inventories live in [cli_reference.md](cli_reference.md): terminal 
 
 ### 5.1 Extensions install model
 
+**Installing the `forge` tool.** Forge ships on PyPI and is installed as a global tool (`uv tool install multi-forge` or
+`pipx install multi-forge`), placing the `forge` launcher on `PATH` so it resolves from any shell and from Claude Code
+hooks — not only inside an activated project venv. Contributors use an editable install (`uv sync` → `.venv/bin/forge`).
+`forge extension doctor` reports how Forge is installed and whether it is globally reachable — install kind (`global` /
+`editable` / `venv` / `unknown`), the resolved launcher path, and PATH reachability. This tool install is the
+prerequisite to installing the extensions described below.
+
 Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
 scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles
 (`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,

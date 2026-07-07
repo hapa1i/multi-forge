@@ -23,7 +23,9 @@ starting it does **not** force the still-open D2 timing decision.
     `proposed/cross_runtime_skills`.
   - Verified: link-resolver sweep reports **0** move-related broken relative links. (7 unrelated pre-existing broken
     board links were left untouched -- candidate for a separate board-hygiene pass, not this branch.)
-- [ ] T1 checklist reviewed; execution started.
+- [x] T1 checklist reviewed; execution complete on branch `global-forge-install` (Phases 0--3 shipped + verified;
+  `make pre-commit` clean, 12 new doctor tests + 2584 touched-suite tests pass). Lane move `doing/ -> done/` deferred to
+  post-merge. doctor's minimal-PATH probe now provides the D2 evidence (recorded below).
 
 ## Decisions owed (coordination -- none block T1)
 
@@ -47,7 +49,15 @@ Record outcomes here as members are picked up.
     (the same facts D3 leaned on) -- but recorded as a consequence, not a silent orphan.
   - **T2-card disposition if skipped:** fold T2's groundwork (unmerge-before-merge on the ~16 hook entries; the paired
     T10 sidecar exemption) into T5, don't abandon the card.
-  - **Decision: pending** -- resolve at T1 closeout on the minimal-PATH evidence.
+  - **T1 doctor evidence (gathered):** `forge extension doctor` reports `on_path_minimal=false` on the editable dev
+    install, and by construction it is also `false` for a global `~/.local/bin` install (launchd's minimal PATH excludes
+    `~/.local/bin`). So the GUI/launchd reachability gap is **mechanically real even after T1** -- a global install does
+    not by itself put `forge` on a Dock/IDE-launched hook's PATH. The decision now reduces to the *usage* question the
+    criterion names: is a GUI/Dock launch actually in use, or is launch terminal-only (which inherits the shell PATH and
+    resolves `forge`)?
+  - **Decision: ready for the epic owner at T1 merge.** Per the stated lean (presumptive skip) + the "launch from a
+    terminal" workaround: terminal-only usage -> **skip T2, next member T3**; if GUI/Dock launch is a supported path ->
+    T2 stays. Not resolved unilaterally here.
 - [ ] **T4 benchmark (owner T4):** dispatcher shim (`forge-hook`, hyphen) vs absolute-symlink. Outcome decides whether
   T5 must update presence detection (the `has_forge_hook` needle is `"forge hook"`, with a space).
 - [ ] **T3 trust model (owner T3):** explicit enroll only vs auto-enroll on enable / worktree-create for
