@@ -170,6 +170,15 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   shipped; the remaining mutator-family sweep is parked in
   [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
   with T4.
+- **Adjacent (non-member), sequence-sensitive:**
+  [`env_var_interface_boundary`](../../proposed/env_var_interface_boundary/card.md) declares `FORGE_*` an internal
+  launcher-to-runtime contract and strips internal env-var names (notably `FORGE_SESSION`) from normal-flow user
+  surfaces. It is deliberately **not** a member (the vocabulary boundary is repo-wide, not epic-owned), but it couples
+  one-directionally to this epic: **T4/T5/T6 author new user-facing strings** (dispatcher messages, `doctor`
+  registry/cleanup output, migration output), and shipped **T3 already speaks its vocabulary** (`forge_project_registry`
+  checklist Phase 3: normal-flow says "managed session"/`--session`, not `FORGE_SESSION`). Land it **before** T4/T5/T6
+  so those surfaces are born clean; its `test_output.py`-style guard catches re-leaks after the fact, but landing first
+  is cheaper. Not a blocker for T4's *mechanism* -- only for T4's user-facing *strings*.
 
 ## Grounding (verified against code, 2026-07-02)
 
