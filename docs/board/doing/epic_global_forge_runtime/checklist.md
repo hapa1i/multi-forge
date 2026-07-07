@@ -83,7 +83,8 @@ Record outcomes here as members are picked up.
   amended. Detail in the T3 checklist Phase 0.
 - [x] Next member after T1: **T3 `forge_project_registry`** (critical path) + **T7 `forge_project_compat`** (off-path
   companion), picked up together 2026-07-06; both `git mv` `proposed/ -> doing/` on branch `forge-project-registry`,
-  epic/member links repointed, execution checklists added. Implementation pending review.
+  epic/member links repointed, execution checklists added. T3 Phase 1--3 implementation and T7's first command-path
+  guard slice landed 2026-07-07; T7's broader mutator sweep remains tracked in its member checklist before closeout.
 
 ## Shared-contract seams (drift watch)
 

@@ -87,6 +87,9 @@ project_root    (logical repo -- git identity, shared across worktrees)
    silently (it is a directory, not a config file -- no ambiguity, no interactive prompt needed). User-level install
    (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
 
+`.forge/project.toml` is an optional compatibility guardrail, not part of project identity. Missing file means
+unconstrained; when present, Forge command paths strict-read it before mutating project-local state.
+
 **Definitions:**
 
 - **Forge project** = directory containing both `.claude/` and `.forge/`, established by `forge extension enable`.
@@ -176,6 +179,8 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 | Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
 | Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
 | Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
+| Project registry     | `~/.forge/projects.json`                                         | Forge Installer          | Versioned trusted-root registry for user-scope hook gating                              |
+| Project compat pin   | `<forge_root>/.forge/project.toml`                               | User / Forge Installer   | Optional `required_forge` guardrail for project-local state mutations                   |
 | Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                            |
 | Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
 | Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |

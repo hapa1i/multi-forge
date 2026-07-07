@@ -10,6 +10,8 @@ Configuration is split by ownership. Each type of setting has a single authorita
 | Policy, memory, verification settings            | Session manifest                   | `forge session set`                    |
 | Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
 | Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
+| Project Forge compatibility                      | `<forge_root>/.forge/project.toml` | edit file                              |
+| Trusted project enrollment                       | `~/.forge/projects.json`           | `forge extension enable` / `doctor`    |
 | API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
 ---
@@ -129,6 +131,25 @@ Notes:
 - `forge claude preset edit` validates JSON before saving.
 - `forge claude preset reset` restores the built-in preset; without `--force`, it asks for confirmation.
 - If the preset file is corrupted, Forge tells you to fix it with `forge claude preset edit` or reset it.
+
+---
+
+## Project compatibility (`.forge/project.toml`)
+
+Projects may opt into a Forge version guardrail with a repo-local TOML file:
+
+```toml
+schema_version = 1
+required_forge = ">=1.2,<2"
+```
+
+When the file is missing, the project is unconstrained. When it exists, covered project-local command paths strict-read
+it before mutating state and fail with an upgrade/reset hint if the running global Forge does not satisfy
+`required_forge`. `forge extension doctor` reports malformed or incompatible pins. Forge does not auto-create this file.
+
+`~/.forge/projects.json` is different: it is a machine-written trusted-project registry maintained by
+`forge extension enable` and managed worktree creation. Do not edit it by hand; use `forge extension doctor` to inspect
+registry health.
 
 ---
 

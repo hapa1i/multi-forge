@@ -1002,16 +1002,19 @@ def worktree_create() -> None:
 
             from forge.install.installer import Installer
             from forge.install.models import InstallMode, InstallProfile, InstallScope
+            from forge.install.project_registry import ProjectRegistryStore
 
             with open(_os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
                 installer = Installer(
                     scope=InstallScope.LOCAL,
                     project_root=worktree_path,
                 )
-                installer.init(
+                plan = installer.init(
                     profile=InstallProfile.STANDARD,
                     mode=InstallMode.COPY,
                 )
+                if not plan.has_conflicts:
+                    ProjectRegistryStore().enroll(worktree_path, "worktree")
             logger.debug("worktree-create: extensions installed in %s", worktree_path)
         except Exception as ext_err:
             # Non-fatal: worktree works without Forge extensions

@@ -5,11 +5,9 @@ Epic: [`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md). Card:
 
 ## Current focus
 
-**Pre-implementation review checkpoint.** The card is picked up (`proposed/ -> doing/`) but **no code is written yet**.
-The trust-model and file-format Phase 0 decisions are resolved below; the enrollment surface remains open as D-T3-b.
-Phase 1 can proceed on the durable `~/.forge/projects.json` schema/read helper, while Phase 2 enrollment wiring and
-Phase 3 CLI reference sync wait on D-T3-b. Everything below is unticked until its assertion is verified (Phase 0's
-re-verification and greenfield items are already done and ticked).
+**Implementation verified.** The project registry module, enable/worktree enrollment paths, doctor registry section,
+docs sync, targeted unit tests, full pre-commit, and named Docker integration checks are green on
+`forge-project-registry`. Prune/reconcile actions remain deferred to T5/T6.
 
 T3 is the head of the user-scope-model track (T3 -> T4 -> T5 -> T6). Its **read half** is the dependency for T4's
 dispatcher no-op gate, so "schema + read helper" (Phase 1) is the load-bearing deliverable; enrollment/lifecycle (Phase
@@ -56,12 +54,10 @@ Record hand-offs so the ticket does not creep:
   - **Sub-decision (name it in Phase 2):** "enroll on enable" enrolls the **project root the enable targets**
     (`--scope project`/`local`). A `--scope user` global enable has no project target and enrolls **nothing** by itself;
     managed sessions self-cover via worktree auto-enroll and the `FORGE_SESSION` short-circuit.
-- [ ] **DECISION D-T3-b (enrollment surface) -- OPEN (lean: fold into `forge extension`).** A new `forge project` group
-  vs folding enroll into the existing `forge extension` family. The epic CLI-surface rule prefers attaching to existing
-  groups and a new top-level group needs explicit justification, so the lean is **fold enrollment into
-  `forge extension enable` (+ an explicit `forge extension` verb if a standalone enroll/prune is warranted)**. Confirm
-  or justify a new group here; T3 owns whatever surface is chosen so `forge_project_compat` / `forge_hook_dispatcher`
-  references resolve.
+- [x] **DECISION D-T3-b (enrollment surface) -- RESOLVED 2026-07-07: fold into `forge extension enable`.** No new
+  `forge project` group for v1. Project/local `forge extension enable` enrolls the target root after a successful
+  install; user-scope enable enrolls nothing. Standalone enroll/prune/reconcile verbs stay deferred with T5/T6
+  ownership.
 - [x] **Seam re-verify (done 2026-07-07, recorded):** `find_forge_installation` -> `install/installer.py:280` (card said
   `:279`); `find_forge_root` **relocated** to `core/ops/context.py:106` (card said `context.py:122` -- the ops
   extraction moved it); `FORGE_SESSION` reaches the hook env, now a single comment at `cli/hooks/commands.py:1298` (card
@@ -71,14 +67,14 @@ Record hand-offs so the ticket does not creep:
 
 ## Phase 1 -- Schema + canonicalization + versioned read helper (the T4 dependency)
 
-- [ ] **Schema `~/.forge/projects.json`** -- versioned (`schema_version`) durable state; a list of enrolled roots, each
+- [x] **Schema `~/.forge/projects.json`** -- versioned (`schema_version`) durable state; a list of enrolled roots, each
   `{ canonical_path, enrolled_at, enrollment_source }`. Written via the shared versioned-JSON helper +
   `atomic_write_text` (D-T3-c). Follows Forge durable-state rules (mandatory version field, strict shape on the CLI read
   path).
-- [ ] **Concurrent-write posture:** every registry writer (enable, managed-worktree auto-enroll, and future backfill)
+- [x] **Concurrent-write posture:** every registry writer (enable, managed-worktree auto-enroll, and future backfill)
   performs read-modify-write under `file_lock_for_target(target_path=projects_path, timeout_s=5.0)`, then persists with
   `atomic_write_text`. This follows Forge's credentials/install-tracking pattern, not unguarded last-writer-wins.
-- [ ] **One canonicalization rule** applied on **both write and read** (epic seam-2 contract -- T4/T5/T6 must reuse the
+- [x] **One canonicalization rule** applied on **both write and read** (epic seam-2 contract -- T4/T5/T6 must reuse the
   identical rule or the gate silently no-fires / double-enrolls). Resolve symlinks + normalize absolute path, and **pin
   the mechanism** here rather than "account for":
   - Tradeoff -- **inode / `os.path.samefile`** is robust against macOS default case-insensitivity and APFS's
@@ -89,7 +85,7 @@ Record hand-offs so the ticket does not creep:
     `/users/x` on its own.
   - **Lean:** store a canonical *resolved string* for lookup (existence-independent) with documented case/Unicode
     handling; reserve `samefile` for existence-confirmed reconciles only.
-- [ ] **Dual read semantics from one parser:**
+- [x] **Dual read semantics from one parser:**
   - **CLI path -> strict.** Unsupported `schema_version` fails with a clear "written by newer Forge -- upgrade" message;
     unknown fields are corruption (coding_standards §5).
   - **Hook path -> fail-open, but detect-and-surface (NOT silent-empty).** The read helper returns a **result object**
@@ -100,7 +96,7 @@ Record hand-offs so the ticket does not creep:
     flag for its routing decision and never raises (a bounded one-time notice is optional); the **authoritative §5
     surface is `doctor`'s own strict read** (a fresh process re-reads, reports the corruption, and names the reset path)
     -- not the ephemeral hook's in-memory flag.
-- [ ] **"Am I inside an enrolled root?"** builds on the *current* root-detection helpers (Phase 0 re-verified:
+- [x] **"Am I inside an enrolled root?"** builds on the *current* root-detection helpers (Phase 0 re-verified:
   `install/installer.py:280`, `core/ops/context.py:106`), not a new walker; the new piece is the trusted-root lookup
   against the canonicalized registry.
 
@@ -120,50 +116,52 @@ Acceptance (Phase 1):
 Both items below assume the D-T3-a outcome (enroll-on-enable + auto-enroll-on-managed-worktree); there is no
 explicit-only fork to reframe.
 
-- [ ] **Enroll on enable** via the D-T3-b surface: enabling for a project root adds that canonical root (idempotent -- a
+- [x] **Enroll on enable** via the D-T3-b surface: enabling for a project root adds that canonical root (idempotent -- a
   re-enroll of an already-enrolled canonical root is a no-op, not a duplicate). A `--scope user` global enable enrolls
   nothing by itself (sub-decision above).
-- [ ] **Auto-enroll on managed worktree / fork create.** Forge session worktrees are new canonical roots; under T5
+- [x] **Auto-enroll on managed worktree / fork create.** Forge session worktrees are new canonical roots; under T5
   user-scope there is no project hook block to copy into them, so the new root is **enrolled** at create time (derived
   consent) and covered meanwhile by the `FORGE_SESSION` short-circuit -- otherwise a managed session lands unenrolled
   and loses hooks.
-- [ ] **`FORGE_SESSION` short-circuit semantics (contract with T4):** a managed session (`FORGE_SESSION` set, reaches
+- [x] **`FORGE_SESSION` short-circuit semantics (contract with T4):** a managed session (`FORGE_SESSION` set, reaches
   the hook env at `commands.py:1298`) is treated as active **even if cwd is not enrolled**. Gate logic ships in T4; the
   semantics are pinned here so T4 implements the agreed contract.
-- [ ] **Doctor registry section + stale-root primitive:** `forge extension doctor` strict-reads `projects.json`, reports
+- [x] **Doctor registry section + stale-root primitive:** `forge extension doctor` strict-reads `projects.json`, reports
   corrupt/newer registry state with the reset path, and reports moved or deleted roots. It does not prune/reconcile;
   those actions stay with T5/T6. (Interacts with the canonicalization mechanism: a deleted root cannot be stat'd, so
   lookup must not depend on `samefile` for stale entries.)
 
 Acceptance (Phase 2):
 
-| Test                | Fixture                              | Assertion                                                         | Test File                                    |
-| ------------------- | ------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------- |
-| Enable enrolls root | project-scope enable at a root       | that canonical root is enrolled; re-enable is an idempotent no-op | `tests/src/install/test_project_registry.py` |
-| Worktree enrolls    | `forge session` worktree/fork create | the new worktree root is enrolled (managed session keeps hooks)   | same                                         |
+| Test                | Fixture                              | Assertion                                                           | Test File                                    |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------------- | -------------------------------------------- |
+| Enable enrolls root | project-scope enable at a root       | that canonical root is enrolled; re-enable is an idempotent no-op   | `tests/src/install/test_project_registry.py` |
+| Worktree enrolls    | `forge session` worktree/fork create | the new worktree root is enrolled (managed session keeps hooks)     | same                                         |
 | Stale root reported | registered root now deleted          | `doctor` reports the stale entry (no `samefile`); prune is deferred | same                                         |
 
 ## Phase 3 -- Design-doc sync (ship with the code)
 
-- [ ] `design.md` §3.2 contract-files table: add `~/.forge/projects.json` (owner, purpose, versioned durable state).
-- [ ] `design_appendix.md`: document the schema, the single canonicalization rule (mechanism + macOS case/Unicode
+- [x] `design.md` §3.2 contract-files table: add `~/.forge/projects.json` (owner, purpose, versioned durable state).
+- [x] `design_appendix.md`: document the schema, the single canonicalization rule (mechanism + macOS case/Unicode
   handling), and the strict-CLI / fail-open-hook read split (with the detect-and-surface `degraded` contract).
-- [ ] **Disambiguate the lookalike files** in the docs: `~/.forge/projects.json` (user-global, machine-written trust
+- [x] **Disambiguate the lookalike files** in the docs: `~/.forge/projects.json` (user-global, machine-written trust
   registry) vs `.forge/project.toml` (repo-local, user-authored compat pin) -- one line so a reader never conflates
   them.
-- [ ] **Document the `FORGE_SESSION` short-circuit unconditionally** (not gated on D-T3-a): T4 implements against it
+- [x] **Document the `FORGE_SESSION` short-circuit unconditionally** (not gated on D-T3-a): T4 implements against it
   regardless, so it belongs in the appendix as a standing contract.
-- [ ] **User-facing vocabulary:** new enrollment output, doctor registry messages, reset/fix hints, and CLI reference
+- [x] **User-facing vocabulary:** new enrollment output, doctor registry messages, reset/fix hints, and CLI reference
   text follow the env-var-boundary vocabulary: normal-flow output says "managed session" / `--session`, not
   `FORGE_SESSION`; diagnostic doctor output may name internals only when the variable itself is the diagnosis.
-- [ ] `cli_reference.md`: add the enrollment surface chosen in D-T3-b.
+- [x] `cli_reference.md`: add the enrollment surface chosen in D-T3-b.
 
 ## Closeout
 
-- [ ] All Phase 1--3 assertions verified; acceptance tests green.
-- [ ] `make pre-commit` clean; **named integration targets:** installer integration for the enable-enroll path
-  (`tests/integration/docker/test_installer.py`); session worktree/fork integration if auto-enroll wires into worktree
-  create.
+- [x] All Phase 1--3 assertions verified; acceptance tests green (`uv run pytest` targeted install/doctor/extension/
+  guard/session/hook suite, 331 passed).
+- [x] `make pre-commit` clean; **named integration targets** passed via `./scripts/test-integration.sh`
+  `tests/integration/docker/test_installer.py tests/integration/docker/test_session_lifecycle.py -k "enable_creates_forge_anchor or worktree_flag_creates_isolated_session or fork_creates_worktree_and_tracks_parent"`:
+  installer integration for the enable-enroll path (`tests/integration/docker/test_installer.py`); session worktree/fork
+  integration if auto-enroll wires into worktree create.
 - [ ] `change_log.md` entry; durable lessons proposed for `impl_notes.md` (canonicalization mechanism, dual-read
   detect-and-surface posture, JSON-registry house pattern).
 - [ ] Epic checklist: tick the T3 lines under "Decisions owed"; update seam-2/seam-3 drift-watch notes.

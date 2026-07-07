@@ -213,14 +213,14 @@ Line refs are the 2026-07-02 snapshot; T3 Phase 0 re-verified the T3-relevant ro
 
 These are no longer open; kept here so the epic card and checklist do not drift.
 
-| Question                                                                                   | Outcome                                                                                                      |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Question                                                                                   | Outcome                                                                                                                                           |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip T2.** Terminal-only launch makes the interim reachability fix unnecessary; reopen only if GUI/Dock/IDE launch becomes supported. |
-| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork and paired T10 sidecar exemption. |
-| Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.        |
-| Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                             |
-| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                               |
-| Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                    |
+| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork and paired T10 sidecar exemption.                                 |
+| Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                             |
+| Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                  |
+| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                                                                    |
+| Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                                                         |
 
 ## Open questions still owed (each assigned to a member)
 

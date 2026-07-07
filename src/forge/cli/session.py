@@ -255,6 +255,13 @@ def _auto_install_extensions(
     Non-blocking: catches all exceptions and warns on failure.
     """
     try:
+        try:
+            from forge.install.project_registry import ProjectRegistryStore
+
+            ProjectRegistryStore().enroll(install_root, "worktree")
+        except Exception:
+            logger.debug("Worktree registry enrollment failed", exc_info=True)
+
         if force_extensions is False:
             return False
 

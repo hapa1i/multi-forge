@@ -14,6 +14,25 @@ from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
 
 
+def _enforce_project_compatibility(project_root: Path) -> None:
+    """Apply the project-local Forge version guardrail for command paths."""
+
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+    )
+
+    try:
+        enforce_project_compatibility(project_root)
+    except ProjectCompatibilityError as e:
+        print_error(e.reason)
+        print_tip(
+            "Edit .forge/project.toml, upgrade the global Forge, or reset project state.",
+            console=err_console,
+        )
+        sys.exit(1)
+
+
 def require_repo_root() -> Path:
     """Verify CWD is a git repository root or a Forge project root.
 
@@ -31,6 +50,7 @@ def require_repo_root() -> Path:
     # Accept CWD at a Forge project root (nested or top-level)
     forge_root = find_forge_root(cwd)
     if forge_root is not None and forge_root == cwd:
+        _enforce_project_compatibility(cwd)
         return cwd
 
     try:
@@ -47,6 +67,7 @@ def require_repo_root() -> Path:
         print_tip("Run from:", commands=[f"cd {display_path(hint)}"], console=err_console)
         sys.exit(1)
 
+    _enforce_project_compatibility(repo_root)
     return cwd
 
 
@@ -90,6 +111,7 @@ def require_main_repo_root() -> Path:
     # Accept CWD at a Forge project root (nested or top-level)
     forge_root = find_forge_root(cwd)
     if forge_root is not None and forge_root == cwd:
+        _enforce_project_compatibility(cwd)
         return cwd
 
     if cwd != repo_root:
@@ -100,4 +122,5 @@ def require_main_repo_root() -> Path:
         print_tip("Run from:", commands=[f"cd {display_path(repo_root)}"], console=err_console)
         sys.exit(1)
 
+    _enforce_project_compatibility(repo_root)
     return cwd
