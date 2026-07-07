@@ -3,9 +3,9 @@
 **Status**: Done (`done/`) -- shipped to `main` (2026-06-16). **Re-cut 2026-06-16** to a minimal scope: v1 reads the
 outcome the **usage ledger already records** and renders a marker -- no new durable-state field. The original
 structured-`failure_kind`-on-`PolicyDecision` design, and the clean two-ledger model it implied, are deferred to the
-[`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md) proposed card (see "Relationship"
-below). Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor
-accumulated repeated supervisor timeouts while the status line still showed only the normal active `SUP` posture.
+[`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md) proposed card (see "Relationship" below). Spun
+out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor accumulated repeated
+supervisor timeouts while the status line still showed only the normal active `SUP` posture.
 
 **References**: `src/forge/cli/status_line.py::format_supervisor`,
 `src/forge/cli/statusline/registry.py::_produce_supervisor` (+ the `forge_cost` throttle precedent:
@@ -77,8 +77,8 @@ toward the policy decision log. The clean model splits them into a **downstream*
 \+ audit unified) and a first-class **upstream** outcome ledger wrapped at each operation boundary, with **asymmetric
 correlation**: upstream records carry `session` + `run`/`root` id; downstream records carry `request`/`run`/`root` ids
 and are session-blind; readers select upstream by `session` and join downstream through the run tree. Captured in
-[`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md). v1 here is the minimal on-model
-step; that card is the principled completion.
+[`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md). v1 here is the minimal on-model step; that card
+is the principled completion.
 
 ## Risks
 

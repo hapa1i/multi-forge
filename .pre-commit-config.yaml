@@ -73,8 +73,10 @@ repos:
   rev: 1.0.0
   hooks:
     - id: mdformat
+      # Plugins pinned: unpinned deps let CI float to newer versions that re-wrap
+      # lines differently than a stale local cache, breaking pre-commit only in CI.
       additional_dependencies:
-        - mdformat-gfm                   # GitHub-Flavored Markdown support - see https://github.github.com/gfm
-        - mdformat-gfm-alerts            # GitHub admonitions ([!WARNING], [!NOTE], etc.)
-        - mdformat-simple-breaks         # thematic breaks using three dashes instead of 70 underscores
-        - mdformat-frontmatter           # support for YAML front matter in Markdown files
+        - mdformat-gfm==1.0.0            # GitHub-Flavored Markdown support - see https://github.github.com/gfm
+        - mdformat-gfm-alerts==2.0.0     # GitHub admonitions ([!WARNING], [!NOTE], etc.)
+        - mdformat-simple-breaks==0.1.0  # thematic breaks using three dashes instead of 70 underscores
+        - mdformat-frontmatter==2.1.2    # support for YAML front matter in Markdown files

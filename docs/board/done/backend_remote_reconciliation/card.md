@@ -43,7 +43,7 @@ disconnected. This card therefore **enhances local trace, never replaces it**.
   registry presence is the single source of truth and keeps a read/account-side concern out of the proxy-write-path
   capability struct).
 - Proxied provider-user grouping uses the standard `user` field (shipped). Direct `core.llm` `user` injection remains
-  the separate [`openrouter_user_direct_callers`](../../todo/openrouter_user_direct_callers/card.md) card.
+  the separate [`openrouter_user_direct_callers`](../openrouter_user_direct_callers/card.md) card.
 
 ## Superseded Phase 0 decisions
 

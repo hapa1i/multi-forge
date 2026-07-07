@@ -1,8 +1,8 @@
 # ops_policy_seam -- complete the core/ops split for the policy surface
 
 **Lane**: `done/` -- split from the `ops_seam_completion` batch (2026-07-06) per its own acceptance guidance (two member
-cards, no epic). Sibling: [`proxy_tier_resolvers`](../../doing/proxy_tier_resolvers/card.md) (Seam B). They share a
-theme, not a load-bearing contract, and ship independently.
+cards, no epic). Sibling: [`proxy_tier_resolvers`](../proxy_tier_resolvers/card.md) (Seam B). They share a theme, not a
+load-bearing contract, and ship independently.
 
 **Type**: behavior-preserving refactor + one **small defect fix** (A2: converge the drifted proxy-id-recovery error
 posture -- two copies silently swallow, two log -- to a single logged fail-open posture per coding_standards §5).

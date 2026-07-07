@@ -7,8 +7,8 @@ outcome data the **usage ledger already records** -- no new durable-state field.
 `status="timeout"`/`failure_type` per `claude -p` run (`emit_usage_for_session_result`, `supervisor.py:496`), and the
 status line already reads the ledger throttled (the `forge_cost` segment). v1 = a throttled read + a posture-preserving
 render. The structured-`failure_kind`-on-`PolicyDecision` design and the parse/auth coverage it enabled are deferred to
-[`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md) -- adding a field to the policy
-decision log is the off-model path (patches the accidental outcome record, not the real one).
+[`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md) -- adding a field to the policy decision log is
+the off-model path (patches the accidental outcome record, not the real one).
 
 ## Current focus
 

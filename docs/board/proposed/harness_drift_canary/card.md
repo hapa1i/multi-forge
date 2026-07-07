@@ -15,7 +15,7 @@ postmortem case (silent reasoning-effort downgrade; a thinking-cache bug; a hidd
 injection). Forge's only *wire-level* answer is the optional audit proxy, and the one regression that is **invisible at
 the wire** (a system prompt injected *downstream* of the proxy) can't be caught by inspection at all -- only by its
 *effects*. For OAuth/subscription interactive sessions, even the wire is out of reach without MITM, which is
-[deferred and account-risky](../../doing/runtime_abstraction/card.md).
+[deferred and account-risky](../../done/runtime_abstraction/card.md).
 
 ## Proposal
 
