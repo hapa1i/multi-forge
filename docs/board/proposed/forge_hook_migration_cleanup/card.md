@@ -1,6 +1,6 @@
 # Hook migration + legacy cleanup
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Depends on `user_scope_hook_ownership` (the target model exists to migrate to). End of the
 user-scope-model critical path.

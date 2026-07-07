@@ -3,9 +3,11 @@
 **This is an epic.** It coordinates the shared contract, sequencing, and drift control across the member cards below.
 Each member is an independently shippable implementation unit; the epic ships no code itself.
 
-**Lane**: `proposed/` -- not yet scheduled. Members spin out to their own `doing/<slug>/` when picked up; move this epic
-to `doing/` when its coordination (or a member gated on sequencing) becomes the active cursor, and add a coordination
-`checklist.md` then (`board_contract.md`).
+**Lane**: `doing/` -- active coordinator. First member **T1 [`global_forge_install`](../global_forge_install/card.md)**
+is in `doing/` on branch `global-forge-install`, and the epic's coordination [`checklist.md`](checklist.md) (sequencing,
+seam drift-watch, the owed D2/T3/T4 decisions) is live. Remaining members stay in `proposed/` and spin out to their own
+`doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/` (or the shared contract is folded into
+normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -31,18 +33,18 @@ migration; the **user-scope-model track** (T1 -> T3 -> T4 -> T5 -> T6) is the la
 command bytes. **T9 and T10 are cross-cutting** -- each touches multiple byte-changing members and needs a single owner,
 so neither sits on one linear track.
 
-| Label | Card                                                                        | Ships                                                                               | Depends on  |
-| ----- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
-| T1    | [`global_forge_install`](../global_forge_install/card.md)                   | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
-| T2    | [`forge_hook_absolute_command`](../forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
-| T3    | [`forge_project_registry`](../forge_project_registry/card.md)               | `~/.forge/projects.toml` trusted-root registry (schema + read + enroll + lifecycle) | --          |
-| T4    | [`forge_hook_dispatcher`](../forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
-| T5    | [`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
-| T6    | [`forge_hook_migration_cleanup`](../forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
-| T7    | [`forge_project_compat`](../forge_project_compat/card.md)                   | `required_forge` fail-clear guardrail + missing-file semantics                      | --          |
-| T8    | [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
-| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)   | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
-| T10   | [`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
+| Label | Card                                                                                    | Ships                                                                               | Depends on  |
+| ----- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
+| T1    | [`global_forge_install`](../global_forge_install/card.md)                               | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
+| T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
+| T3    | [`forge_project_registry`](../../proposed/forge_project_registry/card.md)               | `~/.forge/projects.toml` trusted-root registry (schema + read + enroll + lifecycle) | --          |
+| T4    | [`forge_hook_dispatcher`](../../proposed/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
+| T5    | [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
+| T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
+| T7    | [`forge_project_compat`](../../proposed/forge_project_compat/card.md)                   | `required_forge` fail-clear guardrail + missing-file semantics                      | --          |
+| T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
+| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)               | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
+| T10   | [`forge_hook_sidecar_resolution`](../../proposed/forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
 
 ## Accepted decisions
 

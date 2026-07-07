@@ -25,6 +25,7 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge extension sync`    | Update existing installation to current version              |
 | `forge extension disable` | Remove Forge installation cleanly                            |
 | `forge extension status`  | Show installation status (`--json`)                          |
+| `forge extension doctor`  | Report install kind + `forge` PATH reachability (`--json`)   |
 
 ### Session management
 

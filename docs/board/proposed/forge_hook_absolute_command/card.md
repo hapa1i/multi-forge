@@ -1,6 +1,6 @@
 # Absolute-path hook command (the reachability fix)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Depends on `global_forge_install` -- **for a PATH-stable target to point at**, not just for a
 global `forge` to exist. This is the D2 reachability fix: it ships early and closes the exit-127 incident **without**
@@ -101,12 +101,12 @@ not merely a global binary.
 
 ## Acceptance tests
 
-| Test                                | Fixture                                      | Assertion                                                                          | Test File                                  |
-| ----------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
-| Bare Codex finds Forge (abs path)   | absolute-path command, no venv on `PATH`     | Codex hook exits 0, resolves the global `forge`                                    | `tests/src/install/test_installer.py`      |
-| statusLine (tracked) replaced       | prior Forge-tracked bare `forge status-line` | re-plan replaces it with the absolute path, no conflict, install proceeds          | `tests/src/install/test_installer.py`      |
-| statusLine (manual) still conflicts | user's own non-Forge `statusLine` value      | install plans a conflict (not silently overwritten without `--force`)              | `tests/src/install/test_installer.py`      |
-| Re-enable is idempotent             | enable over an existing bare install         | exactly one entry per event (old tracked entries unmerged before merge)            | `tests/src/install/test_installer.py`      |
-| Recorded path survives upgrade      | install, then simulate tool upgrade          | the recorded launcher path still resolves the current `forge`                      | `tests/src/install/test_install_doctor.py` |
-| Detection stays true (substring)    | absolute-path command installed              | `has_forge_hook` / `has_forge_hooks` return True; no false "not installed" warning | `tests/src/install/test_hooks.py`          |
-| One re-trust only                   | reinstall                                    | command bytes change exactly once (Codex golden updated once)                      | `tests/src/install/test_codex_hooks.py`    |
+| Test                                | Fixture                                      | Assertion                                                                          | Test File                               |
+| ----------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------- |
+| Bare Codex finds Forge (abs path)   | absolute-path command, no venv on `PATH`     | Codex hook exits 0, resolves the global `forge`                                    | `tests/src/install/test_installer.py`   |
+| statusLine (tracked) replaced       | prior Forge-tracked bare `forge status-line` | re-plan replaces it with the absolute path, no conflict, install proceeds          | `tests/src/install/test_installer.py`   |
+| statusLine (manual) still conflicts | user's own non-Forge `statusLine` value      | install plans a conflict (not silently overwritten without `--force`)              | `tests/src/install/test_installer.py`   |
+| Re-enable is idempotent             | enable over an existing bare install         | exactly one entry per event (old tracked entries unmerged before merge)            | `tests/src/install/test_installer.py`   |
+| Recorded path survives upgrade      | install, then simulate tool upgrade          | the recorded launcher path still resolves the current `forge`                      | `tests/src/install/test_doctor.py`      |
+| Detection stays true (substring)    | absolute-path command installed              | `has_forge_hook` / `has_forge_hooks` return True; no false "not installed" warning | `tests/src/install/test_hooks.py`       |
+| One re-trust only                   | reinstall                                    | command bytes change exactly once (Codex golden updated once)                      | `tests/src/install/test_codex_hooks.py` |

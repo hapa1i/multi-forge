@@ -1,8 +1,10 @@
 # Global Forge install + Day-1 docs
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
 
-**Lane**: `proposed/`. Foundational member; no dependencies. Ship first.
+**Lane**: `doing/`. Foundational member (no dependencies); the epic's first ticket, active on branch
+`global-forge-install` -- execution plan in [`checklist.md`](checklist.md). Ships global-tool Day-1 docs +
+`forge extension doctor`.
 
 ## Goal
 
@@ -48,8 +50,8 @@ None blocking. (The dispatcher's cross-upgrade reachability lives in `forge_hook
 
 ## Acceptance tests
 
-| Test                        | Fixture                            | Assertion                                                                  | Test File                                        |
-| --------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------ |
-| Docs show global install    | rendered end-user docs             | `uv tool install` / `pipx install` present; contributor path kept distinct | doc check                                        |
-| Doctor reports install kind | global-tool install                | `forge extension doctor` names the resolved path + PATH reachability       | `tests/src/install/test_install_doctor.py` (new) |
-| Doctor flags venv-only      | editable/venv install, not on PATH | doctor reports "not globally reachable" + advises global install           | same                                             |
+| Test                        | Fixture                            | Assertion                                                                  | Test File                                |
+| --------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------- |
+| Docs show global install    | rendered end-user docs             | `uv tool install` / `pipx install` present; contributor path kept distinct | doc check                                |
+| Doctor reports install kind | global-tool install                | `forge extension doctor` names the resolved path + PATH reachability       | `tests/src/install/test_doctor.py` (new) |
+| Doctor flags venv-only      | editable/venv install, not on PATH | doctor reports "not globally reachable" + advises global install           | same                                     |

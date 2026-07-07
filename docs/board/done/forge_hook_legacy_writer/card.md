@@ -1,6 +1,6 @@
 # Reconcile the second hook writer (`forge hook enable`/`disable`)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../../proposed/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` -- shipped via PR #88, merged to `main` as `0458a5ae` on 2026-07-06.
 

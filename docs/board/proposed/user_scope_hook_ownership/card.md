@@ -1,6 +1,6 @@
 # User-scope-only hook ownership
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Depends on `forge_hook_dispatcher` (the dispatcher mechanism) and `forge_project_registry` (the
 gating registry). On the user-scope-model critical path.

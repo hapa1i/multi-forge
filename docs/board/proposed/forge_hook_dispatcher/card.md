@@ -1,6 +1,6 @@
 # User hook dispatcher (user-scope-model mechanism)
 
-**Epic**: [`docs/board/proposed/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `proposed/`. Depends on `global_forge_install` (a global `forge` to resolve) and `forge_project_registry` (the
 no-op gate reads the registry). Part of the user-scope-only model -- **not** the incident fix (that is
