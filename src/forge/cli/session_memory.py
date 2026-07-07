@@ -49,7 +49,7 @@ def session_memory() -> None:
 
 
 @session_memory.command("enable")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION).")
+@click.option("--session", "-s", "session_name", default=None, help="Target session (default: the current session).")
 @click.option("--review-only", is_flag=True, default=False, help="Enable in review-only mode (no edits).")
 @click.option(
     "--effort",
@@ -63,14 +63,13 @@ def enable_cmd(session_name: str | None, review_only: bool, effort: str | None) 
 
     Sets ``memory.auto_update.enabled`` on the session manifest. ``--effort``
     sets ``memory.auto_update.effort`` and applies even when memory is already
-    enabled in the same mode. Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
+    enabled in the same mode. Resolves the current session when ``--session`` is omitted.
     """
     target_mode = "review-only" if review_only else "augment"
     resolved_name = session_name or os.environ.get("FORGE_SESSION")
     if not resolved_name:
         print_error(
-            "Memory activation is session-scoped. "
-            "Use --session <name> or run inside a Forge session ($FORGE_SESSION).",
+            "Memory activation is session-scoped. Use --session <name> or run inside a Forge-managed session.",
             console=err_console,
         )
         sys.exit(1)
@@ -83,18 +82,17 @@ def enable_cmd(session_name: str | None, review_only: bool, effort: str | None) 
 
 
 @session_memory.command("disable")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION).")
+@click.option("--session", "-s", "session_name", default=None, help="Target session (default: the current session).")
 def disable_cmd(session_name: str | None) -> None:
     """Disable memory auto-update for a session.
 
     Sets ``memory.auto_update.enabled=false`` on the session manifest.
-    Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
+    Resolves the current session when ``--session`` is omitted.
     """
     resolved_name = session_name or os.environ.get("FORGE_SESSION")
     if not resolved_name:
         print_error(
-            "Memory activation is session-scoped. "
-            "Use --session <name> or run inside a Forge session ($FORGE_SESSION).",
+            "Memory activation is session-scoped. Use --session <name> or run inside a Forge-managed session.",
             console=err_console,
         )
         sys.exit(1)

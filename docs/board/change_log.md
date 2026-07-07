@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-07
 
+### env_var_interface_boundary
+
+**Goal**: Treat `FORGE_*` launch environment names as a classified interface and remove internal wiring vocabulary from
+normal-flow user surfaces.
+
+**Key changes**:
+
+- Added the `FORGE_*` vocabulary table in `design_appendix.md` with a `design.md` pointer: public (`FORGE_HOME`,
+  `FORGE_PROFILE`), public-diagnostic (`FORGE_DEBUG`, `FORGE_STATUS_TRUNCATE`), internal wiring, and Test/QA harness
+  classes.
+- Rewrote normal-flow CLI errors/help/docstrings and user docs to say "current session", "Forge-managed session", and
+  `--session <name>` instead of teaching users to set internal session env vars.
+- Added paired diagnostic markers for troubleshooting sections that legitimately name hook/session env wiring; no
+  whole-file docs exemption.
+- Added `tests/src/cli/test_env_vocabulary.py`, a two-layer guard over CLI/op user-visible sinks and user-facing docs,
+  with live product-env inventory coverage, boundary-matched names, and parity against the appendix table.
+
+**Verification**: `rg "Set FORGE_SESSION|set \\$FORGE_SESSION" src/ docs/end-user docs/cli_reference.md` clean;
+`uv run pytest tests/src/cli/test_env_vocabulary.py tests/src/cli/test_memory.py tests/src/cli/test_session_memory.py tests/src/cli/test_session_lane.py tests/src/cli/test_output.py tests/src/core/ops/test_session_context.py -q`
+(`169 passed`); `make pre-commit` clean. Integration not run because the change is docs, strings, and a source-scan test
+only with no runtime behavior change.
+
 ### forge_project_registry / forge_project_compat closeout
 
 **Goal**: Close the merged project-registry work and the first project-compat guardrail slice after PR #90 landed on

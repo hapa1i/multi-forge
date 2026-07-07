@@ -171,7 +171,7 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
   with T4.
 - **Adjacent (non-member), sequence-sensitive:**
-  [`env_var_interface_boundary`](../../proposed/env_var_interface_boundary/card.md) declares `FORGE_*` an internal
+  [`env_var_interface_boundary`](../../done/env_var_interface_boundary/card.md) declares `FORGE_*` an internal
   launcher-to-runtime contract and strips internal env-var names (notably `FORGE_SESSION`) from normal-flow user
   surfaces. It is deliberately **not** a member (the vocabulary boundary is repo-wide, not epic-owned), but it couples
   one-directionally to this epic: **T4/T5/T6 author new user-facing strings** (dispatcher messages, `doctor`

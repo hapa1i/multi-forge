@@ -98,7 +98,7 @@ Project-doc passports (project-scoped, git-tracked; sessionless):
 
 Session-scoped activation and reports (whether the memory writer runs for a session):
 
-- `forge session memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`).
+- `forge session memory enable|disable`: toggle session memory auto-update (`--session`, resolves the current session).
   `enable` takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same
   mode).
 - `forge session memory status`: show memory activation across sessions (`--scope`, `--json`).

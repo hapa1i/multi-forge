@@ -37,6 +37,8 @@ Forge’s deployment model is:
 
 Hooks need to identify the current session to read/write confirmed facts. The resolution order is:
 
+<!-- forge-env-vocab: diagnostic:start -->
+
 1. **`FORGE_FORK_NAME` env var** — set during fork registration (including relaunches)
 2. **`FORGE_SESSION` env var** — set by `forge session start` / `forge session resume`
 3. **IndexStore UUID lookup** — matches the Claude session UUID against the global index
@@ -45,6 +47,8 @@ Hooks need to identify the current session to read/write confirmed facts. The re
 No CWD-based directory scanning — `FORGE_SESSION` is the authoritative source. Under the 1:1 model, each session has at
 most one `claude_session_id`. On `/compact` or `/clear`, the UUID is **overwritten** (not accumulated). The env var
 chain typically resolves in step 1 or 2; step 3 is a fallback for edge cases where env vars are not propagated.
+
+<!-- forge-env-vocab: diagnostic:end -->
 
 ---
 
@@ -55,7 +59,13 @@ Hooks are intentionally restricted.
 ### Hooks CAN do
 
 - write **confirmed facts** into the session file (under `confirmed.*`)
-  - Session located via hook resolution: `FORGE_FORK_NAME` -> `FORGE_SESSION` -> UUID lookup
+
+<!-- forge-env-vocab: diagnostic:start -->
+
+- Session located via hook resolution: `FORGE_FORK_NAME` -> `FORGE_SESSION` -> UUID lookup
+
+<!-- forge-env-vocab: diagnostic:end -->
+
 - capture **artifacts** (approved plans, transcripts) into `<forge_root>/.forge/artifacts/...`
 - apply **session overrides** through direct `%` commands handled by `UserPromptSubmit` (for example `%policy ...`,
   `%cancel-verification`)
@@ -304,8 +314,14 @@ Checklist:
 ### "Hooks fired but session file didn't update"
 
 - hooks only write `confirmed.*`
+
+<!-- forge-env-vocab: diagnostic:start -->
+
 - confirm `FORGE_SESSION` env var is set (should be set by `forge session start` / `resume`)
 - if env var is missing, confirm the session exists in the IndexStore (`~/.forge/sessions/index.json`)
+
+<!-- forge-env-vocab: diagnostic:end -->
+
 - confirm the session manifest exists at `<forge_root>/.forge/sessions/<name>/forge.session.json`
 
 ### "Hooks changed my model / routing"
@@ -322,8 +338,12 @@ They shouldn't. If this appears to happen:
 
 ### Hook resolution mechanism
 
+<!-- forge-env-vocab: diagnostic:start -->
+
 See [Hook session resolution](#hook-session-resolution) for the three-step resolution chain (`FORGE_FORK_NAME` ->
 `FORGE_SESSION` -> UUID lookup).
+
+<!-- forge-env-vocab: diagnostic:end -->
 
 ### Hook command group
 
@@ -348,8 +368,12 @@ forge hook codex-session-start # SessionStart transfer delivery (Codex; installe
 
 ### Gotchas
 
+<!-- forge-env-vocab: diagnostic:start -->
+
 | Trap                    | Explanation                                                                                                                  |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                              |
 | "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                                       |
 | "Wrong settings file"   | `forge extension enable --scope user` writes `~/.claude/settings.json`; `--scope local` writes `.claude/settings.local.json` |
+
+<!-- forge-env-vocab: diagnostic:end -->

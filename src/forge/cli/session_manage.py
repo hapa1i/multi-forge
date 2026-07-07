@@ -750,7 +750,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
     """Show session details.
 
     SESSION_ID can be a Forge session name or a Claude session UUID.
-    Without SESSION_ID, resolves from $FORGE_SESSION.
+    Without SESSION_ID, resolves the current session.
 
     \b
     Examples:
@@ -995,7 +995,7 @@ def _build_show_plan_json(state: SessionState | None) -> dict[str, Any]:
 def shell(name: str | None) -> None:
     """Open a shell in a sidecar session container.
 
-    Without NAME, resolves from $FORGE_SESSION.
+    Without NAME, resolves the current session.
     Only works for sessions started with --sidecar.
     """
     from forge.sidecar import exec_in_container, is_container_running

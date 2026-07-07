@@ -151,7 +151,7 @@ def start_cmd(
 ) -> None:
     """Start Claude Code with proxy routing or direct to Anthropic.
 
-    Bare launcher: no session state, no FORGE_SESSION.  Use
+    Bare launcher: no session state (not a managed session). Use
     ``forge session start`` for managed sessions with lifecycle tracking.
 
     \b

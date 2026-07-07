@@ -199,7 +199,7 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             except ForgeSessionError:
                 pass
 
-    raise SessionContextError("No session found (no argument, no $FORGE_SESSION)")
+    raise SessionContextError("No session found. Use --session <name> or run inside a Forge-managed session.")
 
 
 class SessionContextError(RuntimeError):

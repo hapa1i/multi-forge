@@ -348,6 +348,59 @@ User-editable JSON merged into Claude Code `settings.json` by `forge extension e
 
 See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
+### A.7b Forge env-var vocabulary
+
+`FORGE_*` environment variables are a launcher-to-runtime contract first, not an accidental public API. User-facing
+normal-flow surfaces speak in terms of `--session <name>`, "current session", and "Forge-managed session"; diagnostic
+surfaces may name internal wiring when that is the evidence a user needs to inspect. Future user-settable `FORGE_*`
+variables must be added here and documented in the relevant end-user guide before help text or normal docs teach them.
+
+| Variable                          | Class             | Rule                                                                |
+| --------------------------------- | ----------------- | ------------------------------------------------------------------- |
+| `FORGE_HOME`                      | Public            | User-settable state-root relocation; documented in end-user guides  |
+| `FORGE_PROFILE`                   | Public            | User-settable credential profile selector                           |
+| `FORGE_DEBUG`                     | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces |
+| `FORGE_STATUS_TRUNCATE`           | Public diagnostic | User-settable status-line troubleshooting toggle                    |
+| `FORGE_CODEX_PROXY_TOKEN`         | Internal wiring   | Loopback proxy bearer between Forge and Codex                       |
+| `FORGE_COMMAND`                   | Internal wiring   | Forge-spawned command attribution                                   |
+| `FORGE_DEFAULT_PROXY_BASE_URL`    | Internal wiring   | Legacy/default session proxy wiring                                 |
+| `FORGE_DEFAULT_PROXY_TEMPLATE`    | Internal wiring   | Legacy/default session proxy wiring                                 |
+| `FORGE_DEPTH`                     | Internal wiring   | Recursion guard for hook/subprocess chains                          |
+| `FORGE_FORGE_ROOT`                | Internal wiring   | Launcher-provided Forge project root                                |
+| `FORGE_FORK_NAME`                 | Internal wiring   | Fork/relaunch session identity fast path                            |
+| `FORGE_LAUNCH_MODE`               | Internal wiring   | Host/sidecar launch metadata                                        |
+| `FORGE_OMIT_INTERACTIVE_KEY`      | Internal wiring   | Sidecar entrypoint instruction for interactive key omission         |
+| `FORGE_PARENT_RUN_ID`             | Internal wiring   | Run-tree attribution parent id                                      |
+| `FORGE_PARENT_SESSION`            | Internal wiring   | Fork/relaunch lineage metadata                                      |
+| `FORGE_PROXY_ID`                  | Internal wiring   | Sidecar/proxy runtime identity                                      |
+| `FORGE_PROXY_WIRE_SHAPE`          | Internal wiring   | Proxy wire-shape metadata propagated to children                    |
+| `FORGE_ROOT_RUN_ID`               | Internal wiring   | Run-tree attribution root id                                        |
+| `FORGE_RUN_ID`                    | Internal wiring   | Run-tree attribution id                                             |
+| `FORGE_SESSION`                   | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling |
+| `FORGE_SIDECAR`                   | Internal wiring   | Sidecar runtime marker                                              |
+| `FORGE_SUBPROCESS_BASE_URL`       | Internal wiring   | Child-process proxy routing metadata                                |
+| `FORGE_SUBPROCESS_PROXY`          | Internal wiring   | Child-process proxy selection                                       |
+| `FORGE_SUBPROCESS_PROXY_ID`       | Internal wiring   | Child-process resolved proxy id                                     |
+| `FORGE_SUBPROCESS_TEMPLATE`       | Internal wiring   | Child-process resolved proxy template                               |
+| `FORGE_TEMPLATE`                  | Internal wiring   | Sidecar template metadata                                           |
+| `FORGE_MANUAL_TEST_SYSTEM_PROMPT` | Test/QA harness   | Manual QA fixture marker                                            |
+| `FORGE_QA_ANTHROPIC_PROXY`        | Test/QA harness   | QA container proxy fixture                                          |
+| `FORGE_QA_ANTHROPIC_TEMPLATE`     | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_DEEPSEEK_TEMPLATE`      | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_GEMINI_PROXY`           | Test/QA harness   | QA container proxy fixture                                          |
+| `FORGE_QA_GEMINI_TEMPLATE`        | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_MINIMAX_TEMPLATE`       | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_OPENAI_PROXY`           | Test/QA harness   | QA container proxy fixture                                          |
+| `FORGE_QA_OPENAI_TEMPLATE`        | Test/QA harness   | QA container template fixture                                       |
+| `FORGE_QA_PROVIDER_PROFILE`       | Test/QA harness   | QA provider profile selector                                        |
+| `FORGE_QA_WORKFLOW_MODEL_A`       | Test/QA harness   | QA workflow model fixture                                           |
+| `FORGE_QA_WORKFLOW_MODEL_B`       | Test/QA harness   | QA workflow model fixture                                           |
+| `FORGE_QA_WORKFLOW_MODELS`        | Test/QA harness   | QA workflow model fixture                                           |
+| `FORGE_TEST_REPO`                 | Test/QA harness   | Manual/QA test-repository root                                      |
+
+Build-script locals, Docker build args, HTTP header constants, and Python constant names that merely contain `FORGE` are
+outside this vocabulary unless they are read from or written to a process environment.
+
 ### A.8 Status line guidance (§3.6.11)
 
 Status line reads Claude Code's stdin JSON plus two env-var-addressed sources:
