@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 ENV_CLASSES = {
     "FORGE_HOME": "public",
     "FORGE_PROFILE": "public",
@@ -107,11 +106,7 @@ def _docstring_nodes(tree: ast.Module) -> set[ast.Constant]:
         if not node.body:
             continue
         first = node.body[0]
-        if (
-            isinstance(first, ast.Expr)
-            and isinstance(first.value, ast.Constant)
-            and isinstance(first.value.value, str)
-        ):
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
             docstrings.add(first.value)
     return docstrings
 
@@ -224,7 +219,9 @@ def _resolve_env_name(node: ast.AST, constants: dict[str, str]) -> str | None:
 
 
 def _joined_static_text(node: ast.JoinedStr) -> str:
-    return "".join(value.value for value in node.values if isinstance(value, ast.Constant) and isinstance(value.value, str))
+    return "".join(
+        value.value for value in node.values if isinstance(value, ast.Constant) and isinstance(value.value, str)
+    )
 
 
 def _is_env_constant_target(name: str) -> bool:
@@ -385,14 +382,14 @@ def cmd():
 def test_python_guard_flags_console_print_and_bare_click_imports(tmp_path: Path) -> None:
     sample = tmp_path / "sample.py"
     sample.write_text(
-        '''
+        """
 from click import echo
 
 
 def cmd(console):
     console.print("Leaked FORGE_SESSION")
     echo("Leaked FORGE_FORK_NAME")
-''',
+""",
         encoding="utf-8",
     )
 
