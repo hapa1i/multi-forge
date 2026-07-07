@@ -10,7 +10,9 @@ member execution checklists (each member owns its own). Full contract in [`card.
 [`forge_project_registry`](../../done/forge_project_registry/card.md), and T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md). No member is currently active. Next critical-path
 pick is T4 `forge_hook_dispatcher` unless priority changes; T7's remaining mutator-family sweep is parked in
-[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
+[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
+`env_var_interface_boundary` also landed via PR #91, so T4/T5/T6 should author new user-facing strings against the
+shipped env-var vocabulary boundary.
 
 ## Activation bookkeeping (this branch)
 

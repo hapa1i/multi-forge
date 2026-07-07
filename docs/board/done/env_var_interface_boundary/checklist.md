@@ -9,7 +9,7 @@ the string rewrites, and the guard's allowlist — sources from Phase 0's invent
 starts. **Docs + strings + one new test only; no behavior change** (no env var renamed, removed, or re-resolved;
 resolution order `FORGE_FORK_NAME -> FORGE_SESSION -> UUID` untouched).
 
-**Status: implemented, verified, and moved to `done/` on 2026-07-07.**
+**Status: implemented, verified, moved to `done/`, and landed on `main` via PR #91 (`c593eb66`) on 2026-07-07.**
 
 ## Grounding delta (verified 2026-07-07 on this branch)
 

@@ -27,13 +27,14 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-07
 
-### env_var_interface_boundary
+### env_var_interface_boundary closeout
 
-**Goal**: Treat `FORGE_*` launch environment names as a classified interface and remove internal wiring vocabulary from
-normal-flow user surfaces.
+**Goal**: Close the shipped env-var vocabulary boundary after PR #91 landed on `main`.
 
 **Key changes**:
 
+- Closed PR #91 (`c593eb66`) on `main`: card/checklist are in `done/`, durable notes are promoted, and the epic
+  coordinator points at the done card.
 - Added the `FORGE_*` vocabulary table in `design_appendix.md` with a `design.md` pointer: public (`FORGE_HOME`,
   `FORGE_PROFILE`), public-diagnostic (`FORGE_DEBUG`, `FORGE_STATUS_TRUNCATE`), internal wiring, and Test/QA harness
   classes.
@@ -47,7 +48,8 @@ normal-flow user surfaces.
 **Verification**: `rg "Set FORGE_SESSION|set \\$FORGE_SESSION" src/ docs/end-user docs/cli_reference.md` clean;
 `uv run pytest tests/src/cli/test_env_vocabulary.py tests/src/cli/test_memory.py tests/src/cli/test_session_memory.py tests/src/cli/test_session_lane.py tests/src/cli/test_output.py tests/src/core/ops/test_session_context.py -q`
 (`169 passed`); `make pre-commit` clean. Integration not run because the change is docs, strings, and a source-scan test
-only with no runtime behavior change.
+only with no runtime behavior change. Post-merge closeout re-checked `main` at `c593eb66`, the done-lane card/checklist,
+the epic inbound link, and `make pre-commit-md`.
 
 ### forge_project_registry / forge_project_compat closeout
 

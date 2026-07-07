@@ -176,9 +176,9 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   surfaces. It is deliberately **not** a member (the vocabulary boundary is repo-wide, not epic-owned), but it couples
   one-directionally to this epic: **T4/T5/T6 author new user-facing strings** (dispatcher messages, `doctor`
   registry/cleanup output, migration output), and shipped **T3 already speaks its vocabulary** (`forge_project_registry`
-  checklist Phase 3: normal-flow says "managed session"/`--session`, not `FORGE_SESSION`). Land it **before** T4/T5/T6
-  so those surfaces are born clean; its `test_output.py`-style guard catches re-leaks after the fact, but landing first
-  is cheaper. Not a blocker for T4's *mechanism* -- only for T4's user-facing *strings*.
+  checklist Phase 3: normal-flow says "managed session"/`--session`, not `FORGE_SESSION`). It landed **before** T4/T5/T6
+  via PR #91 (`c593eb66`), so those surfaces should be authored against the shipped boundary; its `test_output.py`-style
+  guard catches re-leaks after the fact. Not a blocker for T4's *mechanism* -- only for T4's user-facing *strings*.
 
 ## Grounding (verified against code, 2026-07-02)
 
