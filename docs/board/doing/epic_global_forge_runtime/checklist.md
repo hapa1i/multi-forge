@@ -5,18 +5,12 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**D2 resolved (2026-07-06): skip T2.** The epic owner confirmed **terminal-only** Claude launches, which inherit the
-shell PATH and already resolve `forge` -- so the exit-127 incident is latent and the interim absolute-path fix (T2) has
-no residual value (its hook bytes would be superseded by T5 anyway; its statusLine rewrite is the only orphan, recorded
-under D2 below). Two members are now **active in `doing/`**, picked up together on branch `forge-project-registry`:
-
-- **T3 [`forge_project_registry`](../forge_project_registry/card.md)** -- critical path; opens the user-scope-model
-  track (T3 -> T4 -> T5 -> T6). Its shipped read half is the dependency for T4's no-op gate.
-- **T7 [`forge_project_compat`](../forge_project_compat/card.md)** -- off-path `required_forge` guardrail; independent,
-  can land any time.
-
-Both carry execution checklists; implementation is **pending review** (no code yet). T1
-[`global_forge_install`](../../done/global_forge_install/card.md) shipped in #89 and remains the only merged member.
+**T3/T7 closeout complete after PR #90 merged to `main`.** Shipped members now are T1
+[`global_forge_install`](../../done/global_forge_install/card.md), T3
+[`forge_project_registry`](../../done/forge_project_registry/card.md), and T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md). No member is currently active. Next critical-path
+pick is T4 `forge_hook_dispatcher` unless priority changes; T7's remaining mutator-family sweep is parked in
+[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
 
 ## Activation bookkeeping (this branch)
 
@@ -84,7 +78,8 @@ Record outcomes here as members are picked up.
 - [x] Next member after T1: **T3 `forge_project_registry`** (critical path) + **T7 `forge_project_compat`** (off-path
   companion), picked up together 2026-07-06; both `git mv` `proposed/ -> doing/` on branch `forge-project-registry`,
   epic/member links repointed, execution checklists added. T3 Phase 1--3 implementation and T7's first command-path
-  guard slice landed 2026-07-07; T7's broader mutator sweep remains tracked in its member checklist before closeout.
+  guard slice landed 2026-07-07 in PR #90; both member cards are now `done/`. T7's broader mutator sweep was split to
+  `todo/forge_project_compat_mutator_sweep/`.
 
 ## Shared-contract seams (drift watch)
 

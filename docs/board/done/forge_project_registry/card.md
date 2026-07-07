@@ -1,10 +1,10 @@
 # Project registry + enrollment (`~/.forge/projects.json`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/`. **Precedes `forge_hook_dispatcher`** -- the dispatcher's shipped no-op gate reads this registry, so
-the schema + read half must land first (correction from the first decomposition, which called it parallel). On the
-user-scope-model critical path.
+**Lane**: `done/`. Shipped in PR #90. **Precedes `forge_hook_dispatcher`** -- the dispatcher's shipped no-op gate reads
+this registry, so the schema + read half landed first (correction from the first decomposition, which called it
+parallel). On the user-scope-model critical path.
 
 ## Goal
 
@@ -92,8 +92,9 @@ The registry is not just a schema -- it needs a full lifecycle, or user-scope ho
 - **Trust model** -- **RESOLVED (D-T3-a):** enroll-on-enable + auto-enroll-on-managed-worktree, keeping
   `enrollment_source` provenance. Explicit-only rejected (`extension enable` is the consent; the dangerous design is
   enroll-on-*detection*, never proposed). See the T3 checklist Phase 0.
-- **Surface**: a new `forge project` group vs folding enroll into `forge extension enable` (existence committed above;
-  shape open).
+- **Surface** -- **RESOLVED:** fold enrollment into `forge extension enable`. Project/local enable enrolls the targeted
+  root; user-scope enable enrolls no root by itself. Standalone project enrollment/prune/reconcile verbs stay deferred
+  to the ownership/cleanup tickets.
 
 ## Acceptance tests
 

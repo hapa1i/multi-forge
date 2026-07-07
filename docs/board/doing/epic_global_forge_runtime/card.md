@@ -3,11 +3,13 @@
 **This is an epic.** It coordinates the shared contract, sequencing, and drift control across the member cards below.
 Each member is an independently shippable implementation unit; the epic ships no code itself.
 
-**Lane**: `doing/` -- active coordinator. First member **T1
-[`global_forge_install`](../../done/global_forge_install/card.md)** shipped (merged in #89, now in `done/`); no member
-is currently active, and the next pick awaits the D2 timing decision (now ripe on T1's doctor evidence). The epic's
-coordination [`checklist.md`](checklist.md) (sequencing, seam drift-watch, the owed D2/T3/T4 decisions) stays live.
-Remaining members stay in `proposed/` and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when
+**Lane**: `doing/` -- active coordinator. Shipped members: **T1
+[`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
+[`forge_project_registry`](../../done/forge_project_registry/card.md)**, and **T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**. No member is currently active; next critical-path
+pick is T4 `forge_hook_dispatcher` unless priority changes. The epic's coordination [`checklist.md`](checklist.md)
+(sequencing, seam drift-watch, owed T4/T5/T8/T10 decisions) stays live. Remaining members stay in `proposed/` (or
+accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when
 every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
@@ -38,11 +40,11 @@ so neither sits on one linear track.
 | ----- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
 | T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                       | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
-| T3    | [`forge_project_registry`](../forge_project_registry/card.md)                           | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
+| T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                   | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
 | T4    | [`forge_hook_dispatcher`](../../proposed/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
 | T5    | [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
-| T7    | [`forge_project_compat`](../forge_project_compat/card.md)                               | `required_forge` fail-clear guardrail + missing-file semantics                      | --          |
+| T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
 | T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)               | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../../proposed/forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
@@ -103,7 +105,9 @@ contract, and byte-identity is the API:
 ### 2. `~/.forge/projects.json` schema + canonical path form
 
 T3 defines it (versioned, strictly read on the CLI path, fail-open on the hook path -- see Risks), T4 consumes it (no-op
-gate), T5/T6 write to it. One canonicalization rule (resolve symlinks + normalize) shared by all.
+gate), T5/T6 write to it. One canonicalization rule shared by all: store the resolved canonical string, match exact
+strings first, then use `samefile()` only when both paths exist. No unconditional casefold/Unicode fold, because that
+would grant trust across distinct case-variant roots on case-sensitive filesystems.
 
 **Format decided (D-T3-c, 2026-07-07): JSON (`projects.json`), not TOML.** The registry is machine-written Forge-owned
 durable state, so it follows the house pattern of every sibling registry (`sessions/index.json`, `proxies/index.json`,
@@ -162,7 +166,10 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 - **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- delete it before T6 finalizes
   cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) pairs with T2 and T5
   -- it must land with whichever byte-changing member ships first, or the sidecar regresses.
-- **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). T8 (dev override) pairs with T4.
+- **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice
+  shipped; the remaining mutator-family sweep is parked in
+  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
+  with T4.
 
 ## Grounding (verified against code, 2026-07-02)
 
@@ -218,19 +225,19 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 | Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip T2.** Terminal-only launch makes the interim reachability fix unnecessary; reopen only if GUI/Dock/IDE launch becomes supported. |
 | Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork and paired T10 sidecar exemption.                                 |
 | Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                             |
+| Enrollment surface: new `forge project` group vs `forge extension` family                  | **Resolved: fold into `forge extension enable`.** Project/local enable enrolls the targeted root; user-scope enable enrolls no root by itself.    |
 | Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                  |
 | Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                                                                    |
 | Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                                                         |
+| Version-check fail-open vs fail-closed matrix per hook type                                | **Resolved:** command paths fail closed; session/context hook readers fail open with diagnostics; policy hooks keep existing fail-mode settings.  |
 
 ## Open questions still owed (each assigned to a member)
 
 | Question                                                                                   | Owner                                         |
 | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| Enrollment surface: new `forge project` group vs `forge extension` family                  | T3                                            |
 | Dispatcher shim vs absolute-symlink (benchmark decides; also decides the detection update) | T4                                            |
 | Deprecate `extension enable --scope user` vs re-semantic it as dispatcher-only             | T5                                            |
 | In-container command form: bare/image-PATH vs mounting the host dispatcher                 | T10                                           |
-| Version-check fail-open vs fail-closed matrix per hook type                                | T7                                            |
 | `FORGE_DEV` override vs `uv run forge`-only for contributors                               | T8                                            |
 | How much project-local Codex hook policy to keep for teams                                 | deferred -- out of scope for v1 (noted in T5) |
 

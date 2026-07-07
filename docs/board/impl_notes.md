@@ -36,6 +36,28 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Project registry trust keys preserve filesystem boundaries; compatibility pins are opt-in guardrails (T3/T7, shipped 2026-07-07)
+
+- `~/.forge/projects.json` is Forge-owned machine state, not a hand-edit surface. Keep it versioned JSON, write it via
+  locked read-modify-write + atomic replace, and preserve the split read contract: CLI/operator paths fail clear on
+  corrupt, unreadable, or newer state; hook/dispatcher paths fail open with a `degraded` reason that `doctor` can
+  surface.
+- The project-registry trust key must not casefold or Unicode-fold unconditionally. Store the resolved canonical string,
+  match exact strings first, then use `Path.samefile()` only when both paths exist. This keeps case-sensitive
+  filesystems from granting trust across case-variant directories while still accepting same-directory spelling variants
+  on case-insensitive filesystems. Deleted/stale roots intentionally match only exact stored strings.
+- Enrollment consent is explicit or derived, never detection-based: project/local `forge extension enable` enrolls the
+  targeted root; user-scope enable enrolls no root by itself; managed session worktrees/forks auto-enroll because the
+  user created them through Forge. Install success and trust enrollment are separate facts.
+- `.forge/project.toml` is repo-local, user-authored, and opt-in. Missing means compatible/unconstrained and should not
+  warn or auto-create a file. Strict command paths fail closed on malformed, unsupported, or incompatible pins;
+  session/context hook helpers fail open with diagnostics. PEP 440 range checks use
+  `SpecifierSet.contains(..., prereleases=True)` so checkout-local dev/rc Forge builds can satisfy numeric ranges.
+- T7 intentionally closed with the remaining mutation-family sweep split to
+  `docs/board/todo/forge_project_compat_mutator_sweep/`: confirmed-state hook writes, memory-writer doc writes, and
+  proxy/backend registry mutations must either be wired through the guard or documented as out of scope before claiming
+  all project-state mutators observe `.forge/project.toml`.
+
 ### Install-kind detection: editable-first, launcher-symlink-not-realpath, minimal-PATH is a fact (global_forge_install, shipped 2026-07-06)
 
 `src/forge/install/doctor.py` (`diagnose_install`) classifies how the `forge` binary is installed. Durable rules:

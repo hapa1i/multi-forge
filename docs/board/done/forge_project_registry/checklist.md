@@ -1,13 +1,13 @@
 # Execution checklist: T3 `forge_project_registry`
 
-Epic: [`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md). Card: [`card.md`](card.md). Branch:
+Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md). Branch:
 `forge-project-registry`.
 
 ## Current focus
 
-**Implementation verified.** The project registry module, enable/worktree enrollment paths, doctor registry section,
-docs sync, targeted unit tests, full pre-commit, and named Docker integration checks are green on
-`forge-project-registry`. Prune/reconcile actions remain deferred to T5/T6.
+**Closed on `main` 2026-07-07.** The project registry module, enable/worktree enrollment paths, doctor registry section,
+docs sync, targeted unit tests, full pre-commit, and named Docker integration checks landed in PR #90. Prune/reconcile
+actions remain deferred to T5/T6.
 
 T3 is the head of the user-scope-model track (T3 -> T4 -> T5 -> T6). Its **read half** is the dependency for T4's
 dispatcher no-op gate, so "schema + read helper" (Phase 1) is the load-bearing deliverable; enrollment/lifecycle (Phase
@@ -157,12 +157,12 @@ Acceptance (Phase 2):
 ## Closeout
 
 - [x] All Phase 1--3 assertions verified; acceptance tests green (`uv run pytest` targeted install/doctor/extension/
-  guard/session/hook suite, 331 passed).
+  guard/session/hook suite, 355 passed, 1 skipped; focused follow-up suite, 38 passed, 1 skipped).
 - [x] `make pre-commit` clean; **named integration targets** passed via `./scripts/test-integration.sh`
   `tests/integration/docker/test_installer.py tests/integration/docker/test_session_lifecycle.py -k "enable_creates_forge_anchor or worktree_flag_creates_isolated_session or fork_creates_worktree_and_tracks_parent"`:
   installer integration for the enable-enroll path (`tests/integration/docker/test_installer.py`); session worktree/fork
   integration if auto-enroll wires into worktree create.
-- [ ] `change_log.md` entry; durable lessons proposed for `impl_notes.md` (canonicalization mechanism, dual-read
+- [x] `change_log.md` entry; durable lessons promoted to `impl_notes.md` (canonicalization mechanism, dual-read
   detect-and-surface posture, JSON-registry house pattern).
-- [ ] Epic checklist: tick the T3 lines under "Decisions owed"; update seam-2/seam-3 drift-watch notes.
-- [ ] Move `doing/forge_project_registry/ -> done/`; repoint inbound epic/member links.
+- [x] Epic checklist: T3 shipped; seam-2/seam-3 drift-watch notes kept live for downstream T4/T5/T6.
+- [x] Move `doing/forge_project_registry/ -> done/`; repoint inbound epic/member links.

@@ -1,14 +1,17 @@
 # Project compatibility guardrail (`required_forge`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/`. Independent -- a check layered on project state. Can land any time, even before the hook-ownership
-tickets.
+**Lane**: `done/`. Shipped in PR #90 as the first command-path guardrail slice. Independent -- a check layered on
+project state. The remaining mutator-family sweep was split to
+[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
 
 ## Goal
 
-`<repo>/.forge/project.toml` carrying `schema_version` + `required_forge`. Every command/hook that mutates project state
-checks it and **fails clearly** on mismatch, naming the resolution path.
+`<repo>/.forge/project.toml` carrying `schema_version` + `required_forge`. This slice ships the reader, doctor surface,
+extension lifecycle guard, and shared session repo-root guards. The broader "every command/hook that mutates project
+state" coverage is owned by
+[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
 
 ## Accepted decision (epic D1)
 
@@ -41,11 +44,11 @@ around it.
 ## Design
 
 - **`.forge/project.toml`**: `schema_version` (durable state, strictly read) + `required_forge` (a version range).
-- **Single enforcement chokepoint**: one function that every state-mutating command/hook calls before mutating -- avoid
-  sprinkling the check across dozens of call sites.
-- **Fail-open/closed matrix per hook type** (decision owed): candidate -- session/context hooks fail **open** with a
-  warning (never block the coding session); policy hooks obey a project strictness flag. Consistent with the fail-open
-  posture for policy evaluations (`design_workflows` §1.2).
+- **Named enforcement guards**: T7 covers extension lifecycle plus shared session repo-root guards; the remaining
+  mutator families are split to the accepted follow-up so coverage stays auditable.
+- **Fail-open/closed matrix (resolved)**: command paths fail closed; session/context hook readers fail open with a
+  degraded diagnostic; policy hook blocking stays governed by existing policy fail-mode settings unless a future project
+  strictness flag is explicitly added.
 
 ## Risks
 
@@ -53,13 +56,12 @@ around it.
 - **False-blocking during rapid iteration**: Forge clean-breaks state often; the guardrail must name the reset/upgrade
   path, and its fail-open default must not brick a coding session.
 - Interaction with `forge_dev_runtime_override`: a contributor running a checkout `forge` against a project pinned to a
-  released range -- decide whether the dev override bypasses the guardrail.
+  released range -- T8 decides whether the dev override bypasses the guardrail.
 
 ## Open questions
 
-- Exact fail-open vs fail-closed matrix per hook type.
 - Whether `required_forge` is enforced when a contributor runs checkout-local Forge (interacts with
-  `forge_dev_runtime_override`).
+  `forge_dev_runtime_override`; T8).
 
 ## Acceptance tests
 

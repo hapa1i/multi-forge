@@ -1,12 +1,13 @@
 # Execution checklist: T7 `forge_project_compat`
 
-Epic: [`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md). Card: [`card.md`](card.md).
+Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md).
 
 ## Current focus
 
-**Implementation pass underway.** The `.forge/project.toml` reader/enforcer, extension/session command-path guard set,
-and doctor surface are implemented on `forge-project-registry`. The remaining risk is the broader mutation-family sweep
-named below; do not close T7 until that sweep is either wired or split to a follow-up card.
+**Closed on `main` 2026-07-07 as the first command-path guardrail slice.** The `.forge/project.toml` reader/enforcer,
+extension/session command-path guard set, and doctor surface landed in PR #90. The broader mutation-family sweep is
+explicitly split to [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md); do
+not claim every state-mutating path observes `.forge/project.toml` until that follow-up lands.
 
 ## Scope boundary (what is NOT in T7)
 
@@ -73,10 +74,12 @@ isolation is out of scope.
 - [x] **Doctor strict-read surface:** extend `forge extension doctor` to strict-read `.forge/project.toml` and report
   malformed/unsupported-schema or incompatible state with the same fix hint. Missing file remains compatible and should
   not warn.
-- [ ] **Remaining mutator sweep:** wire or explicitly split follow-up coverage for hook confirmed-state writes,
-  memory-writer doc writes, and proxy/backend registry mutations. This is the remaining condition before claiming every
-  state-mutating path observes `.forge/project.toml`. If the sweep splits to a follow-up card before release, move the
-  lenient hook helper with its first production caller rather than shipping unused contract code indefinitely.
+- [x] **Remaining mutator sweep split:** hook confirmed-state writes, memory-writer doc writes, and proxy/backend
+  registry mutations moved to
+  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). This is the remaining
+  condition before claiming every state-mutating path observes `.forge/project.toml`. If the sweep does not wire a hook
+  caller before release, move the lenient hook helper with its first production caller rather than shipping unused
+  contract code indefinitely.
 
 Acceptance (Phases 1--2):
 
@@ -102,9 +105,10 @@ Acceptance (Phases 1--2):
 
 ## Closeout
 
-- [ ] All Phase 1--3 assertions verified; acceptance tests green.
-- [ ] `make pre-commit` clean; integration run if a hook path enforces the guardrail.
-- [ ] `change_log.md` entry; durable lessons proposed for `impl_notes.md` if any (chokepoint enumeration pattern,
-  three-state posture, SpecifierSet reuse).
-- [ ] Epic checklist: note T7 shipped (off-path member).
-- [ ] Move `doing/forge_project_compat/ -> done/`; repoint inbound epic/member links.
+- [x] All Phase 1--3 assertions for this slice verified; acceptance tests green.
+- [x] `make pre-commit` clean; no production hook path enforces the guardrail in this slice, so hook integration stays
+  with the follow-up sweep.
+- [x] `change_log.md` entry; durable lessons promoted to `impl_notes.md` (chokepoint enumeration pattern, three-state
+  posture, SpecifierSet reuse).
+- [x] Epic checklist: T7 shipped as first guardrail slice; follow-up sweep parked in `todo/`.
+- [x] Move `doing/forge_project_compat/ -> done/`; repoint inbound epic/member links.

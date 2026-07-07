@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-07
+
+### forge_project_registry / forge_project_compat closeout
+
+**Goal**: Close the merged project-registry work and the first project-compat guardrail slice after PR #90 landed on
+`main`.
+
+**Key changes**:
+
+- Moved T3 `forge_project_registry` to `done/`: `~/.forge/projects.json` is now the machine-written trusted-root
+  registry, with locked read-modify-write enrollment, strict CLI reads, fail-open hook reads, doctor surfacing, and
+  managed-worktree auto-enrollment.
+- Moved T7 `forge_project_compat` to `done/` for the shipped first slice: `.forge/project.toml` is an opt-in,
+  hand-edited compatibility pin; extension/session command paths enforce it, and doctor reports malformed or
+  incompatible state.
+- Split T7's uncovered mutation families into accepted follow-up `todo/forge_project_compat_mutator_sweep/`:
+  confirmed-state hook writes, memory-writer doc writes, and proxy/backend registry mutations.
+- Promoted durable registry/compat invariants to `impl_notes.md`; epic links now point at the done cards.
+
+**Verification**: PR #90 verification included the targeted install/doctor/extension/guard/session/hook suite
+(`355 passed, 1 skipped`), focused follow-up suite (`38 passed, 1 skipped`), named Docker integration checks
+(`3 passed, 33 deselected`), `make pre-commit`, and `uv run --frozen pyright`. Closeout docs verified with
+`make pre-commit-md`.
+
 ## 2026-07-06
 
 ### global_forge_install closeout
