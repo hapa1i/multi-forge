@@ -1075,8 +1075,11 @@ def doctor_cmd(as_json: bool) -> None:
     """
     import json
 
-    from forge.install.doctor import GLOBAL_INSTALL_COMMANDS, diagnose_install
+    from forge.install.doctor import diagnose_install
 
+    # Diagnostic: always exits 0 -- health lives in the payload (install_kind,
+    # on_path*, advice), not the exit code. A non-zero-on-unhealthy mode is a
+    # future question if hooks/CI ever gate on doctor (epic T2/T5).
     diag = diagnose_install()
 
     if as_json:
@@ -1096,4 +1099,4 @@ def doctor_cmd(as_json: bool) -> None:
     )
 
     if diag.advice:
-        print_tip(diag.advice, commands=list(GLOBAL_INSTALL_COMMANDS), console=console)
+        print_tip(diag.advice, commands=list(diag.advice_commands), console=console)

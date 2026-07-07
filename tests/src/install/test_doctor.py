@@ -17,7 +17,9 @@ from click.testing import CliRunner
 
 from forge.cli.extensions import extensions
 from forge.install.doctor import (
+    GLOBAL_INSTALL_COMMANDS,
     MINIMAL_PATH,
+    PATH_SETUP_COMMANDS,
     diagnose_install,
     is_editable_install,
 )
@@ -93,9 +95,30 @@ def test_venv_only_not_on_path_advises_global(tmp_path: Path) -> None:
     assert diag.on_path_minimal is False
     assert diag.advice is not None
     assert "global tool" in diag.advice
+    assert diag.advice_commands == GLOBAL_INSTALL_COMMANDS
 
 
-@pytest.mark.parametrize("env_var", [None, "XDG_BIN_HOME", "PIPX_BIN_DIR"])
+def test_global_installed_but_off_path_advises_path_setup(tmp_path: Path) -> None:
+    """The 'just ran uv tool install, PATH not wired' case: fix PATH, do not reinstall."""
+    home = tmp_path
+    bindir = home / ".local" / "bin"
+    bindir.mkdir(parents=True)
+    forge = bindir / "forge"
+    environ = {"HOME": str(home), "PATH": "/usr/bin:/bin"}  # ~/.local/bin NOT on PATH
+    which = _fake_which({})  # forge not resolvable on the current PATH
+    # Off PATH, the user invokes the launcher by its full path -> that is argv0.
+    diag = diagnose_install(argv0=str(forge), which=which, environ=environ, editable=False)
+
+    assert diag.install_kind == "global"
+    assert diag.on_path is False
+    assert diag.forge_path == str(forge)
+    assert diag.advice is not None
+    assert "not on your PATH" in diag.advice
+    assert "global tool" not in diag.advice  # must NOT tell an installed user to reinstall
+    assert diag.advice_commands == PATH_SETUP_COMMANDS
+
+
+@pytest.mark.parametrize("env_var", [None, "XDG_BIN_HOME", "PIPX_BIN_DIR", "UV_TOOL_BIN_DIR"])
 def test_global_tool_layouts_resolve_global(tmp_path: Path, env_var: str | None) -> None:
     """uv tool (~/.local/bin) and pipx/XDG override dirs both classify as global."""
     home = tmp_path

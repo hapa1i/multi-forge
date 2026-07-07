@@ -35,9 +35,12 @@ Forge is installed and whether it is globally reachable -- the epic's first, dep
 **Key changes**:
 
 - New `src/forge/install/doctor.py` (`diagnose_install`, injectable seams): classifies the install as
-  `global`/`editable`/`venv`/`unknown`, resolves the `forge` launcher path, and reports PATH reachability. Adds a
-  GUI/launchd minimal-PATH probe (`on_path_minimal`) -- the mechanical signal for epic D2 (a healthy global install
-  still reads `false`, since `~/.local/bin` is off launchd's PATH; advice is keyed on `on_path`/kind, not the probe).
+  `global`/`editable`/`venv`/`unknown` (global honors `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`,
+  `PIPX_BIN_DIR`), resolves the `forge` launcher path, and reports PATH reachability. Adds a GUI/launchd minimal-PATH
+  probe (`on_path_minimal`) -- the mechanical signal for epic D2 (a healthy global install still reads `false`, since
+  `~/.local/bin` is off launchd's PATH; advice is keyed on `on_path`/kind, not the probe). Advice is state-aware: an
+  installed-but-off-PATH global install is told to fix PATH (`uv tool update-shell` / `pipx ensurepath`), not to
+  reinstall.
 - New `forge extension doctor` leaf (thin CLI over `doctor.py`; `--json` for scripting, `print_tip` advice).
 - Day-1 docs: README Quick Start leads with `uv tool install` / `pipx install` (dev sub-note -> `uv sync`); uninstall ->
   tool form; end-user README gains an "Install Forge (once)" prerequisite (the workflow previously assumed `forge` was
@@ -45,10 +48,11 @@ Forge is installed and whether it is globally reachable -- the epic's first, dep
 - Design sync: cli_reference Installation table, design.md §5.1 (two install layers), design_appendix §C (tool
   distribution, kinds, probe semantics, `--json` shape).
 
-**Verification**: `tests/src/install/test_install_doctor.py` (12 new tests) covers all kinds + both probe outcomes + CLI
-JSON shape; `tests/src/{install,cli} -m "not integration"` -> 2584 passed; `make pre-commit` clean; live
-`forge extension doctor` on the editable dev install reported `editable` + real path + `on_path_minimal=false`.
-Installer Docker integration skipped with rationale (read-only diagnostic, no write-path change).
+**Verification**: `tests/src/install/test_doctor.py` (14 new tests) covers all kinds + both probe outcomes +
+off-PATH-global advice + CLI JSON shape; `tests/src/{install,cli} -m "not integration"` -> 2586 passed;
+`make pre-commit` clean; live `forge extension doctor` on the editable dev install reported `editable` + real path +
+`on_path_minimal=false`. Installer Docker integration skipped with rationale (read-only diagnostic, no write-path
+change).
 
 ### forge_hook_legacy_writer: Remove the standalone hook writer
 

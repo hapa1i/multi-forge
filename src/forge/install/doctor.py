@@ -34,6 +34,10 @@ MINIMAL_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 # The two recommended global-tool installs (surfaced in advice + Day-1 docs).
 GLOBAL_INSTALL_COMMANDS = ("uv tool install multi-forge", "pipx install multi-forge")
 
+# Fixes for a global install whose bin dir is off PATH -- installed, just not wired
+# into the shell (the common "just ran uv tool install / pipx install" state).
+PATH_SETUP_COMMANDS = ("uv tool update-shell", "pipx ensurepath")
+
 # shutil.which-compatible callable; injected in tests.
 WhichFn = Callable[..., "str | None"]
 
@@ -61,6 +65,18 @@ class InstallDiagnosis:
             "on_path_minimal": self.on_path_minimal,
             "advice": self.advice,
         }
+
+    @property
+    def advice_commands(self) -> tuple[str, ...]:
+        """Copy-paste commands that resolve the advised state (empty when no advice).
+
+        A global install that is merely off PATH needs shell wiring, not a reinstall.
+        """
+        if self.advice is None:
+            return ()
+        if self.install_kind == "global" and not self.on_path:
+            return PATH_SETUP_COMMANDS
+        return GLOBAL_INSTALL_COMMANDS
 
 
 def is_editable_install(dist_name: str = DIST_NAME) -> bool:
@@ -92,7 +108,8 @@ def _global_bin_dirs(environ: dict[str, str]) -> set[Path]:
     """Directories where global-tool installers (uv tool, pipx) place launchers."""
     home = environ.get("HOME") or str(Path.home())
     dirs = {Path(home) / ".local" / "bin"}
-    for var in ("XDG_BIN_HOME", "PIPX_BIN_DIR"):
+    # uv honors UV_TOOL_BIN_DIR then XDG_BIN_HOME; pipx honors PIPX_BIN_DIR.
+    for var in ("UV_TOOL_BIN_DIR", "XDG_BIN_HOME", "PIPX_BIN_DIR"):
         val = environ.get(var)
         if val:
             dirs.add(Path(val))
@@ -123,10 +140,18 @@ def _classify(forge_path: str | None, is_editable: bool, environ: dict[str, str]
     return "unknown"
 
 
-def _advice(install_kind: str, on_path: bool) -> str | None:
+def _advice(install_kind: str, on_path: bool, forge_path: str | None) -> str | None:
     # A global install that resolves on PATH is the recommended end state.
     if install_kind == "global" and on_path:
         return None
+    if install_kind == "global":
+        # Installed globally but its bin dir is off PATH -- the fix is PATH setup,
+        # not a reinstall (the common "just ran uv tool install" state).
+        location = forge_path or "its install directory"
+        return (
+            f"Forge is installed at {location}, but that directory is not on your PATH. Add it so "
+            "`forge` resolves in every shell and from hooks."
+        )
     if install_kind == "editable":
         return (
             "Editable/development install (contributor setup). End users should install Forge as a "
@@ -154,6 +179,14 @@ def diagnose_install(
     resolved on PATH (the symlink a user sees, not its target), so a ``uv tool``
     launcher in ``~/.local/bin`` classifies as global rather than by its
     tool-venv target.
+
+    Note the subjects differ: ``install_kind`` reflects the *running* interpreter's
+    packaging metadata (``importlib.metadata``), while ``forge_path``/``on_path``
+    reflect PATH resolution. In a mixed setup they can describe different installs --
+    e.g. invoking a dev checkout's ``.venv/bin/forge`` directly (venv not on PATH)
+    while a global install is earlier on PATH yields ``kind=editable`` with a global
+    ``forge_path``. Editable-wins precedence is right for the common cases; the
+    checkout-local dev override is T8's space (``forge_dev_runtime_override``).
     """
     env = dict(os.environ) if environ is None else environ
     a0 = sys.argv[0] if argv0 is None else argv0
@@ -172,5 +205,5 @@ def diagnose_install(
         forge_path=forge_path,
         on_path=on_path,
         on_path_minimal=on_path_minimal,
-        advice=_advice(install_kind, on_path),
+        advice=_advice(install_kind, on_path, forge_path),
     )

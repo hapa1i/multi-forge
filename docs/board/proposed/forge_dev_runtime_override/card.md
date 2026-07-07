@@ -36,6 +36,10 @@ bypasses the `required_forge` guardrail.
 
 - Contributors currently rely on `.venv/bin/forge` via `uv sync` (`CLAUDE.md:14`); the global-dispatcher model removes
   that implicit path from hooks unless this override exists.
+- `forge extension doctor` (T1) already exposes this seam: `install_kind` reads the *running* interpreter's metadata
+  while `forge_path`/`on_path` read PATH resolution, so a contributor with both a dev checkout and a global install can
+  see `kind=editable` beside a global `forge_path` (documented in `diagnose_install`'s docstring). T8 owns making the
+  dev runtime authoritative for hooks; doctor's reporting should stay consistent with whatever precedence T8 defines.
 
 ## Risks
 

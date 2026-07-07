@@ -50,8 +50,8 @@ None blocking. (The dispatcher's cross-upgrade reachability lives in `forge_hook
 
 ## Acceptance tests
 
-| Test                        | Fixture                            | Assertion                                                                  | Test File                                        |
-| --------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------ |
-| Docs show global install    | rendered end-user docs             | `uv tool install` / `pipx install` present; contributor path kept distinct | doc check                                        |
-| Doctor reports install kind | global-tool install                | `forge extension doctor` names the resolved path + PATH reachability       | `tests/src/install/test_install_doctor.py` (new) |
-| Doctor flags venv-only      | editable/venv install, not on PATH | doctor reports "not globally reachable" + advises global install           | same                                             |
+| Test                        | Fixture                            | Assertion                                                                  | Test File                                |
+| --------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------- |
+| Docs show global install    | rendered end-user docs             | `uv tool install` / `pipx install` present; contributor path kept distinct | doc check                                |
+| Doctor reports install kind | global-tool install                | `forge extension doctor` names the resolved path + PATH reachability       | `tests/src/install/test_doctor.py` (new) |
+| Doctor flags venv-only      | editable/venv install, not on PATH | doctor reports "not globally reachable" + advises global install           | same                                     |
