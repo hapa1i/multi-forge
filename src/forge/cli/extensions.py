@@ -234,6 +234,17 @@ def _print_completion_message(
     _print_codex_completion(plan, scope)
 
 
+def _render_hook_dispatcher() -> None:
+    """Render the global hook dispatcher artifact after successful lifecycle commands."""
+
+    from forge.install.hook_dispatcher import install_hook_dispatcher
+
+    try:
+        install_hook_dispatcher()
+    except OSError as e:
+        raise ForgeInstallError(f"Failed to render hook dispatcher: {e}") from e
+
+
 def _print_codex_completion(plan: InstallPlan, scope: InstallScope) -> None:
     """Print the trust-ceremony guidance (or skip notice) for the codex plan.
 
@@ -675,6 +686,7 @@ def enable_cmd(
                     _log.info("Created %s for session state", project_root / ".forge")
 
                 _enroll_project_root(project_root, "enable", announce=True)
+                _render_hook_dispatcher()
                 _print_completion_message(plan, install_scope, project_root, TrackingStore())
 
     except click.UsageError:
@@ -771,6 +783,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             # A synced block can carry NEW entries whose trust is not yet
             # granted (per-entry trusted_hash) -- the ceremony guidance
             # matters most exactly here.
+            _render_hook_dispatcher()
             _print_codex_completion(plan, install_scope)
 
     except NoForgeInstallationError as e:
@@ -1123,6 +1136,7 @@ def doctor_cmd(as_json: bool) -> None:
 
     from forge.core.ops.context import find_forge_root
     from forge.install.doctor import diagnose_install
+    from forge.install.hook_dispatcher import diagnose_hook_dispatcher
     from forge.install.project_compat import diagnose_project_compatibility
     from forge.install.project_registry import diagnose_project_registry
 
@@ -1131,11 +1145,13 @@ def doctor_cmd(as_json: bool) -> None:
     # future question if hooks/CI ever gate on doctor (epic T2/T5).
     diag = diagnose_install()
     registry_diag = diagnose_project_registry()
+    dispatcher_diag = diagnose_hook_dispatcher()
     compat_root = find_forge_root(Path.cwd().resolve())
     compat_diag = diagnose_project_compatibility(compat_root)
 
     if as_json:
         payload = diag.to_dict()
+        payload["hook_dispatcher"] = dispatcher_diag.to_dict()
         payload["project_registry"] = registry_diag.to_dict()
         payload["project_compatibility"] = compat_diag.to_dict()
         click.echo(json.dumps(payload, indent=2))
@@ -1155,6 +1171,16 @@ def doctor_cmd(as_json: bool) -> None:
 
     if diag.advice:
         print_tip(diag.advice, commands=list(diag.advice_commands), console=console)
+
+    console.print("\n[bold]Hook dispatcher[/bold]")
+    console.print(f"  Path:           {display_path(dispatcher_diag.path)}")
+    console.print(f"  Status:         {dispatcher_diag.status}")
+    if dispatcher_diag.installed_version:
+        console.print(f"  Version:        {dispatcher_diag.installed_version}")
+    if dispatcher_diag.forge_binary_path:
+        console.print(f"  forge target:   {display_path(dispatcher_diag.forge_binary_path)}")
+    if dispatcher_diag.advice:
+        print_tip(dispatcher_diag.advice, console=console)
 
     console.print("\n[bold]Project registry[/bold]")
     console.print(f"  Path:           {display_path(registry_diag.path)}")

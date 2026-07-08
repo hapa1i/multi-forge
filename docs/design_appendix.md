@@ -1017,6 +1017,45 @@ The installer must track what it changed so:
 - `forge extension sync` updates only tracked items
 - `forge extension disable` removes only tracked files and reverts only Forge-added settings entries
 
+`installed.json` tracks extension ownership only. Runtime launcher metadata deliberately lives elsewhere so extension
+tracking's strict schema (`version` + `installations`) does not grow a second responsibility.
+
+#### Runtime metadata (`~/.forge/runtime.json`)
+
+The hook dispatcher stores host runtime resolution metadata in `~/.forge/runtime.json`, schema version 1:
+
+```json
+{
+  "schema_version": 1,
+  "forge_binary_path": "/absolute/path/to/forge",
+  "dispatcher_path": "/home/user/.forge/bin/forge-hook",
+  "dispatcher_version": "0.0.0",
+  "dispatcher_source_sha256": "sha256-of-rendered-stdlib-source",
+  "updated_at": "2026-07-08T00:00:00Z"
+}
+```
+
+`forge_binary_path` records the launcher path visible at install/sync time. The standalone dispatcher first tries this
+recorded launcher, then known user-tool locations (`~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`).
+It verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic naming the checked
+locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths are not mounted
+there.
+
+#### Hook dispatcher (`~/.forge/bin/forge-hook`)
+
+The dispatcher is a generated stdlib-only Python script. The no-op gate mirrors the project registry hook read posture:
+walk upward to `.forge/` while stopping at `.git`, read `~/.forge/projects.json` fail-open, and match exact canonical
+paths before `samefile()`. If the hook environment already identifies a managed Forge session, the dispatcher dispatches
+even when the cwd is not enrolled.
+
+Rendered hook command strings use a literal absolute path, never `~`, for example
+`/home/user/.forge/bin/forge-hook session-start`. The command byte template is golden-pinned with `$HOME` normalized
+because Codex trust hashes cover command definitions.
+
+The rendered script carries `FORGE_HOOK_DISPATCHER_VERSION` and `FORGE_HOOK_DISPATCHER_SOURCE_SHA256` stamps.
+`forge extension sync` re-renders the artifact, and `forge extension doctor` reports missing/stale/unreadable dispatcher
+state so a package upgrade that changes embedded gate logic does not silently leave hooks disabled everywhere.
+
 #### Trusted project registry (`~/.forge/projects.json`)
 
 The project registry is user-global, machine-written JSON owned by Forge. It is not a hand-edit configuration surface.

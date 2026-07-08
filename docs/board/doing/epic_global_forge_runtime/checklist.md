@@ -68,8 +68,11 @@ Record outcomes here as members are picked up.
     absolute-path rewriter, D3 keeps it project-scoped, and it self-gates on `FORGE_SESSION` (acceptable); (b) **T2-card
     disposition** -- fold its unmerge-before-merge groundwork + paired T10 sidecar exemption into T5; the T2 card stays
     in `proposed/` as superseded-not-abandoned. Reopen only if a GUI/Dock/IDE launch becomes a supported path.
-- [ ] **T4 benchmark (owner T4):** dispatcher shim (`forge-hook`, hyphen) vs absolute-symlink. Outcome decides whether
-  T5 must update presence detection (the `has_forge_hook` needle is `"forge hook"`, with a space).
+- [x] **T4 benchmark (owner T4) -- RESOLVED 2026-07-08:** stdlib dispatcher shim (`forge-hook`, hyphen) wins.
+  Populated-registry benchmark (40 enrolled roots, cwd depth 5, 50 cold subprocess runs) measured shim **p50 20.21 ms /
+  p95 22.13 ms** under the p95 \<= 30 ms ceiling; full Forge gate representative measured **p50 419.66 ms / p95 611.78
+  ms**. Consequences: T5 must update presence detection because the current `has_forge_hook` needle is `"forge hook"`
+  with a space; no derived enrollment cache is needed.
 - [x] **T3 trust model (owner T3) -- RESOLVED 2026-07-07:** enroll-on-enable + auto-enroll-on-managed-worktree, keeping
   `enrollment_source` provenance. Explicit-only rejected -- `extension enable` is itself the consent and a managed
   worktree/fork is derived consent, so explicit-only adds friction without a safety property (the dangerous design,

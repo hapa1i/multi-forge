@@ -104,7 +104,7 @@ def is_editable_install(dist_name: str = DIST_NAME) -> bool:
     return bool(isinstance(dir_info, dict) and dir_info.get("editable"))
 
 
-def _global_bin_dirs(environ: dict[str, str]) -> set[Path]:
+def global_bin_dirs(environ: dict[str, str]) -> set[Path]:
     """Directories where global-tool installers (uv tool, pipx) place launchers."""
     home = environ.get("HOME") or str(Path.home())
     dirs = {Path(home) / ".local" / "bin"}
@@ -114,6 +114,12 @@ def _global_bin_dirs(environ: dict[str, str]) -> set[Path]:
         if val:
             dirs.add(Path(val))
     return dirs
+
+
+def _global_bin_dirs(environ: dict[str, str]) -> set[Path]:
+    """Backward-compatible private alias for existing install diagnosis code."""
+
+    return global_bin_dirs(environ)
 
 
 def _looks_like_venv_bin(bindir: Path) -> bool:
@@ -133,7 +139,7 @@ def _classify(forge_path: str | None, is_editable: bool, environ: dict[str, str]
         return "editable"
     if forge_path is not None:
         parent = Path(forge_path).parent
-        if parent in _global_bin_dirs(environ):
+        if parent in global_bin_dirs(environ):
             return "global"
         if _looks_like_venv_bin(parent):
             return "venv"
