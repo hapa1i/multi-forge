@@ -1,11 +1,10 @@
 # User-scope-only hook ownership
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/` -- active (branch `user-scope-hook-ownership`, picked up 2026-07-08). Depends on
-`forge_hook_dispatcher` (shipped -- the dispatcher mechanism + `render_dispatcher_command`) and `forge_project_registry`
-(shipped -- the gating registry). On the user-scope-model critical path. Execution plan in
-[`checklist.md`](checklist.md).
+**Lane**: `done/` -- shipped via PR #93 on 2026-07-08 and closed out on `main`. Depends on `forge_hook_dispatcher`
+(shipped -- the dispatcher mechanism + `render_dispatcher_command`) and `forge_project_registry` (shipped -- the gating
+registry). Execution record in [`checklist.md`](checklist.md).
 
 ## Goal
 

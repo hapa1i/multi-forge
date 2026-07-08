@@ -6,12 +6,12 @@ Each member is an independently shippable implementation unit; the epic ships no
 **Lane**: `doing/` -- active coordinator. Shipped members: **T1
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
-[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, and **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**. **T5
-[`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md) is now active** (branch `user-scope-hook-ownership`,
-picked up 2026-07-08 -- see its [checklist](../user_scope_hook_ownership/checklist.md)). The epic's coordination
-[`checklist.md`](checklist.md) (sequencing, seam drift-watch, owed T5/T8/T10 decisions) stays live. Remaining members
-stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
+[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, **T5
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, and **T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**. The epic's coordination
+[`checklist.md`](checklist.md) (sequencing, seam drift-watch, remaining T6/T8/T10 decisions) stays live. Next cursor is
+**T10** sidecar resolution and **T6** migration cleanup; **T8** remains the dev-runtime override. Remaining members stay
+in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
 Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
@@ -44,7 +44,7 @@ so neither sits on one linear track.
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
 | T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                   | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
 | T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                     | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
-| T5    | [`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md)                     | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
+| T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)             | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |

@@ -5,15 +5,15 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T4 closeout complete after its PR merged.** Shipped members now are T1
+**T5 closeout complete after PR #93 merged.** Shipped members now are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
-[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). **T5
-[`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md) is now active** (branch `user-scope-hook-ownership`,
-picked up 2026-07-08 -- see its [checklist](../user_scope_hook_ownership/checklist.md)): it flips hook registration to
-user-scope-only, cuts the hook command bytes over to the hyphenated dispatcher form (unmerge-before-merge), updates
-presence detection, and adds cross-scope double-fire detection. T7's remaining mutator-family sweep is parked in
+[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), and T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md). T5 flipped hook registration to user-scope-only, cut
+hook command bytes over to the hyphenated dispatcher form (unmerge-before-merge), updated presence detection, and added
+double-fire detection. Next cursor: **T10** sidecar resolution and **T6** migration cleanup; **T8** remains the
+dev-runtime override. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
 user-facing strings against the shipped env-var vocabulary boundary.
@@ -103,7 +103,7 @@ Record outcomes here as members are picked up.
   **T10**-owned (T5 lands only an exposure gate / documented interim-gap guard); the unmerge-before-merge groundwork
   from skipped T2 folds into T5. Checklist reviewed 2026-07-08; Phase 0 decisions resolved (enable UX keeps
   `--scope user`; sidecar -> T10 with exposure gate; additive detection; explicit project/local hook overrides
-  hard-reject).
+  hard-reject). Moved `doing/ -> done/` after PR #93 merged.
 
 ## Shared-contract seams (drift watch)
 

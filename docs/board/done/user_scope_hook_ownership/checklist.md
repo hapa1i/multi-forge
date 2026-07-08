@@ -1,7 +1,7 @@
 # Execution checklist: T5 `user_scope_hook_ownership`
 
 Execution plan for the user-scope-only hook registration flip. Coordination/contract lives in the epic
-[`card.md`](../epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
+[`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
 
 > **Drafted 2026-07-08**, **revised 2026-07-08 after review**. Refinements over the card's 2026-07-02 grounding:
 > presence detection has **five** call sites (not two); T4 already ships `render_dispatcher_command()` as the
@@ -11,12 +11,11 @@ Execution plan for the user-scope-only hook registration flip. Coordination/cont
 
 ## Current focus
 
-**Implementation complete; unit verification green; targeted Codex installer integration green.** T5 now implements the
-user-scope hook ownership flip, dispatcher command-byte cutover, filtered-update cleanup tracking preservation, logical
-double-fire diagnostics (including `$HOME` and matcher-aware cases), Codex legacy-byte dedupe, Day-1 guidance, docs/QA
-updates, and the interim sidecar warning path. `make test-unit`, `make pre-commit`, and the targeted Codex hook
-installer Docker regression are green; the broader installer sweep plus real-Claude / real-Codex hook-firing coverage is
-still outstanding before release.
+**Closed on `main` after PR #93 merged.** T5 implements the user-scope hook ownership flip, dispatcher command-byte
+cutover, filtered-update cleanup tracking preservation, logical double-fire diagnostics (including `$HOME` and
+matcher-aware cases), Codex legacy-byte dedupe, Day-1 guidance, docs/QA updates, and the interim sidecar warning path.
+`make test-unit`, `make pre-commit`, and the full Docker installer suite are green. Live real-Claude / real-Codex
+hook-firing coverage remains a release follow-up for the T10/T6 path, not an open T5 implementation task.
 
 ## Scope boundary (do not cross)
 
@@ -230,19 +229,16 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 - [x] All code-level acceptance rows green in unit/regression coverage, including the real filtered-update cleanup test,
   same-file duplicate diagnostics, and legacy Codex dedupe regression.
 - [x] `make pre-commit` clean.
-- [ ] Install + hook integration run (testing_guidelines mandates it for installer/hook changes):
-  `./scripts/test-integration.sh tests/integration/docker/test_installer.py`, plus real-Claude and real-Codex
-  hook-firing coverage proving the **dispatcher command form actually fires** end-to-end. Targeted Codex installer
-  regression passed:
-  `./scripts/test-integration.sh tests/integration/docker/test_installer.py::TestCodexHooksModule::test_enable_registers_block_and_disable_removes_it`
-  (`1 passed`).
+- [x] Installer integration run: `./scripts/test-integration.sh tests/integration/docker/test_installer.py`
+  (`15 passed`). Live real-Claude and real-Codex hook-firing coverage proving the **dispatcher command form actually
+  fires** end-to-end remains a release follow-up for T10/T6.
 - [x] Epic seam bookkeeping updated; `change_log.md` entry (Goal / Key changes / Verification); durable lessons proposed
   for `impl_notes.md` (human review before promotion).
-- [ ] Lane move `doing/ -> done/` deferred to **post-merge**; repoint inbound links on the move (epic forward-link,
-  member back-link, `done/forge_hook_matcher_consolidation` inbound link).
-- [ ] Verify the sidecar exposure gate is satisfied before merge/release (T10 landed, or explicit maintainer waiver +
-  warning/block covered). Hand the epic cursor to **T10** (sidecar, if not already landed) and **T6** (migrate existing
-  installs); **T8** (dev override) remains.
+- [x] Lane move `doing/ -> done/` completed **post-merge**; repoint inbound links on the move (epic forward-link, member
+  back-link, `done/forge_hook_matcher_consolidation` inbound link).
+- [x] Sidecar exposure gate satisfied for merge by the covered warning/block path; **T10** still owns full sidecar
+  resolution before release. Epic cursor handed to **T10** (sidecar) and **T6** (migrate existing installs); **T8** (dev
+  override) remains.
 
 ## Acceptance tests
 
