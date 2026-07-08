@@ -142,7 +142,7 @@ def _produce_hooks(ctx: RenderContext) -> Optional[str]:
 
     if not ctx.workspace_dir:
         return None
-    return sl.format_hook_double_fire(has_forge_hook_double_fire(Path(ctx.workspace_dir), "SessionStart"))
+    return sl.format_hook_double_fire(has_forge_hook_double_fire(Path(ctx.workspace_dir)))
 
 
 def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:

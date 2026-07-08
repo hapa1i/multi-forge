@@ -974,12 +974,6 @@ def format_hook_double_fire(double_fire: bool) -> str | None:
     return f"{YELLOW_BOLD}{HOOK_DOUBLE_FIRE_INDICATOR}{RESET}"
 
 
-def format_hook_scopes(scopes: set[str]) -> str | None:
-    """Return a compact diagnostic for the legacy scope-based signal."""
-
-    return format_hook_double_fire(len(scopes) >= 2)
-
-
 def format_native_sandbox() -> str | None:
     """Return indicator if Claude Code native sandbox is active.
 

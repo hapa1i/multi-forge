@@ -576,7 +576,7 @@ class TestInstallerScopeModulePolicy:
 
         with pytest.raises(ForgeInstallError, match="user-scope only"):
             local.plan(profile=InstallProfile.MINIMAL, with_modules={InstallModule.HOOKS})
-        with pytest.raises(ForgeInstallError, match="project/local-scope only"):
+        with pytest.raises(ForgeInstallError, match="install it at project/local scope"):
             user.plan(profile=InstallProfile.MINIMAL, with_modules={InstallModule.STATUSLINE})
 
     def test_filtered_local_update_preserves_legacy_hook_tracking_for_disable(self, tmp_path: Path) -> None:

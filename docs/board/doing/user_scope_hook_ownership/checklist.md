@@ -13,9 +13,10 @@ Execution plan for the user-scope-only hook registration flip. Coordination/cont
 
 **Implementation complete; unit verification green; integration blocked locally.** T5 now implements the user-scope hook
 ownership flip, dispatcher command-byte cutover, filtered-update cleanup tracking preservation, logical double-fire
-diagnostics, Codex legacy-byte dedupe, Day-1 guidance, docs/QA updates, and the interim sidecar warning path.
-`make test-unit` and `make pre-commit` are green, but the targeted Docker installer integration run could not execute
-because Docker is not running; real-Claude / real-Codex hook-firing coverage is also still outstanding before release.
+diagnostics (including `$HOME` and matcher-aware cases), Codex legacy-byte dedupe, Day-1 guidance, docs/QA updates, and
+the interim sidecar warning path. `make test-unit` and `make pre-commit` are green, but the targeted Docker installer
+integration run could not execute because Docker is not running; real-Claude / real-Codex hook-firing coverage is also
+still outstanding before release.
 
 ## Scope boundary (do not cross)
 

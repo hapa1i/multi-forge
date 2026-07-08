@@ -164,7 +164,7 @@ def _apply_scope_module_policy(
         if scope == InstallScope.USER:
             raise ForgeInstallError(
                 f"module(s) {_format_modules(explicit_conflicts)} are project/local-scope only; "
-                "statusLine stays project-scoped."
+                "statusLine stays project-scoped; install it at project/local scope."
             )
         raise ForgeInstallError(
             f"module(s) {_format_modules(explicit_conflicts)} are user-scope only; "

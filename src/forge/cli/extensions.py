@@ -1166,7 +1166,7 @@ def doctor_cmd(as_json: bool) -> None:
     compat_diag = diagnose_project_compatibility(compat_root)
     cwd = Path.cwd().resolve()
     hook_scopes = sorted(find_forge_hook_scopes(cwd, "SessionStart"))
-    hook_double_fire = has_forge_hook_double_fire(cwd, "SessionStart")
+    hook_double_fire = has_forge_hook_double_fire(cwd)
 
     if as_json:
         payload = diag.to_dict()
@@ -1213,7 +1213,6 @@ def doctor_cmd(as_json: bool) -> None:
             "T6 cleanup will land as 'forge extension cleanup-project'. Until then, keep runtime hooks at user "
             "scope and disable tracked project/local hook installs.",
             commands=[
-                "forge extension cleanup-project",
                 "forge extension disable --scope local",
                 "forge extension enable --scope user",
             ],

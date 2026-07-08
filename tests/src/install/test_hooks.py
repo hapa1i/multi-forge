@@ -45,6 +45,21 @@ FORGE_PRE_TOOL_USE = {
     }
 }
 
+FORGE_PRE_TOOL_USE_MATCHERS = {
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Write",
+                "hooks": [{"type": "command", "command": "forge hook policy-check"}],
+            },
+            {
+                "matcher": "Edit",
+                "hooks": [{"type": "command", "command": "forge-hook policy-check"}],
+            },
+        ]
+    }
+}
+
 FORGE_STOP = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "forge hook stop"}]}]}}
 
 
@@ -160,6 +175,33 @@ class TestHasForgeHook:
 
         assert find_forge_hook_scopes(repo, "SessionStart") == {"user"}
         assert has_forge_hook_double_fire(repo, "SessionStart") is False
+
+    def test_home_claude_dir_is_user_scope_when_cwd_is_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        claude_home = home / ".claude"
+        home.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.setattr(Path, "home", lambda: home)
+        _write_settings(claude_home / "settings.json", FORGE_SESSION_START)
+
+        assert find_forge_hook_scopes(home, "SessionStart") == {"user"}
+        assert has_forge_hook_double_fire(home, "SessionStart") is False
+        assert [registration.scope for registration in find_forge_hook_registrations(home, "SessionStart")] == ["user"]
+
+    def test_distinct_pre_tool_use_matchers_do_not_double_fire(self, project: Path) -> None:
+        _write_settings(project / ".claude" / "settings.json", FORGE_PRE_TOOL_USE_MATCHERS)
+
+        assert has_forge_hook_double_fire(project) is False
+        assert has_forge_hook_double_fire(project, "PreToolUse") is False
+        assert has_forge_hook_double_fire(project, "PreToolUse", "policy-check") is False
+        registrations = find_forge_hook_registrations(project, "PreToolUse", "policy-check")
+        assert [(registration.matcher, registration.command) for registration in registrations] == [
+            ("Write", "forge hook policy-check"),
+            ("Edit", "forge-hook policy-check"),
+        ]
 
     def test_same_user_file_legacy_and_dispatcher_entries_are_double_fire(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -933,6 +933,48 @@ class TestExtensionDoctorRuntimeHooks:
             "double_fire_risk": True,
         }
 
+    def test_json_treats_home_cwd_user_hooks_as_single_scope(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+
+        home = tmp_path / "home"
+        claude_home = home / ".claude"
+        home.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.setattr(Path, "home", lambda: home)
+        claude_home.mkdir(parents=True)
+        (claude_home / "settings.json").write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge-hook session-start",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(home)
+
+        result = CliRunner().invoke(extensions, ["doctor", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["runtime_hooks"] == {
+            "scopes": ["user"],
+            "double_fire_risk": False,
+        }
+
     def test_human_report_names_t6_cleanup_and_current_disable_path(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -948,6 +990,7 @@ class TestExtensionDoctorRuntimeHooks:
         assert result.exit_code == 0, result.output
         assert "may fire twice" in result.output
         assert "forge extension cleanup-project" in result.output
+        assert "  forge extension cleanup-project" not in result.output
         assert "forge extension disable --scope local" in result.output
         assert "forge extension enable --scope user" in result.output
 

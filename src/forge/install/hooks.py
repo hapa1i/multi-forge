@@ -22,6 +22,7 @@ class ForgeHookRegistration:
     event: str
     handler: str
     command: str
+    matcher: str | None = None
 
 
 def _find_claude_dir(start: Path) -> Path | None:
@@ -33,13 +34,12 @@ def _find_claude_dir(start: Path) -> Path | None:
     project scope for ordinary repos under $HOME.
     """
     current = start.resolve()
-    start_resolved = current
     try:
         home = Path.home().resolve()
     except RuntimeError:
         home = None
     for _ in range(50):  # safety bound
-        if home is not None and current == home and current != start_resolved:
+        if home is not None and current == home:
             return None
         if (current / ".claude").is_dir():
             return current
@@ -58,13 +58,47 @@ def _scoped_settings_paths(worktree_path: Path) -> list[tuple[str, Path]]:
     """
     from forge.session.claude.paths import get_claude_home
 
-    project_root = _find_claude_dir(worktree_path) or worktree_path
-    return [
-        ("local", project_root / ".claude" / "settings.local.json"),
-        ("project", project_root / ".claude" / "settings.json"),
-        ("user", get_claude_home() / "settings.local.json"),
-        ("user", get_claude_home() / "settings.json"),
-    ]
+    project_root = _find_claude_dir(worktree_path)
+    paths: list[tuple[str, Path]] = []
+    if project_root is not None:
+        paths.extend(
+            [
+                ("local", project_root / ".claude" / "settings.local.json"),
+                ("project", project_root / ".claude" / "settings.json"),
+            ]
+        )
+    paths.extend(
+        [
+            ("user", get_claude_home() / "settings.local.json"),
+            ("user", get_claude_home() / "settings.json"),
+        ]
+    )
+    return _dedupe_scoped_settings_paths(paths)
+
+
+def _dedupe_scoped_settings_paths(paths: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+    """Return paths once by resolved identity, preferring later scope labels.
+
+    When running from ``$HOME``, ``~/.claude/settings.json`` can otherwise be
+    discovered once as project settings and once as user settings. Keeping the
+    later user label preserves the real Claude scope.
+    """
+
+    order: list[Path] = []
+    by_identity: dict[Path, tuple[str, Path]] = {}
+    for scope, path in paths:
+        identity = _settings_path_identity(path)
+        if identity not in by_identity:
+            order.append(identity)
+        by_identity[identity] = (scope, path)
+    return [by_identity[identity] for identity in order]
+
+
+def _settings_path_identity(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except OSError:
+        return path.absolute()
 
 
 def _settings_paths(worktree_path: Path) -> list[Path]:
@@ -168,13 +202,15 @@ def _entry_forge_hook_registrations(
     handler: str | None = None,
     *,
     require_command_type: bool = False,
-) -> list[tuple[str, str]]:
+) -> list[tuple[str, str, str | None]]:
     if not isinstance(entry, dict):
         return []
 
-    registrations: list[tuple[str, str]] = []
+    matcher = _entry_matcher(entry)
+    registrations: list[tuple[str, str, str | None]] = []
     if found := _entry_command_registration(entry, handler, require_command_type=require_command_type):
-        registrations.append(found)
+        found_handler, command = found
+        registrations.append((found_handler, command, matcher))
 
     hooks = entry.get("hooks")
     if isinstance(hooks, list):
@@ -182,8 +218,17 @@ def _entry_forge_hook_registrations(
             if isinstance(hook, dict) and (
                 found := _entry_command_registration(hook, handler, require_command_type=require_command_type)
             ):
-                registrations.append(found)
+                found_handler, command = found
+                hook_matcher = _entry_matcher(hook)
+                registrations.append((found_handler, command, matcher if hook_matcher is None else hook_matcher))
     return registrations
+
+
+def _entry_matcher(entry: dict[str, Any]) -> str | None:
+    matcher = entry.get("matcher")
+    if isinstance(matcher, str):
+        return matcher
+    return None
 
 
 def _settings_path_has_forge_hook(
@@ -217,7 +262,7 @@ def _settings_path_forge_hook_registrations(
             if not hook_entries or not isinstance(hook_entries, list):
                 continue
             for entry in hook_entries:
-                for found_handler, command in _entry_forge_hook_registrations(entry, handler):
+                for found_handler, command, matcher in _entry_forge_hook_registrations(entry, handler):
                     registrations.append(
                         ForgeHookRegistration(
                             scope=scope,
@@ -225,6 +270,7 @@ def _settings_path_forge_hook_registrations(
                             event=event,
                             handler=found_handler,
                             command=command,
+                            matcher=matcher,
                         )
                     )
         return registrations
@@ -301,11 +347,16 @@ def has_forge_hook_double_fire(
     hook_type: str | None = None,
     handler: str | None = None,
 ) -> bool:
-    """Return True when the same Forge hook handler is registered more than once."""
+    """Return True when one Forge hook trigger has duplicate registrations.
 
-    seen: set[tuple[str, str]] = set()
+    The trigger identity includes Claude event, matcher, and Forge handler.
+    Distinct matchers under one event, such as policy checks for Write and Edit,
+    are expected and do not double-fire for a single Claude hook dispatch.
+    """
+
+    seen: set[tuple[str, str | None, str]] = set()
     for registration in find_forge_hook_registrations(worktree_path, hook_type, handler):
-        key = (registration.event, registration.handler)
+        key = (registration.event, registration.matcher, registration.handler)
         if key in seen:
             return True
         seen.add(key)
