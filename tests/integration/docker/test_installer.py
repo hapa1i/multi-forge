@@ -302,8 +302,8 @@ class TestCodexHooksModule:
 
         config = synced_container.read_file("/tmp/codex-home/config.toml")
         assert "# >>> forge hooks >>>" in config
-        assert "forge hook codex-session-start" in config
-        assert "forge hook codex-policy-check" in config
+        assert "forge-hook codex-session-start" in config
+        assert "forge-hook codex-policy-check" in config
 
         status = synced_container.exec(
             "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension status --scope user"

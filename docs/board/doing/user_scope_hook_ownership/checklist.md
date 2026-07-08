@@ -11,11 +11,11 @@ Execution plan for the user-scope-only hook registration flip. Coordination/cont
 
 ## Current focus
 
-**Implementation complete; unit verification green; integration blocked locally.** T5 now implements the user-scope hook
-ownership flip, dispatcher command-byte cutover, filtered-update cleanup tracking preservation, logical double-fire
-diagnostics (including `$HOME` and matcher-aware cases), Codex legacy-byte dedupe, Day-1 guidance, docs/QA updates, and
-the interim sidecar warning path. `make test-unit` and `make pre-commit` are green, but the targeted Docker installer
-integration run could not execute because Docker is not running; real-Claude / real-Codex hook-firing coverage is also
+**Implementation complete; unit verification green; targeted Codex installer integration green.** T5 now implements the
+user-scope hook ownership flip, dispatcher command-byte cutover, filtered-update cleanup tracking preservation, logical
+double-fire diagnostics (including `$HOME` and matcher-aware cases), Codex legacy-byte dedupe, Day-1 guidance, docs/QA
+updates, and the interim sidecar warning path. `make test-unit`, `make pre-commit`, and the targeted Codex hook
+installer Docker regression are green; the broader installer sweep plus real-Claude / real-Codex hook-firing coverage is
 still outstanding before release.
 
 ## Scope boundary (do not cross)
@@ -86,10 +86,10 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 - **Status/JSON surfaces that must not lie** (`cli/extensions.py`): `_print_plan` shows `Modules: {plan.modules}`
   (dry-run + plan); `_warn_if_modules_have_no_files` (:115) keys off `plan.modules`; `extension status`/`--json` and
   `installed.json` report `modules_enabled`.
-- **Claude registration** (`install/preset.py`): 13 event keys wiring `forge hook <name>` (:53--211, ~17 command
-  entries) + the `statusLine` scalar `forge status-line` (:218--220).
-- **Codex registration** (`install/codex_hooks.py`): entries `forge hook codex-session-start` /
-  `forge hook codex-policy-check` (:84--85), rendered by `render_codex_block` (:127); command bytes are the
+- **Claude registration** (`install/preset.py`): 13 event keys wiring dispatcher `forge-hook <name>` entries (:53--211,
+  ~17 command entries) + the `statusLine` scalar `forge status-line` (:218--220).
+- **Codex registration** (`install/codex_hooks.py`): entries `forge-hook codex-session-start` /
+  `forge-hook codex-policy-check` (:84--85), rendered by `render_codex_block` (:127); command bytes are the
   `trusted_hash` surface (golden-pinned, :16--19,:66--67; `test_codex_hooks.py`).
 - **Settings-merge machinery** (`install/settings_merge.py`): `merge_hooks` (:505) is **append + dedupe by full
   canonical entry** — a changed command string is a **coexisting new sibling** (double-fire), not an in-place update.
@@ -232,7 +232,10 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 - [x] `make pre-commit` clean.
 - [ ] Install + hook integration run (testing_guidelines mandates it for installer/hook changes):
   `./scripts/test-integration.sh tests/integration/docker/test_installer.py`, plus real-Claude and real-Codex
-  hook-firing coverage proving the **dispatcher command form actually fires** end-to-end.
+  hook-firing coverage proving the **dispatcher command form actually fires** end-to-end. Targeted Codex installer
+  regression passed:
+  `./scripts/test-integration.sh tests/integration/docker/test_installer.py::TestCodexHooksModule::test_enable_registers_block_and_disable_removes_it`
+  (`1 passed`).
 - [x] Epic seam bookkeeping updated; `change_log.md` entry (Goal / Key changes / Verification); durable lessons proposed
   for `impl_notes.md` (human review before promotion).
 - [ ] Lane move `doing/ -> done/` deferred to **post-merge**; repoint inbound links on the move (epic forward-link,

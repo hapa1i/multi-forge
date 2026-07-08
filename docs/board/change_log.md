@@ -46,8 +46,8 @@ wc -l docs/board/change_log.md
 
 **Verification**: `make test-unit` (`7511 passed, 1 skipped, 116 deselected`); targeted hook/Codex/installer regression
 suites including `tests/regression/test_bug_codex_dedupe_wrong_event.py`; `make pre-commit`;
-`./scripts/test-integration.sh tests/integration/docker/test_installer.py` blocked locally because Docker daemon was not
-running.
+`./scripts/test-integration.sh tests/integration/docker/test_installer.py::TestCodexHooksModule::test_enable_registers_block_and_disable_removes_it`
+(`1 passed`).
 
 ### forge_hook_dispatcher closeout
 
