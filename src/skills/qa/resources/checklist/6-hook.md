@@ -2,17 +2,16 @@
 
 ## 6. Hooks Testing
 
-Note: Install hooks via `forge extension enable` (full) or the tracked hooks-only replacement.
+Note: Runtime hooks are installed once at user scope with `forge extension enable --scope user`.
 
 ### 6.1 Verify Hook Configuration
 
 <!-- auto -->
 
 ```bash
-# Check hooks in whichever settings file was used during enable.
-# `forge extension enable --scope local` writes to settings.local.json.
-cat $CLAUDE_HOME/settings.local.json | jq '.hooks' 2>/dev/null || \
-  cat $CLAUDE_HOME/settings.json | jq '.hooks'
+# Check user-scope runtime hooks. Project/local extension installs no longer
+# write hook blocks.
+cat $CLAUDE_HOME/settings.json | jq '.hooks'
 ```
 
 - [ ] `PreToolUse` hooks configured (policy-check)
@@ -26,11 +25,11 @@ cat $CLAUDE_HOME/settings.local.json | jq '.hooks' 2>/dev/null || \
 <!-- auto -->
 
 ```bash
-# Install hooks only (no commands/skills)
-forge extension enable --scope local --profile minimal --with hooks --without commands
+# Install runtime hooks only (no commands/skills)
+forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
-- [ ] Hooks-only install works (writes tracked hooks to settings.local.json)
+- [ ] Hooks-only install works (writes tracked hooks to user settings.json)
 
 ### 6.3 Test Hook Manually
 

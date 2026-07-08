@@ -112,7 +112,7 @@ FILE_MODULES: set[InstallModule] = {
 }
 
 # Modules that are settings-only (no files to install)
-# HOOKS: All hooks are now `forge hook X` commands - no files to copy
+# HOOKS: All hooks are dispatcher commands (`forge-hook X`) - no files to copy
 # STATUSLINE: Now `forge status-line` command - no scripts to copy
 # CODEX_HOOKS: managed block in Codex config.toml - no files to copy
 SETTINGS_ONLY_MODULES: set[InstallModule] = {

@@ -16,10 +16,14 @@ from forge.cli.extensions import (
     _validate_anchor,
     extensions,
 )
-from forge.core.paths import find_git_root
+from forge.core.paths import find_git_root, get_forge_home
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallScope
 from forge.install.project_registry import ProjectRegistryStore
+
+
+def _normalize_forge_home(command: str) -> str:
+    return command.replace(str(get_forge_home()), "$FORGE_HOME")
 
 
 def test_scope_help_is_shared_across_extension_commands() -> None:
@@ -588,6 +592,44 @@ class TestEnableWithPath:
         call_kwargs = MockInstaller.call_args
         assert call_kwargs.kwargs["scope"] == InstallScope.LOCAL
 
+    def test_auto_local_enable_prints_user_scope_runtime_hook_next_step(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.cli.extensions import enable_cmd
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        monkeypatch.chdir(repo)
+
+        mock_plan = MagicMock()
+        mock_plan.has_conflicts = False
+        mock_plan.conflicts = []
+        mock_plan.files = []
+        mock_plan.codex = None
+        mock_plan.settings = []
+        mock_plan.settings_entries = []
+        mock_plan.modules = []
+        mock_plan.profile = "standard"
+
+        with (
+            patch("forge.cli.extensions.Installer") as MockInstaller,
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+        ):
+            mock_instance = MockInstaller.return_value
+            mock_instance.init.return_value = mock_plan
+            mock_ver.return_value = MagicMock(ok=True)
+            result = CliRunner().invoke(enable_cmd, [])
+
+        assert result.exit_code == 0, result.output
+        assert "Auto-detected scope: local" in result.output
+        assert "Next steps (runtime hooks):" in result.output
+        assert "forge extension enable --scope user" in result.output
+        call_kwargs = MockInstaller.call_args
+        assert call_kwargs.kwargs["scope"] == InstallScope.LOCAL
+
     def test_path_with_scope_user_errors(self, tmp_path: Path) -> None:
         from unittest.mock import MagicMock, patch
 
@@ -661,15 +703,12 @@ class TestEnableWithPath:
         assert result.exit_code != 0
         assert "inside a .claude directory" in result.output
 
-    def test_public_hooks_only_command_writes_only_tracked_hooks(
+    def test_project_scope_explicit_hooks_request_is_rejected(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import json
         from unittest.mock import MagicMock, patch
 
         from forge.cli.extensions import enable_cmd
-        from forge.install.preset import get_builtin_preset, get_preset_path
-        from forge.install.tracking import TrackingStore
 
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -686,29 +725,26 @@ class TestEnableWithPath:
         monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
         monkeypatch.chdir(repo)
 
-        preset = get_builtin_preset()
-        preset["env"] = {"CUSTOM": "1"}
-        get_preset_path().write_text(json.dumps(preset), encoding="utf-8")
-
         with patch("forge.install.version.check_minimum_version") as mock_ver:
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(
                 enable_cmd,
-                ["--scope", "local", "--profile", "minimal", "--with", "hooks", "--without", "commands"],
+                [
+                    "--scope",
+                    "local",
+                    "--profile",
+                    "minimal",
+                    "--with",
+                    "hooks",
+                    "--without",
+                    "commands",
+                ],
             )
 
-        assert result.exit_code == 0, result.output
-        settings = json.loads((repo / ".claude" / "settings.local.json").read_text(encoding="utf-8"))
-        assert settings == {"hooks": get_builtin_preset()["hooks"]}
-        assert not (repo / ".claude" / "commands").exists()
-        assert not (repo / ".claude" / "agents").exists()
-        assert not (repo / ".claude" / "skills").exists()
-        assert (repo / ".forge").is_dir()
-
-        installation = TrackingStore().get_installation("local", str(repo.resolve()))
-        assert installation is not None
-        assert installation.modules_enabled == ["hooks"]
-        assert {entry.key_path.split(".", 1)[0] for entry in installation.settings_entries} == {"hooks"}
+        assert result.exit_code == 1
+        assert "user-scope only" in result.output
+        assert "forge extension enable --scope user" in result.output
+        assert not (repo / ".forge").exists()
 
 
 class TestScopeAllConflict:
@@ -781,6 +817,141 @@ class TestDisableNoInstallMessage:
         assert "forge init" not in result.output
 
 
+class TestExtensionDoctorRuntimeHooks:
+    @staticmethod
+    def _write_double_scope_hooks(project: Path, claude_home: Path) -> None:
+        import json
+
+        (project / ".claude").mkdir(parents=True)
+        (project / ".claude" / "settings.local.json").write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge hook session-start",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        (claude_home / "settings.json").write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge-hook session-start",
+                                    }
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _write_same_user_file_duplicate_hooks(claude_home: Path) -> None:
+        import json
+
+        (claude_home / "settings.json").write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge hook session-start",
+                                    }
+                                ]
+                            },
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge-hook session-start",
+                                    }
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_json_reports_double_fire_hook_scopes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import json
+        import os
+
+        project = tmp_path / "repo"
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        self._write_double_scope_hooks(project, claude_home)
+        monkeypatch.chdir(project)
+
+        result = CliRunner().invoke(extensions, ["doctor", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["runtime_hooks"] == {
+            "scopes": ["local", "user"],
+            "double_fire_risk": True,
+        }
+
+    def test_json_reports_same_user_file_duplicate_as_double_fire(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+        import os
+
+        project = tmp_path / "repo"
+        project.mkdir()
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        self._write_same_user_file_duplicate_hooks(claude_home)
+        monkeypatch.chdir(project)
+
+        result = CliRunner().invoke(extensions, ["doctor", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["runtime_hooks"] == {
+            "scopes": ["user"],
+            "double_fire_risk": True,
+        }
+
+    def test_human_report_names_t6_cleanup_and_current_disable_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import os
+
+        project = tmp_path / "repo"
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        self._write_double_scope_hooks(project, claude_home)
+        monkeypatch.chdir(project)
+
+        result = CliRunner().invoke(extensions, ["doctor"])
+
+        assert result.exit_code == 0, result.output
+        assert "may fire twice" in result.output
+        assert "forge extension cleanup-project" in result.output
+        assert "forge extension disable --scope local" in result.output
+        assert "forge extension enable --scope user" in result.output
+
+
 class TestEnableCodexHooks:
     """Tests for the codex-hooks module surfaces on enable/status/disable."""
 
@@ -845,9 +1016,9 @@ class TestEnableCodexHooks:
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert data[0]["codex_config_path"] == str(self._codex_config())
-        assert data[0]["codex_commands"] == [
-            "forge hook codex-policy-check",
-            "forge hook codex-session-start",
+        assert [_normalize_forge_home(command) for command in data[0]["codex_commands"]] == [
+            "$FORGE_HOME/bin/forge-hook codex-policy-check",
+            "$FORGE_HOME/bin/forge-hook codex-session-start",
         ]
 
     def test_disable_previews_and_removes_block(self) -> None:

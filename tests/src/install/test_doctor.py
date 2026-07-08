@@ -191,6 +191,7 @@ def test_doctor_json_shape_is_stable() -> None:
         "on_path_minimal",
         "advice",
         "hook_dispatcher",
+        "runtime_hooks",
         "project_registry",
         "project_compatibility",
     }
@@ -209,6 +210,7 @@ def test_doctor_json_shape_is_stable() -> None:
         "forge_binary_path",
         "advice",
     }
+    assert set(data["runtime_hooks"]) == {"scopes", "double_fire_risk"}
     assert set(data["project_registry"]) == {"path", "status", "enrolled_count", "stale_roots", "error", "advice"}
     assert set(data["project_compatibility"]) == {
         "path",

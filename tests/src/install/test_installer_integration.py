@@ -54,8 +54,8 @@ def mock_repo(tmp_path: Path) -> Path:
     scripts.mkdir()
     (scripts / "search.py").write_text("#!/usr/bin/env python3\nprint('search')\n")
 
-    # Note: hooks and status-line are now settings-only modules
-    # (no files to copy, just settings entries pointing to `forge hook <name>` and `forge status-line`)
+    # Note: hooks and status-line are settings-only modules
+    # (no files to copy, just settings entries pointing to dispatcher hooks and `forge status-line`)
 
     return repo
 
@@ -235,15 +235,14 @@ class TestInstallerIntegration:
         assert "Bash(git:*)" in settings["permissions"]["allow"]  # Added
         assert "Read" in settings["permissions"]["allow"]  # Added
 
-        # Verify hooks merged (existing + new) - now `forge hook <name>` commands
+        # Verify hooks merged (existing + new) - now dispatcher hook commands
         pretool_hooks = settings["hooks"]["PreToolUse"]
         matchers = [h.get("matcher") for h in pretool_hooks]
         assert "Bash" in matchers  # Existing preserved
         assert "Write" in matchers  # New added
 
-        # Verify statusLine added (now uses `forge status-line` command)
-        assert "statusLine" in settings
-        assert settings["statusLine"]["command"] == "forge status-line"
+        # User-scope installs own runtime hooks, while statusLine remains project-scoped.
+        assert "statusLine" not in settings
 
         # Verify tracking updated
         tracking = TrackingStore(tracking_path=mock_forge_home / "installed.json")

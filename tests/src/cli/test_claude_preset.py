@@ -16,7 +16,6 @@ class TestPresetShow:
         result = runner.invoke(claude, ["preset", "show"])
         assert result.exit_code == 0
         assert "Claude Code Settings Preset" in result.output
-        assert "forge hook session-start" in result.output
 
     def test_show_raw(self) -> None:
         runner = CliRunner()
@@ -25,6 +24,8 @@ class TestPresetShow:
         data = json.loads(result.output)
         assert "hooks" in data
         assert "statusLine" in data
+        command = data["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+        assert command.endswith("forge-hook session-start")
 
     def test_show_custom_content(self) -> None:
         preset_path = ensure_preset()

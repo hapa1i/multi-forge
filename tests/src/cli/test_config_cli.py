@@ -432,7 +432,10 @@ class TestConfigSetStatusline:
         runner = CliRunner()
         result = runner.invoke(
             config,
-            ["set", "statusline.segments=path,supervisor,policy,audit,drift,spend_cap"],
+            [
+                "set",
+                "statusline.segments=path,hooks,supervisor,policy,audit,drift,spend_cap",
+            ],
         )
         assert result.exit_code == 0, result.output
 

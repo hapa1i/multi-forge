@@ -259,7 +259,7 @@ def _warn_if_hooks_missing(project_path: Path) -> None:
         "will not be active."
     )
     print_tip(
-        "Run 'forge extension enable' to install hooks.",
+        "Run 'forge extension enable --scope user' to install runtime hooks.",
         blank_before=False,
         console=console,
     )
@@ -362,6 +362,8 @@ def _warn_before_claude_launch(forge_root: Path) -> None:
 
 
 def _render_sidecar_launch(event: ClaudeSidecarLaunch) -> None:
+    for warning in event.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
     console.print("[cyan]Starting sidecar session in container[/cyan]")
     console.print(f"  Image: {event.image}")
     if event.proxy_id and event.intercept_mode:

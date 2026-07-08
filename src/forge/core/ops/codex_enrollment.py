@@ -165,13 +165,14 @@ def _read_user_scope_registration() -> tuple[str, bool]:
     Event-aware on purpose: a Forge command registered under the WRONG event is not a
     working SessionStart hook and must not read as registered -- otherwise the probe
     burns a real ``codex exec`` turn and the advice misdiagnoses a wrong-event entry as
-    "registered but not trust-enrolled". Uses ``codex_registration_pairs`` (the
-    ``(event, command)`` identity), NOT ``read_codex_registration``'s event-agnostic
+    "registered but not trust-enrolled". Uses logical ``codex_registration_keys``
+    (event + command identity), NOT ``read_codex_registration``'s event-agnostic
     reporting set. Lazy install import (the ``core/ops/gc.py`` precedent) keeps a
     ``core -> install`` edge off load time.
     """
     from forge.install.codex_hooks import (
-        codex_registration_pairs,
+        codex_registration_key,
+        codex_registration_keys,
         get_builtin_codex_entries,
         get_codex_config_path,
     )
@@ -179,8 +180,8 @@ def _read_user_scope_registration() -> tuple[str, bool]:
 
     session_start = next(e for e in get_builtin_codex_entries() if e.event == "SessionStart")
     config_path = get_codex_config_path(InstallScope.USER)
-    pairs = codex_registration_pairs(config_path)
-    return str(config_path), (session_start.event, session_start.command) in pairs
+    keys = codex_registration_keys(config_path)
+    return str(config_path), codex_registration_key(session_start.event, session_start.command) in keys
 
 
 def _user_scope_config_path_safe() -> str:

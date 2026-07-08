@@ -96,7 +96,7 @@ class TestModuleCategories:
         assert InstallModule.COMMANDS in FILE_MODULES
         assert InstallModule.AGENTS in FILE_MODULES
         assert InstallModule.SKILLS in FILE_MODULES
-        # HOOKS is now settings-only (all hooks are `forge hook X` commands)
+        # HOOKS is settings-only (all hooks are dispatcher commands)
         assert InstallModule.HOOKS not in FILE_MODULES
         # STATUSLINE is now settings-only (uses `forge status-line` command)
         assert InstallModule.STATUSLINE not in FILE_MODULES

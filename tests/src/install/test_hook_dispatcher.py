@@ -513,16 +513,16 @@ def test_install_hook_dispatcher_records_path_from_which(monkeypatch: pytest.Mon
 
 
 def test_render_hook_dispatcher_wraps_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    from forge.cli.extensions import _render_hook_dispatcher
     from forge.install.exceptions import ForgeInstallError
+    from forge.install.installer import _ensure_hook_dispatcher
 
     def fail() -> None:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("forge.install.hook_dispatcher.install_hook_dispatcher", fail)
+    monkeypatch.setattr("forge.install.installer.install_hook_dispatcher", fail)
 
     with pytest.raises(ForgeInstallError, match="Failed to render hook dispatcher: boom"):
-        _render_hook_dispatcher()
+        _ensure_hook_dispatcher()
 
 
 def test_cli_enable_renders_dispatcher_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

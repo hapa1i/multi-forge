@@ -980,15 +980,15 @@ for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json
 
 ### C.2 Installable modules + profiles
 
-| Module        | Installs                                           | Notes                                                            |
-| ------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| `commands`    | Slash commands markdown                            |                                                                  |
-| `agents`      | Subagents markdown                                 |                                                                  |
-| `skills`      | Skills (SKILL.md + resources/scripts)              | Scripting layer for Forge workflows (see design_workflows.md §3) |
-| `hooks`       | Hook settings entries (invoke `forge hook ...`)    | No hook scripts installed; requires `hooks.*` settings merge     |
-| `status-line` | `statusLine` setting (invokes `forge status-line`) | No scripts installed; same pattern as hooks                      |
-| `permissions` | Forge-required permission entries                  | Merged as unions                                                 |
-| `codex-hooks` | Managed hook block in Codex `config.toml`          | Scope-mapped target; best-effort (see §C.6)                      |
+| Module        | Installs                                            | Notes                                                            |
+| ------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| `commands`    | Slash commands markdown                             |                                                                  |
+| `agents`      | Subagents markdown                                  |                                                                  |
+| `skills`      | Skills (SKILL.md + resources/scripts)               | Scripting layer for Forge workflows (see design_workflows.md §3) |
+| `hooks`       | User-scope hook settings entries (`forge-hook ...`) | No hook scripts installed; dispatcher forwards to `forge hook`   |
+| `status-line` | Project/local `statusLine` setting                  | Invokes `forge status-line`; not installed at user scope         |
+| `permissions` | Forge-required permission entries                   | Merged as unions                                                 |
+| `codex-hooks` | User-scope managed hook block in Codex config       | Best-effort; dispatcher bytes require Codex re-trust (see §C.6)  |
 
 Profiles:
 
@@ -996,15 +996,18 @@ Profiles:
 - `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
+Profiles are filtered by scope before writing: `hooks` and `codex-hooks` are user-only; `status-line` is project/local
+only. Commands, agents, skills, and permissions keep their existing scope behavior.
+
 ### C.3 Settings merge rules
 
-| Setting             | Merge behavior                                             |
-| ------------------- | ---------------------------------------------------------- |
-| `hooks.*`           | Append + dedupe by command path (invokes `forge hook ...`) |
-| `permissions.allow` | Union unique entries                                       |
-| `permissions.deny`  | Union unique entries                                       |
-| `statusLine`        | Scalar merge; conflict fails unless `--force`              |
-| `model`             | Never touched                                              |
+| Setting             | Merge behavior                                                   |
+| ------------------- | ---------------------------------------------------------------- |
+| `hooks.*`           | Append + dedupe by command path (registered as `forge-hook ...`) |
+| `permissions.allow` | Union unique entries                                             |
+| `permissions.deny`  | Union unique entries                                             |
+| `statusLine`        | Scalar merge; conflict fails unless `--force`                    |
+| `model`             | Never touched                                                    |
 
 All settings modifications must be backed up first (`settings.json.forge-backup`).
 
@@ -1122,33 +1125,35 @@ same scope as the SKILL.md that was invoked.
 copies of every skill. Each copy has its own SKILL.md, resources, and scripts. Forge does **not** deduplicate across
 scopes.
 
-| Concern             | Behavior                                                                                  |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| Resource resolution | Safe: `${CLAUDE_SKILL_DIR}` is self-referential (no cross-scope mismatch)                 |
-| Which copy runs     | Determined by Claude Code's scope precedence (not controlled by Forge)                    |
-| Version skew        | If scopes are updated independently, one copy may be stale                                |
-| Hook duplication    | Both scopes add hook entries to their respective settings files; hooks may fire from both |
-| Uninstall           | Scope-specific: `forge extension disable` removes only the targeted scope                 |
+| Concern             | Behavior                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| Resource resolution | Safe: `${CLAUDE_SKILL_DIR}` is self-referential (no cross-scope mismatch)                         |
+| Which copy runs     | Determined by Claude Code's scope precedence (not controlled by Forge)                            |
+| Version skew        | If scopes are updated independently, one copy may be stale                                        |
+| Hook duplication    | New installs register runtime hooks only at user scope; legacy project hooks are T6 cleanup state |
+| Uninstall           | Scope-specific: `forge extension disable` removes only the targeted scope                         |
 
-**Recommendation:** Use a single scope per project. If both exist, disable one:
+**Recommendation:** Use one skill scope per project. If you keep project-level skills, reinstall only the user-scope
+runtime hooks:
 
 ```bash
-forge extension disable --scope user     # Remove user-level
-forge extension enable --scope project   # Keep project-level only
+forge extension disable --scope user
+forge extension enable --scope project
+forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
 ### C.6 Codex hook registration (codex-hooks module)
 
-`forge extension enable` registers Forge's two Codex hooks by appending a marker-delimited managed block
-(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the Codex config the Forge install scope maps to:
+`forge extension enable --scope user` registers Forge's two Codex hooks by appending a marker-delimited managed block
+(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the user Codex config:
 
-| Forge scope         | Codex config target                                        |
-| ------------------- | ---------------------------------------------------------- |
-| `user`              | `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) |
-| `project` / `local` | `<project_root>/.codex/config.toml`                        |
+| Forge scope | Codex config target                                        |
+| ----------- | ---------------------------------------------------------- |
+| `user`      | `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) |
 
-Codex has no settings.local analog, so both project scopes target the one per-project config. The scope choice carries a
-trust cost (stage 84): user scope needs **one** trust ceremony ever; project/local scope needs one **per repo**.
+Project/local extension installs do not write Codex hook blocks. Codex trust hashes the registered command bytes, so the
+dispatcher cutover (`<forge-home>/bin/forge-hook codex-*`) requires a one-time re-trust when an existing installation is
+updated.
 
 Mechanics (`src/forge/install/codex_hooks.py`):
 

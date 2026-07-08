@@ -14,34 +14,45 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.install.codex_hooks import get_builtin_codex_entries, render_codex_block
+from forge.core.paths import get_forge_home
+from forge.install.codex_hooks import (
+    CodexHookEntry,
+    get_builtin_codex_entries,
+    render_codex_block,
+)
 from forge.install.exceptions import NoForgeInstallationError
+from forge.install.hook_dispatcher import render_dispatcher_command
 from forge.install.models import Installation, InstallScope
 from forge.install.tracking import TrackingStore
 
 _EXPECTED_COMMANDS = {
-    "forge hook codex-session-start",
-    "forge hook codex-policy-check",
+    "$FORGE_HOME/bin/forge-hook codex-session-start",
+    "$FORGE_HOME/bin/forge-hook codex-policy-check",
 }
 
-# Both commands present, but codex-session-start is under PreToolUse (its
-# correct event is SessionStart) -- a registration that exists by name but
-# cannot fire correctly.
-_WRONG_EVENT_CONFIG = """\
-# >>> forge hooks >>>
-[[hooks.PreToolUse]]
-[[hooks.PreToolUse.hooks]]
-type = "command"
-command = "forge hook codex-session-start"
-timeout = 60
 
-[[hooks.PreToolUse]]
-[[hooks.PreToolUse.hooks]]
-type = "command"
-command = "forge hook codex-policy-check"
-timeout = 60
-# <<< forge hooks <<<
-"""
+def _normalize_forge_home(command: str) -> str:
+    return command.replace(str(get_forge_home()), "$FORGE_HOME")
+
+
+def _wrong_event_config() -> str:
+    """Return a managed block whose commands are right but event wiring is wrong."""
+
+    # codex-session-start belongs under SessionStart; putting both entries under
+    # PreToolUse creates a registration that exists by command bytes but cannot
+    # fire correctly.
+    return render_codex_block(
+        (
+            CodexHookEntry(
+                event="PreToolUse",
+                command=render_dispatcher_command("codex-session-start"),
+            ),
+            CodexHookEntry(
+                event="PreToolUse",
+                command=render_dispatcher_command("codex-policy-check"),
+            ),
+        )
+    )
 
 
 class _FakeSpec:
@@ -97,7 +108,7 @@ def test_status_reports_managed_block(codex_home, monkeypatch):
     assert scope["config_exists"] is True
     assert scope["block_present"] is True
     assert scope["registered"] == "yes"
-    assert set(scope["commands_registered"]) == _EXPECTED_COMMANDS
+    assert {_normalize_forge_home(command) for command in scope["commands_registered"]} == _EXPECTED_COMMANDS
 
 
 def test_status_surfaces_installed_json_tracking(codex_home, monkeypatch):
@@ -120,9 +131,27 @@ def test_status_surfaces_installed_json_tracking(codex_home, monkeypatch):
 
 def test_status_catches_wrong_event(codex_home, monkeypatch):
     _fake_runtime(monkeypatch, installed=True, version="1.2.3")
-    (codex_home / "config.toml").write_text(_WRONG_EVENT_CONFIG, encoding="utf-8")
+    (codex_home / "config.toml").write_text(_wrong_event_config(), encoding="utf-8")
     scope = _status_json(["--scope", "user", "--json"])["scopes"][0]
     assert scope["registered"] == "wrong-event"  # not "yes"
+
+
+def test_status_treats_legacy_correct_event_registration_as_registered(codex_home, monkeypatch):
+    _fake_runtime(monkeypatch, installed=True, version="1.2.3")
+    (codex_home / "config.toml").write_text(
+        "[[hooks.SessionStart]]\n[[hooks.SessionStart.hooks]]\n"
+        'type = "command"\ncommand = "forge hook codex-session-start"\ntimeout = 60\n'
+        "[[hooks.PreToolUse]]\n[[hooks.PreToolUse.hooks]]\n"
+        'type = "command"\ncommand = "forge hook codex-policy-check"\ntimeout = 60\n',
+        encoding="utf-8",
+    )
+    scope = _status_json(["--scope", "user", "--json"])["scopes"][0]
+    assert scope["registered"] == "yes"
+    assert scope["commands_registered"] == [
+        "forge hook codex-policy-check",
+        "forge hook codex-session-start",
+    ]
+    assert "SessionStart -> forge hook codex-session-start" in scope["registered_pairs"]
 
 
 def test_status_does_not_claim_enrollment(codex_home, monkeypatch):
@@ -201,9 +230,9 @@ def test_status_filters_unrelated_hooks(codex_home, monkeypatch):
         render_codex_block(get_builtin_codex_entries()) + unrelated, encoding="utf-8"
     )
     scope = _status_json(["--scope", "user", "--json"])["scopes"][0]
-    pairs = " ".join(scope["registered_pairs"])
+    pairs = _normalize_forge_home(" ".join(scope["registered_pairs"]))
     assert "some-unrelated-linter" not in pairs  # not Forge's footprint
-    assert "forge hook codex-session-start" in pairs
+    assert "$FORGE_HOME/bin/forge-hook codex-session-start" in pairs
 
 
 def test_status_project_scope_resolves_root_from_subdir(tmp_path, monkeypatch):

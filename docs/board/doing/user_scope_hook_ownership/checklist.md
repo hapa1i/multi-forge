@@ -11,8 +11,11 @@ Execution plan for the user-scope-only hook registration flip. Coordination/cont
 
 ## Current focus
 
-**Phase 0 complete — implementation not started; awaiting go.** Resolved decisions were mirrored into the epic card on
-2026-07-08; Phases 1--7 are ready to begin once implementation is approved.
+**Implementation complete; unit verification green; integration blocked locally.** T5 now implements the user-scope hook
+ownership flip, dispatcher command-byte cutover, filtered-update cleanup tracking preservation, logical double-fire
+diagnostics, Codex legacy-byte dedupe, Day-1 guidance, docs/QA updates, and the interim sidecar warning path.
+`make test-unit` and `make pre-commit` are green, but the targeted Docker installer integration run could not execute
+because Docker is not running; real-Claude / real-Codex hook-firing coverage is also still outstanding before release.
 
 ## Scope boundary (do not cross)
 
@@ -121,20 +124,20 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 
 ## Phase 1 — Presence-detection update (additive; lockstep with the byte cutover)
 
-- [ ] Extend `is_forge_hook_command` (`install/hooks.py:49`) to recognize the dispatcher form (basename `forge-hook`,
+- [x] Extend `is_forge_hook_command` (`install/hooks.py:49`) to recognize the dispatcher form (basename `forge-hook`,
   handler as the second token) **alongside** the existing `forge` + `hook` + handler form. Keep it the single predicate
   (`forge_hook_matcher_consolidation` single-sourced it — do not add a second matcher, do not revert to substring).
   - _Assertion:_ `is_forge_hook_command("/abs/.forge/bin/forge-hook policy-check", handler="policy-check")` True; legacy
     `forge hook policy-check` stays True; `echo forge-hook stop` (contains-only) stays False.
-- [ ] Verify **all five** callers resolve True against a dispatcher-form install (no false "hooks not installed"
+- [x] Verify **all five** callers resolve True against a dispatcher-form install (no false "hooks not installed"
   warnings): `session_manage.py:1075`, `session.py:232`, `policy.py:323`, `session_lifecycle.py:253`, `search.py:160`.
   - _Assertion:_ launch/policy-enable smoke over each call site emits no false "not installed" warning (acceptance:
     "Detection recognizes dispatcher"); legacy form still matches (acceptance: "Detection still matches legacy").
-- [ ] Extend the matcher golden/contract (`tests/src/install/test_registered_commands_contract.py`, `test_hooks.py`).
+- [x] Extend the matcher golden/contract (`tests/src/install/test_registered_commands_contract.py`, `test_hooks.py`).
 
 ## Phase 2 — Scope-ownership at the module layer (seam 4) + tracking truthfulness
 
-- [ ] Gate the **effective module set** by scope in a shared helper used by both `resolve_modules`/plan-build
+- [x] Gate the **effective module set** by scope in a shared helper used by both `resolve_modules`/plan-build
   (`installer.py:349,:458`) and update/sync `_modules_override` (`installer.py:1065--1071`): drop `hooks` +
   `codex-hooks` for `project`/`local`; drop `status-line` for `user`. Everything else (commands/agents/skills/
   permissions) installs at every scope as today. The settings-merge writes then follow the module set.
@@ -143,12 +146,12 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
   - _Assertion:_ `--scope user` → user `~/.claude/settings.json` carries the dispatcher hook entries and **no**
     `statusLine`; user scope **still** installs commands/agents/skills/permissions (acceptance: "User settings:
     dispatcher hooks only, still full extension install").
-- [ ] **Tracking/status/JSON truthfulness** (the payoff of gating at the module layer): `plan.modules`, dry-run output,
+- [x] **Tracking/status/JSON truthfulness** (the payoff of gating at the module layer): `plan.modules`, dry-run output,
   `Installation.modules_enabled`, `forge extension status`, `--json`, and `disable`/unmerge must reflect **actual**
   per-scope writes — project/local never claims `hooks`/`codex-hooks`; user never claims `status-line`.
   - _Assertion:_ dry-run `Modules:` line, `installed.json` `modules_enabled`, and `extension status --json` are truthful
     per scope (acceptance: "Tracking/status truthful per scope").
-- [ ] Preserve migration boundaries on legacy sync: if a pre-T5 project/local install has tracked hook entries, `sync`
+- [x] Preserve migration boundaries on legacy sync: if a pre-T5 project/local install has tracked hook entries, `sync`
   filters `hooks`/`codex-hooks` out of the effective modules, does **not** rewrite them to dispatcher project hooks,
   records no hook module as enabled, and reports the cross-scope/legacy state instead of claiming it is clean. Cleanup
   tracking is distinct from enabled-module truthfulness: preserve the pre-existing hook cleanup records in both
@@ -158,74 +161,78 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
     settings without adding a dispatcher sibling, filters `modules_enabled`, preserves cleanup tracking, and a
     subsequent `forge extension disable --scope local` still removes that legacy hook (acceptance: "Project sync
     preserves cleanup tracking").
-- [ ] Enforce the Phase-0 explicit override decision: project/local `--with hooks` and `--with codex-hooks` hard-reject;
+- [x] Enforce the Phase-0 explicit override decision: project/local `--with hooks` and `--with codex-hooks` hard-reject;
   no unwritten module is ever recorded as enabled.
-- [ ] Emit the actionable enable next-steps line: in-repo project/local enable points to
+- [x] Emit the actionable enable next-steps line: in-repo project/local enable points to
   `forge extension enable --scope user` for runtime hooks. Must pass the env-var vocabulary guard.
   - _Assertion:_ project/local enable output names the user-scope hook install command (acceptance: "Day-1 next-steps").
 
 ## Phase 3 — Command-byte cutover + unmerge-before-merge + goldens (seam 1)
 
-- [ ] Register hook commands via `render_dispatcher_command(handler)` (absolute `<home>/.forge/bin/forge-hook <name>`,
+- [x] Register hook commands via `render_dispatcher_command(handler)` (absolute `<home>/.forge/bin/forge-hook <name>`,
   never `~`) for the Claude preset hooks and the Codex block.
   - _Assertion:_ rendered Claude + Codex commands are literal absolute paths to `forge-hook` (acceptance: "Literal
     absolute path").
-- [ ] **Unmerge-before-merge, user scope only**: user-scope `enable`/`sync` unmerge the previously-tracked hook entries
+- [x] **Unmerge-before-merge, user scope only**: user-scope `enable`/`sync` unmerge the previously-tracked hook entries
   (old `forge hook <name>` form, via `installed.json` tracking + `smart_unmerge`/`unmerge`) **before** merging the new
   dispatcher entries, so `merge_hooks`' append+dedupe leaves no coexisting old sibling. Project/local legacy hook
   entries are not converted to dispatcher project hooks by T5; T6 migrates/removes them.
   - _Assertion:_ a user-scope `sync` over a settings file holding the old form yields exactly the new dispatcher entries
     — no old+new sibling (acceptance: "User sync cutover leaves no double sibling").
-- [ ] Update the Codex trust-byte golden to the dispatcher form with `$HOME` normalized (mirror T4: template golden + a
+- [x] Update the Codex trust-byte golden to the dispatcher form with `$HOME` normalized (mirror T4: template golden + a
   separate real-home substitution assertion). A byte change fails the golden.
-- [ ] Surface the **Codex re-trust** consequence: the byte change invalidates existing `trusted_hash` enrollment, so
+- [x] Surface the **Codex re-trust** consequence: the byte change invalidates existing `trusted_hash` enrollment, so
   enable/sync next-steps + the changelog name the one-time re-trust ceremony (Forge cannot perform/verify it — design.md
   §3.9).
 
-## Phase 4 — Cross-scope double-fire detection (report only; cleanup is T6)
+## Phase 4 — Duplicate double-fire detection (report only; cleanup is T6)
 
-- [ ] Add cross-scope detection to `forge extension doctor` (`cli/extensions.py`, alongside the existing
+- [x] Add duplicate runtime-hook detection to `forge extension doctor` (`cli/extensions.py`, alongside the existing
   `hook_dispatcher`/`project_registry`/`project_compatibility` diagnostics at :1147--1156) and the status line: report
-  when user-scope **and** project-scope Forge hooks both exist, and **name** the T6 cleanup command.
-  - _Assertion:_ legacy user + project Forge hooks present → `doctor` (+ `--json`) reports double-fire risk and names
-    the cleanup command (acceptance: "Cross-scope double-fire warned"); the string passes the env-var vocabulary guard.
-- [ ] No cleanup here (that is T6) — detection + naming only.
+  when the same Forge `(event, handler)` is registered more than once, including cross-scope user+project duplicates and
+  same-file old+new siblings. Doctor names the planned T6 cleanup command (`forge extension cleanup-project`) and
+  current tracked-disable fallback; the compact status-line segment reports the risk as `HOOKx2`.
+  - _Assertion:_ legacy user + project Forge hooks present, or old+new siblings in one user settings file, means
+    `doctor` (+ `--json`) reports double-fire risk and names the cleanup command (acceptance: "Double-fire warned"); the
+    string passes the env-var vocabulary guard.
+- [x] No cleanup here (that is T6) — detection + naming only.
 
 ## Phase 5 — Sidecar exposure gate (T10-owned mechanism)
 
-- [ ] Confirm T5 writes **no** host-absolute dead path into sidecar-read project config — true by construction for new
+- [x] Confirm T5 writes **no** host-absolute dead path into sidecar-read project config — true by construction for new
   project/local installs, since they write no hook block into `/workspace/.claude/settings*.json`. Do not test only
   `run_sidecar_session`; sidecar launch also mounts project `.claude` at `/workspace/.claude` and sidecar home at
   `/root/.claude`.
-- [ ] Land the **operational exposure gate**: T5 cannot merge/release to sidecar users until T10 is merged, unless the
+- [x] Land the **operational exposure gate**: T5 cannot merge/release to sidecar users until T10 is merged, unless the
   maintainer records an explicit temporary hookless-sidecar waiver. If the waiver path is chosen, T5 must add a
   user-facing sidecar warning/block before launch that names T10 and the hookless state. Do **not** implement
   in-container injection here.
   - _Assertion:_ sidecar launch coverage asserts the chosen gate: T10-present path, or waiver + warning/block + no dead
     host path (acceptance: "Sidecar exposure gate enforced").
-- [ ] Record the seam-5 sequencing in the epic: **T10 must land before T5's change reaches sidecar users** unless a
+- [x] Record the seam-5 sequencing in the epic: **T10 must land before T5's change reaches sidecar users** unless a
   named waiver is accepted; T10 owns the injection, both settings files, and statusLine neutralization.
 
 ## Phase 6 — Design-doc + QA sync
 
-- [ ] `design.md §3.10` (Hook handlers / Deployment model): describe the **shipped** user-scope-only registration
+- [x] `design.md §3.10` (Hook handlers / Deployment model): describe the **shipped** user-scope-only registration
   cutover in present tense; statusLine stays project-scoped (D3).
-- [ ] `design_appendix §C` (install model): scope model + module inventory reflect hooks/codex-hooks → user-only,
+- [x] `design_appendix §C` (install model): scope model + module inventory reflect hooks/codex-hooks → user-only,
   status-line → project/local; `§C.6` notes the Codex byte cutover + re-trust.
-- [ ] `cli_reference.md`: `forge extension enable` scope semantics + the `doctor` double-fire report + changed
+- [x] `cli_reference.md`: `forge extension enable` scope semantics + the `doctor` double-fire report + changed
   next-steps.
-- [ ] **Day-1 UX docs + QA/walkthrough**: end-user install guide teaches "install hooks once at user scope"; the
+- [x] **Day-1 UX docs + QA/walkthrough**: end-user install guide teaches "install hooks once at user scope"; the
   `/forge:walkthrough` + `/forge:qa` checklists reflect that in-repo enable no longer installs hooks.
-- [ ] Epic seams 1/4 + CLI-surface section reflect the shipped model; seam 5 records the T10 hand-off.
+- [x] Epic seams 1/4 + CLI-surface section reflect the shipped model; seam 5 records the T10 hand-off.
 
 ## Phase 7 — Closeout
 
-- [ ] All acceptance rows green.
-- [ ] `make pre-commit` clean.
+- [x] All code-level acceptance rows green in unit/regression coverage, including the real filtered-update cleanup test,
+  same-file duplicate diagnostics, and legacy Codex dedupe regression.
+- [x] `make pre-commit` clean.
 - [ ] Install + hook integration run (testing_guidelines mandates it for installer/hook changes):
   `./scripts/test-integration.sh tests/integration/docker/test_installer.py`, plus real-Claude and real-Codex
   hook-firing coverage proving the **dispatcher command form actually fires** end-to-end.
-- [ ] Epic seam bookkeeping updated; `change_log.md` entry (Goal / Key changes / Verification); durable lessons proposed
+- [x] Epic seam bookkeeping updated; `change_log.md` entry (Goal / Key changes / Verification); durable lessons proposed
   for `impl_notes.md` (human review before promotion).
 - [ ] Lane move `doing/ -> done/` deferred to **post-merge**; repoint inbound links on the move (epic forward-link,
   member back-link, `done/forge_hook_matcher_consolidation` inbound link).
@@ -237,23 +244,23 @@ Re-grep the symbol before relying on an exact line; these are the current snapsh
 
 Grounded on the card's contract, refined against the re-grepped seams + the 2026-07-08 review.
 
-| Test                                       | Fixture                                                             | Assertion                                                                                                                                                              | Phase | Test File                                   |
-| ------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
-| Detection recognizes dispatcher            | `forge-hook` dispatcher command installed                           | `is_forge_hook_command`/`has_forge_hook(s)` True; all five callers emit no false "not installed"                                                                       | 1     | `tests/src/install/test_hooks.py`           |
-| Detection still matches legacy             | legacy `forge hook <name>` command                                  | additive predicate keeps the old form True (T6 migration-window safe); no substring broadening                                                                         | 1     | `tests/src/install/test_hooks.py`           |
-| Project skips hooks                        | `forge extension enable --scope local`                              | project `.claude/settings*.json` + `.codex/config.toml` get **no** Forge hook block                                                                                    | 2     | `tests/src/install/test_installer.py`       |
-| Project keeps statusLine                   | `forge extension enable --scope local`                              | project `.claude/settings*.json` **still** registers the `statusLine` scalar (D3)                                                                                      | 2     | `tests/src/install/test_installer.py`       |
-| User settings: dispatcher hooks only       | `forge extension enable --scope user`                               | user `settings.json` carries only dispatcher hook entries, **no** statusLine; commands/agents/skills/permissions still install                                         | 2/3   | `tests/src/cli/test_extension_enable.py`    |
-| Tracking/status truthful per scope         | enable at each scope                                                | dry-run `Modules:`, `installed.json` `modules_enabled`, `extension status --json` reflect actual writes (no unwritten module claimed)                                  | 2     | `tests/src/cli/test_extension_enable.py`    |
-| Explicit `--with hooks --scope project`    | `enable --scope local --with hooks`                                 | hard-rejects with ownership-rule error; no project hook block; tracking not claiming hooks                                                                             | 2     | `tests/src/cli/test_extension_enable.py`    |
-| Day-1 next-steps                           | in-repo `forge extension enable` (auto-LOCAL)                       | completion output names `forge extension enable --scope user` for runtime hooks; passes env guard                                                                      | 2     | `tests/src/cli/test_extension_enable.py`    |
-| Literal absolute path                      | user hook install                                                   | rendered Claude + Codex commands contain `/abs/home/.forge/bin/forge-hook`, not `~`                                                                                    | 3     | `tests/src/cli/test_extension_enable.py`    |
-| Project sync preserves cleanup tracking    | real filtered `sync` over pre-T5 tracked project/local hook install | filters forbidden modules, adds no dispatcher project sibling, preserves `settings_entries` + `.forge-added` cleanup data, and later `disable` removes the legacy hook | 2     | `tests/src/cli/test_extension_enable.py`    |
-| User sync cutover leaves no double sibling | user settings holding old `forge hook` form                         | `sync` unmerges old, merges new → exactly the dispatcher entries, no coexisting sibling                                                                                | 3     | `tests/src/install/test_settings_merge.py`  |
-| Codex golden + re-trust surfaced           | rendered Codex block (`$HOME`-normalized)                           | golden pins the dispatcher template; byte change fails; next-steps name the re-trust                                                                                   | 3     | `tests/src/install/test_codex_hooks.py`     |
-| Cross-scope double-fire warned             | legacy user + project Forge hooks present                           | `doctor`/status reports double-fire risk and names the cleanup command                                                                                                 | 4     | `tests/src/cli/test_extension_enable.py`    |
-| Sidecar exposure gate enforced             | sidecar launch under T5 user-scope model                            | T10 landed, or explicit waiver + warning/block before launch; no host-absolute dead path in `/workspace/.claude`                                                       | 5     | `tests/src/core/ops/test_claude_session.py` |
-| New user-facing strings pass guard         | doctor/status/enable next-steps strings                             | `test_env_vocabulary.py` classification passes (no leaked internal `FORGE_*`)                                                                                          | 2/4   | `tests/src/cli/test_env_vocabulary.py`      |
+| Test                                       | Fixture                                                             | Assertion                                                                                                                                                              | Phase | Test File                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Detection recognizes dispatcher            | `forge-hook` dispatcher command installed                           | `is_forge_hook_command`/`has_forge_hook(s)` True; all five callers emit no false "not installed"                                                                       | 1     | `tests/src/install/test_hooks.py`                                                                                                   |
+| Detection still matches legacy             | legacy `forge hook <name>` command                                  | additive predicate keeps the old form True (T6 migration-window safe); no substring broadening                                                                         | 1     | `tests/src/install/test_hooks.py`                                                                                                   |
+| Project skips hooks                        | `forge extension enable --scope local`                              | project `.claude/settings*.json` + `.codex/config.toml` get **no** Forge hook block                                                                                    | 2     | `tests/src/install/test_installer.py`                                                                                               |
+| Project keeps statusLine                   | `forge extension enable --scope local`                              | project `.claude/settings*.json` **still** registers the `statusLine` scalar (D3)                                                                                      | 2     | `tests/src/install/test_installer.py`                                                                                               |
+| User settings: dispatcher hooks only       | `forge extension enable --scope user`                               | user `settings.json` carries only dispatcher hook entries, **no** statusLine; commands/agents/skills/permissions still install                                         | 2/3   | `tests/src/install/test_installer.py`                                                                                               |
+| Tracking/status truthful per scope         | enable at each scope                                                | dry-run `Modules:`, `installed.json` `modules_enabled`, `extension status --json` reflect actual writes (no unwritten module claimed)                                  | 2     | `tests/src/cli/test_extension_enable.py`                                                                                            |
+| Explicit `--with hooks --scope project`    | `enable --scope local --with hooks`                                 | hard-rejects with ownership-rule error; no project hook block; tracking not claiming hooks                                                                             | 2     | `tests/src/cli/test_extension_enable.py`                                                                                            |
+| Day-1 next-steps                           | in-repo `forge extension enable` (auto-LOCAL)                       | completion output names `forge extension enable --scope user` for runtime hooks; passes env guard                                                                      | 2     | `tests/src/cli/test_extension_enable.py`                                                                                            |
+| Literal absolute path                      | user hook install                                                   | rendered Claude + Codex commands contain `/abs/home/.forge/bin/forge-hook`, not `~`                                                                                    | 3     | `tests/src/install/test_registered_commands_contract.py`, `tests/src/install/test_codex_hooks.py`                                   |
+| Project sync preserves cleanup tracking    | real filtered `sync` over pre-T5 tracked project/local hook install | filters forbidden modules, adds no dispatcher project sibling, preserves `settings_entries` + `.forge-added` cleanup data, and later `disable` removes the legacy hook | 2     | `tests/src/install/test_installer.py`                                                                                               |
+| User sync cutover leaves no double sibling | user settings holding old `forge hook` form                         | `sync` unmerges old, merges new → exactly the dispatcher entries, no coexisting sibling                                                                                | 3     | `tests/src/install/test_installer.py`                                                                                               |
+| Codex golden + re-trust surfaced           | rendered Codex block (`$HOME`-normalized)                           | golden pins the dispatcher template; byte change fails; next-steps name the re-trust                                                                                   | 3     | `tests/src/install/test_codex_hooks.py`                                                                                             |
+| Double-fire warned                         | legacy user + project hooks, or old+new siblings in one user file   | `doctor`/status reports double-fire risk; clean user-scope-only installs stay quiet; doctor names the planned cleanup command                                          | 4     | `tests/src/install/test_hooks.py`, `tests/src/cli/test_extension_enable.py`, `tests/src/cli/statusline/test_statusline_registry.py` |
+| Sidecar exposure gate enforced             | sidecar launch under T5 user-scope model                            | T10 landed, or explicit waiver + warning/block before launch; no host-absolute dead path in `/workspace/.claude`                                                       | 5     | `tests/src/cli/test_session_sidecar_warning.py`                                                                                     |
+| New user-facing strings pass guard         | doctor/status/enable next-steps strings                             | `test_env_vocabulary.py` classification passes (no leaked internal `FORGE_*`)                                                                                          | 2/4   | `tests/src/cli/test_env_vocabulary.py`                                                                                              |
 
 ## Open decisions
 

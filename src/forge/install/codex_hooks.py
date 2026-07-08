@@ -1,11 +1,10 @@
 """Codex hook registration (managed block in Codex config.toml).
 
-Forge registers its Codex hooks (``forge hook codex-session-start``,
-``forge hook codex-policy-check``) by appending a marker-delimited TOML block
-to the Codex config that the install scope maps to:
+Forge registers its Codex hooks through the user-scope dispatcher by appending
+a marker-delimited TOML block to the Codex config:
 
 - ``user``            -> ``$CODEX_HOME/config.toml`` (default ``~/.codex/config.toml``)
-- ``project``/``local`` -> ``<project_root>/.codex/config.toml``
+- ``project``/``local`` -> no managed hook block (runtime hooks are user-scope only)
 
 codex-cli owns config.toml (model settings, project trust, comments), so Forge
 never rewrites or normalizes it: merge appends or replaces only the managed
@@ -32,6 +31,8 @@ from forge.core.runtime.codex_rollouts import codex_home
 from forge.core.state import atomic_write_text
 
 from .exceptions import ForgeInstallError
+from .hook_dispatcher import render_dispatcher_command
+from .hooks import forge_hook_handler
 from .models import InstallScope
 
 # The 10 Codex lifecycle events (probe-pinned, codex-cli 0.138.0+). Codex
@@ -58,6 +59,8 @@ CODEX_BLOCK_END = "# <<< forge hooks <<<"
 
 CODEX_CONFIG_FILENAME = "config.toml"
 
+CodexRegistrationKey = tuple[str, str, str]
+
 
 @dataclass(frozen=True)
 class CodexHookEntry:
@@ -81,8 +84,11 @@ def get_builtin_codex_entries() -> tuple[CodexHookEntry, ...]:
     matcher="shell" never fired).
     """
     return (
-        CodexHookEntry(event="SessionStart", command="forge hook codex-session-start"),
-        CodexHookEntry(event="PreToolUse", command="forge hook codex-policy-check"),
+        CodexHookEntry(
+            event="SessionStart",
+            command=render_dispatcher_command("codex-session-start"),
+        ),
+        CodexHookEntry(event="PreToolUse", command=render_dispatcher_command("codex-policy-check")),
     )
 
 
@@ -181,32 +187,6 @@ def _split_block(text: str) -> tuple[str, str, str] | None:
     return before, block, after
 
 
-def _collect_commands(parsed: dict[str, Any]) -> set[str]:
-    """Collect every hook command string registered in a parsed config.
-
-    Event-agnostic by design -- this is the REPORTING surface (status display,
-    uninstall leftover warnings), where "your command string appears
-    somewhere" is the right question. Dedupe uses _collect_registrations.
-    """
-    hooks = parsed.get("hooks")
-    if not isinstance(hooks, dict):
-        return set()
-    found: set[str] = set()
-    for event_entries in hooks.values():
-        if not isinstance(event_entries, list):
-            continue
-        for entry in event_entries:
-            if not isinstance(entry, dict):
-                continue
-            inner = entry.get("hooks")
-            if not isinstance(inner, list):
-                continue
-            for hook in inner:
-                if isinstance(hook, dict) and isinstance(hook.get("command"), str):
-                    found.add(hook["command"])
-    return found
-
-
 def _collect_registrations(parsed: dict[str, Any]) -> set[tuple[str, str]]:
     """Collect (event, command) registration pairs from a parsed config.
 
@@ -235,6 +215,55 @@ def _collect_registrations(parsed: dict[str, Any]) -> set[tuple[str, str]]:
                 if isinstance(hook, dict) and hook.get("type") == "command" and isinstance(hook.get("command"), str):
                     found.add((str(event), hook["command"]))
     return found
+
+
+def _command_identity(command: str) -> tuple[str, str]:
+    handler = forge_hook_handler(command)
+    if handler is not None:
+        return "forge-hook", handler
+    return "command", command
+
+
+def codex_registration_key(event: str, command: str) -> CodexRegistrationKey:
+    """Return the logical Codex hook registration identity for an event/command."""
+
+    kind, value = _command_identity(command)
+    return event, kind, value
+
+
+def codex_expected_registration_keys(
+    entries: tuple[CodexHookEntry, ...],
+) -> set[CodexRegistrationKey]:
+    """Return logical registration keys for Forge-managed Codex hook entries."""
+
+    return {codex_registration_key(e.event, e.command) for e in entries}
+
+
+def _collect_registration_keys(parsed: dict[str, Any]) -> set[CodexRegistrationKey]:
+    return {codex_registration_key(event, command) for event, command in _collect_registrations(parsed)}
+
+
+def _collect_commands_by_key(
+    parsed: dict[str, Any],
+) -> dict[CodexRegistrationKey, set[str]]:
+    commands: dict[CodexRegistrationKey, set[str]] = {}
+    for event, command in _collect_registrations(parsed):
+        commands.setdefault(codex_registration_key(event, command), set()).add(command)
+    return commands
+
+
+def _format_registration_keys(
+    keys: set[CodexRegistrationKey],
+    entries: tuple[CodexHookEntry, ...],
+    commands_by_key: dict[CodexRegistrationKey, set[str]] | None = None,
+) -> list[str]:
+    expected = {codex_registration_key(e.event, e.command): e.command for e in entries}
+    formatted: list[str] = []
+    for key in sorted(keys):
+        event, kind, value = key
+        commands = sorted((commands_by_key or {}).get(key, {expected.get(key, f"{kind}:{value}")}))
+        formatted.append(f"{event}: {', '.join(commands)}")
+    return formatted
 
 
 def _structure_conflict(parsed: dict[str, Any], events: set[str]) -> str | None:
@@ -312,8 +341,8 @@ def plan_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> 
     # No managed block: dedupe against manually registered Forge hooks, by
     # (event, command) registration identity -- a command under the wrong
     # event is not a working registration and must not satisfy dedupe.
-    ours = {(e.event, e.command) for e in entries}
-    present = _collect_registrations(parsed) & ours
+    ours = codex_expected_registration_keys(entries)
+    present = _collect_registration_keys(parsed) & ours
     if present == ours:
         return CodexMergePlan(
             action="skip",
@@ -321,8 +350,9 @@ def plan_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> 
             reason="already registered outside Forge markers (manual registration kept)",
         )
     if present:
-        present_strs = sorted(f"{event}: {command}" for event, command in present)
-        missing = sorted(f"{event}: {command}" for event, command in ours - present)
+        commands_by_key = _collect_commands_by_key(parsed)
+        present_strs = _format_registration_keys(present, entries, commands_by_key)
+        missing = _format_registration_keys(ours - present, entries)
         return CodexMergePlan(
             action="conflict",
             config_path=path_str,
@@ -392,9 +422,9 @@ def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) ->
         raise ForgeInstallError(
             f"merging Forge hooks into {config_path} would produce invalid TOML " f"({e}); file left unmodified"
         ) from e
-    missing_regs = {(e.event, e.command) for e in entries} - _collect_registrations(merged)
+    missing_regs = codex_expected_registration_keys(entries) - _collect_registration_keys(merged)
     if missing_regs:
-        missing_strs = sorted(f"{event}: {command}" for event, command in missing_regs)
+        missing_strs = _format_registration_keys(missing_regs, entries)
         raise ForgeInstallError(
             f"post-merge validation failed for {config_path}: "
             f"{', '.join(missing_strs)} not present; file left unmodified"
@@ -440,8 +470,9 @@ def remove_codex_block(config_path: Path, entries: tuple[CodexHookEntry, ...]) -
         parsed = tomllib.loads(remainder)
     except tomllib.TOMLDecodeError:
         parsed = {}
-    ours = {e.command for e in entries}
-    leftover = tuple(sorted(_collect_commands(parsed) & ours))
+    ours = codex_expected_registration_keys(entries)
+    commands_by_key = _collect_commands_by_key(parsed)
+    leftover = tuple(sorted(command for key in ours for command in commands_by_key.get(key, set())))
 
     if split is None:
         return CodexRemoveResult(removed=False, leftover_commands=leftover)
@@ -484,8 +515,9 @@ def read_codex_registration(config_path: Path, entries: tuple[CodexHookEntry, ..
         parsed = tomllib.loads(text)
     except tomllib.TOMLDecodeError:
         parsed = {}
-    ours = {e.command for e in entries}
-    registered = tuple(sorted(_collect_commands(parsed) & ours))
+    ours = codex_expected_registration_keys(entries)
+    commands_by_key = _collect_commands_by_key(parsed)
+    registered = tuple(sorted(command for key in ours for command in commands_by_key.get(key, set())))
     return CodexRegistrationStatus(
         config_path=path_str,
         block_present=split is not None,
@@ -496,10 +528,8 @@ def read_codex_registration(config_path: Path, entries: tuple[CodexHookEntry, ..
 def codex_registration_pairs(config_path: Path) -> set[tuple[str, str]]:
     """Return the ``(event, command)`` registration pairs in a Codex config (event-aware).
 
-    The correctness counterpart to ``read_codex_registration``'s event-agnostic
-    ``commands_registered`` reporting set: callers asking "is THIS command registered
-    under THIS event?" (enrollment verification, dedupe) must use this, since a command
-    under the wrong event is not a working registration. Best-effort: a missing,
+    Use ``codex_registration_keys`` for Forge-owned logical identity checks
+    across legacy and dispatcher command bytes. Best-effort: a missing,
     unreadable, or invalid-TOML config yields an empty set (never raises).
     """
     if not config_path.is_file():
@@ -513,3 +543,19 @@ def codex_registration_pairs(config_path: Path) -> set[tuple[str, str]]:
     except tomllib.TOMLDecodeError:
         return set()
     return _collect_registrations(parsed)
+
+
+def codex_registration_keys(config_path: Path) -> set[CodexRegistrationKey]:
+    """Return logical Codex registration keys in a config (event + command identity)."""
+
+    if not config_path.is_file():
+        return set()
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return set()
+    return _collect_registration_keys(parsed)

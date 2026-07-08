@@ -177,4 +177,4 @@ class TestReadHygieneRegistration:
         read_entries = [e for e in pre_tool_use if e.get("matcher") == "Read"]
         assert len(read_entries) == 1, "Expected exactly one Read matcher in PreToolUse"
         commands = [h["command"] for h in read_entries[0]["hooks"]]
-        assert any("forge hook read-hygiene" in cmd for cmd in commands)
+        assert any(cmd.endswith("forge-hook read-hygiene") for cmd in commands)

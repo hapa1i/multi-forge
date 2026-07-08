@@ -9,13 +9,16 @@ from unittest.mock import patch
 
 import pytest
 
+from forge.core.paths import get_forge_home
 from forge.install.exceptions import (
+    ForgeInstallError,
     NestedClaudeDirectoryError,
     NoClaudeDirectoryError,
     NoForgeInstallationError,
     NotInstalledError,
     PathBoundaryViolationError,
 )
+from forge.install.hook_dispatcher import render_dispatcher_command
 from forge.install.installer import (
     Installer,
     find_claude_root,
@@ -27,12 +30,19 @@ from forge.install.installer import (
     validate_path_within_boundary,
 )
 from forge.install.models import (
+    Installation,
+    InstalledSettingsEntry,
     InstallMode,
     InstallModule,
     InstallProfile,
     InstallScope,
 )
+from forge.install.settings_merge import load_added_settings, read_settings
 from forge.install.tracking import TrackingStore
+
+
+def _normalize_forge_home(command: str) -> str:
+    return command.replace(str(get_forge_home()), "$FORGE_HOME")
 
 
 class TestResolveModules:
@@ -456,6 +466,291 @@ class TestInstallerInit:
         assert settings["hooks"] == get_builtin_preset()["hooks"]
         assert settings["permissions"]["allow"]
         assert settings["env"] == {"CUSTOM": "1"}
+
+
+class TestInstallerScopeModulePolicy:
+    """Tests for T5's split between user-owned runtime hooks and project settings."""
+
+    @staticmethod
+    def _source_root(tmp_path: Path) -> Path:
+        src = tmp_path / "src"
+        src.mkdir(parents=True)
+        (src / "forge").mkdir()
+        commands = src / "commands"
+        commands.mkdir()
+        (commands / "test.md").write_text("# Test Command\n")
+        (src / "agents").mkdir()
+        (src / "skills").mkdir()
+        return tmp_path
+
+    def test_local_standard_filters_runtime_hooks_but_keeps_statusline(self, tmp_path: Path) -> None:
+        import json
+
+        project = tmp_path / "repo"
+        (project / ".claude").mkdir(parents=True)
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        installer = Installer(scope=InstallScope.LOCAL, project_root=project, tracking_store=tracking)
+
+        with (
+            patch(
+                "forge.install.installer.get_forge_source_root",
+                return_value=source_root,
+            ),
+            patch("forge.install.installer._codex_available", return_value=True),
+        ):
+            plan = installer.init(profile=InstallProfile.STANDARD)
+
+        settings = json.loads((project / ".claude" / "settings.local.json").read_text())
+        assert "hooks" not in settings
+        assert "statusLine" in settings
+        assert plan.codex is None
+        installation = tracking.get_installation("local", str(project))
+        assert installation is not None
+        assert "hooks" not in installation.modules_enabled
+        assert "codex-hooks" not in installation.modules_enabled
+        assert "status-line" in installation.modules_enabled
+
+    def test_local_standard_still_renders_hook_dispatcher_for_lifecycle_compatibility(self, tmp_path: Path) -> None:
+        project = tmp_path / "repo"
+        (project / ".claude").mkdir(parents=True)
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        installer = Installer(scope=InstallScope.LOCAL, project_root=project, tracking_store=tracking)
+
+        with (
+            patch(
+                "forge.install.installer.get_forge_source_root",
+                return_value=source_root,
+            ),
+            patch("forge.install.installer._codex_available", return_value=True),
+            patch("forge.install.installer.install_hook_dispatcher") as render,
+        ):
+            installer.init(profile=InstallProfile.STANDARD)
+
+        render.assert_called_once()
+
+    def test_user_standard_filters_statusline_but_keeps_runtime_hooks(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+
+        claude_home = tmp_path / "claude-home"
+        claude_home.mkdir()
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+        with (
+            patch(
+                "forge.install.installer.get_forge_source_root",
+                return_value=source_root,
+            ),
+            patch("forge.install.installer.get_target_root", return_value=claude_home),
+            patch("forge.install.installer._codex_available", return_value=False),
+        ):
+            plan = installer.init(profile=InstallProfile.STANDARD)
+
+        settings = json.loads((claude_home / "settings.json").read_text())
+        assert "hooks" in settings
+        assert "statusLine" not in settings
+        assert "status-line" not in plan.modules
+        installation = tracking.get_installation("user", None)
+        assert installation is not None
+        assert "hooks" in installation.modules_enabled
+        assert "status-line" not in installation.modules_enabled
+
+    def test_explicit_scope_contradictions_are_rejected(self, tmp_path: Path) -> None:
+        project = tmp_path / "repo"
+        (project / ".claude").mkdir(parents=True)
+        local = Installer(
+            scope=InstallScope.LOCAL,
+            project_root=project,
+            tracking_store=TrackingStore(tracking_path=tmp_path / "local" / "installed.json"),
+        )
+        user = Installer(
+            scope=InstallScope.USER,
+            tracking_store=TrackingStore(tracking_path=tmp_path / "user" / "installed.json"),
+        )
+
+        with pytest.raises(ForgeInstallError, match="user-scope only"):
+            local.plan(profile=InstallProfile.MINIMAL, with_modules={InstallModule.HOOKS})
+        with pytest.raises(ForgeInstallError, match="project/local-scope only"):
+            user.plan(profile=InstallProfile.MINIMAL, with_modules={InstallModule.STATUSLINE})
+
+    def test_filtered_local_update_preserves_legacy_hook_tracking_for_disable(self, tmp_path: Path) -> None:
+        import json
+
+        project = tmp_path / "repo"
+        (project / ".claude").mkdir(parents=True)
+        settings_path = project / ".claude" / "settings.local.json"
+        legacy_hook = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
+        settings_path.write_text(
+            json.dumps({"hooks": {"SessionStart": [legacy_hook]}}),
+            encoding="utf-8",
+        )
+
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        legacy_entry = InstalledSettingsEntry(
+            key_path="hooks.SessionStart",
+            value=legacy_hook,
+            merge_type="append",
+            stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+        )
+        tracking.set_installation(
+            "local",
+            Installation(
+                scope="local",
+                mode="copy",
+                profile="standard",
+                modules_enabled=["hooks"],
+                settings_entries=[legacy_entry],
+                installed_at="2026-01-01T00:00:00+00:00",
+                updated_at="2026-01-01T00:00:00+00:00",
+            ),
+            str(project),
+        )
+        installer = Installer(scope=InstallScope.LOCAL, project_root=project, tracking_store=tracking)
+
+        with patch("forge.install.installer.get_forge_source_root", return_value=source_root):
+            plan = installer.update()
+
+        assert "hooks" not in plan.modules
+        assert read_settings(settings_path)["hooks"]["SessionStart"] == [legacy_hook]
+        assert load_added_settings(settings_path)["hooks"]["SessionStart"] == [legacy_hook]
+        updated = tracking.get_installation("local", str(project))
+        assert updated is not None
+        assert updated.modules_enabled == []
+        assert updated.settings_entries == [legacy_entry]
+
+        installer.uninstall()
+
+        assert read_settings(settings_path) == {}
+        assert tracking.get_installation("local", str(project)) is None
+
+    def test_user_update_replaces_legacy_hook_entry_with_dispatcher(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+
+        claude_home = tmp_path / "claude-home"
+        claude_home.mkdir()
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        settings_path = claude_home / "settings.json"
+        legacy_hook = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
+        settings_path.write_text(
+            json.dumps({"hooks": {"SessionStart": [legacy_hook]}}),
+            encoding="utf-8",
+        )
+
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        tracking.set_installation(
+            "user",
+            Installation(
+                scope="user",
+                mode="copy",
+                profile="standard",
+                modules_enabled=["hooks"],
+                settings_entries=[
+                    InstalledSettingsEntry(
+                        key_path="hooks.SessionStart",
+                        value=legacy_hook,
+                        merge_type="append",
+                        stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+                    )
+                ],
+                installed_at="2026-01-01T00:00:00+00:00",
+                updated_at="2026-01-01T00:00:00+00:00",
+            ),
+            None,
+        )
+        installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+        with (
+            patch(
+                "forge.install.installer.get_forge_source_root",
+                return_value=source_root,
+            ),
+            patch("forge.install.installer._codex_available", return_value=False),
+        ):
+            installer.update()
+
+        settings = read_settings(settings_path)
+        assert settings["hooks"]["SessionStart"] == [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": render_dispatcher_command("session-start"),
+                    }
+                ]
+            }
+        ]
+        added = load_added_settings(settings_path)
+        assert added["hooks"]["SessionStart"] == settings["hooks"]["SessionStart"]
+        updated = tracking.get_installation("user", None)
+        assert updated is not None
+        assert all("forge hook" not in entry.stable_id for entry in updated.settings_entries)
+
+    def test_user_update_dispatcher_failure_does_not_unmerge_legacy_hook(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import json
+
+        claude_home = tmp_path / "claude-home"
+        claude_home.mkdir()
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        settings_path = claude_home / "settings.json"
+        legacy_hook = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
+        settings_path.write_text(
+            json.dumps({"hooks": {"SessionStart": [legacy_hook]}}),
+            encoding="utf-8",
+        )
+
+        source_root = self._source_root(tmp_path / "forge-src")
+        tracking = TrackingStore(tracking_path=tmp_path / "forge-home" / "installed.json")
+        legacy_entry = InstalledSettingsEntry(
+            key_path="hooks.SessionStart",
+            value=legacy_hook,
+            merge_type="append",
+            stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+        )
+        tracking.set_installation(
+            "user",
+            Installation(
+                scope="user",
+                mode="copy",
+                profile="standard",
+                modules_enabled=["hooks"],
+                settings_entries=[legacy_entry],
+                installed_at="2026-01-01T00:00:00+00:00",
+                updated_at="2026-01-01T00:00:00+00:00",
+            ),
+            None,
+        )
+        installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+        with (
+            patch(
+                "forge.install.installer.get_forge_source_root",
+                return_value=source_root,
+            ),
+            patch("forge.install.installer._codex_available", return_value=False),
+            patch(
+                "forge.install.installer.install_hook_dispatcher",
+                side_effect=RuntimeError("boom"),
+            ),
+            pytest.raises(ForgeInstallError, match="Failed to render hook dispatcher"),
+        ):
+            installer.update()
+
+        assert read_settings(settings_path)["hooks"]["SessionStart"] == [legacy_hook]
+        updated = tracking.get_installation("user", None)
+        assert updated is not None
+        assert updated.settings_entries == [legacy_entry]
 
 
 class TestInstallerUpdate:
@@ -942,9 +1237,9 @@ class TestInstallerCodexHooks:
         assert plan.codex is not None
         assert plan.codex.action == "install"
         assert plan.codex.config_path == str(self._codex_config())
-        assert plan.codex.commands == [
-            "forge hook codex-session-start",
-            "forge hook codex-policy-check",
+        assert [_normalize_forge_home(command) for command in plan.codex.commands] == [
+            "$FORGE_HOME/bin/forge-hook codex-session-start",
+            "$FORGE_HOME/bin/forge-hook codex-policy-check",
         ]
 
     def test_plan_minimal_has_no_codex(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
@@ -983,9 +1278,9 @@ class TestInstallerCodexHooks:
         installation = installer._tracking.get_installation("user", None)
         assert installation is not None
         assert installation.codex_config_path == str(config)
-        assert installation.codex_commands == [
-            "forge hook codex-policy-check",
-            "forge hook codex-session-start",
+        assert [_normalize_forge_home(command) for command in installation.codex_commands] == [
+            "$FORGE_HOME/bin/forge-hook codex-policy-check",
+            "$FORGE_HOME/bin/forge-hook codex-session-start",
         ]
 
     def test_init_is_idempotent(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:

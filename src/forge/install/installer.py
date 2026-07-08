@@ -34,6 +34,7 @@ from .exceptions import (
     NotInstalledError,
     PathBoundaryViolationError,
 )
+from .hook_dispatcher import install_hook_dispatcher
 from .models import (
     MODULE_DEPENDENCIES,
     PROFILE_MODULES,
@@ -130,6 +131,53 @@ def get_extensions_root() -> Path:
 
 _EXCLUDED_DIR_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 _EXCLUDED_EXTENSIONS = {".pyc", ".pyo"}
+_RUNTIME_HOOK_MODULES = {InstallModule.HOOKS, InstallModule.CODEX_HOOKS}
+_USER_SCOPE_OMITTED_MODULES = {InstallModule.STATUSLINE}
+
+
+def _format_modules(modules: set[InstallModule]) -> str:
+    return ", ".join(sorted(module.value for module in modules))
+
+
+def _scope_omitted_modules(scope: InstallScope) -> set[InstallModule]:
+    if scope == InstallScope.USER:
+        return set(_USER_SCOPE_OMITTED_MODULES)
+    return set(_RUNTIME_HOOK_MODULES)
+
+
+def _apply_scope_module_policy(
+    modules: set[InstallModule],
+    *,
+    scope: InstallScope,
+    explicit_modules: set[InstallModule] | None = None,
+) -> set[InstallModule]:
+    """Return modules that are actually writable at *scope*.
+
+    Implicit profile modules are filtered by scope. Explicit `--with` modules
+    that contradict the ownership model are rejected so the CLI does not appear
+    to honor a request while silently dropping it.
+    """
+
+    omitted = _scope_omitted_modules(scope)
+    explicit_conflicts = omitted & (explicit_modules or set())
+    if explicit_conflicts:
+        if scope == InstallScope.USER:
+            raise ForgeInstallError(
+                f"module(s) {_format_modules(explicit_conflicts)} are project/local-scope only; "
+                "statusLine stays project-scoped."
+            )
+        raise ForgeInstallError(
+            f"module(s) {_format_modules(explicit_conflicts)} are user-scope only; "
+            "run 'forge extension enable --scope user' to install runtime hooks."
+        )
+    return modules - omitted
+
+
+def _ensure_hook_dispatcher() -> None:
+    try:
+        install_hook_dispatcher()
+    except Exception as e:
+        raise ForgeInstallError(f"Failed to render hook dispatcher: {e}") from e
 
 
 def _is_installable(path: Path) -> bool:
@@ -447,6 +495,11 @@ class Installer:
             modules = _modules_override
         else:
             modules = resolve_modules(profile, with_modules, without_modules)
+        modules = _apply_scope_module_policy(
+            modules,
+            scope=self._scope,
+            explicit_modules=None if _modules_override is not None else with_modules,
+        )
 
         # Sort modules for deterministic output
         sorted_modules = sorted(m.value for m in modules)
@@ -862,8 +915,20 @@ class Installer:
         if plan.has_conflicts and not force:
             return plan  # Don't execute if conflicts
 
+        if _modules_override is not None:
+            modules = _modules_override
+        else:
+            modules = resolve_modules(profile, with_modules, without_modules)
+        modules = _apply_scope_module_policy(
+            modules,
+            scope=self._scope,
+            explicit_modules=None if _modules_override is not None else with_modules,
+        )
+        _ensure_hook_dispatcher()
+
         settings_path = get_settings_path(self._scope, self._project_root)
         backup_path = backup_settings(settings_path)
+        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
 
         installed_files: list[InstalledFile] = []
         for file_plan in plan.files:
@@ -871,11 +936,13 @@ class Installer:
                 installed_file = self._execute_file(file_plan, mode)
                 installed_files.append(installed_file)
 
-        if _modules_override is not None:
-            modules = _modules_override
-        else:
-            modules = resolve_modules(profile, with_modules, without_modules)
         settings = read_settings(settings_path)
+        removed_entry_ids: set[tuple[str, str]] = set()
+        if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+            old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
+            if old_hook_entries:
+                unmerge(settings, old_hook_entries)
+                removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
         forge_settings = self._load_forge_settings()
         include_permissions = InstallModule.PERMISSIONS in modules
         entries = merge(
@@ -889,13 +956,25 @@ class Installer:
         )
         write_settings(settings_path, settings)
 
-        # Save what we added for smart uninstall
-        added_structure = entries_to_added_structure(entries)
+        entry_ids = {(e.key_path, e.stable_id) for e in entries}
+        final_entries = list(entries)
+        if existing:
+            for existing_entry in existing.settings_entries:
+                existing_entry_id = (
+                    existing_entry.key_path,
+                    existing_entry.stable_id,
+                )
+                if existing_entry_id not in entry_ids and existing_entry_id not in removed_entry_ids:
+                    final_entries.append(existing_entry)
+
+        # Save everything Forge still needs to remove on disable before the
+        # potentially long stale-file cleanup walk. This includes legacy entries
+        # preserved for cleanup after scope filtering.
+        added_structure = entries_to_added_structure(final_entries)
         save_added_settings(settings_path, added_structure)
 
         # Merge newly installed files with existing tracked files (for idempotent re-runs)
         now = now_iso()
-        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
 
         # All targets the current source scan knows about (installed, skipped, or conflicted)
         planned_targets = {f.target_path for f in plan.files}
@@ -916,7 +995,10 @@ class Installer:
                     except PathBoundaryViolationError:
                         continue
                     if not self._is_forge_owned(target, existing_file):
-                        logger.debug("Stale target not Forge-owned, dropping from manifest: %s", target)
+                        logger.debug(
+                            "Stale target not Forge-owned, dropping from manifest: %s",
+                            target,
+                        )
                         continue
                     try:
                         target.unlink(missing_ok=True)
@@ -947,13 +1029,6 @@ class Installer:
                     if existing_file.target_path in planned_targets:
                         # Keep existing tracked file that was skipped (source still exists)
                         final_files.append(existing_file)
-
-        entry_ids = {(e.key_path, e.stable_id) for e in entries}
-        final_entries = list(entries)
-        if existing:
-            for existing_entry in existing.settings_entries:
-                if (existing_entry.key_path, existing_entry.stable_id) not in entry_ids:
-                    final_entries.append(existing_entry)
 
         codex_result = self._execute_codex(plan.codex)
         if codex_result is not None:

@@ -7,7 +7,7 @@ PATH.
 The minimal-PATH probe is the mechanical signal behind the exit-127 hook
 incident: GUI-launched apps (Dock/IDE) inherit launchd's PATH, which excludes
 ``~/.local/bin`` (where ``uv tool`` / ``pipx`` place the launcher), so a bare
-``forge hook ...`` command can be unreachable even when Forge is installed. It is
+``forge`` launcher can be unreachable even when Forge is installed. It is
 deliberately reported as a fact, not an error: a correct global install still
 reads ``on_path_minimal=false``. See the epic's D2 decision.
 """

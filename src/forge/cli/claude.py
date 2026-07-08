@@ -308,7 +308,7 @@ def preset_show(raw: bool = False, as_json: bool = False) -> None:
         return
 
     if raw:
-        console.print(content, end="")
+        click.echo(content, nl=False)
     else:
         console.print("[bold]Claude Code Settings Preset[/bold]")
         console.print(f"[bold]Path:[/bold] {display_path(preset_path)}")

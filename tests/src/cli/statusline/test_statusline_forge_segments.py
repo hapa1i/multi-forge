@@ -46,7 +46,10 @@ from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 # --- Builders -------------------------------------------------------------
 
-_DATA = {"workspace": {"current_dir": "/tmp/demo"}, "model": {"id": "claude-opus-4-8", "display_name": "Opus"}}
+_DATA = {
+    "workspace": {"current_dir": "/tmp/demo"},
+    "model": {"id": "claude-opus-4-8", "display_name": "Opus"},
+}
 
 
 def _plain(text):
@@ -105,7 +108,15 @@ class TestFormatHelpers:
         for suspended, enabled in [(False, True), (True, True), (False, False)]:
             bare = format_supervisor(suspended=suspended, enabled=enabled)
             assert format_supervisor(suspended=suspended, enabled=enabled, recent_failures=0) == bare
-            assert format_supervisor(suspended=suspended, enabled=enabled, recent_failures=0, last_kind=None) == bare
+            assert (
+                format_supervisor(
+                    suspended=suspended,
+                    enabled=enabled,
+                    recent_failures=0,
+                    last_kind=None,
+                )
+                == bare
+            )
 
     def test_supervisor_health_suffix_and_tiers(self):
         # >0 failures append `!N <kind>`, tiered like format_spend_cap (yellow 1-2, red >=3).
@@ -180,7 +191,14 @@ class TestFormatHelpers:
 
 class TestLaunchProducer:
     def test_renders_from_confirmed_launch(self):
-        manifest = {"confirmed": {"launch": {"routing_mode": "direct", "api_key_source": "omitted_by_config"}}}
+        manifest = {
+            "confirmed": {
+                "launch": {
+                    "routing_mode": "direct",
+                    "api_key_source": "omitted_by_config",
+                }
+            }
+        }
         out = _stream(_ctx(manifest=manifest), ["launch"])
         assert any("direct·key:omit" in s for s in out)
 
@@ -229,7 +247,10 @@ class TestSupervisorProducer:
         # Headline acceptance: a sparse override flips the rendered posture to
         # suspended while raw intent stays active (we read effective state).
         intent = {"policy": {"enabled": True, "supervisor": {"suspended": False}}}
-        manifest = {"intent": intent, "overrides": {"policy": {"supervisor": {"suspended": True}}}}
+        manifest = {
+            "intent": intent,
+            "overrides": {"policy": {"supervisor": {"suspended": True}}},
+        }
         stream = _stream(_ctx(manifest=manifest), ["supervisor"])
         assert any("SUP(susp)" in s for s in stream)
         # Intent dict is untouched (apply_overrides deepcopies).
@@ -319,7 +340,10 @@ class TestPolicyProducer:
     def test_confirmed_fallback_only_when_no_effective_policy(self):
         # Confirmed is the last-evaluated posture; surface it ONLY when intent
         # carries no policy block at all (not when it explicitly clears bundles).
-        manifest = {"intent": {}, "confirmed": {"policy": {"bundles": ["coding_standards"]}}}
+        manifest = {
+            "intent": {},
+            "confirmed": {"policy": {"bundles": ["coding_standards"]}},
+        }
         assert any("pol:STD" in s for s in _stream(_ctx(manifest=manifest), ["policy"]))
 
     def test_no_policy_anywhere_is_hidden(self):
@@ -343,7 +367,11 @@ class TestAuditProducer:
         assert any("aud:inspect" in s and "(lossy)" in s for s in out)
 
     def test_passthrough_preserves_thinking(self):
-        raw = {**self._RAW, "intercept_mode": "passthrough", "intercept": {"thinking_blocks_preserved": True}}
+        raw = {
+            **self._RAW,
+            "intercept_mode": "passthrough",
+            "intercept": {"thinking_blocks_preserved": True},
+        }
         out = _stream(_ctx(is_proxy=True, runtime=_proxy(raw)), ["audit"])
         assert any("aud:pass" in s and "(lossy)" not in s for s in out)
 
@@ -364,7 +392,10 @@ class TestDriftProducer:
     def test_aligned_is_quiet(self):
         raw = {
             "is_proxy": True,
-            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "claude-opus-4-8"}},
+            "runtime": {
+                "active_tier": "opus",
+                "tier_mappings": {"opus": "claude-opus-4-8"},
+            },
             "proxy": {"template": "anthropic-passthrough"},
         }
         ctx = _ctx(is_proxy=True, runtime=_proxy(raw))
@@ -372,8 +403,15 @@ class TestDriftProducer:
 
     def test_no_model_id_avoids_false_positive(self):
         # display_name only (no model.id) -> can't normalize -> hidden, not a guess.
-        raw = {"is_proxy": True, "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}}}
-        ctx = _ctx(data={"workspace": {}, "model": {"display_name": "Opus"}}, is_proxy=True, runtime=_proxy(raw))
+        raw = {
+            "is_proxy": True,
+            "runtime": {"active_tier": "opus", "tier_mappings": {"opus": "o3"}},
+        }
+        ctx = _ctx(
+            data={"workspace": {}, "model": {"display_name": "Opus"}},
+            is_proxy=True,
+            runtime=_proxy(raw),
+        )
         assert _stream(ctx, ["drift"]) == []
 
     def test_explicit_tier_beats_default_no_false_positive(self):
@@ -385,12 +423,18 @@ class TestDriftProducer:
             "is_proxy": True,
             "runtime": {
                 "active_tier": "sonnet",
-                "tier_mappings": {"sonnet": "claude-sonnet-4-5", "opus": "claude-opus-4-8"},
+                "tier_mappings": {
+                    "sonnet": "claude-sonnet-4-5",
+                    "opus": "claude-opus-4-8",
+                },
             },
             "proxy": {"template": "anthropic-passthrough"},
         }
         ctx = _ctx(
-            data={"workspace": {}, "model": {"id": "claude-opus-4-8", "display_name": "Opus"}},
+            data={
+                "workspace": {},
+                "model": {"id": "claude-opus-4-8", "display_name": "Opus"},
+            },
             is_proxy=True,
             runtime=_proxy(raw),
         )
@@ -404,7 +448,10 @@ class TestDriftProducer:
             "proxy": {"template": "litellm-openai"},
         }
         ctx = _ctx(
-            data={"workspace": {}, "model": {"id": "custom-model", "display_name": "Custom"}},
+            data={
+                "workspace": {},
+                "model": {"id": "custom-model", "display_name": "Custom"},
+            },
             is_proxy=True,
             runtime=_proxy(raw),
         )
@@ -548,7 +595,10 @@ class TestForgeCostProducer:
 
     def test_ledger_read_error_fails_open_to_hidden(self):
         # A raising ledger read must degrade to "no segment", never crash the line.
-        with patch("forge.core.ops.usage_summary.sum_forge_added_cost", side_effect=RuntimeError("ledger boom")):
+        with patch(
+            "forge.core.ops.usage_summary.sum_forge_added_cost",
+            side_effect=RuntimeError("ledger boom"),
+        ):
             assert _stream(_ctx(manifest=self._MANIFEST), ["forge_cost"]) == []
 
     def test_off_by_default(self):
@@ -562,7 +612,15 @@ class TestForgeCostProducer:
 
 class TestOptInWiring:
     def test_all_forge_segments_named_and_opt_in(self):
-        for name in ("supervisor", "policy", "audit", "drift", "spend_cap", "forge_cost"):
+        for name in (
+            "hooks",
+            "supervisor",
+            "policy",
+            "audit",
+            "drift",
+            "spend_cap",
+            "forge_cost",
+        ):
             assert name in SEGMENT_NAMES
             assert name not in DEFAULT_ORDER
 
@@ -587,25 +645,42 @@ class TestEndToEndRender:
             es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
             es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=TranscriptStats()))
             es.enter_context(patch("forge.runtime_config.get_runtime_config", return_value=cfg))
-            res = runner.invoke(status_line, input=json.dumps(fixture), env={"FORGE_STATUS_TRUNCATE": "0"})
+            res = runner.invoke(
+                status_line,
+                input=json.dumps(fixture),
+                env={"FORGE_STATUS_TRUNCATE": "0"},
+            )
         assert res.exit_code == 0, res.output
         return _plain(res.output)
 
     def test_suspended_supervisor_and_policy_render_through_cli(self):
         manifest = (
             {
-                "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}, "bundles": ["tdd"]}},
+                "intent": {
+                    "policy": {
+                        "enabled": True,
+                        "supervisor": {"suspended": False},
+                        "bundles": ["tdd"],
+                    }
+                },
                 "overrides": {"policy": {"supervisor": {"suspended": True}}},
             },
             True,
         )
-        visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy"], session=manifest)
+        visible = self._render(
+            dict(_DATA),
+            segments=["path", "model", "supervisor", "policy"],
+            session=manifest,
+        )
         assert "SUP(susp)" in visible
         assert "pol:TDD" in visible
 
     def test_forge_segments_omitted_when_no_data(self):
         # Configured but no session/proxy -> baseline path+model only, no crash.
-        visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy", "audit", "drift"])
+        visible = self._render(
+            dict(_DATA),
+            segments=["path", "model", "supervisor", "policy", "audit", "drift"],
+        )
         assert "SUP" not in visible and "pol:" not in visible and "aud:" not in visible and "drift:" not in visible
 
     def test_supervisor_segment_exits_zero_on_corrupt_ledger(self):

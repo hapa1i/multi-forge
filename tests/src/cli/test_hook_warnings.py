@@ -47,9 +47,10 @@ class TestSessionStartWarning:
 
         assert result.exit_code == 0
         assert "Forge hooks are not installed" in result.output
+        assert "forge extension enable --scope user" in result.output
 
     def test_start_no_warning_when_hooks_present(self, runner: CliRunner, temp_env: Path) -> None:
-        _install_hook(temp_env, "SessionStart", "forge hook session-start")
+        _install_hook(temp_env, "SessionStart", "/tmp/forge-home/bin/forge-hook session-start")
 
         with patch("forge.core.ops.claude_session.invoke_claude", return_value=0):
             result = runner.invoke(main, ["session", "start", "clean-test"])
@@ -147,9 +148,10 @@ class TestGuardEnableWarning:
         assert result.exit_code == 0
         assert "Policy enabled" in result.output
         assert "PreToolUse hook is not installed" in result.output
+        assert "forge extension enable --scope user" in result.output
 
     def test_guard_enable_no_warning_when_hooks_present(self, runner: CliRunner, temp_env: Path) -> None:
-        _install_hook(temp_env, "PreToolUse", "forge hook policy-check")
+        _install_hook(temp_env, "PreToolUse", "/tmp/forge-home/bin/forge-hook policy-check")
         runner.invoke(main, ["session", "start", "policy-clean", "--no-launch"])
 
         result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd"])
@@ -163,11 +165,20 @@ class TestVerificationSetWarning:
         runner.invoke(main, ["session", "start", "ver-warn", "--no-launch"])
 
         result = runner.invoke(
-            main, ["session", "set", "--session", "ver-warn", "verification.type", "completion_promise"]
+            main,
+            [
+                "session",
+                "set",
+                "--session",
+                "ver-warn",
+                "verification.type",
+                "completion_promise",
+            ],
         )
 
         assert result.exit_code == 0
         assert "Stop hook is not installed" in result.output
+        assert "forge extension enable --scope user" in result.output
 
     def test_set_non_verification_key_no_warning(self, runner: CliRunner, temp_env: Path) -> None:
         runner.invoke(main, ["session", "start", "ver-clean", "--no-launch"])

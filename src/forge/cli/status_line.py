@@ -79,6 +79,7 @@ SEP = f"{DARK_GRAY}|{RESET}"
 THINKING_INDICATOR = "THINK"
 VERIFICATION_INDICATOR = "LOOP"
 SIDECAR_INDICATOR = "SC"
+HOOK_DOUBLE_FIRE_INDICATOR = "HOOKx2"
 TOKEN_INPUT_LABEL = "in:"
 TOKEN_OUTPUT_LABEL = "out:"
 TOKEN_CACHE_LABEL = "cache:"
@@ -603,7 +604,9 @@ def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def get_effective_context_window(
-    data: dict[str, Any], runtime: ProxyRuntimeTruth | None, context_info: dict[str, Any] | None
+    data: dict[str, Any],
+    runtime: ProxyRuntimeTruth | None,
+    context_info: dict[str, Any] | None,
 ) -> int | None:
     """Resolve the best-known context window size for display."""
     if runtime and runtime.active_context_window:
@@ -963,6 +966,20 @@ def format_sidecar(manifest: dict[str, Any]) -> str | None:
     return None
 
 
+def format_hook_double_fire(double_fire: bool) -> str | None:
+    """Return a compact diagnostic when Forge hooks may fire more than once."""
+
+    if not double_fire:
+        return None
+    return f"{YELLOW_BOLD}{HOOK_DOUBLE_FIRE_INDICATOR}{RESET}"
+
+
+def format_hook_scopes(scopes: set[str]) -> str | None:
+    """Return a compact diagnostic for the legacy scope-based signal."""
+
+    return format_hook_double_fire(len(scopes) >= 2)
+
+
 def format_native_sandbox() -> str | None:
     """Return indicator if Claude Code native sandbox is active.
 
@@ -974,7 +991,9 @@ def format_native_sandbox() -> str | None:
     return None
 
 
-def _extract_windows(rate_limits: Any) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def _extract_windows(
+    rate_limits: Any,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Return ``(five_hour, seven_day)`` windows from either Claude Code shape.
 
     Current payload is an object ``{five_hour: {...}, seven_day: {...}}``; older
@@ -1174,7 +1193,11 @@ def format_cache_hit(rate: float) -> str:
 # Compact labels for the Forge-unique opt-in segments. Known names map to short
 # codes; unknown names fall back to the uppercased raw name (honest, if longer).
 _BUNDLE_LABELS = {"tdd": "TDD", "coding_standards": "STD"}
-_AUDIT_MODE_LABELS = {"passthrough": "pass", "inspect": "inspect", "override": "override"}
+_AUDIT_MODE_LABELS = {
+    "passthrough": "pass",
+    "inspect": "inspect",
+    "override": "override",
+}
 
 
 def format_supervisor(
@@ -1271,7 +1294,11 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
         entry = caps.get(window)
         if not isinstance(entry, dict):
             continue
-        pct, cur, lim = entry.get("percent"), entry.get("current_usd"), entry.get("limit_usd")
+        pct, cur, lim = (
+            entry.get("percent"),
+            entry.get("current_usd"),
+            entry.get("limit_usd"),
+        )
         if not all(isinstance(v, (int, float)) for v in (pct, cur, lim)):
             continue
         if binding is None or float(pct) > binding[0]:  # type: ignore[arg-type]  # guarded above
@@ -1652,13 +1679,20 @@ def status_line() -> None:
     logger.debug("env: ANTHROPIC_BASE_URL=%s", os.environ.get("ANTHROPIC_BASE_URL", "<unset>"))
     logger.debug("env: FORGE_SESSION=%s", os.environ.get("FORGE_SESSION", "<unset>"))
     logger.debug("input keys: %s", list(data.keys()))
-    logger.debug("workspace.current_dir: %s", data.get("workspace", {}).get("current_dir", "<missing>"))
+    logger.debug(
+        "workspace.current_dir: %s",
+        data.get("workspace", {}).get("current_dir", "<missing>"),
+    )
 
     is_proxy, runtime, is_proxy_authoritative = detect_proxy()
 
     logger.debug("proxy: is_proxy=%s, authoritative=%s", is_proxy, is_proxy_authoritative)
     if runtime:
-        logger.debug("proxy: template=%s, tier_mappings=%s", runtime.template, runtime.tier_mappings)
+        logger.debug(
+            "proxy: template=%s, tier_mappings=%s",
+            runtime.template,
+            runtime.tier_mappings,
+        )
     else:
         logger.debug("proxy: runtime=None")
 
@@ -1667,7 +1701,9 @@ def status_line() -> None:
     session_name = session_manifest.get("name") if session_manifest else None
     logger.debug("session: name=%s, authoritative=%s", session_name, is_session_authoritative)
     logger.debug(
-        "context_window raw: %s (type=%s)", data.get("context_window"), type(data.get("context_window")).__name__
+        "context_window raw: %s (type=%s)",
+        data.get("context_window"),
+        type(data.get("context_window")).__name__,
     )
 
     # Build the render context once, then let the segment registry produce the

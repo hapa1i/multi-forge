@@ -71,6 +71,11 @@ from .session import ForgeOpError
 
 logger = logging.getLogger(__name__)
 
+SIDECAR_RUNTIME_HOOK_WARNING = (
+    "Sidecar sessions currently launch without Forge runtime hooks inside the container; "
+    "hook-backed policy and session automation may be inactive there."
+)
+
 
 @dataclass(frozen=True)
 class ClaudeSidecarLaunch:
@@ -80,6 +85,7 @@ class ClaudeSidecarLaunch:
     proxy_id: str | None
     intercept_mode: str | None = None
     audit_path: Path | None = None
+    warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1305,8 +1311,11 @@ def _run_sidecar_claude_session(
     )
 
     sidecar_image = image or _runtime_config.sidecar_image
+    sidecar_warnings = (SIDECAR_RUNTIME_HOOK_WARNING,)
     if on_sidecar_launch is not None:
-        on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id))
+        on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id, warnings=sidecar_warnings))
+    else:
+        warnings.extend(sidecar_warnings)
 
     _update_manifest_best_effort(
         store,
@@ -1462,7 +1471,12 @@ def _run_host_claude_session(
     )
 
 
-def _build_sidecar_launch_payload(sidecar_image: str, proxy_id: str | None) -> ClaudeSidecarLaunch:
+def _build_sidecar_launch_payload(
+    sidecar_image: str,
+    proxy_id: str | None,
+    *,
+    warnings: tuple[str, ...] = (),
+) -> ClaudeSidecarLaunch:
     intercept_mode: str | None = None
     audit_path: Path | None = None
     if proxy_id:
@@ -1483,4 +1497,5 @@ def _build_sidecar_launch_payload(sidecar_image: str, proxy_id: str | None) -> C
         proxy_id=proxy_id,
         intercept_mode=intercept_mode,
         audit_path=audit_path,
+        warnings=warnings,
     )

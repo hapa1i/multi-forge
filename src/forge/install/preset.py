@@ -4,7 +4,7 @@ The preset (~/.forge/claude.preset.json) defines what settings Forge merges
 into Claude Code's settings.json on ``forge extension enable``.
 
 Built-in content contains only essential infrastructure:
-- hooks: all 13 Forge-managed hook events wiring ``forge hook <name>`` commands
+- hooks: Forge-managed hook events wiring dispatcher ``forge-hook <name>`` commands
 - statusLine: ``forge status-line`` command
 - permissions: Write/Edit (required by the memory writer's ``claude -p`` subprocess)
 
@@ -20,8 +20,13 @@ from typing import Any
 
 from forge.core.paths import get_forge_home
 from forge.core.state import atomic_write_text
+from forge.install.hook_dispatcher import render_dispatcher_command
 
 PRESET_FILENAME = "claude.preset.json"
+
+
+def _hook_command(handler: str) -> str:
+    return render_dispatcher_command(handler)
 
 
 def get_preset_path() -> Path:
@@ -50,7 +55,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook session-start",
+                            "command": _hook_command("session-start"),
                         }
                     ]
                 }
@@ -61,7 +66,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook read-hygiene",
+                            "command": _hook_command("read-hygiene"),
                             "timeout": 5,
                         }
                     ],
@@ -71,7 +76,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook exit-plan-mode",
+                            "command": _hook_command("exit-plan-mode"),
                         }
                     ],
                 },
@@ -80,7 +85,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook policy-check",
+                            "command": _hook_command("policy-check"),
                             "timeout": 60,
                         }
                     ],
@@ -90,7 +95,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook policy-check",
+                            "command": _hook_command("policy-check"),
                             "timeout": 60,
                         }
                     ],
@@ -102,7 +107,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook plan-write",
+                            "command": _hook_command("plan-write"),
                         }
                     ],
                 }
@@ -112,7 +117,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook stop",
+                            "command": _hook_command("stop"),
                         }
                     ]
                 }
@@ -122,7 +127,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook stop-failure",
+                            "command": _hook_command("stop-failure"),
                         }
                     ]
                 }
@@ -132,7 +137,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook user-prompt-submit",
+                            "command": _hook_command("user-prompt-submit"),
                         }
                     ]
                 }
@@ -142,7 +147,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook pre-compact",
+                            "command": _hook_command("pre-compact"),
                             "timeout": 10,
                         }
                     ],
@@ -153,7 +158,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook post-compact",
+                            "command": _hook_command("post-compact"),
                             "timeout": 5,
                         }
                     ],
@@ -164,7 +169,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook worktree-create",
+                            "command": _hook_command("worktree-create"),
                             "timeout": 30,
                         }
                     ],
@@ -175,7 +180,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook subagent-stop",
+                            "command": _hook_command("subagent-stop"),
                             "timeout": 10,
                         }
                     ],
@@ -186,7 +191,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook teammate-idle",
+                            "command": _hook_command("teammate-idle"),
                             "timeout": 60,
                         }
                     ]
@@ -197,7 +202,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook task-completed",
+                            "command": _hook_command("task-completed"),
                             "timeout": 60,
                         }
                     ]
@@ -208,7 +213,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "forge hook session-end",
+                            "command": _hook_command("session-end"),
                             "timeout": 5,
                         }
                     ]

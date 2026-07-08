@@ -41,7 +41,8 @@ install instead (`uv sync`); see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 ### A. Install extensions
 
 ```bash
-forge extension enable    # Installs hooks, skills, status line into Claude Code
+forge extension enable --scope user    # Install runtime hooks once
+forge extension enable                 # Set up this project (.forge/, status line, project assets)
 ```
 
 ### B. Launch Claude

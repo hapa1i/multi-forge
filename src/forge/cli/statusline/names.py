@@ -32,6 +32,7 @@ SEGMENT_NAMES: tuple[str, ...] = (
     "loop",
     "sidecar",
     # Opt-in (off by default; not in DEFAULT_ORDER):
+    "hooks",
     "cache_hit",
     # Forge-unique opt-in (off by default):
     "supervisor",

@@ -137,7 +137,12 @@ class TestClassifyEvent:
         events = read_usage_events()
         assert len(events) == 1
         e = events[0]
-        assert (e.command, e.session, e.provider, e.status) == ("team-tagger", "team-sess", "gemini", "success")
+        assert (e.command, e.session, e.provider, e.status) == (
+            "team-tagger",
+            "team-sess",
+            "gemini",
+            "success",
+        )
         assert (e.input_tokens, e.output_tokens) == (6, 1)
 
     @patch("forge.core.llm.get_client")
@@ -497,7 +502,7 @@ class TestHookInstallConfig:
         hook_config = get_builtin_preset()["hooks"]
         assert "TeammateIdle" in hook_config
         hooks = hook_config["TeammateIdle"]
-        assert any("forge hook teammate-idle" in h.get("command", "") for group in hooks for h in group["hooks"])
+        assert any(h.get("command", "").endswith("forge-hook teammate-idle") for group in hooks for h in group["hooks"])
 
     def test_task_completed_in_config(self):
         from forge.install.preset import get_builtin_preset
@@ -505,7 +510,9 @@ class TestHookInstallConfig:
         hook_config = get_builtin_preset()["hooks"]
         assert "TaskCompleted" in hook_config
         hooks = hook_config["TaskCompleted"]
-        assert any("forge hook task-completed" in h.get("command", "") for group in hooks for h in group["hooks"])
+        assert any(
+            h.get("command", "").endswith("forge-hook task-completed") for group in hooks for h in group["hooks"]
+        )
 
 
 # --- per-caller reasoning effort ---
