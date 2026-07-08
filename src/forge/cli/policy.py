@@ -326,7 +326,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             "Enforcement will not be active."
         )
         print_tip(
-            "Run 'forge extension enable' to install hooks.",
+            "Run 'forge extension enable --scope user' to install runtime hooks.",
             blank_before=False,
             console=console,
         )

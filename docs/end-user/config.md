@@ -107,7 +107,7 @@ forge claude preset reset --yes
 
 Built-in defaults include only Forge infrastructure:
 
-- `hooks`: Forge hook wiring (`forge hook ...`)
+- `hooks`: Forge runtime hook wiring (`<forge-home>/bin/forge-hook ...`, forwarding to `forge hook ...`)
 - `statusLine`: `forge status-line`
 - `permissions`: Write/Edit (required by the memory writer)
 

@@ -52,6 +52,7 @@ Runs the full checklist inside a Docker container. Requires Docker Desktop.
 **Requires `full` install profile:**
 
 ```bash
+forge extension enable --scope user --profile full
 forge extension enable --profile full
 ```
 

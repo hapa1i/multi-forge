@@ -135,6 +135,16 @@ def _produce_sidecar(ctx: RenderContext) -> Optional[str]:
     return sl.format_sidecar(ctx.manifest)
 
 
+def _produce_hooks(ctx: RenderContext) -> Optional[str]:
+    from pathlib import Path
+
+    from forge.install.hooks import has_forge_hook_double_fire
+
+    if not ctx.workspace_dir:
+        return None
+    return sl.format_hook_double_fire(has_forge_hook_double_fire(Path(ctx.workspace_dir)))
+
+
 def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
     if ctx.config.statusline.cache_hit == "off":
         return None
@@ -321,6 +331,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("think", _produce_think),
     Segment("loop", _produce_loop),
     Segment("sidecar", _produce_sidecar),
+    Segment("hooks", _produce_hooks),
     Segment("cache_hit", _produce_cache_hit),
     Segment("supervisor", _produce_supervisor),
     Segment("policy", _produce_policy),

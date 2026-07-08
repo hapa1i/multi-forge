@@ -42,7 +42,10 @@ def _render(fixture, *, proxy=None, session=None, stats=None, api_key=True):
         res = runner.invoke(
             status_line,
             input=json.dumps(fixture),
-            env={"FORGE_STATUS_TRUNCATE": "0", "ANTHROPIC_API_KEY": "sk-ant-test" if api_key else None},
+            env={
+                "FORGE_STATUS_TRUNCATE": "0",
+                "ANTHROPIC_API_KEY": "sk-ant-test" if api_key else None,
+            },
         )
     assert res.exit_code == 0, res.output
     return res.output
@@ -56,7 +59,11 @@ FIXTURE_MINIMAL = {
     "context_window": {
         "context_window_size": 200000,
         "used_percentage": 12,
-        "current_usage": {"input_tokens": 12000, "cache_read_input_tokens": 2000, "cache_creation_input_tokens": 5000},
+        "current_usage": {
+            "input_tokens": 12000,
+            "cache_read_input_tokens": 2000,
+            "cache_creation_input_tokens": 5000,
+        },
     },
 }
 
@@ -68,9 +75,18 @@ FIXTURE_FULL = {
         "used_percentage": 47,
         "total_input_tokens": 28000,
         "total_output_tokens": 17500,
-        "current_usage": {"input_tokens": 12000, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0},
+        "current_usage": {
+            "input_tokens": 12000,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+        },
     },
-    "cost": {"total_cost_usd": 0.42, "total_duration_ms": 185000, "total_lines_added": 12, "total_lines_removed": 3},
+    "cost": {
+        "total_cost_usd": 0.42,
+        "total_duration_ms": 185000,
+        "total_lines_added": 12,
+        "total_lines_removed": 3,
+    },
 }
 
 FIXTURE_SESSION = {
@@ -79,7 +95,11 @@ FIXTURE_SESSION = {
     "context_window": {
         "context_window_size": 200000,
         "used_percentage": 30,
-        "current_usage": {"input_tokens": 60000, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0},
+        "current_usage": {
+            "input_tokens": 60000,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+        },
     },
 }
 SESSION_MANIFEST = (
@@ -101,7 +121,11 @@ FIXTURE_PROXY = {
     "context_window": {
         "context_window_size": 200000,
         "used_percentage": 20,
-        "current_usage": {"input_tokens": 40000, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0},
+        "current_usage": {
+            "input_tokens": 40000,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+        },
     },
 }
 PROXY_RUNTIME = (
@@ -116,7 +140,11 @@ PROXY_RUNTIME = (
                 "base_url": "http://localhost:8085",
             },
             "runtime": {
-                "tier_mappings": {"haiku": "gpt-4o-mini", "sonnet": "gpt-4o", "opus": "o3"},
+                "tier_mappings": {
+                    "haiku": "gpt-4o-mini",
+                    "sonnet": "gpt-4o",
+                    "opus": "o3",
+                },
                 "context_windows": {"haiku": 128000, "sonnet": 128000, "opus": 200000},
                 "active_tier": "sonnet",
                 "active_context_window": 128000,
@@ -151,12 +179,19 @@ def _proxy_runtime_with_cost(
                         "sonnet": "gemini-3.1-pro",
                         "haiku": "gemini-3.5-flash",
                     },
-                    "context_windows": {"haiku": 1_000_000, "sonnet": 1_000_000, "opus": 1_000_000},
+                    "context_windows": {
+                        "haiku": 1_000_000,
+                        "sonnet": 1_000_000,
+                        "opus": 1_000_000,
+                    },
                     "active_tier": "opus",
                     "active_context_window": 1_000_000,
                 },
                 "tiers": {},
-                "metrics": {"started_at": started_at, "costs": {"total_usd": total_usd}},
+                "metrics": {
+                    "started_at": started_at,
+                    "costs": {"total_usd": total_usd},
+                },
             }
         ),
         True,
@@ -240,7 +275,9 @@ class TestGoldenNoOpGuard:
         visible = sl._ANSI_RE.sub("", out)
         assert "~$0.50" in visible
 
-    def test_proxy_cost_uses_current_total_after_proxy_restart_even_above_baseline(self):
+    def test_proxy_cost_uses_current_total_after_proxy_restart_even_above_baseline(
+        self,
+    ):
         fixture = {**FIXTURE_PROXY, "cost": {"total_duration_ms": 360_000}}
         out = _render(
             fixture,
@@ -326,3 +363,19 @@ class TestLazyContext:
         with patch.object(sl, "get_git_branch", return_value="main") as git:
             render_segments(ctx, ["path", "branch"])
         git.assert_called_once()
+
+    def test_hooks_segment_reports_double_scope_only_when_enabled(self):
+        ctx = _ctx(FIXTURE_MINIMAL)
+        with patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True) as detect:
+            where, stream = render_segments(ctx, ["path", "hooks"])
+
+        detect.assert_called_once()
+        assert len(where) == 1
+        assert stream == [f"{sl.YELLOW_BOLD}{sl.HOOK_DOUBLE_FIRE_INDICATOR}{sl.RESET}"]
+
+    def test_hooks_segment_omits_single_scope(self):
+        ctx = _ctx(FIXTURE_MINIMAL)
+        with patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False):
+            _where, stream = render_segments(ctx, ["hooks"])
+
+        assert stream == []

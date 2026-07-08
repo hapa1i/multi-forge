@@ -1,6 +1,7 @@
 # Forge Hooks — Lifecycle + Artifacts Guide
 
-**Status:** Implemented (hooks run as `forge hook <name>`).
+**Status:** Implemented (runtime registrations use the `forge-hook <name>` dispatcher; handlers still forward to
+`forge hook <name>`).
 
 Hooks are Forge’s integration layer: they observe Claude Code lifecycle events and write **confirmed facts** and
 **artifacts** so sessions are inspectable and auditable.
@@ -21,8 +22,9 @@ etc.).
 
 Forge’s deployment model is:
 
-- hooks are configured in Claude Code settings
-- hooks execute the Forge CLI: `forge hook <name>`
+- runtime hooks are configured once at user scope with `forge extension enable --scope user`
+- installed hook entries execute the Forge dispatcher: `<forge-home>/bin/forge-hook <name>`
+- the dispatcher forwards to the Forge CLI handler: `forge hook <name>`
 - Forge does **not** install ad-hoc scripts into `.claude/`
 
 ### Why this model
@@ -82,27 +84,31 @@ that may update session overrides.
 
 ---
 
-## Installing hooks
+## Installing Runtime Hooks
 
-Hooks are installed as part of `forge extension enable`:
+Install runtime hooks once at user scope:
 
-**Recommended:** Use the full installer, which handles hooks along with everything else:
+```bash
+forge extension enable --scope user
+```
+
+Project/local extension installs still install project-owned settings such as `statusLine`, plus commands, agents,
+skills, and permissions, but they no longer write runtime hook blocks:
 
 ```bash
 forge extension enable                           # Auto-detect scope
-forge extension enable --scope user              # Personal install → ~/.claude/settings.json
 forge extension enable --scope local             # Local install → .claude/settings.local.json
 ```
 
-**Advanced:** Install tracked hooks only (without commands, agents, skills, permissions, or env):
+**Advanced:** Install tracked runtime hooks only (without commands, agents, skills, permissions, or env):
 
 ```bash
-forge extension enable --scope local --profile minimal --with hooks --without commands
-forge extension disable --scope local
+forge extension enable --scope user --profile minimal --with hooks --without commands
+forge extension disable --scope user
 ```
 
-> **Note:** The tracked replacement uses normal installer scope files: user scope writes `~/.claude/settings.json`;
-> local scope writes `.claude/settings.local.json`.
+> **Note:** Explicit `--with hooks` at `--scope local` or `--scope project` is rejected. Runtime hooks are user-scoped;
+> project/local installs own statusLine and other project settings.
 
 ---
 
@@ -232,9 +238,12 @@ first turn ran without the parent context.
 [[hooks.SessionStart]]
 [[hooks.SessionStart.hooks]]
 type = "command"
-command = "forge hook codex-session-start"
+command = "/absolute/path/to/forge-home/bin/forge-hook codex-session-start"
 timeout = 60
 ```
+
+Use the exact absolute dispatcher path that Forge registers for your install; changing the command bytes requires a new
+Codex trust ceremony.
 
 - the installer detects a pre-existing manual registration and leaves it alone (it never double-registers; a *partial*
   manual registration is reported as a conflict to resolve by hand)

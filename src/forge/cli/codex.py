@@ -29,6 +29,10 @@ from forge.core.paths import display_path
 from forge.core.runtime import get_runtime
 from forge.core.runtime.codex_preflight import codex_proxy_contract_blocker
 from forge.install.codex_hooks import (
+    CodexRegistrationKey,
+    codex_expected_registration_keys,
+    codex_registration_key,
+    codex_registration_keys,
     codex_registration_pairs,
     get_builtin_codex_entries,
     get_codex_config_path,
@@ -108,23 +112,24 @@ def _runtime_info() -> _RuntimeInfo:
 
 
 def _enrollment_posture(
-    expected: set[tuple[str, str]],
-    actual: set[tuple[str, str]],
-    commands_registered: tuple[str, ...],
+    expected: set[CodexRegistrationKey],
+    actual: set[CodexRegistrationKey],
 ) -> str:
     """Classify static registration as yes/no/partial/wrong-event (no probe).
 
-    `expected` is the builtin (event, command) set; `actual` is the event-aware
-    set really in the config; `commands_registered` is the event-agnostic set of
-    our commands found anywhere. A command present by name but not under its
-    expected event is `wrong-event` (not merely missing).
+    `expected` is the builtin logical (event, command identity) set; `actual`
+    is the event-aware logical set really in the config. A command identity
+    present under the wrong event is `wrong-event` (not merely missing).
     """
     if expected <= actual:
         return "yes"
-    present_cmds = set(commands_registered)
-    if not present_cmds:
+    expected_event_by_identity = {(kind, value): event for event, kind, value in expected}
+    matching_actual = [
+        (event, kind, value) for event, kind, value in actual if (kind, value) in expected_event_by_identity
+    ]
+    if not matching_actual:
         return "no"
-    wrong_event = any((ev, cmd) not in actual and cmd in present_cmds for ev, cmd in expected)
+    wrong_event = any(event != expected_event_by_identity[(kind, value)] for event, kind, value in matching_actual)
     return "wrong-event" if wrong_event else "partial"
 
 
@@ -177,9 +182,9 @@ def _scope_status(scope: InstallScope, project_root: Path | None, tracking: Trac
     config_path = get_codex_config_path(scope, project_root)
     entries = get_builtin_codex_entries()
     registration = read_codex_registration(config_path, entries)
-    actual = codex_registration_pairs(config_path)
-    expected = {(e.event, e.command) for e in entries}
-    forge_commands = {e.command for e in entries}
+    actual_pairs = codex_registration_pairs(config_path)
+    actual_keys = codex_registration_keys(config_path)
+    expected_keys = codex_expected_registration_keys(entries)
 
     tracked_path: str | None = None
     tracked_commands: list[str] = []
@@ -195,9 +200,11 @@ def _scope_status(scope: InstallScope, project_root: Path | None, tracking: Trac
         config_path=display_path(config_path),
         config_exists=config_path.exists(),
         block_present=registration.block_present,
-        registered=_enrollment_posture(expected, actual, registration.commands_registered),
+        registered=_enrollment_posture(expected_keys, actual_keys),
         # Forge footprint only: unrelated user hooks in the same config are not ours to report.
-        registered_pairs=sorted(f"{ev} -> {cmd}" for ev, cmd in actual if cmd in forge_commands),
+        registered_pairs=sorted(
+            f"{ev} -> {cmd}" for ev, cmd in actual_pairs if codex_registration_key(ev, cmd) in expected_keys
+        ),
         commands_registered=list(registration.commands_registered),
         tracked_config_path=display_path(tracked_path) if tracked_path else None,
         tracked_commands=tracked_commands,
@@ -376,7 +383,9 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         # wire_shape is "openai_responses_passthrough" on success (uninformative); the
         # failure path names the actual shape via the exception instead.
         default_model, _ = assert_proxy_responses_capable(
-            entry.base_url, expected_proxy_id=entry.proxy_id, expected_template=entry.template
+            entry.base_url,
+            expected_proxy_id=entry.proxy_id,
+            expected_template=entry.template,
         )
     except ProxyUnreachableError as e:
         print_error_with_tip(

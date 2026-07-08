@@ -9,7 +9,10 @@ import pytest
 
 from forge.install.hooks import (
     entry_is_forge_hook,
+    find_forge_hook_registrations,
+    find_forge_hook_scopes,
     has_forge_hook,
+    has_forge_hook_double_fire,
     has_forge_hooks,
     is_forge_hook_command,
 )
@@ -33,7 +36,27 @@ FORGE_SESSION_START = {
 
 FORGE_PRE_TOOL_USE = {
     "hooks": {
-        "PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": "forge hook policy-check"}]}]
+        "PreToolUse": [
+            {
+                "matcher": "Write",
+                "hooks": [{"type": "command", "command": "forge hook policy-check"}],
+            }
+        ]
+    }
+}
+
+FORGE_PRE_TOOL_USE_MATCHERS = {
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Write",
+                "hooks": [{"type": "command", "command": "forge hook policy-check"}],
+            },
+            {
+                "matcher": "Edit",
+                "hooks": [{"type": "command", "command": "forge-hook policy-check"}],
+            },
+        ]
     }
 }
 
@@ -47,6 +70,9 @@ class TestForgeHookPredicate:
             "forge hook stop",
             "/opt/multi-forge/bin/forge hook stop",
             '"/opt/my tools/forge" hook stop',
+            "forge-hook stop",
+            "/home/me/.forge/bin/forge-hook stop",
+            '"/home/me/forge home/bin/forge-hook" stop',
         ],
     )
     def test_matches_forge_hook_invocation(self, command: str) -> None:
@@ -55,15 +81,18 @@ class TestForgeHookPredicate:
     def test_matches_specific_handler(self) -> None:
         assert is_forge_hook_command("forge hook policy-check", "policy-check") is True
         assert is_forge_hook_command("/opt/bin/forge hook policy-check --json", "policy-check") is True
+        assert is_forge_hook_command("/home/me/.forge/bin/forge-hook policy-check", "policy-check") is True
         assert is_forge_hook_command("forge hook exit-plan-mode", "policy-check") is False
+        assert is_forge_hook_command("forge-hook exit-plan-mode", "policy-check") is False
         assert is_forge_hook_command("forge hook", "policy-check") is False
 
     @pytest.mark.parametrize(
         "command",
         [
             "echo forge hook stop",
+            "echo forge-hook stop",
             "myforge hook stop",
-            "forge-hook stop",
+            "forge-hook",
             "forge",
             "",
             '"unterminated',
@@ -76,6 +105,10 @@ class TestForgeHookPredicate:
         "entry",
         [
             {"type": "command", "command": "forge hook session-start"},
+            {
+                "type": "command",
+                "command": "/home/me/.forge/bin/forge-hook session-start",
+            },
             {"hooks": [{"type": "command", "command": "forge hook session-start"}]},
         ],
     )
@@ -117,6 +150,102 @@ class TestHasForgeHook:
         claude_home = Path(os.environ["CLAUDE_HOME"])
         _write_settings(claude_home / "settings.local.json", FORGE_SESSION_START)
         assert has_forge_hook(project, "SessionStart") is True
+
+    def test_reports_distinct_hook_scopes(self, project: Path) -> None:
+        import os
+
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        _write_settings(project / ".claude" / "settings.local.json", FORGE_SESSION_START)
+        _write_settings(project / ".claude" / "settings.json", FORGE_STOP)
+        _write_settings(claude_home / "settings.json", FORGE_SESSION_START)
+
+        assert find_forge_hook_scopes(project) == {"local", "project", "user"}
+        assert find_forge_hook_scopes(project, "SessionStart") == {"local", "user"}
+        assert has_forge_hook_double_fire(project, "SessionStart") is True
+
+    def test_home_claude_dir_is_not_project_scope(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        home = tmp_path / "home"
+        repo = home / "repo"
+        claude_home = home / ".claude"
+        repo.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.setattr(Path, "home", lambda: home)
+        _write_settings(claude_home / "settings.json", FORGE_SESSION_START)
+
+        assert find_forge_hook_scopes(repo, "SessionStart") == {"user"}
+        assert has_forge_hook_double_fire(repo, "SessionStart") is False
+
+    def test_home_claude_dir_is_user_scope_when_cwd_is_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        claude_home = home / ".claude"
+        home.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.setattr(Path, "home", lambda: home)
+        _write_settings(claude_home / "settings.json", FORGE_SESSION_START)
+
+        assert find_forge_hook_scopes(home, "SessionStart") == {"user"}
+        assert has_forge_hook_double_fire(home, "SessionStart") is False
+        assert [registration.scope for registration in find_forge_hook_registrations(home, "SessionStart")] == ["user"]
+
+    def test_distinct_pre_tool_use_matchers_do_not_double_fire(self, project: Path) -> None:
+        _write_settings(project / ".claude" / "settings.json", FORGE_PRE_TOOL_USE_MATCHERS)
+
+        assert has_forge_hook_double_fire(project) is False
+        assert has_forge_hook_double_fire(project, "PreToolUse") is False
+        assert has_forge_hook_double_fire(project, "PreToolUse", "policy-check") is False
+        registrations = find_forge_hook_registrations(project, "PreToolUse", "policy-check")
+        assert [(registration.matcher, registration.command) for registration in registrations] == [
+            ("Write", "forge hook policy-check"),
+            ("Edit", "forge-hook policy-check"),
+        ]
+
+    def test_same_user_file_legacy_and_dispatcher_entries_are_double_fire(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        repo = home / "repo"
+        claude_home = home / ".claude"
+        repo.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        monkeypatch.setattr(Path, "home", lambda: home)
+        _write_settings(
+            claude_home / "settings.json",
+            {
+                "hooks": {
+                    "SessionStart": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "forge hook session-start",
+                                }
+                            ]
+                        },
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "forge-hook session-start",
+                                }
+                            ]
+                        },
+                    ]
+                }
+            },
+        )
+
+        assert find_forge_hook_scopes(repo, "SessionStart") == {"user"}
+        assert has_forge_hook_double_fire(repo, "SessionStart") is True
+        registrations = find_forge_hook_registrations(repo, "SessionStart", "session-start")
+        assert [registration.command for registration in registrations] == [
+            "forge hook session-start",
+            "forge-hook session-start",
+        ]
 
     def test_returns_false_when_no_settings(self, project: Path) -> None:
         assert has_forge_hook(project, "SessionStart") is False
@@ -182,7 +311,16 @@ class TestHasForgeHook:
     def test_absolute_path_forge_command_matches(self, project: Path) -> None:
         data = {
             "hooks": {
-                "SessionStart": [{"hooks": [{"type": "command", "command": "/opt/bin/forge hook session-start"}]}]
+                "SessionStart": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "/opt/bin/forge hook session-start",
+                            }
+                        ]
+                    }
+                ]
             }
         }
         _write_settings(project / ".claude" / "settings.local.json", data)
@@ -198,7 +336,10 @@ class TestHasForgeHook:
         data = {
             "hooks": {
                 "PreToolUse": [
-                    {"matcher": "ExitPlanMode", "hooks": [{"type": "command", "command": "forge hook exit-plan-mode"}]}
+                    {
+                        "matcher": "ExitPlanMode",
+                        "hooks": [{"type": "command", "command": "forge hook exit-plan-mode"}],
+                    }
                 ]
             }
         }

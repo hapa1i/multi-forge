@@ -28,9 +28,11 @@ from forge.install.exceptions import (
     NotInstalledError,
     SettingsConflictError,
 )
+from forge.install.hooks import find_forge_hook_scopes, has_forge_hook_double_fire
 from forge.install.installer import Installer, find_claude_root, find_forge_installation
 from forge.install.models import (
     FILE_MODULES,
+    PROFILE_RANK,
     InstallMode,
     InstallModule,
     InstallPlan,
@@ -231,18 +233,24 @@ def _print_completion_message(
             console=console,
         )
 
+    _print_runtime_hook_completion(plan, scope)
     _print_codex_completion(plan, scope)
 
 
-def _render_hook_dispatcher() -> None:
-    """Render the global hook dispatcher artifact after successful lifecycle commands."""
+def _print_runtime_hook_completion(plan: InstallPlan, scope: InstallScope) -> None:
+    """Explain the T5 scope split when a project/local profile no longer writes hooks."""
 
-    from forge.install.hook_dispatcher import install_hook_dispatcher
-
+    if scope == InstallScope.USER:
+        return
     try:
-        install_hook_dispatcher()
-    except Exception as e:
-        raise ForgeInstallError(f"Failed to render hook dispatcher: {e}") from e
+        profile = InstallProfile(plan.profile)
+    except ValueError:
+        return
+    if PROFILE_RANK[profile] < PROFILE_RANK[InstallProfile.STANDARD]:
+        return
+    console.print("\n[dim]Next steps (runtime hooks):[/dim]")
+    console.print("  - Runtime hooks install once at user scope.")
+    console.print("  - Run 'forge extension enable --scope user' to register them globally.")
 
 
 def _print_codex_completion(plan: InstallPlan, scope: InstallScope) -> None:
@@ -620,14 +628,23 @@ def enable_cmd(
         needs_create = False
 
         if scope is None:
-            install_scope, project_root = find_claude_root()
-            # P1 fix: auto-detect in a git repo should prefer LOCAL over USER
-            if install_scope == InstallScope.USER:
+            try:
+                install_scope, project_root = find_claude_root()
+            except NoClaudeDirectoryError:
                 git_root = _detect_git_project_root()
-                if git_root is not None:
-                    install_scope = InstallScope.LOCAL
-                    project_root = git_root
-                    needs_create = not (git_root / ".claude").is_dir()
+                if git_root is None:
+                    raise
+                install_scope = InstallScope.LOCAL
+                project_root = git_root
+                needs_create = not (git_root / ".claude").is_dir()
+            else:
+                # P1 fix: auto-detect in a git repo should prefer LOCAL over USER
+                if install_scope == InstallScope.USER:
+                    git_root = _detect_git_project_root()
+                    if git_root is not None:
+                        install_scope = InstallScope.LOCAL
+                        project_root = git_root
+                        needs_create = not (git_root / ".claude").is_dir()
             console.print(f"[dim]Auto-detected scope: {install_scope.value}[/dim]")
         else:
             install_scope = InstallScope(scope)
@@ -686,7 +703,6 @@ def enable_cmd(
                     _log.info("Created %s for session state", project_root / ".forge")
 
                 _enroll_project_root(project_root, "enable", announce=True)
-                _render_hook_dispatcher()
                 _print_completion_message(plan, install_scope, project_root, TrackingStore())
 
     except click.UsageError:
@@ -783,7 +799,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             # A synced block can carry NEW entries whose trust is not yet
             # granted (per-entry trusted_hash) -- the ceremony guidance
             # matters most exactly here.
-            _render_hook_dispatcher()
+            _print_runtime_hook_completion(plan, install_scope)
             _print_codex_completion(plan, install_scope)
 
     except NoForgeInstallationError as e:
@@ -1148,10 +1164,17 @@ def doctor_cmd(as_json: bool) -> None:
     dispatcher_diag = diagnose_hook_dispatcher()
     compat_root = find_forge_root(Path.cwd().resolve())
     compat_diag = diagnose_project_compatibility(compat_root)
+    cwd = Path.cwd().resolve()
+    hook_scopes = sorted(find_forge_hook_scopes(cwd, "SessionStart"))
+    hook_double_fire = has_forge_hook_double_fire(cwd)
 
     if as_json:
         payload = diag.to_dict()
         payload["hook_dispatcher"] = dispatcher_diag.to_dict()
+        payload["runtime_hooks"] = {
+            "scopes": hook_scopes,
+            "double_fire_risk": hook_double_fire,
+        }
         payload["project_registry"] = registry_diag.to_dict()
         payload["project_compatibility"] = compat_diag.to_dict()
         click.echo(json.dumps(payload, indent=2))
@@ -1181,6 +1204,20 @@ def doctor_cmd(as_json: bool) -> None:
         console.print(f"  forge target:   {display_path(dispatcher_diag.forge_binary_path)}")
     if dispatcher_diag.advice:
         print_tip(dispatcher_diag.advice, console=console)
+
+    console.print("\n[bold]Runtime hooks[/bold]")
+    console.print(f"  Scopes:         {', '.join(hook_scopes) if hook_scopes else 'none'}")
+    if hook_double_fire:
+        console.print("  [yellow]Warning:[/yellow] Forge hooks are registered more than once and may fire twice.")
+        print_tip(
+            "T6 cleanup will land as 'forge extension cleanup-project'. Until then, keep runtime hooks at user "
+            "scope and disable tracked project/local hook installs.",
+            commands=[
+                "forge extension disable --scope local",
+                "forge extension enable --scope user",
+            ],
+            console=console,
+        )
 
     console.print("\n[bold]Project registry[/bold]")
     console.print(f"  Path:           {display_path(registry_diag.path)}")

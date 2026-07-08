@@ -409,8 +409,8 @@ Policy violation(s):
 
 - Check that policies are enabled: `forge policy status`
 - Policies only evaluate on `Write` and `Edit` tool calls — `Bash`, `Read`, etc. are not checked
-- Verify the hook is installed: check your settings file for `PreToolUse` entries with `forge hook policy-check` (see
-  [`hook.md`](hook.md) for which settings file applies to your scope)
+- Verify the hook is installed: check your user settings file for `PreToolUse` entries with `forge-hook policy-check`
+  (see [`hook.md`](hook.md) for which settings file applies to your scope)
 
 ### Blocked but tests were written
 

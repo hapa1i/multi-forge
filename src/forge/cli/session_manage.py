@@ -1078,7 +1078,7 @@ def set_override(key: str, value: str, session_name: str | None) -> None:
                     "Enforcement will not be active."
                 )
                 print_tip(
-                    "Run 'forge extension enable' to install hooks.",
+                    "Run 'forge extension enable --scope user' to install runtime hooks.",
                     blank_before=False,
                     console=console,
                 )

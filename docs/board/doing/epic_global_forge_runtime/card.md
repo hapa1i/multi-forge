@@ -7,8 +7,9 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, and **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**. No member is currently active in `doing/`; the next
-critical-path member is T5 `user_scope_hook_ownership` when picked up. The epic's coordination
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**. **T5
+[`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md) is now active** (branch `user-scope-hook-ownership`,
+picked up 2026-07-08 -- see its [checklist](../user_scope_hook_ownership/checklist.md)). The epic's coordination
 [`checklist.md`](checklist.md) (sequencing, seam drift-watch, owed T5/T8/T10 decisions) stays live. Remaining members
 stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
 Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design docs).
@@ -43,7 +44,7 @@ so neither sits on one linear track.
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
 | T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                   | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
 | T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                     | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
-| T5    | [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
+| T5    | [`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md)                     | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
@@ -154,8 +155,10 @@ mounted at `/workspace`), but the container does **not** mount host `~/.claude`,
 - A host-absolute path (T2) is a **dead path in-container** -- reintroducing exit-127 one level in.
 - User-scope-only (T5) leaves in-container Claude with **no hooks** (host `~/.claude` unmounted).
 
-**T10 is the single owner** of in-container resolution, keyed on `FORGE_SIDECAR`; T2 and T5 must *exempt* the sidecar
-(emit the bare/image-PATH form there, where `forge` is globally installed in the image).
+**T10 is the single owner** of in-container resolution, keyed on `FORGE_SIDECAR`. T5 does not implement a sidecar
+injection path; its sidecar obligation is an exposure gate: T10 must land before T5's change reaches sidecar users
+unless a maintainer records an explicit temporary hookless-sidecar waiver and T5 warns/blocks before sidecar launch. T10
+emits the bare/image-PATH form there, where `forge` is globally installed in the image.
 
 ## CLI surface (command placement -- decided intentionally)
 
@@ -168,6 +171,9 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 - **Migration / cleanup** lands under `forge extension` (the lifecycle group) -- e.g. `forge extension cleanup-project`
   (T6) -- **not** the `hook` group, which is **singular and hidden** (`cli/hooks/_group.py:8`) and exposes only the
   user-facing `enable`/`disable` that T9 reconciles.
+- **T5 keeps `forge extension enable --scope user`** for one-time user hook registration; no distinct extension verb is
+  added. In-repo auto-LOCAL/project enable stops installing runtime hooks and must point users to
+  `forge extension enable --scope user` for the hook install.
 - Any genuinely new top-level group needs explicit justification here (`cli_style_guidelines`).
 
 ## Sequencing / critical path
@@ -180,7 +186,8 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   where detection is updated (gated on T4's benchmark outcome).
 - **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- delete it before T6 finalizes
   cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) pairs with T2 and T5
-  -- it must land with whichever byte-changing member ships first, or the sidecar regresses.
+  -- it must land before T5's change reaches sidecar users, unless an explicit temporary hookless-sidecar waiver is
+  recorded and T5 warns/blocks before sidecar launch.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice
   shipped; the remaining mutator-family sweep is parked in
   [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
@@ -244,27 +251,28 @@ Line refs are the 2026-07-02 snapshot; T3 Phase 0 re-verified the T3-relevant ro
 
 These are no longer open; kept here so the epic card and checklist do not drift.
 
-| Question                                                                                   | Outcome                                                                                                                                           |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip T2.** Terminal-only launch makes the interim reachability fix unnecessary; reopen only if GUI/Dock/IDE launch becomes supported. |
-| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork and paired T10 sidecar exemption.                                 |
-| Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                             |
-| Enrollment surface: new `forge project` group vs `forge extension` family                  | **Resolved: fold into `forge extension enable`.** Project/local enable enrolls the targeted root; user-scope enable enrolls no root by itself.    |
-| Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                  |
-| Dispatcher shim vs absolute-symlink                                                        | **Resolved: shim.** T4 benchmark measured shim p95 22.13 ms under the 30 ms ceiling; full Forge gate p95 611.78 ms.                               |
-| Dispatcher metadata home                                                                   | **Resolved: `~/.forge/runtime.json`.** Keeps runtime binary resolution state separate from strict extension tracking in `installed.json`.         |
-| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                                                                    |
-| Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                                                         |
-| Version-check fail-open vs fail-closed matrix per hook type                                | **Resolved:** command paths fail closed; session/context hook readers fail open with diagnostics; policy hooks keep existing fail-mode settings.  |
+| Question                                                                                   | Outcome                                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip T2.** Terminal-only launch makes the interim reachability fix unnecessary; reopen only if GUI/Dock/IDE launch becomes supported.    |
+| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork; T10 owns sidecar exemption, with T5 carrying the exposure gate.     |
+| Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                                |
+| Enrollment surface: new `forge project` group vs `forge extension` family                  | **Resolved: fold into `forge extension enable`.** Project/local enable enrolls the targeted root; user-scope enable enrolls no root by itself.       |
+| Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                     |
+| Dispatcher shim vs absolute-symlink                                                        | **Resolved: shim.** T4 benchmark measured shim p95 22.13 ms under the 30 ms ceiling; full Forge gate p95 611.78 ms.                                  |
+| Dispatcher metadata home                                                                   | **Resolved: `~/.forge/runtime.json`.** Keeps runtime binary resolution state separate from strict extension tracking in `installed.json`.            |
+| Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                                                                       |
+| Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                                                            |
+| Version-check fail-open vs fail-closed matrix per hook type                                | **Resolved:** command paths fail closed; session/context hook readers fail open with diagnostics; policy hooks keep existing fail-mode settings.     |
+| `extension enable --scope user` naming                                                     | **Resolved: keep existing verb.** T5 re-semantics hook ownership without adding a new extension verb; project/local completion points to user scope. |
+| Explicit project/local `--with hooks`                                                      | **Resolved: hard-reject.** Implicit `standard` modules are filtered by scope; explicit contradictory hook modules fail with an ownership-rule error. |
 
 ## Open questions still owed (each assigned to a member)
 
-| Question                                                                       | Owner                                         |
-| ------------------------------------------------------------------------------ | --------------------------------------------- |
-| Deprecate `extension enable --scope user` vs re-semantic it as dispatcher-only | T5                                            |
-| In-container command form: bare/image-PATH vs mounting the host dispatcher     | T10                                           |
-| `FORGE_DEV` override vs `uv run forge`-only for contributors                   | T8                                            |
-| How much project-local Codex hook policy to keep for teams                     | deferred -- out of scope for v1 (noted in T5) |
+| Question                                                                   | Owner                                         |
+| -------------------------------------------------------------------------- | --------------------------------------------- |
+| In-container command form: bare/image-PATH vs mounting the host dispatcher | T10                                           |
+| `FORGE_DEV` override vs `uv run forge`-only for contributors               | T8                                            |
+| How much project-local Codex hook policy to keep for teams                 | deferred -- out of scope for v1 (noted in T5) |
 
 ## Out of scope
 

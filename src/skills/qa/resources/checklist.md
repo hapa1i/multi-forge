@@ -12,8 +12,8 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-07-06 (hook-only QA now uses tracked
-`forge extension enable --scope local --profile minimal --with hooks --without commands`; earlier 2026-06-15:
+**Last updated**: 2026-07-08 (runtime hook QA now uses tracked user-scope
+`forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
 same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
 auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:
 registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex binary (2.11). Earlier

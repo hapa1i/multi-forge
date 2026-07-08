@@ -19,7 +19,7 @@ ls -la $CLAUDE_HOME/skills/
 cat $CLAUDE_HOME/settings.json | jq '.hooks'
 cat $FORGE_HOME/installed.json | jq '.installations.user.modules_enabled'
 
-# Optional: confirm status line + permissions were merged (user scope)
+# Confirm statusLine is not user-scoped; runtime hooks and permissions are
 cat $CLAUDE_HOME/settings.json | jq '.statusLine'
 cat $CLAUDE_HOME/settings.json | jq '.permissions'
 ```
@@ -27,8 +27,8 @@ cat $CLAUDE_HOME/settings.json | jq '.permissions'
 - [ ] `modules_enabled` in `installed.json` lists `commands` and `agents` (directories created only if source has
   installable files)
 - [ ] Skills installed to `$CLAUDE_HOME/skills/` (standard profile)
-- [ ] Hooks configured in `$CLAUDE_HOME/settings.json` (or in `$CLAUDE_HOME/settings.local.json` if you used hooks-only
-  install)
+- [ ] Runtime hooks configured in `$CLAUDE_HOME/settings.json`
+- [ ] `statusLine` is absent from user scope
 - [ ] `$FORGE_HOME/installed.json` tracking file created
 
 ### 2.2 Verify Installed Content
@@ -39,7 +39,7 @@ cat $CLAUDE_HOME/settings.json | jq '.permissions'
 # Check what was installed
 cat $FORGE_HOME/installed.json | jq '.'
 
-# Verify user-scope status line setting
+# Verify statusLine is not user-scoped
 cat $CLAUDE_HOME/settings.json | jq '.statusLine'
 
 # Verify user-scope permissions
@@ -50,7 +50,7 @@ ls $CLAUDE_HOME/skills/
 ```
 
 - [ ] `installed.json` lists all installed files
-- [ ] `statusLine` points to `forge status-line`
+- [ ] `statusLine` is absent at user scope
 - [ ] Permissions include Forge-required entries
 - [ ] Skills directory contains skill folders (analyze, debate, panel, review, review-docs, etc.)
 
@@ -86,7 +86,8 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 cd $FORGE_TEST_REPO
 forge extension enable --scope local
 
-# Verify local installation
+# Verify local installation: statusLine yes, runtime hooks no
+cat .claude/settings.local.json | jq '.statusLine'
 cat .claude/settings.local.json | jq '.hooks'
 LOCAL_KEY="local:$(cd "$FORGE_TEST_REPO" && pwd -P)"
 cat $FORGE_HOME/installed.json | jq --arg key "$LOCAL_KEY" '.installations[$key].modules_enabled'
@@ -94,7 +95,8 @@ cat $FORGE_HOME/installed.json | jq --arg key "$LOCAL_KEY" '.installations[$key]
 
 - [ ] `modules_enabled` for local installation lists `commands` and `agents` (directories created only if source has
   installable files)
-- [ ] Hooks configured in `.claude/settings.local.json`
+- [ ] `statusLine` configured in `.claude/settings.local.json`
+- [ ] Runtime hooks are absent from `.claude/settings.local.json`
 
 ### 2.5 Verify Both Installations Tracked
 
@@ -205,8 +207,8 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 
 - [ ] Enable output shows a "Codex hooks (config.toml)" plan section and "Next steps (Codex hooks):" trust-ceremony
   guidance
-- [ ] `$CODEX_HOME/config.toml` contains the `# >>> forge hooks >>>` block with `forge hook codex-session-start` and
-  `forge hook codex-policy-check`
+- [ ] `$CODEX_HOME/config.toml` contains the `# >>> forge hooks >>>` block with `forge-hook codex-session-start` and
+  `forge-hook codex-policy-check`
 - [ ] `forge extension status` shows a `Codex:` line with the config path
 - [ ] After disable, `BLOCK-REMOVED` is printed (Forge-created file removed)
 

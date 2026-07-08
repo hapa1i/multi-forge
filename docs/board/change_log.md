@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-08
 
+### user_scope_hook_ownership implementation
+
+**Goal**: Flip runtime hook ownership to user scope while preserving cleanup paths for legacy project/local installs.
+
+**Key changes**:
+
+- Scoped the extension module policy so user installs own `hooks`/`codex-hooks` and omit `status-line`, while
+  project/local installs keep project settings such as `statusLine` and reject explicit runtime-hook module requests.
+- Registered Claude and Codex runtime hooks through the T4 dispatcher command bytes, extended detection to accept both
+  `forge-hook <handler>` and legacy `forge hook <handler>`, and added double-fire diagnostics.
+- Tightened diagnostics so `~/.claude` is not misreported as a project install even when doctor runs from `$HOME`,
+  same-file old+new hook siblings still report double-fire risk, distinct `PreToolUse` matchers do not, and Codex legacy
+  hook registrations dedupe by logical `(event, handler)` identity.
+- Preserved filtered-update cleanup tracking for pre-T5 project/local hook entries, while user-scope sync removes the
+  old command bytes before adding dispatcher entries. Dispatcher rendering now happens before hook settings are written.
+- Updated Day-1 CLI guidance, end-user docs, QA/walkthrough checks, and the interim sidecar warning path.
+
+**Verification**: `make test-unit` (`7511 passed, 1 skipped, 116 deselected`); targeted hook/Codex/installer regression
+suites including `tests/regression/test_bug_codex_dedupe_wrong_event.py`; `make pre-commit`;
+`./scripts/test-integration.sh tests/integration/docker/test_installer.py::TestCodexHooksModule::test_enable_registers_block_and_disable_removes_it`
+(`1 passed`).
+
 ### forge_hook_dispatcher closeout
 
 **Goal**: Close T4 after its PR merged and hand the epic cursor back to the remaining user-scope hook migration work.

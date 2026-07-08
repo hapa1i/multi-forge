@@ -126,11 +126,11 @@ wc -l docs/board/impl_notes.md
 - The standalone `forge hook enable` / `forge hook disable` writer was removed as a clean break. Claude hook
   registration now goes through `forge extension enable`, so writes are tracked in `installed.json` and uninstalled via
   the settings unmerge path instead of a second hand-written settings mutator.
-- The public hooks-only replacement is
-  `forge extension enable --scope local --profile minimal --with hooks --without commands`. This writes tracked hooks to
-  `.claude/settings.local.json` without commands, agents, skills, permissions, or env.
-- The old user-directory/local-file combination was intentionally not recreated. Tracked `--scope user` writes
-  `~/.claude/settings.json`; tracked `--scope local` writes `.claude/settings.local.json`.
+- Runtime hook registration is user-scope-only. The public hooks-only replacement is
+  `forge extension enable --scope user --profile minimal --with hooks --without commands`. This writes tracked hooks to
+  `~/.claude/settings.json` without commands, agents, skills, permissions, or env.
+- Tracked `--scope local` writes project/local settings such as `statusLine` to `.claude/settings.local.json`; explicit
+  local/project `--with hooks` is rejected instead of silently dropped.
 
 ### Transcript role/turn parsing is single-sourced in `core/transcript.py` (test_mirror_and_contract_cleanup, shipped 2026-07-06)
 
