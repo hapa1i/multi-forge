@@ -5,15 +5,15 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T3/T7 closeout complete after PR #90 merged to `main`.** Shipped members now are T1
+**T4 closeout complete after its PR merged.** Shipped members now are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
-[`forge_project_registry`](../../done/forge_project_registry/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). **T4 `forge_hook_dispatcher` is now active** (branch
-`forge-hook-dispatcher`, picked up 2026-07-07 -- see its [checklist](../forge_hook_dispatcher/checklist.md)); T7's
-remaining mutator-family sweep is parked in
+[`forge_project_registry`](../../done/forge_project_registry/card.md), T4
+[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), and T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md). No member is currently active in `doing/`; the next
+critical-path member is T5 `user_scope_hook_ownership` when picked up. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
-`env_var_interface_boundary` also landed via PR #91, so T4/T5/T6 should author new user-facing strings against the
-shipped env-var vocabulary boundary.
+`env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
+user-facing strings against the shipped env-var vocabulary boundary.
 
 ## Activation bookkeeping (this branch)
 
@@ -88,9 +88,8 @@ Record outcomes here as members are picked up.
   `todo/forge_project_compat_mutator_sweep/`.
 - [x] Next member after T3/T7: **T4 `forge_hook_dispatcher`** (critical path), picked up 2026-07-07; `git mv`
   `proposed/ -> doing/` on branch `forge-hook-dispatcher`, epic forward-link + member back-link repointed, execution
-  checklist added. Ships the dispatcher mechanism + resolver + no-op gate + metadata home; its **Phase 0** owns the
-  shim-vs-symlink benchmark (the still-unchecked **T4 benchmark** decision above). Awaiting checklist review before
-  implementation.
+  checklist added. Shipped the dispatcher mechanism + resolver + no-op gate + metadata home; Phase 0 resolved the
+  shim-vs-symlink benchmark above. Moved `doing/ -> done/` after the PR merged.
 
 ## Shared-contract seams (drift watch)
 

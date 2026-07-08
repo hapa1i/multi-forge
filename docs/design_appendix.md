@@ -968,7 +968,7 @@ Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` — so a healthy global
 install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the mechanical signal
 for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
-`{install_kind, forge_path, on_path, on_path_minimal, advice, project_registry, project_compatibility}`.
+`{install_kind, forge_path, on_path, on_path_minimal, advice, hook_dispatcher, project_registry, project_compatibility}`.
 
 ### C.1 Scope model
 

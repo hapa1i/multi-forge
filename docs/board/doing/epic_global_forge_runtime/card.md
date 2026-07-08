@@ -5,13 +5,13 @@ Each member is an independently shippable implementation unit; the epic ships no
 
 **Lane**: `doing/` -- active coordinator. Shipped members: **T1
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
-[`forge_project_registry`](../../done/forge_project_registry/card.md)**, and **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**. **T4 `forge_hook_dispatcher` is now active**
-(branch `forge-hook-dispatcher`, picked up 2026-07-07) -- the dispatcher mechanism, `forge` resolver, and no-op gate; it
-owns the shim-vs-symlink benchmark. The epic's coordination [`checklist.md`](checklist.md) (sequencing, seam
-drift-watch, owed T4/T5/T8/T10 decisions) stays live. Remaining members stay in `proposed/` (or accepted `todo/` for the
-split T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is
-`done/` (or the shared contract is folded into normative design docs).
+[`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
+[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, and **T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**. No member is currently active in `doing/`; the next
+critical-path member is T5 `user_scope_hook_ownership` when picked up. The epic's coordination
+[`checklist.md`](checklist.md) (sequencing, seam drift-watch, owed T5/T8/T10 decisions) stays live. Remaining members
+stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
+Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -42,7 +42,7 @@ so neither sits on one linear track.
 | T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                       | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
 | T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                   | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
-| T4    | [`forge_hook_dispatcher`](../forge_hook_dispatcher/card.md)                             | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
+| T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                     | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
 | T5    | [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
@@ -220,9 +220,9 @@ Line refs are the 2026-07-02 snapshot; T3 Phase 0 re-verified the T3-relevant ro
 
 ## Cross-cutting risks (epic-owned)
 
-- **Presence detection can lie after the cutover.** If T4's benchmark picks a `forge-hook` shim (hyphen), the current
-  shared predicate still needs an update, so `session_lifecycle.py:264` and `policy.py:309` could warn incorrectly. T5
-  owns the detection update (gated on T4's shape).
+- **Presence detection can lie after the cutover.** T4's benchmark picked a `forge-hook` shim (hyphen), so the current
+  shared predicate still needs an update before T5 flips registration; otherwise `session_lifecycle.py:264` and
+  `policy.py:309` could warn incorrectly. T5 owns the detection update.
 - **Same-file coexistence, not replacement.** Because Claude hooks merge append+dedupe-by-entry
   (`settings_merge.py:505`), a changed command *adds* a sibling; without unmerge-before-merge, every byte change
   double-fires in the same file. (T2/T5/T6.)

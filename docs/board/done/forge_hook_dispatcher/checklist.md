@@ -1,7 +1,7 @@
 # Execution checklist: T4 `forge_hook_dispatcher`
 
 Execution plan for the user-scope hook dispatcher. Coordination/contract lives in the epic
-[`card.md`](../epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
+[`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
 
 > **Revised 2026-07-07** after a code-cited review: three-rule behavioral parity (not byte-parity), codegen drift-guard,
 > the structural (not latency) no-import framing, shim-staleness ownership, `$HOME`-normalized golden, two new
@@ -9,8 +9,8 @@ Execution plan for the user-scope hook dispatcher. Coordination/contract lives i
 
 ## Current focus
 
-**Implementation complete on this branch; awaiting review/merge.** Phase 0 resolved the shim-vs-symlink decision before
-production code, and Phases 1-6 are implemented/verified. T5 still owns the user-scope registration flip and detection
+**Closed after PR merge.** Phase 0 resolved the shim-vs-symlink decision before production code, and Phases 1-6 are
+implemented/verified. The card has moved to `done/`; T5 still owns the user-scope registration flip and detection
 update.
 
 **Scope boundary (do not cross):** T4 ships the *mechanism* — dispatcher entrypoint, `forge` resolver, no-op gate,
@@ -222,8 +222,8 @@ Reuse seams, confirmed by symbol on this branch:
 - [x] Epic checklist `[ ] T4 benchmark` ticked with outcome; epic card seam 3 recorded.
 - [x] `change_log.md` entry (Goal / Key changes / Verification); durable lessons proposed for `impl_notes.md` (human
   review before promotion).
-- [x] Lane move `doing/ -> done/` deferred to **post-merge**; repoint inbound board links on the move (epic forward-link
-  and any member back-links).
+- [x] Lane move `doing/ -> done/` completed after the PR merged; inbound board links repointed (epic forward-link and
+  member back-link).
 
 ## Acceptance tests
 

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-08
 
+### forge_hook_dispatcher closeout
+
+**Goal**: Close T4 after its PR merged and hand the epic cursor back to the remaining user-scope hook migration work.
+
+**Key changes**:
+
+- Moved `forge_hook_dispatcher` from `doing/` to `done/` with its checklist preserved as the execution record.
+- Repointed the member back-link and epic forward-links to the done card, and updated the epic focus to show no active
+  member in `doing/`.
+- Reframed the remaining detection risk as T5-owned now that T4 chose the hyphenated `forge-hook` shim.
+
+**Verification**: stale-reference scan for `doing/forge_hook_dispatcher` and pre-merge T4 status language;
+`git diff --check -- docs/board`; `make pre-commit-md`.
+
 ### forge_hook_dispatcher implementation and review hardening
 
 **Goal**: Ship the T4 user-scope hook dispatcher mechanism without flipping hook registration to user scope.
