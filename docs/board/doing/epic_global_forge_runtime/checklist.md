@@ -9,8 +9,11 @@ member execution checklists (each member owns its own). Full contract in [`card.
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). No member is currently active in `doing/`; the next
-critical-path member is T5 `user_scope_hook_ownership` when picked up. T7's remaining mutator-family sweep is parked in
+[`forge_project_compat`](../../done/forge_project_compat/card.md). **T5
+[`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md) is now active** (branch `user-scope-hook-ownership`,
+picked up 2026-07-08 -- see its [checklist](../user_scope_hook_ownership/checklist.md)): it flips hook registration to
+user-scope-only, cuts the hook command bytes over to the hyphenated dispatcher form (unmerge-before-merge), updates
+presence detection, and adds cross-scope double-fire detection. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
 user-facing strings against the shipped env-var vocabulary boundary.
@@ -66,8 +69,9 @@ Record outcomes here as members are picked up.
     residual value after T1) does not apply. Next members: **T3** (critical path) + **T7** (off-path guardrail), picked
     up together. **Recorded consequences:** (a) `forge status-line` stays bare permanently -- T2 was its only
     absolute-path rewriter, D3 keeps it project-scoped, and it self-gates on `FORGE_SESSION` (acceptable); (b) **T2-card
-    disposition** -- fold its unmerge-before-merge groundwork + paired T10 sidecar exemption into T5; the T2 card stays
-    in `proposed/` as superseded-not-abandoned. Reopen only if a GUI/Dock/IDE launch becomes a supported path.
+    disposition** -- fold its unmerge-before-merge groundwork into T5, while the paired sidecar exemption is implemented
+    by T10 and release-gated by T5; the T2 card stays in `proposed/` as superseded-not-abandoned. Reopen only if a
+    GUI/Dock/IDE launch becomes a supported path.
 - [x] **T4 benchmark (owner T4) -- RESOLVED 2026-07-08:** stdlib dispatcher shim (`forge-hook`, hyphen) wins.
   Populated-registry benchmark (40 enrolled roots, cwd depth 5, 50 cold subprocess runs) measured shim **p50 20.21 ms /
   p95 22.13 ms** under the p95 \<= 30 ms ceiling; full Forge gate representative measured **p50 419.66 ms / p95 611.78
@@ -90,6 +94,16 @@ Record outcomes here as members are picked up.
   `proposed/ -> doing/` on branch `forge-hook-dispatcher`, epic forward-link + member back-link repointed, execution
   checklist added. Shipped the dispatcher mechanism + resolver + no-op gate + metadata home; Phase 0 resolved the
   shim-vs-symlink benchmark above. Moved `doing/ -> done/` after the PR merged.
+- [x] Next member after T4: **T5 `user_scope_hook_ownership`** (critical path), picked up 2026-07-08; `git mv`
+  `proposed/ -> doing/` on branch `user-scope-hook-ownership`, epic forward-link + member back-link + the
+  `done/forge_hook_matcher_consolidation` inbound link repointed, execution checklist added. Ships the user-scope-only
+  registration flip, the hook command-byte cutover to the dispatcher form (unmerge-before-merge), the presence-detection
+  update (the hyphenated `forge-hook` needle), and cross-scope double-fire detection, gated at the effective-module
+  layer so tracking/status/JSON stay truthful across both normal enable and sync/update overrides. Sidecar stays
+  **T10**-owned (T5 lands only an exposure gate / documented interim-gap guard); the unmerge-before-merge groundwork
+  from skipped T2 folds into T5. Checklist reviewed 2026-07-08; Phase 0 decisions resolved (enable UX keeps
+  `--scope user`; sidecar -> T10 with exposure gate; additive detection; explicit project/local hook overrides
+  hard-reject).
 
 ## Shared-contract seams (drift watch)
 

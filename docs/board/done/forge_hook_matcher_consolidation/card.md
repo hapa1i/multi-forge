@@ -7,7 +7,7 @@
 behavior-preserving consolidation that makes the epic *inherit* a locked contract instead of coordinating it across six
 members. It enabled the update branch that [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) ultimately
 did not need because T9 chose delete, and it shrinks
-[`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md) (T5) from "update three matchers in
+[`user_scope_hook_ownership`](../../doing/user_scope_hook_ownership/card.md) (T5) from "update three matchers in
 lockstep" to "update one predicate."
 
 **Origin**: de-risking review (2026-07-06). The epic's hardest seam is byte-identity of registered hook commands across
