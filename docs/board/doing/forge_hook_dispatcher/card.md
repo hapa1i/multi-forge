@@ -1,10 +1,11 @@
 # User hook dispatcher (user-scope-model mechanism)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
 
-**Lane**: `proposed/`. Depends on `global_forge_install` (a global `forge` to resolve) and `forge_project_registry` (the
-no-op gate reads the registry). Part of the user-scope-only model -- **not** the incident fix (that is
-`forge_hook_absolute_command`). On the model's critical path.
+**Lane**: `doing/` -- active (branch `forge-hook-dispatcher`, picked up 2026-07-07). Depends on `global_forge_install`
+(shipped -- a global `forge` to resolve) and `forge_project_registry` (shipped -- the no-op gate reads the registry).
+Part of the user-scope-only model -- **not** the incident fix (that is `forge_hook_absolute_command`). On the model's
+critical path. Execution plan in [`checklist.md`](checklist.md).
 
 ## Goal
 
@@ -127,4 +128,4 @@ If the shim shape wins, the detection update (`has_forge_hook` + callers) is **r
 | Corrupt registry fails open      | corrupt/newer `projects.json`, hook run | dispatcher degrades to not-enrolled, exits 0, does not error (integration; the read-helper unit is `forge_project_registry`) | same                                              |
 | Literal absolute path            | user hook install                       | config contains `/abs/home/.forge/bin/...`, not `~`                                                                          | same                                              |
 | Stale target resolved            | recorded `forge` path stale             | tries known tool locations or reports an actionable resolution error                                                         | same                                              |
-| No-op path is cheap              | non-Forge repo, per-Read cadence        | no-op exits under the benchmark ceiling; no Forge import                                                                     | same (perf assertion)                             |
+| No-op path is cheap              | non-Forge repo, per-Read cadence        | benchmark records the ceiling; in-suite test asserts populated-registry no-op skips dispatch/no Forge import                 | benchmark + same                                  |

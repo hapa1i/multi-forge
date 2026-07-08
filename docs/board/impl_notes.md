@@ -36,6 +36,21 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### User-scope hook dispatcher is a generated runtime artifact, with fail-open gate semantics (forge_hook_dispatcher, 2026-07-08)
+
+- `~/.forge/bin/forge-hook` is a standalone stdlib script rendered from `src/forge/install/hook_dispatcher.py`, not a
+  normal import path. It cannot assume Forge's package is importable from hook-launched `python3`. Keep the no-op gate
+  dependency-light and preserve its generated-source stamp plus `forge extension sync` re-render path.
+- The dispatcher gate is fail-open: corrupt/newer/unknown-field project registry state, deleted cwd, and transient
+  filesystem gate errors degrade to exit 0 with no traceback. Resolver failures happen only after the gate chooses to
+  dispatch and should remain fail-loud with checked locations.
+- The embedded gate intentionally mirrors `core.ops.context.find_forge_root` and project-registry
+  parse/canonicalize/match behavior. If those rules change, update `_GATE_SOURCE` and the parity fixture matrix
+  together; the source hash catches installed-vs-package staleness, not semantic drift between the package
+  implementation and the embedded copy.
+- Treat the Phase-0 benchmark script as the performance authority. Unit tests should pin no-dispatch/no-import behavior
+  on populated registries rather than assert tight cold-start wall-clock ceilings that can flake on slower hosts.
+
 ### `FORGE_*` env vars are a classified interface, not general user vocabulary (env_var_interface_boundary, shipped 2026-07-07)
 
 - The human authority is `docs/design_appendix.md` §A.7b. Public names are `FORGE_HOME` and `FORGE_PROFILE`;

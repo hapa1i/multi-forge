@@ -858,10 +858,16 @@ Forge project. Hooks use `FORGE_SESSION` + UUID lookup only. No CWD-based scan o
 
 **Implementation:** Artifact capture uses first-class hook handlers (testable Python entrypoints), not ad-hoc scripts.
 
-**Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). Hooks run via the Forge CLI
-(`forge hook <name>`), so runtime + deps live with the Forge package (single upgrade surface).
+**Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). The hook handler remains the
+Forge CLI surface (`forge hook <name>`), so runtime + deps live with the Forge package (single upgrade surface). For the
+user-scope hook model, settings point at the rendered dispatcher command `<home>/.forge/bin/forge-hook <name>`: the
+dispatcher exits 0 in non-enrolled repos, short-circuits managed sessions, resolves the global `forge` launcher from
+`~/.forge/runtime.json` + known user-tool locations, then `exec`s `forge hook <name>` with stdin/stdout/stderr/exit code
+preserved. The registration cutover to this user-scope command form is owned by the user-scope hook ownership work; the
+dispatcher mechanism exists independently.
 
-**Operational requirement:** `forge` must be on PATH for hook execution.
+**Operational requirement:** the global `forge` launcher must be installed where the dispatcher can resolve it. A stale
+or missing launcher is surfaced by the dispatcher error and by `forge extension doctor`.
 
 **Why `forge hook …` instead of installed scripts:**
 

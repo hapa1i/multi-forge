@@ -6,11 +6,12 @@ Each member is an independently shippable implementation unit; the epic ships no
 **Lane**: `doing/` -- active coordinator. Shipped members: **T1
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md)**, and **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**. No member is currently active; next critical-path
-pick is T4 `forge_hook_dispatcher` unless priority changes. The epic's coordination [`checklist.md`](checklist.md)
-(sequencing, seam drift-watch, owed T4/T5/T8/T10 decisions) stays live. Remaining members stay in `proposed/` (or
-accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when
-every live member is `done/` (or the shared contract is folded into normative design docs).
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**. **T4 `forge_hook_dispatcher` is now active**
+(branch `forge-hook-dispatcher`, picked up 2026-07-07) -- the dispatcher mechanism, `forge` resolver, and no-op gate; it
+owns the shim-vs-symlink benchmark. The epic's coordination [`checklist.md`](checklist.md) (sequencing, seam
+drift-watch, owed T4/T5/T8/T10 decisions) stays live. Remaining members stay in `proposed/` (or accepted `todo/` for the
+split T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is
+`done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -41,7 +42,7 @@ so neither sits on one linear track.
 | T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                       | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
 | T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)     | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
 | T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                   | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
-| T4    | [`forge_hook_dispatcher`](../../proposed/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
+| T4    | [`forge_hook_dispatcher`](../forge_hook_dispatcher/card.md)                             | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
 | T5    | [`user_scope_hook_ownership`](../../proposed/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + backfill + legacy cleanup                                | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
@@ -118,10 +119,24 @@ no-op gate parses stdlib `json`) and signals "not a hand-edit surface." T7's `.f
 because it is the opposite: user-authored opt-in config. The two files now differ by extension *and* number, de-twinning
 the lookalike names.
 
+**T4 gate-parity strategy decided (2026-07-08):** the dispatcher uses package-owned, embed-safe stdlib source for the
+same three registry rules -- walk-up with `.git` stop, canonicalize, and exact-then-`samefile()` path match -- rendered
+into the shim. Behavioral parity tests compare the rendered shim verdict with
+`ProjectRegistryStore.lookup_enrolled_root` across symlinks, subdirectories, nested un-enrolled git repos, worktree
+`.git` files, missing registries, and corrupt/newer registries. No derived enrollment cache is needed because the JSON
+shim benchmark is under budget.
+
 ### 3. Forge-binary resolution contract
 
 T4 defines how a hook subprocess finds the real global `forge`; T8 extends it with the dev override; a `FORGE_SESSION` /
 managed-session short-circuit is part of the contract (T4). One resolver, one recorded metadata home.
+
+**T4 benchmark/metadata decision (2026-07-08):** choose the stdlib `forge-hook` shim. Benchmark:
+`uv run python scripts/experiments/hook-dispatcher/benchmark.py --runs 50 --project-count 40 --depth 5` measured **p50
+20.21 ms / p95 22.13 ms** for the shim against a 30 ms p95 no-op ceiling, versus **p50 419.66 ms / p95 611.78 ms** for
+the full Forge gate representative. Metadata home is a dedicated `~/.forge/runtime.json` with its own schema version,
+not `installed.json`, so dispatcher binary resolution state does not couple to extension tracking. The chosen hyphenated
+command means T5 must update presence detection away from the current `"forge hook"` space-token needle.
 
 ### 4. Scope-ownership rule: runtime hooks live only at user scope
 
@@ -236,19 +251,20 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 | Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                             |
 | Enrollment surface: new `forge project` group vs `forge extension` family                  | **Resolved: fold into `forge extension enable`.** Project/local enable enrolls the targeted root; user-scope enable enrolls no root by itself.    |
 | Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                  |
+| Dispatcher shim vs absolute-symlink                                                        | **Resolved: shim.** T4 benchmark measured shim p95 22.13 ms under the 30 ms ceiling; full Forge gate p95 611.78 ms.                               |
+| Dispatcher metadata home                                                                   | **Resolved: `~/.forge/runtime.json`.** Keeps runtime binary resolution state separate from strict extension tracking in `installed.json`.         |
 | Legacy `forge hook enable`/`disable`: update to the new form or delete                     | **Resolved: delete chosen and shipped in T9.**                                                                                                    |
 | Missing `.forge/project.toml` semantics for existing projects                              | **Resolved: missing file is compatible / unconstrained.**                                                                                         |
 | Version-check fail-open vs fail-closed matrix per hook type                                | **Resolved:** command paths fail closed; session/context hook readers fail open with diagnostics; policy hooks keep existing fail-mode settings.  |
 
 ## Open questions still owed (each assigned to a member)
 
-| Question                                                                                   | Owner                                         |
-| ------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| Dispatcher shim vs absolute-symlink (benchmark decides; also decides the detection update) | T4                                            |
-| Deprecate `extension enable --scope user` vs re-semantic it as dispatcher-only             | T5                                            |
-| In-container command form: bare/image-PATH vs mounting the host dispatcher                 | T10                                           |
-| `FORGE_DEV` override vs `uv run forge`-only for contributors                               | T8                                            |
-| How much project-local Codex hook policy to keep for teams                                 | deferred -- out of scope for v1 (noted in T5) |
+| Question                                                                       | Owner                                         |
+| ------------------------------------------------------------------------------ | --------------------------------------------- |
+| Deprecate `extension enable --scope user` vs re-semantic it as dispatcher-only | T5                                            |
+| In-container command form: bare/image-PATH vs mounting the host dispatcher     | T10                                           |
+| `FORGE_DEV` override vs `uv run forge`-only for contributors                   | T8                                            |
+| How much project-local Codex hook policy to keep for teams                     | deferred -- out of scope for v1 (noted in T5) |
 
 ## Out of scope
 

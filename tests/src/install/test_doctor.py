@@ -190,12 +190,25 @@ def test_doctor_json_shape_is_stable() -> None:
         "on_path",
         "on_path_minimal",
         "advice",
+        "hook_dispatcher",
         "project_registry",
         "project_compatibility",
     }
     assert isinstance(data["on_path"], bool)
     assert isinstance(data["on_path_minimal"], bool)
     assert data["install_kind"] in {"global", "editable", "venv", "unknown"}
+    assert set(data["hook_dispatcher"]) == {
+        "path",
+        "status",
+        "installed_version",
+        "expected_version",
+        "installed_source_sha256",
+        "expected_source_sha256",
+        "metadata_path",
+        "metadata_status",
+        "forge_binary_path",
+        "advice",
+    }
     assert set(data["project_registry"]) == {"path", "status", "enrolled_count", "stale_roots", "error", "advice"}
     assert set(data["project_compatibility"]) == {
         "path",
@@ -215,6 +228,7 @@ def test_doctor_human_output_names_install_kind() -> None:
     assert result.exit_code == 0, result.output
     assert "Install kind" in result.output
     assert "On PATH" in result.output
+    assert "Hook dispatcher" in result.output
     assert "Project registry" in result.output
     assert "Project compatibility" in result.output
 

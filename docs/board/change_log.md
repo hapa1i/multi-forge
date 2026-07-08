@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-08
+
+### forge_hook_dispatcher implementation and review hardening
+
+**Goal**: Ship the T4 user-scope hook dispatcher mechanism without flipping hook registration to user scope.
+
+**Key changes**:
+
+- Added the generated stdlib `~/.forge/bin/forge-hook` artifact, `~/.forge/runtime.json` launcher metadata,
+  known-location resolver fallback, runtime-agnostic `exec` forwarding, sync re-rendering, and doctor drift reporting.
+- Chose the shim shape from the populated-registry benchmark: p95 22.13 ms for the shim versus p95 611.78 ms for the
+  full Forge gate representative.
+- Hardened review findings: gate exceptions fail open, registry unknown top-level fields now match package fail-open
+  behavior, resolver bin-dir precedence is single-sourced, the in-suite perf assertion no longer has a tight wall-clock
+  bound, and dispatcher render failures are wrapped as install errors.
+- Synced the epic/member docs and promoted durable dispatcher invariants to `impl_notes.md`; T5 still owns user-scope
+  registration bytes and hook-detection updates.
+
+**Verification**: `uv run pytest tests/src/install/test_hook_dispatcher.py -q` (`25 passed`);
+`uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py -q` (`39 passed`);
+`uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py tests/src/cli/test_extension_enable.py tests/src/cli/test_env_vocabulary.py -q`
+(`100 passed`); `uv run pytest tests/src/install -q` (`364 passed, 1 skipped`); `make pre-commit`;
+`./scripts/test-integration.sh tests/integration/docker/test_installer.py` (`15 passed`).
+
 ## 2026-07-07
 
 ### env_var_interface_boundary closeout
