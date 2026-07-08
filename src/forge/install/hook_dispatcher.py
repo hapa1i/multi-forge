@@ -73,6 +73,11 @@ class HookDispatcherDiagnosis:
         }
 
 
+# Drift guard: _GATE_SOURCE is the embed-safe stdlib copy of
+# core.ops.context.find_forge_root plus project_registry canonicalization,
+# path-match, and hook-read validation rules. If those rules change, update this
+# block and the behavioral parity fixture matrix in test_hook_dispatcher.py
+# together; the rendered source hash only detects installed-vs-package staleness.
 _GATE_SOURCE = r"""
 import json
 import os
@@ -123,6 +128,11 @@ def _registry_roots() -> list[str] | None:
         return []
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        allowed_top = {"schema_version", "projects"}
+        if set(data) - allowed_top:
+            return None
         if data.get("schema_version") != PROJECT_REGISTRY_VERSION:
             return None
         projects = data.get("projects", [])
@@ -240,7 +250,11 @@ def _resolve_forge() -> tuple[Path | None, list[Path]]:
 
 _DISPATCHER_SOURCE = r"""
 def main() -> int:
-    if not _should_dispatch():
+    try:
+        should_dispatch = _should_dispatch()
+    except Exception:
+        return 0
+    if not should_dispatch:
         return 0
 
     argv = sys.argv[1:]
@@ -499,4 +513,4 @@ def known_forge_launcher_paths(environ: dict[str, str] | None = None) -> list[Pa
     """Return resolver fallback launcher paths, shared with tests/docs."""
 
     env = dict(os.environ) if environ is None else environ
-    return [directory / EXECUTABLE for directory in sorted(global_bin_dirs(env), key=str)]
+    return [directory / EXECUTABLE for directory in global_bin_dirs(env)]

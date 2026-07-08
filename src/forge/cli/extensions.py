@@ -241,7 +241,7 @@ def _render_hook_dispatcher() -> None:
 
     try:
         install_hook_dispatcher()
-    except OSError as e:
+    except Exception as e:
         raise ForgeInstallError(f"Failed to render hook dispatcher: {e}") from e
 
 

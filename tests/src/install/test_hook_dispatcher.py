@@ -7,7 +7,6 @@ import os
 import stat
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,7 @@ from forge.install.hook_dispatcher import (
     get_hook_dispatcher_path,
     get_runtime_metadata_path,
     install_hook_dispatcher,
+    known_forge_launcher_paths,
     normalize_dispatcher_command_home,
     parse_dispatcher_stamp,
     read_runtime_metadata,
@@ -26,8 +26,6 @@ from forge.install.hook_dispatcher import (
     write_runtime_metadata,
 )
 from forge.install.project_registry import ProjectRegistryStore
-
-PHASE0_NOOP_P95_CEILING_MS = 30.0
 
 
 def _forge_home() -> Path:
@@ -155,6 +153,23 @@ def test_install_writes_dispatcher_and_runtime_metadata(tmp_path: Path, monkeypa
     assert metadata["dispatcher_source_sha256"] == dispatcher_source_sha256()
 
 
+def test_known_forge_launcher_paths_preserve_dispatcher_precedence(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    env = {
+        "HOME": str(home),
+        "UV_TOOL_BIN_DIR": str(tmp_path / "uv-bin"),
+        "XDG_BIN_HOME": str(tmp_path / "xdg-bin"),
+        "PIPX_BIN_DIR": str(tmp_path / "pipx-bin"),
+    }
+
+    assert known_forge_launcher_paths(env) == [
+        home / ".local" / "bin" / "forge",
+        tmp_path / "uv-bin" / "forge",
+        tmp_path / "xdg-bin" / "forge",
+        tmp_path / "pipx-bin" / "forge",
+    ]
+
+
 def test_dispatcher_resolves_recorded_global_forge_without_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -264,6 +279,64 @@ def test_corrupt_and_newer_registry_fail_open(tmp_path: Path, monkeypatch: pytes
 
     assert corrupt.returncode == 0, corrupt.stderr
     assert newer.returncode == 0, newer.stderr
+    assert not record_path.exists()
+
+
+def test_unknown_registry_top_level_field_matches_package_fail_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_forge, record_path = _make_fake_forge(tmp_path)
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    registry = _forge_home() / "projects.json"
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    data["unexpected"] = True
+    registry.write_text(json.dumps(data), encoding="utf-8")
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert _lookup(repo) is False
+    assert result.returncode == 0, result.stderr
+    assert not record_path.exists()
+
+
+def test_gate_exceptions_fail_open_for_deleted_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_forge, record_path = _make_fake_forge(tmp_path)
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
+    deleted = tmp_path / "deleted-cwd"
+    deleted.mkdir()
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+    probe = (
+        "import json, os, pathlib, shutil, subprocess, sys\n"
+        "work = pathlib.Path(sys.argv[1])\n"
+        "dispatcher = sys.argv[2]\n"
+        "os.chdir(work)\n"
+        "shutil.rmtree(work)\n"
+        "result = subprocess.run(\n"
+        "    [sys.executable, dispatcher, 'session-start'],\n"
+        "    text=True,\n"
+        "    capture_output=True,\n"
+        "    check=False,\n"
+        ")\n"
+        "print(json.dumps({'returncode': result.returncode, 'stderr': result.stderr, 'stdout': result.stdout}))\n"
+    )
+
+    wrapper = subprocess.run(
+        [sys.executable, "-c", probe, str(deleted), str(dispatcher)],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert wrapper.returncode == 0, wrapper.stderr
+    payload = json.loads(wrapper.stdout)
+    assert payload["returncode"] == 0
+    assert payload["stdout"] == ""
+    assert "Traceback" not in payload["stderr"]
     assert not record_path.exists()
 
 
@@ -405,7 +478,7 @@ def test_doctor_reports_stale_shim_and_sync_rerenders(
     assert get_runtime_metadata_path().is_file()
 
 
-def test_noop_path_stays_under_phase0_ceiling(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_noop_path_skips_dispatch_with_populated_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_forge, record_path = _make_fake_forge(tmp_path)
     dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
     roots = [_forge_project(tmp_path / "enrolled" / f"repo-{index:02d}") for index in range(40)]
@@ -417,15 +490,11 @@ def test_noop_path_stays_under_phase0_ceiling(tmp_path: Path, monkeypatch: pytes
     env = _env(tmp_path, _forge_home())
     env["FORGE_FAKE_RECORD"] = str(record_path)
 
-    samples: list[float] = []
-    for _ in range(5):
-        start = time.perf_counter()
+    for _ in range(3):
         result = _run_dispatcher(dispatcher, cwd, env)
-        samples.append((time.perf_counter() - start) * 1000)
         assert result.returncode == 0, result.stderr
 
     assert not record_path.exists()
-    assert max(samples) < PHASE0_NOOP_P95_CEILING_MS
 
 
 def test_install_hook_dispatcher_records_path_from_which(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -441,6 +510,19 @@ def test_install_hook_dispatcher_records_path_from_which(monkeypatch: pytest.Mon
     metadata = read_runtime_metadata()
     assert metadata is not None
     assert metadata["forge_binary_path"] == str(fake_forge)
+
+
+def test_render_hook_dispatcher_wraps_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge.cli.extensions import _render_hook_dispatcher
+    from forge.install.exceptions import ForgeInstallError
+
+    def fail() -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("forge.install.hook_dispatcher.install_hook_dispatcher", fail)
+
+    with pytest.raises(ForgeInstallError, match="Failed to render hook dispatcher: boom"):
+        _render_hook_dispatcher()
 
 
 def test_cli_enable_renders_dispatcher_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

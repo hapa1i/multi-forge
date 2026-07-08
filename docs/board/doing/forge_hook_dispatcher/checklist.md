@@ -102,12 +102,13 @@ Reuse seams, confirmed by symbol on this branch:
       a cache only changes stored-side parse cost — it folds into (b) and leaves the query-side duplication untouched.
     - _Decision:_ use the preferred generated-source contract: package-owned, embed-safe stdlib gate/resolver source is
       rendered into the shim, and tests assert the rendered shim source is current plus behavioral parity against
-      `ProjectRegistryStore.lookup_enrolled_root` for the matrix below. No arbitrary `inspect.getsource()` across
-      package functions.
+      `ProjectRegistryStore.lookup_enrolled_root` for the matrix below. The rendered source hash catches
+      installed-vs-package staleness; the code comment and parity fixtures guard the intentional stdlib copy against
+      package-vs-registry drift. No arbitrary `inspect.getsource()` across package functions.
   - **Parity fixture matrix** (drives (c)'s test, whichever mechanism): symlinked root, case-variant spelling,
     subdirectory cwd (walk-up hits the root), **nested un-enrolled git repo inside an enrolled parent** (git-stop →
-    no-op), worktree `.git` **file**, missing registry, corrupt/newer registry. Assert the shim's verdict equals
-    `lookup_enrolled_root`'s over the matrix.
+    no-op), worktree `.git` **file**, missing registry, corrupt/newer registry, registry with unknown top-level fields.
+    Assert the shim's verdict equals `lookup_enrolled_root`'s over the matrix.
 - [x] Close the **metadata-home** open question: extend `~/.forge/installed.json` (via `install/tracking.py`) vs a new
   `~/.forge/runtime.json`. Record the choice + rationale. If `installed.json` wins, account explicitly for
   `InstalledManifest`'s strict schema (`version` + `installations` today) and whether the change needs a manifest
@@ -156,13 +157,15 @@ Reuse seams, confirmed by symbol on this branch:
     short-circuits").
   - _Assertion:_ corrupt/newer `projects.json` + hook run → degrades to not-enrolled, exit 0, does not error
     (acceptance: "Corrupt registry fails open"; integration — the read-helper unit is T3's).
+  - _Assertion:_ deleted cwd or other unexpected gate exception → degrades to not-enrolled, exit 0, no traceback
+    (acceptance: "Gate exceptions fail open").
   - _Assertion:_ nested un-enrolled git repo inside an enrolled parent → git-stop → not-enrolled → no-op, no Forge
     import (acceptance: "Nested un-enrolled repo no-ops").
   - _Assertion:_ enrolled root reached from a subdirectory cwd → walk-up finds it → dispatches (acceptance:
     "Subdirectory cwd dispatches").
   - _Verified:_ subprocess tests cover managed-session dispatch, outside/non-enrolled no-op with Forge/pydantic
-    tripwires, corrupt/newer registry fail-open, nested git-stop no-op, symlink/case/worktree parity, and subdirectory
-    dispatch.
+    tripwires, corrupt/newer/unknown-field registry fail-open, deleted-cwd gate exception fail-open, nested git-stop
+    no-op, symlink/case/worktree parity, and subdirectory dispatch.
 
 ## Phase 3 — Dispatcher entrypoint + runtime-agnostic forwarding
 
@@ -188,8 +191,9 @@ Reuse seams, confirmed by symbol on this branch:
   `~/.forge/bin/forge-hook`, so embedded gate logic can drift from the package — e.g., a future registry schema v2 that
   a stale shim's fail-open maps to "not enrolled" forever → hooks silently off everywhere (the no-op promise inverted).
   Version-stamp the rendered shim; make `forge extension sync` re-render it; teach `forge extension doctor` to report
-  render-vs-installed drift. Codegen-from-source (Phase 0(c)) makes the re-render correct by construction. If doctor's
-  drift surfacing is deferred, **assign it explicitly to T5/T6 here** — do not leave it unowned.
+  render-vs-installed drift. The source stamp makes installed-vs-package drift visible; the Phase 0 parity matrix guards
+  the package-owned stdlib copy against registry-rule drift. If doctor's drift surfacing is deferred, **assign it
+  explicitly to T5/T6 here** — do not leave it unowned.
   - _Assertion:_ rendered shim carries a version stamp; `extension sync` re-renders on a version change; a stale-shim
     fixture is reported by `doctor` (or the deferral is recorded with an owner).
 - [x] **Do not** alter what `preset.py` / `codex_hooks.py` currently register at project scope — the flip to
@@ -208,8 +212,9 @@ Reuse seams, confirmed by symbol on this branch:
 
 ## Phase 6 — Closeout
 
-- [x] All acceptance rows green in `tests/src/install/test_hook_dispatcher.py` (new); no-op perf assertion holds under
-  the Phase-0 ceiling.
+- [x] All acceptance rows green in `tests/src/install/test_hook_dispatcher.py` (new); benchmark script remains the
+  authority for the Phase-0 ceiling, while the in-suite no-op test asserts populated-registry no-dispatch/no-import
+  behavior without a flaky wall-clock bound.
 - [x] `make pre-commit` clean.
 - [x] Install/hook integration run (this touches install + hook wiring — testing_guidelines mandates integration for
   installer/hook changes): `./scripts/test-integration.sh tests/integration/docker/test_installer.py` plus any
@@ -233,11 +238,12 @@ Grounded on the card's contract; all in `tests/src/install/test_hook_dispatcher.
 | Nested un-enrolled repo no-ops   | enrolled parent, un-enrolled git repo nested inside  | walk-up hits the nested `.git` → not-enrolled → exits 0, no Forge import        | 2     |
 | Subdirectory cwd dispatches      | cwd is a subdir of an enrolled root                  | walk-up finds the enrolled root → dispatches to `forge hook <name>`             | 2     |
 | Corrupt registry fails open      | corrupt/newer `projects.json`, hook run              | degrades to not-enrolled, exits 0, does not error (integration)                 | 2     |
+| Gate exceptions fail open        | deleted cwd or unexpected gate exception             | degrades to not-enrolled, exits 0, no traceback                                 | 2     |
 | Runtime-agnostic forwarding      | Claude-shaped and Codex-shaped stdin payloads        | both forward to `forge hook <name>`; stdin + exit code pass through             | 3     |
 | Literal absolute path            | user hook install                                    | rendered config contains `/abs/home/.forge/bin/...`, not `~`                    | 4     |
 | Rendered command template golden | rendered dispatcher command (`$HOME`-normalized)     | golden pins the template; a byte change fails (guards Codex trust-byte)         | 4     |
 | Shim staleness detected          | shim rendered by an older version than installed     | `doctor` reports render-vs-installed drift (or deferral recorded)               | 4     |
-| No-op path is cheap              | non-Forge repo, per-Read cadence, populated registry | no-op exits under the Phase-0 ceiling; no Forge import                          | 0/2   |
+| No-op path is cheap              | non-Forge repo, per-Read cadence, populated registry | benchmark records the Phase-0 ceiling; in-suite test asserts no dispatch/import | 0/2   |
 
 ## Open decisions (close in Phase 0)
 

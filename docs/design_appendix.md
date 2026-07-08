@@ -1036,17 +1036,18 @@ The hook dispatcher stores host runtime resolution metadata in `~/.forge/runtime
 ```
 
 `forge_binary_path` records the launcher path visible at install/sync time. The standalone dispatcher first tries this
-recorded launcher, then known user-tool locations (`~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`).
-It verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic naming the checked
-locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths are not mounted
-there.
+recorded launcher, then known user-tool locations in order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`,
+`PIPX_BIN_DIR`. It verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic
+naming the checked locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths
+are not mounted there.
 
 #### Hook dispatcher (`~/.forge/bin/forge-hook`)
 
 The dispatcher is a generated stdlib-only Python script. The no-op gate mirrors the project registry hook read posture:
 walk upward to `.forge/` while stopping at `.git`, read `~/.forge/projects.json` fail-open, and match exact canonical
-paths before `samefile()`. If the hook environment already identifies a managed Forge session, the dispatcher dispatches
-even when the cwd is not enrolled.
+paths before `samefile()`. Unexpected gate errors, such as a deleted cwd or transient filesystem permission error, also
+fail open to exit 0. If the hook environment already identifies a managed Forge session, the dispatcher dispatches even
+when the cwd is not enrolled.
 
 Rendered hook command strings use a literal absolute path, never `~`, for example
 `/home/user/.forge/bin/forge-hook session-start`. The command byte template is golden-pinned with `$HOME` normalized
@@ -1059,7 +1060,7 @@ state so a package upgrade that changes embedded gate logic does not silently le
 #### Trusted project registry (`~/.forge/projects.json`)
 
 The project registry is user-global, machine-written JSON owned by Forge. It is not a hand-edit configuration surface.
-Schema version 1 is:
+Schema reads are strict on shape, including unknown top-level and project-entry fields. Schema version 1 is:
 
 ```json
 {
