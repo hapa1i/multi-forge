@@ -8,8 +8,9 @@ member execution checklists (each member owns its own). Full contract in [`card.
 **T3/T7 closeout complete after PR #90 merged to `main`.** Shipped members now are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). No member is currently active. Next critical-path
-pick is T4 `forge_hook_dispatcher` unless priority changes; T7's remaining mutator-family sweep is parked in
+[`forge_project_compat`](../../done/forge_project_compat/card.md). **T4 `forge_hook_dispatcher` is now active** (branch
+`forge-hook-dispatcher`, picked up 2026-07-07 -- see its [checklist](../forge_hook_dispatcher/checklist.md)); T7's
+remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91, so T4/T5/T6 should author new user-facing strings against the
 shipped env-var vocabulary boundary.
@@ -82,6 +83,11 @@ Record outcomes here as members are picked up.
   epic/member links repointed, execution checklists added. T3 Phase 1--3 implementation and T7's first command-path
   guard slice landed 2026-07-07 in PR #90; both member cards are now `done/`. T7's broader mutator sweep was split to
   `todo/forge_project_compat_mutator_sweep/`.
+- [x] Next member after T3/T7: **T4 `forge_hook_dispatcher`** (critical path), picked up 2026-07-07; `git mv`
+  `proposed/ -> doing/` on branch `forge-hook-dispatcher`, epic forward-link + member back-link repointed, execution
+  checklist added. Ships the dispatcher mechanism + resolver + no-op gate + metadata home; its **Phase 0** owns the
+  shim-vs-symlink benchmark (the still-unchecked **T4 benchmark** decision above). Awaiting checklist review before
+  implementation.
 
 ## Shared-contract seams (drift watch)
 
