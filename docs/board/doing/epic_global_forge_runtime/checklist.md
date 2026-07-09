@@ -104,6 +104,11 @@ Record outcomes here as members are picked up.
   from skipped T2 folds into T5. Checklist reviewed 2026-07-08; Phase 0 decisions resolved (enable UX keeps
   `--scope user`; sidecar -> T10 with exposure gate; additive detection; explicit project/local hook overrides
   hard-reject). Moved `doing/ -> done/` after PR #93 merged.
+- [x] Next member after T5: **T10 `forge_hook_sidecar_resolution`** (seam 5), picked up 2026-07-08; `git mv`
+  `proposed/ -> doing/` on branch `forge-hook-sidecar-resolution`, epic forward-link + member back-link repointed, and
+  execution checklist added. Phase 0 reframes the card around the shipped T5 world: T2 was skipped, so the live
+  regression is a hookless sidecar plus sidecar-specific PATH/settings persistence effects, not host-absolute project
+  hook bytes.
 
 ## Shared-contract seams (drift watch)
 

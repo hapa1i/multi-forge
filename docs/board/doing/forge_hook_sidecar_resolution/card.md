@@ -1,9 +1,12 @@
 # In-container (sidecar) hook resolution
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
 
-**Lane**: `proposed/`. Cross-cutting -- pairs with `forge_hook_absolute_command` (host-absolute path is dead
-in-container) and `user_scope_hook_ownership` (user scope is unmounted in-container). Owns the epic's seam 5.
+**Lane**: `doing/` (picked up 2026-07-08 on branch `forge-hook-sidecar-resolution`). Cross-cutting -- owns the epic's
+seam 5. Originally framed to pair with `forge_hook_absolute_command` (T2, host-absolute path dead in-container) and
+`user_scope_hook_ownership` (T5, user scope unmounted in-container). **T2 was skipped** (epic decision 2026-07-06,
+terminal-only launch), so the host-absolute dead-path track no longer exists; the live regression is T5's hookless
+container. See `checklist.md` Phase 0 for the premise correction.
 
 ## Goal
 

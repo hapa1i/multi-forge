@@ -49,7 +49,7 @@ so neither sits on one linear track.
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                       | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
 | T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)               | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
-| T10   | [`forge_hook_sidecar_resolution`](../../proposed/forge_hook_sidecar_resolution/card.md) | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
+| T10   | [`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md)             | In-container (sidecar) hook resolution under both byte-change tracks                | pairs T2/T5 |
 
 ## Accepted decisions
 
