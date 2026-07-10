@@ -48,6 +48,9 @@ Use `uv` for dependencies and `make` for the standard workflow:
 Editable installs can hide packaging and clean-environment bugs. For changes that affect `pyproject.toml`,
 `scripts/setup.sh`, installer code, bundled extensions (`src/skills/`, `src/commands/`, `src/agents/`), or runtime files
 loaded with `importlib.resources`, build a wheel/sdist and verify the behavior from a clean install path when practical.
+For Day 1 install or extension lifecycle changes, verify the global-tool path with `forge extension doctor` (use
+`--json` when checking install kind, PATH reachability, hook dispatcher, project registry, and compatibility fields),
+then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup.
 
 For auth, proxy, and workflow changes, test the no-`.env` path explicitly: credentials should resolve from environment
 variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
@@ -82,9 +85,10 @@ launch-strategy changes, verify `forge session resume <parent> --fresh --strateg
 For Codex-runtime session changes, start with `forge runtime preflight codex`, then verify the relevant launch path:
 `forge session start <name> --runtime codex --resume-from <parent> --task "..."`,
 `forge session resume <name> --task "..."`, or the interactive TUI path that omits `--task`. `--context-delivery hook`
-and Codex policy enforcement require manual Codex hook registration/trust for `forge hook codex-session-start` and
-`forge hook codex-policy-check`; the default transfer delivery is `initial-message`. For consumer-lane or
-subscription-billing changes, verify
+and Codex policy enforcement require Codex hook registration/trust for `$FORGE_HOME/bin/forge-hook codex-session-start`
+and `$FORGE_HOME/bin/forge-hook codex-policy-check`; the default transfer delivery is `initial-message`. Runtime hooks
+are user-scoped via the `forge-hook <name>` dispatcher, while project/local extension installs own status line and
+project assets. For consumer-lane or subscription-billing changes, verify
 `forge session lane set|show|clear --consumer <supervisor|memory_writer|shadow_curation|team_supervisor>`,
 `forge policy supervisor status`, and `forge telemetry activity [session]`; `--backend claude-max` should label only
 keyless direct runs as `subscription_quota`, while resolvable keys remain `api` and proxied runs remain `unknown`.

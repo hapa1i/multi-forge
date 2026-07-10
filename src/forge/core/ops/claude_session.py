@@ -24,6 +24,7 @@ from forge.core.models.direct_model import (
 from forge.core.reactive.env import (
     FORGE_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
+    FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
@@ -1233,8 +1234,10 @@ def _run_sidecar_claude_session(
     except ValueError as e:
         raise ForgeOpError(str(e)) from e
 
+    host_launch_root = launch_root.resolve()
+    host_forge_root = Path(manifest.forge_root).resolve() if manifest.forge_root else host_launch_root
     claude_dir = launch_root / ".claude"
-    forge_dir = launch_root / ".forge"
+    forge_dir = host_forge_root / ".forge"
     sidecar_home = forge_dir / "sidecar-home"
     from forge.core.paths import get_forge_home
 
@@ -1269,9 +1272,12 @@ def _run_sidecar_claude_session(
     container_env = {**env_vars, **secrets}
     # Host paths in launcher-owned env are not meaningful inside the container.
     # Hooks operate on the project mount, while deferred-work markers retain the
-    # host root separately so the host CLI can drain them after the container exits.
+    # host worktree and Forge root separately so the host CLI can drain them after
+    # the container exits, including root-level worktrees whose manifest root is
+    # outside the checkout.
     container_env[FORGE_FORGE_ROOT_VAR] = "/workspace"
-    container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(launch_root.resolve())
+    container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(host_forge_root)
+    container_env[FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR] = str(host_launch_root)
 
     if "LITELLM_BASE_URL" not in container_env:
         try:
