@@ -471,6 +471,56 @@ class TestSessionStart:
         assert manifest.intent.launch.sidecar.mounts == ["/data:/mnt/data:ro"]
         assert manifest.intent.launch.sidecar.image == "forge-sidecar:test"
 
+    def test_sidecar_launch_restages_user_hooks_without_touching_project_settings(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        """The sidecar gets current bare-form hooks through its Forge-owned user home."""
+        import json
+
+        from forge.core.paths import get_forge_home
+        from forge.core.reactive.env import (
+            FORGE_FORGE_ROOT_VAR,
+            FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
+        )
+        from forge.install.preset import get_sidecar_hook_settings
+
+        claude_dir = temp_env / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        project_settings = claude_dir / "settings.json"
+        project_local_settings = claude_dir / "settings.local.json"
+        project_settings.write_bytes(b'{"project": true}\n')
+        project_local_settings.write_bytes(b'{"local": true}\n')
+        before_project = project_settings.read_bytes()
+        before_local = project_local_settings.read_bytes()
+
+        sidecar_home = temp_env / ".forge" / "sidecar-home"
+        sidecar_home.mkdir(parents=True)
+        (sidecar_home / "settings.json").write_text(
+            '{"apiKeyHelper": "stale", "hooks": {"Stop": [{"hooks": [{"command": "stale hook"}]}]}}\n'
+        )
+
+        with (
+            patch("forge.sidecar.docker.is_docker_available", return_value=True),
+            patch("forge.sidecar.get_secrets_for_template", return_value={}),
+            patch("forge.sidecar.run_sidecar_session", return_value=0) as run_sidecar,
+        ):
+            result = runner.invoke(main, ["session", "start", "sidecar-hooks", "--sidecar"])
+
+        assert result.exit_code == 0, result.output
+        assert json.loads((sidecar_home / "settings.json").read_text()) == get_sidecar_hook_settings()
+        assert (sidecar_home / "settings.json").stat().st_mode & 0o777 == 0o600
+        assert project_settings.read_bytes() == before_project
+        assert project_local_settings.read_bytes() == before_local
+
+        kwargs = run_sidecar.call_args.kwargs
+        assert kwargs["env_vars"][FORGE_FORGE_ROOT_VAR] == "/workspace"
+        assert kwargs["env_vars"][FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] == str(temp_env.resolve())
+        assert (
+            str(get_forge_home() / "pending-work"),
+            "/root/.forge/pending-work",
+            "rw",
+        ) in kwargs["extra_mounts"]
+
 
 class TestSessionDelete:
     """Tests for 'forge session delete' command."""

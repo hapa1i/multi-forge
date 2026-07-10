@@ -22,6 +22,12 @@
 ARG BASE_IMAGE=forge-claude-test:latest
 FROM ${BASE_IMAGE}
 
+# The development image installs Forge into /forge/.venv. Production images may
+# also provide a global launcher, but keeping the editable install on PATH makes
+# the sidecar's bare `forge hook ...` and project `forge status-line` commands
+# resolve consistently in both shapes.
+ENV PATH="/forge/.venv/bin:${PATH}"
+
 # Ensure curl is available for health checks
 # (Already in base image from Dockerfile.forge, but explicit for documentation)
 RUN command -v curl > /dev/null || (apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*)

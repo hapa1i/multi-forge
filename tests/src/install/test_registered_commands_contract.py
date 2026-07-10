@@ -7,7 +7,7 @@ from typing import Any
 
 from forge.core.paths import get_forge_home
 from forge.install.codex_hooks import get_builtin_codex_entries
-from forge.install.preset import get_builtin_preset
+from forge.install.preset import get_builtin_preset, get_sidecar_hook_settings
 from forge.install.settings_merge import merge_hooks, unmerge
 
 
@@ -61,6 +61,26 @@ def test_claude_hook_entries_are_pinned_by_event_matcher_command_and_timeout() -
         ("TaskCompleted", None, "$FORGE_HOME/bin/forge-hook task-completed", 60),
         ("SessionEnd", None, "$FORGE_HOME/bin/forge-hook session-end", 5),
     ]
+
+
+def test_sidecar_hook_entries_share_inventory_but_use_bare_commands() -> None:
+    host_rows = _rendered_hook_entries()
+    sidecar_rows: list[tuple[str, Any, str, int | None]] = []
+    settings = get_sidecar_hook_settings()
+
+    assert set(settings) == {"hooks"}
+    for event_key, entries in settings["hooks"].items():
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                sidecar_rows.append((event_key, entry.get("matcher"), hook["command"], hook.get("timeout")))
+
+    assert [(event, matcher, timeout) for event, matcher, _command, timeout in sidecar_rows] == [
+        (event, matcher, timeout) for event, matcher, _command, timeout in host_rows
+    ]
+    assert [command for _event, _matcher, command, _timeout in sidecar_rows] == [
+        f"forge hook {command.rsplit(' ', 1)[-1]}" for _event, _matcher, command, _timeout in host_rows
+    ]
+    assert all("forge-hook" not in command for _event, _matcher, command, _timeout in sidecar_rows)
 
 
 def test_statusline_command_is_pinned() -> None:

@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-08
 
+### user_scope_hook_ownership closeout
+
+**Goal**: Close T5 after PR #93 merged and hand the epic cursor to the remaining runtime-hook migration work.
+
+**Key changes**:
+
+- Moved `user_scope_hook_ownership` from `doing/` to `done/` with its checklist preserved as the execution record.
+- Repointed the member back-link, epic forward-links, and the matcher-consolidation inbound link to the done card.
+- Updated the epic focus to show T5 shipped and hand the next cursor to **T10** sidecar resolution and **T6** migration
+  cleanup, with **T8** still parked.
+
+**Verification**: `./scripts/test-integration.sh tests/integration/docker/test_installer.py` (`15 passed`);
+`make pre-commit-md`; `git diff --check`.
+
 ### user_scope_hook_ownership implementation
 
 **Goal**: Flip runtime hook ownership to user scope while preserving cleanup paths for legacy project/local installs.
