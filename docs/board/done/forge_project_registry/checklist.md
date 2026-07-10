@@ -20,8 +20,10 @@ test-mirror rule -- the acceptance-table paths below are valid iff the module li
 
 Record hand-offs so the ticket does not creep:
 
-- **Backfill from `installed.json` -> T6** (`forge_hook_migration_cleanup`; moved out of T3 in the epic's Round-5
-  review). T3 only defines canonicalization + the registry write API that T6's backfill calls.
+- **Existing-install discovery/activation -> T6** (`forge_hook_migration_cleanup`; corrected after T3 closeout on
+  2026-07-10). T3 defines canonicalization + the registry write API. T6 reads `installed.json` only to report
+  candidates; explicit cleanup calls the API for its selected root after legacy removal and user registration, rather
+  than bulk backfilling during user enable/sync.
 - **Dispatcher no-op gate + end-to-end fail-open integration test -> T4** (`forge_hook_dispatcher` owns
   `test_hook_dispatcher.py`, which does not exist when T3 closes). T3 tests the **read helper's** fail-open in its own
   suite; the `FORGE_SESSION` short-circuit *gate logic* is T4's, its *semantics* are T3's contract.
@@ -71,9 +73,10 @@ Record hand-offs so the ticket does not creep:
   `{ canonical_path, enrolled_at, enrollment_source }`. Written via the shared versioned-JSON helper +
   `atomic_write_text` (D-T3-c). Follows Forge durable-state rules (mandatory version field, strict shape on the CLI read
   path).
-- [x] **Concurrent-write posture:** every registry writer (enable, managed-worktree auto-enroll, and future backfill)
-  performs read-modify-write under `file_lock_for_target(target_path=projects_path, timeout_s=5.0)`, then persists with
-  `atomic_write_text`. This follows Forge's credentials/install-tracking pattern, not unguarded last-writer-wins.
+- [x] **Concurrent-write posture:** every registry writer (enable, managed-worktree auto-enroll, and future migration
+  enrollment) performs read-modify-write under `file_lock_for_target(target_path=projects_path, timeout_s=5.0)`, then
+  persists with `atomic_write_text`. This follows Forge's credentials/install-tracking pattern, not unguarded
+  last-writer-wins.
 - [x] **One canonicalization rule** applied on **both write and read** (epic seam-2 contract -- T4/T5/T6 must reuse the
   identical rule or the gate silently no-fires / double-enrolls). Resolve symlinks + normalize absolute path, and **pin
   the mechanism** here rather than "account for":

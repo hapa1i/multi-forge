@@ -41,11 +41,11 @@ The registry is not just a schema -- it needs a full lifecycle, or user-scope ho
   interim** a worktree inherits the absolute-path hook (same host, still resolvable) with no enrollment step. But under
   **T5 user-scope** there is no project hook block to copy, so the new root must be **enrolled** in `projects.json` (or
   covered by the `FORGE_SESSION` short-circuit) or the managed session lands in an unenrolled directory and loses hooks.
-- **Backfill from `installed.json`.** `installed.json` already keys tracked installs by root (`local:` / `project:<abs>`
-  forms, `install/models.py`) -- it is the de-facto existing list of Forge project roots. Migration
-  (`forge_hook_migration_cleanup`) backfills the registry from those keys so existing installs enroll without a manual
-  step. Note the overlap: two root lists (registry + `installed.json`) risk drift; the canonicalization rule plus later
-  reconcile/prune actions keep them aligned.
+- **Existing-install migration handoff (corrected 2026-07-10).** `installed.json` keys tracked installs by root
+  (`local:` / `project:<abs>` forms, `install/models.py`) and remains T6's candidate source. The original bulk-backfill
+  handoff was rejected during `forge_hook_migration_cleanup` review: enrollment activates the user dispatcher for
+  ambient sessions and would double-fire while a legacy project hook remains. T6 reports candidates without enrolling
+  them; explicit cleanup removes legacy state, verifies user registration, and enrolls only the selected root last.
 - **Doctor registry section.** T3 adds a `forge extension doctor` registry section: corrupt/newer registry strict-read
   report + basic stale-root report. Reconcile/prune actions stay with `user_scope_hook_ownership` /
   `forge_hook_migration_cleanup`.
@@ -74,8 +74,8 @@ The registry is not just a schema -- it needs a full lifecycle, or user-scope ho
 - `projects.json` appears only in the epic; it is absent from `src/`, `tests/`, and other docs.
 - No `forge project` command group exists (`cli/main.py:402-432` registers no `project`); no `project init`/`enroll`
   handlers.
-- `installed.json` already keys installs by root (`local:` / `project:<abs>`), so a backfill source exists
-  (`install/models.py`).
+- `installed.json` already keys installs by root (`local:` / `project:<abs>`), so it supplies T6's candidate source;
+  `enrollment_source="backfill"` remains available for the explicit selected-root activation (`install/models.py`).
 - `FORGE_SESSION` is present in the hook subprocess env (`cli/hooks/commands.py:1298`).
 - Root-detection helpers exist and walk up from cwd today, but there is **no** user-side trusted-root registry.
 

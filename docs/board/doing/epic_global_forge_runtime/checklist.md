@@ -5,7 +5,9 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T10 sidecar resolution shipped via PR #94 and its member card is closed.** Shipped members are T1
+**T6 migration cleanup is active on branch `forge-hook-migration-cleanup`; its draft execution checklist has been
+revised through follow-up review and is awaiting Phase 0 approval. No implementation has started.** T10 sidecar
+resolution shipped via PR #94 and its member card is closed. Shipped members are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
@@ -13,7 +15,7 @@ member execution checklists (each member owns its own). Full contract in [`card.
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). T10 restores in-container hooks by
 staging canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes
-deferred work through a host-drainable queue with normalized roots. Next implementation cursor: **T6** migration
+deferred work through a host-drainable queue with normalized roots. Current implementation cursor: **T6** migration
 cleanup; **T8** remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
@@ -112,6 +114,10 @@ Record outcomes here as members are picked up.
   hook bytes. Implementation verified 2026-07-09: canonical settings stage at `.forge/sidecar-home`, the entrypoint
   merges auth idempotently, bare `forge hook` resolves via image PATH, pending work is host-drainable, and the interim
   warning is retired. PR #94 merged 2026-07-10; moved `doing/ -> done/` in the separate post-merge closeout commit.
+- [x] Next member after T10: **T6 `forge_hook_migration_cleanup`** (end of the critical path), picked up 2026-07-10;
+  branch `forge-hook-migration-cleanup` created from `main`, card moved `proposed/ -> doing/`, epic forward-link
+  repointed, and a code-grounded draft checklist added. Initial review is incorporated; implementation waits for Phase 0
+  approval.
 
 ## Shared-contract seams (drift watch)
 
