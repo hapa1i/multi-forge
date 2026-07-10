@@ -123,6 +123,14 @@ Do not print token values while debugging. To diagnose safely, compare presence/
 through `direnv exec .`; `gh` gives `GH_TOKEN` precedence over stored credentials, and unsetting `GH_TOKEN` may make
 `gh` appear logged out even though SSH-based `git push` still works.
 
+In a network-restricted Codex sandbox, `gh auth status` can misleadingly label a valid token as invalid when the real
+failure is inability to reach `api.github.com`. Do not ask the user to rotate the token from that message alone. First
+confirm, without printing the secret, that direnv's token is present and matches the trimmed token file; then run
+`direnv exec . gh api user --silent`. If that reports a connection error, rerun the auth/API probe with approved network
+access before diagnosing credentials. The connected GitHub plugin authenticates independently of `GH_TOKEN`; a plugin
+profile/repository read can separately confirm connector identity and repository permissions while CLI connectivity is
+being debugged.
+
 ## Release Process
 
 Version lives in `pyproject.toml`. PyPI publishing is automated: push an annotated `v*` tag to trigger the
