@@ -12,6 +12,7 @@ from forge.core.ops.claude_session import (
     ClaudeStartExtensions,
     start_claude_session,
 )
+from forge.core.ops.session import ForgeOpError
 from forge.core.reactive.env import (
     FORGE_FORGE_ROOT_VAR,
     FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
@@ -37,8 +38,17 @@ class _Presenter:
     def on_sidecar_launch(self, event: ClaudeSidecarLaunch) -> None:
         pass
 
-    def on_launch_error(self, error: Exception) -> None:
+    def on_launch_error(self, error: ForgeOpError) -> None:
         raise error
+
+    def on_incognito_cleanup_start(self) -> None:
+        pass
+
+    def on_incognito_cleanup_ok(self) -> None:
+        pass
+
+    def on_incognito_cleanup_warning(self, message: str) -> None:
+        pass
 
 
 class _FakeManager:
