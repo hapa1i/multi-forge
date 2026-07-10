@@ -5,16 +5,16 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T10 sidecar resolution is implemented and verified, awaiting PR review and merge.** Shipped members remain T1
+**T10 sidecar resolution shipped via PR #94 and its member card is closed.** Shipped members are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
-[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). Active T10
-[`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md) restores in-container hooks by staging
-canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes deferred work
-through a host-drainable queue with normalized roots. Next implementation cursor: **T6** migration cleanup; **T8**
-remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
+[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). T10 restores in-container hooks by
+staging canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes
+deferred work through a host-drainable queue with normalized roots. Next implementation cursor: **T6** migration
+cleanup; **T8** remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
 user-facing strings against the shipped env-var vocabulary boundary.
@@ -111,7 +111,7 @@ Record outcomes here as members are picked up.
   regression is a hookless sidecar plus sidecar-specific PATH/settings persistence effects, not host-absolute project
   hook bytes. Implementation verified 2026-07-09: canonical settings stage at `.forge/sidecar-home`, the entrypoint
   merges auth idempotently, bare `forge hook` resolves via image PATH, pending work is host-drainable, and the interim
-  warning is retired. Keep the member in `doing/` until its PR merges, matching the T4/T5 closeout pattern.
+  warning is retired. PR #94 merged 2026-07-10; moved `doing/ -> done/` in the separate post-merge closeout commit.
 
 ## Shared-contract seams (drift watch)
 

@@ -1,9 +1,9 @@
 # In-container (sidecar) hook resolution
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/` (implementation verified 2026-07-09 on branch `forge-hook-sidecar-resolution`; awaiting PR review and
-merge). Cross-cutting -- owns the epic's seam 5.
+**Lane**: `done/` (shipped via PR #94 on 2026-07-10 after implementation verification on branch
+`forge-hook-sidecar-resolution`). Cross-cutting -- closes the epic's seam 5 member work.
 
 ## Goal
 
@@ -21,7 +21,7 @@ The card originally also covered host-absolute project hook bytes from T2. T2 wa
 never shipped. T10 addresses the live T5 regression and the sidecar-specific PATH and persistence effects discovered
 during Phase 0.
 
-## Implemented design
+## Shipped design
 
 - **One hook inventory, two command renderers.** `install/preset.py` remains the canonical event/matcher/timeout source.
   Host settings render the dispatcher form; sidecar settings render bare `forge hook <handler>` commands.

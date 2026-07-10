@@ -1,14 +1,14 @@
 # Execution checklist: In-container (sidecar) hook resolution (T10)
 
-Member of [`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md). Owns seam 5 (host vs sidecar execution).
-Card: [`card.md`](card.md). Branch: `forge-hook-sidecar-resolution`.
+Member of [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Owns seam 5 (host vs sidecar
+execution). Card: [`card.md`](card.md). Branch: `forge-hook-sidecar-resolution`.
 
 ## Current focus
 
-**Implementation and verification complete 2026-07-09; awaiting PR review and merge.** T2 was skipped, so the
-implementation fixes the one live regression from T5: host user-scope hooks are not mounted into the sidecar. The branch
-stages canonical hooks into the persisted in-container user scope, makes bare `forge` commands image-resolvable, and
-routes deferred work back to a host-drainable queue.
+**Complete.** PR #94 merged 2026-07-10 after unit, real-Claude Docker integration, pre-commit, and GitHub CI
+verification. T2 was skipped, so T10 fixes the one live regression from T5: host user-scope hooks are not mounted into
+the sidecar. The shipped path stages canonical hooks into the persisted in-container user scope, makes bare `forge`
+commands image-resolvable, and routes deferred work back to a host-drainable queue.
 
 ## Premise correction (verified against current code 2026-07-09)
 
@@ -143,11 +143,11 @@ Acceptance table (fixture-grounded):
   `forge hook` form; host project `.claude` is never mutated; statusLine relies on `forge` on the image PATH.
 - [x] `design_appendix §C` / `§C.6` records the sidecar exception alongside user-scope ownership (T5).
 - [x] Update epic `checklist.md`: record seam 5 verification, the command-form resolution + the retired
-  `SIDECAR_RUNTIME_HOOK_WARNING`, while keeping T10 active until merge (T6 remains next; T8 parked).
-- [ ] After merge, add the compact `docs/board/change_log.md` entry (goal / key changes / verification).
+  `SIDECAR_RUNTIME_HOOK_WARNING`, and advance the cursor to T6 with T8 parked.
+- [x] Add the compact `docs/board/change_log.md` entry (goal / key changes / verification).
 - [x] Keep durable rules in normative design docs; do not promote them to `impl_notes.md` without the human review that
   file requires.
-- [ ] After merge, move card `doing/ -> done/`; repoint the epic forward-link + this card's back-link to `done/`.
+- [x] After merge, move card `doing/ -> done/`; repoint the epic forward-link + this card's back-link to `done/`.
 
 ## Resolved blockers / deferred item
 

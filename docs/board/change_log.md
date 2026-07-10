@@ -25,6 +25,26 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-10
+
+### forge_hook_sidecar_resolution closeout
+
+**Goal**: Close T10 after PR #94 restored Forge runtime hooks inside Claude sidecars.
+
+**Key changes**:
+
+- Shipped fresh canonical hook staging in the persisted sidecar user scope, idempotent entrypoint auth merging, and an
+  image PATH that resolves bare hook and project status-line commands without mutating project `.claude` settings.
+- Persisted deferred work through a host-drainable queue with host-path normalization and container-side drain
+  suppression; retained the stale-image skew guard and PATH breadth as explicit follow-ups.
+- Moved `forge_hook_sidecar_resolution` from `doing/` to `done/`, repointed its epic links, and advanced the epic cursor
+  to T6 with T8 parked.
+
+**Verification**: `make test-unit` (`7517 passed, 1 skipped, 116 deselected`);
+`./scripts/test-integration.sh tests/integration/sidecar/test_sidecar_hook_inject.py -v` (`3 passed`);
+`make pre-commit`; PR #94 GitHub checks (test, pre-commit, CodeQL analyses); `make pre-commit-md`; post-merge board
+link/stale-reference scan.
+
 ## 2026-07-08
 
 ### user_scope_hook_ownership closeout

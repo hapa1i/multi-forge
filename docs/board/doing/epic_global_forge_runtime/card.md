@@ -7,14 +7,13 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, **T5
-[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, and **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**. **T10
-[`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md)** is implemented and verified in `doing/`,
-awaiting PR review and merge before closeout. The epic's coordination [`checklist.md`](checklist.md) (sequencing, seam
-drift-watch, and remaining T6/T8 decisions) stays live. Next implementation cursor is **T6** migration cleanup; **T8**
-remains the parked dev-runtime override. Remaining members stay in `proposed/` (or accepted `todo/` for the split T7
-sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/` (or
-the shared contract is folded into normative design docs).
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, **T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
+[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**. The epic's coordination
+[`checklist.md`](checklist.md) (sequencing, seam drift-watch, and remaining T6/T8 decisions) stays live. Next
+implementation cursor is **T6** migration cleanup; **T8** remains the parked dev-runtime override. Remaining members
+stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
+Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -51,7 +50,7 @@ so neither sits on one linear track.
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                     | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)     | Checkout-local forge for Forge contributors                                         | T4          |
 | T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)             | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
-| T10   | [`forge_hook_sidecar_resolution`](../forge_hook_sidecar_resolution/card.md)           | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
+| T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)   | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
 
 ## Accepted decisions
 
@@ -158,8 +157,7 @@ settings rather than clobbering them, and the sidecar image exposes `/forge/.ven
 Hook-generated artifacts remain under the mounted project state. Deferred-work markers use a separately mounted host
 queue and serialize host-resolvable roots; the container does not drain them. `FORGE_FORGE_ROOT=/workspace` remains the
 in-container root, while internal launcher state carries the host root solely for marker normalization. This is the
-implemented seam-5 contract on the active T10 branch; T2's host-absolute track was skipped and is not part of the
-runtime design.
+shipped seam-5 contract; T2's host-absolute track was skipped and is not part of the runtime design.
 
 ## CLI surface (command placement -- decided intentionally)
 
@@ -186,8 +184,8 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   the real gate, not a stub. T5's registration change is where the command *form* changes to the dispatcher shape and
   where detection is updated (gated on T4's benchmark outcome).
 - **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- delete it before T6 finalizes
-  cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) is implemented after
-  T5 and awaiting merge; it restores runtime hooks in the container through staged sidecar-user settings.
+  cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) shipped after T5 via
+  PR #94 and restores runtime hooks in the container through staged sidecar-user settings.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice
   shipped; the remaining mutator-family sweep is parked in
   [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
@@ -233,8 +231,8 @@ Line refs are the 2026-07-02 snapshot; T3 Phase 0 re-verified the T3-relevant ro
 - **Same-file coexistence, not replacement.** Because Claude hooks merge append+dedupe-by-entry
   (`settings_merge.py:505`), a changed command *adds* a sibling; without unmerge-before-merge, every byte change
   double-fires in the same file. (T2/T5/T6.)
-- **Sidecar regression -- addressed by active T10.** User-scope-only host hooks are unmounted; fresh canonical hooks
-  stage into the persisted in-container user scope and execute through the image PATH.
+- **Sidecar regression -- resolved by T10.** User-scope-only host hooks are unmounted; fresh canonical hooks stage into
+  the persisted in-container user scope and execute through the image PATH.
 - **Legacy untracked entries still exist in the wild.** T9 removes the writer, but any entries it already wrote have no
   `installed.json` tracking and must still be handled by T6's value-based cleanup.
 - **No-op frequency.** The user-scope dispatcher fires on every `PreToolUse:Read` and `UserPromptSubmit` in every repo
