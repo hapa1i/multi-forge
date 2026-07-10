@@ -100,11 +100,8 @@ def _deferred_work_paths(cwd: Path, store: SessionStore | None) -> tuple[Path, s
     if os.environ.get(FORGE_SIDECAR_VAR) == "1":
         host_forge_root = os.environ.get(FORGE_SIDECAR_HOST_FORGE_ROOT_VAR)
         host_worktree_path = os.environ.get(FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR) or host_forge_root
-        if host_worktree_path or host_forge_root:
-            return (
-                Path(host_worktree_path or host_forge_root or str(cwd)),
-                host_forge_root or forge_root,
-            )
+        if host_worktree_path:
+            return Path(host_worktree_path), host_forge_root or forge_root
     return cwd, forge_root
 
 

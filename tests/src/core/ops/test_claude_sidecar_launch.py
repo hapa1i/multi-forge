@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import patch
 
 from forge.core.ops.claude_session import (
+    ClaudeSessionStartResult,
     ClaudeSidecarLaunch,
     ClaudeStartCreated,
     ClaudeStartExtensions,
@@ -62,14 +63,16 @@ class _FakeManager:
         return self._state
 
 
-def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
+def _launch_split_root_sidecar(
     tmp_path: Path,
-) -> None:
+    *,
+    prompt_file: Path | None = None,
+) -> tuple[ClaudeSessionStartResult, Any, Path, Path]:
     forge_root = tmp_path / "main-repo"
     worktree = tmp_path / "checkout"
-    forge_root.mkdir()
-    worktree.mkdir()
-    (worktree / ".claude").mkdir()
+    forge_root.mkdir(exist_ok=True)
+    worktree.mkdir(exist_ok=True)
+    (worktree / ".claude").mkdir(exist_ok=True)
 
     state = create_session_state(
         "split-sidecar",
@@ -114,13 +117,21 @@ def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
             proxy_display=None,
             proxy_id=None,
             normalized_direct_model=None,
-            prompt_file=None,
+            prompt_file=str(prompt_file) if prompt_file is not None else None,
             memory_flag=None,
             subprocess_proxy=None,
             supervisor=None,
             presenter=_Presenter(),
             run_active=run_active,
         )
+
+    return result, run_sidecar, forge_root, worktree
+
+
+def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
+    tmp_path: Path,
+) -> None:
+    result, run_sidecar, forge_root, worktree = _launch_split_root_sidecar(tmp_path)
 
     assert result.exit_code == 0
     kwargs = run_sidecar.call_args.kwargs
@@ -136,3 +147,20 @@ def test_sidecar_launch_mounts_session_forge_root_when_worktree_differs(
         "rw",
     ) in kwargs["extra_mounts"]
     assert not (worktree / ".forge").exists()
+
+
+def test_sidecar_launch_mounts_prompt_hidden_by_split_forge_root(tmp_path: Path) -> None:
+    worktree = tmp_path / "checkout"
+    prompt_file = worktree / ".forge" / "launch-context" / "split-sidecar.md"
+    prompt_file.parent.mkdir(parents=True)
+    prompt_file.write_text("combined launch context\n", encoding="utf-8")
+
+    result, run_sidecar, forge_root, _ = _launch_split_root_sidecar(tmp_path, prompt_file=prompt_file)
+
+    assert result.exit_code == 0
+    kwargs = run_sidecar.call_args.kwargs
+    container_prompt = f"/tmp/{prompt_file.name}"
+    assert (str(forge_root / ".forge"), "/workspace/.forge", "rw") in kwargs["extra_mounts"]
+    assert (str(prompt_file.resolve()), container_prompt, "ro") in kwargs["extra_mounts"]
+    prompt_arg = kwargs["claude_args"].index("--append-system-prompt-file")
+    assert kwargs["claude_args"][prompt_arg + 1] == container_prompt
