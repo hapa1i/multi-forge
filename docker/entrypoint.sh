@@ -97,7 +97,9 @@ fi
 # Configure Claude Code auth for container environment.
 # Containers have no keychain/console login. apiKeyHelper calls a helper script
 # to resolve the API key, and hasCompletedOnboarding skips the first-run screen.
-# All files are in /root/.claude/ (container-local, ephemeral with --rm).
+# /root/.claude is the host-persisted .forge/sidecar-home mount. The launcher
+# restages Forge-owned hooks before every run; this entrypoint merges auth into
+# that fresh settings file so prior-run state cannot clobber or duplicate hooks.
 # See: github.com/anthropics/claude-code/issues/9699
 mkdir -p /root/.claude
 cat > /root/.claude/forge_api_key_helper.sh <<'HELPEREOF'
@@ -106,12 +108,37 @@ printf '%s\n' "${ANTHROPIC_API_KEY:-forge-proxy-passthrough}"
 HELPEREOF
 chmod 700 /root/.claude/forge_api_key_helper.sh
 
-cat > /root/.claude/settings.json <<'SETTINGSEOF'
-{
-  "apiKeyHelper": "/root/.claude/forge_api_key_helper.sh"
-}
-SETTINGSEOF
-chmod 600 /root/.claude/settings.json
+"$FORGE_PYTHON" - <<'SETTINGSPY'
+import json
+import os
+import tempfile
+from pathlib import Path
+
+path = Path("/root/.claude/settings.json")
+if path.is_file():
+    settings = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(settings, dict):
+        raise SystemExit(f"{path} must contain a JSON object")
+else:
+    settings = {}
+
+settings["apiKeyHelper"] = "/root/.claude/forge_api_key_helper.sh"
+fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=".settings.", suffix=".tmp")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(settings, handle, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fchmod(handle.fileno(), 0o600)
+        os.fsync(handle.fileno())
+    os.replace(temp_path, path)
+except BaseException:
+    try:
+        os.unlink(temp_path)
+    except OSError:
+        pass
+    raise
+SETTINGSPY
 
 cat > /root/.claude.json <<'ONBOARDEOF'
 {

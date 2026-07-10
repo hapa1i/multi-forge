@@ -378,6 +378,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_RUN_ID`                    | Internal wiring   | Run-tree attribution id                                             |
 | `FORGE_SESSION`                   | Internal wiring   | Launcher-provided session identity for hooks/status/session tooling |
 | `FORGE_SIDECAR`                   | Internal wiring   | Sidecar runtime marker                                              |
+| `FORGE_SIDECAR_HOST_FORGE_ROOT`   | Internal wiring   | Host path retained for sidecar deferred-work markers                |
 | `FORGE_SUBPROCESS_BASE_URL`       | Internal wiring   | Child-process proxy routing metadata                                |
 | `FORGE_SUBPROCESS_PROXY`          | Internal wiring   | Child-process proxy selection                                       |
 | `FORGE_SUBPROCESS_PROXY_ID`       | Internal wiring   | Child-process resolved proxy id                                     |
@@ -998,6 +999,12 @@ Profiles:
 
 Profiles are filtered by scope before writing: `hooks` and `codex-hooks` are user-only; `status-line` is project/local
 only. Commands, agents, skills, and permissions keep their existing scope behavior.
+
+**Sidecar exception.** Host user settings are not mounted into the container. Before every managed sidecar launch, Forge
+stages the same canonical Claude hook inventory into the Forge-owned `.forge/sidecar-home/settings.json`, mounted at
+`/root/.claude/settings.json`, with bare image-PATH commands (`forge hook <name>`). The entrypoint merges its
+`apiKeyHelper` without replacing the hook block. This is runtime injection, not another install scope: it does not
+mutate project `.claude` files or add tracking rows to `installed.json`.
 
 ### C.3 Settings merge rules
 

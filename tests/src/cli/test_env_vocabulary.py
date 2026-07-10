@@ -29,6 +29,7 @@ ENV_CLASSES = {
     "FORGE_RUN_ID": "internal-wiring",
     "FORGE_SESSION": "internal-wiring",
     "FORGE_SIDECAR": "internal-wiring",
+    "FORGE_SIDECAR_HOST_FORGE_ROOT": "internal-wiring",
     "FORGE_SUBPROCESS_BASE_URL": "internal-wiring",
     "FORGE_SUBPROCESS_PROXY": "internal-wiring",
     "FORGE_SUBPROCESS_PROXY_ID": "internal-wiring",

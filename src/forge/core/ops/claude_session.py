@@ -7,6 +7,7 @@ errors.
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from collections.abc import Callable
@@ -21,10 +22,12 @@ from forge.core.models.direct_model import (
     apply_proxy_context_model_defaults,
 )
 from forge.core.reactive.env import (
+    FORGE_FORGE_ROOT_VAR,
+    FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
-from forge.core.state import FileLockTimeoutError
+from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     LAUNCH_MODE_HOST,
@@ -70,11 +73,6 @@ from forge.session.models import session_runtime
 from .session import ForgeOpError
 
 logger = logging.getLogger(__name__)
-
-SIDECAR_RUNTIME_HOOK_WARNING = (
-    "Sidecar sessions currently launch without Forge runtime hooks inside the container; "
-    "hook-backed policy and session automation may be inactive there."
-)
 
 
 @dataclass(frozen=True)
@@ -1238,9 +1236,14 @@ def _run_sidecar_claude_session(
     claude_dir = launch_root / ".claude"
     forge_dir = launch_root / ".forge"
     sidecar_home = forge_dir / "sidecar-home"
+    from forge.core.paths import get_forge_home
+
+    host_pending_work = get_forge_home() / "pending-work"
     claude_dir.mkdir(parents=True, exist_ok=True)
     forge_dir.mkdir(parents=True, exist_ok=True)
     sidecar_home.mkdir(parents=True, exist_ok=True)
+    host_pending_work.mkdir(parents=True, exist_ok=True)
+    _stage_sidecar_hook_settings(sidecar_home)
     sidecar_prompt_file, prompt_mounts = _prepare_sidecar_prompt_file(
         worktree_path=launch_root,
         system_prompt_file=system_prompt_file,
@@ -1249,6 +1252,7 @@ def _run_sidecar_claude_session(
         (str(claude_dir), "/workspace/.claude", "rw"),
         (str(forge_dir), "/workspace/.forge", "rw"),
         (str(sidecar_home), "/root/.claude", "rw"),
+        (str(host_pending_work), "/root/.forge/pending-work", "rw"),
     ]
     all_mounts = standard_mounts + prompt_mounts + extra_mounts
     claude_args = build_claude_args(
@@ -1263,6 +1267,11 @@ def _run_sidecar_claude_session(
 
     secrets = get_secrets_for_template(effective_template)
     container_env = {**env_vars, **secrets}
+    # Host paths in launcher-owned env are not meaningful inside the container.
+    # Hooks operate on the project mount, while deferred-work markers retain the
+    # host root separately so the host CLI can drain them after the container exits.
+    container_env[FORGE_FORGE_ROOT_VAR] = "/workspace"
+    container_env[FORGE_SIDECAR_HOST_FORGE_ROOT_VAR] = str(launch_root.resolve())
 
     if "LITELLM_BASE_URL" not in container_env:
         try:
@@ -1311,11 +1320,8 @@ def _run_sidecar_claude_session(
     )
 
     sidecar_image = image or _runtime_config.sidecar_image
-    sidecar_warnings = (SIDECAR_RUNTIME_HOOK_WARNING,)
     if on_sidecar_launch is not None:
-        on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id, warnings=sidecar_warnings))
-    else:
-        warnings.extend(sidecar_warnings)
+        on_sidecar_launch(_build_sidecar_launch_payload(sidecar_image, proxy_id))
 
     _update_manifest_best_effort(
         store,
@@ -1371,6 +1377,16 @@ def _run_sidecar_claude_session(
         claude_project_root=str(launch_root),
         store_exists=store.exists(),
     )
+
+
+def _stage_sidecar_hook_settings(sidecar_home: Path) -> Path:
+    """Replace the Forge-owned sidecar user settings for the next launch."""
+    from forge.install.preset import get_sidecar_hook_settings
+
+    settings_path = sidecar_home / "settings.json"
+    content = json.dumps(get_sidecar_hook_settings(), indent=2) + "\n"
+    atomic_write_text(settings_path, content, mode=0o600)
+    return settings_path
 
 
 def _run_host_claude_session(

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
@@ -62,6 +63,16 @@ class TestStartupQueueProcessing:
 
         # Command completes (may have non-zero exit if no install state, but shouldn't crash)
         assert result.exception is None or isinstance(result.exception, SystemExit)
+
+    def test_sidecar_cli_leaves_host_queue_for_host_drain(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        marker = _create_test_marker(tmp_path)
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+
+        CliRunner().invoke(main, ["extension", "status"])
+
+        assert marker.is_file(), "Sidecar commands must not consume host-path work markers"
 
 
 class TestExemptSubcommands:

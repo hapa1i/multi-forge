@@ -110,6 +110,10 @@ forge extension disable --scope user
 > **Note:** Explicit `--with hooks` at `--scope local` or `--scope project` is rejected. Runtime hooks are user-scoped;
 > project/local installs own statusLine and other project settings.
 
+> **Sidecar sessions:** host user settings are not mounted into the container. Forge stages the current hook inventory
+> into its container user settings automatically on every launch, using the `forge` executable bundled in the image.
+> This does not modify the project's `.claude/settings*.json` files.
+
 ---
 
 ## Core hooks (what they do)

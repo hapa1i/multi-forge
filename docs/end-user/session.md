@@ -321,6 +321,9 @@ Why use sidecar mode:
 - project directory is mounted at `/workspace`
 - optional extra mounts: `--mount /data:/mnt/data:ro`
 - custom image: `--image my-dev-image:latest`
+- Forge injects its runtime hooks into the container's user settings on every launch; project `.claude` files are not
+  rewritten
+- Stop-time indexing and memory work is persisted to the host queue and drained by a later host `forge` command
 - Forge records sidecar mode, extra mounts, and image in the session manifest so `forge session resume <name>` can
   replay them later
 
@@ -878,6 +881,7 @@ same way.
 - Sidecar sessions use a container-local proxy at `http://localhost:8085`
 - `forge session shell [name]` only works for sessions started with `--sidecar`
 - The project directory is mounted at `/workspace` inside the container
+- Runtime hooks use the container's `forge` executable; custom sidecar images must keep `forge` on `PATH`
 
 ### Files to inspect (debugging)
 
