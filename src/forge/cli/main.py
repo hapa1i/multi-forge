@@ -6,6 +6,7 @@ This module defines the `forge` command group and registers subcommands.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import click
@@ -179,6 +180,13 @@ def _process_pending_work_best_effort() -> None:
     Handlers are assembled here (CLI assembly layer) and passed explicitly
     to avoid global registry coupling.
     """
+    from forge.core.reactive.env import FORGE_SIDECAR_VAR
+
+    # Sidecar markers carry host-resolvable paths and are mounted specifically
+    # for the host CLI to drain. Never consume or poison them inside the container.
+    if os.environ.get(FORGE_SIDECAR_VAR) == "1":
+        return
+
     try:
         from forge.core.workqueue import Marker, WorkHandler, process_pending_work
 

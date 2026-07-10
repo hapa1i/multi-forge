@@ -5,15 +5,16 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T5 closeout complete after PR #93 merged.** Shipped members now are T1
+**T10 sidecar resolution shipped via PR #94 and its member card is closed.** Shipped members are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
-[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), and T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md). T5 flipped hook registration to user-scope-only, cut
-hook command bytes over to the hyphenated dispatcher form (unmerge-before-merge), updated presence detection, and added
-double-fire detection. Next cursor: **T10** sidecar resolution and **T6** migration cleanup; **T8** remains the
-dev-runtime override. T7's remaining mutator-family sweep is parked in
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
+[`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
+[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). T10 restores in-container hooks by
+staging canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes
+deferred work through a host-drainable queue with normalized roots. Next implementation cursor: **T6** migration
+cleanup; **T8** remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
 user-facing strings against the shipped env-var vocabulary boundary.
@@ -104,6 +105,13 @@ Record outcomes here as members are picked up.
   from skipped T2 folds into T5. Checklist reviewed 2026-07-08; Phase 0 decisions resolved (enable UX keeps
   `--scope user`; sidecar -> T10 with exposure gate; additive detection; explicit project/local hook overrides
   hard-reject). Moved `doing/ -> done/` after PR #93 merged.
+- [x] Next member after T5: **T10 `forge_hook_sidecar_resolution`** (seam 5), picked up 2026-07-08; `git mv`
+  `proposed/ -> doing/` on branch `forge-hook-sidecar-resolution`, epic forward-link + member back-link repointed, and
+  execution checklist added. Phase 0 reframes the card around the shipped T5 world: T2 was skipped, so the live
+  regression is a hookless sidecar plus sidecar-specific PATH/settings persistence effects, not host-absolute project
+  hook bytes. Implementation verified 2026-07-09: canonical settings stage at `.forge/sidecar-home`, the entrypoint
+  merges auth idempotently, bare `forge hook` resolves via image PATH, pending work is host-drainable, and the interim
+  warning is retired. PR #94 merged 2026-07-10; moved `doing/ -> done/` in the separate post-merge closeout commit.
 
 ## Shared-contract seams (drift watch)
 
@@ -114,7 +122,7 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 - [ ] Seam 2 -- `~/.forge/projects.json` schema (JSON, D-T3-c) + one canonicalization rule.
 - [ ] Seam 3 -- Forge-binary resolution contract (+ `FORGE_SESSION` / managed-session short-circuit).
 - [ ] Seam 4 -- runtime hooks live only at user scope (statusLine is the D3 exception -- stays project-scoped).
-- [ ] Seam 5 -- host vs sidecar execution (T10 owns in-container resolution, `FORGE_SIDECAR`-keyed).
+- [ ] Seam 5 -- host vs sidecar execution (verified by T10; retained unchecked until epic closeout per the rule above).
 
 ## Accepted decisions (reference; detail in card.md)
 
@@ -127,5 +135,6 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 
 - [ ] Every live member card is `done/` (or the shared contract is folded into normative design docs).
 - [ ] design.md / design_appendix §C / cli_reference reflect the shipped install + hook-ownership model.
+- [ ] When moving the epic to `done/`, repoint done-member back-links that currently target the epic's `doing/` path.
 - [ ] Epic moved `doing/ -> done/`; `change_log.md` entry added; durable lessons promoted to `impl_notes.md` after human
   review.

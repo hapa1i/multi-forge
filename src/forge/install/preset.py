@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -29,13 +30,18 @@ def _hook_command(handler: str) -> str:
     return render_dispatcher_command(handler)
 
 
+def _sidecar_hook_command(handler: str) -> str:
+    """Render the command form used inside a managed sidecar container."""
+    return f"forge hook {handler}"
+
+
 def get_preset_path() -> Path:
     """Return the path to ~/.forge/claude.preset.json."""
     return get_forge_home() / PRESET_FILENAME
 
 
-def get_builtin_preset() -> dict[str, Any]:
-    """Return the built-in preset content (factory defaults).
+def _build_builtin_preset(hook_command: Callable[[str], str]) -> dict[str, Any]:
+    """Build the preset from the canonical hook inventory.
 
     Contains only essential Forge infrastructure:
     - hooks: all 13 Forge-managed hook events
@@ -55,7 +61,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("session-start"),
+                            "command": hook_command("session-start"),
                         }
                     ]
                 }
@@ -66,7 +72,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("read-hygiene"),
+                            "command": hook_command("read-hygiene"),
                             "timeout": 5,
                         }
                     ],
@@ -76,7 +82,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("exit-plan-mode"),
+                            "command": hook_command("exit-plan-mode"),
                         }
                     ],
                 },
@@ -85,7 +91,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("policy-check"),
+                            "command": hook_command("policy-check"),
                             "timeout": 60,
                         }
                     ],
@@ -95,7 +101,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("policy-check"),
+                            "command": hook_command("policy-check"),
                             "timeout": 60,
                         }
                     ],
@@ -107,7 +113,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("plan-write"),
+                            "command": hook_command("plan-write"),
                         }
                     ],
                 }
@@ -117,7 +123,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("stop"),
+                            "command": hook_command("stop"),
                         }
                     ]
                 }
@@ -127,7 +133,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("stop-failure"),
+                            "command": hook_command("stop-failure"),
                         }
                     ]
                 }
@@ -137,7 +143,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("user-prompt-submit"),
+                            "command": hook_command("user-prompt-submit"),
                         }
                     ]
                 }
@@ -147,7 +153,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("pre-compact"),
+                            "command": hook_command("pre-compact"),
                             "timeout": 10,
                         }
                     ],
@@ -158,7 +164,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("post-compact"),
+                            "command": hook_command("post-compact"),
                             "timeout": 5,
                         }
                     ],
@@ -169,7 +175,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("worktree-create"),
+                            "command": hook_command("worktree-create"),
                             "timeout": 30,
                         }
                     ],
@@ -180,7 +186,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("subagent-stop"),
+                            "command": hook_command("subagent-stop"),
                             "timeout": 10,
                         }
                     ],
@@ -191,7 +197,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("teammate-idle"),
+                            "command": hook_command("teammate-idle"),
                             "timeout": 60,
                         }
                     ]
@@ -202,7 +208,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("task-completed"),
+                            "command": hook_command("task-completed"),
                             "timeout": 60,
                         }
                     ]
@@ -213,7 +219,7 @@ def get_builtin_preset() -> dict[str, Any]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_command("session-end"),
+                            "command": hook_command("session-end"),
                             "timeout": 5,
                         }
                     ]
@@ -226,6 +232,22 @@ def get_builtin_preset() -> dict[str, Any]:
             "padding": 0,
         },
     }
+
+
+def get_builtin_preset() -> dict[str, Any]:
+    """Return the host/user-scope preset with dispatcher hook commands."""
+    return _build_builtin_preset(_hook_command)
+
+
+def get_sidecar_hook_settings() -> dict[str, Any]:
+    """Return the Forge-owned user settings staged for a sidecar launch.
+
+    Sidecars are always managed sessions, so they do not need the host dispatcher's
+    project-enrollment gate or binary resolver. Only the hook block is staged here;
+    project-scoped statusLine and permissions continue to come from the mounted
+    project settings.
+    """
+    return {"hooks": _build_builtin_preset(_sidecar_hook_command)["hooks"]}
 
 
 def get_builtin_preset_json() -> str:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from typing import Any, Callable
 
 import click
 
+from forge.core.reactive.env import FORGE_SIDECAR_HOST_FORGE_ROOT_VAR, FORGE_SIDECAR_VAR
 from forge.core.state import FileLockTimeoutError, now_iso
 from forge.core.workqueue import (
     enqueue_handoff_marker,
@@ -39,7 +41,7 @@ from forge.session.hooks import (
     parse_hook_input,
     resolve_session_store,
 )
-from forge.session.store import HOOK_LOCK_TIMEOUT_S
+from forge.session.store import HOOK_LOCK_TIMEOUT_S, SessionStore
 
 from ._group import hooks
 from ._helpers import (
@@ -86,6 +88,16 @@ class _TranscriptCaptureResult:
     dst_rel: Path
     manifest_updated: bool
     manifest_error: str | None
+
+
+def _deferred_work_paths(cwd: Path, store: SessionStore | None) -> tuple[Path, str | None]:
+    """Return host-resolvable paths for deferred work produced in a sidecar."""
+    forge_root = str(store.forge_root) if store else None
+    if os.environ.get(FORGE_SIDECAR_VAR) == "1":
+        host_forge_root = os.environ.get(FORGE_SIDECAR_HOST_FORGE_ROOT_VAR)
+        if host_forge_root:
+            return Path(host_forge_root), host_forge_root
+    return cwd, forge_root
 
 
 def _capture_transcript_artifact(
@@ -550,11 +562,11 @@ def stop() -> None:
     # Important: enqueue even if manifest update failed - the transcript artifact
     # exists on disk and deferred work should still be triggered.
     # Only enqueue if verification passed (we reach here only if should_allow_stop=True)
-    effective_forge_root = str(store.forge_root) if store else None
+    deferred_worktree_path, effective_forge_root = _deferred_work_paths(cwd, store)
     queued_stop = (
         enqueue_stop_marker(
             session_id=session_id,
-            worktree_path=cwd,
+            worktree_path=deferred_worktree_path,
             session_name=manifest.name,
             transcript_snapshot_rel=str(dst_rel),
             forge_root=effective_forge_root,
@@ -564,7 +576,7 @@ def stop() -> None:
     queued_index = (
         enqueue_index_marker(
             session_id=session_id,
-            worktree_path=cwd,
+            worktree_path=deferred_worktree_path,
             session_name=manifest.name,
             transcript_snapshot_rel=str(dst_rel),
             forge_root=effective_forge_root,
@@ -583,7 +595,7 @@ def stop() -> None:
             queued_handoff = (
                 enqueue_handoff_marker(
                     session_id=session_id,
-                    worktree_path=cwd,
+                    worktree_path=deferred_worktree_path,
                     session_name=manifest.name,
                     transcript_snapshot_rel=str(dst_rel),
                     subprocess_proxy=effective.subprocess_proxy,
@@ -606,7 +618,7 @@ def stop() -> None:
                 enqueue_shadow_marker(
                     session_id=session_id,
                     session_name=manifest.name,
-                    worktree_path=cwd,
+                    worktree_path=deferred_worktree_path,
                     forge_root=effective_forge_root,
                 )
                 is not None
@@ -728,12 +740,12 @@ def stop_failure() -> None:
     # Enqueuing for a nonexistent artifact wastes retries until poison handling.
     queued_stop = False
     queued_index = False
-    effective_forge_root = str(store.forge_root) if store else None
+    deferred_worktree_path, effective_forge_root = _deferred_work_paths(cwd, store)
     if dst_abs.is_file():
         queued_stop = (
             enqueue_stop_marker(
                 session_id=session_id,
-                worktree_path=cwd,
+                worktree_path=deferred_worktree_path,
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
                 forge_root=effective_forge_root,
@@ -743,7 +755,7 @@ def stop_failure() -> None:
         queued_index = (
             enqueue_index_marker(
                 session_id=session_id,
-                worktree_path=cwd,
+                worktree_path=deferred_worktree_path,
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
                 forge_root=effective_forge_root,

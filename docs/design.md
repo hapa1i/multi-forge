@@ -1302,17 +1302,28 @@ multi-forge/
 **Sidecar mode** solves operational problems (not security): lifecycle coupling, port isolation, version consistency,
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
 `--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount all of `~/.forge` (UID issues, undermines port
-isolation). **Narrow exception (§7.x audit path):** when a session launches with a proxy id, the sidecar additionally
-mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and
-`~/.forge/audit/`, `~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost
-files, downstream/upstream telemetry, cap state, and the usage-attribution ledger persist on the host instead of dying
-with the `--rm` container — the ledger is the only record of the in-container supervisor/verb activity, and it feeds
-`forge telemetry activity` and the session-end summary for sidecar sessions). These are the only `~/.forge` subdirs
-mounted, preserving the port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has
-no passwd entry, so the launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`)
-so the mapped uid can reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral
-single-session `--rm` sandbox, **not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode,
-extra mounts, and image in `intent.launch` so `forge session resume <name>` can replay the same runtime wiring later.
+isolation). The launcher stages the canonical Claude runtime-hook inventory at
+`<forge_root>/.forge/sidecar-home/settings.json`, mounted as the in-container user scope at
+`/root/.claude/settings.json`. Those entries use the image-resolvable bare form (`forge hook <name>`), because every
+sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The file is replaced on
+every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project `.claude/settings*.json` bytes are
+never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
+host root separately.
+
+The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so Stop-time
+index/memory/shadow work survives `--rm` and is drained only by the host CLI. **Narrow exception (§7.x audit path):**
+when a session launches with a proxy id, the sidecar additionally mounts that proxy's `~/.forge/proxies/<id>/` read-only
+(so the in-container proxy loads its intercept/audit overlay) and `~/.forge/audit/`, `~/.forge/costs/`,
+`~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost files, downstream/upstream telemetry, cap
+state, and the usage-attribution ledger persist on the host instead of dying with the `--rm` container — the ledger is
+the only record of the in-container supervisor/verb activity, and it feeds `forge telemetry activity` and the
+session-end summary for sidecar sessions). These are the only global `~/.forge` subdirectories mounted, preserving the
+port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the
+launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can
+reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox,
+**not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in
+`intent.launch` so `forge session resume <name>` can replay the same runtime wiring later. Project-scoped `statusLine`
+remains the D3 exception to user-scope hook ownership and resolves through the sidecar image's `PATH`.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.
