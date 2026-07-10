@@ -192,6 +192,35 @@ class TestStopHook:
             assert payload["worktree_path"] == str(host_root)
             assert payload["forge_root"] == str(host_root)
 
+    def test_sidecar_markers_preserve_split_host_worktree_and_forge_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from forge.core.workqueue import pending_work_dir
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        transcript = tmp_path / "sidecar-split.jsonl"
+        transcript.write_text("{}\n", encoding="utf-8")
+        manifest = store.read()
+        manifest.confirmed.transcript_path = str(transcript)
+        manifest.confirmed.claude_session_id = "uuid-sidecar-split"
+        store.write(manifest)
+
+        host_worktree = tmp_path / "host-checkout"
+        host_forge_root = tmp_path / "host-main"
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        monkeypatch.setenv("FORGE_SIDECAR_HOST_WORKTREE_PATH", str(host_worktree))
+        monkeypatch.setenv("FORGE_SIDECAR_HOST_FORGE_ROOT", str(host_forge_root))
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        for marker_name in ("uuid-sidecar-split.json", "idx-uuid-sidecar-split.json"):
+            payload = json.loads((pending_work_dir() / marker_name).read_text())["payload"]
+            assert payload["worktree_path"] == str(host_worktree)
+            assert payload["forge_root"] == str(host_forge_root)
+
     def _stop_with_transcript(self, store: SessionStore, tmp_path: Path, session_id: str) -> SessionStore:
         transcript = tmp_path / "t.jsonl"
         transcript.write_text("{}\n", encoding="utf-8")

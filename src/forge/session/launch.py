@@ -122,11 +122,20 @@ def _prepare_sidecar_prompt_file(
     prompt_path = Path(system_prompt_file).resolve()
     worktree_root = worktree_path.resolve()
 
+    def mount_prompt() -> tuple[str, list[tuple[str, str, str]]]:
+        container_prompt = f"/tmp/{prompt_path.name}"
+        return container_prompt, [(str(prompt_path), container_prompt, "ro")]
+
     try:
         relative_prompt = prompt_path.relative_to(worktree_root)
     except ValueError:
-        container_prompt = f"/tmp/{prompt_path.name}"
-        return container_prompt, [(str(prompt_path), container_prompt, "ro")]
+        return mount_prompt()
+
+    # The sidecar overlays /workspace/.forge with the manifest-owned Forge root.
+    # A launch-context file under a split-root checkout's .forge would therefore
+    # be hidden unless it receives its own mount.
+    if relative_prompt.parts[:1] == (".forge",):
+        return mount_prompt()
 
     return str(Path("/workspace") / relative_prompt), []
 

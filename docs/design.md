@@ -1301,14 +1301,15 @@ multi-forge/
 
 **Sidecar mode** solves operational problems (not security): lifecycle coupling, port isolation, version consistency,
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
-`--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount all of `~/.forge` (UID issues, undermines port
-isolation). The launcher stages the canonical Claude runtime-hook inventory at
+`--host-proxy`. The launch checkout supplies `.claude/`, while the session manifest's Forge root supplies `.forge/`;
+Forge mounts both at their corresponding paths under `/workspace`. It does NOT mount all of `~/.forge` (UID issues,
+undermines port isolation). The launcher stages the canonical Claude runtime-hook inventory at
 `<forge_root>/.forge/sidecar-home/settings.json`, mounted as the in-container user scope at
 `/root/.claude/settings.json`. Those entries use the image-resolvable bare form (`forge hook <name>`), because every
 sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The file is replaced on
 every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project `.claude/settings*.json` bytes are
 never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
-host root separately.
+host checkout and manifest-owned Forge root separately.
 
 The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so Stop-time
 index/memory/shadow work survives `--rm` and is drained only by the host CLI. **Narrow exception (§7.x audit path):**

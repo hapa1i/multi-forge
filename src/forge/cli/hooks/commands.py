@@ -20,7 +20,11 @@ from typing import Any, Callable
 
 import click
 
-from forge.core.reactive.env import FORGE_SIDECAR_HOST_FORGE_ROOT_VAR, FORGE_SIDECAR_VAR
+from forge.core.reactive.env import (
+    FORGE_SIDECAR_HOST_FORGE_ROOT_VAR,
+    FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR,
+    FORGE_SIDECAR_VAR,
+)
 from forge.core.state import FileLockTimeoutError, now_iso
 from forge.core.workqueue import (
     enqueue_handoff_marker,
@@ -95,8 +99,9 @@ def _deferred_work_paths(cwd: Path, store: SessionStore | None) -> tuple[Path, s
     forge_root = str(store.forge_root) if store else None
     if os.environ.get(FORGE_SIDECAR_VAR) == "1":
         host_forge_root = os.environ.get(FORGE_SIDECAR_HOST_FORGE_ROOT_VAR)
-        if host_forge_root:
-            return Path(host_forge_root), host_forge_root
+        host_worktree_path = os.environ.get(FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR) or host_forge_root
+        if host_worktree_path:
+            return Path(host_worktree_path), host_forge_root or forge_root
     return cwd, forge_root
 
 
