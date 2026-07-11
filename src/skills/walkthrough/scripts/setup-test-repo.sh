@@ -73,7 +73,7 @@ if [ "${1:-}" = "--reset" ]; then
         fi
         echo "Resetting test repo: $FORGE_TEST_REPO" >&2
         cd "$FORGE_TEST_REPO"
-        git clean -fdx -e .forge/walkthrough/ -e .forge-home/
+        git clean -fdx -e .forge/walkthrough/ -e .forge-home/ -e .claude-user/ -e .codex-user/
         git checkout -- .
         mkdir -p .forge-home
         mkdir -p .forge/walkthrough

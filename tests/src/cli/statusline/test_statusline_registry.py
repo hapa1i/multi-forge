@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -366,13 +367,8 @@ class TestLazyContext:
 
     def test_hooks_segment_reports_double_scope_only_when_enabled(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with (
-            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True) as detect,
-            patch(
-                "forge.install.hooks.has_forge_hook_cleanup_required",
-                return_value=False,
-            ),
-        ):
+        diagnostics = SimpleNamespace(double_fire_risk=True, cleanup_registrations=())
+        with patch("forge.install.hooks.diagnose_forge_hook_runtime", return_value=diagnostics) as detect:
             where, stream = render_segments(ctx, ["path", "hooks"])
 
         detect.assert_called_once()
@@ -381,23 +377,16 @@ class TestLazyContext:
 
     def test_hooks_segment_omits_single_scope(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with (
-            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False),
-            patch(
-                "forge.install.hooks.has_forge_hook_cleanup_required",
-                return_value=False,
-            ),
-        ):
+        diagnostics = SimpleNamespace(double_fire_risk=False, cleanup_registrations=())
+        with patch("forge.install.hooks.diagnose_forge_hook_runtime", return_value=diagnostics):
             _where, stream = render_segments(ctx, ["hooks"])
 
         assert stream == []
 
     def test_hooks_segment_reports_cleanup_without_labeling_it_double_fire(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with (
-            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False),
-            patch("forge.install.hooks.has_forge_hook_cleanup_required", return_value=True),
-        ):
+        diagnostics = SimpleNamespace(double_fire_risk=False, cleanup_registrations=(object(),))
+        with patch("forge.install.hooks.diagnose_forge_hook_runtime", return_value=diagnostics):
             _where, stream = render_segments(ctx, ["hooks"])
 
         assert stream == [f"{sl.YELLOW_BOLD}{sl.HOOK_CLEANUP_INDICATOR}{sl.RESET}"]
@@ -405,10 +394,8 @@ class TestLazyContext:
 
     def test_hooks_segment_can_report_cleanup_and_double_fire_together(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with (
-            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True),
-            patch("forge.install.hooks.has_forge_hook_cleanup_required", return_value=True),
-        ):
+        diagnostics = SimpleNamespace(double_fire_risk=True, cleanup_registrations=(object(),))
+        with patch("forge.install.hooks.diagnose_forge_hook_runtime", return_value=diagnostics):
             _where, stream = render_segments(ctx, ["hooks"])
 
         assert len(stream) == 1

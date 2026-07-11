@@ -955,7 +955,9 @@ class Installer:
             # dispatcher merge so settings.json changes in one atomic write.
             from .hook_migration import remove_known_legacy_hook_entries
 
-            settings, _removed_legacy_count = remove_known_legacy_hook_entries(settings)
+            settings, removed_legacy_count = remove_known_legacy_hook_entries(settings)
+            if removed_legacy_count:
+                plan.legacy_hook_cleanup_paths.append(str(settings_path))
         forge_settings = self._load_forge_settings()
         include_permissions = InstallModule.PERMISSIONS in modules
         entries = merge(

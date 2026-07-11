@@ -351,6 +351,34 @@ PY
         assert check.returncode == 0, f"Migration verification failed: {check.stderr}"
         assert "migration-ok" in check.stdout
 
+        disabled = synced_container.exec(
+            "cd ~/repo-hook-migration && CODEX_HOME=/tmp/codex-home "
+            "/forge/.venv/bin/forge extension disable --scope project --yes"
+        )
+        assert disabled.returncode == 0, f"Disable failed: stdout={disabled.stdout!r} stderr={disabled.stderr!r}"
+        disable_check = synced_container.exec("""
+            cd /forge && CODEX_HOME=/tmp/codex-home uv run python - <<'PY'
+from pathlib import Path
+
+from forge.install.hooks import find_forge_hook_registrations
+from forge.install.models import InstallScope
+from forge.install.settings_merge import read_settings
+from forge.install.tracking import TrackingStore
+
+root = Path.home() / "repo-hook-migration"
+assert "hooks" not in read_settings(root / ".claude" / "settings.json")
+registrations = find_forge_hook_registrations(root)
+assert registrations
+assert {registration.scope for registration in registrations} == {"user"}
+tracking = TrackingStore()
+assert tracking.get_installation(InstallScope.PROJECT.value, str(root)) is None
+assert tracking.get_installation(InstallScope.USER.value) is not None
+print("disable-after-migration-ok")
+PY
+            """)
+        assert disable_check.returncode == 0, f"Post-migration disable verification failed: {disable_check.stderr}"
+        assert "disable-after-migration-ok" in disable_check.stdout
+
 
 class TestForgeExtensionDisable:
     """Tests for forge extension disable command."""

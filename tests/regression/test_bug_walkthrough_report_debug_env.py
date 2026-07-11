@@ -4,8 +4,9 @@ Bug: walkthrough `--report` wanted QA-style debug logs, but the sandbox env
 did not enable `FORGE_DEBUG` and reruns preserved stale `.forge-home/logs`
 content. That made copied artifacts incomplete or polluted by prior runs.
 
-Fix: env.sh now exports `FORGE_DEBUG=1`, and setup/reset scrubs
-`.forge-home/logs` alongside other volatile walkthrough state.
+Fix: env.sh exports `FORGE_DEBUG=1`, setup/reset scrubs `.forge-home/logs`
+alongside other volatile walkthrough state, and reset preserves the three
+coherent sandbox homes together.
 """
 
 from __future__ import annotations
@@ -19,8 +20,8 @@ import pytest
 pytestmark = pytest.mark.regression
 
 
-def test_setup_repo_enables_debug_and_reset_scrubs_logs(tmp_path: Path) -> None:
-    """Generated env.sh should enable debug logs, and reset should clear them."""
+def test_setup_repo_enables_debug_and_reset_preserves_sandbox_homes(tmp_path: Path) -> None:
+    """Reset should clear volatile logs without splitting persistent sandbox state."""
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "src" / "skills" / "walkthrough" / "scripts" / "setup-test-repo.sh"
 
@@ -49,6 +50,12 @@ def test_setup_repo_enables_debug_and_reset_scrubs_logs(tmp_path: Path) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     log_file.write_text("debug evidence\n", encoding="utf-8")
     assert log_file.exists()
+    tracking = forge_test_repo / ".forge-home" / "installed.json"
+    claude_settings = forge_test_repo / ".claude-user" / "settings.json"
+    codex_settings = forge_test_repo / ".codex-user" / "config.toml"
+    tracking.write_text('{"version": 1}\n', encoding="utf-8")
+    claude_settings.write_text('{"custom": true}\n', encoding="utf-8")
+    codex_settings.write_text('model = "gpt-5"\n', encoding="utf-8")
 
     reset = subprocess.run(
         ["bash", str(script), "--reset"],
@@ -58,6 +65,9 @@ def test_setup_repo_enables_debug_and_reset_scrubs_logs(tmp_path: Path) -> None:
     )
     assert reset.returncode == 0, reset.stderr
     assert not log_file.exists()
+    assert tracking.read_text(encoding="utf-8") == '{"version": 1}\n'
+    assert claude_settings.read_text(encoding="utf-8") == '{"custom": true}\n'
+    assert codex_settings.read_text(encoding="utf-8") == 'model = "gpt-5"\n'
 
     reset_env_text = env_file.read_text(encoding="utf-8")
     assert 'export FORGE_DEBUG="1"' in reset_env_text

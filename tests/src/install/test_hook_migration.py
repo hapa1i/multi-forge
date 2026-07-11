@@ -38,6 +38,7 @@ from forge.install.project_registry import (
 )
 from forge.install.settings_merge import (
     entries_to_added_structure,
+    find_backup_files,
     get_added_path,
     get_settings_path,
     load_added_settings,
@@ -375,6 +376,59 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     assert repeated.enrollment_created is False
 
 
+def test_disable_after_migration_does_not_restore_or_re_remove_legacy_hooks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.installer import Installer
+
+    root = _forge_root(tmp_path)
+    hook_entry = _legacy_entry()
+    permission_entry = InstalledSettingsEntry(
+        key_path="permissions.allow",
+        value="Read",
+        merge_type="union",
+        stable_id="Read",
+    )
+    settings = get_settings_path(InstallScope.PROJECT, root)
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {"SessionStart": [hook_entry]},
+                "permissions": {"allow": ["Read", "UserOwned"]},
+                "custom": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    installation = _installation(root, hook_entry)
+    installation.modules_enabled.append(InstallModule.PERMISSIONS.value)
+    installation.settings_entries.append(permission_entry)
+    tracking = TrackingStore()
+    tracking.set_installation(InstallScope.PROJECT.value, installation, str(root))
+    save_added_settings(settings, entries_to_added_structure(installation.settings_entries))
+    monkeypatch.setattr(
+        "forge.install.hook_migration.diagnose_hook_dispatcher",
+        lambda: SimpleNamespace(status="current"),
+    )
+    monkeypatch.setattr("forge.install.hook_migration.install_hook_dispatcher", lambda: None)
+
+    apply_project_hook_migration(root, tracking=tracking)
+    assert "hooks" not in read_settings(settings)
+
+    Installer(
+        scope=InstallScope.PROJECT,
+        project_root=root,
+        tracking_store=tracking,
+    ).uninstall()
+
+    disabled = read_settings(settings)
+    assert "hooks" not in disabled
+    assert disabled["permissions"]["allow"] == ["UserOwned"]
+    assert disabled["custom"] is True
+    assert tracking.get_installation(InstallScope.PROJECT.value, str(root)) is None
+
+
 def test_enrollment_observes_clean_root_and_current_user_dispatcher(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -513,6 +567,7 @@ def test_codex_block_moves_to_user_scope_after_project_cleanup(
     assert updated_user is not None
     assert InstallModule.CODEX_HOOKS.value in updated_user.modules_enabled
     assert any(".config.toml.forge.backup." in path.name for path in result.backup_paths)
+    assert result.user_codex_action == "install"
 
 
 def test_enrollment_failure_reports_hooks_off_recovery(
@@ -544,4 +599,36 @@ def test_enrollment_failure_reports_hooks_off_recovery(
 
     assert "cleanup-project --root" in str(exc_info.value)
     assert "hooks" not in read_settings(settings)
+    assert not get_project_registry_path().exists()
+
+
+def test_dispatcher_write_failure_keeps_backups_and_reports_hooks_off_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _forge_root(tmp_path)
+    entry = _legacy_entry()
+    settings = get_settings_path(InstallScope.PROJECT, root)
+    settings.write_text(json.dumps({"hooks": {"SessionStart": [entry]}}), encoding="utf-8")
+    tracking = TrackingStore()
+    tracking.set_installation(InstallScope.PROJECT.value, _installation(root, entry), str(root))
+    monkeypatch.setattr(
+        "forge.install.hook_migration.diagnose_hook_dispatcher",
+        lambda: SimpleNamespace(status="missing"),
+    )
+
+    def fail_dispatcher_write() -> None:
+        raise OSError("injected dispatcher write failure")
+
+    monkeypatch.setattr("forge.install.hook_migration.install_hook_dispatcher", fail_dispatcher_write)
+
+    with pytest.raises(HookMigrationError, match="hooks may be temporarily off") as exc_info:
+        apply_project_hook_migration(root, tracking=tracking)
+
+    assert "cleanup-project --root" in str(exc_info.value)
+    assert "injected dispatcher write failure" in str(exc_info.value)
+    assert "hooks" not in read_settings(settings)
+    backups = find_backup_files(settings)
+    assert backups
+    assert read_settings(backups[0])["hooks"]["SessionStart"] == [entry]
     assert not get_project_registry_path().exists()

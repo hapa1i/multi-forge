@@ -25,6 +25,15 @@ class ForgeHookRegistration:
     matcher: str | None = None
 
 
+@dataclass(frozen=True)
+class ForgeHookRuntimeDiagnostics:
+    """One scan's runtime ownership and duplicate-hook diagnostics."""
+
+    registrations: tuple[ForgeHookRegistration, ...]
+    cleanup_registrations: tuple[ForgeHookRegistration, ...]
+    double_fire_risk: bool
+
+
 def _find_claude_dir(start: Path) -> Path | None:
     """Walk up from start to find the nearest .claude/ directory.
 
@@ -360,22 +369,51 @@ def find_forge_hook_registrations(
     return registrations
 
 
+def _cleanup_registrations(
+    registrations: tuple[ForgeHookRegistration, ...] | list[ForgeHookRegistration],
+) -> tuple[ForgeHookRegistration, ...]:
+    return tuple(
+        registration
+        for registration in registrations
+        if registration.scope in {"local", "project"} or is_legacy_forge_hook_command(registration.command)
+    )
+
+
+def _registrations_have_double_fire(
+    registrations: tuple[ForgeHookRegistration, ...] | list[ForgeHookRegistration],
+) -> bool:
+    seen: set[tuple[str, str | None, str]] = set()
+    for registration in registrations:
+        key = (registration.event, registration.matcher, registration.handler)
+        if key in seen:
+            return True
+        seen.add(key)
+    return False
+
+
+def diagnose_forge_hook_runtime(worktree_path: Path) -> ForgeHookRuntimeDiagnostics:
+    """Scan hook settings once and derive ownership plus duplicate state."""
+
+    registrations = tuple(find_forge_hook_registrations(worktree_path))
+    return ForgeHookRuntimeDiagnostics(
+        registrations=registrations,
+        cleanup_registrations=_cleanup_registrations(registrations),
+        double_fire_risk=_registrations_have_double_fire(registrations),
+    )
+
+
 def find_forge_hook_cleanup_registrations(
     worktree_path: Path,
 ) -> list[ForgeHookRegistration]:
     """Return registrations that violate T5's user-dispatcher ownership model."""
 
-    return [
-        registration
-        for registration in find_forge_hook_registrations(worktree_path)
-        if registration.scope in {"local", "project"} or is_legacy_forge_hook_command(registration.command)
-    ]
+    return list(diagnose_forge_hook_runtime(worktree_path).cleanup_registrations)
 
 
 def has_forge_hook_cleanup_required(worktree_path: Path) -> bool:
     """Return whether the current root/user settings still need hook migration."""
 
-    return bool(find_forge_hook_cleanup_registrations(worktree_path))
+    return bool(diagnose_forge_hook_runtime(worktree_path).cleanup_registrations)
 
 
 def has_forge_hook_double_fire(
@@ -390,10 +428,4 @@ def has_forge_hook_double_fire(
     are expected and do not double-fire for a single Claude hook dispatch.
     """
 
-    seen: set[tuple[str, str | None, str]] = set()
-    for registration in find_forge_hook_registrations(worktree_path, hook_type, handler):
-        key = (registration.event, registration.matcher, registration.handler)
-        if key in seen:
-            return True
-        seen.add(key)
-    return False
+    return _registrations_have_double_fire(find_forge_hook_registrations(worktree_path, hook_type, handler))

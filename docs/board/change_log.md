@@ -43,10 +43,10 @@ without silently mutating or activating other tracked checkouts.
 - Added independent doctor/status-line cleanup state (`HOOK!`) without broadening genuine `HOOKx2`, and synchronized
   architecture, CLI, Day-1/recovery, QA, and isolated walkthrough guidance.
 
-**Verification**: focused migration suite (`312 passed`); CLI command/output/vocabulary guards (`68 passed`);
-`make test-unit` (`7548 passed, 1 skipped, 116 deselected`); installer Docker suite (`16 passed`) plus final targeted
-migration rerun; real-Claude migration (`1 passed, 2 deselected`) with user-dispatcher SessionStart/Stop effects;
-isolated walkthrough migration exercise; `make pre-commit`.
+**Verification**: focused migration suite (`320 passed`); CLI command/output/vocabulary guards (`68 passed`);
+`make test-unit` (`7556 passed, 1 skipped, 116 deselected`); installer Docker suite (`16 passed`) plus final targeted
+migration-and-disable rerun; real-Claude migration (`1 passed, 2 deselected`) with user-dispatcher SessionStart/Stop
+effects; isolated walkthrough migration exercise; `make pre-commit`.
 
 ### forge_hook_sidecar_resolution closeout
 

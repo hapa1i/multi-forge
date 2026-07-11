@@ -138,17 +138,14 @@ def _produce_sidecar(ctx: RenderContext) -> Optional[str]:
 def _produce_hooks(ctx: RenderContext) -> Optional[str]:
     from pathlib import Path
 
-    from forge.install.hooks import (
-        has_forge_hook_cleanup_required,
-        has_forge_hook_double_fire,
-    )
+    from forge.install.hooks import diagnose_forge_hook_runtime
 
     if not ctx.workspace_dir:
         return None
-    root = Path(ctx.workspace_dir)
+    diagnostics = diagnose_forge_hook_runtime(Path(ctx.workspace_dir))
     return sl.format_hook_migration_state(
-        has_forge_hook_double_fire(root),
-        has_forge_hook_cleanup_required(root),
+        diagnostics.double_fire_risk,
+        bool(diagnostics.cleanup_registrations),
     )
 
 

@@ -37,11 +37,7 @@ from forge.install.hook_migration import (
     list_hook_migration_candidates,
     plan_project_hook_migration,
 )
-from forge.install.hooks import (
-    find_forge_hook_cleanup_registrations,
-    find_forge_hook_scopes,
-    has_forge_hook_double_fire,
-)
+from forge.install.hooks import diagnose_forge_hook_runtime
 from forge.install.installer import Installer, find_claude_root, find_forge_installation
 from forge.install.models import (
     FILE_MODULES,
@@ -312,9 +308,17 @@ def _finish_user_scope_hook_migration(plan: InstallPlan, tracking: TrackingStore
     store = tracking or TrackingStore()
     if InstallModule.HOOKS.value in plan.modules:
         cleanup = cleanup_user_legacy_hook_files()
-        if cleanup.changed_paths:
+        changed_paths = tuple(
+            dict.fromkeys(
+                [
+                    *(Path(path) for path in plan.legacy_hook_cleanup_paths),
+                    *cleanup.changed_paths,
+                ]
+            )
+        )
+        if changed_paths:
             console.print("\n[dim]Removed legacy user hook registrations from:[/dim]")
-            for path in cleanup.changed_paths:
+            for path in changed_paths:
                 console.print(f"  - {display_path(path)}")
         if cleanup.unresolved:
             console.print("\n[yellow]Warning:[/yellow] Some user hook entries require manual cleanup:")
@@ -980,7 +984,7 @@ def cleanup_project_cmd(path: str | None, yes: bool) -> None:
                     console.print(f"    - {display_path(backup)}")
         else:
             console.print("\n[dim]Already migrated; no changes required.[/dim]")
-        if plan.user.codex is not None and plan.user.codex.action in {
+        if result.user_codex_action in {
             "install",
             "update",
         }:
@@ -1350,9 +1354,12 @@ def doctor_cmd(as_json: bool) -> None:
     compat_root = find_forge_root(Path.cwd().resolve())
     compat_diag = diagnose_project_compatibility(compat_root)
     cwd = Path.cwd().resolve()
-    hook_scopes = sorted(find_forge_hook_scopes(cwd, "SessionStart"))
-    hook_double_fire = has_forge_hook_double_fire(cwd)
-    cleanup_registrations = find_forge_hook_cleanup_registrations(cwd)
+    hook_diagnostics = diagnose_forge_hook_runtime(cwd)
+    hook_scopes = sorted(
+        {registration.scope for registration in hook_diagnostics.registrations if registration.event == "SessionStart"}
+    )
+    hook_double_fire = hook_diagnostics.double_fire_risk
+    cleanup_registrations = list(hook_diagnostics.cleanup_registrations)
     hook_cleanup_required = bool(cleanup_registrations)
 
     if as_json:

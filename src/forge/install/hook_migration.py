@@ -209,6 +209,7 @@ class ProjectHookMigrationResult:
     backup_paths: tuple[Path, ...]
     enrolled: bool
     enrollment_created: bool
+    user_codex_action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -949,6 +950,7 @@ def apply_project_hook_migration(
         backup_paths=tuple(dict.fromkeys(backups)),
         enrolled=True,
         enrollment_created=enrollment.created,
+        user_codex_action=plan.user.codex.action if plan.user.codex is not None else None,
     )
 
 

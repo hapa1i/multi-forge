@@ -330,6 +330,8 @@ class InstallPlan:
         files: List of file operations.
         settings: List of settings operations.
         codex: Codex hook registration plan (None when module not selected).
+        legacy_hook_cleanup_paths: User settings files whose legacy direct hooks
+            were removed while executing this plan.
         has_conflicts: True if any conflicts were detected.
         conflicts: Human-readable conflict descriptions.
     """
@@ -341,5 +343,6 @@ class InstallPlan:
     files: list[FilePlan] = field(default_factory=list)
     settings: list[SettingsPlan] = field(default_factory=list)
     codex: CodexPlan | None = None
+    legacy_hook_cleanup_paths: list[str] = field(default_factory=list)
     has_conflicts: bool = False
     conflicts: list[str] = field(default_factory=list)

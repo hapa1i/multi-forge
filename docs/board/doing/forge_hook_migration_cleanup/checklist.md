@@ -286,16 +286,16 @@ assertions):
 | Preview/apply contract                 | migratable root, first without and then with `--yes`                                                 | preview changes no bytes; apply performs listed actions; third run is an idempotent no-op                                                    | `tests/src/cli/test_extension_enable.py`               |
 | Doctor cleanup state                   | unresolved legacy-only, duplicate, coexistence, and clean fixtures                                   | human/JSON expose independent cleanup-required and double-fire state while keeping existing fields stable                                    | `tests/src/install/test_doctor.py`                     |
 | Status-line cleanup state              | lone legacy source, genuine duplicate, coexistence, and clean fixtures                               | lone legacy is not `HOOKx2`; duplicate remains `HOOKx2`; the independent cleanup indication stays fail-open/default-off                      | `tests/src/cli/statusline/test_statusline_registry.py` |
-| Full Docker migration                  | pre-T5 project/user settings + tracking + Codex block in isolated home                               | legacy source is removed before selected-root enrollment; afterward one user dispatcher source runs and unrelated state stays coherent       | `tests/integration/docker/test_installer.py`           |
+| Full Docker migration                  | pre-T5 project/user settings + tracking + Codex block in isolated home                               | legacy source is removed before selected-root enrollment; one user dispatcher source runs, and later project disable leaves it intact        | `tests/integration/docker/test_installer.py`           |
 | Host hook reachability after migration | migrated project followed by a managed real-Claude session                                           | dispatcher-backed SessionStart/Stop effects occur from user scope; no project hook block is required                                         | `tests/integration/docker/test_real_claude_hooks.py`   |
 
-- [x] Focused unit suite (312 passed):
+- [x] Focused unit suite (320 passed):
   `uv run pytest tests/src/install/test_hook_migration.py tests/src/install/test_hook_dispatcher.py tests/src/install/test_installer.py tests/src/install/test_hooks.py tests/src/install/test_codex_hooks.py tests/src/cli/test_extension_enable.py tests/src/install/test_doctor.py tests/src/cli/statusline/test_statusline_registry.py -q`.
 - [x] Command-tree/output/env-vocabulary guards (68 passed):
   `uv run pytest tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_output.py tests/src/cli/test_output_streams.py tests/src/cli/test_env_vocabulary.py -q`.
-- [x] Full unit suite: `make test-unit` (7,548 passed, 1 platform skip, 116 deselected).
+- [x] Full unit suite: `make test-unit` (7,556 passed, 1 platform skip, 116 deselected).
 - [x] Required installer integration: `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v` (16
-  passed; final migration-only rerun also passed).
+  passed; final migration-only rerun also passed with post-migration project disable verification).
 - [x] Required targeted real-Claude hook integration:
   `./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py -k migration -v` (name the final
   test so the selector is stable; 1 passed, 2 deselected).
