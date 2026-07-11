@@ -14,8 +14,9 @@ from forge.cli.extensions import (
     _detect_git_project_root,
     _resolve_project_root,
     _validate_anchor,
-    extensions,
 )
+from forge.cli.extensions import console as extensions_console
+from forge.cli.extensions import extensions
 from forge.core.paths import find_git_root, get_forge_home
 from forge.install.exceptions import NoClaudeDirectoryError
 from forge.install.models import InstallScope
@@ -1136,12 +1137,14 @@ class TestCleanupProject:
         import os
 
         claude_home = Path(os.environ["CLAUDE_HOME"])
+        current_path = claude_home / "settings.json"
+        local_path = claude_home / "settings.local.json"
         legacy = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
-        (claude_home / "settings.json").write_text(
+        current_path.write_text(
             json.dumps({"hooks": {"SessionStart": [legacy]}, "custom": True}),
             encoding="utf-8",
         )
-        (claude_home / "settings.local.json").write_text(
+        local_path.write_text(
             json.dumps({"hooks": {"SessionStart": [legacy]}, "localCustom": True}),
             encoding="utf-8",
         )
@@ -1151,19 +1154,21 @@ class TestCleanupProject:
         )
         monkeypatch.setattr("forge.install.installer._ensure_hook_dispatcher", lambda: None)
         monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+        monkeypatch.setattr(extensions_console, "_width", 40)
 
         result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
 
         assert result.exit_code == 0, result.output
-        current = json.loads((claude_home / "settings.json").read_text(encoding="utf-8"))
-        local = json.loads((claude_home / "settings.local.json").read_text(encoding="utf-8"))
+        current = json.loads(current_path.read_text(encoding="utf-8"))
+        local = json.loads(local_path.read_text(encoding="utf-8"))
         assert current["custom"] is True
         assert current["hooks"]["SessionStart"][0]["hooks"][0]["command"].endswith("/bin/forge-hook session-start")
         assert local == {"localCustom": True}
         assert list(claude_home.glob(".settings.json.forge.backup.*"))
         assert list(claude_home.glob(".settings.local.json.forge.backup.*"))
-        assert "settings.json" in result.output
-        assert "settings.local.json" in result.output
+        compact_output = "".join(result.output.split())
+        assert str(current_path) in compact_output
+        assert str(local_path) in compact_output
 
     def test_user_sync_consolidates_safe_legacy_siblings(
         self,
@@ -1193,6 +1198,7 @@ class TestCleanupProject:
             json.dumps({"hooks": {"SessionStart": [legacy]}, "localCustom": True}),
             encoding="utf-8",
         )
+        monkeypatch.setattr(extensions_console, "_width", 40)
 
         result = runner.invoke(extensions, ["sync", "--scope", "user"])
 
@@ -1201,8 +1207,9 @@ class TestCleanupProject:
         commands = [entry["hooks"][0]["command"] for entry in synced["hooks"]["SessionStart"]]
         assert all("forge hook session-start" not in command for command in commands)
         assert json.loads(local_path.read_text(encoding="utf-8")) == {"localCustom": True}
-        assert "settings.json" in result.output
-        assert "settings.local.json" in result.output
+        compact_output = "".join(result.output.split())
+        assert str(current_path) in compact_output
+        assert str(local_path) in compact_output
 
     def test_preview_apply_and_repeat_are_safe(
         self,
