@@ -80,6 +80,7 @@ THINKING_INDICATOR = "THINK"
 VERIFICATION_INDICATOR = "LOOP"
 SIDECAR_INDICATOR = "SC"
 HOOK_DOUBLE_FIRE_INDICATOR = "HOOKx2"
+HOOK_CLEANUP_INDICATOR = "HOOK!"
 TOKEN_INPUT_LABEL = "in:"
 TOKEN_OUTPUT_LABEL = "out:"
 TOKEN_CACHE_LABEL = "cache:"
@@ -972,6 +973,28 @@ def format_hook_double_fire(double_fire: bool) -> str | None:
     if not double_fire:
         return None
     return f"{YELLOW_BOLD}{HOOK_DOUBLE_FIRE_INDICATOR}{RESET}"
+
+
+def format_hook_cleanup_required(cleanup_required: bool) -> str | None:
+    """Return a diagnostic distinct from genuine duplicate execution."""
+
+    if not cleanup_required:
+        return None
+    return f"{YELLOW_BOLD}{HOOK_CLEANUP_INDICATOR}{RESET}"
+
+
+def format_hook_migration_state(double_fire: bool, cleanup_required: bool) -> str | None:
+    """Render independent double-fire and cleanup-required hook states."""
+
+    parts = [
+        part
+        for part in (
+            format_hook_double_fire(double_fire),
+            format_hook_cleanup_required(cleanup_required),
+        )
+        if part
+    ]
+    return " ".join(parts) if parts else None
 
 
 def format_native_sandbox() -> str | None:

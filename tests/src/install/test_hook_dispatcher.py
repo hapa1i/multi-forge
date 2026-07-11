@@ -153,7 +153,9 @@ def test_install_writes_dispatcher_and_runtime_metadata(tmp_path: Path, monkeypa
     assert metadata["dispatcher_source_sha256"] == dispatcher_source_sha256()
 
 
-def test_known_forge_launcher_paths_preserve_dispatcher_precedence(tmp_path: Path) -> None:
+def test_known_forge_launcher_paths_preserve_dispatcher_precedence(
+    tmp_path: Path,
+) -> None:
     home = tmp_path / "home"
     env = {
         "HOME": str(home),
@@ -260,7 +262,11 @@ def test_managed_session_short_circuits_enrollment(tmp_path: Path, monkeypatch: 
     result = _run_dispatcher(dispatcher, cwd, env)
 
     assert result.returncode == 0, result.stderr
-    assert _read_fake_record(record_path)["argv"] == [str(fake_forge), "hook", "session-start"]
+    assert _read_fake_record(record_path)["argv"] == [
+        str(fake_forge),
+        "hook",
+        "session-start",
+    ]
 
 
 def test_corrupt_and_newer_registry_fail_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -379,7 +385,11 @@ def test_subdirectory_cwd_dispatches(
 
     assert _lookup(cwd) is True
     assert result.returncode == 0, result.stderr
-    assert _read_fake_record(record_path)["argv"] == [str(fake_forge), "hook", "session-start"]
+    assert _read_fake_record(record_path)["argv"] == [
+        str(fake_forge),
+        "hook",
+        "session-start",
+    ]
 
 
 def test_symlinked_root_parity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -512,7 +522,9 @@ def test_install_hook_dispatcher_records_path_from_which(monkeypatch: pytest.Mon
     assert metadata["forge_binary_path"] == str(fake_forge)
 
 
-def test_render_hook_dispatcher_wraps_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_hook_dispatcher_wraps_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from forge.install.exceptions import ForgeInstallError
     from forge.install.installer import _ensure_hook_dispatcher
 
@@ -532,8 +544,14 @@ def test_cli_enable_renders_dispatcher_after_success(monkeypatch: pytest.MonkeyP
 
     fake_forge, _record_path = _make_fake_forge(tmp_path)
 
-    monkeypatch.setattr("forge.install.hook_dispatcher.find_current_forge_binary", lambda **_kwargs: fake_forge)
-    monkeypatch.setattr("forge.install.version.check_minimum_version", lambda: type("Check", (), {"ok": True})())
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: fake_forge,
+    )
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: type("Check", (), {"ok": True})(),
+    )
 
     result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "minimal"])
 
@@ -544,14 +562,82 @@ def test_cli_enable_renders_dispatcher_after_success(monkeypatch: pytest.MonkeyP
     assert metadata["forge_binary_path"] == str(fake_forge)
 
 
+def test_user_enable_reports_legacy_root_without_activating_ambient_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from click.testing import CliRunner
+
+    from forge.cli.extensions import extensions
+    from forge.install.models import (
+        Installation,
+        InstallMode,
+        InstallModule,
+        InstallProfile,
+        InstallScope,
+    )
+    from forge.install.tracking import TrackingStore
+
+    fake_forge, record_path = _make_fake_forge(tmp_path)
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
+    root = _forge_project(tmp_path / "legacy-root")
+    (root / ".claude").mkdir()
+    (root / ".claude" / "settings.json").write_text("{not read by user enable", encoding="utf-8")
+    tracking = TrackingStore()
+    tracking.set_installation(
+        InstallScope.PROJECT.value,
+        Installation(
+            scope=InstallScope.PROJECT.value,
+            project_path=str(root),
+            mode=InstallMode.COPY.value,
+            profile=InstallProfile.STANDARD.value,
+            modules_enabled=[InstallModule.HOOKS.value],
+            installed_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+        str(root),
+    )
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    before = _run_dispatcher(dispatcher, root, env)
+    assert before.returncode == 0
+    assert not record_path.exists()
+
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: fake_forge,
+    )
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: type("Check", (), {"ok": True})(),
+    )
+    monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+    enabled = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
+
+    assert enabled.exit_code == 0, enabled.output
+    assert "Legacy hook cleanup candidates" in enabled.output
+    assert "cleanup-project --root" in enabled.output
+    assert not _lookup(root)
+    after = _run_dispatcher(dispatcher, root, env)
+    assert after.returncode == 0
+    assert not record_path.exists()
+
+
 def test_cli_sync_rerenders_stale_dispatcher(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from click.testing import CliRunner
 
     from forge.cli.extensions import extensions
 
     fake_forge, _record_path = _make_fake_forge(tmp_path)
-    monkeypatch.setattr("forge.install.hook_dispatcher.find_current_forge_binary", lambda **_kwargs: fake_forge)
-    monkeypatch.setattr("forge.install.version.check_minimum_version", lambda: type("Check", (), {"ok": True})())
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: fake_forge,
+    )
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: type("Check", (), {"ok": True})(),
+    )
     runner = CliRunner()
 
     enable = runner.invoke(extensions, ["enable", "--scope", "user", "--profile", "minimal"])

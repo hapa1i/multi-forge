@@ -924,11 +924,18 @@ class Installer:
             scope=self._scope,
             explicit_modules=None if _modules_override is not None else with_modules,
         )
+        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
+        if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+            # Read both user settings targets before rendering the dispatcher or
+            # changing tracking. The later cleanup can then fail only on a new
+            # race or an environmental write error, not known malformed input.
+            from .hook_migration import plan_user_legacy_hook_files
+
+            plan_user_legacy_hook_files(tuple(existing.settings_entries) if existing is not None else ())
         _ensure_hook_dispatcher()
 
         settings_path = get_settings_path(self._scope, self._project_root)
         backup_path = backup_settings(settings_path)
-        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
 
         installed_files: list[InstalledFile] = []
         for file_plan in plan.files:
@@ -943,6 +950,12 @@ class Installer:
             if old_hook_entries:
                 unmerge(settings, old_hook_entries)
                 removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
+        if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+            # T6 migration: stage safe same-file legacy cleanup with the
+            # dispatcher merge so settings.json changes in one atomic write.
+            from .hook_migration import remove_known_legacy_hook_entries
+
+            settings, _removed_legacy_count = remove_known_legacy_hook_entries(settings)
         forge_settings = self._load_forge_settings()
         include_permissions = InstallModule.PERMISSIONS in modules
         entries = merge(

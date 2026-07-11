@@ -817,6 +817,288 @@ class TestDisableNoInstallMessage:
         assert "forge init" not in result.output
 
 
+class TestCleanupProject:
+    def test_user_enable_aborts_on_corrupt_tracking_before_user_write(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import os
+
+        from forge.core.state.exceptions import StateCorruptedError
+        from forge.install.tracking import TrackingStore
+
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        settings = claude_home / "settings.json"
+        settings.write_text('{"custom": true}', encoding="utf-8")
+        tracking = TrackingStore().path
+        tracking.parent.mkdir(parents=True, exist_ok=True)
+        tracking.write_text("{not json", encoding="utf-8")
+        dispatcher_calls: list[bool] = []
+        monkeypatch.setattr(
+            "forge.install.version.check_minimum_version",
+            lambda: type("Check", (), {"ok": True})(),
+        )
+        monkeypatch.setattr(
+            "forge.install.installer._ensure_hook_dispatcher",
+            lambda: dispatcher_calls.append(True),
+        )
+        monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+
+        result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
+
+        assert result.exit_code == 1
+        assert isinstance(result.exception, StateCorruptedError)
+        assert settings.read_text(encoding="utf-8") == '{"custom": true}'
+        assert tracking.read_text(encoding="utf-8") == "{not json"
+        assert dispatcher_calls == []
+
+    def test_user_enable_preflights_both_user_settings_before_writes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import os
+
+        from forge.install.tracking import TrackingStore
+
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        current = claude_home / "settings.json"
+        current.write_text('{"custom": true}', encoding="utf-8")
+        (claude_home / "settings.local.json").write_text("{not json", encoding="utf-8")
+        dispatcher_calls: list[bool] = []
+        monkeypatch.setattr(
+            "forge.install.version.check_minimum_version",
+            lambda: type("Check", (), {"ok": True})(),
+        )
+        monkeypatch.setattr(
+            "forge.install.installer._ensure_hook_dispatcher",
+            lambda: dispatcher_calls.append(True),
+        )
+        monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+
+        result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
+
+        assert result.exit_code == 1
+        assert "cannot read settings" in result.output
+        assert current.read_text(encoding="utf-8") == '{"custom": true}'
+        assert dispatcher_calls == []
+        assert not TrackingStore().path.exists()
+
+    def test_user_enable_ignores_corrupt_registry_and_reports_tracked_root(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from forge.install.models import (
+            Installation,
+            InstallMode,
+            InstallModule,
+            InstallProfile,
+        )
+        from forge.install.tracking import TrackingStore
+
+        root = tmp_path / "legacy"
+        (root / ".forge").mkdir(parents=True)
+        registry = ProjectRegistryStore().path
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        registry.write_text("{not json", encoding="utf-8")
+        tracking = TrackingStore()
+        tracking.set_installation(
+            InstallScope.PROJECT.value,
+            Installation(
+                scope=InstallScope.PROJECT.value,
+                project_path=str(root),
+                mode=InstallMode.COPY.value,
+                profile=InstallProfile.STANDARD.value,
+                modules_enabled=[InstallModule.HOOKS.value],
+                installed_at="2026-01-01T00:00:00Z",
+                updated_at="2026-01-01T00:00:00Z",
+            ),
+            str(root),
+        )
+        monkeypatch.setattr(
+            "forge.install.version.check_minimum_version",
+            lambda: type("Check", (), {"ok": True})(),
+        )
+        monkeypatch.setattr("forge.install.installer._ensure_hook_dispatcher", lambda: None)
+        monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+
+        result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
+
+        assert result.exit_code == 0, result.output
+        assert "cleanup-project --root" in result.output
+        assert registry.read_text(encoding="utf-8") == "{not json"
+
+    def test_cleanup_rejects_corrupt_registry_before_any_write(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import json
+        import os
+        from types import SimpleNamespace
+
+        from forge.core.state.exceptions import StateCorruptedError
+        from forge.install.tracking import TrackingStore
+
+        root = tmp_path / "repo"
+        (root / ".forge").mkdir(parents=True)
+        (root / ".claude").mkdir()
+        settings = root / ".claude" / "settings.json"
+        original = {
+            "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "forge hook session-start"}]}]}
+        }
+        settings.write_text(json.dumps(original), encoding="utf-8")
+        registry = ProjectRegistryStore().path
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        registry.write_text("{not json", encoding="utf-8")
+        user_settings = Path(os.environ["CLAUDE_HOME"]) / "settings.json"
+        tracking_path = TrackingStore().path
+        monkeypatch.setattr(
+            "forge.install.hook_migration.diagnose_hook_dispatcher",
+            lambda: SimpleNamespace(status="current"),
+        )
+
+        result = CliRunner().invoke(extensions, ["cleanup-project", "--root", str(root), "--yes"])
+
+        assert result.exit_code == 1
+        assert isinstance(result.exception, StateCorruptedError)
+        assert json.loads(settings.read_text(encoding="utf-8")) == original
+        assert not user_settings.exists()
+        assert not tracking_path.exists()
+        assert registry.read_text(encoding="utf-8") == "{not json"
+
+    def test_user_enable_consolidates_safe_legacy_siblings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import json
+        import os
+
+        claude_home = Path(os.environ["CLAUDE_HOME"])
+        legacy = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
+        (claude_home / "settings.json").write_text(
+            json.dumps({"hooks": {"SessionStart": [legacy]}, "custom": True}),
+            encoding="utf-8",
+        )
+        (claude_home / "settings.local.json").write_text(
+            json.dumps({"hooks": {"SessionStart": [legacy]}, "localCustom": True}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "forge.install.version.check_minimum_version",
+            lambda: type("Check", (), {"ok": True})(),
+        )
+        monkeypatch.setattr("forge.install.installer._ensure_hook_dispatcher", lambda: None)
+        monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+
+        result = CliRunner().invoke(extensions, ["enable", "--scope", "user", "--profile", "standard"])
+
+        assert result.exit_code == 0, result.output
+        current = json.loads((claude_home / "settings.json").read_text(encoding="utf-8"))
+        local = json.loads((claude_home / "settings.local.json").read_text(encoding="utf-8"))
+        assert current["custom"] is True
+        assert current["hooks"]["SessionStart"][0]["hooks"][0]["command"].endswith("/bin/forge-hook session-start")
+        assert local == {"localCustom": True}
+        assert list(claude_home.glob(".settings.json.forge.backup.*"))
+        assert list(claude_home.glob(".settings.local.json.forge.backup.*"))
+
+    def test_preview_apply_and_repeat_are_safe(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import json
+        from types import SimpleNamespace
+
+        root = tmp_path / "repo"
+        (root / ".forge").mkdir(parents=True)
+        (root / ".claude").mkdir()
+        settings = root / ".claude" / "settings.json"
+        settings.write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge hook session-start",
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "permissions": {"allow": ["Read"]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "forge.install.hook_migration.diagnose_hook_dispatcher",
+            lambda: SimpleNamespace(status="current"),
+        )
+        monkeypatch.setattr("forge.install.hook_migration.install_hook_dispatcher", lambda: None)
+        runner = CliRunner()
+
+        preview = runner.invoke(extensions, ["cleanup-project", "--root", str(root)])
+
+        assert preview.exit_code == 0, preview.output
+        assert "Hook Migration Plan" in preview.output
+        assert "enroll last" in preview.output
+        assert "forge hook session-start" in settings.read_text(encoding="utf-8")
+        assert not ProjectRegistryStore().contains_root(root)
+
+        applied = runner.invoke(extensions, ["cleanup-project", "--root", str(root), "--yes"])
+
+        assert applied.exit_code == 0, applied.output
+        assert "Project hook migration complete" in applied.output
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        assert "hooks" not in data
+        assert data["permissions"] == {"allow": ["Read"]}
+        assert ProjectRegistryStore().contains_root(root)
+
+        repeated = runner.invoke(extensions, ["cleanup-project", "--root", str(root), "--yes"])
+        assert repeated.exit_code == 0, repeated.output
+        assert "Already migrated" in repeated.output
+
+    def test_ambiguous_entry_blocks_before_writes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import json
+        from types import SimpleNamespace
+
+        root = tmp_path / "repo"
+        (root / ".forge").mkdir(parents=True)
+        (root / ".claude").mkdir()
+        settings = root / ".claude" / "settings.json"
+        original = {
+            "hooks": {
+                "SessionStart": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "forge hook session-start",
+                                "timeout": 99,
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        settings.write_text(json.dumps(original), encoding="utf-8")
+        monkeypatch.setattr(
+            "forge.install.hook_migration.diagnose_hook_dispatcher",
+            lambda: SimpleNamespace(status="current"),
+        )
+
+        result = CliRunner().invoke(extensions, ["cleanup-project", "--root", str(root), "--yes"])
+
+        assert result.exit_code == 1
+        assert "Cleanup blockers" in result.output
+        assert json.loads(settings.read_text(encoding="utf-8")) == original
+        assert not ProjectRegistryStore().contains_root(root)
+
+
 class TestExtensionDoctorRuntimeHooks:
     @staticmethod
     def _write_double_scope_hooks(project: Path, claude_home: Path) -> None:
@@ -907,10 +1189,12 @@ class TestExtensionDoctorRuntimeHooks:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["runtime_hooks"] == {
-            "scopes": ["local", "user"],
-            "double_fire_risk": True,
-        }
+        runtime = data["runtime_hooks"]
+        assert runtime["scopes"] == ["local", "user"]
+        assert runtime["double_fire_risk"] is True
+        assert runtime["cleanup_required"] is True
+        assert len(runtime["legacy_registrations"]) == 1
+        assert runtime["legacy_registrations"][0]["scope"] == "local"
 
     def test_json_reports_same_user_file_duplicate_as_double_fire(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -928,10 +1212,12 @@ class TestExtensionDoctorRuntimeHooks:
 
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["runtime_hooks"] == {
-            "scopes": ["user"],
-            "double_fire_risk": True,
-        }
+        runtime = data["runtime_hooks"]
+        assert runtime["scopes"] == ["user"]
+        assert runtime["double_fire_risk"] is True
+        assert runtime["cleanup_required"] is True
+        assert len(runtime["legacy_registrations"]) == 1
+        assert runtime["legacy_registrations"][0]["command"] == "forge hook session-start"
 
     def test_json_treats_home_cwd_user_hooks_as_single_scope(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -973,9 +1259,11 @@ class TestExtensionDoctorRuntimeHooks:
         assert data["runtime_hooks"] == {
             "scopes": ["user"],
             "double_fire_risk": False,
+            "cleanup_required": False,
+            "legacy_registrations": [],
         }
 
-    def test_human_report_names_t6_cleanup_and_current_disable_path(
+    def test_human_report_distinguishes_cleanup_from_double_fire(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import os
@@ -989,10 +1277,9 @@ class TestExtensionDoctorRuntimeHooks:
 
         assert result.exit_code == 0, result.output
         assert "may fire twice" in result.output
+        assert "Cleanup needed: yes" in result.output
         assert "forge extension cleanup-project" in result.output
-        assert "  forge extension cleanup-project" not in result.output
-        assert "forge extension disable --scope local" in result.output
-        assert "forge extension enable --scope user" in result.output
+        assert "forge extension disable --scope local" not in result.output
 
 
 class TestEnableCodexHooks:

@@ -20,6 +20,7 @@ from forge.install.codex_hooks import (
     get_builtin_codex_entries,
     get_codex_config_path,
     plan_codex_merge,
+    plan_codex_remove,
     read_codex_registration,
     remove_codex_block,
     render_codex_block,
@@ -290,6 +291,54 @@ class TestApplyMerge:
 
 
 class TestRemoveBlock:
+    def test_strict_remove_plan_rejects_manual_sibling(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        _install(config)
+        config.write_text(
+            config.read_text(encoding="utf-8")
+            + (
+                "\n[[hooks.SessionStart]]\n"
+                "[[hooks.SessionStart.hooks]]\n"
+                'type = "command"\n'
+                f'command = "{_entries()[0].command}"\n'
+                "timeout = 60\n"
+            ),
+            encoding="utf-8",
+        )
+
+        plan = plan_codex_remove(config, _entries())
+
+        assert plan.action == "conflict"
+        assert plan.leftover_commands == (_entries()[0].command,)
+
+    def test_strict_remove_plan_accepts_balanced_managed_block(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        config.write_text(USER_CONTENT, encoding="utf-8")
+        _install(config)
+
+        plan = plan_codex_remove(config, _entries())
+
+        assert plan.action == "remove"
+
+    def test_strict_remove_plan_rejects_any_forge_command_outside_markers(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        _install(config)
+        config.write_text(
+            config.read_text(encoding="utf-8")
+            + (
+                "\n[[hooks.Stop]]\n"
+                "[[hooks.Stop.hooks]]\n"
+                'type = "command"\n'
+                'command = "forge-hook custom-handler"\n'
+            ),
+            encoding="utf-8",
+        )
+
+        plan = plan_codex_remove(config, _entries())
+
+        assert plan.action == "conflict"
+        assert plan.leftover_commands == ("forge-hook custom-handler",)
+
     def test_remove_preserves_user_content(self, tmp_path: Path) -> None:
         config = tmp_path / "config.toml"
         config.write_text(USER_CONTENT)

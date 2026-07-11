@@ -76,7 +76,9 @@ def _scoped_settings_paths(worktree_path: Path) -> list[tuple[str, Path]]:
     return _dedupe_scoped_settings_paths(paths)
 
 
-def _dedupe_scoped_settings_paths(paths: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+def _dedupe_scoped_settings_paths(
+    paths: list[tuple[str, Path]],
+) -> list[tuple[str, Path]]:
     """Return paths once by resolved identity, preferring later scope labels.
 
     When running from ``$HOME``, ``~/.claude/settings.json`` can otherwise be
@@ -147,6 +149,16 @@ def forge_hook_handler(command: str) -> str | None:
         return tokens[2]
 
     return None
+
+
+def is_legacy_forge_hook_command(command: str) -> bool:
+    """Return whether *command* uses the pre-dispatcher ``forge hook`` form."""
+
+    try:
+        tokens = shlex.split(command.strip())
+    except ValueError:
+        return False
+    return len(tokens) >= 3 and Path(tokens[0]).name == "forge" and tokens[1] == "hook"
 
 
 def entry_is_forge_hook(entry: Any, handler: str | None = None, *, require_command_type: bool = False) -> bool:
@@ -220,7 +232,13 @@ def _entry_forge_hook_registrations(
             ):
                 found_handler, command = found
                 hook_matcher = _entry_matcher(hook)
-                registrations.append((found_handler, command, matcher if hook_matcher is None else hook_matcher))
+                registrations.append(
+                    (
+                        found_handler,
+                        command,
+                        matcher if hook_matcher is None else hook_matcher,
+                    )
+                )
     return registrations
 
 
@@ -340,6 +358,24 @@ def find_forge_hook_registrations(
     for scope, settings_path in _scoped_settings_paths(worktree_path):
         registrations.extend(_settings_path_forge_hook_registrations(scope, settings_path, hook_type, handler))
     return registrations
+
+
+def find_forge_hook_cleanup_registrations(
+    worktree_path: Path,
+) -> list[ForgeHookRegistration]:
+    """Return registrations that violate T5's user-dispatcher ownership model."""
+
+    return [
+        registration
+        for registration in find_forge_hook_registrations(worktree_path)
+        if registration.scope in {"local", "project"} or is_legacy_forge_hook_command(registration.command)
+    ]
+
+
+def has_forge_hook_cleanup_required(worktree_path: Path) -> bool:
+    """Return whether the current root/user settings still need hook migration."""
+
+    return bool(find_forge_hook_cleanup_registrations(worktree_path))
 
 
 def has_forge_hook_double_fire(

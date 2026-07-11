@@ -138,11 +138,18 @@ def _produce_sidecar(ctx: RenderContext) -> Optional[str]:
 def _produce_hooks(ctx: RenderContext) -> Optional[str]:
     from pathlib import Path
 
-    from forge.install.hooks import has_forge_hook_double_fire
+    from forge.install.hooks import (
+        has_forge_hook_cleanup_required,
+        has_forge_hook_double_fire,
+    )
 
     if not ctx.workspace_dir:
         return None
-    return sl.format_hook_double_fire(has_forge_hook_double_fire(Path(ctx.workspace_dir)))
+    root = Path(ctx.workspace_dir)
+    return sl.format_hook_migration_state(
+        has_forge_hook_double_fire(root),
+        has_forge_hook_cleanup_required(root),
+    )
 
 
 def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:

@@ -366,7 +366,13 @@ class TestLazyContext:
 
     def test_hooks_segment_reports_double_scope_only_when_enabled(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True) as detect:
+        with (
+            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True) as detect,
+            patch(
+                "forge.install.hooks.has_forge_hook_cleanup_required",
+                return_value=False,
+            ),
+        ):
             where, stream = render_segments(ctx, ["path", "hooks"])
 
         detect.assert_called_once()
@@ -375,7 +381,36 @@ class TestLazyContext:
 
     def test_hooks_segment_omits_single_scope(self):
         ctx = _ctx(FIXTURE_MINIMAL)
-        with patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False):
+        with (
+            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False),
+            patch(
+                "forge.install.hooks.has_forge_hook_cleanup_required",
+                return_value=False,
+            ),
+        ):
             _where, stream = render_segments(ctx, ["hooks"])
 
         assert stream == []
+
+    def test_hooks_segment_reports_cleanup_without_labeling_it_double_fire(self):
+        ctx = _ctx(FIXTURE_MINIMAL)
+        with (
+            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=False),
+            patch("forge.install.hooks.has_forge_hook_cleanup_required", return_value=True),
+        ):
+            _where, stream = render_segments(ctx, ["hooks"])
+
+        assert stream == [f"{sl.YELLOW_BOLD}{sl.HOOK_CLEANUP_INDICATOR}{sl.RESET}"]
+        assert sl.HOOK_DOUBLE_FIRE_INDICATOR not in stream[0]
+
+    def test_hooks_segment_can_report_cleanup_and_double_fire_together(self):
+        ctx = _ctx(FIXTURE_MINIMAL)
+        with (
+            patch("forge.install.hooks.has_forge_hook_double_fire", return_value=True),
+            patch("forge.install.hooks.has_forge_hook_cleanup_required", return_value=True),
+        ):
+            _where, stream = render_segments(ctx, ["hooks"])
+
+        assert len(stream) == 1
+        assert sl.HOOK_DOUBLE_FIRE_INDICATOR in stream[0]
+        assert sl.HOOK_CLEANUP_INDICATOR in stream[0]

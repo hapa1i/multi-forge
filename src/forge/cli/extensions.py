@@ -11,6 +11,7 @@ Commands:
 from __future__ import annotations
 
 import logging
+import shlex
 import sys
 from pathlib import Path
 
@@ -28,7 +29,19 @@ from forge.install.exceptions import (
     NotInstalledError,
     SettingsConflictError,
 )
-from forge.install.hooks import find_forge_hook_scopes, has_forge_hook_double_fire
+from forge.install.hook_migration import (
+    HookMigrationError,
+    ProjectHookMigrationPlan,
+    apply_project_hook_migration,
+    cleanup_user_legacy_hook_files,
+    list_hook_migration_candidates,
+    plan_project_hook_migration,
+)
+from forge.install.hooks import (
+    find_forge_hook_cleanup_registrations,
+    find_forge_hook_scopes,
+    has_forge_hook_double_fire,
+)
 from forge.install.installer import Installer, find_claude_root, find_forge_installation
 from forge.install.models import (
     FILE_MODULES,
@@ -273,6 +286,98 @@ def _print_codex_completion(plan: InstallPlan, scope: InstallScope) -> None:
         console.print(f"\n[yellow]Warning:[/yellow] Codex hook registration skipped: {codex.reason}")
     elif codex.action == "unavailable":
         console.print(f"\n[dim]Codex hooks skipped: {codex.reason}.[/dim]")
+
+
+def _print_hook_migration_candidates(tracking: TrackingStore | None = None) -> None:
+    """Report tracked cleanup candidates without reading or enrolling roots."""
+
+    candidates = list_hook_migration_candidates(tracking)
+    if not candidates:
+        return
+    console.print("\n[bold]Legacy hook cleanup candidates[/bold]")
+    for candidate in candidates:
+        if candidate.cleanup_command is not None:
+            console.print(f"  - {display_path(candidate.root or '')}")
+            console.print(f"    [dim]{candidate.cleanup_command}[/dim]")
+        else:
+            detail = candidate.reason or "no recoverable root"
+            target = display_path(candidate.root) if candidate.root is not None else "unrecoverable tracking row"
+            console.print(f"  - {target}: [yellow]{detail}[/yellow] ({', '.join(candidate.scopes)})")
+    console.print("[dim]No project files or registry entries were changed.[/dim]")
+
+
+def _finish_user_scope_hook_migration(plan: InstallPlan, tracking: TrackingStore | None = None) -> None:
+    """Consolidate safe user legacy siblings and report root candidates."""
+
+    store = tracking or TrackingStore()
+    if InstallModule.HOOKS.value in plan.modules:
+        cleanup = cleanup_user_legacy_hook_files()
+        if cleanup.changed_paths:
+            console.print("\n[dim]Removed legacy user hook registrations from:[/dim]")
+            for path in cleanup.changed_paths:
+                console.print(f"  - {display_path(path)}")
+        if cleanup.unresolved:
+            console.print("\n[yellow]Warning:[/yellow] Some user hook entries require manual cleanup:")
+            for issue in cleanup.unresolved:
+                console.print(f"  - {issue}")
+    _print_hook_migration_candidates(store)
+
+
+def _print_hook_migration_plan(plan: ProjectHookMigrationPlan) -> None:
+    """Render a cleanup preview without mutating state."""
+
+    from forge.install.hook_dispatcher import (
+        get_hook_dispatcher_path,
+        get_runtime_metadata_path,
+    )
+
+    console.print("\n[bold]Hook Migration Plan[/bold]")
+    console.print(f"  Root: {display_path(plan.root)}")
+    for settings_plan in plan.settings:
+        if settings_plan.removals:
+            tracked = sum(removal.source == "tracked" for removal in settings_plan.removals)
+            fallback = len(settings_plan.removals) - tracked
+            console.print(
+                f"  - {display_path(settings_plan.path)}: remove {len(settings_plan.removals)} hook wrapper(s) "
+                f"({tracked} tracked, {fallback} known legacy); backup first"
+            )
+        if settings_plan.added_path is not None:
+            console.print(f"  - {display_path(settings_plan.added_path)}: reconcile Forge-owned settings metadata")
+    if plan.codex.action == "remove":
+        console.print(f"  - {display_path(plan.codex.config_path)}: remove managed Codex block; backup first")
+    if plan.user.changed:
+        if not plan.user.dispatcher_current:
+            console.print(f"  - {display_path(get_hook_dispatcher_path())}: install/update hook dispatcher")
+            console.print(f"  - {display_path(get_runtime_metadata_path())}: update dispatcher runtime metadata")
+        for settings_plan in (plan.user.settings, plan.user.legacy_settings):
+            if settings_plan.changed:
+                console.print(f"  - {display_path(settings_plan.path)}: update user runtime hooks; backup first")
+        if plan.user.codex is not None and plan.user.codex.action in {"install", "update"}:
+            console.print(f"  - {display_path(plan.user.codex.config_path)}: install/update user Codex hooks")
+        if plan.user.settings.added_path is not None:
+            console.print(
+                f"  - {display_path(plan.user.settings.added_path)}: reconcile Forge-owned user settings metadata"
+            )
+    tracked_root_change = any(
+        InstallModule.HOOKS.value in installation.modules_enabled
+        or InstallModule.CODEX_HOOKS.value in installation.modules_enabled
+        or installation.codex_config_path
+        or any(entry.key_path.startswith("hooks.") for entry in installation.settings_entries)
+        for _scope, installation in plan.tracked_installations
+    )
+    if tracked_root_change or plan.user.changed:
+        console.print(f"  - {display_path(TrackingStore().path)}: reconcile project/user hook ownership")
+    if not plan.enrolled:
+        console.print(
+            f"  - {display_path(ProjectRegistryStore().path)}: enroll last, after cleanup and user registration "
+            f"({display_path(plan.root)})"
+        )
+    if not plan.has_actions:
+        console.print("  [dim]No migration changes required.[/dim]")
+    if plan.blockers:
+        console.print("\n[bold red]Cleanup blockers:[/bold red]")
+        for blocker in plan.blockers:
+            console.print(f"  [red]- {blocker}[/red]")
 
 
 def _validate_anchor(anchor: Path) -> None:
@@ -683,6 +788,8 @@ def enable_cmd(
             _print_plan(plan, dry_run=True)
             if plan.has_conflicts:
                 sys.exit(1)
+            if install_scope == InstallScope.USER:
+                _print_hook_migration_candidates()
         else:
             plan = installer.init(
                 profile=install_profile,
@@ -703,7 +810,10 @@ def enable_cmd(
                     _log.info("Created %s for session state", project_root / ".forge")
 
                 _enroll_project_root(project_root, "enable", announce=True)
-                _print_completion_message(plan, install_scope, project_root, TrackingStore())
+                tracking = TrackingStore()
+                _print_completion_message(plan, install_scope, project_root, tracking)
+                if install_scope == InstallScope.USER:
+                    _finish_user_scope_hook_migration(plan, tracking)
 
     except click.UsageError:
         raise
@@ -801,6 +911,8 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             # matters most exactly here.
             _print_runtime_hook_completion(plan, install_scope)
             _print_codex_completion(plan, install_scope)
+            if install_scope == InstallScope.USER:
+                _finish_user_scope_hook_migration(plan)
 
     except NoForgeInstallationError as e:
         print_error(f"{e}")
@@ -813,6 +925,79 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
         print_error(f"{e}")
+        sys.exit(1)
+
+
+@extensions.command("cleanup-project")
+@click.option(
+    "--root",
+    "path",
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    default=None,
+    help="Forge project root to clean (default: current Forge root)",
+)
+@click.option("--yes", is_flag=True, help="Apply the previewed migration")
+def cleanup_project_cmd(path: str | None, yes: bool) -> None:
+    """Preview or apply legacy project-hook cleanup for one Forge root."""
+
+    from forge.core.ops.context import find_forge_root
+
+    try:
+        anchor = Path(path) if path else Path.cwd()
+        if path:
+            _validate_anchor(anchor)
+        root = find_forge_root(anchor.expanduser().resolve())
+        if root is None:
+            raise HookMigrationError(
+                f"'{anchor}' is not inside a Forge project (expected a project root containing .forge/)"
+            )
+
+        _enforce_project_compatibility(root)
+        plan = plan_project_hook_migration(root)
+        _print_hook_migration_plan(plan)
+        if plan.blockers:
+            print_tip(
+                "Resolve the listed entries manually, then rerun the preview.",
+                console=console,
+            )
+            raise click.exceptions.Exit(1)
+        if not yes:
+            if plan.has_actions:
+                print_tip(
+                    f"Apply with: forge extension cleanup-project --root {shlex.quote(str(root))} --yes",
+                    console=console,
+                )
+            return
+
+        result = apply_project_hook_migration(root)
+        if result.changed_paths or result.enrollment_created:
+            console.print("\n[green]Project hook migration complete.[/green]")
+            console.print(f"  Removed hooks: {result.removed_hooks}")
+            console.print(f"  Registry:      {'enrolled' if result.enrollment_created else 'already enrolled'}")
+            if result.backup_paths:
+                console.print("  Backups:")
+                for backup in result.backup_paths:
+                    console.print(f"    - {display_path(backup)}")
+        else:
+            console.print("\n[dim]Already migrated; no changes required.[/dim]")
+        if plan.user.codex is not None and plan.user.codex.action in {
+            "install",
+            "update",
+        }:
+            console.print("\n[dim]Next steps (Codex hooks):[/dim]")
+            console.print("  - Run 'codex' interactively in this project and grant trust when prompted (one-time).")
+
+    except click.UsageError:
+        raise
+    except click.exceptions.Exit:
+        raise
+    except (StateCorruptedError, StateUnreadableError):
+        raise
+    except HookMigrationError as e:
+        print_error(str(e))
+        sys.exit(1)
+    except ForgeInstallError as e:
+        print_error(str(e))
         sys.exit(1)
 
 
@@ -1167,6 +1352,8 @@ def doctor_cmd(as_json: bool) -> None:
     cwd = Path.cwd().resolve()
     hook_scopes = sorted(find_forge_hook_scopes(cwd, "SessionStart"))
     hook_double_fire = has_forge_hook_double_fire(cwd)
+    cleanup_registrations = find_forge_hook_cleanup_registrations(cwd)
+    hook_cleanup_required = bool(cleanup_registrations)
 
     if as_json:
         payload = diag.to_dict()
@@ -1174,6 +1361,18 @@ def doctor_cmd(as_json: bool) -> None:
         payload["runtime_hooks"] = {
             "scopes": hook_scopes,
             "double_fire_risk": hook_double_fire,
+            "cleanup_required": hook_cleanup_required,
+            "legacy_registrations": [
+                {
+                    "scope": registration.scope,
+                    "settings_path": str(registration.settings_path),
+                    "event": registration.event,
+                    "matcher": registration.matcher,
+                    "handler": registration.handler,
+                    "command": registration.command,
+                }
+                for registration in cleanup_registrations
+            ],
         }
         payload["project_registry"] = registry_diag.to_dict()
         payload["project_compatibility"] = compat_diag.to_dict()
@@ -1207,15 +1406,27 @@ def doctor_cmd(as_json: bool) -> None:
 
     console.print("\n[bold]Runtime hooks[/bold]")
     console.print(f"  Scopes:         {', '.join(hook_scopes) if hook_scopes else 'none'}")
+    console.print(f"  Cleanup needed: {'yes' if hook_cleanup_required else 'no'}")
+    if hook_cleanup_required:
+        console.print("  [yellow]Warning:[/yellow] Legacy project/local or direct user hooks still need cleanup.")
+        for registration in cleanup_registrations:
+            console.print(
+                f"    - {registration.scope}: {display_path(registration.settings_path)} "
+                f"({registration.event}/{registration.handler})"
+            )
+        print_tip(
+            "Preview the selected project migration before applying it.",
+            commands=[
+                "forge extension cleanup-project",
+                "forge extension cleanup-project --yes",
+            ],
+            console=console,
+        )
     if hook_double_fire:
         console.print("  [yellow]Warning:[/yellow] Forge hooks are registered more than once and may fire twice.")
         print_tip(
-            "T6 cleanup will land as 'forge extension cleanup-project'. Until then, keep runtime hooks at user "
-            "scope and disable tracked project/local hook installs.",
-            commands=[
-                "forge extension disable --scope local",
-                "forge extension enable --scope user",
-            ],
+            "Run the cleanup preview for this project; ambiguous entries remain report-only.",
+            commands=["forge extension cleanup-project"],
             console=console,
         )
 

@@ -206,6 +206,152 @@ print('preserved')
         assert "preserved" in check.stdout
 
 
+class TestHookMigration:
+    """Pre-T5 project state transitions to one user-scoped runtime source."""
+
+    def test_cleanup_project_migrates_tracked_claude_and_codex_hooks(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        synced_container.exec("rm -rf ~/.claude ~/.forge ~/repo-hook-migration /tmp/codex-home")
+        setup = synced_container.exec("""
+            cd /forge && uv run python - <<'PY'
+import json
+from pathlib import Path
+
+from forge.install.codex_hooks import apply_codex_merge, get_builtin_codex_entries
+from forge.install.models import (
+    Installation,
+    InstalledSettingsEntry,
+    InstallMode,
+    InstallModule,
+    InstallProfile,
+    InstallScope,
+)
+from forge.install.settings_merge import entries_to_added_structure, save_added_settings, write_settings
+from forge.install.tracking import TrackingStore
+
+root = Path.home() / "repo-hook-migration"
+(root / ".forge").mkdir(parents=True)
+(root / ".claude").mkdir()
+(root / ".codex").mkdir()
+(Path.home() / ".claude").mkdir()
+legacy = {"hooks": [{"type": "command", "command": "forge hook session-start"}]}
+status_line = {"type": "command", "command": "forge status-line"}
+settings_path = root / ".claude" / "settings.json"
+write_settings(
+    settings_path,
+    {
+        "hooks": {"SessionStart": [legacy]},
+        "statusLine": status_line,
+        "permissions": {"allow": ["Read"]},
+    },
+)
+write_settings(
+    Path.home() / ".claude" / "settings.local.json",
+    {"hooks": {"SessionStart": [legacy]}, "legacyUserKey": True},
+)
+hook_tracking = InstalledSettingsEntry(
+    key_path="hooks.SessionStart",
+    value=legacy,
+    merge_type="append",
+    stable_id=json.dumps(legacy, sort_keys=True, separators=(",", ":")),
+)
+status_tracking = InstalledSettingsEntry(
+    key_path="statusLine",
+    value=status_line,
+    merge_type="scalar",
+    stable_id="statusLine",
+)
+codex_path = root / ".codex" / "config.toml"
+codex_path.write_text('model = "gpt-5"\\n', encoding="utf-8")
+apply_codex_merge(codex_path, get_builtin_codex_entries())
+installation = Installation(
+    scope=InstallScope.PROJECT.value,
+    project_path=str(root),
+    mode=InstallMode.COPY.value,
+    profile=InstallProfile.STANDARD.value,
+    modules_enabled=[
+        InstallModule.HOOKS.value,
+        InstallModule.STATUSLINE.value,
+        InstallModule.CODEX_HOOKS.value,
+    ],
+    settings_entries=[hook_tracking, status_tracking],
+    codex_config_path=str(codex_path),
+    codex_commands=[entry.command for entry in get_builtin_codex_entries()],
+    installed_at="2026-01-01T00:00:00Z",
+    updated_at="2026-01-01T00:00:00Z",
+)
+TrackingStore().set_installation(InstallScope.PROJECT.value, installation, str(root))
+save_added_settings(settings_path, entries_to_added_structure(installation.settings_entries))
+PY
+            """)
+        assert setup.returncode == 0, f"Migration fixture setup failed: {setup.stderr}"
+
+        result = synced_container.exec(
+            "cd ~/repo-hook-migration && CODEX_HOME=/tmp/codex-home "
+            "/forge/.venv/bin/forge extension cleanup-project --root ~/repo-hook-migration --yes"
+        )
+        assert result.returncode == 0, f"Migration failed: stdout={result.stdout!r} stderr={result.stderr!r}"
+        assert "Project hook migration complete" in result.stdout
+        assert "grant trust" in result.stdout
+
+        check = synced_container.exec("""
+            cd /forge && CODEX_HOME=/tmp/codex-home uv run python - <<'PY'
+from pathlib import Path
+
+from forge.install.hooks import (
+    find_forge_hook_cleanup_registrations,
+    find_forge_hook_registrations,
+    has_forge_hook_double_fire,
+)
+from forge.install.models import InstallModule, InstallScope
+from forge.install.project_registry import ProjectRegistryStore
+from forge.install.settings_merge import load_added_settings, read_settings
+from forge.install.tracking import TrackingStore
+
+root = Path.home() / "repo-hook-migration"
+project_settings = read_settings(root / ".claude" / "settings.json")
+assert "hooks" not in project_settings
+assert project_settings["permissions"] == {"allow": ["Read"]}
+assert project_settings["statusLine"]["command"] == "forge status-line"
+legacy_user = read_settings(Path.home() / ".claude" / "settings.local.json")
+assert legacy_user == {"legacyUserKey": True}
+registrations = find_forge_hook_registrations(root)
+assert registrations
+assert {registration.scope for registration in registrations} == {"user"}
+assert not find_forge_hook_cleanup_registrations(root)
+assert not has_forge_hook_double_fire(root)
+registry = ProjectRegistryStore().read_strict()
+entry = next(item for item in registry.projects if item.canonical_path == str(root.resolve()))
+assert entry.enrollment_source == "backfill"
+tracking = TrackingStore()
+project = tracking.get_installation(InstallScope.PROJECT.value, str(root))
+assert project is not None
+assert InstallModule.HOOKS.value not in project.modules_enabled
+assert InstallModule.CODEX_HOOKS.value not in project.modules_enabled
+assert InstallModule.STATUSLINE.value in project.modules_enabled
+assert not any(item.key_path.startswith("hooks.") for item in project.settings_entries)
+added = load_added_settings(root / ".claude" / "settings.json")
+assert "hooks" not in added
+assert "statusLine" in added
+user = tracking.get_installation(InstallScope.USER.value)
+assert user is not None
+assert InstallModule.HOOKS.value in user.modules_enabled
+assert InstallModule.CODEX_HOOKS.value in user.modules_enabled
+project_codex = (root / ".codex" / "config.toml").read_text(encoding="utf-8")
+assert project_codex == 'model = "gpt-5"\\n'
+user_codex = Path("/tmp/codex-home/config.toml").read_text(encoding="utf-8")
+assert "# >>> forge hooks >>>" in user_codex
+assert list((root / ".claude").glob(".settings.json.forge.backup.*"))
+assert list((root / ".codex").glob(".config.toml.forge.backup.*"))
+print("migration-ok")
+PY
+            """)
+        assert check.returncode == 0, f"Migration verification failed: {check.stderr}"
+        assert "migration-ok" in check.stdout
+
+
 class TestForgeExtensionDisable:
     """Tests for forge extension disable command."""
 
