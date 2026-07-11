@@ -3,7 +3,7 @@
 **Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `doing/` on branch `forge-hook-migration-cleanup`. Depends on `user_scope_hook_ownership` (the target model
-exists to migrate to). End of the user-scope-model critical path. Implementation is gated on Phase 0 checklist approval.
+exists to migrate to). End of the user-scope-model critical path. Implementation is verified and awaiting review/merge.
 
 ## Goal
 
@@ -93,7 +93,7 @@ uniformly:
 - **Codex trust reset** -- unavoidable when the command bytes change; make it explicit, never silent.
 - **Un-cleanable legacy** (manual edits, lost tracking, broken markers) -- must be reported, not passed over.
 
-## Decisions pending checklist approval
+## Implemented decisions
 
 - Freeze known released legacy direct-hook shapes as an additive migration inventory; exact known shapes may be removed
   after command normalization, while hand-edited or otherwise ambiguous entries remain report-only.

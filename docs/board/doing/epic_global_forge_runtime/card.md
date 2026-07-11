@@ -11,10 +11,10 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**. The epic's coordination
 [`checklist.md`](checklist.md) (sequencing, seam drift-watch, and remaining T6/T8 decisions) stays live. **T6**
-migration cleanup is the active implementation cursor and is gated on its checklist review; **T8** remains the parked
-dev-runtime override. Other inactive members stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin
-out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/` (or the shared
-contract is folded into normative design docs).
+migration cleanup is implemented and verified on its branch, but remains the active cursor until review/merge; **T8**
+remains the parked dev-runtime override. Other inactive members stay in `proposed/` (or accepted `todo/` for the split
+T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/`
+(or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large

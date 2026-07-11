@@ -19,13 +19,25 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 
 ### Installation
 
-| Command                   | Purpose                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `forge extension enable`  | Install Forge extensions; user scope installs runtime hooks, project/local installs project settings and enrolls the root |
-| `forge extension sync`    | Update existing installation to current version                                                                           |
-| `forge extension disable` | Remove Forge installation cleanly                                                                                         |
-| `forge extension status`  | Show installation status (`--json`)                                                                                       |
-| `forge extension doctor`  | Report install, hook dispatcher/double-fire, project registry, and compatibility status (`--json`)                        |
+| Command                           | Purpose                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `forge extension enable`          | Install Forge extensions; user scope installs runtime hooks, project/local installs project settings and enrolls the root |
+| `forge extension sync`            | Update existing installation to current version                                                                           |
+| `forge extension cleanup-project` | Preview/apply one legacy project-hook migration (`--root`, `--yes`)                                                       |
+| `forge extension disable`         | Remove Forge installation cleanly                                                                                         |
+| `forge extension status`          | Show installation status (`--json`)                                                                                       |
+| `forge extension doctor`          | Report install, hook migration/double-fire, project registry, and compatibility status (`--json`)                         |
+
+`forge extension cleanup-project [--root <dir>] [--yes]` targets one Forge root. The default invocation is a read-only
+preview that lists settings/config removals, backups, tracking reconciliation, user runtime registration, and final
+registry activation. `--yes` recomputes the plan and applies it; ambiguous registrations or invalid selected/global
+state exit non-zero without a preflight write. If cleanup has begun and user registration or final enrollment fails, the
+command retains backups and prints the exact retry command for the temporary hooks-off state. There is no `--json` mode;
+`forge extension doctor --json` is the scriptable diagnostic surface.
+
+User-scope `enable`/`sync` may report one cleanup command per tracked legacy root, but never opens, edits, or enrolls
+those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registrations` independently from
+`double_fire_risk`. `forge extension status` remains the installation/tracking view and does not report migration state.
 
 ### Session management
 

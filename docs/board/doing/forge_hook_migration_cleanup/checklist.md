@@ -4,15 +4,14 @@ Execution plan for migrating pre-T5 hook installations to the user-scoped dispat
 sequencing live in the epic [`card.md`](../epic_global_forge_runtime/card.md); this member's problem framing is
 [`card.md`](card.md).
 
-> **Drafted 2026-07-10 on branch `forge-hook-migration-cleanup`; revised through follow-up review.** No product
-> implementation has started. Phase 0 decisions still require approval before Phase 1 begins.
+> **Implemented and verified 2026-07-10 on branch `forge-hook-migration-cleanup` after checklist review.** The card
+> remains in `doing/` until its review is accepted and the branch merges.
 
 ## Current focus
 
-Review this checklist, especially the explicit project-mutation boundary and the conservative fallback rule. T6 is the
-last member on the T3 -> T4 -> T5 -> T6 critical path. T5 already changed new installations; T6 must provide a safe,
-visible path for migrating old tracked and legacy state without deleting user-owned configuration or claiming that an
-unresolved root is clean.
+Review the implementation against the accepted D1–D6 boundary and verification evidence below. In particular, user-scope
+lifecycle commands only report other roots, while `cleanup-project --yes` owns selected-root cleanup and enrolls that
+root last. Post-merge lane/link closeout remains intentionally deferred.
 
 ## Scope boundary
 
@@ -83,7 +82,7 @@ unresolved root is clean.
 
 ## Phase 0 — Decisions for review
 
-- [ ] **D1 — Untracked Claude fallback. Recommended: exact known-released Forge-only auto-removal; ambiguity stays
+- [x] **D1 — Untracked Claude fallback. Recommended: exact known-released Forge-only auto-removal; ambiguity stays
   report-only.** Freeze an additive migration inventory of released legacy direct-hook shapes. Normalize only the
   recognized command form, then require the event, matcher, timeout, wrapper shape, and handler to match one historical
   shape exactly. Do not derive the historical set solely from the current preset or replace old fixtures when current
@@ -92,7 +91,7 @@ unresolved root is clean.
   commands. Never use substring matching.
   - _Assertion:_ every frozen legacy-writer generation remains removable after later inventory changes, while every byte
     of an ambiguous manual entry is preserved.
-- [ ] **D2 — Cross-repo mutation and visibility boundary. Recommended: user-scope `enable`/`sync` never edit
+- [x] **D2 — Cross-repo mutation and visibility boundary. Recommended: user-scope `enable`/`sync` never edit
   project/local roots; `cleanup-project` owns all repository mutation.** User lifecycle commands may consolidate safe
   legacy siblings in user settings, install/update the user dispatcher, and list tracked roots with exact
   `forge extension cleanup-project --root <path>` guidance. They must not open cross-root settings/config for migration,
@@ -102,24 +101,24 @@ unresolved root is clean.
   - _Assertion:_ user-scope enable/sync may change user Forge files, but never produces a repository diff or changes
     ambient dispatcher eligibility in another root; each root mutation and enrollment requires a separately visible
     `cleanup-project --yes` invocation.
-- [ ] **D3 — `cleanup-project` mutation UX. Recommended: preview by default; `--yes` applies; optional `--root` selects
+- [x] **D3 — `cleanup-project` mutation UX. Recommended: preview by default; `--yes` applies; optional `--root` selects
   one Forge project.** The preview lists exact settings/config paths, tracked versus fallback removals, registry
   enrollment as the final activation, user-hook action, backups, and unresolved entries. A later `--yes` invocation
   recomputes the plan rather than applying state captured by a prior preview. No `--json` in v1: this is a destructive
   migration leaf, while `doctor --json` is the scriptable read surface.
-- [ ] **D4 — Completing the transition. Recommended: cleanup ensures only the runtime-hook modules at user scope without
+- [x] **D4 — Completing the transition. Recommended: cleanup ensures only the runtime-hook modules at user scope without
   changing unrelated user modules.** For an existing user installation, union the required runtime modules into its
   tracked module set; for no user installation, create a tracked runtime-hooks-only installation. Do not reinstall a
   full profile or remove existing commands/skills/permissions. Add `codex-hooks` when a Codex project block is migrated;
   otherwise do not introduce Codex configuration merely because Claude hooks were present.
-- [ ] **D5 — Operation-scoped persistent-duplicate guard. Recommended: an unresolved registration blocks completion only
+- [x] **D5 — Operation-scoped persistent-duplicate guard. Recommended: an unresolved registration blocks completion only
   for the root being cleaned, not for unrelated tracked roots or plain user enable/sync.** The selected root plus any
   user settings named in its plan form the cleanup gate. If an ambiguous selected-root registration remains,
   retain/report it, skip a new user write from that cleanup, exit non-zero on `--yes`, and provide the exact recovery
   path. An unresolved entry elsewhere degrades to reported cleanup/doctor state and never prevents the user's own
   dispatcher from being installed. If a user dispatcher already exists, report the selected root's still-present risk
   rather than claiming cleanup success.
-- [ ] **D6 — Candidate discovery and selected-root activation. Recommended: discovery never enrolls; successful cleanup
+- [x] **D6 — Candidate discovery and selected-root activation. Recommended: discovery never enrolls; successful cleanup
   enrolls the selected root last.** Report missing/unrecoverable tracking rows without changing `projects.json`. For an
   unenrolled, compatibility-readable selected root, remove legacy state, verify the user dispatcher/Codex transition,
   then call `ProjectRegistryStore.enroll(root, "backfill")` as the final activation write. Do not turn stale tracking
@@ -128,22 +127,22 @@ unresolved root is clean.
 
 ## Phase 1 — Migration inventory and plan model
 
-- [ ] Add dependency-light `src/forge/install/hook_migration.py` with typed, UI-agnostic plan/result records. Keep
+- [x] Add dependency-light `src/forge/install/hook_migration.py` with typed, UI-agnostic plan/result records. Keep
   Click/Rich output in `cli/extensions.py`; no `%` direct-command mirror is needed.
-- [ ] Define the additive known-released legacy shape inventory in migration-owned code and mirror every supported
+- [x] Define the additive known-released legacy shape inventory in migration-owned code and mirror every supported
   generation with a frozen golden fixture. Do not generate historical eligibility dynamically from the current
   `get_builtin_preset()` output; changes require intentionally appending a fixture.
-- [ ] Build one strict inventory for:
+- [x] Build one strict inventory for:
   - project `.claude/settings.json` and `.claude/settings.local.json`;
   - legacy user `~/.claude/settings.local.json` and current user `~/.claude/settings.json`;
   - project/local `Installation.settings_entries`, module fields, `.forge-added` payloads, and tracked Codex path;
   - project `.codex/config.toml` marker state and outside-marker Forge registrations. Inventory is operation-scoped:
     cleanup reads the selected root plus named user targets; user enable/sync reads user targets and global tracking but
     does not inventory another root's Claude/Codex files.
-- [ ] Separate **logical detection** from **mutation eligibility**. Detection may use
+- [x] Separate **logical detection** from **mutation eligibility**. Detection may use
   `forge_hook_handler()`/`find_forge_hook_registrations()`; auto-removal additionally requires D1's canonical Forge-only
   shape. Dispatcher entries and legacy entries with the same handler are not interchangeable mutation targets.
-- [ ] Apply strict failure boundaries at the state that failed:
+- [x] Apply strict failure boundaries at the state that failed:
   - corrupt/unreadable/newer shared `projects.json` aborts `cleanup-project` before selected-root removal, but does not
     block user enable/sync because those commands neither read nor write the registry;
   - invalid global installation tracking aborts an operation that must read/update it before any mutation;
@@ -154,107 +153,107 @@ unresolved root is clean.
   - read-only discovery failures in other roots are reported and do not block user enable/sync. Any future explicit
     batch apply must skip failed roots, continue eligible roots, aggregate them, and exit non-zero. Doctor remains the
     fail-open/read-only diagnostic surface.
-- [ ] The preview plan names every intended write and classifies it as tracked removal, safe fallback removal, registry
+- [x] The preview plan names every intended write and classifies it as tracked removal, safe fallback removal, registry
   enrollment/final activation, Codex block removal, user-hook install/update, or report-only ambiguity.
-- [ ] Recompute and revalidate the plan under `--yes`; do not trust file contents captured by a prior preview.
+- [x] Recompute and revalidate the plan under `--yes`; do not trust file contents captured by a prior preview.
 
 ## Phase 2 — Candidate discovery and selected-root activation
 
-- [ ] Enumerate project/local tracking rows through `TrackingStore.list_installations()`; never parse installation keys
+- [x] Enumerate project/local tracking rows through `TrackingStore.list_installations()`; never parse installation keys
   again in the migration layer.
-- [ ] Keep user-scope candidate discovery behaviorally read-only with respect to every root: use global installation
+- [x] Keep user-scope candidate discovery behaviorally read-only with respect to every root: use global installation
   tracking to print cleanup candidates, but do not open their Claude/Codex/compatibility files, change project/local
   tracking rows, read or write `projects.json`, or enroll anything.
-- [ ] Report stale paths, v1 project/local rows with no recoverable path, and tracking paths that no longer identify a
+- [x] Report stale paths, v1 project/local rows with no recoverable path, and tracking paths that no longer identify a
   Forge project. Do not invent roots from CWD or delete tracking during discovery. These visibility results do not turn
   a successful user dispatcher install into a failed root migration because no root migration was attempted.
-- [ ] For explicit cleanup, enforce the selected root's `.forge/project.toml` with the normal command-path strict
+- [x] For explicit cleanup, enforce the selected root's `.forge/project.toml` with the normal command-path strict
   posture and strictly validate `projects.json` before the first removal. An incompatible/malformed pin or corrupt
   registry aborts that root without touching it; an unrelated tracked root cannot affect the result.
-- [ ] After selected-root legacy removal, tracking reconciliation, post-clean scan, and user dispatcher/Codex transition
+- [x] After selected-root legacy removal, tracking reconciliation, post-clean scan, and user dispatcher/Codex transition
   succeed, enroll the selected root with `ProjectRegistryStore.enroll(root, "backfill")`. Preserve existing provenance
   when already enrolled and canonicalize through the registry API.
-- [ ] Treat new enrollment as the final ambient-dispatch activation write, not as preliminary bookkeeping. A failed
+- [x] Treat new enrollment as the final ambient-dispatch activation write, not as preliminary bookkeeping. A failed
   final enrollment exits non-zero in the documented hooks-off recovery state. Concurrent enrollment uses the existing
   lock and remains idempotent; an already-enrolled root proceeds directly to legacy removal without an
   unenroll/re-enroll cycle.
 
 ## Phase 3 — Claude settings cleanup and tracking reconciliation
 
-- [ ] For ownership-proven tracked hooks, remove only entries whose current full canonical value matches a tracked hook
+- [x] For ownership-proven tracked hooks, remove only entries whose current full canonical value matches a tracked hook
   entry. Preserve user-modified tracked entries and report them as unresolved rather than removing by handler alone.
-- [ ] For D1-eligible untracked legacy entries, remove only the Forge-only nested command/entry after backing up the
+- [x] For D1-eligible untracked legacy entries, remove only the Forge-only nested command/entry after backing up the
   exact settings file. Preserve unrelated event entries, matchers, non-command hooks, and user keys byte-for-byte at the
   semantic JSON level.
-- [ ] Assign legacy user-scope sibling cleanup to the shared user-scope `enable`/`sync` transition: remove safe
+- [x] Assign legacy user-scope sibling cleanup to the shared user-scope `enable`/`sync` transition: remove safe
   bare/absolute `forge hook` entries while preserving the current dispatcher entry. `cleanup-project` may call that same
   transition only when its preview names the user-file action; it must not grow a second user-settings cleaner. Never
   remove a valid user dispatcher merely because a legacy sibling exists.
-- [ ] Write each changed settings file once through `write_settings()` after `backup_settings()`, then run
+- [x] Write each changed settings file once through `write_settings()` after `backup_settings()`, then run
   `cleanup_empty_settings()` so empty hook containers do not linger. No partial per-entry writes.
-- [ ] Reconcile each project/local `Installation` without disabling the installation:
+- [x] Reconcile each project/local `Installation` without disabling the installation:
   - remove `hooks` from `modules_enabled`;
   - remove only migrated hook `settings_entries`;
   - preserve status line, permissions/env, commands, skills, agents, files, `installed_at`, and scope metadata; set
     `updated_at` to the migration time;
   - rewrite the newest `.forge-added` payload so a later `extension disable` neither resurrects nor re-removes migrated
     hooks.
-- [ ] Persist physical cleanup before dropping its tracking record. If the tracking write then fails, a retry sees stale
+- [x] Persist physical cleanup before dropping its tracking record. If the tracking write then fails, a retry sees stale
   ownership metadata over already-removed bytes, which is safer and idempotent; never drop ownership first and strand an
   active hook.
-- [ ] Post-clean, scan the selected root plus user scope by `(event, matcher, handler)`. The selected-root apply result
+- [x] Post-clean, scan the selected root plus user scope by `(event, matcher, handler)`. The selected-root apply result
   is successful only when that root's registrations are gone and user scope contains at most one logical registration
   per trigger. Registrations in other roots remain independent diagnostic state and do not block this result.
 
 ## Phase 4 — Codex block migration and trust posture
 
-- [ ] For a tracked project/local Codex path, validate it against that scope's expected mapping before editing. Back up
+- [x] For a tracked project/local Codex path, validate it against that scope's expected mapping before editing. Back up
   the file, then call `remove_codex_block()`; do not duplicate marker parsing.
-- [ ] For an untracked block at the selected project's `.codex/config.toml`, exact balanced Forge markers are sufficient
+- [x] For an untracked block at the selected project's `.codex/config.toml`, exact balanced Forge markers are sufficient
   ownership for removal after backup. A partial/malformed marker pair is report-only and blocks successful completion.
-- [ ] Preserve unrelated TOML exactly outside the removed block. A whitespace-only Forge-created file may be deleted
+- [x] Preserve unrelated TOML exactly outside the removed block. A whitespace-only Forge-created file may be deleted
   only after its backup exists.
-- [ ] Never auto-remove Forge-looking Codex commands outside the managed markers. Surface the event and config path as
+- [x] Never auto-remove Forge-looking Codex commands outside the managed markers. Surface the event and config path as
   manual cleanup, without printing secrets or unrelated TOML.
-- [ ] Clear `codex_config_path`, `codex_commands`, and `codex-hooks` from the project/local tracking row only after the
+- [x] Clear `codex_config_path`, `codex_commands`, and `codex-hooks` from the project/local tracking row only after the
   block is removed or the tracked file is confirmed absent. Preserve tracking when removal is ambiguous or fails.
-- [ ] After project/local cleanup, install/update the user Codex managed block only when D4 requires it. Reuse T5's
+- [x] After project/local cleanup, install/update the user Codex managed block only when D4 requires it. Reuse T5's
   logical event+handler dedupe, preserve the module's best-effort conflict posture, and print the one-time re-trust
   ceremony whenever command bytes or config location changed. Never claim enrollment was verified.
 
 ## Phase 5 — Orchestration, CLI, and diagnostics
 
-- [ ] Add `forge extension cleanup-project [--root <dir>] [--yes]` as an explicit leaf on the existing lifecycle group.
+- [x] Add `forge extension cleanup-project [--root <dir>] [--yes]` as an explicit leaf on the existing lifecycle group.
   Resolve the selected Forge root with the same project identity rules as extension enable; reject `--root` inside
   `.claude/` and fail loudly outside a Forge project.
-- [ ] Implement D2's user-scope `enable`/`sync` transition at one orchestration seam. Validate the user/tracking
+- [x] Implement D2's user-scope `enable`/`sync` transition at one orchestration seam. Validate the user/tracking
   targets, report candidate roots from global installation tracking, consolidate safe user-file siblings, and
   install/update the user dispatcher. Print one exact cleanup command per affected root, but do not read or write its
   Claude/Codex targets or `projects.json`. Root cleanup need or staleness remains report/doctor state and must not
   suppress the user dispatcher write. Do not bury this orchestration inside `settings_merge.py`.
-- [ ] Preserve remove-first ordering within explicit `cleanup-project --yes`:
+- [x] Preserve remove-first ordering within explicit `cleanup-project --yes`:
   1. strict registry/tracking/config preflight and immutable plan;
   2. selected-root tracked/safe legacy cleanup and tracking reconciliation;
   3. selected-root plus user-scope post-clean scan, aborting on unresolved selected-root state;
   4. user dispatcher/Codex registration;
   5. selected-root enrollment as the final ambient-dispatch activation write;
   6. selected-root final scan and result rendering.
-- [ ] Report the unavoidable cross-file hooks-off window honestly. If user installation or final enrollment fails after
+- [x] Report the unavoidable cross-file hooks-off window honestly. If user installation or final enrollment fails after
   removal, exit non-zero, retain backups/tracking truth, and print the exact recovery command; do not roll project hooks
   back after a partially successful migration. A newly installed dispatcher remains ambient-inactive until enrollment,
   so this failure is hooks-off rather than double-fire.
-- [ ] Make preview and apply idempotent. A fully migrated root previews no destructive actions; repeated `--yes` neither
+- [x] Make preview and apply idempotent. A fully migrated root previews no destructive actions; repeated `--yes` neither
   creates duplicate registry rows nor rewrites settings/config unnecessarily.
-- [ ] Extend `forge extension doctor --json` with stable additive cleanup state under `runtime_hooks` (for example,
+- [x] Extend `forge extension doctor --json` with stable additive cleanup state under `runtime_hooks` (for example,
   `legacy_registrations` and `cleanup_required`) without removing T5's `scopes`/`double_fire_risk`. Human output names
   actual paths and the now-shipped cleanup command.
-- [ ] Add an independent cleanup-required detector for the opt-in status-line hook warning. Do not broaden or replace
+- [x] Add an independent cleanup-required detector for the opt-in status-line hook warning. Do not broaden or replace
   `has_forge_hook_double_fire()`: `HOOKx2` remains true only for duplicate `(event, matcher, handler)` registrations,
   while a reviewed, distinct indication represents a lone legacy source. Both states may coexist. Keep the segment
   fail-open and default-off.
-- [ ] Keep `forge extension status` unchanged. In this epic's T5/T6 terminology, “doctor/status” means doctor plus the
+- [x] Keep `forge extension status` unchanged. In this epic's T5/T6 terminology, “doctor/status” means doctor plus the
   opt-in status line; installation/tracking status is not a third migration diagnostic surface.
-- [ ] Keep primary preview/result output on stdout and diagnostics/errors/prompts on stderr. Route recovery through
+- [x] Keep primary preview/result output on stdout and diagnostics/errors/prompts on stderr. Route recovery through
   `forge.cli.output`; new normal-flow strings must pass the `FORGE_*` vocabulary guard without teaching internal env
   variables.
 
@@ -290,40 +289,38 @@ assertions):
 | Full Docker migration                  | pre-T5 project/user settings + tracking + Codex block in isolated home                               | legacy source is removed before selected-root enrollment; afterward one user dispatcher source runs and unrelated state stays coherent       | `tests/integration/docker/test_installer.py`           |
 | Host hook reachability after migration | migrated project followed by a managed real-Claude session                                           | dispatcher-backed SessionStart/Stop effects occur from user scope; no project hook block is required                                         | `tests/integration/docker/test_real_claude_hooks.py`   |
 
-- [ ] Focused unit suite:
+- [x] Focused unit suite (312 passed):
   `uv run pytest tests/src/install/test_hook_migration.py tests/src/install/test_hook_dispatcher.py tests/src/install/test_installer.py tests/src/install/test_hooks.py tests/src/install/test_codex_hooks.py tests/src/cli/test_extension_enable.py tests/src/install/test_doctor.py tests/src/cli/statusline/test_statusline_registry.py -q`.
-- [ ] Command-tree/output/env-vocabulary guards:
+- [x] Command-tree/output/env-vocabulary guards (68 passed):
   `uv run pytest tests/src/cli/test_command_tree_invariants.py tests/src/cli/test_output.py tests/src/cli/test_output_streams.py tests/src/cli/test_env_vocabulary.py -q`.
-- [ ] Full unit suite: `make test-unit`.
-- [ ] Required installer integration: `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v`.
-- [ ] Required targeted real-Claude hook integration:
+- [x] Full unit suite: `make test-unit` (7,548 passed, 1 platform skip, 116 deselected).
+- [x] Required installer integration: `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v` (16
+  passed; final migration-only rerun also passed).
+- [x] Required targeted real-Claude hook integration:
   `./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py -k migration -v` (name the final
-  test so the selector is stable).
-- [ ] Full quality gate: `make pre-commit`.
+  test so the selector is stable; 1 passed, 2 deselected).
+- [x] Full quality gate: `make pre-commit`.
 
 ## Phase 7 — Documentation and closeout
 
-- [ ] Update `design.md` §3.10/§5.1 with the shipped migration ordering, explicit per-root mutation boundary,
+- [x] Update `design.md` §3.10/§5.1 with the shipped migration ordering, explicit per-root mutation boundary,
   operation-scoped duplicate guard, and transient hooks-off recovery contract.
-- [ ] Update `design_appendix.md` §C.2–C.6 with tracked-root candidate discovery, final selected-root enrollment, Claude
+- [x] Update `design_appendix.md` §C.2–C.6 with tracked-root candidate discovery, final selected-root enrollment, Claude
   tracked/fallback cleanup, Codex marker cleanup, tracking reconciliation, and re-trust behavior.
-- [ ] Add `forge extension cleanup-project` to `docs/cli_reference.md` and document preview/`--yes` behavior.
-- [ ] Update wheel-user Day 1/recovery guidance in `docs/end-user/README.md`, `docs/end-user/hook.md`, and
+- [x] Add `forge extension cleanup-project` to `docs/cli_reference.md` and document preview/`--yes` behavior.
+- [x] Update wheel-user Day 1/recovery guidance in `docs/end-user/README.md`, `docs/end-user/hook.md`, and
   `docs/end-user/config.md`; update QA/walkthrough extension-hook checks for a pre-T5 migration fixture.
-- [ ] Update the epic checklist: mark T6 shipped, record member-level evidence for seams 1/2/4, and advance the
-  remaining cursor to T8 (or record the epic closeout decision if T8 stays parked/out of the live member set). Do not
-  tick the epic seam boxes during member closeout; those boxes tick only when the epic itself closes.
-- [ ] Add a compact `docs/board/change_log.md` entry only after implementation is complete, with Goal / Key changes /
+- [x] Update the epic checklist with T6's review-ready state and member-level evidence for seams 1/2/4. Keep “shipped”
+  and the cursor advance pending merge; do not tick the epic seam boxes before epic closeout.
+- [x] Add a compact `docs/board/change_log.md` entry only after implementation is complete, with Goal / Key changes /
   Verification.
-- [ ] Propose any durable migration invariant for `docs/board/impl_notes.md`; promote it only after human review.
+- [x] Propose a durable invariant for `docs/board/impl_notes.md`; do not promote it before human review: **registry
+  enrollment is runtime activation, not discovery metadata.** A read/report path must never enroll; a migration may
+  enroll only its explicitly selected root, after legacy removal, user registration, and duplicate scans.
 - [ ] After merge, move this card `doing/ -> done/`, repoint the epic forward-link and every inbound board link, and run
   a relative-link/stale-lane sweep.
 
 ## Review blockers
 
-- Phase 0 D1–D6 require maintainer approval.
-- In particular, D2 now withholds cross-repository mutation authority from user-scope lifecycle commands; D1 freezes
-  historical eligibility, D5 scopes the completion guard to the selected operation, and D6 treats enrollment as the
-  final activation write rather than discovery bookkeeping. Implementation must not widen or reorder those boundaries
-  from the old card alone.
-- The checklist intentionally stops before product code until that review is complete.
+No implementation blocker remains. Human review and merge are required before the card can move to `done/`, T6 can be
+called shipped in the epic, or the epic cursor can advance.

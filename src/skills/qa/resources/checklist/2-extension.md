@@ -230,4 +230,36 @@ unset CODEX_HOME
 - [ ] Enable prints "Codex hooks skipped: codex binary not found on PATH"
 - [ ] `NO-CONFIG-WRITTEN` is printed (no Codex config created)
 
+### 2.12 Migrate a Pre-User-Scope Hook Fixture
+
+<!-- auto -->
+
+```bash
+cd $FORGE_TEST_REPO
+
+# Seed one exact pre-T5 direct hook beside the current local project settings.
+tmp=$(mktemp)
+jq '.hooks.SessionStart = ((.hooks.SessionStart // []) + [{"hooks":[{"type":"command","command":"forge hook session-start"}]}])' \
+  .claude/settings.local.json > "$tmp" && mv "$tmp" .claude/settings.local.json
+
+forge extension doctor --json | jq -e '.runtime_hooks.cleanup_required == true'
+BEFORE=$(shasum -a 256 .claude/settings.local.json | cut -d' ' -f1)
+forge extension cleanup-project --root "$FORGE_TEST_REPO" | tee /tmp/forge-hook-migration-preview.txt
+AFTER=$(shasum -a 256 .claude/settings.local.json | cut -d' ' -f1)
+test "$BEFORE" = "$AFTER" && echo "PREVIEW-UNCHANGED"
+
+forge extension cleanup-project --root "$FORGE_TEST_REPO" --yes
+! rg -q '"command": "forge hook ' .claude/settings.local.json
+rg -q 'forge-hook session-start' "$CLAUDE_HOME/settings.json"
+forge extension doctor --json \
+  | jq -e '.runtime_hooks.cleanup_required == false and .runtime_hooks.double_fire_risk == false'
+find .claude -name '.settings.local.json.forge.backup.*' -print -quit | grep -q .
+```
+
+- [ ] Doctor detects the seeded cleanup state, and preview prints `PREVIEW-UNCHANGED`
+- [ ] Preview identifies the selected settings path and a known-legacy removal
+- [ ] Apply removes the direct project hook while leaving the user dispatcher registration present
+- [ ] Doctor reports neither cleanup-required nor double-fire after migration
+- [ ] A project settings backup exists
+
 ---

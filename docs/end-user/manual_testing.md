@@ -36,7 +36,8 @@ The default mode creates a hermetic test environment, installs Forge extensions 
 
 1. Files landed in the test repo (not your real `~/.claude/`)
 2. Your real system was not modified (mtime assertions)
-3. Isolation invariants are correct (HOME, FORGE_HOME, CLAUDE_HOME redirected)
+3. Isolation invariants are correct (`FORGE_HOME`, `CLAUDE_HOME`, and `CODEX_HOME` redirected; `HOME` unchanged for
+   existing authentication)
 
 The agent walks through each step interactively, explaining what it's checking and why. Risky operations (install,
 uninstall) go through `run-in-repo.sh`; read-only checks are done directly.
@@ -97,11 +98,11 @@ The setup script creates a hermetic environment at `~/.forge/manual-testing/walk
 `FORGE_TEST_REPO`):
 
 ```
-forge-manual-test/
-+-- .test-home/          # Redirected HOME, FORGE_HOME, CLAUDE_HOME
-|   +-- .claude/
-|   +-- .forge/
-+-- .forge/manual-test/  # State file, env.sh, reports (never wiped)
+test-repo/
++-- .forge-home/         # Redirected Forge global state
++-- .claude-user/        # Redirected user-scope Claude extensions
++-- .codex-user/         # Redirected user-scope Codex config
++-- .forge/walkthrough/  # State file, env.sh, reports
 +-- src/                 # Fixture source files
 +-- tests/               # Fixture test files
 +-- CLAUDE.md            # Fixture project file
