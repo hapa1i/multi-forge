@@ -147,6 +147,8 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 
 - [ ] Every live member card is `done/` (or the shared contract is folded into normative design docs).
 - [ ] design.md / design_appendix §C / cli_reference reflect the shipped install + hook-ownership model.
-- [ ] When moving the epic to `done/`, repoint done-member back-links that currently target the epic's `doing/` path.
+- [ ] When moving the epic to `done/`, repoint every inbound board link that currently targets the epic's `doing/` path,
+  including done-member back-links and standalone follow-ups such as
+  [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md).
 - [ ] Epic moved `doing/ -> done/`; `change_log.md` entry added; durable lessons promoted to `impl_notes.md` after human
   review.
