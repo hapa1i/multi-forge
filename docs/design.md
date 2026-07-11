@@ -869,6 +869,20 @@ is a scalar setting, not a runtime hook.
 **Operational requirement:** the global `forge` launcher must be installed where the dispatcher can resolve it. A stale
 or missing launcher is surfaced by the dispatcher error and by `forge extension doctor`.
 
+**Legacy migration:** user-scope `forge extension enable` and `sync` may report tracked project/local cleanup
+candidates, but they neither open those checkouts nor enroll them. Repository mutation requires an explicit
+`forge extension cleanup-project [--root <dir>] --yes`; without `--yes`, the command is a side-effect-free preview. The
+apply path validates the selected root, global tracking, user targets, and the project registry before writing. It then
+removes exact tracked or frozen known-released direct-hook entries, reconciles tracking, verifies the selected root is
+clean, installs/updates the user runtime hooks, and enrolls that root with source `backfill` as the final
+ambient-dispatch activation. Ambiguous entries block only that selected operation. Because project and user files cannot
+be swapped atomically, a failure after project removal is reported as a hooks-off recovery state with backups and an
+exact retry command; Forge does not roll legacy hooks back or create a known double-fire window.
+
+Doctor exposes cleanup-required registrations separately from actual duplicate `(event, matcher, handler)` triggers. The
+opt-in status-line `hooks` segment follows the same distinction: `HOOK!` means cleanup is required, while `HOOKx2` means
+a genuine duplicate trigger; both may appear.
+
 **Why `forge hook …` instead of installed scripts:**
 
 1. **No dependency ambiguity** — install Forge once; deps resolved at install.
@@ -1209,17 +1223,23 @@ scope model (`--scope user` / `--scope project` / `--scope local`) and provides 
 (`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,
 codex-hooks) are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union). The
 `codex-hooks` module registers Forge's Codex hooks (`codex-session-start`, `codex-policy-check`) as a marker-delimited
-managed block in the Codex config the install scope maps to — user scope targets `$CODEX_HOME/config.toml`,
-project/local scope targets `<project>/.codex/config.toml` (Codex has no settings.local analog). It is best-effort:
-skipped with a notice when `codex` is not on PATH, and its conflicts never block the install. Registration alone is
-inert — Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which
-`forge extension enable` names in its next steps but cannot perform or verify. Enrollment is unverifiable from a config
-read (the `trusted_hash` is not computable), so `forge runtime preflight codex --verify-enrollment` confirms it
-empirically instead — it runs one trivial managed `codex exec` turn and reports the user-scope hook as enrolled iff the
-`codex-session-start` hook fired (the observation receipt appeared). `~/.forge/installed.json` tracks what was installed
-for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory (created if
-missing); user-level install (`--scope user`) goes to `~/.claude/` and does not require a project anchor. This
-establishes the Forge project per the identity model (§3).
+managed block in the user Codex config (`$CODEX_HOME/config.toml`). Project/local installs do not write runtime hook
+blocks for either Claude or Codex. Ordinary enable/sync keeps Codex installation best-effort: it is skipped with a
+notice when `codex` is not on PATH, and its conflicts never block the Claude install. Registration alone is inert —
+Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which `forge extension enable` names
+in its next steps but cannot perform or verify. Enrollment is unverifiable from a config read (the `trusted_hash` is not
+computable), so `forge runtime preflight codex --verify-enrollment` confirms it empirically instead — it runs one
+trivial managed `codex exec` turn and reports the user-scope hook as enrolled iff the `codex-session-start` hook fired
+(the observation receipt appeared). `~/.forge/installed.json` tracks what was installed for clean update/uninstall.
+Project/local enablement requires a `.claude/` anchor at the target directory (created if missing); user-level install
+(`--scope user`) goes to `~/.claude/` and does not require a project anchor. This establishes the Forge project per the
+identity model (§3).
+
+For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
+or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it
+removes safe legacy Claude registrations and project Codex marker blocks, preserves unrelated settings/TOML, installs
+the user-scoped runtime registrations, and enrolls the root last. A Codex block moved to user scope must be trusted
+again because its config location and command bytes changed.
 
 > Scope model, module inventory, merge rules, and tracking file details in
 > [design_appendix.md §C](design_appendix.md#c-install-model-reference). Multi-scope installation behavior (dual user +

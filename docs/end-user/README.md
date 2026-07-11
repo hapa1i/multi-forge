@@ -42,7 +42,24 @@ install instead (`uv sync`); see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ```bash
 forge extension enable --scope user    # Install runtime hooks once
-forge extension enable                 # Set up this project (.forge/, status line, project assets)
+```
+
+If that command reports the current checkout as a legacy cleanup candidate, migrate it before ordinary project setup:
+
+```bash
+forge extension cleanup-project --root /path/to/project        # Preview; no changes
+forge extension cleanup-project --root /path/to/project --yes  # Apply the reviewed plan
+```
+
+User-scope enable/sync only reports candidate roots; it does not edit or enroll another checkout. Cleanup backs up each
+changed settings/config file, preserves unrelated project settings, moves runtime registrations to user scope, and
+enrolls the selected root last. If it reports a temporary hooks-off recovery state, rerun the exact command it prints.
+Migrated Codex hooks require the one-time interactive trust prompt again.
+
+Then set up the project-owned pieces:
+
+```bash
+forge extension enable                 # Set up .forge/, status line, and project assets
 ```
 
 ### B. Launch Claude
@@ -182,8 +199,9 @@ varies across model versions, cost optimization order, and a release-validation 
 
 ### Hooks -- Lifecycle & Artifacts
 
-Forge hooks capture session artifacts (plans, transcripts) and enforce policies at tool-use boundaries. Installed
-automatically by `forge extension enable`.
+Forge hooks capture session artifacts (plans, transcripts) and enforce policies at tool-use boundaries. Install runtime
+hooks once with `forge extension enable --scope user`; project/local enable owns project assets and status line
+settings.
 
 See [hook.md](hook.md).
 

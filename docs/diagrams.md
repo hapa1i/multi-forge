@@ -227,10 +227,12 @@ session only through run-tree identity.
 ```mermaid
 flowchart LR
     subgraph Installation["Install Surface"]
-        Installer["forge extension enable"]
-        Settings["Claude settings file<br/>(settings.json / settings.local.json)"]
-        CodexCfg["Codex config.toml managed block<br/>(user: $CODEX_HOME; project/local: &lt;project&gt;/.codex)"]
-        Installer -->|writes hook config| Settings
+        Installer["forge extension enable --scope user"]
+        Settings["User Claude settings<br/>(~/.claude/settings.json)"]
+        Dispatcher["~/.forge/bin/forge-hook"]
+        CodexCfg["User Codex config.toml managed block<br/>($CODEX_HOME/config.toml)"]
+        Installer -->|writes dispatcher entries| Settings
+        Installer -->|renders| Dispatcher
         Installer -->|appends managed block| CodexCfg
     end
 
@@ -249,16 +251,19 @@ flowchart LR
     Settings -->|configures| ClaudeEvt
     CodexCfg -->|registers| CodexEvt
     Enroll -.->|enables firing| CodexEvt
-    ClaudeEvt -->|invokes| CLI2
-    CodexEvt -->|"codex-session-start /<br/>codex-policy-check"| CLI2
+    ClaudeEvt -->|invokes| Dispatcher
+    CodexEvt -->|invokes| Dispatcher
+    Dispatcher -->|"exec forge hook &lt;name&gt;"| CLI2
     CLI2 -->|runs| Handler
     Handler -->|produces| Outputs
 ```
 
-Claude hooks fire as soon as the settings file is written. Codex hooks are **enrollment-gated**: the installer appends a
-marker-delimited block to the Codex `config.toml` its install scope maps to, registering two hooks
-(`codex-session-start`, `codex-policy-check`), but they fire only after the user completes Codex's one-time interactive
-trust ceremony — registration alone is inert. Both runtimes converge on the same `forge hook` handlers.
+Claude runtime registrations live at user scope and invoke the standalone dispatcher. It forwards managed sessions
+immediately and ambient events only when the current Forge root is in `~/.forge/projects.json`; project/local extension
+installs do not write hook blocks. Codex hooks are **enrollment-gated**: the installer appends a marker-delimited user
+block registering `codex-session-start` and `codex-policy-check`, but they fire only after the one-time interactive
+trust ceremony. Both runtimes converge on the same `forge hook` handlers. Legacy project blocks move through the
+explicit `forge extension cleanup-project` migration rather than ordinary user enable/sync.
 
 ---
 

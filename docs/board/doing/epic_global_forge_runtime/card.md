@@ -10,10 +10,11 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, **T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**. The epic's coordination
-[`checklist.md`](checklist.md) (sequencing, seam drift-watch, and remaining T6/T8 decisions) stays live. Next
-implementation cursor is **T6** migration cleanup; **T8** remains the parked dev-runtime override. Remaining members
-stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as picked up.
-Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design docs).
+[`checklist.md`](checklist.md) (sequencing, seam drift-watch, and remaining T6/T8 decisions) stays live. **T6**
+migration cleanup is implemented and verified on its branch, but remains the active cursor until review/merge; **T8**
+remains the parked dev-runtime override. Other inactive members stay in `proposed/` (or accepted `todo/` for the split
+T7 sweep) and spin out to their own `doing/<slug>/` as picked up. Closes to `done/` when every live member is `done/`
+(or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -39,18 +40,18 @@ migration; the **user-scope-model track** (T1 -> T3 -> T4 -> T5 -> T6) is the la
 command bytes. **T9 and T10 are cross-cutting** -- each touches multiple byte-changing members and needs a single owner,
 so neither sits on one linear track.
 
-| Label | Card                                                                                  | Ships                                                                               | Depends on  |
-| ----- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
-| T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                     | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
-| T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md)   | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
-| T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)                 | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
-| T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                   | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
-| T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)           | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
-| T6    | [`forge_hook_migration_cleanup`](../../proposed/forge_hook_migration_cleanup/card.md) | No-double-fire migration + backfill + legacy cleanup                                | T5          |
-| T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                     | `required_forge` first guardrail slice + missing-file semantics                     | --          |
-| T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)     | Checkout-local forge for Forge contributors                                         | T4          |
-| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)             | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
-| T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)   | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
+| Label | Card                                                                                | Ships                                                                               | Depends on  |
+| ----- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
+| T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                   | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
+| T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md) | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
+| T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)               | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
+| T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
+| T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
+| T6    | [`forge_hook_migration_cleanup`](../forge_hook_migration_cleanup/card.md)           | No-double-fire migration + candidate discovery + selected-root cleanup/enrollment   | T5          |
+| T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                   | `required_forge` first guardrail slice + missing-file semantics                     | --          |
+| T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)   | Checkout-local forge for Forge contributors                                         | T4          |
+| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)           | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
+| T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
 
 ## Accepted decisions
 
@@ -324,4 +325,10 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 | T10 open question "does the container need `projects.json` enrollment?" is answerable now                                                                                                                        | Resolved: sidecar always sets `FORGE_SESSION` (`container.py:132`) + always a managed session -> "in-sidecar => always active", enrollment moot; T10 OQ2 closed  |
 | T6 risk bullet narrates install-then-remove; T6 scope chose remove-legacy-first                                                                                                                                  | T6 risk realigned to remove-first (transient **hooks-off** window) + one-line least-harmful rationale                                                            |
 | T5 open-question candidate `forge hooks install --user` violates the epic CLI-surface rule (new plural group; `hook` is singular+hidden)                                                                         | T5 open question reshaped to a `forge extension`-family name / drop the rename                                                                                   |
-| Acceptance-row ownership: T3 held T6's backfill row **and** a fail-open row targeting T4's not-yet-existent `test_hook_dispatcher.py` (T3 precedes T4)                                                           | Backfill row moved T3 -> T6; T3 fail-open row retargeted to its own read-helper test (`test_project_registry.py`); dispatcher-integration fail-open left to T4   |
+| Acceptance-row ownership: T3 held T6's backfill row **and** a fail-open row targeting T4's not-yet-existent `test_hook_dispatcher.py` (T3 precedes T4)                                                           | Existing-install row moved T3 -> T6 (bulk behavior later superseded in Round 6); T3 fail-open row retargeted to `test_project_registry.py`                       |
+
+**Round 6 (2026-07-10, T6 checklist review, verified against the shipped dispatcher):**
+
+| Finding                                                                                                                                                                                                            | Resolution                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User-scope bulk backfill is behavior-changing: `_should_dispatch()` activates an installed dispatcher for an enrolled ambient root, so enrolling before legacy cleanup creates double-fire without a checkout diff | User enable/sync only reports candidates and leaves `projects.json` unchanged; explicit cleanup removes legacy state, verifies user registration, then enrolls the selected root last |

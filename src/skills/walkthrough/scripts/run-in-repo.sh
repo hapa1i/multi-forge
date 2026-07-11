@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Safety wrapper for Forge walkthrough commands.
-# Sources env.sh, verifies isolation through 4 gates, cd's to test repo, runs the command.
+# Sources env.sh, verifies isolation through 6 gates, cd's to test repo, runs the command.
 #
 # Usage:
 #   bash run-in-repo.sh forge session list           # cd's to test repo automatically
@@ -93,7 +93,27 @@ if [ "${FORGE_HOME:-}" != "$EXPECTED_FORGE_HOME" ]; then
     exit 1
 fi
 
-# --- Gate 4: structure check ---
+# --- Gate 4: CLAUDE_HOME isolation ---
+EXPECTED_CLAUDE_HOME="$FORGE_TEST_REPO/.claude-user"
+if [ "${CLAUDE_HOME:-}" != "$EXPECTED_CLAUDE_HOME" ]; then
+    echo "ERROR: CLAUDE_HOME is not redirected to the test sandbox." >&2
+    echo "  Expected: $EXPECTED_CLAUDE_HOME" >&2
+    echo "  Actual:   ${CLAUDE_HOME:-<unset>}" >&2
+    echo "  Did you source env.sh?" >&2
+    exit 1
+fi
+
+# --- Gate 5: CODEX_HOME isolation ---
+EXPECTED_CODEX_HOME="$FORGE_TEST_REPO/.codex-user"
+if [ "${CODEX_HOME:-}" != "$EXPECTED_CODEX_HOME" ]; then
+    echo "ERROR: CODEX_HOME is not redirected to the test sandbox." >&2
+    echo "  Expected: $EXPECTED_CODEX_HOME" >&2
+    echo "  Actual:   ${CODEX_HOME:-<unset>}" >&2
+    echo "  Did you source env.sh?" >&2
+    exit 1
+fi
+
+# --- Gate 6: structure check ---
 if [ ! -d "$FORGE_TEST_REPO/.forge/walkthrough" ]; then
     echo "ERROR: Expected directory missing: $FORGE_TEST_REPO/.forge/walkthrough/" >&2
     echo "  The test repo structure is incomplete. Run setup-test-repo.sh." >&2

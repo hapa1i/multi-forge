@@ -272,6 +272,7 @@ Grounded on the card's contract, refined against the re-grepped seams + the 2026
 - **Sidecar / in-container resolution** — T10 `forge_hook_sidecar_resolution` owns the full mechanism. T5 lands only the
   exposure gate / documented interim-gap guard; **T10 must land before T5's change reaches sidecar users** unless a
   maintainer records an explicit temporary waiver and T5 warns/blocks before sidecar launch.
-- **Migration of existing installs** — T6 `forge_hook_migration_cleanup` (backfill + legacy cleanup). T5 changes new
-  installs and adds the double-fire detection that surfaces the pre-T6 state.
+- **Migration of existing installs** — T6 `forge_hook_migration_cleanup` (candidate discovery + explicit selected-root
+  legacy cleanup and final enrollment). T5 changes new installs and adds the double-fire detection that surfaces the
+  pre-T6 state.
 - **Team checked-in Codex hook policy** — deferred (card open question); not the default install path for v1.

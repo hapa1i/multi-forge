@@ -324,7 +324,7 @@ User-editable JSON merged into Claude Code `settings.json` by `forge extension e
 ```json
 {
   "hooks": {
-    "...": "forge hook ..."
+    "...": "<forge-home>/bin/forge-hook ..."
   },
   "statusLine": {
     "type": "command",
@@ -970,7 +970,9 @@ Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` — so a healthy global
 install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the mechanical signal
 for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
-`{install_kind, forge_path, on_path, on_path_minimal, advice, hook_dispatcher, project_registry, project_compatibility}`.
+`{install_kind, forge_path, on_path, on_path_minimal, advice, hook_dispatcher, runtime_hooks, project_registry, project_compatibility}`.
+`runtime_hooks` keeps `scopes` and `double_fire_risk` and adds `cleanup_required` plus concrete `legacy_registrations`;
+cleanup-required is not an alias for double-fire.
 
 ### C.1 Scope model
 
@@ -1001,6 +1003,11 @@ Profiles:
 Profiles are filtered by scope before writing: `hooks` and `codex-hooks` are user-only; `status-line` is project/local
 only. Commands, agents, skills, and permissions keep their existing scope behavior.
 
+User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
+reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
+candidate checkout, mutate its tracking row, or read/write `projects.json`; it cannot change ambient dispatcher
+eligibility in another root.
+
 **Sidecar exception.** Host user settings are not mounted into the container. Before every managed sidecar launch, Forge
 stages the same canonical Claude hook inventory into the Forge-owned `.forge/sidecar-home/settings.json`, mounted at
 `/root/.claude/settings.json`, with bare image-PATH commands (`forge hook <name>`). The entrypoint merges its
@@ -1009,15 +1016,19 @@ mutate project `.claude` files or add tracking rows to `installed.json`.
 
 ### C.3 Settings merge rules
 
-| Setting             | Merge behavior                                                   |
-| ------------------- | ---------------------------------------------------------------- |
-| `hooks.*`           | Append + dedupe by command path (registered as `forge-hook ...`) |
-| `permissions.allow` | Union unique entries                                             |
-| `permissions.deny`  | Union unique entries                                             |
-| `statusLine`        | Scalar merge; conflict fails unless `--force`                    |
-| `model`             | Never touched                                                    |
+| Setting             | Merge behavior                                                         |
+| ------------------- | ---------------------------------------------------------------------- |
+| `hooks.*`           | Append + dedupe by full canonical entry (registered as `forge-hook …`) |
+| `permissions.allow` | Union unique entries                                                   |
+| `permissions.deny`  | Union unique entries                                                   |
+| `statusLine`        | Scalar merge; conflict fails unless `--force`                          |
+| `model`             | Never touched                                                          |
 
-All settings modifications must be backed up first (`settings.json.forge-backup`).
+Changed settings files are backed up first as `.settings[.local].json.forge.backup.<timestamp>`. Legacy cleanup removes
+an untracked Claude wrapper only when, after normalizing the direct `forge hook <handler>` executable spelling, its
+event, matcher, timeout, handler, and wrapper fields exactly match the frozen additive released-shape inventory. Tracked
+removal instead requires the current full canonical value to match the tracked entry. Mixed, modified, malformed, or
+unknown Forge-looking wrappers are retained and reported.
 
 ### C.4 Durable install/project files
 
@@ -1030,6 +1041,13 @@ The installer must track what it changed so:
 
 `installed.json` tracks extension ownership only. Runtime launcher metadata deliberately lives elsewhere so extension
 tracking's strict schema (`version` + `installations`) does not grow a second responsibility.
+
+Project/local installation keys are the candidate source for legacy migration. `cleanup-project` reads only rows that
+match its explicitly selected canonical root. After physical Claude/Codex cleanup, it removes only hook ownership from
+`modules_enabled`, `settings_entries`, `codex_config_path`, and `codex_commands`; unrelated modules, files, scope data,
+and `installed_at` survive. The newest `.forge-added` payload is validated during preflight and rewritten before the
+tracking row, so a later disable cannot act on migrated hook ownership. A stale or v1 row without a recoverable root is
+report-only and is never guessed, enrolled, or deleted by discovery.
 
 #### Runtime metadata (`~/.forge/runtime.json`)
 
@@ -1087,8 +1105,10 @@ Schema reads are strict on shape, including unknown top-level and project-entry 
 ```
 
 `enrollment_source` is one of `manual`, `enable`, `worktree`, or `backfill`. Project/local `forge extension enable`
-enrolls the target Forge project root; user-scope enable enrolls nothing by itself. Managed worktree/session creation
-enrolls the new Forge project root with source `worktree`.
+enrolls the target Forge project root; user-scope enable/sync and migration-candidate discovery enroll nothing. Managed
+worktree/session creation enrolls the new Forge project root with source `worktree`. A successful
+`forge extension cleanup-project --yes` enrolls only its selected root with source `backfill`, after root cleanup, user
+runtime registration, and a duplicate scan. Existing enrollment provenance is preserved.
 
 All writers perform read-modify-write under the registry `.lock` via `file_lock_for_target(...)`, then persist with an
 atomic JSON write. The canonical lookup form is the absolute, symlink-resolved path string. Matching first compares that
@@ -1103,9 +1123,9 @@ Registry reads have two postures from the same parser:
 - **Hook/dispatcher path:** fail open with a `degraded` reason. The routing decision treats this as not enrolled, while
   `forge extension doctor` is the authoritative surfacing point.
 
-Doctor reports corrupt/newer registry state and basic stale roots. Reconcile/prune actions stay with the cleanup
-tickets. A managed session remains active while its session identity is present in the hook environment; the dispatcher
-gate is implemented in the hook-dispatcher ticket.
+Doctor reports corrupt/newer registry state and basic stale roots. A corrupt/newer registry aborts explicit
+`cleanup-project` before any selected-root write, while user enable/sync remains independent because it never reads the
+registry. A managed session remains active while its session identity is present in the hook environment.
 
 #### Project compatibility pin (`<forge_root>/.forge/project.toml`)
 
@@ -1133,13 +1153,13 @@ same scope as the SKILL.md that was invoked.
 copies of every skill. Each copy has its own SKILL.md, resources, and scripts. Forge does **not** deduplicate across
 scopes.
 
-| Concern             | Behavior                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------- |
-| Resource resolution | Safe: `${CLAUDE_SKILL_DIR}` is self-referential (no cross-scope mismatch)                         |
-| Which copy runs     | Determined by Claude Code's scope precedence (not controlled by Forge)                            |
-| Version skew        | If scopes are updated independently, one copy may be stale                                        |
-| Hook duplication    | New installs register runtime hooks only at user scope; legacy project hooks are T6 cleanup state |
-| Uninstall           | Scope-specific: `forge extension disable` removes only the targeted scope                         |
+| Concern             | Behavior                                                                     |
+| ------------------- | ---------------------------------------------------------------------------- |
+| Resource resolution | Safe: `${CLAUDE_SKILL_DIR}` is self-referential (no cross-scope mismatch)    |
+| Which copy runs     | Determined by Claude Code's scope precedence (not controlled by Forge)       |
+| Version skew        | If scopes are updated independently, one copy may be stale                   |
+| Hook duplication    | New installs use user scope; legacy roots require explicit `cleanup-project` |
+| Uninstall           | Scope-specific: `forge extension disable` removes only the targeted scope    |
 
 **Recommendation:** Use one skill scope per project. If you keep project-level skills, reinstall only the user-scope
 runtime hooks:
@@ -1162,6 +1182,13 @@ forge extension enable --scope user --profile minimal --with hooks --without com
 Project/local extension installs do not write Codex hook blocks. Codex trust hashes the registered command bytes, so the
 dispatcher cutover (`<forge-home>/bin/forge-hook codex-*`) requires a one-time re-trust when an existing installation is
 updated.
+
+For a selected legacy root, `cleanup-project` strict-validates the project config and tracked path before mutation. A
+balanced managed block is backed up and removed while unrelated TOML bytes are preserved; a missing tracked block clears
+stale ownership, while partial markers or a matching Forge registration outside the block are retained and block the
+migration. The user managed block is then installed/updated only because a project Codex block or ownership row was
+migrated. Forge prints the re-trust ceremony whenever those user command bytes/location change and never claims trust
+was verified.
 
 Mechanics (`src/forge/install/codex_hooks.py`):
 

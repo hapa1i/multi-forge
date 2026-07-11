@@ -252,6 +252,14 @@ def _collect_commands_by_key(
     return commands
 
 
+def _collect_forge_commands(parsed: dict[str, Any]) -> tuple[str, ...]:
+    """Return all logical Forge hook commands, regardless of event/handler."""
+
+    return tuple(
+        sorted(command for _event, command in _collect_registrations(parsed) if forge_hook_handler(command) is not None)
+    )
+
+
 def _format_registration_keys(
     keys: set[CodexRegistrationKey],
     entries: tuple[CodexHookEntry, ...],
@@ -449,6 +457,61 @@ class CodexRemoveResult:
     leftover_commands: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class CodexRemovePlan:
+    """Strict migration plan for removing one managed Codex block."""
+
+    action: str
+    config_path: str
+    reason: str | None = None
+    leftover_commands: tuple[str, ...] = ()
+
+
+def plan_codex_remove(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexRemovePlan:
+    """Plan strict migration removal without mutating ``config_path``.
+
+    Unlike uninstall's best-effort path, migration refuses malformed TOML,
+    partial markers, or matching manual registrations outside Forge's block.
+    """
+
+    validate_codex_events(entries)
+    path_str = str(config_path)
+    if not config_path.is_file():
+        return CodexRemovePlan(action="skip", config_path=path_str, reason="config absent")
+
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError as e:
+        return CodexRemovePlan(action="conflict", config_path=path_str, reason=f"cannot read: {e}")
+
+    try:
+        split = _split_block(text)
+    except ForgeInstallError as e:
+        return CodexRemovePlan(action="conflict", config_path=path_str, reason=str(e))
+
+    remainder = text if split is None else split[0] + split[2]
+    try:
+        parsed = tomllib.loads(remainder)
+    except tomllib.TOMLDecodeError as e:
+        return CodexRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason=f"config outside the Forge block is not valid TOML: {e}",
+        )
+
+    leftover = _collect_forge_commands(parsed)
+    if leftover:
+        return CodexRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason="Forge hook commands remain outside the managed block",
+            leftover_commands=leftover,
+        )
+    if split is None:
+        return CodexRemovePlan(action="skip", config_path=path_str, reason="managed block absent")
+    return CodexRemovePlan(action="remove", config_path=path_str)
+
+
 def remove_codex_block(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexRemoveResult:
     """Remove the managed block from config_path (uninstall path).
 
@@ -470,9 +533,7 @@ def remove_codex_block(config_path: Path, entries: tuple[CodexHookEntry, ...]) -
         parsed = tomllib.loads(remainder)
     except tomllib.TOMLDecodeError:
         parsed = {}
-    ours = codex_expected_registration_keys(entries)
-    commands_by_key = _collect_commands_by_key(parsed)
-    leftover = tuple(sorted(command for key in ours for command in commands_by_key.get(key, set())))
+    leftover = _collect_forge_commands(parsed)
 
     if split is None:
         return CodexRemoveResult(removed=False, leftover_commands=leftover)

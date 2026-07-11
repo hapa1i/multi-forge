@@ -11,7 +11,7 @@ Configuration is split by ownership. Each type of setting has a single authorita
 | Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
 | Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
 | Project Forge compatibility                      | `<forge_root>/.forge/project.toml` | edit file                              |
-| Trusted project enrollment                       | `~/.forge/projects.json`           | `forge extension enable` / `doctor`    |
+| Trusted project enrollment                       | `~/.forge/projects.json`           | extension `enable` / `cleanup-project` |
 | API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
 ---
@@ -111,7 +111,10 @@ Built-in defaults include only Forge infrastructure:
 - `statusLine`: `forge status-line`
 - `permissions`: Write/Edit (required by the memory writer)
 
-Forge merges only four setting families from the preset: `hooks`, `statusLine`, `env`, and `permissions`.
+Forge merges only four setting families from the preset: `hooks`, `statusLine`, `env`, and `permissions`. Scope policy
+then places runtime `hooks` at user scope and `statusLine` at project/local scope. A pre-user-scope project hook is
+migration state, not a supported customization target; use `forge extension cleanup-project` rather than deleting
+tracking or registry files by hand.
 
 Use the preset when you want Forge to keep applying your preferred Claude Code settings on enable/re-enable, for
 example:
@@ -148,9 +151,10 @@ When the file is missing, the project is unconstrained. When it exists, covered 
 it before mutating state and fail with an upgrade/reset hint if the running global Forge does not satisfy
 `required_forge`. `forge extension doctor` reports malformed or incompatible pins. Forge does not auto-create this file.
 
-`~/.forge/projects.json` is different: it is a machine-written trusted-project registry maintained by
-`forge extension enable` and managed worktree creation. Do not edit it by hand; use `forge extension doctor` to inspect
-registry health.
+`~/.forge/projects.json` is different: it is a machine-written trusted-project registry maintained by project/local
+`forge extension enable`, successful legacy `cleanup-project`, and managed worktree creation. User-scope enable/sync
+never enrolls tracked cleanup candidates. Do not edit it by hand; use `forge extension doctor` to inspect registry
+health.
 
 ---
 
@@ -171,12 +175,13 @@ Code preset). Set keys with `forge config set statusline.<key>=<value>`:
 
 **Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, think, loop, sidecar`. Opt-in
 segments (add to `segments` to enable): `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
-`audit`, `drift`, `spend_cap`, `launch`, `forge_cost`. `forge config set` rejects unknown names; an empty list restores
-the default bar. The `launch` segment shows how the session reached the model (`direct` / `proxy:<id>`) and the api-key
-posture (`key:env|file|none|omit`); it appears only for Forge-managed sessions, not ambient `claude`. The `forge_cost`
-segment shows `forge +$Y` — the LLM cost Forge added for this session (memory writer, supervisor, review fan-out),
-**excluding** the main interactive session, reported-or-nothing (subscription/OAuth sessions show nothing) and distinct
-from Claude's own `cost`; Forge-managed sessions only.
+`audit`, `drift`, `spend_cap`, `launch`, `forge_cost`, `hooks`. `forge config set` rejects unknown names; an empty list
+restores the default bar. The `hooks` segment shows `HOOK!` for legacy cleanup-required state and `HOOKx2` only for an
+actual duplicate event/matcher/handler. The `launch` segment shows how the session reached the model (`direct` /
+`proxy:<id>`) and the api-key posture (`key:env|file|none|omit`); it appears only for Forge-managed sessions, not
+ambient `claude`. The `forge_cost` segment shows `forge +$Y` — the LLM cost Forge added for this session (memory writer,
+supervisor, review fan-out), **excluding** the main interactive session, reported-or-nothing (subscription/OAuth
+sessions show nothing) and distinct from Claude's own `cost`; Forge-managed sessions only.
 
 ```bash
 forge config set statusline.segments=path,model,cost,cache_hit,spend_cap

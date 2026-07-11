@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.0 -->
+<!-- version: 1.0.1 -->
 
-<!-- test-count: 90 assertions -->
+<!-- test-count: 95 assertions -->
 
-<!-- last-updated: 2026-05-18 -->
+<!-- last-updated: 2026-07-10 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -87,11 +87,13 @@ terminal to try Forge commands hands-on in later sections.
 <!-- auto -->
 
 ```bash
+bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope user
 bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope local
 ```
 
-- [ ] Exit code 0
-- [ ] Output shows installed files (commands, skills, agents, hooks)
+- [ ] Both commands exit 0
+- [ ] User output installs runtime hooks; local output installs project assets/status line without a hook block
+- [ ] No real Claude/Codex settings path is changed because both settings homes point at the walkthrough sandbox
 
 ---
 
@@ -119,11 +121,11 @@ Use the Glob tool to verify installed files exist. Set `path` to the directory a
 
 <!-- auto -->
 
-Use the Read tool to read `$FORGE_TEST_REPO/.claude/settings.local.json` and verify Forge entries were added and
-pre-existing fixtures survived the install:
+Use the Read tool to inspect `$FORGE_TEST_REPO/.claude-user/settings.json` and
+`$FORGE_TEST_REPO/.claude/settings.local.json`:
 
-- [ ] hooks section configured (PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit)
-- [ ] statusLine configured
+- [ ] User settings contain runtime hooks (PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit)
+- [ ] Local settings contain `statusLine` and no Forge runtime hook block
 - [ ] permissions.allow includes Forge entries
 - [ ] `env.MY_CUSTOM_VAR` still equals `"should-survive-forge"` (pre-existing fixture survived)
 - [ ] `permissions.allow` still includes `"Bash(npm test)"` and `"Bash(uv run pytest*)"` (pre-existing fixtures
@@ -138,6 +140,32 @@ Use the Read tool to read `$FORGE_TEST_REPO/.forge-home/installed.json` and veri
 - [ ] Manifest file exists
 - [ ] Tracks a local-scope installation
 - [ ] Files list is populated
+
+### 3.4 Preview and Apply a Legacy Hook Migration
+
+<!-- auto -->
+
+Seed one exact pre-user-scope project hook, verify preview is read-only, then migrate it:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  tmp=$(mktemp)
+  jq '\'' .hooks.SessionStart = ((.hooks.SessionStart // []) + [{"hooks":[{"type":"command","command":"forge hook session-start"}]}]) '\'' \
+    .claude/settings.local.json > "$tmp" && mv "$tmp" .claude/settings.local.json
+  shasum -a 256 .claude/settings.local.json > .forge/walkthrough/pre-migration.sha
+'
+bash "$SCRIPTS/run-in-repo.sh" forge extension cleanup-project --root "$FORGE_TEST_REPO"
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  shasum -a 256 -c <(awk '\''{print $1 "  .claude/settings.local.json"}'\'' .forge/walkthrough/pre-migration.sha)
+'
+bash "$SCRIPTS/run-in-repo.sh" forge extension cleanup-project --root "$FORGE_TEST_REPO" --yes
+bash "$SCRIPTS/run-in-repo.sh" forge extension doctor --json
+```
+
+- [ ] Preview names the local settings path and leaves its checksum unchanged
+- [ ] Apply removes the seeded direct project hook but leaves the user dispatcher hooks present
+- [ ] A `.settings.local.json.forge.backup.*` file exists
+- [ ] Doctor reports `cleanup_required=false` and `double_fire_risk=false`
 
 ---
 

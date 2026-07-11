@@ -5,15 +5,16 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T10 sidecar resolution shipped via PR #94 and its member card is closed.** Shipped members are T1
-[`global_forge_install`](../../done/global_forge_install/card.md), T3
+**T6 migration cleanup is implemented and verified on branch `forge-hook-migration-cleanup`; it is awaiting human
+review/merge and remains in `doing/`.** T10 sidecar resolution shipped via PR #94 and its member card is closed. Shipped
+members are T1 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). T10 restores in-container hooks by
 staging canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes
-deferred work through a host-drainable queue with normalized roots. Next implementation cursor: **T6** migration
+deferred work through a host-drainable queue with normalized roots. Current implementation cursor: **T6** migration
 cleanup; **T8** remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
 [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
 `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
@@ -112,6 +113,18 @@ Record outcomes here as members are picked up.
   hook bytes. Implementation verified 2026-07-09: canonical settings stage at `.forge/sidecar-home`, the entrypoint
   merges auth idempotently, bare `forge hook` resolves via image PATH, pending work is host-drainable, and the interim
   warning is retired. PR #94 merged 2026-07-10; moved `doing/ -> done/` in the separate post-merge closeout commit.
+- [x] Next member after T10: **T6 `forge_hook_migration_cleanup`** (end of the critical path), picked up 2026-07-10;
+  branch `forge-hook-migration-cleanup` created from `main`, card moved `proposed/ -> doing/`, epic forward-link
+  repointed, and a code-grounded checklist added. D1–D6 were approved after follow-up review. Implementation is
+  review-ready: tracked/frozen-shape Claude cleanup, Codex marker migration, user-only runtime transition, explicit
+  preview/`--yes`, independent doctor/status-line cleanup state, and final selected-root `backfill` enrollment are all
+  verified. Do not mark T6 shipped or advance the cursor until merge.
+  - **Member seam 1 evidence:** frozen released direct-hook shapes require exact event/matcher/timeout/wrapper identity;
+    current dispatcher entries keep full canonical-entry dedupe, and ambiguous bytes stay report-only.
+  - **Member seam 2 evidence:** candidate discovery uses `TrackingStore.list_installations()` without registry access;
+    explicit cleanup reuses strict `ProjectRegistryStore.enroll(..., "backfill")` only after the clean/user transition.
+  - **Member seam 4 evidence:** project/local runtime ownership is removed and reconciled without touching statusLine;
+    final scans require user scope to be the only Forge runtime source. Epic seam boxes remain unchecked until closeout.
 
 ## Shared-contract seams (drift watch)
 

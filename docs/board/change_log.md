@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-10
 
+### forge_hook_migration_cleanup implementation
+
+**Goal**: Give pre-user-scope installations an explicit, reviewable migration to one dispatcher-backed runtime source
+without silently mutating or activating other tracked checkouts.
+
+**Key changes**:
+
+- Added tracked-root candidate reporting plus `forge extension cleanup-project` preview/`--yes`; user enable/sync never
+  reads the registry or another root, while explicit cleanup validates one selected root, removes legacy state first,
+  installs user runtime hooks, scans for duplicates, and enrolls that root last with `backfill` provenance.
+- Restricted automatic Claude cleanup to canonical tracked entries or a frozen additive released-shape inventory,
+  reconciled `.forge-added`/installation ownership, migrated balanced project Codex blocks with backups and re-trust
+  guidance, and retained ambiguous/manual state as an operation-scoped blocker.
+- Added independent doctor/status-line cleanup state (`HOOK!`) without broadening genuine `HOOKx2`, and synchronized
+  architecture, CLI, Day-1/recovery, QA, and isolated walkthrough guidance.
+
+**Verification**: focused migration suite (`320 passed`); CLI command/output/vocabulary guards (`68 passed`);
+`make test-unit` (`7556 passed, 1 skipped, 116 deselected`); installer Docker suite (`16 passed`) plus final targeted
+migration-and-disable rerun; real-Claude migration (`1 passed, 2 deselected`) with user-dispatcher SessionStart/Stop
+effects; isolated walkthrough migration exercise; `make pre-commit`.
+
 ### forge_hook_sidecar_resolution closeout
 
 **Goal**: Close T10 after PR #94 restored Forge runtime hooks inside Claude sidecars.

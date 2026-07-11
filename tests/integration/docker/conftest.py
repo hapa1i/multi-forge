@@ -56,7 +56,7 @@ def setup_real_claude(
     """Restore real Claude binary and set up a session for testing.
 
     1. Restores real claude binary (forge_workspace replaces it with mock)
-    2. Enables forge hooks (required for hooks to fire)
+    2. Enables user-scoped Forge hooks (required for hooks to fire)
     3. Creates a named session with --no-launch
 
     Args:
@@ -79,7 +79,7 @@ def setup_real_claude(
         pytest.fail(f"Failed to create .claude/.forge directories: {result.stderr}")
 
     result = workspace.exec(
-        f"cd {root_q} && forge extension enable --scope local --profile minimal --with hooks --without commands"
+        f"cd {root_q} && forge extension enable --scope user --profile minimal --with hooks --without commands"
     )
     if result.returncode != 0:
         pytest.fail(f"Failed to enable hooks: {result.stderr}")

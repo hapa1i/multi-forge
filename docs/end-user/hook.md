@@ -114,6 +114,27 @@ forge extension disable --scope user
 > into its container user settings automatically on every launch, using the `forge` executable bundled in the image.
 > This does not modify the project's `.claude/settings*.json` files.
 
+### Migrating a pre-user-scope installation
+
+After an upgrade, user-scope enable/sync may print tracked roots that still own legacy project/local hooks. It only
+reports them; it does not touch those checkouts or enroll them. For each root, review and apply separately:
+
+```bash
+forge extension cleanup-project --root /path/to/project
+forge extension cleanup-project --root /path/to/project --yes
+```
+
+Cleanup removes only canonical tracked entries or exact frozen known-released `forge hook <name>` wrappers. Modified,
+mixed, or otherwise ambiguous entries are preserved and make the selected cleanup fail with a manual-cleanup path.
+Changed Claude settings and project Codex config files are backed up. The command removes project registrations first,
+installs/updates user runtime registrations, checks for duplicate triggers, then enrolls the selected root last. This
+ordering avoids creating a new double-fire window; a failure after removal is an explicit temporary hooks-off state, and
+the error includes the retry command. A migrated Codex block must be trusted again interactively.
+
+`forge extension doctor` distinguishes the states: cleanup-required registrations are listed with their paths, while
+`double_fire_risk` means the same event/matcher/handler is actually registered more than once. If you opt into the
+status-line `hooks` segment, `HOOK!` is cleanup-required and `HOOKx2` is a real duplicate.
+
 ---
 
 ## Core hooks (what they do)
@@ -185,7 +206,8 @@ Purpose: record compaction metadata after compaction completes.
 Purpose: replace Claude Code's default worktree creation with auto-install of Forge extensions.
 
 - creates a git worktree via `git worktree add`
-- best-effort installs Forge extensions (hooks, status line, skills) in the new worktree
+- best-effort installs project-owned Forge extensions (status line, skills, and other assets) in the new worktree; the
+  existing user dispatcher supplies runtime hooks
 - prints the absolute worktree path to stdout (Claude Code reads this)
 - exits 1 on failure (worktree creation fails)
 
@@ -214,9 +236,9 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
   shell (`Bash`) actions pass through unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
-- **registered by `forge extension enable`** (codex-hooks module, standard profile): the installer writes a managed
-  block into the Codex config matching your install scope — user scope targets `$CODEX_HOME/config.toml`, project/local
-  scope targets `<project>/.codex/config.toml`. Skipped with a notice when `codex` is not installed.
+- **registered by `forge extension enable --scope user`** (codex-hooks module, standard profile): the installer writes a
+  managed block into `$CODEX_HOME/config.toml`. Project/local installs do not write runtime Codex blocks. Skipped with a
+  notice when `codex` is not installed.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
   prompted) — Codex hooks only fire from trust-enrolled registrations
 
@@ -234,9 +256,9 @@ first turn ran without the parent context.
 - every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
   resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
   homes capture the thread id of interactive sessions exactly. Non-Forge Codex sessions see zero writes.
-- **registered by `forge extension enable`** (codex-hooks module, with `codex-policy-check`, as a managed block in the
-  scope-mapped Codex config) — then complete the one-time trust ceremony (run `codex` interactively and grant trust). To
-  register manually instead, add this to your Codex `config.toml`:
+- **registered by `forge extension enable --scope user`** (codex-hooks module, with `codex-policy-check`, as a managed
+  block in the user Codex config) — then complete the one-time trust ceremony (run `codex` interactively and grant
+  trust). To register manually instead, add this to your Codex `config.toml`:
 
 ```toml
 [[hooks.SessionStart]]
@@ -320,7 +342,8 @@ Paths stored in the session file should be forge-root-relative for portability.
 
 Checklist:
 
-- confirm hooks are installed in the scope you’re using
+- run `forge extension doctor` and resolve any listed `cleanup-project` action
+- confirm runtime hooks are present in user settings
 - confirm `forge` is on PATH in the environment Claude Code uses to run hooks
 - check Claude Code hook logs (or Forge’s emitted JSON output)
 
@@ -372,21 +395,23 @@ forge hook codex-session-start # SessionStart transfer delivery (Codex; installe
 
 ### Files to inspect (debugging)
 
-| File                                                     | Purpose                                                      |
-| -------------------------------------------------------- | ------------------------------------------------------------ |
-| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest with `confirmed.*` facts                    |
-| `~/.forge/sessions/index.json`                           | Global session index (UUID lookup)                           |
-| Claude settings file for your scope                      | Hook registration (`settings.json` or `settings.local.json`) |
-| `<forge_root>/.forge/artifacts/`                         | Captured plans and transcripts                               |
+| File                                                     | Purpose                                                    |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest with `confirmed.*` facts                  |
+| `~/.forge/sessions/index.json`                           | Global session index (UUID lookup)                         |
+| `~/.claude/settings.json`                                | Current user-scoped runtime hook registrations             |
+| `<forge_root>/.claude/settings*.json`                    | Project state; Forge hook entries mean cleanup is required |
+| `<forge_root>/.forge/artifacts/`                         | Captured plans and transcripts                             |
 
 ### Gotchas
 
 <!-- forge-env-vocab: diagnostic:start -->
 
-| Trap                    | Explanation                                                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                              |
-| "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                                       |
-| "Wrong settings file"   | `forge extension enable --scope user` writes `~/.claude/settings.json`; `--scope local` writes `.claude/settings.local.json` |
+| Trap                    | Explanation                                                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                            |
+| "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                                     |
+| "Wrong settings file"   | Runtime hooks live in user settings; project/local settings own project assets and may contain pre-migration cleanup state |
+| `HOOK!` / `HOOKx2`      | `HOOK!` means cleanup required; `HOOKx2` means an actual duplicate trigger                                                 |
 
 <!-- forge-env-vocab: diagnostic:end -->

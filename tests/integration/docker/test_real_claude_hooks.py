@@ -63,6 +63,61 @@ class TestRealClaudeHooks:
     - Accept that some hooks may not fire in --print mode
     """
 
+    def test_migration_uses_user_dispatcher_after_project_cleanup(
+        self,
+        forge_workspace: ContainerLike,
+    ) -> None:
+        """A cleaned legacy root reaches real Claude hooks from user scope only."""
+
+        legacy = {
+            "hooks": {
+                "SessionStart": [{"hooks": [{"type": "command", "command": "forge hook session-start"}]}],
+                "Stop": [{"hooks": [{"type": "command", "command": "forge hook stop"}]}],
+            }
+        }
+        forge_workspace.write_file("/workspace/.claude/settings.json", json.dumps(legacy))
+        cleanup = forge_workspace.exec("cd /workspace && forge extension cleanup-project --yes")
+        assert cleanup.returncode == 0, f"Migration failed: {cleanup.stderr}"
+
+        scope_check = forge_workspace.exec("""
+            /forge/.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+project = json.loads(Path('/workspace/.claude/settings.json').read_text())
+user = json.loads((Path.home() / '.claude' / 'settings.json').read_text())
+assert 'hooks' not in project
+assert user['hooks']['SessionStart']
+assert user['hooks']['Stop']
+PY
+            """)
+        assert scope_check.returncode == 0, f"Scope verification failed: {scope_check.stderr}"
+
+        restored = forge_workspace.exec("""
+            if [ -f /usr/local/bin/claude-real ]; then
+                mv /usr/local/bin/claude-real /usr/local/bin/claude
+            fi
+            """)
+        assert restored.returncode == 0, f"Failed to restore Claude: {restored.stderr}"
+        session = forge_workspace.exec("cd /workspace && forge session start --no-launch real-claude-test")
+        assert session.returncode == 0, f"Failed to create migrated session: {session.stderr}"
+
+        _exit_code, stdout, _stderr = _run_claude_print(
+            forge_workspace,
+            prompt="Say just the word migrated",
+            timeout=30,
+        )
+
+        manifest_result = forge_workspace.exec("cat /workspace/.forge/sessions/real-claude-test/forge.session.json")
+        manifest = json.loads(manifest_result.stdout)
+        confirmed = manifest.get("confirmed", {})
+        assert (
+            confirmed.get("claude_session_id") is not None
+        ), f"Migrated SessionStart hook did not run. Claude output: {stdout[:500]}..."
+        assert (
+            confirmed.get("transcript_path") is not None
+        ), f"Migrated Stop hook did not run. Claude output: {stdout[:500]}..."
+
     def test_session_start_hook_sets_session_id(self, forge_workspace: ContainerLike) -> None:
         """After claude --print, manifest should have claude_session_id set.
 

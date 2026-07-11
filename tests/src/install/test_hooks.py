@@ -8,10 +8,13 @@ from pathlib import Path
 import pytest
 
 from forge.install.hooks import (
+    diagnose_forge_hook_runtime,
     entry_is_forge_hook,
+    find_forge_hook_cleanup_registrations,
     find_forge_hook_registrations,
     find_forge_hook_scopes,
     has_forge_hook,
+    has_forge_hook_cleanup_required,
     has_forge_hook_double_fire,
     has_forge_hooks,
     is_forge_hook_command,
@@ -162,6 +165,18 @@ class TestHasForgeHook:
         assert find_forge_hook_scopes(project) == {"local", "project", "user"}
         assert find_forge_hook_scopes(project, "SessionStart") == {"local", "user"}
         assert has_forge_hook_double_fire(project, "SessionStart") is True
+
+    def test_lone_legacy_project_hook_requires_cleanup_without_double_fire(self, project: Path) -> None:
+        _write_settings(project / ".claude" / "settings.json", FORGE_SESSION_START)
+
+        diagnostics = diagnose_forge_hook_runtime(project)
+
+        assert diagnostics.double_fire_risk is False
+        assert {registration.scope for registration in diagnostics.registrations} == {"project"}
+        assert [registration.scope for registration in diagnostics.cleanup_registrations] == ["project"]
+        assert [registration.scope for registration in find_forge_hook_cleanup_registrations(project)] == ["project"]
+        assert has_forge_hook_cleanup_required(project) is True
+        assert has_forge_hook_double_fire(project) is False
 
     def test_home_claude_dir_is_not_project_scope(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         home = tmp_path / "home"
