@@ -2,8 +2,8 @@
 
 **Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/` on branch `forge-hook-migration-cleanup`. Depends on `user_scope_hook_ownership` (the target model
-exists to migrate to). End of the user-scope-model critical path. Implementation is verified and awaiting review/merge.
+**Lane**: `done/`. Shipped via PR #96 on 2026-07-11. Depends on `user_scope_hook_ownership` (the target model exists to
+migrate to). This closes the user-scope-model critical path.
 
 ## Goal
 

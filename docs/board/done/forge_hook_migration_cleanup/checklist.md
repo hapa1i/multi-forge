@@ -1,17 +1,17 @@
 # Execution checklist: T6 `forge_hook_migration_cleanup`
 
 Execution plan for migrating pre-T5 hook installations to the user-scoped dispatcher model. The shared contract and
-sequencing live in the epic [`card.md`](../epic_global_forge_runtime/card.md); this member's problem framing is
+sequencing live in the epic [`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is
 [`card.md`](card.md).
 
-> **Implemented and verified 2026-07-10 on branch `forge-hook-migration-cleanup` after checklist review.** The card
-> remains in `doing/` until its review is accepted and the branch merges.
+> **Shipped via PR #96 on 2026-07-11.** Implementation and verification completed on branch
+> `forge-hook-migration-cleanup`; the post-merge card/link closeout is complete on `main`.
 
 ## Current focus
 
-Review the implementation against the accepted D1–D6 boundary and verification evidence below. In particular, user-scope
-lifecycle commands only report other roots, while `cleanup-project --yes` owns selected-root cleanup and enrolls that
-root last. Post-merge lane/link closeout remains intentionally deferred.
+Closed. User-scope lifecycle commands only report other roots, while `cleanup-project --yes` owns selected-root cleanup
+and enrolls that root last. The implementation, verification evidence, and post-merge lane/link closeout are recorded
+below.
 
 ## Scope boundary
 
@@ -317,10 +317,10 @@ assertions):
 - [x] Propose a durable invariant for `docs/board/impl_notes.md`; do not promote it before human review: **registry
   enrollment is runtime activation, not discovery metadata.** A read/report path must never enroll; a migration may
   enroll only its explicitly selected root, after legacy removal, user registration, and duplicate scans.
-- [ ] After merge, move this card `doing/ -> done/`, repoint the epic forward-link and every inbound board link, and run
-  a relative-link/stale-lane sweep.
+- [x] After PR #96 merged, moved this card `doing/ -> done/`, repointed the epic forward-link and every inbound board
+  link, and ran the relative-link/stale-lane sweep on `main`.
 
-## Review blockers
+## Closeout status
 
-No implementation blocker remains. Human review and merge are required before the card can move to `done/`, T6 can be
-called shipped in the epic, or the epic cursor can advance.
+Complete. PR #96 merged on 2026-07-11; the card is in `done/`, the epic records T6 as shipped, and T8 remains parked
+pending a separate activation decision.

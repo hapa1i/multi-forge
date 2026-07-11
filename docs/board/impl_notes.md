@@ -36,6 +36,21 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Hook migration discovery must not activate roots; selected-root cleanup enrolls last (forge_hook_migration_cleanup, shipped 2026-07-11)
+
+- Project-registry enrollment is runtime activation, not discovery metadata: the user dispatcher begins handling ambient
+  hooks in an enrolled root. User-scope `extension enable`/`sync` may report tracked migration candidates, but must not
+  open their checkouts or read/write `projects.json`; otherwise a read/report path can create double-fire without
+  producing a repository diff.
+- `forge extension cleanup-project --yes` is the explicit mutation boundary for one selected root. It strictly
+  preflights shared and selected-root state, removes eligible legacy registrations first, reconciles tracking, ensures
+  user runtime registration, scans for unresolved duplicates, and enrolls only that root as the final activation write.
+  A post-removal failure is an honest hooks-off recovery state: retain backups and report the exact retry command rather
+  than restoring legacy hooks or claiming success.
+- Ambiguity is operation-scoped. An unresolved registration in the selected root blocks that cleanup; an unresolved
+  registration in another tracked root remains doctor/candidate-report state and must not suppress the user's own
+  dispatcher installation.
+
 ### User-scope hook dispatcher is a generated runtime artifact, with fail-open gate semantics (forge_hook_dispatcher, 2026-07-08)
 
 - `~/.forge/bin/forge-hook` is a standalone stdlib script rendered from `src/forge/install/hook_dispatcher.py`, not a

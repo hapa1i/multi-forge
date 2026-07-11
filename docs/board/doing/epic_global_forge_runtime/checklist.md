@@ -5,20 +5,18 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T6 migration cleanup is implemented and verified on branch `forge-hook-migration-cleanup`; it is awaiting human
-review/merge and remains in `doing/`.** T10 sidecar resolution shipped via PR #94 and its member card is closed. Shipped
-members are T1 [`global_forge_install`](../../done/global_forge_install/card.md), T3
+**T6 migration cleanup shipped via PR #96 and its member card is closed.** No epic member is currently active; T8
+remains the parked dev-runtime override pending a separate activation decision. Shipped members are T1
+[`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
-[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). T10 restores in-container hooks by
-staging canonical bare commands into the persisted sidecar user scope, exposes Forge on the image PATH, and routes
-deferred work through a host-drainable queue with normalized roots. Current implementation cursor: **T6** migration
-cleanup; **T8** remains the parked dev-runtime override. T7's remaining mutator-family sweep is parked in
-[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent non-member
-`env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to author new
-user-facing strings against the shipped env-var vocabulary boundary.
+[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md), plus T6
+[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md). T7's remaining mutator-family sweep
+is parked in [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent
+non-member `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to
+author new user-facing strings against the shipped env-var vocabulary boundary.
 
 ## Activation bookkeeping (this branch)
 
@@ -118,7 +116,8 @@ Record outcomes here as members are picked up.
   repointed, and a code-grounded checklist added. D1–D6 were approved after follow-up review. Implementation is
   review-ready: tracked/frozen-shape Claude cleanup, Codex marker migration, user-only runtime transition, explicit
   preview/`--yes`, independent doctor/status-line cleanup state, and final selected-root `backfill` enrollment are all
-  verified. Do not mark T6 shipped or advance the cursor until merge.
+  verified. PR #96 merged 2026-07-11; the card moved `doing/ -> done/`, all inbound links were repointed, and the epic
+  now has no active member. T8 remains parked pending a separate activation decision.
   - **Member seam 1 evidence:** frozen released direct-hook shapes require exact event/matcher/timeout/wrapper identity;
     current dispatcher entries keep full canonical-entry dedupe, and ambiguous bytes stay report-only.
   - **Member seam 2 evidence:** candidate discovery uses `TrackingStore.list_installations()` without registry access;

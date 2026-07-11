@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-11
+
+### forge_hook_migration_cleanup closeout
+
+**Goal**: Close T6 after PR #96 merged and leave the global-runtime epic at an explicit no-active-member cursor.
+
+**Key changes**:
+
+- Moved `forge_hook_migration_cleanup` from `doing/` to `done/`, preserved its implementation checklist, and repointed
+  its epic links.
+- Recorded T6 as shipped in the epic while leaving the epic seam boxes open until epic closeout; T8 remains parked
+  pending a separate activation decision.
+- Promoted the reviewed registry-activation and selected-root migration-ordering invariant to `impl_notes.md`.
+
+**Verification**: PR #96 merged at `93312179`; `make pre-commit-md`; post-merge relative-link and stale-lane sweep;
+`git diff --check`.
+
 ## 2026-07-10
 
 ### forge_hook_migration_cleanup implementation
