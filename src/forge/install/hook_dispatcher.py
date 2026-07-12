@@ -29,6 +29,7 @@ DISPATCHER_FILENAME = "forge-hook"
 DISPATCHER_BIN_DIR = "bin"
 RUNTIME_METADATA_FILENAME = "runtime.json"
 RUNTIME_METADATA_VERSION = 1
+FORGE_DEV_VAR = "FORGE_DEV"
 
 _STAMP_VERSION_RE = re.compile(r'^FORGE_HOOK_DISPATCHER_VERSION = "([^"]*)"$')
 _STAMP_SOURCE_RE = re.compile(r'^FORGE_HOOK_DISPATCHER_SOURCE_SHA256 = "([0-9a-f]*)"$')
@@ -44,6 +45,28 @@ class HookDispatcherInstallResult:
 
 
 @dataclass(frozen=True)
+class DevOverrideDiagnosis:
+    """Doctor-facing state for the checkout-local dispatcher override."""
+
+    present: bool
+    value: str | None
+    target: str | None
+    valid: bool
+    effective: bool
+    advice: str | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "present": self.present,
+            "value": self.value,
+            "target": self.target,
+            "valid": self.valid,
+            "effective": self.effective,
+            "advice": self.advice,
+        }
+
+
+@dataclass(frozen=True)
 class HookDispatcherDiagnosis:
     """Doctor-facing status for the installed hook dispatcher shim."""
 
@@ -56,6 +79,7 @@ class HookDispatcherDiagnosis:
     metadata_path: str
     metadata_status: str
     forge_binary_path: str | None
+    dev_override: DevOverrideDiagnosis
     advice: str | None
 
     def to_dict(self) -> dict[str, object]:
@@ -69,6 +93,7 @@ class HookDispatcherDiagnosis:
             "metadata_path": self.metadata_path,
             "metadata_status": self.metadata_status,
             "forge_binary_path": self.forge_binary_path,
+            "dev_override": self.dev_override.to_dict(),
             "advice": self.advice,
         }
 
@@ -178,6 +203,7 @@ def _should_dispatch() -> bool:
 
 _RESOLVER_SOURCE = r"""
 RUNTIME_METADATA_VERSION = 1
+FORGE_DEV_VAR = "FORGE_DEV"
 
 
 def _runtime_metadata_path() -> Path:
@@ -240,6 +266,22 @@ def _is_executable(path: Path) -> bool:
         return False
 
 
+def _dev_override_target() -> tuple[Path | None, str | None]:
+    value = os.environ.get(FORGE_DEV_VAR, "")
+    if not value:
+        return None, f"{FORGE_DEV_VAR} is set but empty; expected an absolute Forge checkout root"
+    try:
+        root = Path(value).expanduser()
+    except (OSError, RuntimeError) as exc:
+        return None, f"{FORGE_DEV_VAR} value {value!r} could not be expanded: {exc}"
+    if not root.is_absolute():
+        return None, f"{FORGE_DEV_VAR} must name an absolute Forge checkout root; got {value!r}"
+    target = root / ".venv" / "bin" / "forge"
+    if not _is_executable(target):
+        return target, f"{FORGE_DEV_VAR} target is missing or not executable: {target}"
+    return target, None
+
+
 def _resolve_forge() -> tuple[Path | None, list[Path]]:
     checked = _candidate_forge_paths()
     for candidate in checked:
@@ -261,6 +303,20 @@ def main() -> int:
     if not argv:
         sys.stderr.write("forge hook dispatcher: missing hook name\n")
         return 2
+
+    if FORGE_DEV_VAR in os.environ:
+        forge_path, error = _dev_override_target()
+        if error is not None or forge_path is None:
+            sys.stderr.write(f"forge hook dispatcher: {error or f'{FORGE_DEV_VAR} target is invalid'}\n")
+            return 127
+        try:
+            os.execv(str(forge_path), [str(forge_path), "hook", *argv])
+        except OSError as exc:
+            sys.stderr.write(
+                f"forge hook dispatcher: {FORGE_DEV_VAR} target could not be executed: {forge_path}: {exc}\n"
+            )
+            return 127
+        return 127
 
     forge_path, checked = _resolve_forge()
     if forge_path is None:
@@ -349,18 +405,82 @@ def find_current_forge_binary(
 ) -> Path | None:
     """Resolve the current launcher path to record in runtime metadata."""
 
-    def _absolute_without_resolving(path: Path) -> Path:
-        expanded = path.expanduser()
-        return expanded if expanded.is_absolute() else Path.cwd() / expanded
-
     env = dict(os.environ) if environ is None else environ
     found = which(EXECUTABLE, path=env.get("PATH"))
     if found:
-        return _absolute_without_resolving(Path(found))
+        try:
+            return _absolute_without_resolving(Path(found))
+        except (OSError, RuntimeError):
+            pass
 
     a0 = sys.argv[0] if argv0 is None else argv0
     if a0 and os.sep in a0 and Path(a0).name == EXECUTABLE:
-        return _absolute_without_resolving(Path(a0))
+        try:
+            return _absolute_without_resolving(Path(a0))
+        except (OSError, RuntimeError):
+            pass
+    return None
+
+
+def _absolute_without_resolving(path: Path) -> Path:
+    expanded = path.expanduser()
+    return expanded if expanded.is_absolute() else Path.cwd() / expanded
+
+
+def _is_executable_file(path: Path) -> bool:
+    try:
+        return path.is_absolute() and path.is_file() and os.access(path, os.X_OK)
+    except OSError:
+        return False
+
+
+def _is_venv_launcher(path: Path) -> bool:
+    """Classify the launcher lexically so global-tool symlinks stay global."""
+
+    if path.parent.name not in ("bin", "Scripts"):
+        return False
+    try:
+        return (path.parent.parent / "pyvenv.cfg").is_file()
+    except OSError:
+        return False
+
+
+def _recorded_forge_binary(metadata: dict[str, object] | None) -> Path | None:
+    if metadata is None:
+        return None
+    raw = metadata.get("forge_binary_path")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return Path(raw).expanduser()
+    except (OSError, RuntimeError):
+        return None
+
+
+def select_forge_binary_for_recording(
+    *,
+    discovered: Path | None,
+    recorded: Path | None,
+    environ: dict[str, str] | None = None,
+) -> Path | None:
+    """Select durable launcher metadata without sticky-recording a project venv."""
+
+    env = dict(os.environ) if environ is None else environ
+    if discovered is not None and _is_executable_file(discovered) and not _is_venv_launcher(discovered):
+        return discovered
+    if recorded is not None and _is_executable_file(recorded) and not _is_venv_launcher(recorded):
+        return recorded
+    for candidate in known_forge_launcher_paths(env):
+        if _is_executable_file(candidate) and not _is_venv_launcher(candidate):
+            return candidate
+    return None
+
+
+def _resolve_current_dispatch_target(recorded: Path | None, environ: dict[str, str]) -> Path | None:
+    candidates = ([recorded] if recorded is not None else []) + known_forge_launcher_paths(environ)
+    for candidate in candidates:
+        if _is_executable_file(candidate):
+            return candidate
     return None
 
 
@@ -421,7 +541,14 @@ def install_hook_dispatcher(
     """Render ``~/.forge/bin/forge-hook`` and write resolver metadata."""
 
     dispatcher_path = get_hook_dispatcher_path()
-    resolved_forge = forge_binary_path or find_current_forge_binary(argv0=argv0, environ=environ, which=which)
+    env = dict(os.environ) if environ is None else environ
+    resolved_forge: Path | None
+    if forge_binary_path is not None:
+        resolved_forge = _absolute_without_resolving(forge_binary_path)
+    else:
+        discovered = find_current_forge_binary(argv0=argv0, environ=env, which=which)
+        recorded = _recorded_forge_binary(read_runtime_metadata())
+        resolved_forge = select_forge_binary_for_recording(discovered=discovered, recorded=recorded, environ=env)
     atomic_write_text(dispatcher_path, render_dispatcher_script(), mode=0o755)
     metadata_path = write_runtime_metadata(forge_binary_path=resolved_forge, dispatcher_path=dispatcher_path)
     return HookDispatcherInstallResult(
@@ -446,9 +573,72 @@ def parse_dispatcher_stamp(content: str) -> tuple[str | None, str | None]:
     return installed_version, installed_source_sha256
 
 
-def diagnose_hook_dispatcher() -> HookDispatcherDiagnosis:
+def _validate_dev_override(
+    environ: dict[str, str],
+) -> tuple[bool, str | None, Path | None, str | None]:
+    if FORGE_DEV_VAR not in environ:
+        return False, None, None, None
+    value = environ.get(FORGE_DEV_VAR, "")
+    if not value:
+        return (
+            True,
+            value,
+            None,
+            f"{FORGE_DEV_VAR} is empty; set it to an absolute Forge checkout root.",
+        )
+    try:
+        root = Path(value).expanduser()
+    except (OSError, RuntimeError) as exc:
+        return True, value, None, f"{FORGE_DEV_VAR} could not be expanded: {exc}"
+    if not root.is_absolute():
+        return (
+            True,
+            value,
+            None,
+            f"{FORGE_DEV_VAR} must name an absolute Forge checkout root.",
+        )
+    target = root / ".venv" / "bin" / EXECUTABLE
+    if not _is_executable_file(target):
+        return (
+            True,
+            value,
+            target,
+            f"{FORGE_DEV_VAR} target is missing or not executable: {target}",
+        )
+    return True, value, target, None
+
+
+def _diagnose_dev_override(
+    *,
+    environ: dict[str, str],
+    dispatcher_path: Path,
+    dispatcher_status: str,
+) -> DevOverrideDiagnosis:
+    present, value, target, validation_error = _validate_dev_override(environ)
+    if not present:
+        return DevOverrideDiagnosis(False, None, None, False, False, None)
+    target_str = str(target) if target is not None else None
+    if validation_error is not None:
+        return DevOverrideDiagnosis(True, value, target_str, False, False, validation_error)
+    dispatcher_executable = _is_executable_file(dispatcher_path)
+    if dispatcher_status == "non_executable" or (dispatcher_status == "current" and not dispatcher_executable):
+        advice = f"Restore execute permission for {dispatcher_path} (or run 'forge extension sync')."
+        return DevOverrideDiagnosis(True, value, target_str, True, False, advice)
+    if dispatcher_status != "current":
+        advice = "Run 'forge extension sync' so the installed hook dispatcher can honor FORGE_DEV."
+        return DevOverrideDiagnosis(True, value, target_str, True, False, advice)
+    return DevOverrideDiagnosis(True, value, target_str, True, True, None)
+
+
+def diagnose_hook_dispatcher(
+    *,
+    environ: dict[str, str] | None = None,
+    argv0: str | None = None,
+    which: Any = shutil.which,
+) -> HookDispatcherDiagnosis:
     """Return doctor-facing drift status for the dispatcher artifact."""
 
+    env = dict(os.environ) if environ is None else environ
     dispatcher_path = get_hook_dispatcher_path()
     metadata_path = get_runtime_metadata_path()
     expected_version = __version__
@@ -460,11 +650,16 @@ def diagnose_hook_dispatcher() -> HookDispatcherDiagnosis:
         raw_path = metadata.get("forge_binary_path")
         if isinstance(raw_path, str) and raw_path:
             forge_binary_path = raw_path
+    recorded = _recorded_forge_binary(metadata)
+    current_dispatch_target = _resolve_current_dispatch_target(recorded, env)
+    discovered = find_current_forge_binary(argv0=argv0, environ=env, which=which)
+    next_recorded_target = select_forge_binary_for_recording(discovered=discovered, recorded=recorded, environ=env)
 
     if not dispatcher_path.exists():
+        status = "missing"
         return HookDispatcherDiagnosis(
             path=str(dispatcher_path),
-            status="missing",
+            status=status,
             installed_version=None,
             expected_version=expected_version,
             installed_source_sha256=None,
@@ -472,15 +667,21 @@ def diagnose_hook_dispatcher() -> HookDispatcherDiagnosis:
             metadata_path=str(metadata_path),
             metadata_status=metadata_status,
             forge_binary_path=forge_binary_path,
+            dev_override=_diagnose_dev_override(
+                environ=env,
+                dispatcher_path=dispatcher_path,
+                dispatcher_status=status,
+            ),
             advice="Run 'forge extension sync' to render the hook dispatcher.",
         )
 
     try:
         content = dispatcher_path.read_text(encoding="utf-8")
     except OSError as e:
+        status = "unreadable"
         return HookDispatcherDiagnosis(
             path=str(dispatcher_path),
-            status="unreadable",
+            status=status,
             installed_version=None,
             expected_version=expected_version,
             installed_source_sha256=None,
@@ -488,13 +689,45 @@ def diagnose_hook_dispatcher() -> HookDispatcherDiagnosis:
             metadata_path=str(metadata_path),
             metadata_status=metadata_status,
             forge_binary_path=forge_binary_path,
+            dev_override=_diagnose_dev_override(
+                environ=env,
+                dispatcher_path=dispatcher_path,
+                dispatcher_status=status,
+            ),
             advice=f"Fix permissions for {dispatcher_path}: {e}",
         )
 
     installed_version, installed_source_sha256 = parse_dispatcher_stamp(content)
     is_current = installed_version == expected_version and installed_source_sha256 == expected_source_sha256
-    status = "current" if is_current else "stale"
-    advice = None if is_current else "Run 'forge extension sync' to re-render the hook dispatcher."
+    dispatcher_executable = _is_executable_file(dispatcher_path)
+    if not dispatcher_executable:
+        status = "non_executable"
+        advice = "Run 'forge extension sync' to restore the hook dispatcher's executable mode."
+    elif not is_current:
+        status = "stale"
+        advice = "Run 'forge extension sync' to re-render the hook dispatcher."
+    elif recorded is not None and _is_executable_file(recorded) and _is_venv_launcher(recorded):
+        status = "current"
+        advice = "Run 'forge extension sync' to replace the recorded virtualenv launcher used by hook dispatch."
+    elif current_dispatch_target is None:
+        status = "current"
+        if next_recorded_target is not None:
+            advice = f"Run 'forge extension sync' to record {next_recorded_target} for hook dispatch."
+        else:
+            advice = (
+                "No recorded or known global Forge launcher is executable; "
+                "install one and run 'forge extension sync'."
+            )
+    else:
+        status = "current"
+        advice = None
+    dev_override = _diagnose_dev_override(
+        environ=env,
+        dispatcher_path=dispatcher_path,
+        dispatcher_status=status,
+    )
+    if dev_override.effective and current_dispatch_target is None and advice is not None:
+        advice = f"FORGE_DEV is effective for this process; without it, normal resolution reports: {advice}"
     return HookDispatcherDiagnosis(
         path=str(dispatcher_path),
         status=status,
@@ -505,6 +738,7 @@ def diagnose_hook_dispatcher() -> HookDispatcherDiagnosis:
         metadata_path=str(metadata_path),
         metadata_status=metadata_status,
         forge_binary_path=forge_binary_path,
+        dev_override=dev_override,
         advice=advice,
     )
 

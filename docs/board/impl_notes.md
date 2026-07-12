@@ -36,6 +36,25 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Dev hook selection is a resolver override; transient venvs are never implicit runtime metadata (forge_dev_runtime_override, reviewed 2026-07-11)
+
+- `FORGE_DEV` changes binary resolution, not dispatch eligibility. The generated dispatcher applies the managed-session
+  / enrolled-root gate and missing-handler check first. Only then does presence of the variable -- including an empty
+  value -- enter a hard branch for `<absolute-checkout-root>/.venv/bin/forge`. An invalid target or failed `exec` exits
+  127 and must not fall through to the normal skip-invalid candidate loop. The override mutates no `runtime.json` state,
+  does not bypass project compatibility, and does not apply to sidecar hooks that bypass the host dispatcher.
+- Implicit launcher recording is a total, ordered transition: executable non-venv discovery; otherwise valid recorded
+  non-venv launcher; otherwise first executable known-global fallback; otherwise `null`. Keep custom non-venv launchers
+  and deliberate A-to-B migrations working. An explicit installer `forge_binary_path` remains authoritative. Do not
+  replace this table with a global-directory allowlist or record an unverified fallback path.
+- Venv classification is lexical: inspect the candidate path's own `bin`/`Scripts` parent for sibling `pyvenv.cfg` and
+  never resolve the candidate first. Resolving `~/.local/bin/forge` would land inside the uv tool venv and incorrectly
+  reject the stable global launcher symlink. Legacy recorded `.venv/bin/forge` paths are replaced or cleared on the next
+  enable/sync through the same table.
+- Managed Claude and Codex launchers inherit `FORGE_DEV`, so changing or unsetting it requires a relaunch. Doctor
+  reports the value from its own process environment, which may differ from the hook launcher, and separates target
+  `valid` from dispatcher `effective` (valid target plus current, executable installed shim).
+
 ### Hook migration discovery must not activate roots; selected-root cleanup enrolls last (forge_hook_migration_cleanup, shipped 2026-07-11)
 
 - Project-registry enrollment is runtime activation, not discovery metadata: the user dispatcher begins handling ambient
@@ -68,10 +87,10 @@ wc -l docs/board/impl_notes.md
 
 ### `FORGE_*` env vars are a classified interface, not general user vocabulary (env_var_interface_boundary, shipped 2026-07-07)
 
-- The human authority is `docs/design_appendix.md` §A.7b. Public names are `FORGE_HOME` and `FORGE_PROFILE`;
-  public-diagnostic names are `FORGE_DEBUG` and `FORGE_STATUS_TRUNCATE`; launcher/proxy/run-tree/session names such as
-  `FORGE_SESSION`, `FORGE_FORK_NAME`, `FORGE_RUN_ID`, and `FORGE_SUBPROCESS_*` are internal wiring; `FORGE_QA_*` and
-  `FORGE_TEST_REPO` are test/QA harness variables.
+- The human authority is `docs/design_appendix.md` §A.7b. Public names are `FORGE_DEV`, `FORGE_HOME`, and
+  `FORGE_PROFILE`; public-diagnostic names are `FORGE_DEBUG` and `FORGE_STATUS_TRUNCATE`;
+  launcher/proxy/run-tree/session names such as `FORGE_SESSION`, `FORGE_FORK_NAME`, `FORGE_RUN_ID`, and
+  `FORGE_SUBPROCESS_*` are internal wiring; `FORGE_QA_*` and `FORGE_TEST_REPO` are test/QA harness variables.
 - Normal-flow user surfaces should say "current session", "Forge-managed session", and `--session <name>`, not tell
   users to set launcher-owned env vars. Troubleshooting docs may name internal wiring only inside paired
   `forge-env-vocab: diagnostic:start/end` markers.

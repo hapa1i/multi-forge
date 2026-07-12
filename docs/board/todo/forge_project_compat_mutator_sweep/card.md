@@ -1,8 +1,12 @@
 # Project compatibility mutator sweep
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Origin**: standalone follow-up split from the T7 [`forge_project_compat`](../../done/forge_project_compat/card.md)
+closeout. **Reclassified 2026-07-11: not a member of
+[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md)** and does not hold the epic open -- the
+sweep touches none of the epic's five seams and has no sequencing dependence on its members (precedent: the
+consumer_lanes epic re-filed its team-supervisor follow-on as a standalone card).
 
-**Lane**: `todo/` -- accepted follow-up split from T7 closeout. No execution branch yet.
+**Lane**: `todo/` -- accepted, parked. No execution branch yet.
 
 ## Goal
 
@@ -30,7 +34,10 @@ letting unused contract code linger across releases.
 - Prefer small named guard points over sprinkling checks across leaf mutators. If a family is not actually project-local
   state, document the exemption in the checklist and design docs if user-facing behavior depends on it.
 - Do not add `.forge/project.toml` authoring. v1 remains hand-edit only.
-- Leave the `forge_dev_runtime_override` bypass decision to T8.
+- `forge_dev_runtime_override` bypass decision -- **resolved by T8 (2026-07-11): T8 adds no special bypass.** A
+  `FORGE_DEV`-resolved forge keeps the existing compatibility posture unchanged, and hook-path pin enforcement remains
+  this sweep's scope (`check_project_compatibility_for_hook` currently has no production caller; strict enforcement is
+  `cli/guards.py` plus direct `cli/extensions.py` command paths).
 
 ## Acceptance Tests
 

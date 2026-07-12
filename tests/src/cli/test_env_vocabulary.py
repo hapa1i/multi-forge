@@ -10,6 +10,7 @@ from pathlib import Path
 ENV_CLASSES = {
     "FORGE_HOME": "public",
     "FORGE_PROFILE": "public",
+    "FORGE_DEV": "public",
     "FORGE_DEBUG": "public-diagnostic",
     "FORGE_STATUS_TRUNCATE": "public-diagnostic",
     "FORGE_CODEX_PROXY_TOKEN": "internal-wiring",

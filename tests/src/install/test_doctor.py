@@ -23,6 +23,7 @@ from forge.install.doctor import (
     diagnose_install,
     is_editable_install,
 )
+from forge.install.hook_dispatcher import install_hook_dispatcher
 
 
 def _fake_which(bindir_to_forge: dict[str, str]) -> Callable[..., str | None]:
@@ -208,7 +209,24 @@ def test_doctor_json_shape_is_stable() -> None:
         "metadata_path",
         "metadata_status",
         "forge_binary_path",
+        "dev_override",
         "advice",
+    }
+    assert set(data["hook_dispatcher"]["dev_override"]) == {
+        "present",
+        "value",
+        "target",
+        "valid",
+        "effective",
+        "advice",
+    }
+    assert data["hook_dispatcher"]["dev_override"] == {
+        "present": False,
+        "value": None,
+        "target": None,
+        "valid": False,
+        "effective": False,
+        "advice": None,
     }
     assert set(data["runtime_hooks"]) == {
         "scopes",
@@ -243,8 +261,85 @@ def test_doctor_human_output_names_install_kind() -> None:
     assert "Install kind" in result.output
     assert "On PATH" in result.output
     assert "Hook dispatcher" in result.output
+    assert "Dev override" in result.output
+    assert "this doctor process" in result.output
     assert "Project registry" in result.output
     assert "Project compatibility" in result.output
+
+
+def test_doctor_human_output_escapes_dev_override_markup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge = tmp_path / "global" / "forge"
+    global_forge.parent.mkdir(parents=True)
+    global_forge.write_text("#!/bin/sh\n", encoding="utf-8")
+    global_forge.chmod(0o755)
+    checkout = tmp_path / "[red]checkout"
+    dev_forge = checkout / ".venv" / "bin" / "forge"
+    dev_forge.parent.mkdir(parents=True)
+    dev_forge.write_text("#!/bin/sh\n", encoding="utf-8")
+    dev_forge.chmod(0o755)
+    install_hook_dispatcher(forge_binary_path=global_forge)
+    monkeypatch.setenv("FORGE_DEV", str(checkout))
+
+    result = CliRunner().invoke(extensions, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    override_index = next(index for index, line in enumerate(lines) if "Dev override:" in line)
+    target_index = next(index for index, line in enumerate(lines) if "Dev target:" in line)
+    valid_index = next(index for index, line in enumerate(lines) if "Dev valid:" in line)
+    assert "[red]checkout" in "".join(lines[override_index:target_index])
+    assert "[red]checkout" in "".join(lines[target_index:valid_index])
+
+
+def test_doctor_json_reports_valid_dev_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge = tmp_path / "global" / "forge"
+    global_forge.parent.mkdir(parents=True)
+    global_forge.write_text("#!/bin/sh\n", encoding="utf-8")
+    global_forge.chmod(0o755)
+    checkout = tmp_path / "checkout"
+    dev_forge = checkout / ".venv" / "bin" / "forge"
+    dev_forge.parent.mkdir(parents=True)
+    dev_forge.write_text("#!/bin/sh\n", encoding="utf-8")
+    dev_forge.chmod(0o755)
+    install_hook_dispatcher(forge_binary_path=global_forge)
+    monkeypatch.setenv("FORGE_DEV", str(checkout))
+
+    result = CliRunner().invoke(extensions, ["doctor", "--json"])
+
+    assert result.exit_code == 0, result.output
+    override = json.loads(result.output)["hook_dispatcher"]["dev_override"]
+    assert override == {
+        "present": True,
+        "value": str(checkout),
+        "target": str(dev_forge),
+        "valid": True,
+        "effective": True,
+        "advice": None,
+    }
+
+
+def test_doctor_json_reports_invalid_dev_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge = tmp_path / "global" / "forge"
+    global_forge.parent.mkdir(parents=True)
+    global_forge.write_text("#!/bin/sh\n", encoding="utf-8")
+    global_forge.chmod(0o755)
+    install_hook_dispatcher(forge_binary_path=global_forge)
+    checkout = tmp_path / "missing-checkout"
+    monkeypatch.setenv("FORGE_DEV", str(checkout))
+
+    result = CliRunner().invoke(extensions, ["doctor", "--json"])
+
+    assert result.exit_code == 0, result.output
+    override = json.loads(result.output)["hook_dispatcher"]["dev_override"]
+    assert override["present"] is True
+    assert override["value"] == str(checkout)
+    assert override["target"] == str(checkout / ".venv" / "bin" / "forge")
+    assert override["valid"] is False
+    assert override["effective"] is False
+    assert "missing or not executable" in override["advice"]
 
 
 def test_is_editable_install_returns_bool() -> None:

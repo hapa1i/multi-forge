@@ -19,8 +19,8 @@ final dispatcher made T2's hook rewrite obsolete, but T2 was also the only card 
   `statusLine` remains the deliberate project/local scalar exception.
 - [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) -- sidecars resolve the current
   bare status-line command through the image `PATH`.
-- [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) -- separately owns whether contributors can
-  select an editable checkout instead of the recorded global Forge runtime.
+- [`forge_dev_runtime_override`](../../doing/forge_dev_runtime_override/card.md) -- separately owns whether contributors
+  can select an editable checkout instead of the recorded global Forge runtime.
 
 ## Goal
 

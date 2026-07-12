@@ -11,19 +11,21 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**, and **T6
 [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)**. The epic's coordination
-[`checklist.md`](checklist.md) (sequencing, seam drift-watch, and the remaining T8 decision) stays live. No member is
-currently active; **T8** remains the parked dev-runtime override pending a separate activation decision. Other inactive
-members stay in `proposed/` (or accepted `todo/` for the split T7 sweep) and spin out to their own `doing/<slug>/` as
-picked up. Closes to `done/` when every live member is `done/` (or the shared contract is folded into normative design
-docs).
+[`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. **T8
+[`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11) --
+its implementation, public-doc, focused, integration, package, live-smoke, and pre-commit slices are complete on the
+branch; review/commit/merge remain. It is the epic's last live member: T2 stays `proposed/` as superseded-not-abandoned,
+and the split T7 sweep was reclassified a standalone non-member follow-up (2026-07-11,
+[`todo/forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md)). Closes to `done/`
+when every live member is `done/` (or the shared contract is folded into normative design docs).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
 install/hook-ownership migration. The original card's content is redistributed across the members below.
 
 **Decision direction**: Make Forge a single user/global CLI (PyPI, installed as a tool), keep project authority in
-`<repo>/.forge/`, and register runtime hooks only at user scope through a no-op dispatcher that resolves exactly one
-global `forge` from any hook environment.
+`<repo>/.forge/`, and register runtime hooks only at user scope through a no-op dispatcher that normally resolves a
+durable user/global `forge` from any hook environment, with explicit process-scoped checkout selection for contributors.
 
 **References**: `src/forge/install/preset.py` (Claude preset hook + `statusLine` commands),
 `src/forge/install/codex_hooks.py` (`get_codex_config_path`, managed block markers `:56`, trust-byte pinning),
@@ -50,7 +52,7 @@ so neither sits on one linear track.
 | T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + candidate discovery + selected-root cleanup/enrollment   | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                   | `required_forge` first guardrail slice + missing-file semantics                     | --          |
-| T8    | [`forge_dev_runtime_override`](../../proposed/forge_dev_runtime_override/card.md)   | Checkout-local forge for Forge contributors                                         | T4          |
+| T8    | [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md)               | Checkout-local forge for Forge contributors                                         | T4          |
 | T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)           | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
 
@@ -190,8 +192,8 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   PR #94 and restores runtime hooks in the container through staged sidecar-user settings.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice
   shipped; the remaining mutator-family sweep is parked in
-  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). T8 (dev override) pairs
-  with T4.
+  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
+  as a standalone follow-up, not an epic member -- it touches none of the five seams). T8 (dev override) pairs with T4.
 - **Adjacent (non-member), sequence-sensitive:**
   [`env_var_interface_boundary`](../../done/env_var_interface_boundary/card.md) declares `FORGE_*` an internal
   launcher-to-runtime contract and strips internal env-var names (notably `FORGE_SESSION`) from normal-flow user
@@ -269,10 +271,10 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 
 ## Open questions still owed (each assigned to a member)
 
-| Question                                                     | Owner                                         |
-| ------------------------------------------------------------ | --------------------------------------------- |
-| `FORGE_DEV` override vs `uv run forge`-only for contributors | T8                                            |
-| How much project-local Codex hook policy to keep for teams   | deferred -- out of scope for v1 (noted in T5) |
+| Question                                                     | Owner                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `FORGE_DEV` override vs `uv run forge`-only for contributors | T8 -- **resolved 2026-07-11: `FORGE_DEV` override** (T8 checklist Ph. 0) |
+| How much project-local Codex hook policy to keep for teams   | deferred -- out of scope for v1 (noted in T5)                            |
 
 ## Out of scope
 

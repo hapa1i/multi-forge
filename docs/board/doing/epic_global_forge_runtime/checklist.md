@@ -5,8 +5,11 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T6 migration cleanup shipped via PR #96 and its member card is closed.** No epic member is currently active; T8
-remains the parked dev-runtime override pending a separate activation decision. Shipped members are T1
+**T8 [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11,
+branch `forge-dev-runtime-override`) -- the epic's last live member (T2 is superseded-not-abandoned in `proposed/`; the
+split T7 sweep was reclassified a standalone non-member follow-up, 2026-07-11), so its closeout unblocks epic closeout.
+T8's dispatcher/recording/doctor/public-doc slices and all branch verification are complete; review/commit/merge remain
+in the member checklist. No closeout or lane movement is claimed yet. Shipped members are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
@@ -14,9 +17,10 @@ remains the parked dev-runtime override pending a separate activation decision. 
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md), plus T6
 [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md). T7's remaining mutator-family sweep
-is parked in [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). Adjacent
-non-member `env_var_interface_boundary` also landed via PR #91; T4 authored against it, and T5/T6 should continue to
-author new user-facing strings against the shipped env-var vocabulary boundary.
+is parked in [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified
+2026-07-11 as a standalone follow-up, not an epic member). Adjacent non-member `env_var_interface_boundary` also landed
+via PR #91; T4 authored against it, and T5/T6 should continue to author new user-facing strings against the shipped
+env-var vocabulary boundary.
 
 ## Activation bookkeeping (this branch)
 
@@ -117,13 +121,23 @@ Record outcomes here as members are picked up.
   review-ready: tracked/frozen-shape Claude cleanup, Codex marker migration, user-only runtime transition, explicit
   preview/`--yes`, independent doctor/status-line cleanup state, and final selected-root `backfill` enrollment are all
   verified. PR #96 merged 2026-07-11; the card moved `doing/ -> done/`, all inbound links were repointed, and the epic
-  now has no active member. T8 remains parked pending a separate activation decision.
+  briefly had no active member. (T8 was parked pending a separate activation decision at that point; it was activated
+  later the same day -- see the T8 bullet below.)
   - **Member seam 1 evidence:** frozen released direct-hook shapes require exact event/matcher/timeout/wrapper identity;
     current dispatcher entries keep full canonical-entry dedupe, and ambiguous bytes stay report-only.
   - **Member seam 2 evidence:** candidate discovery uses `TrackingStore.list_installations()` without registry access;
     explicit cleanup reuses strict `ProjectRegistryStore.enroll(..., "backfill")` only after the clean/user transition.
   - **Member seam 4 evidence:** project/local runtime ownership is removed and reconciled without touching statusLine;
     final scans require user scope to be the only Forge runtime source. Epic seam boxes remain unchecked until closeout.
+- [x] Next member after T6: **T8 `forge_dev_runtime_override`** (last live member, off-path), picked up 2026-07-11;
+  branch `forge-dev-runtime-override` created from `main`, card `git mv` `proposed/ -> doing/`, epic forward-link +
+  member back-link + the `proposed/statusline_gui_reachability` inbound link repointed, execution checklist added. Phase
+  0 decisions D1-D6 were ratified in maintainer review the same day (two rounds; the core fork resolved to the
+  `FORGE_DEV` env override with a deterministic recording transition table -- record in the member checklist). In the
+  second round the split T7 sweep was reclassified a standalone non-member follow-up, so T8 IS the last live member:
+  when it closes, the epic closeout items (seam boxes, design-doc verification, lane move) become actionable. Phases 1-2
+  are now implemented and the public docs/vocabulary, focused, integration, package, live-smoke, and pre-commit checks
+  are verified. Review/commit/merge remain in the member checklist.
 
 ## Shared-contract seams (drift watch)
 
@@ -149,6 +163,8 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 - [ ] design.md / design_appendix §C / cli_reference reflect the shipped install + hook-ownership model.
 - [ ] When moving the epic to `done/`, repoint every inbound board link that currently targets the epic's `doing/` path,
   including done-member back-links and standalone follow-ups such as
-  [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md).
+  [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md) and
+  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (non-member; its Origin
+  line links this epic).
 - [ ] Epic moved `doing/ -> done/`; `change_log.md` entry added; durable lessons promoted to `impl_notes.md` after human
   review.

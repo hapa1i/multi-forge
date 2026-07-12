@@ -27,6 +27,19 @@ def _normalize_forge_home(command: str) -> str:
     return command.replace(str(get_forge_home()), "$FORGE_HOME")
 
 
+def _make_executable_forge(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def _make_venv_forge(checkout: Path) -> Path:
+    (checkout / ".venv" / "pyvenv.cfg").parent.mkdir(parents=True, exist_ok=True)
+    (checkout / ".venv" / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
+    return _make_executable_forge(checkout / ".venv" / "bin" / "forge")
+
+
 def test_scope_help_is_shared_across_extension_commands() -> None:
     expected = "Installation scope: local (gitignored), project (committed), user (global)"
     runner = CliRunner()
@@ -36,6 +49,82 @@ def test_scope_help_is_shared_across_extension_commands() -> None:
         output = " ".join(result.output.split())
         assert result.exit_code == 0, result.output
         assert expected in output
+
+
+@pytest.mark.parametrize("scope", ["local", "project"])
+def test_project_enable_preserves_recorded_global_launcher_when_run_from_venv(
+    scope: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.hook_dispatcher import (
+        install_hook_dispatcher,
+        read_runtime_metadata,
+    )
+
+    stable_forge = _make_executable_forge(tmp_path / "global-a" / "bin" / "forge")
+    venv_forge = _make_venv_forge(tmp_path / "checkout-b")
+    install_hook_dispatcher(forge_binary_path=stable_forge)
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: venv_forge,
+    )
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: type("Check", (), {"ok": True})(),
+    )
+    monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+    project = tmp_path / f"{scope}-repo"
+    project.mkdir()
+
+    result = CliRunner().invoke(
+        extensions,
+        ["enable", "--scope", scope, "--root", str(project), "--profile", "minimal"],
+    )
+
+    assert result.exit_code == 0, result.output
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(stable_forge)
+
+
+def test_user_sync_preserves_recorded_global_launcher_when_run_from_venv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.hook_dispatcher import read_runtime_metadata
+
+    stable_forge = _make_executable_forge(tmp_path / "global-a" / "bin" / "forge")
+    venv_forge = _make_venv_forge(tmp_path / "checkout-b")
+    monkeypatch.setattr(
+        "forge.install.version.check_minimum_version",
+        lambda: type("Check", (), {"ok": True})(),
+    )
+    monkeypatch.setattr("forge.install.installer._codex_available", lambda: False)
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: stable_forge,
+    )
+    runner = CliRunner()
+    enabled = runner.invoke(
+        extensions,
+        ["enable", "--scope", "user", "--profile", "minimal"],
+    )
+    assert enabled.exit_code == 0, enabled.output
+    initial = read_runtime_metadata()
+    assert initial is not None
+    assert initial["forge_binary_path"] == str(stable_forge)
+
+    monkeypatch.setattr(
+        "forge.install.hook_dispatcher.find_current_forge_binary",
+        lambda **_kwargs: venv_forge,
+    )
+    synced = runner.invoke(extensions, ["sync", "--scope", "user"])
+
+    assert synced.exit_code == 0, synced.output
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(stable_forge)
 
 
 class TestFindGitRoot:

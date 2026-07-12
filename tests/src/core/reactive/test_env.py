@@ -53,6 +53,13 @@ class TestBuildClaudeEnv:
         assert env["HOME"] == "/custom"
         assert env["FOO"] == "bar"
 
+    def test_forge_dev_is_inherited(self, monkeypatch):
+        monkeypatch.setenv("FORGE_DEV", "/checkout")
+
+        env = build_claude_env()
+
+        assert env["FORGE_DEV"] == "/checkout"
+
     def test_base_url_takes_precedence_over_extra_vars(self):
         """Explicit base_url wins over extra_vars for ANTHROPIC_BASE_URL."""
         env = build_claude_env(

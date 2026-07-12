@@ -21,6 +21,20 @@ cp .env.example .env
 # Edit .env with your API keys and credentials (secrets only)
 ```
 
+### Exercising unreleased hook code
+
+`uv run forge` selects the checkout for that command, but live hooks are child processes launched later by Claude or
+Codex. Set the public `FORGE_DEV` override on the session launch so those hook subprocesses use the checkout too:
+
+```bash
+FORGE_DEV="$PWD" uv run forge session start dev-hooks
+```
+
+The value must expand to an absolute checkout root with an executable `.venv/bin/forge`. It is process-scoped and does
+not rewrite `~/.forge/runtime.json`; relaunch the managed session after changing or unsetting it. Use
+`FORGE_DEV="$PWD" uv run forge extension doctor` to validate the target and installed dispatcher. The setup command
+above remains the persistent global editable-install path.
+
 ## Branching
 
 - **`main`**: Primary branch. All PRs target `main`.

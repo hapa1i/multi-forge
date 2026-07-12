@@ -114,6 +114,34 @@ forge extension disable --scope user
 > into its container user settings automatically on every launch, using the `forge` executable bundled in the image.
 > This does not modify the project's `.claude/settings*.json` files.
 
+### Using checkout code for live hooks
+
+Contributors can route hook subprocesses through an unreleased Forge checkout without changing global runtime metadata.
+Create the checkout environment with `uv sync`, then set `FORGE_DEV` on the command that launches the managed session:
+
+```bash
+FORGE_DEV="$PWD" uv run forge session start dev-hooks
+```
+
+`FORGE_DEV` must be non-empty and expand to an absolute checkout root. The user-global dispatcher runs exactly
+`$FORGE_DEV/.venv/bin/forge`, even when the hook fires from a different enrolled project. It does not infer a checkout
+from the hook's working directory. If the value is empty or relative, or the target is missing, non-executable, or
+cannot launch, an eligible hook fails with exit 127 instead of silently using the recorded/global Forge launcher. Unset
+the variable to restore recorded/global launcher resolution.
+
+The value is inherited when Claude or Codex starts. Relaunch the managed session after changing or unsetting it; editing
+the parent shell's environment does not update an already-running process. To inspect the same value explicitly, pass it
+to doctor:
+
+```bash
+FORGE_DEV="$PWD" uv run forge extension doctor
+```
+
+Doctor reports the value, exact target, validity, and whether the installed dispatcher is current and executable enough
+to honor it. This describes the doctor process's environment; a separately launched hook process may have a different
+environment. If a package update leaves the dispatcher stale, run `uv run forge extension sync --scope user` before
+starting the session. Host `FORGE_DEV` does not select code inside sidecar containers.
+
 ### Migrating a pre-user-scope installation
 
 After an upgrade, user-scope enable/sync may print tracked roots that still own legacy project/local hooks. It only
