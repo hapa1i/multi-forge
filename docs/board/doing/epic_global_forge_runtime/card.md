@@ -3,21 +3,20 @@
 **This is an epic.** It coordinates the shared contract, sequencing, and drift control across the member cards below.
 Each member is an independently shippable implementation unit; the epic ships no code itself.
 
-**Lane**: `doing/` -- active coordinator. Shipped members: **T1
+**Lane**: `doing/` -- active coordinator, ready for closeout. Shipped members: **T1
 [`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, **T5
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, **T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**, and **T6
-[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)**. The epic's coordination
-[`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. **T8
-[`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11) --
-its implementation, public-doc, focused, integration, package, live-smoke, and pre-commit slices are complete on the
-branch; review/commit/merge remain. It is the epic's last live member: T2 stays `proposed/` as superseded-not-abandoned,
-and the split T7 sweep was reclassified a standalone non-member follow-up (2026-07-11,
-[`todo/forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md)). Closes to `done/`
-when every live member is `done/` (or the shared contract is folded into normative design docs).
+[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)**, and **T8
+[`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md)**. The epic's coordination
+[`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. There is no active implementation member:
+T2 stays `proposed/` as superseded-not-abandoned, and the split T7 sweep is a standalone non-member follow-up
+([`todo/forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md)). Every live member
+is now `done/`; the epic remains here until its seam boxes, durable-doc verification, inbound links, and lane move are
+closed as one coordinator pass.
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -52,7 +51,7 @@ so neither sits on one linear track.
 | T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + candidate discovery + selected-root cleanup/enrollment   | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                   | `required_forge` first guardrail slice + missing-file semantics                     | --          |
-| T8    | [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md)               | Checkout-local forge for Forge contributors                                         | T4          |
+| T8    | [`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
 | T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)           | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
 

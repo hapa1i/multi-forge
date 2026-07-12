@@ -19,8 +19,8 @@ final dispatcher made T2's hook rewrite obsolete, but T2 was also the only card 
   `statusLine` remains the deliberate project/local scalar exception.
 - [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) -- sidecars resolve the current
   bare status-line command through the image `PATH`.
-- [`forge_dev_runtime_override`](../../doing/forge_dev_runtime_override/card.md) -- separately owns whether contributors
-  can select an editable checkout instead of the recorded global Forge runtime.
+- [`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md) -- ships the precedence contract for
+  selecting an editable checkout instead of the recorded global Forge runtime.
 
 ## Goal
 
@@ -31,7 +31,7 @@ minimal `PATH` cannot resolve the globally installed `forge`, without:
 - embedding a machine-specific absolute path in portable project settings;
 - breaking status-line execution in sidecars;
 - overwriting a user-authored `statusLine`; or
-- implicitly choosing a global versus editable Forge runtime on T8's behalf.
+- contradicting T8's shipped global-versus-editable runtime-selection contract.
 
 ## Problem
 
@@ -90,8 +90,9 @@ Codex trust ceremony. This card addresses only the remaining status-line reachab
    project. It remains a candidate only if a lightweight gate, precedence, and non-enrolled cost are proven.
 5. **Do not silently change runtime or compatibility semantics.** Bare `forge status-line` currently follows the
    launching process's `PATH`, which may intentionally select an editable checkout. A recorded-global resolver would
-   change that behavior and therefore needs an explicit precedence decision coordinated with T8. `statusLine` is
-   read-only and currently has no strict `.forge/project.toml` gate; this card must not add one incidentally.
+   change that behavior and therefore needs an explicit precedence decision reconciled with T8's shipped contract.
+   `statusLine` is read-only and currently has no strict `.forge/project.toml` gate; this card must not add one
+   incidentally.
 
 ## Design Constraints
 
@@ -170,7 +171,8 @@ shim makes that irrelevant.
    unchanged tracked target scalar, and a tracked scalar modified after installation. Do not choose migration behavior
    from tracking presence alone.
 9. **Record runtime precedence.** With both a global tool and an editable checkout available, prove which binary the
-   current terminal path selects and what each candidate would select. Coordinate any intentional change with T8.
+   current terminal path selects and what each candidate would select. Verify any intentional change against T8's
+   shipped precedence contract.
 
 ## Candidate Shapes
 
@@ -196,7 +198,7 @@ Phase 0 chooses one; this card does not assume that the first plausible command 
 - Any change to Claude or Codex runtime-hook registration, dispatch, project enrollment, or trust bytes.
 - Making arbitrary bare `forge` commands work from GUI-launched processes.
 - A general launchd environment manager.
-- Choosing or implementing the T8 checkout-local runtime override.
+- Changing T8's shipped checkout-local runtime override.
 - Moving `statusLine` to global configuration without the Phase 0 precedence and cost evidence.
 - Changing status-line content, segments, formatting, or telemetry semantics.
 
@@ -228,7 +230,7 @@ Phase 0 chooses one; this card does not assume that the first plausible command 
 | User-scope no-op, if selected | non-enrolled, non-Forge project                                         | shim exits before importing Forge; benchmark records p50/p95                                                                         | new test + Phase 0 benchmark                                               |
 | Sidecar parity                | project/local status line in managed sidecar                            | command resolves inside the image and host `.claude` bytes remain unchanged                                                          | `tests/integration/sidecar/test_sidecar_hook_inject.py` or new sibling     |
 | Worktree/nested CWD           | managed worktree and nested launch path                                 | chosen portable indirection resolves the correct Forge project without CWD guessing                                                  | new integration coverage                                                   |
-| Runtime selection contract    | global tool plus editable checkout                                      | selected binary matches the recorded T8-coordinated precedence; no accidental global/editable flip                                   | new test + `tests/src/install/test_hook_dispatcher.py`                     |
+| Runtime selection contract    | global tool plus editable checkout                                      | selected binary matches T8's shipped precedence contract; no accidental global/editable flip                                         | new test + `tests/src/install/test_hook_dispatcher.py`                     |
 | Process propagation           | stdin JSON, stderr/failure, signal, and spaced paths                    | shim preserves bytes, exit status/signals, environment, CWD, and argument quoting                                                    | new launcher contract tests                                                |
 | Custom Forge home             | non-default `FORGE_HOME`, terminal and GUI-style envs                   | chosen command either resolves that home or reports the unsupported missing-env posture honestly                                     | new reachability + doctor tests                                            |
 | Doctor truth                  | healthy hooks plus broken/healthy status-line variants                  | human and `--json` output report the two reachability facts independently                                                            | `tests/src/install/test_doctor.py`                                         |

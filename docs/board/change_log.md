@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-12
 
+### forge_dev_runtime_override closeout
+
+**Goal**: Close T8 after PR #97 merged and hand the global-runtime epic its final coordinator closeout.
+
+**Key changes**:
+
+- Moved `forge_dev_runtime_override` from `doing/` to `done/`, preserved its implementation checklist, and repointed the
+  epic and status-line follow-up links.
+- Recorded T8 as shipped via PR #97 and left the epic in `doing/` with no active member; its five seam boxes,
+  durable-doc verification, inbound-link sweep, and lane move are now actionable as a separate epic closeout.
+- Kept the already-reviewed durable override and launcher-recording lessons in `impl_notes.md`; no additional promotion
+  was needed at lane closeout.
+
+**Verification**: PR #97 merged at `46ff9ef6`; `make pre-commit-md`; post-merge relative-link and stale-status sweep;
+`git diff --check`.
+
 ### forge_dev_runtime_override implementation and branch verification
 
 **Goal**: Let contributors run unreleased checkout hook code explicitly without sticky-pointing global dispatcher

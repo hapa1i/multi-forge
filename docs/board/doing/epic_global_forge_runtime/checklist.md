@@ -5,22 +5,23 @@ member execution checklists (each member owns its own). Full contract in [`card.
 
 ## Current focus
 
-**T8 [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11,
-branch `forge-dev-runtime-override`) -- the epic's last live member (T2 is superseded-not-abandoned in `proposed/`; the
-split T7 sweep was reclassified a standalone non-member follow-up, 2026-07-11), so its closeout unblocks epic closeout.
-T8's dispatcher/recording/doctor/public-doc slices and all branch verification are complete; review/commit/merge remain
-in the member checklist. No closeout or lane movement is claimed yet. Shipped members are T1
+There is no active implementation member. T8
+[`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md), the last live member, shipped via PR #97
+and now sits in `done/`. T2 remains `proposed/` as superseded-not-abandoned, and the split T7 sweep remains a standalone
+non-member follow-up. Every live member is now done, so the epic's seam verification and coordinator closeout are
+actionable; the epic stays in `doing/` until that separate pass is complete. Shipped members are T1
 [`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md), plus T6
-[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md). T7's remaining mutator-family sweep
-is parked in [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified
-2026-07-11 as a standalone follow-up, not an epic member). Adjacent non-member `env_var_interface_boundary` also landed
-via PR #91; T4 authored against it, and T5/T6 should continue to author new user-facing strings against the shipped
-env-var vocabulary boundary.
+[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md), and T8 above. T7's remaining
+mutator-family sweep is parked in
+[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
+as a standalone follow-up, not an epic member). Adjacent non-member `env_var_interface_boundary` also landed via PR #91;
+T4 authored against it, and T5/T6 should continue to author new user-facing strings against the shipped env-var
+vocabulary boundary.
 
 ## Activation bookkeeping (this branch)
 
@@ -136,8 +137,9 @@ Record outcomes here as members are picked up.
   `FORGE_DEV` env override with a deterministic recording transition table -- record in the member checklist). In the
   second round the split T7 sweep was reclassified a standalone non-member follow-up, so T8 IS the last live member:
   when it closes, the epic closeout items (seam boxes, design-doc verification, lane move) become actionable. Phases 1-2
-  are now implemented and the public docs/vocabulary, focused, integration, package, live-smoke, and pre-commit checks
-  are verified. Review/commit/merge remain in the member checklist.
+  shipped via PR #97 (`46ff9ef6`) with the public docs/vocabulary, focused, integration, package, live-smoke, and
+  pre-commit checks verified. The card moved `doing/ -> done/` in the post-merge closeout; epic closeout is now the next
+  coordinator task.
 
 ## Shared-contract seams (drift watch)
 
@@ -159,7 +161,7 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 
 ## Closeout (epic)
 
-- [ ] Every live member card is `done/` (or the shared contract is folded into normative design docs).
+- [x] Every live member card is `done/` (or the shared contract is folded into normative design docs).
 - [ ] design.md / design_appendix §C / cli_reference reflect the shipped install + hook-ownership model.
 - [ ] When moving the epic to `done/`, repoint every inbound board link that currently targets the epic's `doing/` path,
   including done-member back-links and standalone follow-ups such as

@@ -1,16 +1,15 @@
 # Execution checklist: forge_dev_runtime_override (T8)
 
 **Branch**: `forge-dev-runtime-override`. Card: [`card.md`](card.md). Epic:
-[`epic_global_forge_runtime`](../epic_global_forge_runtime/card.md) -- T8 is the epic's last live member (T2 stays
-`proposed/` as superseded-not-abandoned; the split T7 sweep was reclassified a standalone non-member follow-up,
-2026-07-11), so closing this card unblocks epic closeout (epic-owned, not done here).
+[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) -- T8 was the epic's last live member (T2
+stays `proposed/` as superseded-not-abandoned; the split T7 sweep was reclassified a standalone non-member follow-up,
+2026-07-11), so this closeout makes epic closeout actionable (epic-owned, not done here).
 
 ## Current focus
 
-Implementation, public docs, and Phase 3 verification are complete on `forge-dev-runtime-override`: the focused suite,
-Docker installer integration, wheel/clean-install flow, live dev-loop smoke, and `make pre-commit` all pass. Current
-focus is review/commit/merge. The card and epic remain in `doing/` until the branch ships; their lane closeout is not
-claimed here.
+Shipped via PR #97 (`46ff9ef6`) after the focused suite, Docker installer integration, wheel/clean-install flow, live
+dev-loop smoke, and `make pre-commit` all passed. The card is closed in `done/`; the epic remains in `doing/` for its
+own seam verification and lane closeout.
 
 ## Grounding (verified against code, 2026-07-11; extended across both review rounds)
 
@@ -257,7 +256,7 @@ Doctor, env, and byte contracts:
   transition table, lexical launcher classification, and the separate hard branch required by a fail-loud override.
 - [x] `design.md` §3.10 / `design_appendix` §C.4 / §A.7b / `docs/end-user/hook.md` verified against the implemented
   behavior; no shipped-state claim is made before merge.
-- [ ] Card `doing/ -> done/`; inbound links repointed (epic card members table, epic checklist focus, the
+- [x] Card `doing/ -> done/`; inbound links repointed (epic card members table, epic checklist focus, the
   `proposed/statusline_gui_reachability` Related row).
-- [ ] Epic notified: T8 was the last live member -- epic closeout items (seam boxes, design-doc verification, epic lane
+- [x] Epic notified: T8 was the last live member -- epic closeout items (seam boxes, design-doc verification, epic lane
   move) become actionable.
