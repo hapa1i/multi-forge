@@ -282,6 +282,13 @@ class TestPrepareCodexRequest:
         mock_key.assert_not_called()  # codex reads its own store; no injection
         assert "CODEX_API_KEY" not in req.env
 
+    def test_forge_dev_is_inherited(self, monkeypatch):
+        monkeypatch.setenv("FORGE_DEV", "/checkout")
+
+        req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
+
+        assert req.env["FORGE_DEV"] == "/checkout"
+
     @patch("forge.core.invoker.codex.codex_api_key_for_subprocess", return_value=None)
     def test_env_sanitized_of_claude_proxy_and_contradicting_auth(self, _key, monkeypatch):
         # codex_store auth: the child must carry NO stale Codex key/token and NO inherited

@@ -17,6 +17,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from forge.cli.output import print_error, print_tip
@@ -1407,9 +1408,22 @@ def doctor_cmd(as_json: bool) -> None:
     if dispatcher_diag.installed_version:
         console.print(f"  Version:        {dispatcher_diag.installed_version}")
     if dispatcher_diag.forge_binary_path:
-        console.print(f"  forge target:   {display_path(dispatcher_diag.forge_binary_path)}")
+        console.print(f"  forge target:   {escape(display_path(dispatcher_diag.forge_binary_path))}")
+    override = dispatcher_diag.dev_override
+    if override.present:
+        value = override.value if override.value else "[empty]"
+        console.print(f"  Dev override:   {escape(value)}")
+        if override.target:
+            console.print(f"  Dev target:     {escape(display_path(override.target))}")
+        console.print(f"  Dev valid:      {'yes' if override.valid else 'no'}")
+        console.print(f"  Dev effective:  {'yes' if override.effective else 'no'}")
+        if override.advice and (not override.valid or dispatcher_diag.advice is None):
+            print_tip(escape(override.advice), console=console)
+    else:
+        console.print("  Dev override:   not set")
+    console.print("  Dev env scope:  this doctor process; hook launch environments may differ")
     if dispatcher_diag.advice:
-        print_tip(dispatcher_diag.advice, console=console)
+        print_tip(escape(dispatcher_diag.advice), console=console)
 
     console.print("\n[bold]Runtime hooks[/bold]")
     console.print(f"  Scopes:         {', '.join(hook_scopes) if hook_scopes else 'none'}")

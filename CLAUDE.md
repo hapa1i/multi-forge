@@ -27,6 +27,10 @@ make test                   # Full suite
 # uv run pytest tests/src -m "not integration" -v
 # uv run pytest tests/integration -v
 
+# Exercise this checkout's unreleased hooks in a new managed session.
+# FORGE_DEV must be an absolute checkout root; relaunch after changing/unsetting it.
+FORGE_DEV="$PWD" uv run forge session start dev-hooks
+
 # Code quality (run `make pre-commit` before every commit; includes type checks)
 make pre-commit            # All hooks: ruff, black, isort, mypy, pyright, mdformat, gitleaks
 make clean                 # Remove caches

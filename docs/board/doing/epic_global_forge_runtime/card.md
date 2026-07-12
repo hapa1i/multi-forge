@@ -13,8 +13,9 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)**. The epic's coordination
 [`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. **T8
 [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11) --
-the epic's last live member: T2 stays `proposed/` as superseded-not-abandoned, and the split T7 sweep was reclassified a
-standalone non-member follow-up (2026-07-11,
+its implementation, public-doc, focused, integration, package, live-smoke, and pre-commit slices are complete on the
+branch; review/commit/merge remain. It is the epic's last live member: T2 stays `proposed/` as superseded-not-abandoned,
+and the split T7 sweep was reclassified a standalone non-member follow-up (2026-07-11,
 [`todo/forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md)). Closes to `done/`
 when every live member is `done/` (or the shared contract is folded into normative design docs).
 
@@ -23,8 +24,8 @@ Supersedes the single `proposed/global_forge_runtime/` card, which conflated a h
 install/hook-ownership migration. The original card's content is redistributed across the members below.
 
 **Decision direction**: Make Forge a single user/global CLI (PyPI, installed as a tool), keep project authority in
-`<repo>/.forge/`, and register runtime hooks only at user scope through a no-op dispatcher that resolves exactly one
-global `forge` from any hook environment.
+`<repo>/.forge/`, and register runtime hooks only at user scope through a no-op dispatcher that normally resolves a
+durable user/global `forge` from any hook environment, with explicit process-scoped checkout selection for contributors.
 
 **References**: `src/forge/install/preset.py` (Claude preset hook + `statusLine` commands),
 `src/forge/install/codex_hooks.py` (`get_codex_config_path`, managed block markers `:56`, trust-byte pinning),

@@ -113,6 +113,13 @@ class TestEnvAndProcess:
         assert env[FORGE_ROOT_RUN_ID_VAR] == _IDENTITY.root_run_id
         assert FORGE_PARENT_RUN_ID_VAR not in env
 
+    def test_forge_dev_is_inherited(self, mock_run: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_DEV", "/checkout")
+
+        _invoke(mock_run)
+
+        assert mock_run.call_args.kwargs["env"]["FORGE_DEV"] == "/checkout"
+
     def test_caller_identity_used_verbatim_never_minted(self, mock_run: MagicMock) -> None:
         """One-run-tree contract: the TUI env carries exactly the caller's root, so the
         transfer-curation event (emitted under the same identity) joins it."""
@@ -277,6 +284,11 @@ class TestBareProxyEnv:
         env = _build_codex_proxy_env()
         assert env["PATH"] == "/usr/bin"
         assert env["HOME"] == "/home/me"
+
+    def test_forge_dev_is_preserved(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_DEV", "/checkout")
+
+        assert _build_codex_proxy_env()["FORGE_DEV"] == "/checkout"
 
 
 @patch("forge.session.codex_invoke.subprocess.run")

@@ -357,6 +357,7 @@ variables must be added here and documented in the relevant end-user guide befor
 
 | Variable                           | Class             | Rule                                                                |
 | ---------------------------------- | ----------------- | ------------------------------------------------------------------- |
+| `FORGE_DEV`                        | Public            | Absolute checkout root used for contributor hook dispatch           |
 | `FORGE_HOME`                       | Public            | User-settable state-root relocation; documented in end-user guides  |
 | `FORGE_PROFILE`                    | Public            | User-settable credential profile selector                           |
 | `FORGE_DEBUG`                      | Public diagnostic | User-settable logging override; allowed in troubleshooting surfaces |
@@ -965,14 +966,16 @@ Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 **Forge tool distribution.** Forge ships on PyPI; the recommended install is a global tool
 (`uv tool install multi-forge` / `pipx install multi-forge`), which puts the `forge` launcher on `PATH` (typically
 `~/.local/bin`). `forge extension doctor` classifies the install as `global` (launcher in `~/.local/bin`,
-`XDG_BIN_HOME`, or `PIPX_BIN_DIR`), `editable` (PEP 610 `direct_url.json` `dir_info.editable`, e.g. `uv sync`), `venv`
-(launcher in a `bin`/`Scripts` dir with a sibling `pyvenv.cfg`), or `unknown`. It also probes reachability under a
-GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` — so a healthy global
-install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the mechanical signal
-for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
+`UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, or `PIPX_BIN_DIR`), `editable` (PEP 610 `direct_url.json` `dir_info.editable`, e.g.
+`uv sync`), `venv` (launcher in a `bin`/`Scripts` dir with a sibling `pyvenv.cfg`), or `unknown`. It also probes
+reachability under a GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` —
+so a healthy global install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the
+mechanical signal for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
 `{install_kind, forge_path, on_path, on_path_minimal, advice, hook_dispatcher, runtime_hooks, project_registry, project_compatibility}`.
-`runtime_hooks` keeps `scopes` and `double_fire_risk` and adds `cleanup_required` plus concrete `legacy_registrations`;
-cleanup-required is not an alias for double-fire.
+`hook_dispatcher.dev_override` reports `{present, value, target, valid, effective, advice}` for `FORGE_DEV` in the
+doctor process's environment; a hook launch environment may differ. `effective` requires both a valid checkout target
+and a current, executable installed dispatcher. `runtime_hooks` keeps `scopes` and `double_fire_risk` and adds
+`cleanup_required` plus concrete `legacy_registrations`; cleanup-required is not an alias for double-fire.
 
 ### C.1 Scope model
 
@@ -1064,11 +1067,26 @@ The hook dispatcher stores host runtime resolution metadata in `~/.forge/runtime
 }
 ```
 
-`forge_binary_path` records the launcher path visible at install/sync time. The standalone dispatcher first tries this
-recorded launcher, then known user-tool locations in order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`,
-`PIPX_BIN_DIR`. It verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic
-naming the checked locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths
-are not mounted there.
+For an implicit install/sync write, `forge_binary_path` follows this ordered transition table:
+
+| Priority | Condition                                                                    | Recorded result                    |
+| -------- | ---------------------------------------------------------------------------- | ---------------------------------- |
+| 1        | Discovered launcher is an executable, non-venv file                          | Record the discovered launcher     |
+| 2        | Otherwise, the existing recorded launcher is executable and non-venv         | Preserve the existing launcher     |
+| 3        | Otherwise, a known user-tool location contains an executable non-venv target | Record the first such target       |
+| 4        | No usable target exists                                                      | Record `null`; do not guess a path |
+
+This prevents a project `.venv/bin/forge` found by `which` or `argv0` from sticky-pointing all hooks at that checkout,
+while preserving custom non-venv launchers and deliberate launcher migrations. Venv classification is lexical: a
+launcher is a venv launcher only when its own parent is `bin`/`Scripts` and the parent directory has `pyvenv.cfg`. Forge
+never resolves a launcher symlink for this test, so a stable `~/.local/bin/forge` symlink remains eligible even when its
+target lives inside a tool venv. A legacy recorded venv launcher is replaced or cleared by this table on the next
+enable/sync. An explicit internal `forge_binary_path` argument remains authoritative.
+
+With no dev override, the standalone dispatcher first tries the recorded launcher, then known user-tool locations in
+order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`. It verifies executability before `exec`; if no
+target is found, it exits non-zero with a diagnostic naming the checked locations. Sidecar/container resolution is
+separate because host `~/.forge` and host launcher paths are not mounted there.
 
 #### Hook dispatcher (`~/.forge/bin/forge-hook`)
 
@@ -1078,13 +1096,23 @@ paths before `samefile()`. Unexpected gate errors, such as a deleted cwd or tran
 fail open to exit 0. If the hook environment already identifies a managed Forge session, the dispatcher dispatches even
 when the cwd is not enrolled.
 
+After the gate and missing-handler check, presence of `FORGE_DEV` creates a hard resolution branch. Its non-empty value
+must expand to an absolute checkout root, and `<root>/.venv/bin/forge` must be executable. The dispatcher uses exactly
+that target. Empty or relative values, expansion errors, missing/non-executable targets, and `exec` errors exit 127 with
+a diagnostic naming `FORGE_DEV`; none falls through to recorded/global resolution. The variable is process-scoped and
+does not update `runtime.json`; managed Claude and Codex launches inherit it, so a changed or removed value requires a
+relaunch. It has no effect on the gate and adds no `required_forge` bypass. Sidecar hooks do not use the host dispatcher
+and are outside this override contract.
+
 Rendered hook command strings use a literal absolute path, never `~`, for example
 `/home/user/.forge/bin/forge-hook session-start`. The command byte template is golden-pinned with `$HOME` normalized
 because Codex trust hashes cover command definitions.
 
 The rendered script carries `FORGE_HOOK_DISPATCHER_VERSION` and `FORGE_HOOK_DISPATCHER_SOURCE_SHA256` stamps.
 `forge extension sync` re-renders the artifact, and `forge extension doctor` reports missing/stale/unreadable dispatcher
-state so a package upgrade that changes embedded gate logic does not silently leave hooks disabled everywhere.
+state so a package upgrade that changes embedded gate or resolver logic does not silently leave hooks disabled
+everywhere. Resolver changes do not alter registered hook command bytes, so re-rendering the script does not itself
+require Codex hook re-trust.
 
 #### Trusted project registry (`~/.forge/projects.json`)
 

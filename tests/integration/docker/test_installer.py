@@ -206,6 +206,56 @@ print('preserved')
         assert "preserved" in check.stdout
 
 
+class TestHookDispatcherRuntime:
+    """Rendered dispatcher behavior in the installed container environment."""
+
+    def test_dev_override_executes_checkout_and_invalid_value_never_falls_back(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        synced_container.exec(
+            "rm -rf ~/.claude ~/.forge /tmp/forge-global /tmp/forge-dev "
+            "/tmp/forge-dev-args /tmp/forge-dev-stdin /tmp/forge-global-invoked"
+        )
+        synced_container.mkdir("/tmp/forge-global", parents=True)
+        synced_container.write_file(
+            "/tmp/forge-global/forge",
+            '#!/bin/sh\nprintf "%s\\n" "$@" > /tmp/forge-global-invoked\n',
+        )
+        synced_container.mkdir("/tmp/forge-dev/.venv/bin", parents=True)
+        synced_container.write_file(
+            "/tmp/forge-dev/.venv/bin/forge",
+            '#!/bin/sh\nprintf "%s\\n" "$@" > /tmp/forge-dev-args\ncat > /tmp/forge-dev-stdin\n',
+        )
+        permissions = synced_container.exec("chmod +x /tmp/forge-global/forge /tmp/forge-dev/.venv/bin/forge")
+        assert permissions.returncode == 0, permissions.stderr
+
+        enabled = synced_container.exec(
+            "cd /forge && PATH=/tmp/forge-global:$PATH "
+            "/forge/.venv/bin/forge extension enable --scope user --profile minimal"
+        )
+        assert enabled.returncode == 0, f"Enable failed: {enabled.stderr}"
+
+        valid = synced_container.exec(
+            'printf \'{"tool":"Read"}\' | FORGE_SESSION=integration '
+            "FORGE_DEV=/tmp/forge-dev ~/.forge/bin/forge-hook policy-check"
+        )
+        assert valid.returncode == 0, f"Override dispatch failed: {valid.stderr}"
+        assert synced_container.read_file("/tmp/forge-dev-args").splitlines() == [
+            "hook",
+            "policy-check",
+        ]
+        assert synced_container.read_file("/tmp/forge-dev-stdin") == '{"tool":"Read"}'
+        assert not synced_container.file_exists("/tmp/forge-global-invoked")
+
+        invalid = synced_container.exec(
+            "FORGE_SESSION=integration FORGE_DEV=/tmp/missing-checkout " "~/.forge/bin/forge-hook policy-check"
+        )
+        assert invalid.returncode == 127
+        assert "FORGE_DEV target is missing or not executable" in invalid.stderr
+        assert not synced_container.file_exists("/tmp/forge-global-invoked")
+
+
 class TestHookMigration:
     """Pre-T5 project state transitions to one user-scoped runtime source."""
 

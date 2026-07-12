@@ -25,6 +25,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-12
+
+### forge_dev_runtime_override implementation and branch verification
+
+**Goal**: Let contributors run unreleased checkout hook code explicitly without sticky-pointing global dispatcher
+metadata at a project venv.
+
+**Key changes**:
+
+- Added the process-scoped `FORGE_DEV=<absolute-checkout-root>` dispatcher branch after the no-op gate and handler
+  validation; invalid or unlaunchable checkout targets fail with exit 127 and never fall back to the global resolver.
+- Replaced implicit launcher recording with the reviewed four-step transition table, preserving custom stable launchers
+  while excluding lexically classified venv launchers and migrating legacy sticky metadata on enable/sync.
+- Added doctor validity/effectiveness diagnostics, managed Claude/Codex env-propagation coverage, and the Public
+  env-vocabulary plus architecture, CLI, contributor, and end-user hook documentation.
+
+**Verification**: focused dispatcher/doctor/installer/env/golden suite (`308 passed`); Docker installer integration
+(`17 passed`); wheel + sdist build and isolated `uv tool` enable/sync/doctor check; live checkout dispatcher smoke
+(valid exit 0, invalid exit 127 without fallback); `make pre-commit` clean. The active T8 checklist keeps the
+command-level evidence; shipment/lane closeout remains post-merge.
+
 ## 2026-07-11
 
 ### forge_hook_migration_cleanup closeout

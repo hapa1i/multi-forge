@@ -7,9 +7,10 @@
 
 ## Current focus
 
-Phase 0 decisions D1-D6 **ratified 2026-07-11** (maintainer review), then hardened by a **second review round the same
-day** (D2 transition table, override placement/presence semantics, D6 end-user docs, doctor JSON contract, evidence and
-errno fixes -- all folded in below). Next: Phase 1 implementation.
+Implementation, public docs, and Phase 3 verification are complete on `forge-dev-runtime-override`: the focused suite,
+Docker installer integration, wheel/clean-install flow, live dev-loop smoke, and `make pre-commit` all pass. Current
+focus is review/commit/merge. The card and epic remain in `doing/` until the branch ships; their lane closeout is not
+claimed here.
 
 ## Grounding (verified against code, 2026-07-11; extended across both review rounds)
 
@@ -33,12 +34,12 @@ File refs are the 2026-07-11 snapshot.
 - **Hook command bytes do NOT change.** Registration invokes `<forge-home>/bin/forge-hook <handler>`
   (`render_dispatcher_command`). T8 edits script *content*, not registered commands, so there is no unmerge-before-merge
   and **no Codex re-trust** (trust hashes the command definition, not script bytes -- impl_notes, codex_frontend).
-- **Implicit sticky dev selection ships today, from every installer scope.** `Installer.init()` calls
+- **Pre-T8 sticky behavior was characterized at every installer scope.** `Installer.init()` calls
   `_ensure_hook_dispatcher()` unconditionally (`installer.py:935` -> `install_hook_dispatcher()` ->
-  `write_runtime_metadata`), and `find_current_forge_binary` records whatever `forge` the `which`-then-`argv0` discovery
-  finds. A dev-shell enable/sync (any scope, not just user) records `<checkout>/.venv/bin/forge` into `runtime.json`,
-  sticky-pointing ALL hook dispatch at the checkout. This is the card's Risk 1 leak, shipped as an accident of
-  recording; D2 removes it.
+  `write_runtime_metadata`), and the old implementation directly recorded whatever `forge` the `which`-then-`argv0`
+  discovery found. A dev-shell enable/sync (any scope, not just user) therefore recorded `<checkout>/.venv/bin/forge`
+  into `runtime.json`, sticky-pointing all hook dispatch at the checkout. The implemented D2 selector now filters that
+  implicit venv discovery.
 - **Launcher classification must be lexical.** Resolving the `~/.local/bin/forge` symlink lands inside the uv tool-venv
   (beside a `pyvenv.cfg`), which would misclassify every healthy global install as a venv launcher (impl_notes,
   global_forge_install: "launcher-symlink-not-realpath"). `find_current_forge_binary` already avoids `resolve()`
@@ -50,7 +51,7 @@ File refs are the 2026-07-11 snapshot.
   only dev path".
 - **Current hooks do not enforce the `required_forge` pin.** `check_project_compatibility_for_hook`
   (`project_compat.py:138`) has no production caller; strict enforcement lives on command paths via `cli/guards.py`
-  **and directly in `cli/extensions.py`** (4 call sites). Hook-path enforcement is owned by
+  **and directly in `cli/extensions.py`** (5 call sites). Hook-path enforcement is owned by
   `todo/forge_project_compat_mutator_sweep/` (a standalone follow-up, not an epic member).
 - **`FORGE_DEV` propagates into managed launches.** The managed-session environment builders copy `os.environ`
   (`core/reactive/env.py:240`, `session/codex_invoke.py:152`, `core/invoker/codex.py:134`), so a value exported in the
@@ -114,7 +115,7 @@ File refs are the 2026-07-11 snapshot.
 
 Override branch (D3/D4):
 
-- [ ] Add the `FORGE_DEV` branch to the shim source as its own resolution path -- after the gate and the missing-handler
+- [x] Add the `FORGE_DEV` branch to the shim source as its own resolution path -- after the gate and the missing-handler
   check, replacing the normal candidate loop when present: presence via `"FORGE_DEV" in os.environ`; validate non-empty
   absolute checkout root after `~` expansion; target `<root>/.venv/bin/forge` must be an executable file; expansion +
   `os.execv` wrapped (`RuntimeError`/`OSError`). Any failure -> exit 127, stderr names `FORGE_DEV`
@@ -127,42 +128,49 @@ Override branch (D3/D4):
   * override set + no handler argv -> exit 2, no exec (handler validation precedes the override branch);
   * override set + executable whose execv fails (stale shebang interpreter) -> `OSError` caught -> same loud exit 127;
   * non-enrolled cwd, no session, `FORGE_DEV` set -> exit 0 before any resolution (gate untouched);
-  * absolute checkout path containing spaces resolves and execs correctly.
+  * absolute checkout path containing spaces resolves and execs correctly. Implemented in the rendered stdlib source
+    with subprocess fixtures for valid cross-project/spaced paths, every invalid-value class, failed `execv`, handler
+    ordering, and the unchanged no-op gate.
 
 Recording fix (D2):
 
-- [ ] Characterization first (red/green implementation evidence, not a permanent acceptance row): pin today's sticky
-  behavior via the injectable seams (`install_hook_dispatcher(environ=..., which=..., argv0=...)`) -- a dev-shell PATH
-  records `.venv/bin/forge` -- then flip it with the selector.
-- [ ] Implement the D2 selector: a new higher-level recording function owning the four-step transition table
+- [x] Characterize the sticky path through the injectable `install_hook_dispatcher(environ=..., which=..., argv0=...)`
+  seams, then pin the replacement behavior: dev-shell venv discovery no longer records `.venv/bin/forge`, while stable
+  non-venv metadata survives unusable discovery.
+- [x] Implement the D2 selector: a new higher-level recording function owning the four-step transition table
   (`known_forge_launcher_paths()` unchanged as the static fallback-list helper), lexical venv classification,
   explicit-`forge_binary_path=` authority, legacy `.venv` metadata replace-or-clear. Fixture matrix: first-time custom
   install; A->B global launcher migration; global symlink whose realpath is a tool venv (stays non-venv); venv discovery
   against valid / stale / venv recorded targets; `which` vs `argv0` parity; project/local enable AND user sync entry
-  points.
-- [ ] Package-side parity: doctor-facing candidate/selection reporting uses the same selector, so doctor never describes
+  points. `tests/src/install/test_hook_dispatcher.py` covers the selector matrix;
+  `tests/src/cli/test_extension_enable.py` covers project/local enable and user sync.
+- [x] Package-side parity: doctor-facing candidate/selection reporting uses the same selector, so doctor never describes
   a different resolution or recording decision than the shim/installer performs.
-- [ ] Tests extend the existing rendered-shim execution suite in `tests/src/install/test_hook_dispatcher.py` (render
+- [x] Tests extend the existing rendered-shim execution suite in `tests/src/install/test_hook_dispatcher.py` (render
   script -> run via `python3` subprocess with a controlled env), not source-string asserts.
-- [ ] Byte-stability guard: `tests/src/install/test_registered_commands_contract.py` passes unchanged -- proves no
-  registered command byte moved and no Codex re-trust is triggered.
+- [x] Execute the byte-stability guard: implementation leaves `render_dispatcher_command()` and
+  `tests/src/install/test_registered_commands_contract.py` unchanged; the golden contract passed in the 308-test focused
+  command, so no registered byte moved and no Codex re-trust is triggered.
 
 ## Phase 2: Doctor + docs
 
-- [ ] `forge extension doctor` surfaces the override under `hook_dispatcher.dev_override` (human + `--json`) with a
+- [x] `forge extension doctor` surfaces the override under `hook_dispatcher.dev_override` (human + `--json`) with a
   defined contract:
   `{present: bool, value: string|null, target: string|null, valid: bool, effective: bool, advice: string|null}`. `valid`
   = the D3/D4 target checks pass; `effective` = `valid` AND the installed shim status is `current` AND the shim is
   executable -- a stale pre-T8 or mode-drifted shim cannot honor the override, and doctor must report that split rather
   than imply activity (advice names `forge extension sync` for stale source and permission repair for mode drift). Label
-  it env-derived state: doctor sees its own environment, which may differ from a hook's launch environment.
-- [ ] Stale-shim surfacing verified as the upgrade path: after this change, an installed pre-T8 shim reports `stale`
-  (source-hash drift) and `forge extension sync` re-renders it -- covered by a doctor test, not assumed.
-- [ ] Docs: `design.md` §3.10 deployment-model paragraph (the resolver narrative names the override); `design_appendix`
+  it env-derived state: doctor sees its own environment, which may differ from a hook's launch environment. Human output
+  escapes env-derived values; JSON fixtures cover set/unset and valid/invalid states.
+- [x] Stale-shim surfacing is covered as the upgrade path: the doctor fixture pins source-hash drift independently of
+  the version stamp, and sync retains the existing re-render path. The fixture passed in the Phase 3 focused command.
+- [x] Docs: `design.md` §3.10 deployment-model paragraph (the resolver narrative names the override); `design_appendix`
   §C.4 (override branch precedence + the D2 recording table) and §A.7b row (**Public**, per D6);
   **`docs/end-user/hook.md`** (Public-contract user surface); developer docs (`CLAUDE.md` / `docs/developer/`) with the
-  command-scoped example and the relaunch-required note.
-- [ ] `tests/src/cli/test_env_vocabulary.py` parity row matches the appendix table (Public class).
+  command-scoped example and the relaunch-required note. `docs/cli_reference.md` also defines the doctor payload. All
+  six changed doc surfaces passed mdformat; claims were checked against the rendered/package implementation.
+- [x] `tests/src/cli/test_env_vocabulary.py` parity row matches the appendix table (Public class): targeted guard passed
+  (`9 passed`).
 - [x] D5 write-back: `todo/forge_project_compat_mutator_sweep/card.md` Design Rules records the resolved outcome ("T8
   adds no special bypass; sweep owns hook enforcement"). Done 2026-07-11; evidence wording corrected in round 2 (strict
   enforcement = `cli/guards.py` + `cli/extensions.py`).
@@ -171,19 +179,24 @@ Recording fix (D2):
 
 ## Phase 3: Verification
 
-- [ ] Focused units:
-  `uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py tests/src/cli/test_env_vocabulary.py tests/src/install/test_registered_commands_contract.py tests/src/core/reactive/test_env.py tests/src/session/test_codex_invoke.py tests/src/core/invoker/test_codex_invoker.py -q`.
-- [ ] Targeted integration (installer/hooks touched; unit alone is not enough signal), extended with an actual T8 case
+- [x] Focused units:
+  `uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py tests/src/cli/test_env_vocabulary.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_extension_enable.py tests/src/core/reactive/test_env.py tests/src/session/test_codex_invoke.py tests/src/core/invoker/test_codex_invoker.py -q`
+  -> **308 passed**. This includes the real local/project enable and user-sync entry points.
+- [x] Targeted integration (installer/hooks touched; unit alone is not enough signal), extended with an actual T8 case
   -- the rendered dispatcher honors a valid `FORGE_DEV` and fails loud on an invalid one inside the container -- not
-  only the pre-existing suite: `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v`.
-- [ ] Wheel/clean-install verification: `uv build`, install the wheel into an isolated tool environment, run
-  `forge extension enable --scope user` **then** `forge extension sync` + `forge extension doctor` there, and confirm
-  the rendered shim carries the override branch.
-- [ ] Live dev-loop smoke on this checkout: `forge extension sync` (re-render shim), then command-scoped
-  `FORGE_DEV="$PWD" ~/.forge/bin/forge-hook <name>` with stub stdin from an enrolled root; confirm the checkout binary
-  ran. Also the negative: `FORGE_DEV=/nonexistent ~/.forge/bin/forge-hook <name>` -> exit 127 naming `FORGE_DEV`. Record
-  commands + results here.
-- [ ] `make pre-commit` clean.
+  only the pre-existing suite: `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v` -> **17
+  passed**.
+- [x] Wheel/clean-install verification: `uv build` produced the sdist and wheel. Installing the wheel into an isolated
+  `UV_TOOL_DIR`/`UV_TOOL_BIN_DIR`, then running `forge extension enable --scope user` **then** `forge extension sync` +
+  `forge extension doctor` there confirmed that the rendered shim carries the override branch. Doctor reported
+  `install_kind=global`, the isolated launcher recorded, and dispatcher `status=current`; the rendered artifact
+  contained the `FORGE_DEV` validation/exec branch.
+- [x] Live dev-loop smoke on this checkout: `forge extension sync --scope local` re-rendered the real user dispatcher.
+  Command-scoped `FORGE_DEV="$PWD" ~/.forge/bin/forge-hook <name>` with stub stdin from an enrolled root confirmed that
+  the checkout binary ran (`policy-check`, exit 0). The negative
+  `FORGE_DEV=/nonexistent ~/.forge/bin/forge-hook policy-check` exited 127 and named both `FORGE_DEV` and
+  `/nonexistent/.venv/bin/forge`.
+- [x] `make pre-commit` clean after isort/mdformat normalization and the explicit optional-path type annotation.
 
 ## Acceptance tests
 
@@ -194,7 +207,7 @@ Override branch:
 | Dev override resolves checkout | `FORGE_DEV=<checkout>`, enrolled cwd                               | shim execs `<checkout>/.venv/bin/forge`, not the recorded/global launcher | `tests/src/install/test_hook_dispatcher.py` |
 | Override names the checkout    | `FORGE_DEV=<checkout>`, hook fires in a different enrolled project | named checkout's forge resolves, not that project's `.venv`               | same                                        |
 | Unset -> unchanged resolution  | `FORGE_DEV` unset                                                  | same ordered resolution behavior as the shipped shim (recorded -> global) | same                                        |
-| Override never implicit        | unset, cwd IS a Forge checkout                                     | no accidental checkout resolution (opt-in only)                           | same                                        |
+| Cwd venv never implicit        | override unset; cwd checkout has its own `.venv/bin/forge`         | cwd alone never selects that launcher; recorded/known resolution wins     | same                                        |
 | Invalid override fails loud    | `FORGE_DEV=/nonexistent`                                           | exit 127; stderr names `FORGE_DEV` + checked path; no fallback (D4)       | same                                        |
 | Empty/relative rejected        | `FORGE_DEV=""` (present via `in`), `FORGE_DEV=rel/path`            | present-and-invalid -> loud 127; never treated as unset or cwd-relative   | same                                        |
 | Unexpandable value rejected    | `FORGE_DEV=~nosuchuser/x`                                          | `RuntimeError` caught -> loud 127                                         | same                                        |
@@ -239,11 +252,11 @@ Doctor, env, and byte contracts:
 
 ## Closeout
 
-- [ ] `change_log.md` entry (goal / key changes / verification).
-- [ ] Durable lessons -> `impl_notes.md` after human review (candidates: the override-is-resolution-not-gate split; the
-  D2 transition table -- guard-set prose is not a total function, precedence tables are; lexical launcher
-  classification; skip-and-continue resolvers need a separate hard branch for fail-loud overrides).
-- [ ] `design.md` §3.10 / `design_appendix` §C.4 / §A.7b / `docs/end-user/hook.md` verified against shipped behavior.
+- [x] `change_log.md` entry records the goal, key changes, and complete branch verification without claiming shipment.
+- [x] Durable lessons -> `impl_notes.md` after two rounds of human review: resolution-vs-gate boundary, total D2
+  transition table, lexical launcher classification, and the separate hard branch required by a fail-loud override.
+- [x] `design.md` §3.10 / `design_appendix` §C.4 / §A.7b / `docs/end-user/hook.md` verified against the implemented
+  behavior; no shipped-state claim is made before merge.
 - [ ] Card `doing/ -> done/`; inbound links repointed (epic card members table, epic checklist focus, the
   `proposed/statusline_gui_reachability` Related row).
 - [ ] Epic notified: T8 was the last live member -- epic closeout items (seam boxes, design-doc verification, epic lane

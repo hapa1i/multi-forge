@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import stat
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from forge.install.hook_dispatcher import (
     read_runtime_metadata,
     render_dispatcher_command,
     render_dispatcher_script,
+    select_forge_binary_for_recording,
     write_runtime_metadata,
 )
 from forge.install.project_registry import ProjectRegistryStore
@@ -69,6 +71,17 @@ def _make_fake_forge(tmp_path: Path) -> tuple[Path, Path]:
     return fake, record_path
 
 
+def _make_dev_checkout(root: Path) -> tuple[Path, Path]:
+    fake, record_path = _make_fake_forge(root / "fixture")
+    venv = root / ".venv"
+    target = venv / "bin" / "forge"
+    target.parent.mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr\n", encoding="utf-8")
+    target.write_text(fake.read_text(encoding="utf-8"), encoding="utf-8")
+    target.chmod(target.stat().st_mode | stat.S_IXUSR)
+    return target, record_path
+
+
 def _install_dispatcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_forge: Path | None = None) -> Path:
     forge_home = _forge_home()
     monkeypatch.setenv("FORGE_HOME", str(forge_home))
@@ -84,11 +97,14 @@ def _run_dispatcher(
     cwd: Path,
     env: dict[str, str],
     *,
-    hook_name: str = "session-start",
+    hook_name: str | None = "session-start",
     stdin: str = "{}",
 ) -> subprocess.CompletedProcess[str]:
+    argv = [sys.executable, str(dispatcher)]
+    if hook_name is not None:
+        argv.append(hook_name)
     return subprocess.run(
-        [sys.executable, str(dispatcher), hook_name],
+        argv,
         cwd=cwd,
         env=env,
         input=stdin,
@@ -227,6 +243,251 @@ def test_resolution_failure_names_checked_locations(tmp_path: Path, monkeypatch:
     assert "could not find the global 'forge' launcher" in result.stderr
     assert str(tmp_path / "missing-forge") in result.stderr
     assert str(Path(env["HOME"]) / ".local" / "bin" / "forge") in result.stderr
+
+
+def test_dev_override_executes_named_checkout_in_different_project(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dev_forge, record_path = _make_dev_checkout(tmp_path / "Forge checkout with spaces")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "other-project")
+    project_forge, _project_record = _make_dev_checkout(repo)
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env, hook_name="policy-check", stdin='{"tool":"Read"}')
+
+    assert result.returncode == 0, result.stderr
+    record = _read_fake_record(record_path)
+    assert record["argv"] == [str(dev_forge), "hook", "policy-check"]
+    assert record["argv"][0] != str(project_forge)
+    assert record["stdin"] == '{"tool":"Read"}'
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_stderr", "plant_cwd_competitor"),
+    [
+        (
+            "",
+            "FORGE_DEV is set but empty; expected an absolute Forge checkout root",
+            False,
+        ),
+        (
+            "relative/path",
+            "FORGE_DEV must name an absolute Forge checkout root; got 'relative/path'",
+            True,
+        ),
+        (
+            "1",
+            "FORGE_DEV must name an absolute Forge checkout root; got '1'",
+            False,
+        ),
+        (
+            "true",
+            "FORGE_DEV must name an absolute Forge checkout root; got 'true'",
+            False,
+        ),
+        (
+            "~forge-user-that-cannot-exist/checkout",
+            "FORGE_DEV value '~forge-user-that-cannot-exist/checkout' could not be expanded:",
+            False,
+        ),
+    ],
+)
+def test_invalid_dev_override_fails_loud_without_global_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+    expected_stderr: str,
+    plant_cwd_competitor: bool,
+) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    if plant_cwd_competitor:
+        _make_dev_checkout(repo / value)
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = value
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert result.returncode == 127
+    assert expected_stderr in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not record_path.exists()
+
+
+def test_dev_override_expands_home_relative_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    dev_forge, record_path = _make_dev_checkout(Path(env["HOME"]) / "checkout")
+    env["FORGE_DEV"] = "~/checkout"
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env, hook_name="stop")
+
+    assert result.returncode == 0, result.stderr
+    record = _read_fake_record(record_path)
+    assert record["argv"] == [str(dev_forge), "hook", "stop"]
+
+
+def test_missing_dev_override_target_fails_without_global_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(tmp_path / "missing-checkout")
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert result.returncode == 127
+    target = tmp_path / "missing-checkout" / ".venv" / "bin" / "forge"
+    assert f"FORGE_DEV target is missing or not executable: {target}" in result.stderr
+    assert not record_path.exists()
+
+
+def test_non_executable_dev_override_target_fails_without_global_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    checkout = tmp_path / "checkout"
+    target = checkout / ".venv" / "bin" / "forge"
+    target.parent.mkdir(parents=True)
+    target.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    target.chmod(0o644)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(checkout)
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert result.returncode == 127
+    assert f"FORGE_DEV target is missing or not executable: {target}" in result.stderr
+    assert not record_path.exists()
+
+
+def test_dev_override_exec_failure_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    checkout = tmp_path / "checkout"
+    target = checkout / ".venv" / "bin" / "forge"
+    target.parent.mkdir(parents=True)
+    target.write_text("#!/definitely/missing/interpreter\n", encoding="utf-8")
+    target.chmod(0o755)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(checkout)
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert result.returncode == 127
+    assert "FORGE_DEV target could not be executed" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not record_path.exists()
+
+
+def test_returning_override_execv_does_not_enter_normal_resolver(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    namespace = runpy.run_path(str(dispatcher), run_name="forge_hook_test")
+    calls: list[tuple[str, list[str]]] = []
+
+    def returning_execv(path: str, argv: list[str]) -> None:
+        calls.append((path, argv))
+
+    monkeypatch.setenv("FORGE_SESSION", "managed")
+    monkeypatch.setenv("FORGE_DEV", str(dev_forge.parents[2]))
+    monkeypatch.setattr(os, "execv", returning_execv)
+    monkeypatch.setattr(sys, "argv", [str(dispatcher), "policy-check"])
+
+    result = namespace["main"]()
+
+    assert result == 127
+    assert calls == [
+        (
+            str(dev_forge),
+            [str(dev_forge), "hook", "policy-check"],
+        )
+    ]
+
+
+def test_dev_override_does_not_bypass_handler_validation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env, hook_name=None)
+
+    assert result.returncode == 2
+    assert "missing hook name" in result.stderr
+    assert not record_path.exists()
+
+
+def test_dev_override_does_not_bypass_noop_gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "not-enrolled")
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env)
+
+    assert result.returncode == 0
+    assert not record_path.exists()
+
+
+def test_unset_dev_override_never_selects_cwd_checkout_venv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, record_path = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    repo = _forge_project(tmp_path / "repo")
+    cwd_forge, _cwd_record = _make_dev_checkout(repo)
+    _enroll(repo)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_FAKE_RECORD"] = str(record_path)
+
+    result = _run_dispatcher(dispatcher, repo, env, hook_name="stop")
+
+    assert result.returncode == 0, result.stderr
+    record = _read_fake_record(record_path)
+    assert record["argv"] == [str(global_forge), "hook", "stop"]
+    assert record["argv"][0] != str(cwd_forge)
 
 
 def test_outside_project_noops_without_importing_forge_or_resolving(
@@ -488,6 +749,187 @@ def test_doctor_reports_stale_shim_and_sync_rerenders(
     assert get_runtime_metadata_path().is_file()
 
 
+def test_doctor_reports_valid_effective_dev_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+
+    diagnosis = diagnose_hook_dispatcher(environ=env)
+
+    assert diagnosis.dev_override.to_dict() == {
+        "present": True,
+        "value": str(dev_forge.parents[2]),
+        "target": str(dev_forge),
+        "valid": True,
+        "effective": True,
+        "advice": None,
+    }
+
+
+def test_doctor_separates_valid_override_from_stale_dispatcher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    dispatcher.write_text(render_dispatcher_script(version="0.0.0-old"), encoding="utf-8")
+    dispatcher.chmod(0o755)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+
+    diagnosis = diagnose_hook_dispatcher(environ=env)
+
+    assert diagnosis.status == "stale"
+    assert diagnosis.dev_override.valid is True
+    assert diagnosis.dev_override.effective is False
+    assert diagnosis.dev_override.advice is not None
+    assert "extension sync" in diagnosis.dev_override.advice
+
+
+def test_doctor_detects_source_hash_staleness_with_current_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _record = _make_fake_forge(tmp_path / "global")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    current = render_dispatcher_script()
+    dispatcher.write_text(
+        current.replace(
+            f'FORGE_HOOK_DISPATCHER_SOURCE_SHA256 = "{dispatcher_source_sha256()}"',
+            'FORGE_HOOK_DISPATCHER_SOURCE_SHA256 = "' + ("0" * 64) + '"',
+        ),
+        encoding="utf-8",
+    )
+
+    diagnosis = diagnose_hook_dispatcher()
+
+    assert diagnosis.status == "stale"
+    assert diagnosis.installed_version == diagnosis.expected_version
+    assert diagnosis.installed_source_sha256 != diagnosis.expected_source_sha256
+
+
+def test_doctor_reports_mode_drift_as_ineffective(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    dev_forge, _dev_record = _make_dev_checkout(tmp_path / "checkout")
+    dispatcher = _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    dispatcher.chmod(0o644)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+
+    diagnosis = diagnose_hook_dispatcher(environ=env)
+
+    assert diagnosis.status == "non_executable"
+    assert diagnosis.dev_override.valid is True
+    assert diagnosis.dev_override.effective is False
+    assert diagnosis.dev_override.advice is not None
+    assert "execute permission" in diagnosis.dev_override.advice
+
+
+def test_doctor_reports_invalid_dev_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    _install_dispatcher(tmp_path, monkeypatch, global_forge)
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(tmp_path / "missing-checkout")
+
+    diagnosis = diagnose_hook_dispatcher(environ=env)
+
+    assert diagnosis.dev_override.present is True
+    assert diagnosis.dev_override.valid is False
+    assert diagnosis.dev_override.effective is False
+    assert diagnosis.dev_override.target == str(tmp_path / "missing-checkout" / ".venv" / "bin" / "forge")
+    assert diagnosis.dev_override.advice is not None
+    assert "missing or not executable" in diagnosis.dev_override.advice
+
+
+def test_doctor_advises_sync_when_custom_launcher_is_discoverable_but_not_recorded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    custom_forge, _record = _make_fake_forge(tmp_path / "custom")
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: str(custom_forge),
+    )
+
+    assert diagnosis.status == "current"
+    assert diagnosis.advice is not None
+    assert "extension sync" in diagnosis.advice
+    assert str(custom_forge) in diagnosis.advice
+
+
+def test_doctor_advises_migrating_recorded_venv_even_with_global_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    venv_forge, _venv_record = _make_dev_checkout(tmp_path / "checkout")
+    global_forge, _global_record = _make_fake_forge(tmp_path / "global")
+    home = tmp_path / "home"
+    global_launcher = home / ".local" / "bin" / "forge"
+    global_launcher.parent.mkdir(parents=True)
+    global_launcher.symlink_to(global_forge)
+    _install_dispatcher(tmp_path, monkeypatch, venv_forge)
+    env = _env(tmp_path, _forge_home())
+    env["HOME"] = str(home)
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
+    )
+
+    assert diagnosis.forge_binary_path == str(venv_forge)
+    assert diagnosis.advice is not None
+    assert "replace the recorded virtualenv launcher" in diagnosis.advice
+
+
+def test_doctor_advises_install_when_no_runtime_or_recording_target_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
+    )
+
+    assert diagnosis.status == "current"
+    assert diagnosis.advice is not None
+    assert "install one" in diagnosis.advice
+
+
+def test_doctor_qualifies_missing_normal_launcher_when_dev_override_is_effective(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dev_forge, _record = _make_dev_checkout(tmp_path / "checkout")
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    env = _env(tmp_path, _forge_home())
+    env["FORGE_DEV"] = str(dev_forge.parents[2])
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
+    )
+
+    assert diagnosis.dev_override.effective is True
+    assert diagnosis.advice is not None
+    assert diagnosis.advice.startswith(
+        "FORGE_DEV is effective for this process; without it, normal resolution reports:"
+    )
+    assert "install one" in diagnosis.advice
+
+
 def test_noop_path_skips_dispatch_with_populated_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_forge, record_path = _make_fake_forge(tmp_path)
     dispatcher = _install_dispatcher(tmp_path, monkeypatch, fake_forge)
@@ -507,19 +949,230 @@ def test_noop_path_skips_dispatch_with_populated_registry(tmp_path: Path, monkey
     assert not record_path.exists()
 
 
-def test_install_hook_dispatcher_records_path_from_which(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_install_hook_dispatcher_records_first_custom_launcher(
+    discovery_source: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     fake_forge, _record_path = _make_fake_forge(tmp_path)
 
     def which(command: str, path: str | None = None) -> str | None:
         assert command == "forge"
         assert path == "/usr/bin:/bin"
-        return str(fake_forge)
+        return str(fake_forge) if discovery_source == "which" else None
 
-    install_hook_dispatcher(environ={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}, which=which)
+    argv0 = "forge" if discovery_source == "which" else str(fake_forge)
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+        which=which,
+    )
 
     metadata = read_runtime_metadata()
     assert metadata is not None
     assert metadata["forge_binary_path"] == str(fake_forge)
+
+
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_recording_selector_replaces_global_a_with_discovered_global_b(
+    discovery_source: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    global_a, _record_a = _make_fake_forge(tmp_path / "global-a")
+    global_b, _record_b = _make_fake_forge(tmp_path / "global-b")
+    install_hook_dispatcher(forge_binary_path=global_a)
+
+    argv0 = "forge" if discovery_source == "which" else str(global_b)
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"HOME": str(tmp_path), "PATH": "/custom/bin"},
+        which=lambda *_a, **_k: str(global_b) if discovery_source == "which" else None,
+    )
+
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(global_b)
+
+
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_recording_selector_replaces_legacy_venv_with_discovered_non_venv(
+    discovery_source: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    legacy_venv, _legacy_record = _make_dev_checkout(tmp_path / "legacy-checkout")
+    replacement, _replacement_record = _make_fake_forge(tmp_path / "replacement")
+    install_hook_dispatcher(forge_binary_path=legacy_venv)
+
+    argv0 = "forge" if discovery_source == "which" else str(replacement)
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"HOME": str(tmp_path), "PATH": "/custom/bin"},
+        which=lambda *_a, **_k: str(replacement) if discovery_source == "which" else None,
+    )
+
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(replacement)
+
+
+def test_recording_selector_preserves_global_when_discovery_is_venv_or_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    global_forge, _record = _make_fake_forge(tmp_path / "global")
+    venv_forge, _venv_record = _make_dev_checkout(tmp_path / "checkout")
+    install_hook_dispatcher(forge_binary_path=global_forge)
+
+    install_hook_dispatcher(
+        environ={"HOME": str(tmp_path), "PATH": str(venv_forge.parent)},
+        which=lambda *_a, **_k: str(venv_forge),
+    )
+    after_venv = read_runtime_metadata()
+    install_hook_dispatcher(
+        argv0=str(venv_forge),
+        environ={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+        which=lambda *_a, **_k: None,
+    )
+    after_venv_argv0 = read_runtime_metadata()
+    install_hook_dispatcher(
+        argv0="forge",
+        environ={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+        which=lambda *_a, **_k: None,
+    )
+    after_missing = read_runtime_metadata()
+
+    assert after_venv is not None
+    assert after_venv["forge_binary_path"] == str(global_forge)
+    assert after_venv_argv0 is not None
+    assert after_venv_argv0["forge_binary_path"] == str(global_forge)
+    assert after_missing is not None
+    assert after_missing["forge_binary_path"] == str(global_forge)
+
+
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_recording_selector_replaces_legacy_venv_with_known_global(
+    discovery_source: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    venv_forge, _venv_record = _make_dev_checkout(tmp_path / "checkout")
+    known_forge, _known_record = _make_fake_forge(tmp_path / "known-source")
+    home = tmp_path / "home"
+    known_launcher = home / ".local" / "bin" / "forge"
+    known_launcher.parent.mkdir(parents=True)
+    known_launcher.symlink_to(known_forge)
+    install_hook_dispatcher(forge_binary_path=venv_forge)
+
+    argv0 = "forge" if discovery_source == "which" else str(venv_forge)
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"HOME": str(home), "PATH": str(venv_forge.parent)},
+        which=lambda *_a, **_k: str(venv_forge) if discovery_source == "which" else None,
+    )
+
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(known_launcher)
+
+
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_recording_selector_clears_legacy_venv_without_fallback(
+    discovery_source: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    venv_forge, _venv_record = _make_dev_checkout(tmp_path / "checkout")
+    install_hook_dispatcher(forge_binary_path=venv_forge)
+
+    argv0 = "forge" if discovery_source == "which" else str(venv_forge)
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"HOME": str(tmp_path / "empty-home"), "PATH": str(venv_forge.parent)},
+        which=lambda *_a, **_k: str(venv_forge) if discovery_source == "which" else None,
+    )
+
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] is None
+
+
+def test_recording_selector_classifies_global_symlink_lexically(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    tool_forge, _record = _make_dev_checkout(tmp_path / "tool-venv")
+    home = tmp_path / "home"
+    launcher = home / ".local" / "bin" / "forge"
+    launcher.parent.mkdir(parents=True)
+    launcher.symlink_to(tool_forge)
+
+    selected = select_forge_binary_for_recording(
+        discovered=launcher,
+        recorded=None,
+        environ={"HOME": str(home)},
+    )
+
+    assert selected == launcher
+
+
+def test_recording_selector_rejects_configured_global_dir_that_is_a_venv(
+    tmp_path: Path,
+) -> None:
+    venv_forge, _record = _make_dev_checkout(tmp_path / "checkout")
+    env = {
+        "HOME": str(tmp_path / "home"),
+        "UV_TOOL_BIN_DIR": str(venv_forge.parent),
+    }
+
+    selected = select_forge_binary_for_recording(
+        discovered=venv_forge,
+        recorded=None,
+        environ=env,
+    )
+
+    assert selected is None
+
+
+def test_recording_selector_ignores_non_executable_known_fallback(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    launcher = home / ".local" / "bin" / "forge"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    selected = select_forge_binary_for_recording(
+        discovered=None,
+        recorded=None,
+        environ={"HOME": str(home)},
+    )
+
+    assert selected is None
+
+
+@pytest.mark.parametrize("discovery_source", ["which", "argv0"])
+def test_unexpandable_implicit_discovery_preserves_recorded_target(
+    discovery_source: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_forge, _record = _make_fake_forge(tmp_path / "global")
+    install_hook_dispatcher(forge_binary_path=global_forge)
+
+    unexpandable = "~forge-user-that-cannot-exist/bin/forge"
+    argv0 = "forge" if discovery_source == "which" else unexpandable
+    install_hook_dispatcher(
+        argv0=argv0,
+        environ={"HOME": str(tmp_path), "PATH": "/custom/bin"},
+        which=lambda *_a, **_k: unexpandable if discovery_source == "which" else None,
+    )
+
+    metadata = read_runtime_metadata()
+    assert metadata is not None
+    assert metadata["forge_binary_path"] == str(global_forge)
 
 
 def test_render_hook_dispatcher_wraps_unexpected_errors(

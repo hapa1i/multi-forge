@@ -8,7 +8,9 @@ member execution checklists (each member owns its own). Full contract in [`card.
 **T8 [`forge_dev_runtime_override`](../forge_dev_runtime_override/card.md) is the active member** (picked up 2026-07-11,
 branch `forge-dev-runtime-override`) -- the epic's last live member (T2 is superseded-not-abandoned in `proposed/`; the
 split T7 sweep was reclassified a standalone non-member follow-up, 2026-07-11), so its closeout unblocks epic closeout.
-Shipped members are T1 [`global_forge_install`](../../done/global_forge_install/card.md), T3
+T8's dispatcher/recording/doctor/public-doc slices and all branch verification are complete; review/commit/merge remain
+in the member checklist. No closeout or lane movement is claimed yet. Shipped members are T1
+[`global_forge_install`](../../done/global_forge_install/card.md), T3
 [`forge_project_registry`](../../done/forge_project_registry/card.md), T4
 [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md), T5
 [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md), T7
@@ -133,7 +135,9 @@ Record outcomes here as members are picked up.
   0 decisions D1-D6 were ratified in maintainer review the same day (two rounds; the core fork resolved to the
   `FORGE_DEV` env override with a deterministic recording transition table -- record in the member checklist). In the
   second round the split T7 sweep was reclassified a standalone non-member follow-up, so T8 IS the last live member:
-  when it closes, the epic closeout items (seam boxes, design-doc verification, lane move) become actionable.
+  when it closes, the epic closeout items (seam boxes, design-doc verification, lane move) become actionable. Phases 1-2
+  are now implemented and the public docs/vocabulary, focused, integration, package, live-smoke, and pre-commit checks
+  are verified. Review/commit/merge remain in the member checklist.
 
 ## Shared-contract seams (drift watch)
 

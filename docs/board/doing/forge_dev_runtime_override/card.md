@@ -2,8 +2,9 @@
 
 **Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/` -- active execution (picked up 2026-07-11); execution plan in [`checklist.md`](checklist.md). Off the
-critical path; pairs with `forge_hook_dispatcher` (the override is honored in the same resolution contract).
+**Lane**: `doing/` -- implementation and branch verification complete; review/commit/merge remain in
+[`checklist.md`](checklist.md). Off the critical path; pairs with `forge_hook_dispatcher` (the override is honored in
+the same resolution contract).
 
 ## Goal
 
@@ -76,4 +77,4 @@ Both resolved in maintainer review 2026-07-11; outcomes recorded in [`checklist.
 | Dev override resolves checkout | override set in a Forge checkout                                | dispatcher resolves to the checkout `forge`, not the global tool              | `tests/src/install/test_hook_dispatcher.py` |
 | Override names the checkout    | `FORGE_DEV=/path`, hook fires in a *different* enrolled project | dispatcher resolves the named checkout's `forge`, not that project's `.venv`  | same                                        |
 | No override -> normal resolver | override unset; valid recorded global launcher                  | recorded launcher wins; invalid/missing records fall through to known globals | same                                        |
-| Override never implicit        | override unset in a Forge checkout                              | no accidental checkout resolution (opt-in only)                               | same                                        |
+| Cwd venv never implicit        | override unset; cwd checkout has its own `.venv/bin/forge`      | cwd alone never selects that launcher; recorded/known resolution wins         | same                                        |
