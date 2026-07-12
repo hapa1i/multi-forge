@@ -116,10 +116,10 @@ wc -l docs/board/impl_notes.md
   warn or auto-create a file. Strict command paths fail closed on malformed, unsupported, or incompatible pins;
   session/context hook helpers fail open with diagnostics. PEP 440 range checks use
   `SpecifierSet.contains(..., prereleases=True)` so checkout-local dev/rc Forge builds can satisfy numeric ranges.
-- T7 intentionally closed with the remaining mutation-family sweep split to
-  `docs/board/todo/forge_project_compat_mutator_sweep/`: confirmed-state hook writes, memory-writer doc writes, and
-  proxy/backend registry mutations must either be wired through the guard or documented as out of scope before claiming
-  all project-state mutators observe `.forge/project.toml`.
+- T7 intentionally closed with the remaining mutation-family sweep split to the standalone
+  `forge_project_compat_mutator_sweep` card: confirmed-state hook writes, memory-writer doc writes, and proxy/backend
+  registry mutations must either be wired through the guard or documented as out of scope before claiming all
+  project-state mutators observe `.forge/project.toml`.
 
 ### Install-kind detection: editable-first, launcher-symlink-not-realpath, minimal-PATH is a fact (global_forge_install, shipped 2026-07-06)
 
