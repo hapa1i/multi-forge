@@ -2,12 +2,12 @@
 
 **Lane**: `done/` -- shipped to `main` on 2026-07-06 via PR #87.
 
-**Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md)
-(its Seam 1 -- "all Forge-registered command strings + all three matchers"). Not an epic member: it is a
-behavior-preserving consolidation that makes the epic *inherit* a locked contract instead of coordinating it across six
-members. It enabled the update branch that [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) ultimately
-did not need because T9 chose delete, and it shrinks [`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md)
-(T5) from "update three matchers in lockstep" to "update one predicate."
+**Relationship**: **Pre-epic prep** for [`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md) (its
+Seam 1 -- "all Forge-registered command strings + all three matchers"). Not an epic member: it is a behavior-preserving
+consolidation that makes the epic *inherit* a locked contract instead of coordinating it across six members. It enabled
+the update branch that [`forge_hook_legacy_writer`](../forge_hook_legacy_writer/card.md) ultimately did not need because
+T9 chose delete, and it shrinks [`user_scope_hook_ownership`](../user_scope_hook_ownership/card.md) (T5) from "update
+three matchers in lockstep" to "update one predicate."
 
 **Origin**: de-risking review (2026-07-06). The epic's hardest seam is byte-identity of registered hook commands across
 two writers and two divergent matchers. This card front-loads that seam as an isolated, behavior-preserving change --

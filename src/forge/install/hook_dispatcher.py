@@ -388,7 +388,7 @@ def render_dispatcher_script(*, version: str = __version__) -> str:
 
 
 def render_dispatcher_command(handler: str, *, forge_home: Path | None = None) -> str:
-    """Return the hook command byte form T5 will register."""
+    """Return the literal absolute host hook command byte form."""
 
     path = get_hook_dispatcher_path(forge_home).expanduser()
     return f"{shlex.quote(str(path))} {shlex.quote(handler)}"

@@ -1,6 +1,6 @@
 # Checklist: global_forge_install (T1)
 
-Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) -- first member ("Ship first"). Card:
+Epic: [`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md) -- first member ("Ship first"). Card:
 [`card.md`](card.md). Branch: `global-forge-install`.
 
 ## Current focus
@@ -13,7 +13,7 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
 - **IN:** Day-1 docs for `uv tool install multi-forge` / `pipx install multi-forge`; keep the contributor `uv sync` path
   documented and distinct; `forge extension doctor` reporting install kind, resolved `forge` path, PATH reachability.
 - **OUT:** hook scope changes (T5), dispatcher (T4), registry (T3), removing PyPI, a version manager (D1). Cross-upgrade
-  staleness of a *recorded* absolute path is **T2's** concern, not here.
+  staleness of a *recorded* direct absolute path was assigned to T2 at activation; T2 was later skipped and retired.
 - **CLI placement:** `doctor` attaches to the existing **`forge extension`** group (epic CLI-surface decision -- no new
   `install` group; `forge info` stays the top-level dashboard). Support `--json` (list/show convention).
 
@@ -39,8 +39,8 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
   (`diagnose_install`, injectable seams), keeping the CLI leaf thin.
 - [x] **Minimal-PATH probe (feeds epic D2):** `on_path_minimal` probes `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. Verified on
   the real editable dev install: `on_path=true`, `on_path_minimal=false` -- the mechanical GUI/launchd gap. Advice is
-  keyed on `on_path`/kind (user-actionable), **not** `on_path_minimal` (a T2 signal), so a correct global install is not
-  nagged.
+  keyed on `on_path`/kind (user-actionable), **not** `on_path_minimal` (a bare-command/statusLine signal, not host
+  dispatcher health), so a correct global install is not nagged.
 - [x] `--json` emits the stable shape (`install_kind`, `forge_path`, `on_path`, `on_path_minimal`, `advice`) via
   `click.echo(json.dumps(...))`; human advice routes through `print_tip` (no hand-rolled `Tip:` / `[red]Error:[/red]`).
 - [x] Unit tests `tests/src/install/test_doctor.py` (new) -- 14 tests, all install kinds + both probe outcomes +
@@ -119,8 +119,8 @@ PATH reachability. Read-only reporting plus docs; **no** hook-scope, dispatcher,
 ## Blockers / deferred
 
 - None blocking (card: "Open questions: None blocking").
-- Deferred to sibling members: recorded-absolute-path staleness across upgrades (T2), dispatcher reachability (T4),
-  hook-scope move (T5), sidecar path form (T10).
+- Deferred at activation to sibling members: recorded direct-absolute-path planning (retired T2), dispatcher
+  reachability (T4), hook-scope move (T5), sidecar path form (T10).
 
 ## Post-review hardening
 
@@ -134,8 +134,8 @@ Fixes applied from review (verified by `test_doctor.py`):
   hooks" unqualified, contradicting the PR's own model (a healthy `~/.local/bin` global install reads
   `on_path_minimal=false`). Caveated to shell-inherited/terminal-launched hooks in `doctor.py` (3 advice strings),
   `design.md §5.1`, and `end-user/README.md`; the GUI/launchd minimal-PATH gap now points at `on_path_minimal` (docs)
-  and the T2/T4 hook-reachability decision (epic D2 row). Accurate statements (doctor module docstring, appendix §C)
-  left unchanged.
+  and the then-open T2/T4 hook-reachability decision (epic D2 row). The epic closeout later corrected those surfaces for
+  the shipped absolute host dispatcher and bare project statusLine split.
 - **Test name** (Nit 1, fixed): `test_install_doctor.py -> test_doctor.py` (1:1 mirror); refs repointed in card,
   checklist, and the T2 card (`forge_hook_absolute_command`).
 - **JSON key wording** (Nit 2, fixed): `advice` is always present (nullable), not optional.
@@ -147,4 +147,4 @@ Deferred by design (recorded, not fixed):
   `.venv/bin/forge` (venv off PATH) beside a global install reports `kind=editable` + a global `forge_path`. Documented
   in the `diagnose_install` docstring; flagged in the T8 card. Editable-wins precedence is correct for common cases.
 - **Exit code always 0** (Nit 3): doctor is a diagnostic -- health lives in the payload, not the exit code (noted in
-  `doctor_cmd`). A non-zero-on-unhealthy mode is a future question if T2/T5 ever gate on doctor in CI.
+  `doctor_cmd`). A non-zero-on-unhealthy mode remains a separate future operator-interface question.

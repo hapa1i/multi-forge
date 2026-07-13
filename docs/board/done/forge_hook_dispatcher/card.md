@@ -1,11 +1,11 @@
 # User hook dispatcher (user-scope-model mechanism)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` -- shipped and closed after the T4 PR merged. Depends on `global_forge_install` (shipped -- a global
 `forge` to resolve) and `forge_project_registry` (shipped -- the no-op gate reads the registry). Part of the
-user-scope-only model -- **not** the incident fix (that is `forge_hook_absolute_command`). On the model's critical path.
-Execution record in [`checklist.md`](checklist.md).
+user-scope-only model. T2's separate interim incident proposal was skipped; T4 supplied the dispatcher mechanism and T5
+made the sole shipped host hook-byte cutover. Execution record in [`checklist.md`](checklist.md).
 
 ## Goal
 
@@ -48,9 +48,9 @@ tilde-expand). The string is part of Codex's `trusted_hash` surface, so it is go
 different environment and is owned by `forge_hook_sidecar_resolution`; this ticket does not handle `FORGE_SIDECAR`.
 
 **statusLine is out of scope (epic D3).** This dispatcher forwards `forge hook <name>` **only**. `forge status-line` is
-not a hook and does **not** route through the dispatcher or its no-op gate; statusLine stays project-scoped and keeps
-its T2 absolute-path form. If the epic later flips statusLine to user scope, a *separate* gated status-line entrypoint
-is required -- it is not this ticket's `forge hook` resolver.
+not a hook and does **not** route through the dispatcher or its no-op gate; statusLine stays project-scoped in its bare
+`forge status-line` form. GUI-safe reachability, if supported, requires a separate solution -- it is not this ticket's
+`forge hook` resolver.
 
 **Metadata home:** record the resolved `forge` binary path durably -- add a field to `~/.forge/installed.json` or a
 dedicated `~/.forge/runtime.json` (decided here). Today `installed.json` tracks extensions, not the binary.

@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-13
+
+### epic_global_forge_runtime closeout
+
+**Goal**: Close the global Forge runtime epic with its shipped hook ownership, binary-resolution, migration, and
+execution-environment contracts reflected consistently in code, docs, and the board.
+
+**Key changes**:
+
+- Verified all five epic seams and reconciled the normative install, dispatcher, recovery, status-line, and sidecar
+  documentation with the shipped model.
+- Added the terminal `retired/` lane and retired unshipped T2 as superseded; the narrower GUI-safe status-line concern
+  remains a standalone proposed follow-up.
+- Moved the epic to `done/`, corrected stale member state, and repointed every inbound board link.
+
+**Verification**: PR #99 merged at `168b7db7`; focused hook/runtime suite (`285 passed, 1 skipped`); merged-main Docker
+installer suite (`17 passed`); closeout doctor/dispatcher tests (`86 passed`); pre-commit checks; relative-link and
+stale-lane sweeps; `git diff --check`.
+
 ## 2026-07-12
 
 ### forge_project_compat_mutator_sweep closeout

@@ -1,6 +1,6 @@
 # Execution checklist: T3 `forge_project_registry`
 
-Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md). Branch:
+Epic: [`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md). Branch:
 `forge-project-registry`.
 
 ## Current focus

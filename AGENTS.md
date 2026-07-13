@@ -21,7 +21,8 @@ also update the relevant `docs/end-user/*` guide so wheel-installed users get th
 Board quick semantics: `todo/` means accepted but parked; starting a todo card means create or switch to the execution
 branch, move the card directory to `doing/`, and create/update its `checklist.md`. `doing/` is active work; `paused/` is
 partially-done work on hold and moves back to `doing/` when resumed; `done/` means shipped, verified, design docs
-synced, and closeout recorded.
+synced, and closeout recorded. `retired/` is terminal work that did not ship independently; it is excluded from live and
+done counts, and reconsideration starts a new `proposed/` card.
 
 ## Build, Test, and Development Commands
 

@@ -36,6 +36,19 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Hook runtime ownership and recovery follow the execution environment (global runtime epic, closed 2026-07-13)
+
+- Host Claude and Codex runtime hooks have one owner: user-scope settings containing literal absolute
+  `<forge-home>/bin/forge-hook <handler>` commands. Project/local installs own `statusLine` and other project assets,
+  not runtime hooks; `statusLine` remains the bare `forge status-line` scalar and does not traverse the dispatcher.
+- Sidecars are a separate execution environment because host user settings are not mounted. Stage canonical direct
+  `forge hook <handler>` entries into Forge-owned container-user settings and resolve them through the image PATH; never
+  copy a host dispatcher path into container config or mutate mounted project settings.
+- Dispatcher recovery keys on the user-scope installation row, not on the existence of any tracked installation. Repair
+  an existing user install with `forge extension sync --scope user`; otherwise use
+  `forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands`. An unrelated
+  project tracking row cannot make generic sync actionable.
+
 ### Project compatibility follows target ownership and mutation posture (forge_project_compat_mutator_sweep, shipped 2026-07-12)
 
 - **Guard the Forge root that owns the state being changed, not the caller's CWD.** Named cross-CWD session operations,
@@ -95,7 +108,9 @@ wc -l docs/board/impl_notes.md
 
 - `~/.forge/bin/forge-hook` is a standalone stdlib script rendered from `src/forge/install/hook_dispatcher.py`, not a
   normal import path. It cannot assume Forge's package is importable from hook-launched `python3`. Keep the no-op gate
-  dependency-light and preserve its generated-source stamp plus `forge extension sync` re-render path.
+  dependency-light and preserve its generated-source stamp. Recovery must follow the user-scope installation state:
+  `forge extension sync --scope user` for an existing user row, otherwise the hooks-only user-scope enable recipe above.
+  Do not infer that generic sync is actionable from an unrelated tracked project installation.
 - The dispatcher gate is fail-open: corrupt/newer/unknown-field project registry state, deleted cwd, and transient
   filesystem gate errors degrade to exit 0 with no traceback. Resolver failures happen only after the gate chooses to
   dispatch and should remain fail-loud with checked locations.
@@ -152,8 +167,9 @@ wc -l docs/board/impl_notes.md
   `UV_TOOL_BIN_DIR` / `XDG_BIN_HOME` / `PIPX_BIN_DIR`). Resolving the symlink would land inside a `uv tool` tool-venv
   and mis-classify a global install.
 - **`on_path_minimal` is a reported fact, never a fault.** A healthy `~/.local/bin` global install reads `false`
-  (launchd's minimal PATH excludes `~/.local/bin`); it is the mechanical signal for GUI/Dock hook reachability (epic
-  D2), so `advice` keys on `on_path`/kind, not on it.
+  (launchd's minimal PATH excludes `~/.local/bin`); it is the mechanical signal for bare-command consumers such as the
+  project `statusLine`, not host hook reachability. Host hooks invoke the absolute dispatcher. `advice` therefore keys
+  on `on_path`/kind, not on `on_path_minimal`.
 - **Advice distinguishes "not installed" from "installed, off PATH."** Both read `on_path=false`; the latter gets
   PATH-setup (`uv tool update-shell` / `pipx ensurepath`), not a reinstall.
 - **`install_kind` and `forge_path` are different subjects.** kind reads the running interpreter's metadata;

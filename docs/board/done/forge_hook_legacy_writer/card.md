@@ -1,6 +1,6 @@
 # Reconcile the second hook writer (`forge hook enable`/`disable`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` -- shipped via PR #88, merged to `main` as `0458a5ae` on 2026-07-06.
 
@@ -33,8 +33,8 @@ being a second, untracked hook-registration path that writes a bare, PATH-depend
 
 Before this card, Forge had **two** hook writers, not one:
 
-1. `forge extension enable` -- the tracked installer path (`installer.py` -> `merge_hooks`, `installed.json`), which T2
-   and T5 rewrite.
+1. `forge extension enable` -- the tracked installer path (`installer.py` -> `merge_hooks`, `installed.json`), which T5
+   ultimately rewrote; the interim T2 proposal was skipped.
 2. `forge hook enable` / `disable` (`cli/hooks/install.py`) -- a separate command that overwrites each hook key
    wholesale with bare `forge hook <name>` entries in `settings.local.json`, with **no `installed.json` tracking**
    (`install.py:131-135`). Its cleanup matcher now delegates to the shared `entry_is_forge_hook` predicate
@@ -42,8 +42,8 @@ Before this card, Forge had **two** hook writers, not one:
 
 That second writer is a drift source the epic cannot ignore:
 
-- **It resurrects the legacy state.** It emits bare, PATH-dependent `forge hook <name>` -- exactly the exit-127 form T2
-  fixes and T6 cleans. A user who runs it post-migration reintroduces the incident and a double-fire.
+- **It resurrects the legacy state.** It emits bare, PATH-dependent `forge hook <name>` -- the form T5 later replaced
+  and T6 cleans. A user who runs it post-migration reintroduces the incident and a double-fire.
 - **It clobbers sibling hooks.** `enable` writes `settings["hooks"][key] = value` (`install.py:131-132`), replacing each
   Forge-owned hook key wholesale rather than the tracked path's `merge_hooks` append-and-dedupe
   (`settings_merge.py:505`). A user who keeps their own entry under one of those keys (e.g. `SessionStart`) loses it on
@@ -83,8 +83,8 @@ against update-via-tracked-path on that basis, not on "leftover" assumptions.
 `_is_forge_hook_entry` and its tests and migrate `hook.md`; if keep, align command form + add tracking + adopt the
 shared matcher.
 
-**Out:** the main installer byte change (`forge_hook_absolute_command` / `user_scope_hook_ownership`); the migration
-sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`).
+**Out:** the main installer byte change (`user_scope_hook_ownership`; the interim `forge_hook_absolute_command` was
+later retired); the migration sweep that cleans already-written legacy entries (`forge_hook_migration_cleanup`).
 
 ## Grounding (verified 2026-07-02; matcher + line refs refreshed 2026-07-06 post-merge)
 

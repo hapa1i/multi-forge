@@ -33,12 +33,15 @@ uv tool install multi-forge     # recommended -- puts `forge` on your PATH
 forge extension doctor          # confirm install kind + PATH reachability
 ```
 
-A global tool keeps `forge` on `PATH` for every shell and the hooks launched from one, avoiding the "activate a project
-venv first" trap. Claude launched from the Dock or an IDE inherits a minimal `PATH` that can still miss bare `forge` --
-`forge extension doctor` reports that case as `on_path_minimal`. Contributors working on Forge itself use an editable
-install instead (`uv sync`, then `./scripts/setup.sh --local` for a persistent editable launcher that host hooks can
-resolve). If uv's tool bin is not yet available in the current shell, run `export PATH="$(uv tool dir --bin):$PATH"`;
-`uv tool update-shell` configures future shells. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
+A global tool keeps bare `forge` on `PATH` for shells and project `statusLine`, avoiding the "activate a project venv
+first" trap. Host Claude and Codex runtime hooks instead invoke an absolute `<forge-home>/bin/forge-hook` command; the
+dispatcher resolves its launcher from `~/.forge/runtime.json` and known user-tool directories, not inherited `PATH`.
+Claude launched from the Dock or an IDE inherits a minimal `PATH` that can still miss bare `forge` consumers --
+`forge extension doctor` reports that fact as `on_path_minimal`. Contributors working on Forge itself use an editable
+install (`uv sync`, then `./scripts/setup.sh --local` for a persistent launcher), or set `FORGE_DEV` when launching a
+managed session to route dispatcher-backed hooks through that checkout. If uv's tool bin is not yet available in the
+current shell, run `export PATH="$(uv tool dir --bin):$PATH"`; `uv tool update-shell` configures future shells. See
+[CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ### A. Install extensions
 

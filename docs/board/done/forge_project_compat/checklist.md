@@ -1,6 +1,6 @@
 # Execution checklist: T7 `forge_project_compat`
 
-Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md).
+Epic: [`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md). Card: [`card.md`](card.md).
 
 ## Current focus
 

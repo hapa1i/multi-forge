@@ -131,8 +131,10 @@ Release checklist:
 
 The authoritative board workflow is in `docs/developer/board_contract.md`. In short: `todo/` means accepted but parked.
 When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
-`docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
-design docs synced, and closeout recorded.
+`docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `paused/` is partially completed
+work on hold; `done/` means shipped, verified, design docs synced, and closeout recorded. `retired/` is terminal work
+that did not ship independently; it is excluded from live and done counts, and reconsideration starts a new `proposed/`
+card.
 
 ## Git Hooks
 

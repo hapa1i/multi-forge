@@ -1,6 +1,6 @@
 # In-container (sidecar) hook resolution
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` (shipped via PR #94 on 2026-07-10 after implementation verification on branch
 `forge-hook-sidecar-resolution`). Cross-cutting -- closes the epic's seam 5 member work.

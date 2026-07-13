@@ -3,20 +3,14 @@
 **This is an epic.** It coordinates the shared contract, sequencing, and drift control across the member cards below.
 Each member is an independently shippable implementation unit; the epic ships no code itself.
 
-**Lane**: `doing/` -- active coordinator, ready for closeout. Shipped members: **T1
-[`global_forge_install`](../../done/global_forge_install/card.md)**, **T3
-[`forge_project_registry`](../../done/forge_project_registry/card.md)**, **T4
-[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)**, **T5
-[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)**, **T7
-[`forge_project_compat`](../../done/forge_project_compat/card.md)**, and **T10
-[`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md)**, and **T6
-[`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)**, and **T8
-[`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md)**. The epic's coordination
-[`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. There is no active implementation member:
-T2 stays `proposed/` as superseded-not-abandoned, and the split T7 sweep shipped as a standalone non-member follow-up
-([`done/forge_project_compat_mutator_sweep`](../../done/forge_project_compat_mutator_sweep/card.md), closed 2026-07-12).
-Every live member is now `done/`; the epic remains here until its seam boxes, durable-doc verification, inbound links,
-and lane move are closed as one coordinator pass.
+**Lane**: `done/` -- closed 2026-07-13. All nine live implementation members shipped: **T1** and **T3--T10**. T2
+[`forge_hook_absolute_command`](../../retired/forge_hook_absolute_command/card.md) did not ship independently; its host
+hook work was superseded by the dispatcher cutover, its shared migration work folded into T5/T10, and its remaining GUI
+`statusLine` concern is tracked by the standalone
+[`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md) proposal. The split T7 sweep also
+shipped as a standalone non-member follow-up
+([`forge_project_compat_mutator_sweep`](../../done/forge_project_compat_mutator_sweep/card.md), closed 2026-07-12). The
+finalized coordination evidence is in [`checklist.md`](checklist.md).
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -35,24 +29,23 @@ append+dedupe merge/`unmerge` `:505,:705,:731`), `src/forge/install/installer.py
 
 ---
 
-## Members (each is a ticket)
+## Members and disposition
 
-Two linear tracks plus two cross-cutting members. The **incident track** (T1 -> T2) closes exit-127 without the
-migration; the **user-scope-model track** (T1 -> T3 -> T4 -> T5 -> T6) is the larger redesign that later supersedes T2's
-command bytes. **T9 and T10 are cross-cutting** -- each touches multiple byte-changing members and needs a single owner,
-so neither sits on one linear track.
+The shipped path was T1 -> T3 -> T4 -> T5 -> T6, with T7/T8 off-path and T9/T10 cross-cutting. The proposed interim
+incident path T1 -> T2 was skipped once terminal-only launch was confirmed. T4/T5 subsequently superseded T2's host hook
+command work; T2 is retained in `retired/` as the decision record, not counted as shipped or live work.
 
 | Label | Card                                                                                | Ships                                                                               | Depends on  |
 | ----- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
 | T1    | [`global_forge_install`](../../done/global_forge_install/card.md)                   | Global tool install (`uv tool`/`pipx`) + Day-1 docs + `forge extension doctor`      | --          |
-| T2    | [`forge_hook_absolute_command`](../../proposed/forge_hook_absolute_command/card.md) | **Reachability fix**: absolute-path hook + statusLine command at current scope      | T1          |
+| T2    | [`forge_hook_absolute_command`](../../retired/forge_hook_absolute_command/card.md)  | **Retired:** superseded host-hook proposal; residual statusLine work split out      | T1          |
 | T3    | [`forge_project_registry`](../../done/forge_project_registry/card.md)               | `~/.forge/projects.json` trusted-root registry (schema + read + enroll + lifecycle) | --          |
 | T4    | [`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md)                 | Dispatcher mechanism + resolver + **benchmark gate** + no-op gate                   | T1, T3      |
 | T5    | [`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md)         | User-scope-only registration + detection update + double-fire detection             | T4, T3      |
 | T6    | [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md)   | No-double-fire migration + candidate discovery + selected-root cleanup/enrollment   | T5          |
 | T7    | [`forge_project_compat`](../../done/forge_project_compat/card.md)                   | `required_forge` first guardrail slice + missing-file semantics                     | --          |
 | T8    | [`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md)       | Checkout-local forge for Forge contributors                                         | T4          |
-| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)           | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T2/T6 |
+| T9    | [`forge_hook_legacy_writer`](../../done/forge_hook_legacy_writer/card.md)           | Delete the second hook writer + add a tracked hooks-only replacement                | pairs T5/T6 |
 | T10   | [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md) | In-container hook staging, PATH, and host-drainable deferred work                   | T5          |
 
 ## Accepted decisions
@@ -63,26 +56,27 @@ so neither sits on one linear track.
   research preview that already clean-breaks durable state (`coding_standards` §5), so per-project version pinning was
   never a stable guarantee. Consequence: the original card's "multi-project version conflict" moves from open question
   to accepted trade-off; T7 exists to make the failure *legible* (name the upgrade path), not to isolate versions.
-- **D2 -- Split the bug fix from the migration (corrected 2026-07-02).** The exit-127 incident is closed by **T2**
-  (`forge_hook_absolute_command`), which rewrites the *registered* hook command to a resolvable absolute path at the
-  current scope -- one Codex re-trust, no dispatcher/registry/scope change. T1 (global install) is the independent early
-  win but does not by itself fix a minimal-`PATH` hook subprocess. **Correction from the first decomposition:** the
-  dispatcher ticket (T4) builds the *mechanism* but does not change what is registered, so it cannot close the incident
-  alone -- T2 owns the byte change. The user-scope model (T3-T6) is the larger migration that later supersedes T2's
-  bytes.
+- **D2 -- Keep the bug fix separable from the migration; retire the skipped interim fix (finalized 2026-07-13).** The
+  original decomposition correctly made T2 independently shippable, but the 2026-07-06 terminal-only decision removed
+  the need for that interim rewrite. T2 never changed registered bytes. The shipped T4/T5 cutover instead registers host
+  hooks through the literal absolute `<forge-home>/bin/forge-hook <handler>` dispatcher command, closing the host hook
+  minimal-`PATH` failure as part of the user-scope model. T2's hook portion is therefore superseded. Its only remaining
+  concern -- the deliberately bare, project-scoped `forge status-line` command -- is a separate GUI-support question
+  tracked by [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md), so T2 is retired
+  rather than marked done.
 - **D3 -- statusLine stays project-scoped (2026-07-02 review; maintainer-ratified 2026-07-02).** Unlike hooks,
   `statusLine` is a **scalar** (`set_scalar`, one value) -- it cannot double-fire, so the user-scope-only rationale (T5
-  "Why": remove double-fire *by construction*) does not apply to it. It also self-gates on `FORGE_SESSION`
-  (design_appendix §A.8: no `FORGE_SESSION` -> no session info, **no CWD fallback**) and Claude tolerates a failing
-  statusLine gracefully. Moving it to user scope would run `forge status-line` at **full Forge import in every repo on
-  every render** -- the exact per-render cost the hook no-op gate exists to avoid, but with **no gate in its path** --
-  and would raise a product question (render in non-enrolled repos at all?). Keeping it project-scoped dissolves both
-  the cost and the question. **Consequence:** statusLine is a *documented exception* to "user scope owns all runtime
-  config" -- it stays bare and project-scoped; T10 makes the bare command resolvable on the sidecar image PATH, while
-  the user-scope migration (T5) covers **hooks only**. **Reversal cost if user-scope is chosen instead:** statusLine
-  needs its own gated entrypoint (fast-exit before heavy import, or a status-line shim mirroring the dispatcher) + the
-  non-enrolled-repo product call + a T4 contract extension for a non-hook command + T5 acceptance rows in both
-  directions.
+  "Why": remove double-fire *by construction*) does not apply to it. `FORGE_SESSION` controls managed-session discovery,
+  not all rendering: without it, `statusLine` still renders ambient Claude data but has no Forge-session manifest
+  context and performs no CWD fallback. Claude also tolerates a failing statusLine gracefully. Moving it to user scope
+  would run `forge status-line` at **full Forge import in every repo on every render** -- the exact per-render cost the
+  hook no-op gate exists to avoid, but with **no gate in its path** -- and would raise a product question (render in
+  non-enrolled repos at all?). Keeping it project-scoped dissolves both the cost and the question. **Consequence:**
+  statusLine is a *documented exception* to "user scope owns all runtime config" -- it stays bare and project-scoped;
+  T10 makes the bare command resolvable on the sidecar image PATH, while the user-scope migration (T5) covers **hooks
+  only**. **Reversal cost if user-scope is chosen instead:** statusLine needs its own gated entrypoint (fast-exit before
+  heavy import, or a status-line shim mirroring the dispatcher) + the non-enrolled-repo product call + a T4 contract
+  extension for a non-hook command + T5 acceptance rows in both directions.
 
 ## Shared contract (the epic owns this -- drift control)
 
@@ -93,20 +87,18 @@ The members touch five seams that MUST stay consistent. Drift here is the reason
 Not just the Claude/Codex *hook* commands -- **every** string Forge writes into a runtime config is a byte-identity
 contract, and byte-identity is the API:
 
-- **Registered strings:** Claude preset hooks (`preset.py`, 13 event keys incl. `PreToolUse:Read`), the Claude
-  `statusLine` command `forge status-line` (`preset.py:218-222`), and the Codex managed block (`codex_hooks.py:84`). The
-  command string is part of Codex's `trusted_hash` surface (golden-pinned; `codex_hooks.py:16-19,66-67`,
-  `test_codex_hooks.py:71`). T2 rewrites all of these to absolute paths; the T4/T5 cutover rewrites the **hook**
-  commands again (to the dispatcher form). **statusLine is the exception (D3):** it stays project-scoped, so it is
-  rewritten **once** (T2 absolute path) and never moves to the dispatcher form or user scope.
-- **Detection moves in lockstep or it lies:** `forge_hook_matcher_consolidation` single-sourced command detection in
-  `install/hooks.py`, and T9 deleted the old prefix matcher with the legacy writer. T5 may still need to extend the
-  shared predicate for the dispatcher form, but there is now one predicate to update.
+- **Registered strings:** host Claude and Codex hooks use the literal absolute `<forge-home>/bin/forge-hook <handler>`
+  dispatcher form; the project/local Claude `statusLine` remains the bare `forge status-line` command; sidecar-user hook
+  settings use bare `forge hook <handler>` commands resolved by the image PATH. The host hook command string is part of
+  Codex's `trusted_hash` surface and remains golden-pinned. T2 did not rewrite any of these bytes.
+- **Detection moved in lockstep:** `forge_hook_matcher_consolidation` single-sourced command detection in
+  `install/hooks.py`, T9 deleted the old prefix matcher with the legacy writer, and T5 extended the shared predicate for
+  the dispatcher form.
 - **Claude merge is append + dedupe by full entry, not replace.** Hooks are written via `merge_hooks`
   (`settings_merge.py:505`, called `:705`); `_load_forge_settings` only sets the *source* block (`installer.py:817`).
   Dedup is on the whole canonical entry, so a changed command string is a **new sibling entry that coexists** with the
   old one (double-fire) -- it does not update in place. Every byte change must **unmerge the old tracked entries before
-  merging** the new ones (T2, T5, T6).
+  merging** the new ones; T5/T6 applied and verified that rule during the cutover.
 
 ### 2. `~/.forge/projects.json` schema + canonical path form
 
@@ -141,13 +133,14 @@ managed-session short-circuit is part of the contract (T4). One resolver, one re
 20.21 ms / p95 22.13 ms** for the shim against a 30 ms p95 no-op ceiling, versus **p50 419.66 ms / p95 611.78 ms** for
 the full Forge gate representative. Metadata home is a dedicated `~/.forge/runtime.json` with its own schema version,
 not `installed.json`, so dispatcher binary resolution state does not couple to extension tracking. The chosen hyphenated
-command means T5 must update presence detection away from the current `"forge hook"` space-token needle.
+command required T5 to update presence detection away from the old `"forge hook"` space-token needle; that update
+shipped with the registration cutover.
 
 ### 4. Scope-ownership rule: runtime hooks live only at user scope
 
-T5 enforces it, T6 migrates to it, `doctor` (T5/T6) detects violations, and **presence detection must be updated to
-match the new command form** (see Risks). **The rule covers hooks only, not `statusLine` (D3): statusLine stays
-project-scoped** -- it is a scalar that cannot double-fire, so the user-scope rationale does not apply to it.
+T5 enforces it, T6 migrates to it, `doctor` (T5/T6) detects violations, and presence detection recognizes the shipped
+dispatcher form. **The rule covers hooks only, not `statusLine` (D3): statusLine stays project-scoped** -- it is a
+scalar that cannot double-fire, so the user-scope rationale does not apply to it.
 
 ### 5. Execution environment (host vs sidecar container)
 
@@ -168,11 +161,13 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 (install lifecycle already moved to `forge extension`; only `forge info` stays top-level -- `install/cli.py:1-5`,
 `cli/main.py:415-418`):
 
-- **`forge extension doctor`** (not `forge install doctor`) reports install kind + PATH reachability (T1/T2);
-  `forge info` stays the quick top-level dashboard.
+- **`forge extension doctor`** (not `forge install doctor`) reports install kind and bare-command PATH reachability
+  (T1), plus the ownership/migration checks added by T5/T6. `on_path_minimal` describes bare `forge` consumers such as
+  project `statusLine`; host hooks use the absolute dispatcher and do not depend on inherited PATH. `forge info` stays
+  the quick top-level dashboard.
 - **Migration / cleanup** lands under `forge extension` (the lifecycle group) -- e.g. `forge extension cleanup-project`
-  (T6) -- **not** the `hook` group, which is **singular and hidden** (`cli/hooks/_group.py:8`) and exposes only the
-  user-facing `enable`/`disable` that T9 reconciles.
+  (T6) -- **not** the `hook` group, which is **singular and hidden** (`cli/hooks/_group.py:8`) and exposes runtime
+  handler commands only. T9 removed its former `enable`/`disable` lifecycle writer.
 - **T5 keeps `forge extension enable --scope user`** for one-time user hook registration; no distinct extension verb is
   added. In-repo auto-LOCAL/project enable stops installing runtime hooks and must point users to
   `forge extension enable --scope user` for the hook install.
@@ -180,15 +175,16 @@ New commands attach to **existing** groups rather than inventing an `install` gr
 
 ## Sequencing / critical path
 
-- **Incident track:** T1 -> **T2**. Closes exit-127 on the current scope, independent of the model. T2 is not a
-  prerequisite for the model (the model replaces its bytes).
-- **User-scope-model track:** T1 -> **T3 -> T4 -> T5 -> T6**. Corrected ordering: **T3 (registry schema + read) precedes
-  T4** because the dispatcher's shipped no-op gate reads the registry. T4's shim-vs-symlink benchmark therefore measures
-  the real gate, not a stub. T5's registration change is where the command *form* changes to the dispatcher shape and
-  where detection is updated (gated on T4's benchmark outcome).
-- **Cross-cutting:** **T9** (legacy writer) pairs with T2 (byte form) and T6 (cleanup) -- delete it before T6 finalizes
-  cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) shipped after T5 via
-  PR #94 and restores runtime hooks in the container through staged sidecar-user settings.
+- **Retired incident track:** T1 -> **T2** was designed as an independent interim fix but was not executed.
+  Terminal-only launch made the extra byte transition unnecessary, and the later T4/T5 cutover superseded its host-hook
+  outcome.
+- **Shipped user-scope-model track:** T1 -> **T3 -> T4 -> T5 -> T6**. T3 precedes T4 because the dispatcher's no-op gate
+  reads the registry. T4's shim benchmark measured the real gate, and T5 performed the single direct-hook -> absolute
+  dispatcher registration transition while updating detection. T6 then removed legacy project/local registrations and
+  enrolled the selected root last.
+- **Cross-cutting:** **T9** (legacy writer) pairs with T5's byte form and T6's cleanup -- deleting it prevents an
+  untracked writer from resurrecting state T6 removes. **T10** (sidecar resolution) shipped after T5 via PR #94 and
+  restores runtime hooks in the container through staged sidecar-user settings.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice and the
   standalone mutator-family follow-up both shipped; the latter is
   [`forge_project_compat_mutator_sweep`](../../done/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
@@ -203,48 +199,48 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   via PR #91 (`c593eb66`), so those surfaces should be authored against the shipped boundary; its `test_output.py`-style
   guard catches re-leaks after the fact. Not a blocker for T4's *mechanism* -- only for T4's user-facing *strings*.
 
-## Grounding (verified against code, 2026-07-02)
+## Grounding and final disposition
 
-Line refs are the 2026-07-02 snapshot; T3 Phase 0 re-verified the T3-relevant rows on 2026-07-07, including
-`projects.json`, `find_forge_root`, and `FORGE_SESSION`, so see its checklist before relying on exact line numbers.
+The original line refs were captured on 2026-07-02. Rows changed by the epic are updated to the shipped 2026-07-13 state
+and use stable module/function names where possible.
 
-| Claim                                                                     | Verdict   | Evidence                                                                              |
-| ------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------- |
-| Hooks are bare `forge hook <name>` (PATH-dependent)                       | Confirmed | `preset.py:53`; `codex_hooks.py:84`; `get_codex_config_path` `codex_hooks.py:106`     |
-| statusLine is a bare `forge status-line` command                          | Confirmed | `preset.py:218-222`                                                                   |
-| Hooks cover 13 events incl. `PreToolUse:Read` + `UserPromptSubmit`        | Confirmed | `preset.py:47-217` (fire on every Read / every prompt, in every repo at user scope)   |
-| Presence detection uses the shared hook-command predicate                 | Confirmed | `install/hooks.py::is_forge_hook_command` / `entry_is_forge_hook`                     |
-| A third matcher exists: prefix `startswith("forge hook ")`                | Resolved  | `forge_hook_matcher_consolidation` replaced it with the shared predicate              |
-| A second, untracked writer exists: `forge hook enable`/`disable`          | Resolved  | T9 deletes `cli/hooks/install.py`; tracked replacement uses `forge extension enable`  |
-| Claude hooks merge append+dedupe by full entry (byte change coexists)     | Confirmed | `merge_hooks` `settings_merge.py:505,705`; source-only load `installer.py:817`        |
-| Default scope inside a repo is local/project, not user                    | Confirmed | `installer.py:258-267`, `cli/extensions.py:585-591`                                   |
-| Codex cleanup is marker-based; Claude is tracked/per-entry                | Confirmed | markers `codex_hooks.py:56`; Claude `unmerge` via `stable_id` `settings_merge.py:731` |
-| Codex trust pinned to command bytes; golden test exists                   | Confirmed | `codex_hooks.py:16-19,66-67`, `test_codex_hooks.py:71`                                |
-| Sidecar omits host `~/.claude` and stages hooks in persisted sidecar home | Resolved  | `claude_session.py::_stage_sidecar_hook_settings`; `test_sidecar_hook_inject.py`      |
-| `FORGE_SESSION` reaches the hook subprocess env                           | Confirmed | `cli/hooks/commands.py:90,1302`                                                       |
-| No `projects.json` / `forge project` group today                          | Confirmed | absent from `src/`; `cli/main.py:402-432` has no `project`                            |
-| Project identity is `.claude/` + `.forge/` only (no `project.toml`)       | Confirmed | `design.md:82,92`                                                                     |
-| End-user install is `pip install multi-forge` today                       | Confirmed | `README.md:99`; dev uses `uv sync`/`.venv` (`CLAUDE.md:14`)                           |
+| Claim                                                                     | Verdict    | Evidence                                                                              |
+| ------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| Host hooks are bare `forge hook <name>` (PATH-dependent)                  | Superseded | `preset.py::_hook_command`; `hook_dispatcher.py::render_dispatcher_command`           |
+| statusLine is a bare `forge status-line` command                          | Confirmed  | `preset.py::_build_builtin_preset`; registered-command contract test                  |
+| Hooks cover 13 events incl. `PreToolUse:Read` + `UserPromptSubmit`        | Confirmed  | `preset.py::_build_builtin_preset`; `test_preset.py` inventory assertion              |
+| Presence detection recognizes direct and dispatcher command forms         | Shipped    | `install/hooks.py::is_forge_hook_command` / `entry_is_forge_hook`                     |
+| A third matcher exists: prefix `startswith("forge hook ")`                | Resolved   | `forge_hook_matcher_consolidation` replaced it with the shared predicate              |
+| A second, untracked writer exists: `forge hook enable`/`disable`          | Resolved   | T9 deletes `cli/hooks/install.py`; tracked replacement uses `forge extension enable`  |
+| Claude hooks merge append+dedupe by full entry (byte change coexists)     | Confirmed  | `merge_hooks` `settings_merge.py:505,705`; source-only load `installer.py:817`        |
+| Extension scope may default local/project; runtime hooks are user-only    | Shipped    | `cli/extensions.py`; T5 ownership tests                                               |
+| Codex cleanup is marker-based; Claude is tracked/per-entry                | Confirmed  | markers `codex_hooks.py:56`; Claude `unmerge` via `stable_id` `settings_merge.py:731` |
+| Codex trust pinned to command bytes; golden test exists                   | Confirmed  | `codex_hooks.py:16-19,66-67`, `test_codex_hooks.py:71`                                |
+| Sidecar omits host `~/.claude` and stages hooks in persisted sidecar home | Resolved   | `claude_session.py::_stage_sidecar_hook_settings`; `test_sidecar_hook_inject.py`      |
+| `FORGE_SESSION` reaches the hook subprocess env                           | Confirmed  | `cli/hooks/commands.py:90,1302`                                                       |
+| Registry is `projects.json`; enrollment stays under `forge extension`     | Shipped    | `install/project_registry.py`; `cli/extensions.py`                                    |
+| Optional `.forge/project.toml` carries `required_forge` compatibility     | Shipped    | `install/project_compat.py`                                                           |
+| End-user install targets a global tool environment                        | Shipped    | `README.md`; `docs/end-user/README.md`; `forge extension doctor`                      |
 
 ## Cross-cutting risks (epic-owned)
 
-- **Presence detection can lie after the cutover.** T4's benchmark picked a `forge-hook` shim (hyphen), so the current
-  shared predicate still needs an update before T5 flips registration; otherwise `session_lifecycle.py:264` and
-  `policy.py:309` could warn incorrectly. T5 owns the detection update.
+- **Presence detection moved with the cutover -- resolved by T5.** The shared predicate recognizes the hyphenated
+  `forge-hook` dispatcher form as well as released direct-hook forms, so lifecycle and policy checks do not warn
+  incorrectly.
 - **Same-file coexistence, not replacement.** Because Claude hooks merge append+dedupe-by-entry
   (`settings_merge.py:505`), a changed command *adds* a sibling; without unmerge-before-merge, every byte change
-  double-fires in the same file. (T2/T5/T6.)
+  double-fires in the same file. T5/T6 enforced unmerge-before-merge for the shipped transition.
 - **Sidecar regression -- resolved by T10.** User-scope-only host hooks are unmounted; fresh canonical hooks stage into
   the persisted in-container user scope and execute through the image PATH.
-- **Legacy untracked entries still exist in the wild.** T9 removes the writer, but any entries it already wrote have no
-  `installed.json` tracking and must still be handled by T6's value-based cleanup.
+- **Legacy untracked entries -- resolved by T6.** T9 removed the writer; T6's value-based cleanup handles entries it
+  created without `installed.json` tracking.
 - **No-op frequency.** The user-scope dispatcher fires on every `PreToolUse:Read` and `UserPromptSubmit` in every repo
   (`preset.py`); the no-op ceiling (T4) is measured against per-Read / per-prompt frequency, not per-session.
 - **Registry read: strict in CLI, fail-open in hook.** A corrupt/newer `projects.json` must fail loudly in the CLI
   (durable state) but must **not** error on every hook subprocess (that bricks the session); the dispatcher's read
   degrades to "not enrolled." (T3/T4.)
-- **Two Codex re-trusts across the epic.** T2 changes the command bytes (re-trust #1); the T4/T5 cutover changes them
-  again (re-trust #2). Accept as the cost of the D2 split, or skip T2 if the user-scope model ships imminently.
+- **One Codex re-trust occurred.** Skipping T2 avoided the interim command-byte transition; T5's direct-hook -> absolute
+  dispatcher cutover was the single trust-byte change.
 - **Path canonicalization** for symlinked/moved worktrees (T3).
 - **Version coupling** -- ACCEPTED (D1); the guardrail (T7) fails clearly rather than isolating versions.
 
@@ -254,8 +250,8 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 
 | Question                                                                                   | Outcome                                                                                                                                              |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip T2.** Terminal-only launch makes the interim reachability fix unnecessary; reopen only if GUI/Dock/IDE launch becomes supported.    |
-| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 skipped.** T5 inherits only T2's unmerge-before-merge groundwork; T10 owns sidecar exemption, with T5 carrying the exposure gate.     |
+| Ship the interim absolute-command fix, or jump straight to the dispatcher cutover          | **Resolved: skip and retire T2.** T4/T5 superseded its host-hook outcome; GUI statusLine support has its own proposed card.                          |
+| Which absolute path to record: PATH-stable `~/.local/bin/forge` vs churning tool-venv path | **Moot with T2 retired.** T5 folded the migration groundwork; T10 owns the separate sidecar command contract.                                        |
 | Trust model: explicit enroll only vs auto-enroll on enable / worktree create               | **Resolved: enroll-on-enable + auto-enroll-on-managed-worktree** with `enrollment_source` provenance.                                                |
 | Enrollment surface: new `forge project` group vs `forge extension` family                  | **Resolved: fold into `forge extension enable`.** Project/local enable enrolls the targeted root; user-scope enable enrolls no root by itself.       |
 | Whether `FORGE_SESSION` / managed session short-circuits the no-op gate                    | **Resolved: yes.** T3 pins the semantics; T4 owns the dispatcher implementation.                                                                     |
@@ -283,6 +279,9 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 - Forking Claude/Codex configuration models.
 
 ## Provenance (reviews -> tickets)
+
+The tables below preserve review-time reasoning. T2-specific remedies were never shipped and are superseded by the final
+dispositions above.
 
 **Round 1 (decomposition):** split bug fix vs migration -> D2; benchmark before the registry -> T4 gate; reconcile
 `required_forge` -> D1 accepted -> T7; specify resolution + schema -> T4/T3; dev-mode + test -> T8.
@@ -320,14 +319,14 @@ These are no longer open; kept here so the epic card and checklist do not drift.
 
 **Round 5 (2026-07-02, maintainer residual-issues review, verified against member cards):**
 
-| Finding                                                                                                                                                                                                          | Resolution                                                                                                                                                       |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| statusLine unspecified under user-scope: T4 dispatcher is `forge hook`-only, T5 conflated statusLine into "dispatcher hook commands", no gate applies; embedded product question (render in non-enrolled repos?) | **D3**: statusLine stays project-scoped (scalar, can't double-fire, self-gates on `FORGE_SESSION`); seams 1/4 + T4/T5 corrected to hooks-only                    |
-| T10 overlay example named only `settings.json`; default scope is LOCAL, so the T2 dead path lives in `settings.local.json`                                                                                       | T10 covers **both** settings files; `--settings` alternative flagged pending Claude-precedence verification; T10 also neutralizes statusLine's mounted dead path |
-| T10 open question "does the container need `projects.json` enrollment?" is answerable now                                                                                                                        | Resolved: sidecar always sets `FORGE_SESSION` (`container.py:132`) + always a managed session -> "in-sidecar => always active", enrollment moot; T10 OQ2 closed  |
-| T6 risk bullet narrates install-then-remove; T6 scope chose remove-legacy-first                                                                                                                                  | T6 risk realigned to remove-first (transient **hooks-off** window) + one-line least-harmful rationale                                                            |
-| T5 open-question candidate `forge hooks install --user` violates the epic CLI-surface rule (new plural group; `hook` is singular+hidden)                                                                         | T5 open question reshaped to a `forge extension`-family name / drop the rename                                                                                   |
-| Acceptance-row ownership: T3 held T6's backfill row **and** a fail-open row targeting T4's not-yet-existent `test_hook_dispatcher.py` (T3 precedes T4)                                                           | Existing-install row moved T3 -> T6 (bulk behavior later superseded in Round 6); T3 fail-open row retargeted to `test_project_registry.py`                       |
+| Finding                                                                                                                                                                                                          | Resolution                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| statusLine unspecified under user-scope: T4 dispatcher is `forge hook`-only, T5 conflated statusLine into "dispatcher hook commands", no gate applies; embedded product question (render in non-enrolled repos?) | **D3**: statusLine stays project-scoped (scalar, can't double-fire); session discovery has no CWD fallback, but ambient rendering remains; seams 1/4 + T4/T5 corrected to hooks-only |
+| T10 overlay example named only `settings.json`; default scope is LOCAL, so the T2 dead path lives in `settings.local.json`                                                                                       | T10 covers **both** settings files; `--settings` alternative flagged pending Claude-precedence verification; T10 also neutralizes statusLine's mounted dead path                     |
+| T10 open question "does the container need `projects.json` enrollment?" is answerable now                                                                                                                        | Resolved: sidecar always sets `FORGE_SESSION` (`container.py:132`) + always a managed session -> "in-sidecar => always active", enrollment moot; T10 OQ2 closed                      |
+| T6 risk bullet narrates install-then-remove; T6 scope chose remove-legacy-first                                                                                                                                  | T6 risk realigned to remove-first (transient **hooks-off** window) + one-line least-harmful rationale                                                                                |
+| T5 open-question candidate `forge hooks install --user` violates the epic CLI-surface rule (new plural group; `hook` is singular+hidden)                                                                         | T5 open question reshaped to a `forge extension`-family name / drop the rename                                                                                                       |
+| Acceptance-row ownership: T3 held T6's backfill row **and** a fail-open row targeting T4's not-yet-existent `test_hook_dispatcher.py` (T3 precedes T4)                                                           | Existing-install row moved T3 -> T6 (bulk behavior later superseded in Round 6); T3 fail-open row retargeted to `test_project_registry.py`                                           |
 
 **Round 6 (2026-07-10, T6 checklist review, verified against the shipped dispatcher):**
 

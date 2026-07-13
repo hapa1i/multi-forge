@@ -1,7 +1,7 @@
 # Forge Hooks — Lifecycle + Artifacts Guide
 
-**Status:** Implemented (runtime registrations use the `forge-hook <name>` dispatcher; handlers still forward to
-`forge hook <name>`).
+**Status:** Implemented (host runtime registrations invoke an absolute `forge-hook <name>` dispatcher, which executes
+the hidden `forge hook <name>` handler surface).
 
 Hooks are Forge’s integration layer: they observe Claude Code lifecycle events and write **confirmed facts** and
 **artifacts** so sessions are inspectable and auditable.
@@ -17,14 +17,17 @@ Hooks are Forge’s integration layer: they observe Claude Code lifecycle events
 
 ## What are Forge hooks?
 
-Forge hooks are handlers that Claude Code invokes on lifecycle boundaries (SessionStart, PreToolUse, PostToolUse, Stop,
-etc.).
+Claude Code and Codex invoke registered hook commands at lifecycle boundaries (SessionStart, PreToolUse, PostToolUse,
+Stop, etc.); those commands reach Forge's hook handlers through the host dispatcher or the sidecar image's CLI.
 
 Forge’s deployment model is:
 
 - runtime hooks are configured once at user scope with the hooks-only recipe below
-- installed hook entries execute the Forge dispatcher: `<forge-home>/bin/forge-hook <name>`
-- the dispatcher forwards to the Forge CLI handler: `forge hook <name>`
+- host hook entries execute the literal absolute Forge dispatcher: `<forge-home>/bin/forge-hook <name>`
+- with `FORGE_DEV` present, the dispatcher selects only that checkout's `.venv/bin/forge`; otherwise it resolves the
+  launcher from `~/.forge/runtime.json` and then known user-tool directories, without consulting inherited `PATH`
+- the dispatcher executes the hidden Forge CLI handler surface: `forge hook <name>`
+- sidecar hook entries use the bare image-PATH form `forge hook <name>` instead of the host dispatcher
 - Forge does **not** install ad-hoc scripts into `.claude/`
 
 ### Why this model
@@ -111,8 +114,8 @@ forge extension disable --scope user
 > hooks are user-scoped; project/local installs own statusLine and other project settings.
 
 > **Sidecar sessions:** host user settings are not mounted into the container. Forge stages the current hook inventory
-> into its container user settings automatically on every launch, using the `forge` executable bundled in the image.
-> This does not modify the project's `.claude/settings*.json` files.
+> into its container user settings automatically on every launch, using bare `forge hook <name>` commands resolved from
+> the image's `PATH`. This does not modify the project's `.claude/settings*.json` files.
 
 ### Using checkout code for live hooks
 
@@ -140,8 +143,9 @@ FORGE_DEV="$PWD" uv run forge extension doctor
 
 Doctor reports the value, exact target, validity, and whether the installed dispatcher is current and executable enough
 to honor it. This describes the doctor process's environment; a separately launched hook process may have a different
-environment. If a package update leaves the dispatcher stale, run `uv run forge extension sync --scope user` before
-starting the session. Host `FORGE_DEV` does not select code inside sidecar containers.
+environment. If a package update leaves the dispatcher stale, run the recovery command doctor reports: user-scope sync
+for a tracked user install, or the hooks-only user-scope enable recipe when none is tracked. Host `FORGE_DEV` does not
+select code inside sidecar containers.
 
 ### Migrating a pre-user-scope installation
 
@@ -401,8 +405,10 @@ Paths stored in the session file should be forge-root-relative for portability.
 Checklist:
 
 - run `forge extension doctor` and resolve any listed `cleanup-project` action
-- confirm runtime hooks are present in user settings
-- confirm `forge` is on PATH in the environment Claude Code uses to run hooks
+- follow any `hook_dispatcher` recovery advice from doctor
+- confirm runtime hooks in user settings invoke the expected absolute `<forge-home>/bin/forge-hook` path
+- confirm the dispatcher can resolve an executable launcher from `runtime.json`, a known user-tool directory, or a valid
+  `FORGE_DEV`; inherited `PATH` is not the host runtime-hook resolver
 - check Claude Code hook logs (or Forge’s emitted JSON output)
 
 ### "Hooks fired but session file didn't update"
@@ -439,9 +445,10 @@ See [Hook session resolution](#hook-session-resolution) for the three-step resol
 
 <!-- forge-env-vocab: diagnostic:end -->
 
-### Hook command group
+### Hook handler group
 
-All hooks are under `forge hook ...` (group name `hook`, not `hooks`):
+The dispatcher invokes the hidden `forge hook ...` handler group (group name `hook`, not `hooks`). You can run handlers
+directly for focused diagnostics:
 
 ```bash
 forge hook session-start       # SessionStart handler
@@ -468,7 +475,7 @@ forge hook codex-session-start # SessionStart transfer delivery (Codex; installe
 | Trap                    | Explanation                                                                                                                |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | "FORGE_SESSION not set" | Hooks fall back through `FORGE_FORK_NAME` and UUID lookup; check `~/.forge/sessions/index.json`                            |
-| "Hooks not firing"      | Verify `forge` is on PATH in Claude Code's environment                                                                     |
+| "Hooks not firing"      | Use `forge extension doctor`; host hooks use the absolute dispatcher, not inherited `PATH`                                 |
 | "Wrong settings file"   | Runtime hooks live in user settings; project/local settings own project assets and may contain pre-migration cleanup state |
 | `HOOK!` / `HOOKx2`      | `HOOK!` means cleanup required; `HOOKx2` means an actual duplicate trigger                                                 |
 

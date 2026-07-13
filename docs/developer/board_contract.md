@@ -15,24 +15,32 @@ The work board is Forge's lightweight implementation-memory system for multi-ses
 - active epic coordination and sequencing
 - paused partially-done work
 - completed snapshots
+- retired reference records
 - project lifetime memory
 
 Cards may be aspirational. Design docs are normative and describe shipped code.
 
 ## Lanes
 
-| Path                                 | Meaning                                                             | Required action                                              |
-| ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `docs/board/proposed/<slug>/card.md` | Idea, design sketch, or epic not yet accepted for execution         | Move to `todo/` when accepted or scheduled                   |
-| `docs/board/todo/<slug>/card.md`     | Accepted work or epic parked until an execution/coordination branch | Move to `doing/` when active work starts                     |
-| `docs/board/doing/<slug>/card.md`    | Work currently in flight, or an active coordinating epic            | Keep `checklist.md` current during execution or coordination |
-| `docs/board/paused/<slug>/card.md`   | Partially-done work on hold                                         | Move back to `doing/` when work resumes                      |
-| `docs/board/done/<slug>/card.md`     | Completed work snapshot                                             | Keep paired `checklist.md` when one existed                  |
+| Path                                 | Meaning                                                             | Required action                                                   |
+| ------------------------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `docs/board/proposed/<slug>/card.md` | Idea, design sketch, or epic not yet accepted for execution         | Move to `todo/` when accepted or scheduled                        |
+| `docs/board/todo/<slug>/card.md`     | Accepted work or epic parked until an execution/coordination branch | Move to `doing/` when active work starts                          |
+| `docs/board/doing/<slug>/card.md`    | Work currently in flight, or an active coordinating epic            | Keep `checklist.md` current during execution or coordination      |
+| `docs/board/paused/<slug>/card.md`   | Partially-done work on hold                                         | Move back to `doing/` when work resumes                           |
+| `docs/board/done/<slug>/card.md`     | Completed work snapshot                                             | Keep paired `checklist.md` when one existed                       |
+| `docs/board/retired/<slug>/card.md`  | Terminal reference for work that did not ship independently         | Record the outcome, date, and replacement or folded-into evidence |
 
 `todo/` is not the active cursor. It means the work is accepted, but no execution branch is active for it.
 
 `paused/` is for partially-done work that is temporarily on hold. Unlike `todo/`, a paused card already has a
 `checklist.md` with progress. Move back to `doing/` when work resumes; the checklist picks up where it left off.
+
+`retired/` is terminal. Use it when a card did not ship independently because it was superseded, cancelled, folded into
+other work, or invalidated. It is not a backlog, does not count as `done/` or shipped, and is excluded from live work
+and live epic-member counts. A retired card must record its outcome, retirement date, and a replacement or folded-into
+reference; when no replacement exists, say so explicitly. Preserve its `checklist.md` if one existed. If the idea is
+later reconsidered, create a new `proposed/` card that links to the retired record instead of reactivating it.
 
 When the user says to work on a `todo/` card, the operating contract is:
 
@@ -50,8 +58,9 @@ Every work item is a card directory.
 - `card.md`: durable problem framing, motivation, design context, risks, and open questions.
 - `checklist.md`: active execution plan for the branch/session.
 
-Move cards between lanes instead of copying proposal/checklist snapshots. A completed `done/<slug>/` card is historical
-context; after completion, design docs and code are normative.
+Move cards between lanes instead of copying proposal/checklist snapshots. A `done/<slug>/` or `retired/<slug>/` card is
+historical context; neither is a source of normative architecture after its terminal move. Design docs and code are
+normative for shipped behavior, and a retired card must remain clearly labelled as non-implementable reference material.
 
 ## Epics
 
@@ -74,9 +83,11 @@ If implementation on a member card stops so the team can revisit the epic or sib
 `paused/` and record the pause reason in its checklist. When the epic chooses the next member to execute, move that
 member to `doing/` and update both sides of the link.
 
-An epic closes to `done/` when every live member card is `done/`, or when the shared contract is no longer load-bearing
-because the work was cancelled, superseded, or folded into normative design docs. Until then, keep the epic in `doing/`
-as the living coordinator.
+An epic closes to `done/` when every live member card is `done/` and the coordinated outcome is shipped and verified. A
+retired former member is excluded from the live-member count, but it does not count as shipped or `done/`; record its
+retirement rationale and successor or folded-into evidence on the epic and retired card. If the epic's coordinated
+outcome is itself cancelled, superseded, folded elsewhere, or invalidated before it ships, move the epic to `retired/`
+instead of `done/`. Until one of those terminal conditions is met, keep the epic in `doing/` as the living coordinator.
 
 ## Checklist Contract
 
@@ -197,6 +208,16 @@ When a card is fully executed:
    that pointed at the old lane).
 
 If the card is merged before the lane move, perform the move immediately after the final merge to `main`.
+
+When a card becomes terminal without shipping independently:
+
+1. Record the retirement outcome (`superseded`, `cancelled`, `folded`, or `invalidated`) and date at the top of the
+   card.
+2. Link the replacement or folded-into work and its evidence; if there is no replacement, state that explicitly.
+3. Close any active checklist with the verified stopping point, and retain it with the card.
+4. Remove the card from live work and live epic-member counts without presenting it as completed or shipped.
+5. Move the card directory from its current lane to `retired/<slug>/`.
+6. Repoint inbound board links to the retired path and label references so they do not imply executable future work.
 
 ## Size Checks
 

@@ -2,7 +2,7 @@
 
 Card: [`card.md`](card.md). Standalone follow-up split from T7
 [`forge_project_compat`](../../done/forge_project_compat/card.md); not a member of
-[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md).
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md).
 
 ## Current focus
 

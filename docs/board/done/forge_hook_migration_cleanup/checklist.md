@@ -1,7 +1,7 @@
 # Execution checklist: T6 `forge_hook_migration_cleanup`
 
 Execution plan for migrating pre-T5 hook installations to the user-scoped dispatcher model. The shared contract and
-sequencing live in the epic [`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is
+sequencing live in the epic [`card.md`](../../done/epic_global_forge_runtime/card.md); this member's problem framing is
 [`card.md`](card.md).
 
 > **Shipped via PR #96 on 2026-07-11.** Implementation and verification completed on branch
