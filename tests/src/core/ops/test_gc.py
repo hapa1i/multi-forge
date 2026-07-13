@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -20,6 +21,7 @@ from forge.core.ops.gc import (
     _detect_stale_active_entries,
     _detect_stale_work_queue,
     _path_in_roots,
+    _project_compatibility_skips,
     _resolve_tracked_roots,
     collect_clean_report,
     run_clean,
@@ -623,6 +625,280 @@ class TestRunClean:
         result = run_clean(ctx=ctx, scope="workspace")
         assert result.deleted_count == 0
         assert not result.failed
+
+    @pytest.mark.parametrize(
+        ("project_toml", "expected_state"),
+        [
+            ('schema_version = 1\nrequired_forge = ">=9999"\n', "incompatible"),
+            ('schema_version = 1\nrequired_forge = "not a spec"\n', "malformed"),
+            ('schema_version = 999\nrequired_forge = ">=0"\n', "unsupported_schema"),
+        ],
+    )
+    def test_mixed_roots_skip_refused_project_and_clean_eligible_global_state(
+        self,
+        tmp_path: Path,
+        project_toml: str,
+        expected_state: str,
+    ) -> None:
+        from forge.backend.registry import get_backend_registry_path
+
+        compatible_root = _seed_session(tmp_path, "compatible", tmp_path / "compatible")
+        refused_root = _seed_session(tmp_path, "refused", tmp_path / "refused")
+
+        compatible_orphan = compatible_root / ".forge" / "sessions" / "compatible-orphan"
+        compatible_orphan.mkdir(parents=True)
+        (compatible_orphan / "artifact.txt").write_text("stale")
+
+        refused_orphan = refused_root / ".forge" / "sessions" / "refused-orphan"
+        refused_orphan.mkdir(parents=True)
+        (refused_orphan / "artifact.txt").write_text("stale")
+        (refused_root / ".forge" / "project.toml").write_text(project_toml)
+
+        # Corrupt backend registry is global Forge state, so a refused project
+        # must not prevent this independently eligible repair.
+        backend_registry = get_backend_registry_path()
+        backend_registry.parent.mkdir(parents=True, exist_ok=True)
+        backend_registry.write_text("{")
+
+        result = run_clean(
+            ctx=_make_ctx(tmp_path, forge_root=compatible_root),
+            scope="all",
+        )
+
+        assert not compatible_orphan.exists()
+        assert refused_orphan.exists()
+        assert not backend_registry.exists()
+        assert result.categories_cleaned["session_dirs"] == 1
+        assert result.categories_cleaned["corrupt_state"] == 1
+        assert len(result.skipped_project_compatibility) == 1
+        skip = result.skipped_project_compatibility[0]
+        assert skip.target == str(refused_orphan)
+        assert skip.forge_root == str(refused_root.resolve())
+        assert skip.state == expected_state
+        assert skip.reason
+        assert skip.recovery
+        assert result.should_exit_nonzero is True
+
+    def test_preview_reports_refusal_without_mutating_project_item(self, tmp_path: Path) -> None:
+        refused_root = _seed_session(tmp_path, "refused")
+        refused_orphan = refused_root / ".forge" / "sessions" / "refused-orphan"
+        refused_orphan.mkdir(parents=True)
+        (refused_orphan / "artifact.txt").write_text("stale")
+        (refused_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+
+        report = collect_clean_report(
+            ctx=_make_ctx(tmp_path, forge_root=refused_root),
+            scope="workspace",
+        )
+
+        assert refused_orphan.exists()
+        assert len(report.skipped_project_compatibility) == 1
+        skip = report.skipped_project_compatibility[0]
+        assert skip.target == str(refused_orphan)
+        assert skip.forge_root == str(refused_root.resolve())
+        assert skip.state == "incompatible"
+
+    def test_search_cleanup_uses_store_root_for_external_transcript_paths(self, tmp_path: Path) -> None:
+        from forge.search.extractor import SearchDocumentMeta
+        from forge.search.store import SearchDocumentStore
+
+        compatible_root = _seed_session(tmp_path, "compatible", tmp_path / "compatible")
+        refused_root = _seed_session(tmp_path, "refused", tmp_path / "refused")
+        compatible_missing = tmp_path / "external" / "compatible.jsonl"
+        refused_missing = tmp_path / "external" / "refused.jsonl"
+
+        def _doc(path: Path, name: str) -> SearchDocumentMeta:
+            return SearchDocumentMeta(
+                transcript_path=str(path),
+                session_name=name,
+                session_id=f"{name}-id",
+                extracted_at="2026-01-01T00:00:00+00:00",
+            )
+
+        compatible_store = SearchDocumentStore(forge_root=compatible_root)
+        refused_store = SearchDocumentStore(forge_root=refused_root)
+        compatible_store.write([_doc(compatible_missing, "compatible")])
+        refused_store.write([_doc(refused_missing, "refused")])
+        (refused_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+
+        result = run_clean(
+            ctx=_make_ctx(tmp_path, forge_root=compatible_root),
+            scope="all",
+        )
+
+        assert compatible_store.read() == []
+        assert [doc.transcript_path for doc in refused_store.read()] == [str(refused_missing)]
+        assert result.categories_cleaned["search_docs"] == 1
+        assert [skip.target for skip in result.skipped_project_compatibility] == [str(refused_missing)]
+        assert result.skipped_project_compatibility[0].forge_root == str(refused_root.resolve())
+
+    def test_search_cleanup_distinguishes_duplicate_path_by_store_root(self, tmp_path: Path) -> None:
+        from forge.search.extractor import SearchDocumentMeta
+        from forge.search.store import SearchDocumentStore
+
+        compatible_root = _seed_session(tmp_path, "compatible", tmp_path / "compatible")
+        refused_root = _seed_session(tmp_path, "refused", tmp_path / "refused")
+        shared_missing = tmp_path / "external" / "shared.jsonl"
+        shared_doc = SearchDocumentMeta(
+            transcript_path=str(shared_missing),
+            session_name="shared",
+            session_id="shared-id",
+            extracted_at="2026-01-01T00:00:00+00:00",
+        )
+        compatible_store = SearchDocumentStore(forge_root=compatible_root)
+        refused_store = SearchDocumentStore(forge_root=refused_root)
+        compatible_store.write([shared_doc])
+        refused_store.write([shared_doc])
+        (refused_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+
+        result = run_clean(
+            ctx=_make_ctx(tmp_path, forge_root=compatible_root),
+            scope="all",
+        )
+
+        assert compatible_store.read() == []
+        assert [doc.transcript_path for doc in refused_store.read()] == [str(shared_missing)]
+        assert result.categories_cleaned["search_docs"] == 1
+        assert len(result.skipped_project_compatibility) == 1
+        skip = result.skipped_project_compatibility[0]
+        assert skip.target == str(shared_missing)
+        assert skip.forge_root == str(refused_root.resolve())
+
+    def test_search_preview_records_each_refused_owner_for_shared_path(self, tmp_path: Path) -> None:
+        from forge.search.extractor import SearchDocumentMeta
+        from forge.search.store import SearchDocumentStore
+
+        first_root = _seed_session(tmp_path, "first", tmp_path / "first")
+        second_root = _seed_session(tmp_path, "second", tmp_path / "second")
+        shared_missing = tmp_path / "external" / "shared.jsonl"
+        shared_doc = SearchDocumentMeta(
+            transcript_path=str(shared_missing),
+            session_name="shared",
+            session_id="shared-id",
+            extracted_at="2026-01-01T00:00:00+00:00",
+        )
+        for forge_root in (first_root, second_root):
+            SearchDocumentStore(forge_root=forge_root).write([shared_doc])
+            (forge_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+
+        report = collect_clean_report(
+            ctx=_make_ctx(tmp_path, forge_root=first_root),
+            scope="all",
+        )
+
+        assert {
+            (skip.target, skip.forge_root)
+            for skip in report.skipped_project_compatibility
+            if skip.target == str(shared_missing)
+        } == {
+            (str(shared_missing), str(first_root.resolve())),
+            (str(shared_missing), str(second_root.resolve())),
+        }
+
+    def test_search_compatibility_reuses_owner_data_from_detection(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from forge.search.extractor import SearchDocumentMeta
+        from forge.search.store import SearchDocumentStore
+
+        compatible_root = _seed_session(tmp_path, "compatible", tmp_path / "compatible")
+        refused_root = _seed_session(tmp_path, "refused", tmp_path / "refused")
+
+        def _docs(root: Path) -> list[SearchDocumentMeta]:
+            return [
+                SearchDocumentMeta(
+                    transcript_path=str(tmp_path / "external" / f"{root.name}-{index}.jsonl"),
+                    session_name=f"{root.name}-{index}",
+                    session_id=f"{root.name}-{index}-id",
+                    extracted_at="2026-01-01T00:00:00+00:00",
+                )
+                for index in range(3)
+            ]
+
+        compatible_store = SearchDocumentStore(forge_root=compatible_root)
+        refused_store = SearchDocumentStore(forge_root=refused_root)
+        compatible_store.write(_docs(compatible_root))
+        refused_store.write(_docs(refused_root))
+        (refused_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+
+        real_read = SearchDocumentStore.read
+        read_counts: dict[Path, int] = {}
+
+        def _counted_read(store: SearchDocumentStore) -> list[SearchDocumentMeta]:
+            read_counts[store.store_path] = read_counts.get(store.store_path, 0) + 1
+            return real_read(store)
+
+        monkeypatch.setattr(SearchDocumentStore, "read", _counted_read)
+
+        report = collect_clean_report(
+            ctx=_make_ctx(tmp_path, forge_root=compatible_root),
+            scope="all",
+        )
+
+        assert report.total_count >= 6
+        assert len(report.skipped_project_compatibility) == 3
+        assert read_counts == {
+            compatible_store.store_path: 1,
+            refused_store.store_path: 1,
+        }
+
+    def test_unreadable_pin_is_a_structured_project_skip(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        forge_root = tmp_path / "project"
+        pin = forge_root / ".forge" / "project.toml"
+        pin.parent.mkdir(parents=True)
+        pin.write_text('schema_version = 1\nrequired_forge = ">=0"\n')
+        target = forge_root / ".forge" / "sessions" / "ghost"
+        real_open = Path.open
+
+        def _open(path: Path, *args: Any, **kwargs: Any) -> Any:
+            if path == pin:
+                raise PermissionError("denied")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", _open)
+
+        skips = _project_compatibility_skips(
+            [OrphanCategory("session_dirs", "orphans", 1, [str(target)])],
+            {forge_root},
+        )
+
+        assert len(skips) == 1
+        assert skips[0].target == str(target)
+        assert skips[0].forge_root == str(forge_root.resolve())
+        assert skips[0].state == "unreadable"
+        assert "read error" in skips[0].reason
+
+    def test_pending_work_marker_is_gated_by_payload_forge_root(self, tmp_path: Path) -> None:
+        forge_root = _seed_session(tmp_path, "live")
+        (forge_root / ".forge" / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n')
+        queue_dir = _forge_home() / "pending-work"
+        queue_dir.mkdir(parents=True)
+        marker = queue_dir / "orphan.json"
+        marker.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "kind": "index",
+                    "marker_id": "orphan",
+                    "payload": {
+                        "session_name": "gone",
+                        "worktree_path": str(forge_root),
+                        "forge_root": str(forge_root),
+                    },
+                }
+            )
+        )
+
+        result = run_clean(
+            ctx=_make_ctx(tmp_path, forge_root=forge_root),
+            scope="workspace",
+        )
+
+        assert marker.exists()
+        assert [skip.target for skip in result.skipped_project_compatibility] == [str(marker)]
+        assert result.skipped_project_compatibility[0].forge_root == str(forge_root.resolve())
 
 
 # ---------------------------------------------------------------------------

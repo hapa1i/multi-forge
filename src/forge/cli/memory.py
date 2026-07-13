@@ -105,10 +105,28 @@ def memory() -> None:
     default=None,
     help="Augmentation strategy.",
 )
-@click.option("--intent", default=None, help="Doc intent for passport synthesis (why this doc is memory).")
-@click.option("--writers", default=None, help="Writer spec: all-sessions or comma-separated session names (default).")
-@click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
-@click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
+@click.option(
+    "--intent",
+    default=None,
+    help="Doc intent for passport synthesis (why this doc is memory).",
+)
+@click.option(
+    "--writers",
+    default=None,
+    help="Writer spec: all-sessions or comma-separated session names (default).",
+)
+@click.option(
+    "--propose",
+    is_flag=True,
+    default=False,
+    help="Author a shadow-only passport (proposal mode).",
+)
+@click.option(
+    "--shadow-path",
+    "shadow_override",
+    default=None,
+    help="Explicit shadow file path (use with --propose).",
+)
 def track_cmd(
     path: str,
     strategy: str | None,
@@ -150,6 +168,9 @@ def track_cmd(
     if ctx.forge_root is None:
         raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
     forge_root = ctx.forge_root
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(forge_root)
 
     resolved_base = forge_root.resolve()
     reason = is_safe_designated_doc_path(path, forge_root, resolved_base)
@@ -354,7 +375,7 @@ def _track_propose(
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
                 strategy=strategy,
-                shadow_path=shadow_path if shadow_path != passport.update.shadow_path else None,
+                shadow_path=(shadow_path if shadow_path != passport.update.shadow_path else None),
                 writers=writers,
             )
         except PassportError as e:
@@ -457,7 +478,11 @@ def list_cmd(as_json: bool) -> None:
 
     if not enriched:
         console.print("[dim]No passported memory docs found under scan roots.[/dim]")
-        print_tip("Run 'forge memory track <path> --strategy <strategy>'.", blank_before=False, console=console)
+        print_tip(
+            "Run 'forge memory track <path> --strategy <strategy>'.",
+            blank_before=False,
+            console=console,
+        )
         return
 
     from rich.table import Table
@@ -729,7 +754,10 @@ def shadows_review_cmd(
     ctx = click.get_current_context()
     ctx.invoke(shadows_show_cmd, for_doc=for_doc, scope=scope, as_json=as_json)
     if not as_json:
-        print_tip("Use --curate to run LLM synthesis, --show-latest to view the last report.", console=console)
+        print_tip(
+            "Use --curate to run LLM synthesis, --show-latest to view the last report.",
+            console=console,
+        )
 
 
 def _review_show_latest(
@@ -766,7 +794,12 @@ def _review_show_latest(
 
     if not reports:
         if as_json:
-            click.echo(json.dumps({"success": False, "reason": "no_reports", "official": for_doc}, indent=2))
+            click.echo(
+                json.dumps(
+                    {"success": False, "reason": "no_reports", "official": for_doc},
+                    indent=2,
+                )
+            )
         else:
             console.print(f"[dim]No curation reports found for {for_doc}.[/dim]")
             print_tip("Use --curate to generate one.", blank_before=False, console=console)
@@ -825,6 +858,9 @@ def _review_curate(
     if not forge_root_str:
         raise click.ClickException("Could not resolve forge_root for session.")
     forge_root = Path(forge_root_str)
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(forge_root)
 
     from forge.session.effective import compute_effective_intent
 
@@ -849,7 +885,13 @@ def _review_curate(
         if as_json:
             click.echo(
                 json.dumps(
-                    {"success": True, "official": for_doc, "shadow_count": 0, "report_path": None, "scope": scope},
+                    {
+                        "success": True,
+                        "official": for_doc,
+                        "shadow_count": 0,
+                        "report_path": None,
+                        "scope": scope,
+                    },
                     indent=2,
                 )
             )
@@ -954,7 +996,7 @@ def _review_curate(
                 {
                     "success": result.success,
                     "official": for_doc,
-                    "report_path": str(result.report_path) if result.report_path else None,
+                    "report_path": (str(result.report_path) if result.report_path else None),
                     "shadow_count": len(shadow_entries),
                     "scope": scope,
                     "error": result.error,
@@ -1035,7 +1077,10 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
             )
             return
         console.print(f"[dim]No passport found in {path}.[/dim]")
-        print_tip(f"Run 'forge memory track {path} --strategy <strategy>' to add one.", console=console)
+        print_tip(
+            f"Run 'forge memory track {path} --strategy <strategy>' to add one.",
+            console=console,
+        )
         return
 
     if as_json:
@@ -1083,6 +1128,10 @@ def passport_remove_cmd(path: str, as_json: bool) -> None:
     if ctx.forge_root is None:
         raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
 
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(ctx.forge_root)
+
     resolved_base = ctx.forge_root.resolve()
     reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
     if reason:
@@ -1098,7 +1147,11 @@ def passport_remove_cmd(path: str, as_json: bool) -> None:
         raise click.ClickException(f"Malformed frontmatter in {path}: {e}") from e
 
     if as_json:
-        payload: dict[str, object] = {"success": removed, "removed": removed, "path": path}
+        payload: dict[str, object] = {
+            "success": removed,
+            "removed": removed,
+            "path": path,
+        }
         if not removed:
             payload["reason"] = "no_passport"
         click.echo(json.dumps(payload, indent=2))

@@ -20,7 +20,7 @@ from forge.session import set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.hooks import resolve_session_store
 from forge.session.models import SessionState
-from forge.session.store import HOOK_LOCK_TIMEOUT_S
+from forge.session.store import HOOK_LOCK_TIMEOUT_S, SessionStore
 
 from ._helpers import _output_json
 
@@ -684,6 +684,8 @@ def _handle_policy_enable(argv: list[str]) -> None:
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    if not _guard_direct_project_mutation(store):
+        return
 
     try:
         store.read()  # Verify session exists
@@ -729,6 +731,8 @@ def _handle_policy_disable() -> None:
     store = resolve_session_store(cwd)
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
+        return
+    if not _guard_direct_project_mutation(store):
         return
 
     try:
@@ -788,6 +792,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     # %policy supervisor off — suspend
     if cmd == "off":
+        if not _guard_direct_project_mutation(store):
+            return
         try:
             policy_ops.supervisor_off(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
         except policy_ops.SupervisorNotConfiguredError:
@@ -801,6 +807,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     # %policy supervisor on — resume
     if cmd == "on":
+        if not _guard_direct_project_mutation(store):
+            return
         try:
             policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
         except policy_ops.SupervisorNotConfiguredError:
@@ -814,6 +822,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     # %policy supervisor remove — destructive
     if cmd == "remove":
+        if not _guard_direct_project_mutation(store):
+            return
         try:
             policy_ops.supervisor_remove(store=store, manifest=manifest, lock_timeout_s=HOOK_LOCK_TIMEOUT_S)
         except policy_ops.SupervisorNotConfiguredError:
@@ -829,6 +839,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     if cmd == "reload":
         if len(argv) > 2:
             _block("Usage: %policy supervisor reload [path]")
+            return
+        if not _guard_direct_project_mutation(store):
             return
 
         reload_path = argv[1] if len(argv) == 2 else None
@@ -861,6 +873,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
         if sub not in ("on", "off"):
             _block("Usage: %policy supervisor cascade on|off")
             return
+        if not _guard_direct_project_mutation(store):
+            return
 
         try:
             cascade_result = policy_ops.supervisor_cascade(
@@ -890,6 +904,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
 
     # %policy supervisor <target> — set supervisor
     if argv:
+        if not _guard_direct_project_mutation(store):
+            return
         target = argv[0]
         try:
             set_result = policy_ops.supervisor_set(
@@ -1277,6 +1293,8 @@ def _handle_cmd_cancel_verification() -> None:
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    if not _guard_direct_project_mutation(store):
+        return
 
     try:
         manifest = store.read()
@@ -1342,6 +1360,27 @@ def _handle_cmd_cancel_verification() -> None:
             }
         )
     )
+
+
+def _guard_direct_project_mutation(store: SessionStore) -> bool:
+    """Block an explicit direct-command mutation under an incompatible pin."""
+
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+        format_project_compatibility_recovery,
+    )
+
+    try:
+        enforce_project_compatibility(store.forge_root)
+    except ProjectCompatibilityError as e:
+        reason = (
+            f"Project compatibility refused ({e.state}) at {e.path}: {e.reason}. "
+            f"Recovery: {format_project_compatibility_recovery()}"
+        )
+        click.echo(json.dumps({"decision": "block", "reason": reason}))
+        return False
+    return True
 
 
 def _handle_cmd_clean(argv: list[str]) -> None:

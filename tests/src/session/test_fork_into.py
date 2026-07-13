@@ -7,9 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from forge.session.exceptions import ForgeSessionError, SessionExistsError
+from forge.install.project_compat import ProjectCompatibilityError
+from forge.session.exceptions import (
+    BranchExistsError,
+    BranchNotMergedError,
+    ForgeSessionError,
+    SessionExistsError,
+)
+from forge.session.identity import session_name_from_key
 from forge.session.manager import SessionManager
 from forge.session.models import Derivation
+from forge.session.prev_sessions import child_path
+from forge.session.store import SessionStore
+from forge.session.worktree import resolve_worktree_path
 
 
 def _init_git_repo(path: Path) -> None:
@@ -224,6 +234,77 @@ class TestForkIntoRelativePath:
         with pytest.raises(ForgeSessionError, match="No Forge project"):
             manager.fork_session("parent", "child", into_path=str(target_repo))
 
+    def test_into_incompatible_nested_target_refuses_before_child_write(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        parent_repo = tmp_path / "monorepo"
+        _init_git_repo(parent_repo)
+        parent_nested = parent_repo / "packages" / "app"
+        parent_nested.mkdir(parents=True)
+        _enable_forge(parent_nested)
+
+        target_repo = tmp_path / "monorepo-feat"
+        _init_git_repo(target_repo)
+        target_nested = target_repo / "packages" / "app"
+        target_nested.mkdir(parents=True)
+        _enable_forge(target_nested)
+        pin = target_nested / ".forge" / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n')
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(parent_nested))
+
+        with pytest.raises(ProjectCompatibilityError) as exc_info:
+            manager.fork_session("parent", "child", into_path=str(target_repo))
+
+        assert exc_info.value.path == str(pin)
+        assert exc_info.value.state == "incompatible"
+        assert not (target_nested / ".forge" / "sessions" / "child").exists()
+        assert all(session_name_from_key(key) != "child" for key in manager.index_store.read().sessions)
+
+    def test_into_force_refusal_preserves_stale_target_manifest_index_and_transfer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        parent_repo = tmp_path / "monorepo"
+        _init_git_repo(parent_repo)
+        parent_nested = parent_repo / "packages" / "app"
+        parent_nested.mkdir(parents=True)
+        _enable_forge(parent_nested)
+
+        target_repo = tmp_path / "monorepo-feat"
+        _init_git_repo(target_repo)
+        target_nested = target_repo / "packages" / "app"
+        target_nested.mkdir(parents=True)
+        _enable_forge(target_nested)
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(parent_nested))
+        manager.fork_session("parent", "child", into_path=str(target_repo))
+
+        child_store = SessionStore(str(target_nested), "child")
+        transfer = child_path(target_nested, "parent", "child")
+        transfer.parent.mkdir(parents=True, exist_ok=True)
+        transfer.write_text("stale transfer must survive\n", encoding="utf-8")
+        manifest_before = child_store.manifest_path.read_bytes()
+        index_before = manager.index_store.index_path.read_bytes()
+        transfer_before = transfer.read_bytes()
+
+        pin = target_nested / ".forge" / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n')
+
+        with pytest.raises(ProjectCompatibilityError):
+            manager.fork_session("parent", "child", into_path=str(target_repo), force=True)
+
+        assert child_store.manifest_path.read_bytes() == manifest_before
+        assert manager.index_store.index_path.read_bytes() == index_before
+        assert transfer.read_bytes() == transfer_before
+
     def test_worktree_fork_nested_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Fork --worktree propagates parent's relative_path to new checkout."""
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -249,6 +330,274 @@ class TestForkIntoRelativePath:
 
         entry = manager.index_store.get_session("child")
         assert entry.relative_path == "packages/app"
+
+    def test_worktree_fork_rolls_back_checkout_and_branch_on_target_refusal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        pin = repo / ".forge" / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n')
+        subprocess.run(["git", "add", "-f", ".forge/project.toml"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "track incompatible pin"], cwd=repo, check=True)
+        pin.write_text('schema_version = 1\nrequired_forge = ">=0"\n')
+
+        monkeypatch.chdir(repo)
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+        expected_worktree = resolve_worktree_path(repo, "child")
+
+        with pytest.raises(ProjectCompatibilityError):
+            manager.fork_session("parent", "child", create_worktree=True)
+
+        branches = subprocess.run(
+            ["git", "branch", "--list", "child"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert not expected_worktree.exists()
+        assert branches.strip() == ""
+        assert all(session_name_from_key(key) != "child" for key in manager.index_store.read().sessions)
+
+    def test_worktree_fork_surfaces_incomplete_target_refusal_rollback(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import forge.session.worktree as worktree_module
+
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        pin = repo / ".forge" / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n')
+        subprocess.run(["git", "add", "-f", ".forge/project.toml"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "track incompatible pin"], cwd=repo, check=True)
+        pin.write_text('schema_version = 1\nrequired_forge = ">=0"\n')
+
+        real_cleanup = worktree_module.cleanup_worktree
+
+        def _cleanup_with_error(**kwargs):
+            result = real_cleanup(**kwargs)
+            result.errors.append("simulated branch cleanup failure")
+            return result
+
+        monkeypatch.setattr(worktree_module, "cleanup_worktree", _cleanup_with_error)
+        monkeypatch.chdir(repo)
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+
+        with pytest.raises(
+            ForgeSessionError, match="Rollback incomplete.*simulated branch cleanup failure"
+        ) as exc_info:
+            manager.fork_session("parent", "child", create_worktree=True)
+
+        assert isinstance(exc_info.value.__cause__, ProjectCompatibilityError)
+        assert not resolve_worktree_path(repo, "child").exists()
+
+    def test_worktree_force_refusal_preserves_stale_checkout_branch_and_metadata(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        monkeypatch.chdir(repo)
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+        _, stale = manager.fork_session("parent", "child", create_worktree=True)
+        assert stale.worktree is not None
+
+        stale_checkout = Path(stale.worktree.path)
+        dirty_file = stale_checkout / "uncommitted.txt"
+        dirty_file.write_text("must survive refusal\n", encoding="utf-8")
+        pin = stale_checkout / ".forge" / "project.toml"
+        pin.parent.mkdir(parents=True, exist_ok=True)
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n', encoding="utf-8")
+        transfer = child_path(stale_checkout, "parent", "child")
+        transfer.parent.mkdir(parents=True, exist_ok=True)
+        transfer.write_text("stale transfer must survive\n", encoding="utf-8")
+
+        stale_store = SessionStore(str(stale_checkout), "child")
+        manifest_before = stale_store.manifest_path.read_bytes()
+        index_before = manager.index_store.index_path.read_bytes()
+        transfer_before = transfer.read_bytes()
+        branch_before = subprocess.run(
+            ["git", "rev-parse", "child"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        with pytest.raises(ProjectCompatibilityError):
+            manager.fork_session("parent", "child", create_worktree=True, force=True)
+
+        branch_after = subprocess.run(
+            ["git", "rev-parse", "child"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        worktrees = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+
+        assert stale_checkout.is_dir()
+        assert dirty_file.read_text(encoding="utf-8") == "must survive refusal\n"
+        assert pin.is_file()
+        assert branch_after == branch_before
+        assert f"worktree {stale_checkout}" in worktrees
+        assert stale_store.manifest_path.read_bytes() == manifest_before
+        assert manager.index_store.index_path.read_bytes() == index_before
+        assert transfer.read_bytes() == transfer_before
+
+    def test_worktree_force_refusal_preflights_incompatible_replacement_head(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        monkeypatch.chdir(repo)
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+        _, stale = manager.fork_session("parent", "child", create_worktree=True)
+        assert stale.worktree is not None
+
+        stale_checkout = Path(stale.worktree.path)
+        dirty_file = stale_checkout / "uncommitted.txt"
+        dirty_file.write_text("must survive prospective refusal\n", encoding="utf-8")
+        transfer = child_path(stale_checkout, "parent", "child")
+        transfer.parent.mkdir(parents=True, exist_ok=True)
+        transfer.write_text("stale transfer must survive\n", encoding="utf-8")
+        stale_store = SessionStore(str(stale_checkout), "child")
+        manifest_before = stale_store.manifest_path.read_bytes()
+        index_before = manager.index_store.index_path.read_bytes()
+        transfer_before = transfer.read_bytes()
+        branch_before = subprocess.run(
+            ["git", "rev-parse", "child"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        # The stale checkout predates this tracked pin, so its own precheck is
+        # compatible while the exact HEAD used for replacement is not.
+        pin = repo / ".forge" / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=999"\n', encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".forge/project.toml"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "require future Forge"], cwd=repo, check=True)
+        assert not (stale_checkout / ".forge" / "project.toml").exists()
+
+        with pytest.raises(ProjectCompatibilityError) as exc_info:
+            manager.fork_session("parent", "child", create_worktree=True, force=True)
+
+        branch_after = subprocess.run(
+            ["git", "rev-parse", "child"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        worktrees = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+
+        assert exc_info.value.path == str(stale_checkout / ".forge" / "project.toml")
+        assert stale_checkout.is_dir()
+        assert dirty_file.read_text(encoding="utf-8") == "must survive prospective refusal\n"
+        assert branch_after == branch_before
+        assert f"worktree {stale_checkout}" in worktrees
+        assert stale_store.manifest_path.read_bytes() == manifest_before
+        assert manager.index_store.index_path.read_bytes() == index_before
+        assert transfer.read_bytes() == transfer_before
+
+    def test_worktree_force_unmerged_branch_refusal_preserves_stale_checkout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        monkeypatch.chdir(repo)
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+        _, stale = manager.fork_session("parent", "child", create_worktree=True)
+        assert stale.worktree is not None
+        stale_checkout = Path(stale.worktree.path)
+        committed = stale_checkout / "child-only.txt"
+        committed.write_text("unmerged child commit\n", encoding="utf-8")
+        subprocess.run(["git", "add", "child-only.txt"], cwd=stale_checkout, check=True)
+        subprocess.run(["git", "commit", "-m", "child-only commit"], cwd=stale_checkout, check=True)
+        dirty = stale_checkout / "dirty.txt"
+        dirty.write_text("must survive\n", encoding="utf-8")
+        manifest_before = SessionStore(str(stale_checkout), "child").manifest_path.read_bytes()
+        index_before = manager.index_store.index_path.read_bytes()
+
+        with pytest.raises(BranchNotMergedError):
+            manager.fork_session("parent", "child", create_worktree=True, force=True)
+
+        assert stale_checkout.is_dir()
+        assert committed.read_text(encoding="utf-8") == "unmerged child commit\n"
+        assert dirty.read_text(encoding="utf-8") == "must survive\n"
+        assert SessionStore(str(stale_checkout), "child").manifest_path.read_bytes() == manifest_before
+        assert manager.index_store.index_path.read_bytes() == index_before
+
+    def test_worktree_force_explicit_branch_refusal_preserves_stale_checkout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        repo = tmp_path / "repo"
+        _init_git_repo(repo)
+        _enable_forge(repo)
+        monkeypatch.chdir(repo)
+
+        manager = SessionManager()
+        manager.start_session(name="parent", worktree_path=str(repo))
+        _, stale = manager.fork_session("parent", "child", create_worktree=True, branch="custom-child")
+        assert stale.worktree is not None
+        stale_checkout = Path(stale.worktree.path)
+        dirty = stale_checkout / "dirty.txt"
+        dirty.write_text("must survive\n", encoding="utf-8")
+
+        with pytest.raises(BranchExistsError):
+            manager.fork_session(
+                "parent",
+                "child",
+                create_worktree=True,
+                branch="custom-child",
+                force=True,
+            )
+
+        assert stale_checkout.is_dir()
+        assert dirty.read_text(encoding="utf-8") == "must survive\n"
 
 
 class TestForkNativeRelocate:

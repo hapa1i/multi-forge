@@ -368,6 +368,23 @@ class TestRebuildIndex:
         assert result.exit_code == 0
         assert "No artifacts" in result.output
 
+    def test_rebuild_refuses_incompatible_project_before_writing(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project_root = tmp_path / "project"
+        (project_root / ".git").mkdir(parents=True)
+        (project_root / ".forge").mkdir()
+        (project_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+        monkeypatch.chdir(project_root)
+
+        result = runner.invoke(main, ["search", "rebuild-index"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert not (project_root / ".forge" / "search-index").exists()
+
     def test_rebuild_auto_prunes_stale_index_entries(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -669,6 +686,46 @@ class TestPruneCmd:
         }
         assert store.read() == []
         assert index_store.read().indexed_files == {}
+
+    def test_clean_preview_labels_incompatible_apply_without_pruning(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project_root = tmp_path / "project"
+        (project_root / ".git").mkdir(parents=True)
+        monkeypatch.chdir(project_root)
+        store, index_store, _ = self._seed_orphans(project_root)
+        (project_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["search", "clean", "--json"])
+
+        assert result.exit_code == 0
+        refusal = json.loads(result.stdout)["skipped_project_compatibility"][0]
+        assert refusal["root"] == str(project_root)
+        assert refusal["state"] == "incompatible"
+        assert len(store.read()) == 1
+        assert index_store.read().indexed_files
+
+    def test_clean_apply_json_refuses_without_pruning(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project_root = tmp_path / "project"
+        (project_root / ".git").mkdir(parents=True)
+        monkeypatch.chdir(project_root)
+        store, index_store, _ = self._seed_orphans(project_root)
+        (project_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["search", "clean", "--yes", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        refusal = json.loads(result.stderr)["skipped_project_compatibility"][0]
+        assert refusal["state"] == "incompatible"
+        assert len(store.read()) == 1
+        assert index_store.read().indexed_files
 
     def test_clean_json_error_uses_stderr(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

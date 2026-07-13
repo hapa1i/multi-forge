@@ -6,7 +6,7 @@ Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.m
 
 **Closed on `main` 2026-07-07 as the first command-path guardrail slice.** The `.forge/project.toml` reader/enforcer,
 extension/session command-path guard set, and doctor surface landed in PR #90. The broader mutation-family sweep is
-explicitly split to [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md); do
+explicitly split to [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md); do
 not claim every state-mutating path observes `.forge/project.toml` until that follow-up lands.
 
 ## Scope boundary (what is NOT in T7)
@@ -76,7 +76,7 @@ isolation is out of scope.
   not warn.
 - [x] **Remaining mutator sweep split:** hook confirmed-state writes, memory-writer doc writes, and proxy/backend
   registry mutations moved to
-  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md). This is the remaining
+  [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md). This is the remaining
   condition before claiming every state-mutating path observes `.forge/project.toml`. If the sweep does not wire a hook
   caller before release, move the lenient hook helper with its first production caller rather than shipping unused
   contract code indefinitely.

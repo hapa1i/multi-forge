@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..exceptions import (
     BranchExistsError,
+    BranchNotMergedError,
     GitNotFoundError,
     GitWorktreeError,
     InvalidBranchNameError,
@@ -143,6 +144,79 @@ def branch_exists(branch: str, cwd: Path | None = None) -> bool:
     return result.returncode == 0
 
 
+def _branch_is_merged_into_head(branch: str, cwd: Path) -> bool:
+    """Return whether deleting *branch* with ``git branch -d`` is safe."""
+
+    git = find_git_binary()
+    result = subprocess.run(
+        [git, "merge-base", "--is-ancestor", f"refs/heads/{branch}", "HEAD"],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise GitWorktreeError("merge-base", result.stderr.strip(), result.returncode)
+
+
+def resolve_commit(cwd: Path, revision: str = "HEAD") -> str:
+    """Resolve *revision* to an immutable commit id."""
+
+    git = find_git_binary()
+    result = subprocess.run(
+        [git, "rev-parse", "--verify", f"{revision}^{{commit}}"],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GitWorktreeError("rev-parse", result.stderr.strip(), result.returncode)
+    return result.stdout.strip()
+
+
+def read_file_at_revision(
+    relative_path: Path,
+    *,
+    revision: str,
+    cwd: Path,
+) -> bytes | None:
+    """Read a tracked file from *revision*, or return ``None`` when absent."""
+
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("revision file path must be repository-relative")
+
+    git = find_git_binary()
+    path_str = relative_path.as_posix()
+    listing = subprocess.run(
+        [git, "ls-tree", "-z", "--name-only", revision, "--", path_str],
+        cwd=str(cwd),
+        capture_output=True,
+    )
+    if listing.returncode != 0:
+        raise GitWorktreeError(
+            "ls-tree",
+            listing.stderr.decode(errors="replace").strip(),
+            listing.returncode,
+        )
+    if not listing.stdout:
+        return None
+
+    result = subprocess.run(
+        [git, "show", f"{revision}:{path_str}"],
+        cwd=str(cwd),
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise GitWorktreeError(
+            "show",
+            result.stderr.decode(errors="replace").strip(),
+            result.returncode,
+        )
+    return result.stdout
+
+
 def get_worktree_for_branch(branch: str, cwd: Path | None = None) -> str | None:
     """Find the worktree path that has a branch checked out.
 
@@ -244,6 +318,7 @@ def create_worktree(
     *,
     force: bool = False,
     replace_owned_stale_state: bool = False,
+    start_point: str | None = None,
 ) -> WorktreeResult:
     """Create a git worktree for a session.
 
@@ -259,6 +334,7 @@ def create_worktree(
         replace_owned_stale_state: Allow force recovery only when the caller
             has already verified the target worktree/branch belong to the same
             stale Forge session being replaced.
+        start_point: Optional immutable commit used for the new branch.
 
     Returns:
         WorktreeResult with path and branch info.
@@ -284,6 +360,16 @@ def create_worktree(
 
     worktree_path = resolve_worktree_path(repo_root, session_name)
 
+    # Validate every known branch refusal before force-removing an owned stale
+    # checkout. The later delete keeps the same checks as a race-safe defense.
+    existing_branch = branch_exists(target_branch, repo_root)
+    if force and replace_owned_stale_state and existing_branch:
+        if branch is not None:
+            wt = get_worktree_for_branch(target_branch, repo_root)
+            raise BranchExistsError(target_branch, worktree=wt)
+        if not _branch_is_merged_into_head(target_branch, repo_root):
+            raise BranchNotMergedError(target_branch)
+
     # --force only replaces worktree state when the caller has proved the
     # derived target belongs to the same stale Forge child being recovered.
     # Worktree first (un-checks-out the branch), then branch.
@@ -306,7 +392,8 @@ def create_worktree(
             wt = get_worktree_for_branch(target_branch, repo_root)
             raise BranchExistsError(target_branch, worktree=wt)
         if branch is not None:
-            # Explicit --branch: refuse to destroy a user-chosen name
+            # Race-safe defense; the precheck above handles the normal stale
+            # replacement path before its checkout is removed.
             wt = get_worktree_for_branch(target_branch, repo_root)
             raise BranchExistsError(target_branch, worktree=wt)
         # --force with auto-derived branch: delete (respects git merge safety).
@@ -315,8 +402,11 @@ def create_worktree(
 
         _delete_branch(target_branch, cwd=repo_root, force=False)
 
+    command = [git, "worktree", "add", str(worktree_path), "-b", target_branch]
+    if start_point is not None:
+        command.append(start_point)
     result = subprocess.run(
-        [git, "worktree", "add", str(worktree_path), "-b", target_branch],
+        command,
         cwd=str(repo_root),
         capture_output=True,
         text=True,

@@ -198,7 +198,11 @@ def _direct_model_history_from_transcript_artifacts(manifest: SessionState, *, f
                     if not models or models[-1] != model:
                         models.append(model)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            _log.debug("Failed to scan transcript artifact for model history: %s", transcript_path, exc_info=True)
+            _log.debug(
+                "Failed to scan transcript artifact for model history: %s",
+                transcript_path,
+                exc_info=True,
+            )
 
     return tuple(models)
 
@@ -299,6 +303,19 @@ class ResolveSessionResult:
     state: SessionState
 
 
+def _enforce_session_mutation_compatibility(store: SessionStore) -> None:
+    """Block a session mutation when its owning Forge root is incompatible."""
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+    )
+
+    try:
+        enforce_project_compatibility(store.forge_root)
+    except ProjectCompatibilityError as e:
+        raise ForgeOpError(str(e)) from e
+
+
 def resolve_session(*, ctx: ExecutionContext, session_name: str | None = None) -> ResolveSessionResult:
     """Resolve a session by explicit name or current session from CWD.
 
@@ -373,6 +390,7 @@ def set_session_override(
     """
     resolved = resolve_session(ctx=ctx, session_name=session_name)
     store = resolved.store
+    _enforce_session_mutation_compatibility(store)
 
     try:
         # Validate key before acquiring lock (wildcards handled by set_override)
@@ -429,6 +447,7 @@ def reset_session_overrides(
     """
     resolved = resolve_session(ctx=ctx, session_name=session_name)
     store = resolved.store
+    _enforce_session_mutation_compatibility(store)
 
     try:
         if key:

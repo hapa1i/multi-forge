@@ -1165,11 +1165,29 @@ schema_version = 1
 required_forge = ">=1.2,<2"
 ```
 
-Missing file means compatible/unconstrained and is silent. Malformed or unsupported-schema files fail clear on command
-paths and are surfaced by doctor. A valid but incompatible `required_forge` blocks covered project-local command
-mutations with an "upgrade the global Forge or reset project state" hint. Hook-style reads use the lenient posture:
-degrade to unconstrained and report a diagnostic rather than bricking an active coding session. The guardrail is a
-fail-clear warning system for D1's accepted one-global-Forge version coupling; it is not a version manager.
+Missing means unconstrained. The strict reader returns `compatible=false` for a version mismatch and raises for
+malformed, unreadable, or unsupported state; mutators use the enforcer or reject that false result. The lenient hook
+reader converts refusals to degraded results. The guardrail never selects or installs Forge versions.
+
+Enforcement contracts:
+
+- **Owner and posture:** check the Forge root owning the target state, including resolved cross-CWD sessions and the
+  equivalent nested `fork --into` root. Explicit CLI and mutating `%` commands fail closed before side effects.
+  Lifecycle/context hooks diagnose once and preserve their wire; detached work refuses without failing foreground work.
+- **Batches:** multi-root operations skip and report refused roots while applying eligible work, then exit 1 on refusal
+  or failure. Previews mark what apply would refuse. `--force` does not bypass pins; automatic retention preserves the
+  foreground exit.
+- **Background and global state:** memory writing records `project_compatibility_refused` and exits 0. Index/shadow
+  markers follow bounded retry-to-`failed/` without changing foreground output. Proxy/backend registries and read-time
+  repair of derived global session/active indexes are exempt; paired project writes and mixed cleanup remain guarded.
+- **Worktrees:** WorktreeCreate checks the source before `git worktree add` and the corresponding target before project
+  writes, rolling back refusal. Runtime config never copies the ignored pin. Stale `fork --worktree --force` checks the
+  old root, exact replacement commit, and branch safety before removal, creates from that commit, and retains the
+  post-create defense. Refusal preserves checkout, branch, dirty files, manifest, index, and transfer state; incomplete
+  rollback is surfaced.
+
+Recovery is to run a satisfying Forge version or edit/reset project state. `FORGE_DEV` changes require relaunch and are
+not a bypass; sidecars need a satisfying image. `forge extension doctor` remains authoritative.
 
 ### C.5 Multi-scope installation (skill resolution)
 

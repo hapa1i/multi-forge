@@ -84,6 +84,21 @@ def _resolve_forge_root() -> Path:
         return Path.cwd().resolve()
 
 
+def _project_compatibility_refusal(project_root: Path) -> dict[str, str] | None:
+    """Return a preview/JSON-friendly refusal without blocking a read path."""
+    from forge.install.project_compat import diagnose_project_compatibility
+
+    result = diagnose_project_compatibility(project_root)
+    if result.compatible:
+        return None
+    return {
+        "target": "search_index",
+        "root": str(project_root),
+        "state": result.state,
+        "reason": result.reason or "project is incompatible",
+    }
+
+
 @click.group(
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -332,6 +347,9 @@ def rebuild_index_cmd() -> None:
     from forge.search.index_state import IndexStateStore
 
     project_root = _resolve_forge_root()
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(project_root)
     artifacts_dir = project_root / ".forge" / "artifacts"
 
     if not artifacts_dir.is_dir():
@@ -446,6 +464,24 @@ def _run_clean(*, yes: bool, as_json: bool) -> None:
     from forge.search.index_state import IndexStateStore
 
     project_root = _resolve_forge_root()
+    refusal = _project_compatibility_refusal(project_root)
+    if yes and refusal is not None:
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {
+                        "error": refusal["reason"],
+                        "skipped_project_compatibility": [refusal],
+                    }
+                ),
+                err=True,
+            )
+            raise SystemExit(1)
+
+        from forge.cli.guards import enforce_target_project_compatibility
+
+        enforce_target_project_compatibility(project_root)
+
     doc_store = SearchDocumentStore(forge_root=project_root)
     bm25_store = BM25IndexStore(forge_root=project_root)
     content_store = ContentStore(forge_root=project_root)
@@ -455,8 +491,13 @@ def _run_clean(*, yes: bool, as_json: bool) -> None:
         missing_docs = doc_store.find_missing()
         missing_index = index_store.find_missing()
         if as_json:
-            _output_clean_preview(missing_docs, missing_index)
+            _output_clean_preview(missing_docs, missing_index, refusal=refusal)
             return
+        if refusal is not None:
+            console.print(
+                f"[yellow]Apply would refuse this project[/yellow] "
+                f"([dim]{refusal['state']}[/dim]): {refusal['reason']}"
+            )
         if missing_docs or missing_index:
             console.print(
                 f"Would prune [cyan]{len(missing_docs)}[/cyan] orphaned document(s)"
@@ -506,13 +547,20 @@ def _clean_categories(document_paths: list[str], index_paths: list[str]) -> list
     ]
 
 
-def _output_clean_preview(missing_docs: list[str], missing_index: list[str]) -> None:
-    data = {
+def _output_clean_preview(
+    missing_docs: list[str],
+    missing_index: list[str],
+    *,
+    refusal: dict[str, str] | None = None,
+) -> None:
+    data: dict[str, object] = {
         "scope": "project",
         "dry_run": True,
         "total": len(missing_docs) + len(missing_index),
         "categories": _clean_categories(missing_docs, missing_index),
     }
+    if refusal is not None:
+        data["skipped_project_compatibility"] = [refusal]
     click.echo(json.dumps(data, indent=2))
 
 

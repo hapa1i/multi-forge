@@ -11,6 +11,7 @@ from click.testing import CliRunner
 
 import forge.cli.session as session_cli
 from forge.cli.main import main
+from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
 from forge.session.config import LAUNCH_MODE_HOST
@@ -25,6 +26,21 @@ from tests.src.cli.session_command_support import (
 
 def _help_line(output: str, option: str) -> str:
     return next(line.strip() for line in output.splitlines() if option in line)
+
+
+def _seed_delete_session(project_root: Path, forge_root: Path, name: str) -> None:
+    forge_root.mkdir(parents=True, exist_ok=True)
+    state = create_session_state(name, worktree_path=str(forge_root))
+    state.forge_root = str(forge_root)
+    SessionStore(str(forge_root), name).write(state)
+    IndexStore().add_session(
+        name=name,
+        worktree_path=str(forge_root),
+        project_root=str(project_root),
+        forge_root=str(forge_root),
+        checkout_root=str(project_root),
+        relative_path=str(forge_root.relative_to(project_root)),
+    )
 
 
 def test_start_and_fork_share_supervisor_option_fragment(runner: CliRunner) -> None:
@@ -76,6 +92,25 @@ class TestSessionStart:
         assert result.exit_code == 0
         assert "Created session" in result.output
         assert "new-session" in result.output
+
+    def test_start_refuses_incompatible_project_without_session_registry_writes(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        """The full CLI guard should refuse before manifest, index, or active writes."""
+        (temp_env / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["session", "start", "incompatible-start", "--no-launch"])
+
+        assert result.exit_code == 1
+        assert "Project compatibility refused (incompatible)" in result.output
+        assert "Run a Forge version satisfying required_forge, or edit/reset project state." in result.output
+        assert not SessionStore(str(temp_env), "incompatible-start").exists()
+        assert IndexStore().read().sessions == {}
+        assert ActiveSessionStore().read().sessions == {}
 
     def test_start_tracks_active_session_during_launch(self, runner: CliRunner, temp_env: Path) -> None:
         """Active-session registry should be present during launch and cleared after exit."""
@@ -542,6 +577,17 @@ class TestSessionDelete:
         assert result.exit_code == 1
         assert "not found" in result.output
 
+    def test_delete_nonexistent_preserves_not_found_before_compatibility(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        """A pin cannot refuse a name that has no project-owned state to mutate."""
+        with patch("forge.cli.session_manage.enforce_project_compatibility") as enforce:
+            result = runner.invoke(main, ["session", "delete", "nonexistent", "--yes"])
+
+        assert result.exit_code == 1
+        assert "not found" in result.output
+        enforce.assert_not_called()
+
     def test_delete_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
         """Should prompt for confirmation without --yes."""
         with successful_claude_launch():
@@ -712,6 +758,106 @@ class TestSessionDelete:
         assert not manager.session_exists("multi-1")
         assert not manager.session_exists("multi-2")
         assert not manager.session_exists("multi-3")
+
+    @pytest.mark.parametrize(
+        "state",
+        ["incompatible", "malformed", "unsupported_schema", "unreadable"],
+    )
+    def test_delete_single_refuses_each_project_compatibility_state_before_mutation(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        state: str,
+    ) -> None:
+        _seed_delete_session(temp_env, temp_env, "refused-single")
+        refusal = ProjectCompatibilityError(
+            str(temp_env / ".forge" / "project.toml"),
+            f"{state} pin",
+            state=state,
+        )
+
+        with patch(
+            "forge.cli.session_manage.enforce_project_compatibility",
+            side_effect=refusal,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "delete", "refused-single", "--yes", "--force"],
+            )
+
+        assert result.exit_code == 1
+        assert state in result.output
+        assert "Run a Forge version satisfying required_forge" in result.output
+        assert SessionStore(str(temp_env), "refused-single").exists()
+
+    def test_delete_multiple_skips_incompatible_root_and_continues(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        refused_root = temp_env / "nested-project"
+        _seed_delete_session(temp_env, temp_env, "compatible-delete")
+        _seed_delete_session(temp_env, refused_root, "refused-delete")
+
+        def enforce(root: str | Path | None) -> None:
+            if root is not None and Path(root).resolve() == refused_root.resolve():
+                raise ProjectCompatibilityError(
+                    str(refused_root / ".forge" / "project.toml"),
+                    "version mismatch",
+                    state="incompatible",
+                )
+
+        with patch(
+            "forge.cli.session_manage.enforce_project_compatibility",
+            side_effect=enforce,
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "delete",
+                    "refused-delete",
+                    "compatible-delete",
+                    "--yes",
+                    "--force",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert "refused-delete" in result.output
+        assert "incompatible" in result.output
+        assert "1 deleted, 1 skipped (project compatibility)" in result.output
+        assert SessionStore(str(refused_root), "refused-delete").exists()
+        assert not SessionStore(str(temp_env), "compatible-delete").exists()
+
+    def test_delete_all_force_does_not_bypass_project_compatibility(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        _seed_delete_session(temp_env, temp_env, "all-refused-a")
+        _seed_delete_session(temp_env, temp_env, "all-refused-b")
+        refusal = ProjectCompatibilityError(
+            str(temp_env / ".forge" / "project.toml"),
+            "version mismatch",
+            state="incompatible",
+        )
+
+        with patch(
+            "forge.cli.session_manage.enforce_project_compatibility",
+            side_effect=refusal,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "delete", "--all", "--yes", "--force"],
+            )
+
+        assert result.exit_code == 1
+        assert result.output.count("Skipped session") == 2
+        assert "0 deleted, 2 skipped (project compatibility)" in result.output
+        assert "About to delete" not in result.output
+        assert SessionStore(str(temp_env), "all-refused-a").exists()
+        assert SessionStore(str(temp_env), "all-refused-b").exists()
 
     def test_delete_all_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """--all should delete every session."""

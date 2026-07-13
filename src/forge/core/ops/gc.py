@@ -20,10 +20,15 @@ import json
 import logging
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    ProjectCompatibilitySkip,
+    enforce_project_compatibility,
+)
 
 from .context import ExecutionContext
 
@@ -53,6 +58,8 @@ class CleanReport:
 
     categories: list[OrphanCategory]
     scope: str
+    skipped_project_compatibility: list[ProjectCompatibilitySkip] = field(default_factory=list)
+    _search_doc_owners: tuple[tuple[str, str], ...] = field(default=(), repr=False, compare=False)
 
     @property
     def total_count(self) -> int:
@@ -69,10 +76,17 @@ class CleanResult:
 
     categories_cleaned: dict[str, int] = field(default_factory=dict)
     failed: list[tuple[str, str]] = field(default_factory=list)
+    skipped_project_compatibility: list[ProjectCompatibilitySkip] = field(default_factory=list)
 
     @property
     def deleted_count(self) -> int:
         return sum(self.categories_cleaned.values())
+
+    @property
+    def should_exit_nonzero(self) -> bool:
+        """Return whether explicit cleanup refused or failed any item."""
+
+        return bool(self.failed or self.skipped_project_compatibility)
 
 
 class CleanError(RuntimeError):
@@ -522,14 +536,18 @@ def _detect_stale_proxies() -> OrphanCategory:
     )
 
 
-def _detect_orphan_search_docs(forge_roots: set[Path]) -> OrphanCategory:
+def _detect_orphan_search_docs(
+    forge_roots: set[Path],
+    *,
+    owners: list[tuple[str, str]] | None = None,
+) -> OrphanCategory:
     """Find search-index documents whose transcript files no longer exist.
 
     Read-only: reads the document store without calling prune_missing().
     """
     orphans: list[str] = []
 
-    for forge_root in forge_roots:
+    for forge_root in sorted({root.resolve() for root in forge_roots}, key=str):
         try:
             from forge.search.store import SearchDocumentStore
 
@@ -538,6 +556,8 @@ def _detect_orphan_search_docs(forge_roots: set[Path]) -> OrphanCategory:
             for doc in docs:
                 if not Path(doc.transcript_path).is_file():
                     orphans.append(doc.transcript_path)
+                    if owners is not None:
+                        owners.append((doc.transcript_path, str(forge_root.resolve())))
         except Exception:
             _log.debug("Could not read search store for %s", forge_root, exc_info=True)
             continue
@@ -642,7 +662,11 @@ def _detect_corrupt_state(scope_roots: set[Path]) -> OrphanCategory:
             except StateCorruptedError:
                 corrupt.append(str(manifest))
             except Exception:
-                _log.debug("Non-corruption read error probing manifest %s", manifest, exc_info=True)
+                _log.debug(
+                    "Non-corruption read error probing manifest %s",
+                    manifest,
+                    exc_info=True,
+                )
 
     for path, reader in _global_registry_probes():
         if not path.is_file():
@@ -710,6 +734,182 @@ def _path_in_roots(candidate: Path, roots: set[Path]) -> bool:
     return False
 
 
+_PROJECT_OWNED_CATEGORIES = {
+    "session_dirs",
+    "transfer_files",
+    "active_entries",
+    "work_queue",
+    "search_docs",
+    "corrupt_state",
+}
+
+
+def _owning_scope_root(candidate: Path, scope_roots: set[Path]) -> Path | None:
+    """Return the most-specific tracked Forge root containing *candidate*."""
+
+    resolved = candidate.resolve()
+    matches: list[Path] = []
+    for root in scope_roots:
+        resolved_root = root.resolve()
+        try:
+            resolved.relative_to(resolved_root)
+        except ValueError:
+            continue
+        matches.append(resolved_root)
+    return max(matches, key=lambda path: len(path.parts), default=None)
+
+
+def _work_queue_owner(item: str, scope_roots: set[Path]) -> Path | None:
+    """Resolve a pending-work marker to the project whose work it represents."""
+
+    try:
+        data = json.loads(Path(item).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    payload = data.get("payload", {})
+    forge_root = payload.get("forge_root")
+    if isinstance(forge_root, str) and forge_root:
+        return Path(forge_root).resolve()
+
+    worktree_path = payload.get("worktree_path")
+    if not isinstance(worktree_path, str) or not worktree_path:
+        return None
+    worktree = Path(worktree_path).resolve()
+
+    # Legacy markers lack forge_root. Prefer a tracked nested project within
+    # the checkout; otherwise the checkout itself is the historical Forge root.
+    nested = [
+        root.resolve()
+        for root in scope_roots
+        if root.resolve() == worktree or _path_is_relative_to(root.resolve(), worktree)
+    ]
+    return max(nested, key=lambda path: len(path.parts), default=worktree)
+
+
+def _path_is_relative_to(candidate: Path, parent: Path) -> bool:
+    """Return whether *candidate* is contained by *parent*."""
+
+    try:
+        candidate.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _project_owner(
+    category: str,
+    item: str,
+    scope_roots: set[Path],
+) -> Path | None:
+    """Return the Forge root owning a project-scoped cleanup item.
+
+    ``None`` means the item is global-only. Callers must only invoke this for
+    known cleanup categories; new mutating categories require an explicit
+    ownership decision here before they are added to ``run_clean``.
+    """
+
+    if category in {"proxies", "dead_installations"}:
+        return None
+    if category == "active_entries":
+        if "::" not in item:
+            return None
+        _name, forge_root = item.split("::", 1)
+        return Path(forge_root).resolve() if forge_root else None
+    if category == "work_queue":
+        return _work_queue_owner(item, scope_roots)
+    if category == "corrupt_state":
+        global_paths = {path.resolve() for path, _reader in _global_registry_probes()}
+        if Path(item).resolve() in global_paths:
+            return None
+    if category in _PROJECT_OWNED_CATEGORIES:
+        return _owning_scope_root(Path(item), scope_roots)
+    return None
+
+
+def _search_doc_owners_by_path(scope_roots: set[Path]) -> dict[str, list[Path]]:
+    """Index orphan transcript paths by every root containing their search row."""
+
+    from forge.search.store import SearchDocumentStore
+
+    owners: dict[str, list[Path]] = {}
+    for forge_root in sorted({root.resolve() for root in scope_roots}, key=str):
+        try:
+            docs = SearchDocumentStore(forge_root=forge_root).read()
+        except Exception:
+            continue
+        for doc in docs:
+            owners.setdefault(doc.transcript_path, []).append(forge_root)
+    return owners
+
+
+def _project_compatibility_skips(
+    categories: list[OrphanCategory],
+    scope_roots: set[Path],
+    *,
+    search_doc_owners: tuple[tuple[str, str], ...] | None = None,
+) -> list[ProjectCompatibilitySkip]:
+    """Return every project-owned report item that apply would refuse."""
+
+    skips: list[ProjectCompatibilitySkip] = []
+    errors: dict[Path, ProjectCompatibilityError | None] = {}
+    recorded: set[tuple[str, Path]] = set()
+    search_owners: dict[str, list[Path]] | None = None
+    if search_doc_owners is not None:
+        search_owners = {}
+        for transcript_path, forge_root in search_doc_owners:
+            search_owners.setdefault(transcript_path, []).append(Path(forge_root))
+    for category in categories:
+        for item in category.items:
+            if category.category == "search_docs":
+                if search_owners is None:
+                    search_owners = _search_doc_owners_by_path(scope_roots)
+                owners = search_owners.get(item, [])
+            else:
+                owner = _project_owner(category.category, item, scope_roots)
+                owners = [] if owner is None else [owner]
+            for owner in owners:
+                if owner not in errors:
+                    try:
+                        enforce_project_compatibility(owner)
+                    except ProjectCompatibilityError as compatibility_error:
+                        errors[owner] = compatibility_error
+                    else:
+                        errors[owner] = None
+                error = errors[owner]
+                if error is not None and (item, owner) not in recorded:
+                    skips.append(
+                        ProjectCompatibilitySkip.from_error(
+                            target=item,
+                            forge_root=owner,
+                            error=error,
+                        )
+                    )
+                    recorded.add((item, owner))
+    return skips
+
+
+def _build_clean_report(
+    *,
+    categories: list[OrphanCategory],
+    scope: str,
+    scope_roots: set[Path],
+    search_doc_owners: tuple[tuple[str, str], ...] = (),
+) -> CleanReport:
+    """Build a report with compatibility refusals for preview and apply."""
+
+    return CleanReport(
+        categories=categories,
+        scope=scope,
+        skipped_project_compatibility=_project_compatibility_skips(
+            categories,
+            scope_roots,
+            search_doc_owners=search_doc_owners,
+        ),
+        _search_doc_owners=search_doc_owners,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Report (read-only)
 # ---------------------------------------------------------------------------
@@ -737,20 +937,30 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         # orphan and propose deleting them all.
         _log.warning("forge clean: corrupt durable state blocked the normal scan; reporting corrupt state only")
         fallback_roots = {ctx.forge_root} if scope == "project" and ctx.forge_root else _roots_without_index(ctx)
-        return CleanReport(categories=[_detect_corrupt_state(fallback_roots)], scope=scope)
+        return _build_clean_report(
+            categories=[_detect_corrupt_state(fallback_roots)],
+            scope=scope,
+            scope_roots=fallback_roots,
+        )
 
+    search_doc_owners: list[tuple[str, str]] = []
     categories = [
         _detect_orphan_session_dirs(ref_set, scope_roots),
         _detect_orphan_transfer_files(ref_set, scope_roots),
         _detect_stale_active_entries(scope_roots),
         _detect_stale_work_queue(worktree_ref_set, scope_roots),
         _detect_stale_proxies(),
-        _detect_orphan_search_docs(scope_roots),
+        _detect_orphan_search_docs(scope_roots, owners=search_doc_owners),
         _detect_dead_installations(),
         _detect_corrupt_state(scope_roots),
     ]
 
-    return CleanReport(categories=categories, scope=scope)
+    return _build_clean_report(
+        categories=categories,
+        scope=scope,
+        scope_roots=scope_roots,
+        search_doc_owners=tuple(search_doc_owners),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -767,9 +977,26 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
         CleanError: If scope=project and no forge_root.
     """
     report = collect_clean_report(ctx=ctx, scope=scope)
-    result = CleanResult()
+    result = CleanResult(skipped_project_compatibility=list(report.skipped_project_compatibility))
+    refused_items = {skip.target for skip in report.skipped_project_compatibility}
+    eligible_categories = [
+        replace(
+            category,
+            count=len(items),
+            items=items,
+        )
+        for category in report.categories
+        if (
+            items := (
+                list(category.items)
+                if category.category == "search_docs"
+                else [item for item in category.items if item not in refused_items]
+            )
+        )
+    ]
+    eligible_report = replace(report, categories=eligible_categories)
 
-    for category in report.categories:
+    for category in eligible_report.categories:
         if category.count == 0:
             continue
 
@@ -785,7 +1012,7 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
         elif category.category == "proxies":
             cleaned = _clean_proxies()
         elif category.category == "search_docs":
-            cleaned = _clean_search_docs(report, result)
+            cleaned = _clean_search_docs(eligible_report, result)
         elif category.category == "dead_installations":
             cleaned = _clean_dead_installations(category.items, result)
         elif category.category == "corrupt_state":
@@ -967,6 +1194,18 @@ def _extract_forge_roots_from_report(report: CleanReport) -> set[Path]:
     if search_cat is None:
         return set()
 
+    orphan_paths = set(search_cat.items)
+    if report._search_doc_owners:
+        refused_pairs = {
+            (skip.target, str(Path(skip.forge_root).resolve())) for skip in report.skipped_project_compatibility
+        }
+        return {
+            Path(forge_root)
+            for transcript_path, forge_root in report._search_doc_owners
+            if transcript_path in orphan_paths and (transcript_path, forge_root) not in refused_pairs
+        }
+
+    # Compatibility for synthetic reports constructed by older callers/tests.
     roots: set[Path] = set()
     for transcript_path in search_cat.items:
         # Transcript paths are under <forge_root>/.forge/artifacts/

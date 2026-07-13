@@ -550,6 +550,80 @@ class TestResumeCodexDispatch:
         assert result.exit_code == 0, result.output
         reattach.assert_called_once_with(name="impl")
 
+    def test_bare_codex_resume_cross_project_refuses_incompatible_target(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        codex_project = tmp_path / "codex-project"
+        caller_project = tmp_path / "caller-project"
+        for project_root in (codex_project, caller_project):
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / ".forge").mkdir()
+        (codex_project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state.forge_root = str(codex_project)
+        state.confirmed.codex = CodexConfirmed(thread_id=_TID)
+        SessionStore(str(codex_project), "impl").write(state)
+        IndexStore().add_session(
+            name="impl",
+            worktree_path=str(codex_project),
+            project_root=str(codex_project),
+            forge_root=str(codex_project),
+            checkout_root=str(codex_project),
+            relative_path=".",
+        )
+
+        monkeypatch.chdir(caller_project)
+        with patch("forge.cli.session_codex.reattach_interactive_codex_session") as reattach:
+            result = runner.invoke(main, ["session", "resume", "impl"])
+
+        assert result.exit_code == 1
+        assert "requires Forge >=9999" in result.output
+        reattach.assert_not_called()
+
+    def test_bare_codex_resume_uses_compatible_target_not_incompatible_caller(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        codex_project = tmp_path / "codex-project"
+        caller_project = tmp_path / "caller-project"
+        for project_root in (codex_project, caller_project):
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / ".forge").mkdir()
+        (caller_project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state.forge_root = str(codex_project)
+        state.confirmed.codex = CodexConfirmed(thread_id=_TID)
+        SessionStore(str(codex_project), "impl").write(state)
+        IndexStore().add_session(
+            name="impl",
+            worktree_path=str(codex_project),
+            project_root=str(codex_project),
+            forge_root=str(codex_project),
+            checkout_root=str(codex_project),
+            relative_path=".",
+        )
+
+        monkeypatch.chdir(caller_project)
+        with (
+            patch("forge.cli.session_codex._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+        ):
+            result = runner.invoke(main, ["session", "resume", "impl"])
+
+        assert result.exit_code == 0, result.output
+        reattach.assert_called_once_with(name="impl")
+
     def test_bare_claude_resume_cross_project_keeps_refusal(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

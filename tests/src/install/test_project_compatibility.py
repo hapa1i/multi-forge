@@ -11,7 +11,9 @@ from forge.install.project_compat import (
     check_project_compatibility,
     check_project_compatibility_for_hook,
     diagnose_project_compatibility,
+    diagnose_project_compatibility_for_hook,
     enforce_project_compatibility,
+    format_project_compatibility_recovery,
 )
 
 
@@ -56,6 +58,38 @@ def test_incompatible_pin_blocks_command_path(tmp_path: Path) -> None:
         enforce_project_compatibility(tmp_path, running_forge="1.2.3")
 
 
+def test_recovery_wording_is_provenance_neutral() -> None:
+    recovery = format_project_compatibility_recovery(environment={})
+
+    assert recovery == "Run a Forge version satisfying required_forge, or edit/reset project state."
+    assert "global Forge" not in recovery
+
+
+def test_recovery_wording_adds_dev_relaunch_without_value() -> None:
+    recovery = format_project_compatibility_recovery(
+        environment={"FORGE_DEV": "/secret/checkout"},
+    )
+
+    assert "FORGE_DEV" in recovery
+    assert "relaunching the managed session" in recovery
+    assert "/secret/checkout" not in recovery
+
+
+def test_recovery_wording_adds_sidecar_image_hint() -> None:
+    recovery = format_project_compatibility_recovery(environment={"FORGE_SIDECAR": "1"})
+
+    assert "sidecar session" in recovery
+    assert "image containing a satisfying Forge version" in recovery
+    assert "FORGE_SIDECAR" not in recovery
+
+
+@pytest.mark.parametrize("value", ["", "0"])
+def test_recovery_wording_omits_sidecar_hint_when_not_inside_sidecar(value: str) -> None:
+    recovery = format_project_compatibility_recovery(environment={"FORGE_SIDECAR": value})
+
+    assert "sidecar session" not in recovery
+
+
 def test_malformed_file_fails_strict_but_degrades_for_hook(tmp_path: Path) -> None:
     _write_project_toml(tmp_path, "not = valid = toml\n")
 
@@ -85,6 +119,45 @@ def test_hook_path_fails_open_on_incompatible_pin(tmp_path: Path) -> None:
     assert result.degraded is not None
 
 
+def test_hook_invocation_diagnostic_deduplicates_roots_and_logs_once(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _write_project_toml(tmp_path, 'schema_version = 1\nrequired_forge = ">=9"\n')
+
+    with caplog.at_level("DEBUG", logger="forge.install.project_compat"):
+        results = diagnose_project_compatibility_for_hook(
+            tmp_path,
+            tmp_path,
+            operation="test-hook",
+            running_forge="1.2.3",
+        )
+
+    assert len(results) == 1
+    assert results[0].state == "incompatible"
+    messages = [record.message for record in caplog.records if "Project compatibility degraded" in record.message]
+    assert len(messages) == 1
+    assert "test-hook" in messages[0]
+
+
+def test_hook_invocation_diagnostic_is_silent_for_compatible_root(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _write_project_toml(tmp_path, 'schema_version = 1\nrequired_forge = ">=1"\n')
+
+    with caplog.at_level("DEBUG", logger="forge.install.project_compat"):
+        results = diagnose_project_compatibility_for_hook(
+            tmp_path,
+            operation="test-hook",
+            running_forge="1.2.3",
+        )
+
+    assert len(results) == 1
+    assert results[0].state == "compatible"
+    assert not [record for record in caplog.records if "Project compatibility degraded" in record.message]
+
+
 def test_doctor_surfaces_malformed_project_toml(tmp_path: Path) -> None:
     _write_project_toml(tmp_path, "not = valid = toml\n")
 
@@ -93,3 +166,4 @@ def test_doctor_surfaces_malformed_project_toml(tmp_path: Path) -> None:
     assert result.compatible is False
     assert result.state == "malformed"
     assert result.reason is not None
+    assert "satisfying required_forge" in result.reason

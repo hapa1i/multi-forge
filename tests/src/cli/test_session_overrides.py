@@ -8,9 +8,27 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.session import IndexStore, SessionStore, create_session_state
 from tests.src.cli.session_command_support import (
     successful_claude_launch,
 )
+
+
+def _seed_cross_project_session(*, caller_root: Path, target_root: Path, name: str) -> SessionStore:
+    (target_root / ".forge").mkdir(parents=True)
+    state = create_session_state(name, worktree_path=str(target_root))
+    state.forge_root = str(target_root)
+    store = SessionStore(str(target_root), name)
+    store.write(state)
+    IndexStore().add_session(
+        name=name,
+        worktree_path=str(target_root),
+        project_root=str(caller_root),
+        forge_root=str(target_root),
+        checkout_root=str(target_root),
+        relative_path=".",
+    )
+    return store
 
 
 class TestSessionSetOverride:
@@ -103,6 +121,54 @@ class TestSessionSetOverride:
 
         assert result.exit_code == 1
         assert "unknown field" in result.output
+
+    def test_set_uses_incompatible_target_root_not_compatible_caller(self, runner: CliRunner, temp_env: Path) -> None:
+        target_root = temp_env.parent / "target-project"
+        store = _seed_cross_project_session(caller_root=temp_env, target_root=target_root, name="target-session")
+        before = store.manifest_path.read_bytes()
+        (target_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "set",
+                "--session",
+                "target-session",
+                "policy.fail_mode",
+                "closed",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert store.manifest_path.read_bytes() == before
+
+    def test_set_ignores_incompatible_caller_when_target_root_is_compatible(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        target_root = temp_env.parent / "target-project"
+        store = _seed_cross_project_session(caller_root=temp_env, target_root=target_root, name="target-session")
+        (temp_env / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "set",
+                "--session",
+                "target-session",
+                "policy.fail_mode",
+                "closed",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert store.read().overrides["policy"]["fail_mode"] == "closed"
 
 
 class TestSessionReset:

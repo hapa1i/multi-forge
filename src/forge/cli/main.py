@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import click
@@ -171,6 +172,22 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
     return env
 
 
+def _enforce_queued_project_compatibility(project_root: Path) -> None:
+    """Raise a state-bearing error so queue retries record the refused project."""
+
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+    )
+
+    try:
+        enforce_project_compatibility(project_root)
+    except ProjectCompatibilityError as e:
+        raise RuntimeError(
+            f"project compatibility refused ({e.state}) at {e.path}: {e.reason}",
+        ) from e
+
+
 def _process_pending_work_best_effort() -> None:
     """Process pending-work queue opportunistically.
 
@@ -200,8 +217,6 @@ def _process_pending_work_best_effort() -> None:
             content), then marks as indexed. All store operations are idempotent
             upserts, so work queue retries produce correct state.
             """
-            from pathlib import Path
-
             from forge.search.bm25_store import BM25IndexStore
             from forge.search.content_store import ContentStore
             from forge.search.extractor import decompose_document, extract_document
@@ -215,6 +230,7 @@ def _process_pending_work_best_effort() -> None:
 
             marker_forge_root = payload.get("forge_root")
             forge_root = Path(marker_forge_root) if marker_forge_root else resolve_forge_root(worktree_path)
+            _enforce_queued_project_compatibility(forge_root)
             transcript_abs = (forge_root / transcript_rel).resolve()
 
             # Validate path containment to prevent path traversal
@@ -313,7 +329,16 @@ def _process_pending_work_best_effort() -> None:
             ]
             marker_forge_root = payload.get("forge_root")
             if marker_forge_root:
-                cmd.extend(["--root", marker_forge_root])
+                forge_root = Path(marker_forge_root)
+            else:
+                from forge.session.artifacts import resolve_forge_root
+
+                worktree_path = payload.get("worktree_path")
+                if not worktree_path:
+                    raise ValueError("Shadow marker is missing worktree_path")
+                forge_root = resolve_forge_root(Path(worktree_path))
+            _enforce_queued_project_compatibility(forge_root)
+            cmd.extend(["--root", str(forge_root)])
 
             env = _memory_writer_env(payload)
             # This is a fresh top-level process tree (start_new_session=True). Reset the

@@ -4,14 +4,14 @@
 
 **Lane**: `done/`. Shipped in PR #90 as the first command-path guardrail slice. Independent -- a check layered on
 project state. The remaining mutator-family sweep was split to
-[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
+[`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md).
 
 ## Goal
 
 `<repo>/.forge/project.toml` carrying `schema_version` + `required_forge`. This slice ships the reader, doctor surface,
 extension lifecycle guard, and shared session repo-root guards. The broader "every command/hook that mutates project
 state" coverage is owned by
-[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md).
+[`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md).
 
 ## Accepted decision (epic D1)
 
@@ -55,13 +55,12 @@ around it.
 - **Check-site sprawl** without a single chokepoint.
 - **False-blocking during rapid iteration**: Forge clean-breaks state often; the guardrail must name the reset/upgrade
   path, and its fail-open default must not brick a coding session.
-- Interaction with `forge_dev_runtime_override`: a contributor running a checkout `forge` against a project pinned to a
-  released range -- T8 decides whether the dev override bypasses the guardrail.
+- Interaction with `forge_dev_runtime_override`: resolved by T8 -- checkout-local Forge receives no compatibility
+  bypass; the running checkout version must satisfy the same pin.
 
-## Open questions
+## Resolved follow-up
 
-- Whether `required_forge` is enforced when a contributor runs checkout-local Forge (interacts with
-  `forge_dev_runtime_override`; T8).
+- T8 resolved that `FORGE_DEV` changes binary selection only and never bypasses `required_forge`.
 
 ## Acceptance tests
 

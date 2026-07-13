@@ -19,6 +19,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from forge.install.project_compat import diagnose_project_compatibility_for_hook
 from forge.session.codex_handoff import (
     consume_pending_context,
     pending_context_path,
@@ -76,6 +77,10 @@ def run_codex_session_start(data: dict[str, Any]) -> str | None:
     if store is None:
         logger.debug("Codex session-start: no session resolved")
         return None
+    diagnose_project_compatibility_for_hook(
+        store.forge_root,
+        operation="codex-session-start",
+    )
 
     transcript_path = data.get("transcript_path")
     source = data.get("source")

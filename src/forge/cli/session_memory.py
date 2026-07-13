@@ -116,6 +116,10 @@ def _set_memory_activation(
         print_error(str(e), console=err_console)
         sys.exit(1)
 
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(resolved.store.forge_root)
+
     from forge.session.effective import compute_effective_intent
 
     state = resolved.state

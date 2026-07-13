@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -1899,6 +1900,53 @@ class TestSessionFork:
 
 class TestSessionForkIntoPreflight:
     """Tests for --into cross-repo preflight validation."""
+
+    def test_into_nested_incompatible_target_refuses_before_proxy_or_fork(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        parent = create_session_state("planner", worktree_path=str(temp_env), worktree_branch="main")
+        into_dir = temp_env / "existing-wt"
+        target_root = into_dir / "packages" / "app"
+        (target_root / ".forge").mkdir(parents=True)
+        (target_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+        common_git = str(temp_env / ".git")
+
+        def fake_git_run(cmd, **kwargs):
+            from unittest.mock import MagicMock
+
+            result = MagicMock(returncode=0)
+            if "--show-toplevel" in cmd:
+                result.stdout = str(into_dir)
+            elif "--git-common-dir" in cmd:
+                result.stdout = common_git
+            elif "--abbrev-ref" in cmd:
+                result.stdout = "feat-branch"
+            else:
+                result.stdout = ""
+            return result
+
+        with (
+            patch("forge.cli.session_fork.SessionManager") as manager_cls,
+            patch("subprocess.run", side_effect=fake_git_run),
+            patch("forge.cli.session_fork._resolve_routing_from_cli") as resolve_routing,
+        ):
+            manager = manager_cls.return_value
+            manager.get_session.return_value = parent
+            manager.index_store.get_session.return_value = SimpleNamespace(relative_path="packages/app")
+
+            result = runner.invoke(
+                main,
+                ["session", "fork", "planner", "--into", str(into_dir), "--proxy", "test-proxy"],
+            )
+
+        assert result.exit_code == 1
+        assert ">=9999" in result.output
+        assert "running Forge" in result.output
+        assert str(target_root / ".forge" / "project.toml") in result.output
+        resolve_routing.assert_not_called()
+        manager.fork_session.assert_not_called()
 
     def test_into_cross_repo_rejected_before_fork(self, runner: CliRunner, temp_env: Path) -> None:
         """--into targeting a different repo should fail before fork_session() is called."""

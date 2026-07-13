@@ -16,6 +16,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from forge.core.state import parse_iso
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    ProjectCompatibilitySkip,
+    enforce_project_compatibility,
+)
 from forge.runtime_config import get_runtime_config
 from forge.session import SessionManager
 from forge.session.active import ActiveSessionStore
@@ -34,6 +39,7 @@ class SessionCleanupResult:
     deleted: list[str] = field(default_factory=list)
     skipped_active: list[str] = field(default_factory=list)
     skipped_unparseable: list[str] = field(default_factory=list)
+    skipped_project_compatibility: list[ProjectCompatibilitySkip] = field(default_factory=list)
     failed: list[tuple[str, str]] = field(default_factory=list)
     aborted_error: str | None = None
 
@@ -49,6 +55,7 @@ class SessionCleanupResult:
             not self.deleted
             and not self.skipped_active
             and not self.skipped_unparseable
+            and not self.skipped_project_compatibility
             and not self.failed
             and self.aborted_error is None
         )
@@ -73,7 +80,7 @@ class SessionCleanupResult:
     @property
     def should_exit_nonzero(self) -> bool:
         """Return True when CLI cleanup should exit with an error."""
-        return self.has_failures
+        return self.has_failures or bool(self.skipped_project_compatibility)
 
     @property
     def has_partial_success(self) -> bool:
@@ -87,7 +94,7 @@ class SessionCleanupResult:
             not self.deleted
             and not self.failed
             and self.aborted_error is None
-            and bool(self.skipped_active or self.skipped_unparseable)
+            and bool(self.skipped_active or self.skipped_unparseable or self.skipped_project_compatibility)
         )
 
     @property
@@ -164,7 +171,21 @@ def clean_old_sessions(
             result.skipped_active.append(name)
             continue
 
-        # Delete (scoped by forge_root to avoid cross-project collisions)
+        # Delete (scoped by forge_root to avoid cross-project collisions).
+        # Compatibility is intentionally checked per target so one refused
+        # project cannot prevent cleanup of compatible projects.
+        forge_root = entry.forge_root or entry.worktree_path
+        try:
+            enforce_project_compatibility(forge_root)
+        except ProjectCompatibilityError as e:
+            skip = ProjectCompatibilitySkip.from_error(
+                target=name,
+                forge_root=forge_root,
+                error=e,
+            )
+            result.skipped_project_compatibility.append(skip)
+            continue
+
         try:
             manager.delete_session(
                 name,
@@ -172,7 +193,7 @@ def clean_old_sessions(
                 delete_worktree=delete_worktree,
                 delete_branch=delete_branch,
                 force=force,
-                forge_root=entry.forge_root or entry.worktree_path,
+                forge_root=forge_root,
             )
             result.deleted.append(name)
         except Exception as e:
@@ -211,6 +232,14 @@ def auto_clean_old_sessions() -> None:
                 "Auto-cleaned %d session(s) older than %d days",
                 len(cleanup_result.deleted),
                 rc.session_retention_days,
+            )
+        for skip in cleanup_result.skipped_project_compatibility:
+            logger.debug(
+                "Auto-clean skipped session '%s' at %s for project compatibility (%s): %s",
+                skip.target,
+                skip.forge_root,
+                skip.state,
+                skip.reason,
             )
     except Exception as e:
         logger.debug("Session auto-cleanup error (non-fatal): %s", e)

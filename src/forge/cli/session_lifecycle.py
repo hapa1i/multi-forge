@@ -1046,10 +1046,6 @@ def start(
     if not proxy_name and not direct and not sidecar and not host_proxy:
         direct = True
 
-    routing: ResolvedRouting | None = None
-    if proxy_name:
-        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
-
     # CWD validation: must be at repo root; --worktree requires main repo
     from forge.cli.guards import require_main_repo_root, require_repo_root
 
@@ -1057,6 +1053,10 @@ def start(
         require_main_repo_root()
     else:
         require_repo_root()
+
+    routing: ResolvedRouting | None = None
+    if proxy_name:
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if name is None:
         _fr = _cwd_forge_root()
@@ -1285,10 +1285,6 @@ def resume(
         )
         sys.exit(1)
 
-    routing: ResolvedRouting | None = None
-    if proxy_name:
-        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
-
     manager = SessionManager()
 
     if name is None:
@@ -1336,11 +1332,19 @@ def resume(
         handle_session_error(e)
         return
 
+    target_forge_root = manifest.forge_root or (manifest.worktree.path if manifest.worktree else None)
+    if target_forge_root is None:
+        print_error(f"Session '{name}' has no Forge project root")
+        sys.exit(1)
+
+    from forge.cli.guards import enforce_target_project_compatibility
+
     # Runtime dispatch BEFORE any Claude predicate: a Codex session has no Claude
     # conversation to reattach, so the Claude resume machinery below never applies.
     # Codex resume is cross-CWD by design (the turn runs in the recorded worktree).
     manifest_runtime = session_runtime(manifest)
     if manifest_runtime == "codex":
+        enforce_target_project_compatibility(Path(target_forge_root))
         sys.exit(run_codex_resume(ctx, name, task, manifest))
 
     if task is not None:
@@ -1355,6 +1359,12 @@ def resume(
                 f"Run 'forge session start {name}' to create it.",
             )
         sys.exit(1)
+
+    enforce_target_project_compatibility(Path(target_forge_root))
+
+    routing: ResolvedRouting | None = None
+    if proxy_name:
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
     if routing:
@@ -1971,13 +1981,13 @@ def incognito(
     if not proxy_name and not direct and not sidecar and not host_proxy:
         direct = True
 
-    routing: ResolvedRouting | None = None
-    if proxy_name:
-        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
-
     from forge.cli.guards import require_repo_root
 
     require_repo_root()
+
+    routing: ResolvedRouting | None = None
+    if proxy_name:
+        routing = _resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
 
     if name is None:
         _fr = _cwd_forge_root()

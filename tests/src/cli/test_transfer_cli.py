@@ -104,10 +104,24 @@ class TestTransferShow:
         assert "Error:" in result.output
         assert "resume" in result.output  # recovery tip names the resume path
 
+    def test_show_remains_readable_under_incompatible_pin(self, runner: CliRunner, transfer_project: Path) -> None:
+        (transfer_project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["session", "transfer", "show", "planner"])
+
+        assert result.exit_code == 0, result.output
+        assert "# Session Context" in result.output
+
 
 class TestTransferEdit:
     def test_edit_creates_and_merges_notes(
-        self, runner: CliRunner, transfer_project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        transfer_project: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("EDITOR", _fake_editor(tmp_path, append="run the suite\n"))
         result = runner.invoke(main, ["session", "transfer", "edit", "planner", "--child", "exec"])
@@ -122,7 +136,11 @@ class TestTransferEdit:
         assert "run the suite" in shown.output
 
     def test_edit_ambiguous_child_errors(
-        self, runner: CliRunner, transfer_project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        transfer_project: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from forge.session.prev_sessions import ensure_child
 
@@ -131,6 +149,28 @@ class TestTransferEdit:
         result = runner.invoke(main, ["session", "transfer", "edit", "planner"])
         assert result.exit_code == 1
         assert "multiple" in result.output.lower()
+
+    def test_edit_refuses_before_notes_or_editor_launch(
+        self,
+        runner: CliRunner,
+        transfer_project: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        notes = transfer_project / ".forge" / "prev_sessions" / "planner" / "children" / "exec.notes.md"
+        notes.unlink(missing_ok=True)
+        editor_marker = tmp_path / "editor-ran"
+        monkeypatch.setenv("EDITOR", f"touch {editor_marker}")
+        (transfer_project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["session", "transfer", "edit", "planner", "--child", "exec"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert not notes.exists()
+        assert not editor_marker.exists()
 
 
 class TestTransferRegenerate:
@@ -142,7 +182,11 @@ class TestTransferRegenerate:
         assert "structured" in result.output
 
     def test_regenerate_does_not_touch_notes(
-        self, runner: CliRunner, transfer_project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        transfer_project: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         notes = transfer_project / ".forge" / "prev_sessions" / "planner" / "children" / "exec.notes.md"
         notes.write_text("## User Notes\n\nkeep me", encoding="utf-8")
@@ -157,7 +201,17 @@ class TestTransferRegenerate:
         assert "runtime=claude" in result.output
 
     def test_regenerate_target_runtime_codex_flips_frontmatter(self, runner: CliRunner, transfer_project: Path) -> None:
-        result = runner.invoke(main, ["session", "transfer", "regenerate", "planner", "--target-runtime", "codex"])
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "transfer",
+                "regenerate",
+                "planner",
+                "--target-runtime",
+                "codex",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "runtime=codex" in result.output
         show = runner.invoke(main, ["session", "transfer", "show", "planner", "--json"])
@@ -165,14 +219,47 @@ class TestTransferRegenerate:
 
     def test_regenerate_defaults_target_runtime_from_cache(self, runner: CliRunner, transfer_project: Path) -> None:
         # Flip to codex, then a no-flag regenerate must NOT silently flip back to claude.
-        runner.invoke(main, ["session", "transfer", "regenerate", "planner", "--target-runtime", "codex"])
+        runner.invoke(
+            main,
+            [
+                "session",
+                "transfer",
+                "regenerate",
+                "planner",
+                "--target-runtime",
+                "codex",
+            ],
+        )
         result = runner.invoke(main, ["session", "transfer", "regenerate", "planner"])
         assert result.exit_code == 0, result.output
         assert "runtime=codex" in result.output
 
     def test_regenerate_rejects_unknown_target_runtime(self, runner: CliRunner, transfer_project: Path) -> None:
-        result = runner.invoke(main, ["session", "transfer", "regenerate", "planner", "--target-runtime", "bogus"])
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "transfer",
+                "regenerate",
+                "planner",
+                "--target-runtime",
+                "bogus",
+            ],
+        )
         assert result.exit_code != 0  # click.Choice rejects before the op runs
+
+    def test_regenerate_refuses_before_rewriting_cache(self, runner: CliRunner, transfer_project: Path) -> None:
+        cache = transfer_project / ".forge" / "prev_sessions" / "planner" / "generated.md"
+        before = cache.read_bytes()
+        (transfer_project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["session", "transfer", "regenerate", "planner"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert cache.read_bytes() == before
 
 
 class TestTransferDiff:
@@ -202,7 +289,10 @@ class TestTransferDiff:
         assert "generated_at" not in result.output
 
     def test_diff_json_no_drift_wrapper(self, runner: CliRunner, transfer_project: Path) -> None:
-        result = runner.invoke(main, ["session", "transfer", "diff", "planner", "--child", "exec", "--json"])
+        result = runner.invoke(
+            main,
+            ["session", "transfer", "diff", "planner", "--child", "exec", "--json"],
+        )
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert set(payload) == {"parent", "child", "has_drift", "diff"}
@@ -214,7 +304,10 @@ class TestTransferDiff:
     def test_diff_json_drift_wrapper(self, runner: CliRunner, transfer_project: Path) -> None:
         cache = transfer_project / ".forge" / "prev_sessions" / "planner" / "generated.md"
         cache.write_text(cache.read_text(encoding="utf-8") + "\nDRIFTED LINE\n", encoding="utf-8")
-        result = runner.invoke(main, ["session", "transfer", "diff", "planner", "--child", "exec", "--json"])
+        result = runner.invoke(
+            main,
+            ["session", "transfer", "diff", "planner", "--child", "exec", "--json"],
+        )
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert set(payload) == {"parent", "child", "has_drift", "diff"}

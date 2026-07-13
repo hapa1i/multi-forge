@@ -93,6 +93,22 @@ class TestMemoryTrack:
         state = SessionStore(str(forge_root), "s1").read()
         assert "memory" not in state.overrides
 
+    def test_track_refuses_incompatible_project_without_editing_doc(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/checklist.md"
+        before = doc.read_bytes()
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--strategy", "checklist"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert doc.read_bytes() == before
+
     def test_track_ignores_ambient_session(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """Fixture sets FORGE_SESSION=s1; bare track must not write session state."""
         forge_root = seeded_session[0]
@@ -224,7 +240,15 @@ class TestMemoryTrack:
         forge_root = seeded_session[0]
         runner.invoke(
             main,
-            ["memory", "track", "docs/checklist.md", "--strategy", "checklist", "--intent", "Active task tracking"],
+            [
+                "memory",
+                "track",
+                "docs/checklist.md",
+                "--strategy",
+                "checklist",
+                "--intent",
+                "Active task tracking",
+            ],
         )
 
         from forge.session.passport import read_passport
@@ -296,7 +320,17 @@ class TestMemoryTrackPropose:
         forge_root = seeded_session[0]
         from forge.session.passport import read_passport
 
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--strategy", "changelog"])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--strategy",
+                "changelog",
+            ],
+        )
         assert result.exit_code == 0, result.output
         pp = read_passport(forge_root / "docs/impl_notes.md")
         assert pp is not None
@@ -327,7 +361,17 @@ class TestMemoryTrackPropose:
         custom = ".forge/memory/custom_shadow.md"
         (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
         (forge_root / custom).write_text("", encoding="utf-8")
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", custom])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--shadow-path",
+                custom,
+            ],
+        )
         assert result.exit_code == 0, result.output
         from forge.session.passport import read_passport
 
@@ -335,7 +379,16 @@ class TestMemoryTrackPropose:
         assert pp is not None and pp.update.shadow_path == custom
 
     def test_shadow_without_propose_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--shadow-path", ".forge/memory/x.md"])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--shadow-path",
+                ".forge/memory/x.md",
+            ],
+        )
         assert result.exit_code != 0
         assert "--propose" in result.output
 
@@ -343,7 +396,15 @@ class TestMemoryTrackPropose:
         self, runner: CliRunner, seeded_session: tuple[Path, str]
     ) -> None:
         result = runner.invoke(
-            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", "docs/nonexistent.md"]
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--shadow-path",
+                "docs/nonexistent.md",
+            ],
         )
         assert result.exit_code != 0
         assert "does not exist" in result.output
@@ -370,7 +431,14 @@ class TestMemoryTrackPropose:
         forge_root = seeded_session[0]
         runner.invoke(
             main,
-            ["memory", "track", "docs/impl_notes.md", "--propose", "--intent", "Durable memory"],
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--intent",
+                "Durable memory",
+            ],
         )
         from forge.session.passport import read_passport
 
@@ -386,7 +454,17 @@ class TestMemoryTrackPropose:
         custom = ".forge/memory/new_shadow.md"
         (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
         (forge_root / custom).write_text("", encoding="utf-8")
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", custom])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--shadow-path",
+                custom,
+            ],
+        )
         assert result.exit_code == 0, result.output
         pp = read_passport(forge_root / "docs/impl_notes.md")
         assert pp is not None and pp.update.shadow_path == custom
@@ -394,7 +472,14 @@ class TestMemoryTrackPropose:
     def test_auto_create_rejects_traversal(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
             main,
-            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", ".forge/memory/../../etc/passwd"],
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--shadow-path",
+                ".forge/memory/../../etc/passwd",
+            ],
         )
         assert result.exit_code != 0
 
@@ -408,21 +493,47 @@ class TestMemoryTrackPropose:
         # docs/changelog.md -> shadow_docs_changelog.md; docs/sub/changelog.md -> shadow_sub_changelog.md.
         # Force a real collision with an explicit shadow path.
         used = ".forge/memory/shadow_docs_changelog.md"
-        result = runner.invoke(main, ["memory", "track", "docs/sub/changelog.md", "--propose", "--shadow-path", used])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/sub/changelog.md",
+                "--propose",
+                "--shadow-path",
+                used,
+            ],
+        )
         assert result.exit_code != 0
         assert "--shadow-path" in result.output
 
     def test_propose_explicit_shadow_collision_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
         result = runner.invoke(
-            main, ["memory", "track", "docs/changelog.md", "--propose", "--shadow-path", self.DERIVED]
+            main,
+            [
+                "memory",
+                "track",
+                "docs/changelog.md",
+                "--propose",
+                "--shadow-path",
+                self.DERIVED,
+            ],
         )
         assert result.exit_code != 0
         assert "--shadow-path" in result.output
 
     def test_propose_self_shadow_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
-            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", "docs/impl_notes.md"]
+            main,
+            [
+                "memory",
+                "track",
+                "docs/impl_notes.md",
+                "--propose",
+                "--shadow-path",
+                "docs/impl_notes.md",
+            ],
         )
         assert result.exit_code != 0
         assert "same as the official" in result.output
@@ -464,7 +575,10 @@ class TestMemoryList:
         forge_root = seeded_session[0]
         from forge.session.passport import synthesize_passport, write_passport
 
-        write_passport(forge_root / "docs/checklist.md", synthesize_passport(strategy="checklist", writers="planner"))
+        write_passport(
+            forge_root / "docs/checklist.md",
+            synthesize_passport(strategy="checklist", writers="planner"),
+        )
         result = runner.invoke(main, ["memory", "list", "--json"])
         assert result.exit_code == 0, result.output
         docs = json.loads(result.output)
@@ -560,10 +674,17 @@ class TestMemoryShadowsShow:
 
     def test_show_json_no_match(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """Unknown doc emits structured empty payload, not human text."""
-        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/nonexistent.md", "--json"])
+        result = runner.invoke(
+            main,
+            ["memory", "shadows", "show", "--for", "docs/nonexistent.md", "--json"],
+        )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data == {"official": "docs/nonexistent.md", "scope": "project", "shadows": []}
+        assert data == {
+            "official": "docs/nonexistent.md",
+            "scope": "project",
+            "shadows": [],
+        }
 
     def test_show_json_populated_readable(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """A real shadow file's content comes through with readable=true and reason=null."""
@@ -580,7 +701,14 @@ class TestMemoryShadowsShow:
         shadows = data["shadows"]
         assert len(shadows) == 1
         row = shadows[0]
-        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert set(row) == {
+            "shadow_path",
+            "forge_root",
+            "sessions",
+            "content",
+            "readable",
+            "reason",
+        }
         assert row["shadow_path"] == shadow_path
         assert row["forge_root"] == str(forge_root)
         assert row["sessions"] == sorted(set(row["sessions"]))
@@ -613,7 +741,14 @@ class TestMemoryShadowsShow:
         assert isinstance(rows, list)
         assert len(rows) == 1
         row = rows[0]
-        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert set(row) == {
+            "shadow_path",
+            "forge_root",
+            "sessions",
+            "content",
+            "readable",
+            "reason",
+        }
         assert row["shadow_path"] == ".forge/memory/shadow_docs_impl_notes.md"
         assert row["readable"] is True
         assert "Impl note source" in row["content"]
@@ -660,7 +795,10 @@ class TestShadowsReview:
         assert "--show-latest" in result.output
 
     def test_review_curate_requires_session(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.delenv("FORGE_SESSION", raising=False)
         result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate"])
@@ -669,23 +807,48 @@ class TestShadowsReview:
 
     def test_review_curate_and_show_latest_exclusive(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--show-latest"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/notes.md",
+                "--curate",
+                "--show-latest",
+            ],
         )
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output.lower()
 
     def test_review_scope_all_curate_rejected(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "all"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/notes.md",
+                "--curate",
+                "--scope",
+                "all",
+            ],
         )
         assert result.exit_code != 0
         assert "deferred" in result.output.lower()
 
     def test_review_show_latest_requires_session(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.delenv("FORGE_SESSION", raising=False)
-        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest"])
+        result = runner.invoke(
+            main,
+            ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest"],
+        )
         assert result.exit_code != 0
         assert "session" in result.output.lower()
 
@@ -693,7 +856,17 @@ class TestShadowsReview:
         self, runner: CliRunner, seeded_session: tuple[Path, str]
     ) -> None:
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest", "--scope", "workspace"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/notes.md",
+                "--show-latest",
+                "--scope",
+                "workspace",
+            ],
         )
         assert result.exit_code != 0
         assert "not applicable" in result.output.lower()
@@ -720,24 +893,89 @@ class TestShadowsReview:
             content="Other curation result.",
         )
 
-        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--show-latest"])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/impl_notes.md",
+                "--show-latest",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "Notes curation result" in result.output
         assert "Other curation" not in result.output
 
     def test_review_show_latest_no_reports(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--show-latest"])
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/impl_notes.md",
+                "--show-latest",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "No curation reports" in result.output
         assert "--curate" in result.output
 
+    def test_review_show_latest_remains_readable_under_incompatible_pin(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/impl_notes.md",
+                "--show-latest",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "No curation reports" in result.output
+
+    def test_review_curate_refuses_incompatible_target_before_dispatch(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(
+            main,
+            ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"],
+        )
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+
     def test_review_curate_no_shadows(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+        result = runner.invoke(
+            main,
+            ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"],
+        )
         assert result.exit_code == 0, result.output
         assert "No shadow" in result.output
 
     def test_review_curate_does_not_mutate_official(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         forge_root = seeded_session[0]
         runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
@@ -765,13 +1003,19 @@ class TestShadowsReview:
             lambda *a, **kw: mock_result,
         )
 
-        runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+        runner.invoke(
+            main,
+            ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"],
+        )
 
         official_after = (forge_root / "docs/impl_notes.md").read_text()
         assert official_before == official_after
 
     def test_review_curate_json_output(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         forge_root = seeded_session[0]
         runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
@@ -796,7 +1040,16 @@ class TestShadowsReview:
         )
 
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate", "--json"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/impl_notes.md",
+                "--curate",
+                "--json",
+            ],
         )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
@@ -811,7 +1064,10 @@ class TestShadowsReview:
         (forge_root / ".forge/memory/shadow_docs_impl_notes.md").write_text("- [ ] Item\n", encoding="utf-8")
 
     def test_review_curate_failure_surfaces_error_json(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """T6b/D5: a fail-loud CurationResult.error (e.g. cold codex preflight) is carried in --json,
         with exit 1 -- not dropped like it was before the error field existed."""
@@ -825,7 +1081,16 @@ class TestShadowsReview:
         )
 
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate", "--json"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/impl_notes.md",
+                "--curate",
+                "--json",
+            ],
         )
         assert result.exit_code == 1, result.output
         data = json.loads(result.output)
@@ -834,10 +1099,14 @@ class TestShadowsReview:
         assert "forge runtime preflight codex" in data["error"]
 
     def test_review_curate_failure_surfaces_error_human(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """T6b/D5: the same hint reaches the human (non-JSON) failure output, so a user who bound codex
-        and never refreshed the preflight sees the actionable fix, not just a bare 'Curation failed.'"""
+        and never refreshed the preflight sees the actionable fix, not just a bare 'Curation failed.'
+        """
         from forge.session.shadow_curation import CurationResult
 
         self._seed_shadow(runner, seeded_session[0])
@@ -847,7 +1116,10 @@ class TestShadowsReview:
             lambda *a, **kw: CurationResult(success=False, report_path=None, stdout="", error=hint),
         )
 
-        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+        result = runner.invoke(
+            main,
+            ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"],
+        )
         assert result.exit_code == 1, result.output
         # Rich soft-wraps at the harness's terminal width; normalize before matching the hint.
         assert "forge runtime preflight codex" in " ".join(result.output.split())
@@ -962,7 +1234,17 @@ class TestShadowsReview:
         monkeypatch.setattr("forge.core.reactive.session_runner.run_claude_session", fake_run)
 
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "workspace"]
+            main,
+            [
+                "memory",
+                "shadows",
+                "review",
+                "--for",
+                "docs/notes.md",
+                "--curate",
+                "--scope",
+                "workspace",
+            ],
         )
         assert result.exit_code == 0, result.output
 
@@ -1071,6 +1353,25 @@ class TestPassportRemove:
         assert result.exit_code == 0, result.output
         assert "Passport removed" in result.output
         assert read_passport(forge_root / "docs/checklist.md") is None
+
+    def test_remove_refuses_incompatible_project_without_editing_doc(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root, _ = seeded_session
+        from forge.session.passport import synthesize_passport, write_passport
+
+        doc = forge_root / "docs/checklist.md"
+        write_passport(doc, synthesize_passport(strategy="checklist"))
+        before = doc.read_bytes()
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert doc.read_bytes() == before
 
     def test_remove_no_passport_is_noop(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])

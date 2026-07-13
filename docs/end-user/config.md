@@ -147,9 +147,29 @@ schema_version = 1
 required_forge = ">=1.2,<2"
 ```
 
-When the file is missing, the project is unconstrained. When it exists, covered project-local command paths strict-read
-it before mutating state and fail with an upgrade/reset hint if the running global Forge does not satisfy
-`required_forge`. `forge extension doctor` reports malformed or incompatible pins. Forge does not auto-create this file.
+When the file is missing, the project is unconstrained and Forge stays silent. When it exists, project mutations check
+the Forge root that owns the state being changed, not merely your current directory. A named session command can
+therefore refuse a target in another root even when the caller's project is compatible; conversely, an incompatible
+caller does not block a compatible resolved target. Malformed, unreadable, unsupported-schema, and incompatible pins all
+fail closed on explicit command mutations. `--force` does not bypass the pin.
+
+Lifecycle and context hooks use a different posture so a version transition does not brick an active coding session:
+they proceed after one debug-only compatibility diagnostic per invocation and preserve their normal stdout/stderr/JSON
+contract. Detached project writers refuse only their background write. The memory writer records
+`project_compatibility_refused` and exits normally; index and policy-shadow markers use the bounded work-queue retry
+contract and eventually move to `~/.forge/pending-work/failed/` without failing the foreground command.
+
+Explicit commands that span roots -- including multi-name `session delete`, `session clean --yes`, and
+`forge clean --yes` -- skip incompatible roots, continue compatible ones, report every refusal, and exit 1 if anything
+requested was skipped or failed. Project-scoped `session delete --all` refuses all of its targets together when that
+root is incompatible. Preview modes label what apply would refuse. Global proxy/backend registries and read-time repair
+of the derived global session/active indexes are exempt because that state lives under `~/.forge`, not a project root;
+project-owned state in the same operation is still checked.
+
+Recovery is: run a Forge version satisfying `required_forge`, or edit/reset project state. If you select checkout code
+with `FORGE_DEV`, change it and relaunch the managed session; `FORGE_DEV` is not a bypass. For sidecar sessions, use an
+image containing a satisfying Forge version. `forge extension doctor` reports the precise pin state. Forge does not
+auto-create this file.
 
 `~/.forge/projects.json` is different: it is a machine-written trusted-project registry maintained by project/local
 `forge extension enable`, successful legacy `cleanup-project`, and managed worktree creation. User-scope enable/sync

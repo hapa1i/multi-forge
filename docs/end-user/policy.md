@@ -50,6 +50,12 @@ Claude calls Write or Edit
 Policies are **session-scoped** — enabling policies in one session doesn't affect others. State (like which test files
 have been touched) persists in the session manifest between hook invocations.
 
+Policy hooks use the lifecycle-hook compatibility posture: before policy/shadow state can be written, Forge checks the
+resolved session root and any separate shadow-artifact root once per invocation. A bad `.forge/project.toml` adds one
+debug diagnostic but does not alter allow/deny output, stderr feedback, or the Codex JSON wire. Explicit policy
+mutations are strict instead: CLI `enable`/`disable` and supervisor lifecycle commands, plus their mutating `%` forms,
+refuse before proxy startup or manifest writes. Read-only status/check surfaces remain available.
+
 > **Seeing `warn` verdicts.** A `warn` does not block, and Claude Code does **not** surface non-blocking hook output to
 > you at the terminal (it goes to the model as context, not your console). So a warning is effectively invisible
 > mid-session. Forge records every verdict; review them after the fact with
@@ -243,6 +249,10 @@ no-op). To use a different lane, start or fork a fresh session, or run `forge po
 clears the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
 `(runtime, backend, model)` lane.
 
+A project compatibility refusal happens before that first dispatch and therefore cannot freeze the lane. Recover by
+running a Forge version satisfying `required_forge`, or edit/reset project state. If the hook binary comes from
+`FORGE_DEV`, relaunch after changing it; a sidecar must carry the satisfying Forge version in its image.
+
 **If your codex subscription runs out mid-session**, Forge degrades the supervisor to the default `claude -p` lane for
 the rest of the session instead of failing every check open — real plan-enforcement keeps working. The codex binding
 itself stays put (it resets next session; clear it now with `forge policy supervisor remove` or re-pin with
@@ -431,6 +441,13 @@ The semantic supervisor has a 45s default timeout. If it exceeds this:
 - Raise the budget for slow models: `forge policy supervisor set <target> --timeout 90` at configure time, or
   `forge session set policy.supervisor.timeout_seconds 90` on a live session. Note the hook that invokes the supervisor
   has its own 60s budget; timeouts above ~55s won't take effect end-to-end
+
+### Shadow audit marker failed compatibility
+
+Shadow sampling may enqueue a detached audit marker after a policy hook. The worker strict-checks the shadow artifact's
+Forge root before spawning. A refusal follows the normal bounded work-queue retries and eventually moves the marker to
+`~/.forge/pending-work/failed/`; it never changes the foreground policy decision. After recovery, a later compatible
+policy check can enqueue the candidate again, or a compatible worker run can process an available candidate.
 
 ---
 

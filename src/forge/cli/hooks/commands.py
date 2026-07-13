@@ -32,9 +32,13 @@ from forge.core.workqueue import (
     enqueue_shadow_marker,
     enqueue_stop_marker,
 )
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    diagnose_project_compatibility_for_hook,
+    enforce_project_compatibility,
+)
 from forge.session.artifacts import (
     get_artifact_paths,
-    resolve_forge_root,
     safe_copy_file,
     snapshot_plan_approved,
 )
@@ -94,6 +98,18 @@ class _TranscriptCaptureResult:
     manifest_error: str | None
 
 
+def _policy_shadow_diagnostic_root(supervisor: Any) -> str | Path | None:
+    """Return the separate shadow-write root when sampling can write there."""
+
+    if supervisor is None or not getattr(supervisor, "cascade", False):
+        return None
+    sample_rate = getattr(supervisor, "shadow_sample_rate", 0.0)
+    if not isinstance(sample_rate, (int, float)) or sample_rate <= 0.0:
+        return None
+    root = getattr(supervisor, "forge_root", None)
+    return root if isinstance(root, (str, Path)) else None
+
+
 def _deferred_work_paths(cwd: Path, store: SessionStore | None) -> tuple[Path, str | None]:
     """Return host-resolvable paths for deferred work produced in a sidecar."""
     forge_root = str(store.forge_root) if store else None
@@ -118,7 +134,7 @@ def _capture_transcript_artifact(
     fail_on_copy_error: bool,
 ) -> _TranscriptCaptureResult:
     """Copy a transcript into artifacts and reconcile the manifest."""
-    project_root = resolve_forge_root(cwd)
+    project_root = store.forge_root
     paths = get_artifact_paths(project_root, manifest.name)
 
     src = Path(transcript_path)
@@ -298,6 +314,7 @@ def plan_write() -> None:
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="plan-write")
     try:
         store.read()
     except Exception as e:
@@ -370,6 +387,7 @@ def exit_plan_mode() -> None:
     if store is None:
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="exit-plan-mode")
     try:
         manifest = store.read()
     except Exception as e:
@@ -391,7 +409,7 @@ def exit_plan_mode() -> None:
         return
 
     # Compute artifact roots
-    project_root = resolve_forge_root(cwd)
+    project_root = store.forge_root
     paths = get_artifact_paths(project_root, manifest.name)
 
     try:
@@ -495,6 +513,7 @@ def stop() -> None:
             _copy_transcript_to_pending_runs(pending_transcript_path, session_id=incoming_session_id)
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="stop")
     try:
         manifest = store.read()
     except Exception as e:
@@ -704,6 +723,7 @@ def stop_failure() -> None:
             _copy_transcript_to_pending_runs(pending_transcript_path, session_id=incoming_session_id)
         _output_json({"success": True, "action": "skip", "reason": "no_session"})
         return
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="stop-failure")
     try:
         manifest = store.read()
     except Exception as e:
@@ -819,12 +839,13 @@ def pre_compact() -> None:
         store = resolve_session_store(cwd, session_id=session_id)
         if store is None or not store.exists():
             sys.exit(0)
+        diagnose_project_compatibility_for_hook(store.forge_root, operation="pre-compact")
 
         manifest = store.read()
         if manifest is None:
             sys.exit(0)
 
-        project_root = resolve_forge_root(cwd)
+        project_root = store.forge_root
         paths = get_artifact_paths(project_root, manifest.name)
 
         src = Path(transcript_path)
@@ -905,6 +926,7 @@ def post_compact() -> None:
     store = resolve_session_store(cwd, session_id=session_id)
     if store is None or not store.exists():
         sys.exit(0)
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="post-compact")
 
     try:
         from forge.session.models import CompactionConfirmed, SessionState
@@ -956,11 +978,17 @@ def worktree_create() -> None:
         import subprocess
         import uuid as _uuid
 
+        from forge.core.ops.context import find_forge_root
         from forge.session.worktree.create import (
             find_git_binary,
             get_main_repo_root,
+            get_repo_root,
             resolve_worktree_path,
         )
+
+        source_checkout_root = get_repo_root(cwd)
+        source_forge_root = find_forge_root(cwd)
+        enforce_project_compatibility(source_forge_root)
 
         # Use main-repo root to avoid child-worktree resolution bugs
         repo_root = get_main_repo_root(cwd)
@@ -975,6 +1003,7 @@ def worktree_create() -> None:
         branch_name = f"forge/{wt_name}"
 
         worktree_path = resolve_worktree_path(repo_root, wt_name)
+        created_branch = False
 
         result = subprocess.run(
             [git, "worktree", "add", str(worktree_path), "-b", branch_name],
@@ -995,6 +1024,42 @@ def worktree_create() -> None:
             if result.returncode != 0:
                 logger.debug("worktree-create: fallback also failed: %s", result.stderr.strip())
                 sys.exit(1)
+        else:
+            created_branch = True
+
+        try:
+            source_relative = (
+                source_forge_root.relative_to(source_checkout_root) if source_forge_root is not None else Path(".")
+            )
+        except ValueError:
+            source_relative = Path(".")
+        target_forge_root = worktree_path / source_relative
+
+        try:
+            enforce_project_compatibility(target_forge_root)
+        except ProjectCompatibilityError as compat_error:
+            rollback_errors: list[str] = []
+            try:
+                from forge.session.worktree.cleanup import cleanup_worktree
+
+                cleanup_result = cleanup_worktree(
+                    worktree_path=worktree_path,
+                    branch=branch_name if created_branch else None,
+                    delete_branch_flag=created_branch,
+                    force=True,
+                    repo_root=repo_root,
+                )
+                rollback_errors.extend(cleanup_result.errors)
+            except Exception as cleanup_error:
+                logger.debug("worktree-create: compatibility rollback failed: %s", cleanup_error)
+                rollback_errors.append(str(cleanup_error))
+            click.echo(f"Error: {compat_error}", err=True)
+            if rollback_errors:
+                click.echo(
+                    "Rollback incomplete: " + "; ".join(rollback_errors),
+                    err=True,
+                )
+            sys.exit(1)
 
         # Best-effort: copy runtime config (.env, .claude/settings.local.json,
         # etc.) before installing extensions so the installer merges on top
@@ -1003,10 +1068,8 @@ def worktree_create() -> None:
         # inherit config from the checkout the user is actually in.
         try:
             from forge.session.worktree.config_copy import copy_runtime_config
-            from forge.session.worktree.create import get_repo_root
 
-            source_root = get_repo_root(cwd)
-            copy_runtime_config(source_root, worktree_path)
+            copy_runtime_config(source_checkout_root, worktree_path)
             logger.debug("worktree-create: runtime config copied to %s", worktree_path)
         except Exception as cfg_err:
             logger.debug("worktree-create: config copy failed: %s", cfg_err)
@@ -1017,7 +1080,7 @@ def worktree_create() -> None:
             from forge.install.project_registry import ProjectRegistryStore
 
             # Managed worktree creation is the trust event; extension install may conflict or be skipped.
-            ProjectRegistryStore().enroll(worktree_path, "worktree")
+            ProjectRegistryStore().enroll(target_forge_root, "worktree")
         except Exception as registry_err:
             logger.debug("worktree-create: registry enrollment failed: %s", registry_err)
 
@@ -1031,7 +1094,7 @@ def worktree_create() -> None:
             with open(_os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
                 installer = Installer(
                     scope=InstallScope.LOCAL,
-                    project_root=worktree_path,
+                    project_root=target_forge_root,
                 )
                 installer.init(
                     profile=InstallProfile.STANDARD,
@@ -1046,6 +1109,9 @@ def worktree_create() -> None:
         print(str(worktree_path.resolve()))
         sys.exit(0)
 
+    except ProjectCompatibilityError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
     except Exception as e:
         logger.debug("worktree-create: failed: %s", e)
         sys.exit(1)
@@ -1078,6 +1144,7 @@ def subagent_stop() -> None:
     store = resolve_session_store(cwd, session_id=session_id)
     if store is None or not store.exists():
         sys.exit(0)
+    diagnose_project_compatibility_for_hook(store.forge_root, operation="subagent-stop")
 
     agent_id = data.get("agent_id")
     agent_type = data.get("agent_type", "unknown")
@@ -1183,6 +1250,13 @@ def policy_check() -> None:
 
     if not bundles and not has_supervisor:
         sys.exit(0)
+
+    shadow_root = _policy_shadow_diagnostic_root(sup)
+    diagnose_project_compatibility_for_hook(
+        store.forge_root,
+        shadow_root,
+        operation="policy-check",
+    )
 
     try:
         engine = build_hook_engine(effective)
@@ -1351,6 +1425,13 @@ def codex_policy_check() -> None:
 
     if not bundles and not has_supervisor:
         sys.exit(0)
+
+    shadow_root = _policy_shadow_diagnostic_root(sup)
+    diagnose_project_compatibility_for_hook(
+        store.forge_root,
+        shadow_root,
+        operation="codex-policy-check",
+    )
 
     contexts = CodexHookAdapter().build_contexts(data, tool_name, manifest)
     if not contexts:
@@ -1759,6 +1840,10 @@ def _team_supervisor_hook(log_label: str, handler: Callable[..., tuple[int, str]
     config = effective.policy.team_supervisor if effective.policy else None
     if not config or not config.enabled:
         sys.exit(0)
+    diagnose_project_compatibility_for_hook(
+        store.forge_root,
+        operation=log_label,
+    )
 
     from forge.cli.consumer_lane_freeze import persist_lane_freeze
     from forge.policy.team.handlers import TEAM_SUPERVISOR_CONSUMER

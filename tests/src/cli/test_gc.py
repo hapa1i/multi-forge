@@ -7,7 +7,8 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli.gc import clean_cmd
-from forge.core.ops.gc import CleanReport, OrphanCategory
+from forge.core.ops.gc import CleanReport, CleanResult, OrphanCategory
+from forge.install.project_compat import ProjectCompatibilitySkip
 
 
 def _make_report(scope: str = "workspace", total: int = 0) -> CleanReport:
@@ -21,6 +22,16 @@ def _make_report(scope: str = "workspace", total: int = 0) -> CleanReport:
         OrphanCategory("search_docs", "Orphan search docs", 0, []),
     ]
     return CleanReport(categories=cats, scope=scope)
+
+
+def _compatibility_skip() -> ProjectCompatibilitySkip:
+    return ProjectCompatibilitySkip(
+        target="/project/.forge/sessions/ghost",
+        forge_root="/project",
+        state="incompatible",
+        reason="project requires Forge >=9999, but running Forge is 0.1.0",
+        recovery="Run a Forge version satisfying required_forge, or edit/reset project state.",
+    )
 
 
 class TestCleanCmdDryRun:
@@ -75,6 +86,46 @@ class TestCleanCmdDryRun:
             assert data["dry_run"] is True
             assert data["total"] == 1
 
+    def test_preview_labels_apply_refusal_without_running_clean(self) -> None:
+        report = _make_report(total=1)
+        report.skipped_project_compatibility.append(_compatibility_skip())
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean") as mock_run,
+        ):
+            result = CliRunner().invoke(clean_cmd, [])
+
+        assert result.exit_code == 0
+        mock_run.assert_not_called()
+        assert "Would skip 1 project-owned item" in result.output
+        assert "target: /project/.forge/sessions/ghost" in result.output
+        assert "root: /project" in result.output
+        assert "state: incompatible" in result.output
+        assert "reason:" in result.output
+        assert "recovery:" in result.output
+
+    def test_json_preview_includes_structured_compatibility_skip(self) -> None:
+        import json
+
+        report = _make_report(total=1)
+        report.skipped_project_compatibility.append(_compatibility_skip())
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--json"])
+
+        assert result.exit_code == 0
+        skip = json.loads(result.output)["skipped_project_compatibility"][0]
+        assert skip == {
+            "target": "/project/.forge/sessions/ghost",
+            "root": "/project",
+            "state": "incompatible",
+            "reason": "project requires Forge >=9999, but running Forge is 0.1.0",
+            "recovery": "Run a Forge version satisfying required_forge, or edit/reset project state.",
+        }
+
 
 class TestCleanCmdYes:
     def test_yes_runs_clean(self) -> None:
@@ -93,6 +144,65 @@ class TestCleanCmdYes:
             assert "Cleaned" in result.output
             assert "1" in result.output
 
+    def test_apply_reports_skip_and_exits_nonzero_after_eligible_cleanup(self) -> None:
+        report = _make_report(total=2)
+        clean_result = CleanResult(
+            categories_cleaned={"proxies": 1},
+            skipped_project_compatibility=[_compatibility_skip()],
+        )
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean", return_value=clean_result),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--yes"])
+
+        assert result.exit_code == 1
+        assert "Cleaned 1 objects" in result.output
+        assert "Skipped 1 project-owned item" in result.output
+        assert "state: incompatible" in result.output
+
+    def test_json_apply_reports_structured_skip_and_exits_nonzero(self) -> None:
+        import json
+
+        report = _make_report(total=2)
+        clean_result = CleanResult(
+            categories_cleaned={"proxies": 1},
+            skipped_project_compatibility=[_compatibility_skip()],
+        )
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean", return_value=clean_result),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--yes", "--json"])
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["deleted"] == 1
+        assert data["categories_cleaned"] == {"proxies": 1}
+        assert data["skipped_project_compatibility"][0]["root"] == "/project"
+        assert data["skipped_project_compatibility"][0]["state"] == "incompatible"
+
+    def test_json_apply_reports_failure_and_exits_nonzero_with_clean_stderr(self) -> None:
+        import json
+
+        report = _make_report(total=1)
+        clean_result = CleanResult(failed=[("/project/stale", "permission denied")])
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+            patch("forge.cli.gc.run_clean", return_value=clean_result),
+        ):
+            result = CliRunner().invoke(clean_cmd, ["--yes", "--json"])
+
+        assert result.exit_code == 1
+        assert result.stderr == ""
+        data = json.loads(result.stdout)
+        assert data["deleted"] == 0
+        assert data["failed"] == [{"item": "/project/stale", "error": "permission denied"}]
+        assert data["skipped_project_compatibility"] == []
+
 
 class TestCleanCmdErrors:
     def test_scope_project_no_forge_root(self) -> None:
@@ -100,7 +210,10 @@ class TestCleanCmdErrors:
 
         with (
             patch("forge.cli.gc.ExecutionContext.from_cwd"),
-            patch("forge.cli.gc.collect_clean_report", side_effect=CleanError("Not inside a Forge project")),
+            patch(
+                "forge.cli.gc.collect_clean_report",
+                side_effect=CleanError("Not inside a Forge project"),
+            ),
         ):
             runner = CliRunner()
             result = runner.invoke(clean_cmd, ["--scope", "project"])

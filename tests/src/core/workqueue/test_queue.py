@@ -493,6 +493,33 @@ class TestPoisonMarkers:
         assert not marker.is_file()
         assert (pending_work_dir() / "failed" / "handler-poison-test.json").is_file()
 
+    def test_bounded_failures_delay_but_do_not_starve_later_marker(self) -> None:
+        failing_handler = MagicMock(side_effect=RuntimeError("compatibility refused"))
+        success_handler = MagicMock()
+        for i in range(5):
+            enqueue(kind="blocked", marker_id=f"a-blocked-{i}", payload={})
+        valid_marker = enqueue(kind="valid", marker_id="z-valid", payload={})
+        assert valid_marker is not None
+
+        for attempt in range(MAX_ATTEMPTS):
+            result = process_pending_work(
+                max_items=5,
+                handlers={"blocked": failing_handler, "valid": success_handler},
+            )
+            assert success_handler.call_count == 0
+            if attempt < MAX_ATTEMPTS - 1:
+                assert result.failed == 0
+            else:
+                assert result.failed == 5
+
+        final = process_pending_work(
+            max_items=5,
+            handlers={"blocked": failing_handler, "valid": success_handler},
+        )
+        assert final.processed == 1
+        success_handler.assert_called_once()
+        assert not valid_marker.exists()
+
 
 class TestSchemaValidation:
     """Tests for marker schema validation."""

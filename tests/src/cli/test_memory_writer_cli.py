@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.memory_writer import memory_writer
@@ -133,6 +135,51 @@ def test_run_cmd_disabled_returns_early(tmp_path: Path) -> None:
         result = _run(root)
     assert result.exit_code == 0, result.output
     assert not mock_run.called
+
+
+@pytest.mark.parametrize(
+    ("state", "body"),
+    [
+        ("incompatible", 'schema_version = 1\nrequired_forge = ">=9999"\n'),
+        ("malformed", "not = valid = toml\n"),
+        ("unsupported_schema", 'schema_version = 2\nrequired_forge = ">=1"\n'),
+        ("unreadable", None),
+    ],
+)
+def test_run_cmd_refuses_incompatible_project_without_failing_worker(
+    tmp_path: Path,
+    state: str,
+    body: str | None,
+) -> None:
+    from forge.install.project_compat import ProjectCompatibilityError
+
+    root = tmp_path.resolve()
+    _write_handoff_session(root)
+    compat_path = root / ".forge" / "project.toml"
+    if body is not None:
+        compat_path.write_text(body, encoding="utf-8")
+
+    enforcer_context = (
+        patch(
+            "forge.install.project_compat.enforce_project_compatibility",
+            side_effect=ProjectCompatibilityError(str(compat_path), "read error: denied", state="unreadable"),
+        )
+        if state == "unreadable"
+        else nullcontext()
+    )
+    with (
+        enforcer_context,
+        patch("forge.session.memory_writer.record_memory_writer_outcome") as mock_outcome,
+        patch("forge.session.memory_writer.run_memory_writer") as mock_run,
+    ):
+        result = _run(root)
+
+    assert result.exit_code == 0, result.output
+    mock_run.assert_not_called()
+    mock_outcome.assert_called_once()
+    assert mock_outcome.call_args.args[:2] == ("session", "skipped")
+    assert mock_outcome.call_args.kwargs["reason_code"] == "project_compatibility_refused"
+    assert f"state={state}" in mock_outcome.call_args.kwargs["message"]
 
 
 def test_run_cmd_scans_passported_docs(tmp_path: Path) -> None:

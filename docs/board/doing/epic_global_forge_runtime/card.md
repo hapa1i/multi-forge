@@ -14,9 +14,9 @@ Each member is an independently shippable implementation unit; the epic ships no
 [`forge_dev_runtime_override`](../../done/forge_dev_runtime_override/card.md)**. The epic's coordination
 [`checklist.md`](checklist.md) (sequencing and seam drift-watch) stays live. There is no active implementation member:
 T2 stays `proposed/` as superseded-not-abandoned, and the split T7 sweep is a standalone non-member follow-up
-([`todo/forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md)). Every live member
-is now `done/`; the epic remains here until its seam boxes, durable-doc verification, inbound links, and lane move are
-closed as one coordinator pass.
+([`doing/forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md), active since
+2026-07-12). Every live member is now `done/`; the epic remains here until its seam boxes, durable-doc verification,
+inbound links, and lane move are closed as one coordinator pass.
 
 **Origin**: `PreToolUse hook failed: exit 127` investigation, decomposed after four design-review rounds (2026-07-02).
 Supersedes the single `proposed/global_forge_runtime/` card, which conflated a hook-reachability bug fix with a large
@@ -190,9 +190,10 @@ New commands attach to **existing** groups rather than inventing an `install` gr
   cleanup, so no untracked writer can resurrect the state T6 removes. **T10** (sidecar resolution) shipped after T5 via
   PR #94 and restores runtime hooks in the container through staged sidecar-user settings.
 - **Off-path:** T7 (`required_forge`) is fully independent (a check on project state). Its first guardrail slice
-  shipped; the remaining mutator-family sweep is parked in
-  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
-  as a standalone follow-up, not an epic member -- it touches none of the five seams). T8 (dev override) pairs with T4.
+  shipped; the remaining mutator-family sweep is active in `doing/` as
+  [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md) (reclassified
+  2026-07-11 as a standalone follow-up, not an epic member -- it touches none of the five seams). T8 (dev override)
+  pairs with T4.
 - **Adjacent (non-member), sequence-sensitive:**
   [`env_var_interface_boundary`](../../done/env_var_interface_boundary/card.md) declares `FORGE_*` an internal
   launcher-to-runtime contract and strips internal env-var names (notably `FORGE_SESSION`) from normal-flow user

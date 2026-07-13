@@ -235,12 +235,20 @@ Next CLI startup (any forge command)
       forge memory-writer run --session-name <name> --worktree-path <path> --transcript-rel <rel>
 
 Background process:
+  → Strict-checks <forge_root>/.forge/project.toml
   → Reads session manifest → compute effective intent
   → Checks: enabled? min_turns met? runtime available (claude on PATH, or codex preflight)? mode valid?
   → Validates tracked docs (path safety, passport validity, writer access, file existence)
   → Builds multi-doc prompt with per-doc strategy instructions
   → Runs the bound runtime: claude -p (default) or codex exec (codex lane) -- stdin=prompt, cwd=forge_root, timeout=5min
 ```
+
+If the project pin is incompatible, malformed, unreadable, or uses an unsupported schema, the detached process records
+an upstream `skipped` outcome with reason `project_compatibility_refused` and the actual pin state, then exits 0. It
+does not invoke Claude/Codex, freeze a lane, create a review report, or edit a memory document. This refusal does not
+retroactively fail the foreground command that drained the Stop marker. Run a Forge version satisfying `required_forge`,
+or edit/reset project state, then run the writer again from a compatible Forge. A `FORGE_DEV` change requires
+relaunching the managed session; a sidecar requires a satisfying Forge version in its image.
 
 ### Runtime: claude or codex
 
@@ -312,6 +320,7 @@ Checklist:
 - The bound runtime must be available: `claude` on PATH (default lane), or a ready `codex` preflight (codex lane)
 - At least one memory doc must be discoverable: a passported doc under the scan roots
 - At least one doc must exist on disk
+- Check `forge telemetry activity <session>` for a `project_compatibility_refused` skipped outcome
 
 ### "File wasn't updated"
 

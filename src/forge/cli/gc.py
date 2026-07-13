@@ -11,6 +11,7 @@ from rich.console import Console
 from forge.cli.output import err_console, print_error, print_tip
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run_clean
+from forge.install.project_compat import ProjectCompatibilitySkip
 
 
 @click.command("clean")
@@ -74,6 +75,12 @@ def _print_report(report: CleanReport, verbose: bool, console: Console) -> None:
             for item in cat.items:
                 console.print(f"    [dim]{item}[/dim]")
 
+    _print_project_compatibility_skips(
+        report.skipped_project_compatibility,
+        console=console,
+        preview=True,
+    )
+
     console.print()
     if report.is_clean:
         console.print("[green]Nothing to clean.[/green]")
@@ -98,19 +105,29 @@ def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, cons
         print_error(f"{e}")
         sys.exit(1)
 
-    if result.deleted_count == 0 and not result.failed:
+    if result.deleted_count == 0 and not result.failed and not result.skipped_project_compatibility:
         console.print("[green]Nothing to clean.[/green]")
         return
 
-    console.print(f"\nCleaned [cyan]{result.deleted_count}[/cyan] objects:")
-    for cat, count in sorted(result.categories_cleaned.items()):
-        label = _category_label(cat)
-        console.print(f"  {label:<32} {count}")
+    if result.deleted_count:
+        console.print(f"\nCleaned [cyan]{result.deleted_count}[/cyan] objects:")
+        for cat, count in sorted(result.categories_cleaned.items()):
+            label = _category_label(cat)
+            console.print(f"  {label:<32} {count}")
+
+    _print_project_compatibility_skips(
+        result.skipped_project_compatibility,
+        console=console,
+        preview=False,
+    )
 
     if result.failed:
         console.print(f"\n[yellow]{len(result.failed)} failures:[/yellow]")
         for item, error in result.failed:
             console.print(f"  [red]{item}[/red]: {error}")
+
+    if result.should_exit_nonzero:
+        raise SystemExit(1)
 
 
 def _run_and_report_json(ctx: ExecutionContext, scope: str, report: CleanReport) -> None:
@@ -133,8 +150,11 @@ def _run_and_report_json(ctx: ExecutionContext, scope: str, report: CleanReport)
         "deleted": clean_result.deleted_count,
         "failed": [{"item": item, "error": err} for item, err in clean_result.failed],
         "categories_cleaned": clean_result.categories_cleaned,
+        "skipped_project_compatibility": [skip.to_dict() for skip in clean_result.skipped_project_compatibility],
     }
     click.echo(json.dumps(data, indent=2))
+    if clean_result.should_exit_nonzero:
+        raise SystemExit(1)
 
 
 def _print_json(report: CleanReport) -> None:
@@ -152,8 +172,29 @@ def _print_json(report: CleanReport) -> None:
             }
             for cat in report.categories
         ],
+        "skipped_project_compatibility": [skip.to_dict() for skip in report.skipped_project_compatibility],
     }
     click.echo(json.dumps(data, indent=2))
+
+
+def _print_project_compatibility_skips(
+    skips: list[ProjectCompatibilitySkip],
+    *,
+    console: Console,
+    preview: bool,
+) -> None:
+    """Render project items that apply refuses without hiding recovery."""
+
+    if not skips:
+        return
+    verb = "Would skip" if preview else "Skipped"
+    console.print(f"\n[yellow]{verb} {len(skips)} project-owned item(s) " "for project compatibility:[/yellow]")
+    for skip in skips:
+        console.print(f"  target: {skip.target}")
+        console.print(f"    root: {skip.forge_root}")
+        console.print(f"    state: {skip.state}")
+        console.print(f"    reason: {skip.reason}")
+        console.print(f"    recovery: {skip.recovery}")
 
 
 def _category_label(category: str) -> str:

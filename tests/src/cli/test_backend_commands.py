@@ -101,6 +101,32 @@ def test_create_existing_config_errors_with_tip(runner: CliRunner, tmp_path: Pat
     assert "forge model backend start litellm" in result.output
 
 
+def test_create_is_global_under_incompatible_project_pin(
+    runner: CliRunner,
+    forge_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A project pin does not gate creation of global backend adapter state."""
+    project = tmp_path / "project"
+    (project / ".git").mkdir(parents=True)
+    project_state = project / ".forge"
+    project_state.mkdir()
+    (project_state / "project.toml").write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+    project_files_before = {
+        path.relative_to(project): path.read_bytes() for path in project.rglob("*") if path.is_file()
+    }
+    monkeypatch.chdir(project)
+
+    result = runner.invoke(main, _backend_args("create", "litellm"))
+
+    assert result.exit_code == 0, result.output
+    assert (forge_home / "backends" / "litellm" / "config.yaml").is_file()
+    assert {
+        path.relative_to(project): path.read_bytes() for path in project.rglob("*") if path.is_file()
+    } == project_files_before
+
+
 def test_start_missing_config_errors_with_create_tip(runner: CliRunner, tmp_path: Path) -> None:
     missing = tmp_path / "litellm" / "config.yaml"
 

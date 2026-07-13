@@ -17,8 +17,8 @@ actionable; the epic stays in `doing/` until that separate pass is complete. Shi
 [`forge_project_compat`](../../done/forge_project_compat/card.md), and T10
 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md), plus T6
 [`forge_hook_migration_cleanup`](../../done/forge_hook_migration_cleanup/card.md), and T8 above. T7's remaining
-mutator-family sweep is parked in
-[`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
+mutator-family sweep is active in `doing/` as
+[`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md) (reclassified 2026-07-11
 as a standalone follow-up, not an epic member). Adjacent non-member `env_var_interface_boundary` also landed via PR #91;
 T4 authored against it, and T5/T6 should continue to author new user-facing strings against the shipped env-var
 vocabulary boundary.
@@ -94,7 +94,7 @@ Record outcomes here as members are picked up.
   companion), picked up together 2026-07-06; both `git mv` `proposed/ -> doing/` on branch `forge-project-registry`,
   epic/member links repointed, execution checklists added. T3 Phase 1--3 implementation and T7's first command-path
   guard slice landed 2026-07-07 in PR #90; both member cards are now `done/`. T7's broader mutator sweep was split to
-  `todo/forge_project_compat_mutator_sweep/`.
+  the now-active standalone [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md).
 - [x] Next member after T3/T7: **T4 `forge_hook_dispatcher`** (critical path), picked up 2026-07-07; `git mv`
   `proposed/ -> doing/` on branch `forge-hook-dispatcher`, epic forward-link + member back-link repointed, execution
   checklist added. Shipped the dispatcher mechanism + resolver + no-op gate + metadata home; Phase 0 resolved the
@@ -166,7 +166,7 @@ boxes tick at **epic closeout**; interim per-member verification lives in the me
 - [ ] When moving the epic to `done/`, repoint every inbound board link that currently targets the epic's `doing/` path,
   including done-member back-links and standalone follow-ups such as
   [`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md) and
-  [`forge_project_compat_mutator_sweep`](../../todo/forge_project_compat_mutator_sweep/card.md) (non-member; its Origin
+  [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md) (non-member; its Origin
   line links this epic).
 - [ ] Epic moved `doing/ -> done/`; `change_log.md` entry added; durable lessons promoted to `impl_notes.md` after human
   review.

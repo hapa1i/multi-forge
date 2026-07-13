@@ -208,6 +208,11 @@ forge session list --older-than 30            # List old sessions before cleanin
 Active sessions are always skipped. Worktrees and branches are preserved by default. Claude transcript files
 (`~/.claude/projects/*.jsonl`) are deleted; Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) are not.
 
+Compatibility is evaluated per Forge root. Preview output identifies sessions that apply would refuse. On `--yes`,
+manual cleanup skips incompatible roots, continues compatible roots, reports every skipped target, and exits 1 if any
+requested target was refused or failed. Automatic retention uses the same per-root skip but only logs it and never
+changes the foreground command's exit status. `--force` does not bypass `.forge/project.toml`.
+
 For automatic cleanup, set `session_retention_days` in `~/.forge/config.yaml`:
 
 ```bash
@@ -232,6 +237,12 @@ forge session start my-feature    # Now works
 Without `.forge/`, `forge session start` fails with a clear error. The bare launcher (`forge claude start`) does not
 require `.forge/`.
 
+If `<forge_root>/.forge/project.toml` declares `required_forge`, every explicit session mutation checks the root that
+owns the target manifest and artifacts. This includes named cross-project settings/deletion, transfer edits, lane and
+memory settings, resume, fork, and cleanup. A refusal occurs before proxy startup, editor launch, lane freeze, or
+filesystem mutation. Run a satisfying Forge version, or edit/reset project state; changing `FORGE_DEV` requires
+relaunch, and a sidecar needs a satisfying Forge in its image.
+
 ---
 
 ## Session scoping (`forge_root`)
@@ -255,22 +266,23 @@ common worktree cases are:
 Most session commands resolve sessions **workspace-wide** — if `list` shows a session, you can interact with it
 regardless of which Forge project you're currently in (within the same git repo):
 
-| Command                   | Scope                | Notes                                             |
-| :------------------------ | :------------------- | :------------------------------------------------ |
-| `session list`            | Workspace (default)  | `--scope project` / `--scope all`                 |
-| `session show`            | Workspace-wide       | Prefers current project; shows cross-project note |
-| `session delete` (named)  | Workspace-wide       | Prefers current project; shows cross-project note |
-| `session delete --all`    | Current project only | Requires being inside a Forge project             |
-| `session set` / `reset`   | Workspace-wide       | Via `--session` flag                              |
-| `session resume` / `fork` | Current project only | CWD-dependent (Claude Code constraint)            |
-| `session clean`           | Global               | All projects regardless of CWD                    |
+| Command                          | Scope                | Notes                                             |
+| :------------------------------- | :------------------- | :------------------------------------------------ |
+| `session list`                   | Workspace (default)  | `--scope project` / `--scope all`                 |
+| `session show`                   | Workspace-wide       | Prefers current project; shows cross-project note |
+| `session delete` (named)         | Workspace-wide       | Prefers current project; shows cross-project note |
+| `session delete --all`           | Current project only | Requires being inside a Forge project             |
+| `session set` / `reset`          | Workspace-wide       | Via `--session` flag                              |
+| Claude `session resume` / `fork` | Current project only | CWD-dependent (Claude Code constraint)            |
+| Codex `session resume`           | Resolved session     | Cross-CWD; runs in the recorded worktree          |
+| `session clean`                  | Global               | All projects regardless of CWD                    |
 
 When the same session name exists in multiple Forge projects within the repo, the current project wins. If you're not in
 any of them, you'll see an error listing the locations.
 
 When forking `--into` another worktree, the child session lands at the **equivalent position** — if the parent was at
 `monorepo/packages/app`, the child lands at `target-worktree/packages/app`. The target must have Forge enabled at that
-path.
+path. Forge strict-checks that target root before routing/proxy preflight and again before manager writes.
 
 ---
 
@@ -494,6 +506,13 @@ Creates a git worktree for the fork. `--branch` implies `--worktree`. Because Cl
 the fork starts a fresh Claude session in the new worktree and automatically injects a parent transfer context file
 (`.forge/prev_sessions/<parent>/children/<fork-name>.md`). Claude knows where the parent left off, but the old visible
 chat history is not replayed.
+
+Managed worktree creation checks the source pin before creating the checkout, then checks the equivalent target Forge
+root before copying runtime config or writing project state. If a tracked target pin is incompatible, Forge removes the
+new checkout and branch. Runtime config copying intentionally excludes `.forge/project.toml`, so an ignored source pin
+is not copied into the worktree and a tracked target pin remains authoritative. When `fork --worktree --force` targets a
+stale Forge-owned child, Forge checks that child's existing pin, the exact replacement commit, and branch safety before
+removing anything. A refusal preserves its checkout, branch, dirty files, and session state.
 
 **Resume mode (`--resume-mode`):** cross-directory forks (`--worktree`/`--into`) default to `transfer` — the assembled,
 editable context file above. For a byte-faithful alternative, pass `--resume-mode native-relocate`: Forge relocates the

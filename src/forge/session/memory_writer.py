@@ -69,7 +69,7 @@ def _default_timeout() -> int:
     return get_runtime_config().memory_writer_timeout
 
 
-def _record_memory_writer_outcome(
+def record_memory_writer_outcome(
     session_name: str,
     status: UpstreamStatus,
     *,
@@ -376,13 +376,13 @@ def run_memory_writer(
     reason = is_safe_designated_doc_path(transcript_snapshot_rel, project_root, project_root.resolve())
     if reason:
         logger.warning("Memory writer: unsafe transcript path (%s)", reason)
-        _record_memory_writer_outcome(session_name, "error", reason_code="unsafe_transcript_path", message=reason)
+        record_memory_writer_outcome(session_name, "error", reason_code="unsafe_transcript_path", message=reason)
         return False
     transcript_abs = (project_root / transcript_snapshot_rel).resolve()
 
     if not transcript_abs.is_file():
         logger.warning("Memory writer: transcript not found at %s", transcript_abs)
-        _record_memory_writer_outcome(
+        record_memory_writer_outcome(
             session_name,
             "error",
             reason_code="transcript_not_found",
@@ -398,7 +398,7 @@ def run_memory_writer(
             turn_count,
             config.min_turns,
         )
-        _record_memory_writer_outcome(
+        record_memory_writer_outcome(
             session_name,
             "skipped",
             reason_code="below_min_turns",
@@ -409,7 +409,7 @@ def run_memory_writer(
     _VALID_MODES = {"augment", "review-only"}
     if config.mode not in _VALID_MODES:
         logger.warning("Memory writer: unknown mode %r (expected %s)", config.mode, _VALID_MODES)
-        _record_memory_writer_outcome(session_name, "error", reason_code="unknown_mode", message=config.mode)
+        record_memory_writer_outcome(session_name, "error", reason_code="unknown_mode", message=config.mode)
         return False
 
     # Resolve the bound lane -> runtime (epic consumer_lanes T6c). Validate the LaneRecord against
@@ -421,14 +421,14 @@ def run_memory_writer(
         runtime_id = resolve_lane(MEMORY_WRITER_CONSUMER, override=override).runtime_id
     except LaneError as e:
         logger.warning("Memory writer lane binding invalid for %s: %s", session_name, e)
-        _record_memory_writer_outcome(session_name, "error", reason_code="invalid_lane", message=str(e))
+        record_memory_writer_outcome(session_name, "error", reason_code="invalid_lane", message=str(e))
         return False
 
     # Claude availability is a claude-arm precondition only; a codex-bound run must not require it
     # (epic consumer_lanes T6c, Finding 2).
     if runtime_id == "claude_code" and not is_claude_available():
         logger.warning("Memory writer: claude CLI not found in PATH")
-        _record_memory_writer_outcome(session_name, "error", reason_code="claude_unavailable")
+        record_memory_writer_outcome(session_name, "error", reason_code="claude_unavailable")
         return False
 
     if not designated_docs:
@@ -436,7 +436,7 @@ def run_memory_writer(
             "No designated_docs configured; memory writer has nothing to update (session %s)",
             session_name,
         )
-        _record_memory_writer_outcome(session_name, "skipped", reason_code="no_designated_docs")
+        record_memory_writer_outcome(session_name, "skipped", reason_code="no_designated_docs")
         return True
 
     safe_docs = _validate_designated_docs(designated_docs, forge_root)
@@ -498,7 +498,7 @@ def run_memory_writer(
             "No designated_docs ready after validation/existence checks (session %s)",
             session_name,
         )
-        _record_memory_writer_outcome(session_name, "skipped", reason_code="no_ready_docs")
+        record_memory_writer_outcome(session_name, "skipped", reason_code="no_ready_docs")
         return True
 
     prompt = build_multi_doc_prompt(
@@ -571,7 +571,7 @@ def run_memory_writer(
         reason_code = "timeout" if result.timed_out else f"exit_{result.returncode}"
         if result.error and not result.timed_out:
             reason_code = "subprocess_error"
-        _record_memory_writer_outcome(
+        record_memory_writer_outcome(
             session_name,
             "timeout" if result.timed_out else "error",
             reason_code=reason_code,
@@ -608,7 +608,7 @@ def run_memory_writer(
             "Run 'forge claude preset edit' to add Write/Edit to permissions.allow.",
             session_name,
         )
-        _record_memory_writer_outcome(
+        record_memory_writer_outcome(
             session_name,
             "error",
             reason_code="permission_denied",
@@ -620,7 +620,7 @@ def run_memory_writer(
         return False
 
     logger.info("Memory writer completed for session %s", session_name)
-    _record_memory_writer_outcome(
+    record_memory_writer_outcome(
         session_name,
         "success",
         run_id=result.run_id,
@@ -644,7 +644,7 @@ def _dispatch_codex_memory_writer(
     """Run the memory writer on the codex-exec lane (epic consumer_lanes T6c).
 
     Mirrors ``_dispatch_codex_shadow_curation`` but maps codex failure into the memory writer's
-    **best-effort-async** degrade (log + ``_record_memory_writer_outcome`` + ``return False``), not
+    **best-effort-async** degrade (log + ``record_memory_writer_outcome`` + ``return False``), not
     shadow-curation's fail-loud: this consumer runs detached from the work-queue (stdout -> DEVNULL),
     so there is no user to fail loud to.
 
@@ -657,7 +657,7 @@ def _dispatch_codex_memory_writer(
 
     Outcome recording (T6c Finding 1): the invoker's ``_emit_codex`` records BOTH the usage event
     AND the upstream outcome row (success + error) via the pinned ``Attribution``. So this arm calls
-    ``_record_memory_writer_outcome`` ONLY for no-spawn setup/preflight failures (the invoker never
+    ``record_memory_writer_outcome`` ONLY for no-spawn setup/preflight failures (the invoker never
     ran); a spawned run relies on the invoker row -- recording here too would double-count.
 
     Freeze: ``on_dispatch`` fires only *after* the preflight gate passes -- a cold-preflight
@@ -686,7 +686,7 @@ def _dispatch_codex_memory_writer(
         if preflight is None or not preflight.ready:
             reason = (preflight.blocking_reason if preflight else None) or "no fresh preflight cached"
             logger.warning("Memory writer codex unavailable for %s: %s", session_name, reason)
-            _record_memory_writer_outcome(
+            record_memory_writer_outcome(
                 session_name, "error", reason_code="codex_unavailable", message=f"{reason}. {refresh_hint}"
             )
             return False
@@ -706,7 +706,7 @@ def _dispatch_codex_memory_writer(
         )
     except Exception as e:  # cache read / request shaping failure -> degrade, no spawn, no freeze
         logger.warning("Memory writer codex setup failed for %s: %s", session_name, e)
-        _record_memory_writer_outcome(
+        record_memory_writer_outcome(
             session_name, "error", reason_code="codex_setup_error", message=f"{e}. {refresh_hint}"
         )
         return False

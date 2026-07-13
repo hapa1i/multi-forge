@@ -130,8 +130,9 @@ cannot launch, an eligible hook fails with exit 127 instead of silently using th
 the variable to restore recorded/global launcher resolution.
 
 The value is inherited when Claude or Codex starts. Relaunch the managed session after changing or unsetting it; editing
-the parent shell's environment does not update an already-running process. To inspect the same value explicitly, pass it
-to doctor:
+the parent shell's environment does not update an already-running process. `FORGE_DEV` selects the hook executable but
+does not bypass a project's `required_forge` pin. Sidecars use the Forge executable bundled in their image, so recovery
+there requires an image containing a satisfying version. To inspect the same value explicitly, pass it to doctor:
 
 ```bash
 FORGE_DEV="$PWD" uv run forge extension doctor
@@ -168,6 +169,13 @@ status-line `hooks` segment, `HOOK!` is cleanup-required and `HOOKx2` is a real 
 ## Core hooks (what they do)
 
 Forge provides these hook handlers (invoked as `forge hook <name>`):
+
+Project-writing lifecycle, policy, team, and Codex hooks resolve every Forge root they may change and run one lenient
+compatibility diagnostic per invocation before the first write. An incompatible, malformed, unreadable, or
+unsupported-schema `.forge/project.toml` produces one debug-log entry and the hook proceeds; no compatibility text is
+added to stdout or stderr, and exit/JSON contracts do not change. Doctor is the user-facing diagnostic surface. This
+fail-open posture does not apply to explicit mutations delivered through hooks: mutating `%` commands and WorktreeCreate
+fail closed.
 
 ### session-start
 
@@ -209,6 +217,11 @@ Purpose: persist a transcript copy at stable boundaries and enqueue deferred wor
 - enqueue search indexing work for `<forge_root>/.forge/search-index/`
 - enqueue memory-writer marker (if `memory.auto_update.enabled`). See [`memory.md`](memory.md).
 
+The later workers enforce compatibility independently. An index or policy-shadow marker refused by the pin follows the
+normal bounded retry path and moves to `~/.forge/pending-work/failed/` at the retry limit; the foreground command that
+drains the queue still succeeds. A detached memory writer records a `project_compatibility_refused` skip and exits 0
+without dispatching or writing project files.
+
 ### pre-compact (PreCompact)
 
 Purpose: capture the full, uncompacted transcript before compaction.
@@ -233,7 +246,14 @@ Purpose: record compaction metadata after compaction completes.
 
 Purpose: replace Claude Code's default worktree creation with auto-install of Forge extensions.
 
+- strict-checks the source Forge root before `git worktree add`
 - creates a git worktree via `git worktree add`
+- maps a nested Forge root to the same checkout-relative path in the target and strict-checks it before config copy,
+  project enrollment, extension install, or session writes
+- rolls back the new checkout and newly created branch if the target pin refuses the operation; if Git cannot complete
+  cleanup, stderr reports the incomplete rollback
+- never copies `.forge/project.toml`; runtime-config copy excludes it, so a tracked target pin may differ from the
+  source
 - best-effort installs project-owned Forge extensions (status line, skills, and other assets) in the new worktree; the
   existing user dispatcher supplies runtime hooks
 - prints the absolute worktree path to stdout (Claude Code reads this)
@@ -346,6 +366,11 @@ Type these directly in the Claude prompt to interact with Forge without switchin
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI
 > `forge policy enable/disable` mutates session intent. `%policy check` is read-only — it evaluates but doesn't change
 > enforcement state.
+
+> **Compatibility:** Mutating `%policy` forms, including supervisor set/on/off/remove/reload/cascade, and
+> `%cancel-verification` strict-check the resolved session's Forge root. A refusal is returned through the normal
+> `{"decision":"block"}` response with recovery and writes nothing. Read-only `%policy status`, `%policy check`, and
+> bare `%policy supervisor` remain available.
 
 > **Note:** `%` commands only work in interactive Claude sessions. They do NOT fire in `claude --print` mode.
 

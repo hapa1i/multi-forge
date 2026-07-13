@@ -147,6 +147,12 @@ class TestLogLevelResolution:
 
 
 class TestConfigureDebugLogging:
+    def test_package_logger_shields_disabled_logging_from_last_resort(self, capsys):
+        assert any(isinstance(handler, logging.NullHandler) for handler in logging.getLogger("forge").handlers)
+        logging.getLogger("forge.core.workqueue.queue").warning("must stay off stderr")
+
+        assert capsys.readouterr().err == ""
+
     def test_noop_when_disabled(self, monkeypatch):
         monkeypatch.delenv("FORGE_DEBUG", raising=False)
         forge_logger = logging.getLogger("forge")
