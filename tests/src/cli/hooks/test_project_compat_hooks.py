@@ -24,38 +24,24 @@ def _write_pin(root: Path, state: str) -> None:
     compat_path = root / ".forge" / "project.toml"
     compat_path.parent.mkdir(parents=True, exist_ok=True)
     if state == "incompatible":
-        compat_path.write_text(
-            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
-        )
+        compat_path.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
     elif state == "malformed":
         compat_path.write_text("not = valid = toml\n", encoding="utf-8")
     elif state == "compatible":
-        compat_path.write_text(
-            'schema_version = 1\nrequired_forge = ">=0"\n', encoding="utf-8"
-        )
+        compat_path.write_text('schema_version = 1\nrequired_forge = ">=0"\n', encoding="utf-8")
     elif state == "unsupported_schema":
-        compat_path.write_text(
-            'schema_version = 2\nrequired_forge = ">=0"\n', encoding="utf-8"
-        )
+        compat_path.write_text('schema_version = 2\nrequired_forge = ">=0"\n', encoding="utf-8")
     elif state == "unreadable":
-        compat_path.write_text(
-            'schema_version = 1\nrequired_forge = ">=0"\n', encoding="utf-8"
-        )
+        compat_path.write_text('schema_version = 1\nrequired_forge = ">=0"\n', encoding="utf-8")
     else:
         raise ValueError(f"unknown compatibility fixture: {state}")
 
 
 def _compat_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
-    return [
-        record
-        for record in caplog.records
-        if "Project compatibility degraded for hook" in record.message
-    ]
+    return [record for record in caplog.records if "Project compatibility degraded for hook" in record.message]
 
 
-def _make_session(
-    root: Path, monkeypatch: pytest.MonkeyPatch, *, name: str = "session"
-) -> SessionStore:
+def _make_session(root: Path, monkeypatch: pytest.MonkeyPatch, *, name: str = "session") -> SessionStore:
     monkeypatch.chdir(root)
     monkeypatch.setenv("HOME", str(root / "home"))
     monkeypatch.setenv("FORGE_SESSION", name)
@@ -76,9 +62,7 @@ def test_lenient_diagnostic_degrades_once_and_proceeds(
     _write_pin(tmp_path, state)
 
     with caplog.at_level(logging.DEBUG, logger="forge.install.project_compat"):
-        results = diagnose_project_compatibility_for_hook(
-            tmp_path, operation="test-hook"
-        )
+        results = diagnose_project_compatibility_for_hook(tmp_path, operation="test-hook")
 
     assert len(results) == 1
     assert results[0].compatible is True
@@ -97,9 +81,7 @@ def test_lenient_diagnostic_is_silent_when_not_degraded(
         _write_pin(tmp_path, state)
 
     with caplog.at_level(logging.DEBUG, logger="forge.install.project_compat"):
-        results = diagnose_project_compatibility_for_hook(
-            tmp_path, operation="test-hook"
-        )
+        results = diagnose_project_compatibility_for_hook(tmp_path, operation="test-hook")
 
     assert len(results) == 1
     assert results[0].state == state
@@ -229,13 +211,9 @@ def test_lifecycle_write_hooks_call_the_invocation_diagnostic_once(
     monkeypatch.setattr(commands, "enqueue_index_marker", lambda **_kwargs: None)
     monkeypatch.setattr(commands, "enqueue_handoff_marker", lambda **_kwargs: None)
     monkeypatch.setattr(commands, "enqueue_shadow_marker", lambda **_kwargs: None)
-    monkeypatch.setattr(
-        commands, "_copy_transcript_to_pending_runs", lambda *_args, **_kwargs: None
-    )
+    monkeypatch.setattr(commands, "_copy_transcript_to_pending_runs", lambda *_args, **_kwargs: None)
 
-    result = CliRunner().invoke(
-        hooks, [command], input=json.dumps(payload), catch_exceptions=False
-    )
+    result = CliRunner().invoke(hooks, [command], input=json.dumps(payload), catch_exceptions=False)
 
     assert result.exit_code == 0
     diagnostic.assert_called_once_with(store.forge_root, operation=operation)
@@ -261,9 +239,7 @@ def test_team_hooks_call_the_invocation_diagnostic_once(
 
     with (
         patch("forge.cli.hooks.commands.resolve_session_store", return_value=store),
-        patch(
-            "forge.cli.hooks.commands.compute_effective_intent", return_value=effective
-        ),
+        patch("forge.cli.hooks.commands.compute_effective_intent", return_value=effective),
         patch(
             "forge.cli.hooks.commands.diagnose_project_compatibility_for_hook",
             diagnostic,
@@ -325,18 +301,14 @@ def test_policy_hook_aggregates_store_and_shadow_roots_in_one_diagnostic(
         ),
         caplog.at_level(logging.DEBUG, logger="forge.install.project_compat"),
     ):
-        result = CliRunner().invoke(
-            hooks, ["policy-check"], input=payload, catch_exceptions=False
-        )
+        result = CliRunner().invoke(hooks, ["policy-check"], input=payload, catch_exceptions=False)
 
     assert result.exit_code == 0
     records = _compat_records(caplog)
     assert len(records) == 1
     assert str(project_root / ".forge" / "project.toml") in records[0].message
     assert str(shadow_root / ".forge" / "project.toml") in records[0].message
-    assert list(
-        (shadow_root / ".forge" / "artifacts" / "session" / "shadow").glob("*.json")
-    )
+    assert list((shadow_root / ".forge" / "artifacts" / "session" / "shadow").glob("*.json"))
 
 
 @pytest.mark.parametrize("state", ["incompatible", "malformed"])
@@ -364,9 +336,7 @@ def test_codex_session_start_keeps_wire_and_stderr_unchanged(
     )
 
     with caplog.at_level(logging.DEBUG, logger="forge.install.project_compat"):
-        result = CliRunner().invoke(
-            hooks, ["codex-session-start"], input=payload, catch_exceptions=False
-        )
+        result = CliRunner().invoke(hooks, ["codex-session-start"], input=payload, catch_exceptions=False)
 
     assert result.exit_code == 0
     assert result.stderr == ""
@@ -401,9 +371,7 @@ def test_codex_policy_allow_remains_silent_while_diagnostic_logs(
     )
 
     with caplog.at_level(logging.DEBUG, logger="forge.install.project_compat"):
-        result = CliRunner().invoke(
-            hooks, ["codex-policy-check"], input=payload, catch_exceptions=False
-        )
+        result = CliRunner().invoke(hooks, ["codex-policy-check"], input=payload, catch_exceptions=False)
 
     assert result.exit_code == 0
     assert result.stdout == ""
