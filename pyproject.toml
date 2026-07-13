@@ -1,6 +1,6 @@
 [project]
 name = "multi-forge"
-version = "0.7.1"
+version = "0.8.0"
 description = "Multi-runtime agent toolkit: proxy routing, cost control, session management, policy enforcement, and workflow orchestration"
 readme = "README.md"
 license = "Apache-2.0"
