@@ -30,6 +30,10 @@ DISPATCHER_BIN_DIR = "bin"
 RUNTIME_METADATA_FILENAME = "runtime.json"
 RUNTIME_METADATA_VERSION = 1
 FORGE_DEV_VAR = "FORGE_DEV"
+_USER_HOOK_ENABLE_COMMAND = (
+    "forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands"
+)
+_USER_HOOK_SYNC_COMMAND = "forge extension sync --scope user"
 
 _STAMP_VERSION_RE = re.compile(r'^FORGE_HOOK_DISPATCHER_VERSION = "([^"]*)"$')
 _STAMP_SOURCE_RE = re.compile(r'^FORGE_HOOK_DISPATCHER_SOURCE_SHA256 = "([0-9a-f]*)"$')
@@ -613,6 +617,7 @@ def _diagnose_dev_override(
     environ: dict[str, str],
     dispatcher_path: Path,
     dispatcher_status: str,
+    recovery_command: str,
 ) -> DevOverrideDiagnosis:
     present, value, target, validation_error = _validate_dev_override(environ)
     if not present:
@@ -622,12 +627,28 @@ def _diagnose_dev_override(
         return DevOverrideDiagnosis(True, value, target_str, False, False, validation_error)
     dispatcher_executable = _is_executable_file(dispatcher_path)
     if dispatcher_status == "non_executable" or (dispatcher_status == "current" and not dispatcher_executable):
-        advice = f"Restore execute permission for {dispatcher_path} (or run 'forge extension sync')."
+        advice = f"Restore execute permission for {dispatcher_path} (or run '{recovery_command}')."
         return DevOverrideDiagnosis(True, value, target_str, True, False, advice)
     if dispatcher_status != "current":
-        advice = "Run 'forge extension sync' so the installed hook dispatcher can honor FORGE_DEV."
+        advice = f"Run '{recovery_command}' so the installed hook dispatcher can honor FORGE_DEV."
         return DevOverrideDiagnosis(True, value, target_str, True, False, advice)
     return DevOverrideDiagnosis(True, value, target_str, True, True, None)
+
+
+def _has_user_installation() -> bool:
+    """Best-effort: is a user-scope extension installation tracked?
+
+    The dispatcher is user-scoped, so an unrelated project installation must
+    not select ``sync``: bare sync cannot discover that installation from an
+    arbitrary working directory. Corrupt/unreadable tracking keeps the
+    user-sync advice so the command surfaces the existing reset path.
+    """
+    try:
+        from .tracking import TrackingStore
+
+        return TrackingStore().has_installation("user")
+    except Exception:  # Diagnosis must never raise; degrade to the sync advice.
+        return True
 
 
 def diagnose_hook_dispatcher(
@@ -635,10 +656,13 @@ def diagnose_hook_dispatcher(
     environ: dict[str, str] | None = None,
     argv0: str | None = None,
     which: Any = shutil.which,
+    has_user_installation: bool | None = None,
 ) -> HookDispatcherDiagnosis:
     """Return doctor-facing drift status for the dispatcher artifact."""
 
     env = dict(os.environ) if environ is None else environ
+    has_user = _has_user_installation() if has_user_installation is None else has_user_installation
+    recovery_cmd = _USER_HOOK_SYNC_COMMAND if has_user else _USER_HOOK_ENABLE_COMMAND
     dispatcher_path = get_hook_dispatcher_path()
     metadata_path = get_runtime_metadata_path()
     expected_version = __version__
@@ -671,8 +695,13 @@ def diagnose_hook_dispatcher(
                 environ=env,
                 dispatcher_path=dispatcher_path,
                 dispatcher_status=status,
+                recovery_command=recovery_cmd,
             ),
-            advice="Run 'forge extension sync' to render the hook dispatcher.",
+            advice=(
+                f"Run '{recovery_cmd}' to render the hook dispatcher."
+                if has_user
+                else f"Run '{recovery_cmd}' to install runtime hooks and render the hook dispatcher."
+            ),
         )
 
     try:
@@ -693,6 +722,7 @@ def diagnose_hook_dispatcher(
                 environ=env,
                 dispatcher_path=dispatcher_path,
                 dispatcher_status=status,
+                recovery_command=recovery_cmd,
             ),
             advice=f"Fix permissions for {dispatcher_path}: {e}",
         )
@@ -702,21 +732,20 @@ def diagnose_hook_dispatcher(
     dispatcher_executable = _is_executable_file(dispatcher_path)
     if not dispatcher_executable:
         status = "non_executable"
-        advice = "Run 'forge extension sync' to restore the hook dispatcher's executable mode."
+        advice = f"Run '{recovery_cmd}' to restore the hook dispatcher's executable mode."
     elif not is_current:
         status = "stale"
-        advice = "Run 'forge extension sync' to re-render the hook dispatcher."
+        advice = f"Run '{recovery_cmd}' to re-render the hook dispatcher."
     elif recorded is not None and _is_executable_file(recorded) and _is_venv_launcher(recorded):
         status = "current"
-        advice = "Run 'forge extension sync' to replace the recorded virtualenv launcher used by hook dispatch."
+        advice = f"Run '{recovery_cmd}' to replace the recorded virtualenv launcher used by hook dispatch."
     elif current_dispatch_target is None:
         status = "current"
         if next_recorded_target is not None:
-            advice = f"Run 'forge extension sync' to record {next_recorded_target} for hook dispatch."
+            advice = f"Run '{recovery_cmd}' to record {next_recorded_target} for hook dispatch."
         else:
             advice = (
-                "No recorded or known global Forge launcher is executable; "
-                "install one and run 'forge extension sync'."
+                "No recorded or known global Forge launcher is executable; " f"install one and run '{recovery_cmd}'."
             )
     else:
         status = "current"
@@ -725,6 +754,7 @@ def diagnose_hook_dispatcher(
         environ=env,
         dispatcher_path=dispatcher_path,
         dispatcher_status=status,
+        recovery_command=recovery_cmd,
     )
     if dev_override.effective and current_dispatch_target is None and advice is not None:
         advice = f"FORGE_DEV is effective for this process; without it, normal resolution reports: {advice}"

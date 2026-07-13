@@ -107,8 +107,17 @@ forge extension doctor
 # For development on Forge itself (editable install from a local clone):
 git clone https://github.com/hapa1i/multi-forge.git
 cd multi-forge && uv sync
+# When FORGE_DEV is unset, eligible host hooks use an executable recorded or
+# known-location launcher. Install the persistent editable launcher too:
+./scripts/setup.sh --local
+# Make uv's tool bin available in this shell and future shells:
+uv tool update-shell
+export PATH="$(uv tool dir --bin):$PATH"
 
-# Install extensions (hooks, skills, status line) into Claude Code
+# Register only runtime hooks at user scope
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+
+# Then, inside a project: install project-owned assets and settings
 forge extension enable
 
 # Launch Claude with session tracking (no proxy needed)

@@ -36,12 +36,14 @@ forge extension doctor          # confirm install kind + PATH reachability
 A global tool keeps `forge` on `PATH` for every shell and the hooks launched from one, avoiding the "activate a project
 venv first" trap. Claude launched from the Dock or an IDE inherits a minimal `PATH` that can still miss bare `forge` --
 `forge extension doctor` reports that case as `on_path_minimal`. Contributors working on Forge itself use an editable
-install instead (`uv sync`); see [CONTRIBUTING.md](../../CONTRIBUTING.md).
+install instead (`uv sync`, then `./scripts/setup.sh --local` for a persistent editable launcher that host hooks can
+resolve). If uv's tool bin is not yet available in the current shell, run `export PATH="$(uv tool dir --bin):$PATH"`;
+`uv tool update-shell` configures future shells. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ### A. Install extensions
 
 ```bash
-forge extension enable --scope user    # Install runtime hooks once
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 ```
 
 If that command reports the current checkout as a legacy cleanup candidate, migrate it before ordinary project setup:
@@ -200,7 +202,7 @@ varies across model versions, cost optimization order, and a release-validation 
 ### Hooks -- Lifecycle & Artifacts
 
 Forge hooks capture session artifacts (plans, transcripts) and enforce policies at tool-use boundaries. Install runtime
-hooks once with `forge extension enable --scope user`; project/local enable owns project assets and status line
+hooks once with the hooks-only user-scope recipe above; project/local enable owns project assets and status line
 settings.
 
 See [hook.md](hook.md).

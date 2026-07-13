@@ -17,6 +17,7 @@ from click.testing import CliRunner
 
 from forge.cli.extensions import extensions
 from forge.install.doctor import (
+    EDITABLE_INSTALL_COMMANDS,
     GLOBAL_INSTALL_COMMANDS,
     MINIMAL_PATH,
     PATH_SETUP_COMMANDS,
@@ -76,7 +77,60 @@ def test_editable_install_labeled_editable(tmp_path: Path) -> None:
     assert diag.forge_path == str(forge)
     assert diag.on_path is True
     assert diag.advice is not None
-    assert "global tool" in diag.advice
+    # Contributor fix, not the released wheel (which would shadow the checkout).
+    assert "editable launcher" in diag.advice
+    assert "do not infer this checkout's venv" in diag.advice
+    assert diag.advice_commands == EDITABLE_INSTALL_COMMANDS
+
+
+def test_editable_with_global_launcher_clears_advice(tmp_path: Path) -> None:
+    """setup.sh --local is itself an editable install -- its launcher must clear the tip.
+
+    PATH puts the checkout venv first (the ``uv run forge extension doctor``
+    case), so the clear keys on the launcher's existence in a global bin dir,
+    not on PATH resolution order -- mirroring the dispatcher's fallback. The
+    contract is reachability, not provenance: any executable launcher counts
+    (hence the arbitrary stub), because it means hooks resolve.
+    """
+    venv_bin = tmp_path / "repo" / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    venv_forge = venv_bin / "forge"
+    global_bin = tmp_path / ".local" / "bin"
+    global_bin.mkdir(parents=True)
+    launcher = global_bin / "forge"
+    launcher.write_text("#!/bin/sh\n")
+    launcher.chmod(0o755)
+    environ = {"HOME": str(tmp_path), "PATH": f"{venv_bin}:/usr/bin"}
+    which = _fake_which({str(venv_bin): str(venv_forge)})
+
+    diag = diagnose_install(which=which, environ=environ, editable=True)
+
+    assert diag.install_kind == "editable"  # kind stays truthful
+    assert diag.advice is None  # contributor end state -- no self-repeating tip
+    assert diag.advice_commands == ()
+
+
+def test_editable_with_recorded_custom_launcher_clears_advice(tmp_path: Path) -> None:
+    """A custom launcher recorded in runtime.json is also a durable resolver target.
+
+    The dispatcher tries the recorded launcher before known locations, so a
+    valid custom launcher outside the global bin dirs must clear the tip too.
+    """
+    venv_bin = tmp_path / "repo" / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    venv_forge = venv_bin / "forge"
+    custom = tmp_path / "opt" / "bin" / "forge"
+    custom.parent.mkdir(parents=True)
+    custom.write_text("#!/bin/sh\n")
+    custom.chmod(0o755)
+    environ = {"HOME": str(tmp_path), "PATH": f"{venv_bin}:/usr/bin"}
+    which = _fake_which({str(venv_bin): str(venv_forge)})
+
+    diag = diagnose_install(which=which, environ=environ, editable=True, recorded_launcher=str(custom))
+
+    assert diag.install_kind == "editable"
+    assert diag.advice is None
+    assert diag.advice_commands == ()
 
 
 def test_venv_only_not_on_path_advises_global(tmp_path: Path) -> None:
