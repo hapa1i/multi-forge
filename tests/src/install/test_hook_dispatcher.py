@@ -917,7 +917,12 @@ def test_doctor_unrelated_project_install_still_advises_user_enable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A different project's tracking entry cannot make sync actionable here."""
-    from forge.install.models import Installation, InstallMode, InstallProfile, InstallScope
+    from forge.install.models import (
+        Installation,
+        InstallMode,
+        InstallProfile,
+        InstallScope,
+    )
     from forge.install.tracking import TrackingStore
 
     unrelated = tmp_path / "unrelated-project"
