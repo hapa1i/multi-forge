@@ -1213,7 +1213,7 @@ runtime hooks:
 ```bash
 forge extension disable --scope user
 forge extension enable --scope project
-forge extension enable --scope user --profile minimal --with hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 ```
 
 ### C.6 Codex hook registration (codex-hooks module)

@@ -6,14 +6,15 @@
 
 <!-- test-count: 548 -->
 
-<!-- last-updated: 2026-07-10 -->
+<!-- last-updated: 2026-07-13 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-07-10 (section 2.12 now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups,
-and independent doctor cleanup/double-fire state). Earlier 2026-07-08: runtime hook QA now uses tracked user-scope
+**Last updated**: 2026-07-13 (hooks-only recipes now retain both Claude and Codex runtime registrations). Earlier
+2026-07-10: section 2.12 now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups, and independent
+doctor cleanup/double-fire state. Earlier 2026-07-08: runtime hook QA moved to tracked user-scope
 `forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
 same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
 auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:

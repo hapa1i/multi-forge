@@ -786,7 +786,9 @@ def test_doctor_separates_valid_override_from_stale_dispatcher(
     assert diagnosis.dev_override.valid is True
     assert diagnosis.dev_override.effective is False
     assert diagnosis.dev_override.advice is not None
-    assert "extension sync" in diagnosis.dev_override.advice
+    assert "extension enable --scope user" in diagnosis.dev_override.advice
+    assert "--with hooks,codex-hooks --without commands" in diagnosis.dev_override.advice
+    assert "extension sync" not in diagnosis.dev_override.advice
 
 
 def test_doctor_detects_source_hash_staleness_with_current_version(
@@ -856,12 +858,100 @@ def test_doctor_advises_sync_when_custom_launcher_is_discoverable_but_not_record
         environ=env,
         argv0="forge",
         which=lambda *_args, **_kwargs: str(custom_forge),
+        has_user_installation=True,
     )
 
     assert diagnosis.status == "current"
     assert diagnosis.advice is not None
-    assert "extension sync" in diagnosis.advice
+    assert "extension sync --scope user" in diagnosis.advice
     assert str(custom_forge) in diagnosis.advice
+
+
+def test_doctor_advises_enable_when_never_enabled_and_launcher_unrecorded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """sync refuses on a never-enabled machine, so the advice must name enable."""
+    custom_forge, _record = _make_fake_forge(tmp_path / "custom")
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: str(custom_forge),
+        has_user_installation=False,
+    )
+
+    assert diagnosis.status == "current"
+    assert diagnosis.advice is not None
+    assert "extension enable --scope user" in diagnosis.advice
+    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "extension sync" not in diagnosis.advice
+    assert str(custom_forge) in diagnosis.advice
+
+
+def test_doctor_missing_dispatcher_never_enabled_advises_enable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fresh machine (no dispatcher, nothing tracked): advice must not name sync."""
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
+        has_user_installation=False,
+    )
+
+    assert diagnosis.status == "missing"
+    assert diagnosis.advice is not None
+    assert "extension enable --scope user" in diagnosis.advice
+    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "extension sync" not in diagnosis.advice
+
+
+def test_doctor_unrelated_project_install_still_advises_user_enable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A different project's tracking entry cannot make sync actionable here."""
+    from forge.install.models import (
+        Installation,
+        InstallMode,
+        InstallProfile,
+        InstallScope,
+    )
+    from forge.install.tracking import TrackingStore
+
+    unrelated = tmp_path / "unrelated-project"
+    unrelated.mkdir()
+    TrackingStore().set_installation(
+        InstallScope.PROJECT.value,
+        Installation(
+            scope=InstallScope.PROJECT.value,
+            project_path=str(unrelated),
+            mode=InstallMode.COPY.value,
+            profile=InstallProfile.MINIMAL.value,
+            installed_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+        str(unrelated),
+    )
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
+    )
+
+    assert diagnosis.status == "missing"
+    assert diagnosis.advice is not None
+    assert "extension enable --scope user" in diagnosis.advice
+    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "extension sync" not in diagnosis.advice
 
 
 def test_doctor_advises_migrating_recorded_venv_even_with_global_fallback(
@@ -905,6 +995,9 @@ def test_doctor_advises_install_when_no_runtime_or_recording_target_exists(
     assert diagnosis.status == "current"
     assert diagnosis.advice is not None
     assert "install one" in diagnosis.advice
+    # Isolated FORGE_HOME has no tracked install, so real auto-detection picks
+    # the enable spelling (sync would refuse on this machine).
+    assert "extension enable --scope user" in diagnosis.advice
 
 
 def test_doctor_qualifies_missing_normal_launcher_when_dev_override_is_effective(

@@ -22,7 +22,7 @@ etc.).
 
 Forge’s deployment model is:
 
-- runtime hooks are configured once at user scope with `forge extension enable --scope user`
+- runtime hooks are configured once at user scope with the hooks-only recipe below
 - installed hook entries execute the Forge dispatcher: `<forge-home>/bin/forge-hook <name>`
 - the dispatcher forwards to the Forge CLI handler: `forge hook <name>`
 - Forge does **not** install ad-hoc scripts into `.claude/`
@@ -86,10 +86,11 @@ that may update session overrides.
 
 ## Installing Runtime Hooks
 
-Install runtime hooks once at user scope:
+Install tracked runtime hooks once at user scope, without duplicating project-owned commands, agents, skills,
+permissions, or environment settings:
 
 ```bash
-forge extension enable --scope user
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 ```
 
 Project/local extension installs still install project-owned settings such as `statusLine`, plus commands, agents,
@@ -100,15 +101,14 @@ forge extension enable                           # Auto-detect scope
 forge extension enable --scope local             # Local install → .claude/settings.local.json
 ```
 
-**Advanced:** Install tracked runtime hooks only (without commands, agents, skills, permissions, or env):
+To remove the user-scope runtime hooks later:
 
 ```bash
-forge extension enable --scope user --profile minimal --with hooks --without commands
 forge extension disable --scope user
 ```
 
-> **Note:** Explicit `--with hooks` at `--scope local` or `--scope project` is rejected. Runtime hooks are user-scoped;
-> project/local installs own statusLine and other project settings.
+> **Note:** Explicit `--with hooks` or `--with codex-hooks` at `--scope local` or `--scope project` is rejected. Runtime
+> hooks are user-scoped; project/local installs own statusLine and other project settings.
 
 > **Sidecar sessions:** host user settings are not mounted into the container. Forge stages the current hook inventory
 > into its container user settings automatically on every launch, using the `forge` executable bundled in the image.
@@ -126,8 +126,8 @@ FORGE_DEV="$PWD" uv run forge session start dev-hooks
 `FORGE_DEV` must be non-empty and expand to an absolute checkout root. The user-global dispatcher runs exactly
 `$FORGE_DEV/.venv/bin/forge`, even when the hook fires from a different enrolled project. It does not infer a checkout
 from the hook's working directory. If the value is empty or relative, or the target is missing, non-executable, or
-cannot launch, an eligible hook fails with exit 127 instead of silently using the recorded/global Forge launcher. Unset
-the variable to restore recorded/global launcher resolution.
+cannot launch, an eligible hook fails with exit 127 instead of silently using the recorded or known-location Forge
+launcher. Unset the variable to restore recorded or known-location launcher resolution.
 
 The value is inherited when Claude or Codex starts. Relaunch the managed session after changing or unsetting it; editing
 the parent shell's environment does not update an already-running process. `FORGE_DEV` selects the hook executable but
@@ -152,6 +152,11 @@ reports them; it does not touch those checkouts or enroll them. For each root, r
 forge extension cleanup-project --root /path/to/project
 forge extension cleanup-project --root /path/to/project --yes
 ```
+
+> **Contributor machines:** if Forge exists only in the checkout venv (`uv sync`) and no executable recorded or
+> known-location launcher exists, install the persistent editable launcher first (`./scripts/setup.sh --local` from the
+> checkout). Cleanup moves eligible host hooks to the user-scope dispatcher; with `FORGE_DEV` unset, they fail with exit
+> 127 until one of those normal launchers exists. A valid `FORGE_DEV` explicitly selects the checkout venv instead.
 
 Cleanup removes only canonical tracked entries or exact frozen known-released `forge hook <name>` wrappers. Modified,
 mixed, or otherwise ambiguous entries are preserved and make the selected cleanup fail with a manual-cleanup path.

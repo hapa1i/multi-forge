@@ -1347,9 +1347,11 @@ def doctor_cmd(as_json: bool) -> None:
     # Diagnostic: always exits 0 -- health lives in the payload (install_kind,
     # on_path*, advice), not the exit code. A non-zero-on-unhealthy mode is a
     # future question if hooks/CI ever gate on doctor (epic T2/T5).
-    diag = diagnose_install()
     registry_diag = diagnose_project_registry()
     dispatcher_diag = diagnose_hook_dispatcher()
+    # The recorded launcher counts as a durable hook-resolver target, so the
+    # install-section advice clears for custom runtime.json launchers too.
+    diag = diagnose_install(recorded_launcher=dispatcher_diag.forge_binary_path)
     compat_root = find_forge_root(Path.cwd().resolve())
     compat_diag = diagnose_project_compatibility(compat_root)
     cwd = Path.cwd().resolve()

@@ -26,7 +26,7 @@ cat $CLAUDE_HOME/settings.json | jq '.hooks'
 
 ```bash
 # Install runtime hooks only (no commands/skills)
-forge extension enable --scope user --profile minimal --with hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 ```
 
 - [ ] Hooks-only install works (writes tracked hooks to user settings.json)

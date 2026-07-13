@@ -447,11 +447,11 @@ first turn fails before Codex opens a thread, resume refuses with guidance — d
 
 **Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
 prompt without Codex hook setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead
-(`additionalContext`): run `forge extension enable --scope user` to register the dispatcher-backed Codex hook, then
-complete the one-time trust ceremony first (see [hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment
-can't be verified up front, so Forge checks delivery **after** the turn via the hook's receipt and records the outcome
-in the manifest (`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran
-without the parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
+(`additionalContext`): use the [hooks-only user-scope recipe](hook.md#installing-runtime-hooks) to register the
+dispatcher-backed Codex hook, then complete the one-time trust ceremony first. Enrollment can't be verified up front, so
+Forge checks delivery **after** the turn via the hook's receipt and records the outcome in the manifest
+(`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran without the
+parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
 
 ### Interactive Codex sessions
 

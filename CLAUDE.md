@@ -13,6 +13,11 @@ monorepo. The architecture is a "glue approach" — connective tissue between sp
 # Install dependencies
 uv sync
 
+# One-time contributor launcher. When FORGE_DEV is unset, eligible host hooks
+# use an executable recorded or known-location launcher and fail with exit 127
+# when neither exists. FORGE_DEV explicitly selects the checkout venv.
+./scripts/setup.sh --local
+
 # Run tests (ALWAYS use make - handles prerequisites)
 make test-unit              # Fast unit tests (no Docker)
 make test-integration       # Docker-based integration tests (auto-starts local LiteLLM)

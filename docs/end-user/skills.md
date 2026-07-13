@@ -272,7 +272,7 @@ Fix by keeping one skill scope. If you keep project-level skills, reinstall only
 ```bash
 forge extension disable --scope user
 forge extension enable --scope project
-forge extension enable --scope user --profile minimal --with hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 ```
 
 See [design_appendix.md §C.5](../design_appendix.md#c5-multi-scope-installation-55----skill-resolution) for details.

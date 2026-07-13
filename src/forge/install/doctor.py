@@ -34,6 +34,13 @@ MINIMAL_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 # The two recommended global-tool installs (surfaced in advice + Day-1 docs).
 GLOBAL_INSTALL_COMMANDS = ("uv tool install multi-forge", "pipx install multi-forge")
 
+# Contributor fix for an editable-only machine: a persistent global *editable*
+# launcher from the checkout (uv tool install -e), not the released wheel --
+# installing the release would shadow the checkout behind every hook. No
+# `forge extension sync` companion: sync fails on a never-enabled machine, and
+# the dispatcher's known-location fallback finds the new launcher without it.
+EDITABLE_INSTALL_COMMANDS = ("./scripts/setup.sh --local",)
+
 # Fixes for a global install whose bin dir is off PATH -- installed, just not wired
 # into the shell (the common "just ran uv tool install / pipx install" state).
 PATH_SETUP_COMMANDS = ("uv tool update-shell", "pipx ensurepath")
@@ -76,6 +83,8 @@ class InstallDiagnosis:
             return ()
         if self.install_kind == "global" and not self.on_path:
             return PATH_SETUP_COMMANDS
+        if self.install_kind == "editable":
+            return EDITABLE_INSTALL_COMMANDS
         return GLOBAL_INSTALL_COMMANDS
 
 
@@ -126,10 +135,26 @@ def global_bin_dirs(environ: dict[str, str]) -> tuple[Path, ...]:
     return tuple(unique)
 
 
-def _global_bin_dirs(environ: dict[str, str]) -> tuple[Path, ...]:
-    """Backward-compatible private alias for existing install diagnosis code."""
+def _executable_file(path: Path) -> bool:
+    try:
+        return path.is_file() and os.access(path, os.X_OK)
+    except OSError:
+        return False
 
-    return global_bin_dirs(environ)
+
+def _durable_launcher_exists(environ: dict[str, str], recorded_launcher: str | None) -> bool:
+    """True when hook dispatch has a durable resolver target.
+
+    Mirrors the dispatcher's resolution order: the launcher recorded in
+    ``runtime.json`` first, then known global-tool bin dirs. Deliberately checks
+    reachability only, not provenance -- any executable launcher (released or
+    editable) means hooks resolve, which is all this predicate answers. It also
+    ignores PATH order, so it stays true when a project venv leads PATH (the
+    ``uv run forge`` case) -- exactly how hooks resolve.
+    """
+    if recorded_launcher and _executable_file(Path(recorded_launcher)):
+        return True
+    return any(_executable_file(directory / EXECUTABLE) for directory in global_bin_dirs(environ))
 
 
 def _looks_like_venv_bin(bindir: Path) -> bool:
@@ -156,7 +181,7 @@ def _classify(forge_path: str | None, is_editable: bool, environ: dict[str, str]
     return "unknown"
 
 
-def _advice(install_kind: str, on_path: bool, forge_path: str | None) -> str | None:
+def _advice(install_kind: str, on_path: bool, forge_path: str | None, has_durable_launcher: bool) -> str | None:
     # A global install that resolves on PATH is the recommended end state.
     if install_kind == "global" and on_path:
         return None
@@ -169,9 +194,17 @@ def _advice(install_kind: str, on_path: bool, forge_path: str | None) -> str | N
             "`forge` resolves in every shell and the hooks launched from one."
         )
     if install_kind == "editable":
+        # setup.sh --local is itself an editable install, so kind stays
+        # "editable"; a durable launcher (recorded or known-location) is what
+        # clears the advice (otherwise following it would re-trigger it).
+        # Reachability only -- provenance is not this tip's job.
+        if has_durable_launcher:
+            return None
         return (
-            "Editable/development install (contributor setup). End users should install Forge as a "
-            "global tool so shells and the hooks they launch resolve it."
+            "Editable/development install (contributor setup). With FORGE_DEV unset, eligible host hooks use an "
+            "executable recorded launcher or a known global-tool launcher; they do not infer this checkout's venv. "
+            "Install the persistent editable launcher from the checkout root (end users install the release: "
+            "'uv tool install multi-forge')."
         )
     return (
         "Forge is not installed as a globally reachable tool. Install it as a global tool so shells "
@@ -185,11 +218,14 @@ def diagnose_install(
     which: WhichFn = _shutil_which,
     environ: dict[str, str] | None = None,
     editable: bool | None = None,
+    recorded_launcher: str | None = None,
 ) -> InstallDiagnosis:
     """Diagnose the Forge install: kind, launcher path, and PATH reachability.
 
     Seams are injectable for testing (``argv0``, ``which``, ``environ``,
-    ``editable``). ``on_path`` uses the caller's PATH (what a shell or hook
+    ``editable``, ``recorded_launcher`` -- the ``runtime.json`` launcher the
+    doctor CLI threads in from the dispatcher diagnosis, since importing the
+    dispatcher module here would cycle). ``on_path`` uses the caller's PATH (what a shell or hook
     inherits); ``on_path_minimal`` uses the launchd minimal PATH -- the
     GUI-launch reachability signal (epic D2). The launcher path is reported as
     resolved on PATH (the symlink a user sees, not its target), so a ``uv tool``
@@ -221,5 +257,10 @@ def diagnose_install(
         forge_path=forge_path,
         on_path=on_path,
         on_path_minimal=on_path_minimal,
-        advice=_advice(install_kind, on_path, forge_path),
+        advice=_advice(
+            install_kind,
+            on_path,
+            forge_path,
+            _durable_launcher_exists(env, recorded_launcher),
+        ),
     )
