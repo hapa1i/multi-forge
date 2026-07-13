@@ -285,12 +285,15 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 | Command             | Purpose                                                                                                         |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `forge info`        | Show global system information (`--json`)                                                                       |
-| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                                          |
+| `forge clean`       | Preview/remove orphaned state (`--scope`, `--yes`, `--json`)                                                    |
 | `forge config`      | Manage global runtime preferences                                                                               |
 | `forge auth login`  | Store credentials for LLM providers                                                                             |
 | `forge auth status` | Show credential status per provider                                                                             |
 | `forge logs show`   | Show log file locations/status (`--json`); notes per-proxy request-diagnostics capture (redacted, no plaintext) |
 | `forge logs clean`  | Preview log cleanup; `--yes` to remove files; `--older-than DAYS` to filter by age                              |
+
+`forge clean --yes --json` still emits its result object on stdout and exits 1 when either `failed` or
+`skipped_project_compatibility` is non-empty.
 
 ### Internal (hidden from `forge --help`)
 

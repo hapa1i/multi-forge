@@ -9,11 +9,13 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from forge.cli.hooks._group import hooks
+from forge.install.project_compat import enforce_project_compatibility
 from forge.session.models import (
     CompactionConfirmed,
     SessionState,
     SubagentConfirmed,
 )
+from forge.session.worktree.config_copy import copy_runtime_config
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,14 +81,12 @@ class TestPreCompactTranscriptCapture:
         assert exit_code == 0
 
     @patch("forge.cli.hooks.commands.resolve_session_store")
-    @patch("forge.cli.hooks.commands.resolve_forge_root")
     @patch("forge.cli.hooks.commands.get_artifact_paths")
     @patch("forge.cli.hooks.commands.safe_copy_file")
     def test_copies_transcript_to_artifacts(
         self,
         mock_copy: MagicMock,
         mock_paths: MagicMock,
-        mock_project: MagicMock,
         mock_store: MagicMock,
         tmp_path: Path,
     ) -> None:
@@ -95,8 +95,8 @@ class TestPreCompactTranscriptCapture:
         store = MagicMock()
         store.exists.return_value = True
         store.read.return_value = state
+        store.forge_root = tmp_path
         mock_store.return_value = store
-        mock_project.return_value = tmp_path
         mock_copy.return_value = True
 
         paths_obj = MagicMock()
@@ -120,14 +120,12 @@ class TestPreCompactTranscriptCapture:
         assert "pre-compact" in str(dst_arg)
 
     @patch("forge.cli.hooks.commands.resolve_session_store")
-    @patch("forge.cli.hooks.commands.resolve_forge_root")
     @patch("forge.cli.hooks.commands.get_artifact_paths")
     @patch("forge.cli.hooks.commands.safe_copy_file")
     def test_updates_compaction_confirmed(
         self,
         mock_copy: MagicMock,
         mock_paths: MagicMock,
-        mock_project: MagicMock,
         mock_store: MagicMock,
         tmp_path: Path,
     ) -> None:
@@ -135,8 +133,8 @@ class TestPreCompactTranscriptCapture:
         store = MagicMock()
         store.exists.return_value = True
         store.read.return_value = state
+        store.forge_root = tmp_path
         mock_store.return_value = store
-        mock_project.return_value = tmp_path
         mock_copy.return_value = True
 
         paths_obj = MagicMock()
@@ -254,6 +252,230 @@ class TestWorktreeCreate:
         runner = CliRunner()
         result = runner.invoke(hooks, ["worktree-create"], input="", catch_exceptions=False)
         assert result.exit_code == 1
+
+    @patch("subprocess.run")
+    def test_incompatible_source_refuses_before_git_add(self, mock_run: MagicMock, tmp_path: Path) -> None:
+        checkout_root = tmp_path / "repo"
+        forge_root = checkout_root / "service"
+        forge_root.mkdir(parents=True)
+        compat_path = forge_root / ".forge" / "project.toml"
+        compat_path.parent.mkdir(parents=True)
+        compat_path.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        target_checkout = tmp_path / "repo-source-refused"
+
+        with (
+            patch(
+                "forge.session.worktree.create.get_repo_root",
+                return_value=checkout_root,
+            ),
+            patch("forge.core.ops.context.find_forge_root", return_value=forge_root),
+            patch(
+                "forge.session.worktree.create.get_main_repo_root",
+                return_value=checkout_root,
+            ),
+            patch(
+                "forge.session.worktree.create.find_git_binary",
+                return_value="/usr/bin/git",
+            ),
+            patch(
+                "forge.session.worktree.create.resolve_worktree_path",
+                return_value=target_checkout,
+            ),
+            patch("forge.session.worktree.config_copy.copy_runtime_config") as mock_copy,
+            patch("forge.install.project_registry.ProjectRegistryStore.enroll") as mock_enroll,
+            patch("forge.install.installer.Installer") as mock_installer,
+        ):
+            result = CliRunner().invoke(
+                hooks,
+                ["worktree-create"],
+                input=json.dumps({"cwd": str(forge_root), "name": "source-refused"}),
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 1
+        mock_run.assert_not_called()
+        mock_copy.assert_not_called()
+        mock_enroll.assert_not_called()
+        mock_installer.assert_not_called()
+
+    @patch("subprocess.run")
+    def test_incompatible_tracked_target_rolls_back_before_project_writes(
+        self,
+        mock_run: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        checkout_root = tmp_path / "repo"
+        checkout_root.mkdir()
+        target_checkout = tmp_path / "repo-target-refused"
+        target_compat = target_checkout / ".forge" / "project.toml"
+        target_compat.parent.mkdir(parents=True)
+        target_compat.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch(
+                "forge.session.worktree.create.get_repo_root",
+                return_value=checkout_root,
+            ),
+            patch("forge.core.ops.context.find_forge_root", return_value=checkout_root),
+            patch(
+                "forge.session.worktree.create.get_main_repo_root",
+                return_value=checkout_root,
+            ),
+            patch(
+                "forge.session.worktree.create.find_git_binary",
+                return_value="/usr/bin/git",
+            ),
+            patch(
+                "forge.session.worktree.create.resolve_worktree_path",
+                return_value=target_checkout,
+            ),
+            patch(
+                "forge.session.worktree.cleanup.cleanup_worktree",
+                return_value=MagicMock(errors=[]),
+            ) as mock_cleanup,
+            patch("forge.session.worktree.config_copy.copy_runtime_config") as mock_copy,
+            patch("forge.install.project_registry.ProjectRegistryStore.enroll") as mock_enroll,
+            patch("forge.install.installer.Installer") as mock_installer,
+        ):
+            result = CliRunner().invoke(
+                hooks,
+                ["worktree-create"],
+                input=json.dumps({"cwd": str(checkout_root), "name": "target-refused"}),
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "project requires Forge >=9999" in result.stderr
+        assert "Run a Forge version satisfying required_forge" in result.stderr
+        mock_run.assert_called_once_with(
+            [
+                "/usr/bin/git",
+                "worktree",
+                "add",
+                str(target_checkout),
+                "-b",
+                "forge/target-refused",
+            ],
+            cwd=str(checkout_root),
+            capture_output=True,
+            text=True,
+        )
+        mock_cleanup.assert_called_once_with(
+            worktree_path=target_checkout,
+            branch="forge/target-refused",
+            delete_branch_flag=True,
+            force=True,
+            repo_root=checkout_root,
+        )
+        mock_copy.assert_not_called()
+        mock_enroll.assert_not_called()
+        mock_installer.assert_not_called()
+
+    @patch("subprocess.run")
+    def test_target_refusal_surfaces_incomplete_rollback(
+        self,
+        mock_run: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        checkout_root = tmp_path / "repo"
+        checkout_root.mkdir()
+        target_checkout = tmp_path / "repo-target-refused"
+        target_compat = target_checkout / ".forge" / "project.toml"
+        target_compat.parent.mkdir(parents=True)
+        target_compat.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("forge.session.worktree.create.get_repo_root", return_value=checkout_root),
+            patch("forge.core.ops.context.find_forge_root", return_value=checkout_root),
+            patch("forge.session.worktree.create.get_main_repo_root", return_value=checkout_root),
+            patch("forge.session.worktree.create.find_git_binary", return_value="/usr/bin/git"),
+            patch("forge.session.worktree.create.resolve_worktree_path", return_value=target_checkout),
+            patch(
+                "forge.session.worktree.cleanup.cleanup_worktree",
+                return_value=MagicMock(errors=["branch still exists"]),
+            ),
+        ):
+            result = CliRunner().invoke(
+                hooks,
+                ["worktree-create"],
+                input=json.dumps({"cwd": str(checkout_root), "name": "target-refused"}),
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 1
+        assert "Rollback incomplete: branch still exists" in result.stderr
+
+    @patch("subprocess.run")
+    def test_nested_forge_root_maps_target_for_check_enrollment_and_install(
+        self,
+        mock_run: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        checkout_root = tmp_path / "repo"
+        source_forge_root = checkout_root / "services" / "api"
+        source_compat = source_forge_root / ".forge" / "project.toml"
+        source_compat.parent.mkdir(parents=True)
+        source_compat.write_text('schema_version = 1\nrequired_forge = ">=0"\n', encoding="utf-8")
+
+        target_checkout = tmp_path / "repo-nested"
+        target_forge_root = target_checkout / "services" / "api"
+        target_compat = target_forge_root / ".forge" / "project.toml"
+        target_compat.parent.mkdir(parents=True)
+        target_pin = 'schema_version = 1\nrequired_forge = ">=0,!=999"\n'
+        target_compat.write_text(target_pin, encoding="utf-8")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch(
+                "forge.session.worktree.create.get_repo_root",
+                return_value=checkout_root,
+            ),
+            patch("forge.core.ops.context.find_forge_root", return_value=source_forge_root),
+            patch(
+                "forge.session.worktree.create.get_main_repo_root",
+                return_value=checkout_root,
+            ),
+            patch(
+                "forge.session.worktree.create.find_git_binary",
+                return_value="/usr/bin/git",
+            ),
+            patch(
+                "forge.session.worktree.create.resolve_worktree_path",
+                return_value=target_checkout,
+            ),
+            patch(
+                "forge.cli.hooks.commands.enforce_project_compatibility",
+                wraps=enforce_project_compatibility,
+            ) as mock_enforce,
+            patch(
+                "forge.session.worktree.config_copy.copy_runtime_config",
+                wraps=copy_runtime_config,
+            ) as mock_copy,
+            patch("forge.install.project_registry.ProjectRegistryStore.enroll") as mock_enroll,
+            patch("forge.install.installer.Installer") as mock_installer,
+        ):
+            result = CliRunner().invoke(
+                hooks,
+                ["worktree-create"],
+                input=json.dumps({"cwd": str(source_forge_root), "name": "nested"}),
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == str(target_checkout.resolve())
+        assert [call.args[0] for call in mock_enforce.call_args_list] == [
+            source_forge_root,
+            target_forge_root,
+        ]
+        mock_copy.assert_called_once_with(checkout_root, target_checkout)
+        assert target_compat.read_text(encoding="utf-8") == target_pin
+        mock_enroll.assert_called_once_with(target_forge_root, "worktree")
+        mock_installer.assert_called_once()
+        assert mock_installer.call_args.kwargs["project_root"] == target_forge_root
+        mock_installer.return_value.init.assert_called_once()
 
     @patch("subprocess.run")
     def test_uses_hook_provided_name(

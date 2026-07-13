@@ -388,6 +388,8 @@ class TestEnableProjectRegistry:
 
         assert result.exit_code == 1
         assert "requires Forge >=9999" in result.output
+        assert "satisfying required_forge" in result.output
+        assert "global Forge" not in result.output
         MockInstaller.assert_not_called()
 
 

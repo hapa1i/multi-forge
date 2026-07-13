@@ -77,24 +77,87 @@ def _seed_degrade(store: SessionStore) -> None:
     store.update(
         timeout_s=5.0,
         mutate=lambda m: set_supervisor_degrade(
-            m, from_lane=codex, to_lane=None, reason="subscription_exhausted", at=now_iso()
+            m,
+            from_lane=codex,
+            to_lane=None,
+            reason="subscription_exhausted",
+            at=now_iso(),
         ),
     )
 
 
 def test_set_writes_intent_slot(runner: CliRunner, project: Path) -> None:
     store = _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "memory_writer",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code == 0, result.output
     lanes = store.read().intent.consumer_lanes
     assert lanes is not None
     assert lanes.memory_writer == _CLAUDE_MAX
 
 
+def test_set_refuses_incompatible_target_without_manifest_write(runner: CliRunner, project: Path) -> None:
+    store = _seed(project)
+    before = store.manifest_path.read_bytes()
+    (project / ".forge" / "project.toml").write_text(
+        'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "memory_writer",
+            "--backend",
+            "claude-max",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "requires Forge" in result.output
+    assert store.manifest_path.read_bytes() == before
+
+
+def test_show_remains_readable_under_incompatible_pin(runner: CliRunner, project: Path) -> None:
+    _seed(project)
+    (project / ".forge" / "project.toml").write_text(
+        'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+    )
+
+    result = runner.invoke(main, ["session", "lane", "show"])
+
+    assert result.exit_code == 0, result.output
+    assert "memory_writer" in result.output
+
+
 def test_set_accepts_hyphenated_consumer(runner: CliRunner, project: Path) -> None:
     """`--consumer memory-writer` (hyphen) normalizes to the underscore id."""
     store = _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory-writer", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "memory-writer",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code == 0, result.output
     lanes = store.read().intent.consumer_lanes
     assert lanes is not None
@@ -104,7 +167,18 @@ def test_set_accepts_hyphenated_consumer(runner: CliRunner, project: Path) -> No
 def test_set_supervisor_via_general_surface(runner: CliRunner, project: Path) -> None:
     """The supervisor is reachable through the general surface too (same intent slot)."""
     store = _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "supervisor", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "supervisor",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code == 0, result.output
     lanes = store.read().intent.consumer_lanes
     assert lanes is not None
@@ -114,7 +188,18 @@ def test_set_supervisor_via_general_surface(runner: CliRunner, project: Path) ->
 def test_set_shadow_curation_via_codex_runtime(runner: CliRunner, project: Path) -> None:
     """T6b: `--consumer shadow_curation --runtime codex` resolves to the codex lane (was LaneError)."""
     store = _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "shadow_curation", "--runtime", "codex"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "shadow_curation",
+            "--runtime",
+            "codex",
+        ],
+    )
     assert result.exit_code == 0, result.output
     lanes = store.read().intent.consumer_lanes
     assert lanes is not None
@@ -124,7 +209,10 @@ def test_set_shadow_curation_via_codex_runtime(runner: CliRunner, project: Path)
 def test_set_memory_writer_via_codex_runtime(runner: CliRunner, project: Path) -> None:
     """T6c: `--consumer memory_writer --runtime codex` resolves to the codex lane (was LaneError)."""
     store = _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--runtime", "codex"])
+    result = runner.invoke(
+        main,
+        ["session", "lane", "set", "--consumer", "memory_writer", "--runtime", "codex"],
+    )
     assert result.exit_code == 0, result.output
     lanes = store.read().intent.consumer_lanes
     assert lanes is not None
@@ -133,7 +221,10 @@ def test_set_memory_writer_via_codex_runtime(runner: CliRunner, project: Path) -
 
 def test_set_unknown_consumer_rejects(runner: CliRunner, project: Path) -> None:
     _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "bogus", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        ["session", "lane", "set", "--consumer", "bogus", "--backend", "claude-max"],
+    )
     assert result.exit_code != 0
     assert "Unknown consumer" in result.output
 
@@ -159,7 +250,10 @@ def test_set_help_lists_valid_lanes(runner: CliRunner) -> None:
 
 def test_set_invalid_backend_rejects(runner: CliRunner, project: Path) -> None:
     _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "nope"])
+    result = runner.invoke(
+        main,
+        ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "nope"],
+    )
     output = " ".join(result.output.split())
     assert result.exit_code != 0
     assert "Valid lanes for memory_writer" in output
@@ -169,7 +263,18 @@ def test_set_invalid_backend_rejects(runner: CliRunner, project: Path) -> None:
 
 def test_set_invalid_team_supervisor_runtime_lists_valid_lanes(runner: CliRunner, project: Path) -> None:
     _seed(project)
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "team_supervisor", "--runtime", "codex"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "team_supervisor",
+            "--runtime",
+            "codex",
+        ],
+    )
     output = " ".join(result.output.split())
 
     assert result.exit_code != 0
@@ -186,7 +291,18 @@ def test_set_rejects_change_to_a_frozen_lane(runner: CliRunner, project: Path) -
             memory_writer=ConsumerLaneBinding(lane=_DEFAULT, source="intent", resolved_at=now_iso())
         ),
     )
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "memory_writer",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code != 0
     assert "frozen" in result.output.lower()
     # The frozen binding is untouched and no drifting intent was written.
@@ -208,7 +324,11 @@ def test_show_json_reflects_requested_and_frozen(runner: CliRunner, project: Pat
     result = runner.invoke(main, ["session", "lane", "show", "--json"])
     assert result.exit_code == 0, result.output
     by_id = {row["consumer"]: row for row in json.loads(result.output)["consumers"]}
-    assert by_id["memory_writer"]["requested"] == {"runtime": "claude_code", "backend": "claude-max", "model": "opus"}
+    assert by_id["memory_writer"]["requested"] == {
+        "runtime": "claude_code",
+        "backend": "claude-max",
+        "model": "opus",
+    }
     assert by_id["shadow_curation"]["frozen"] == {
         "runtime": "claude_code",
         "backend": "anthropic-direct",
@@ -224,7 +344,9 @@ def test_show_json_flags_supervisor_degraded(runner: CliRunner, project: Path) -
         project,
         confirmed=ConsumerLaneConfirmed(
             supervisor=ConsumerLaneBinding(
-                lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"), source="intent", resolved_at=now_iso()
+                lane=LaneRecord("codex", "chatgpt", "gpt-5-codex"),
+                source="intent",
+                resolved_at=now_iso(),
             )
         ),
     )
@@ -236,7 +358,11 @@ def test_show_json_flags_supervisor_degraded(runner: CliRunner, project: Path) -
     assert by_id["supervisor"]["degraded"] is True
     assert by_id["memory_writer"]["degraded"] is False  # supervisor-only overlay
     # Degrade routes around the binding, never rewrites it: frozen is still codex.
-    assert by_id["supervisor"]["frozen"] == {"runtime": "codex", "backend": "chatgpt", "model": "gpt-5-codex"}
+    assert by_id["supervisor"]["frozen"] == {
+        "runtime": "codex",
+        "backend": "chatgpt",
+        "model": "gpt-5-codex",
+    }
 
 
 def test_clear_removes_intent_only_preserving_frozen(runner: CliRunner, project: Path) -> None:
@@ -266,7 +392,18 @@ def test_supervisor_set_clears_degrade(runner: CliRunner, project: Path) -> None
     _seed_degrade(store)
     assert is_supervisor_degraded(store.read()) is True  # precondition
 
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "supervisor", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "supervisor",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert is_supervisor_degraded(store.read()) is False
 
@@ -278,7 +415,18 @@ def test_set_non_supervisor_consumer_leaves_degrade(runner: CliRunner, project: 
     store = _seed(project)
     _seed_degrade(store)
 
-    result = runner.invoke(main, ["session", "lane", "set", "--consumer", "memory_writer", "--backend", "claude-max"])
+    result = runner.invoke(
+        main,
+        [
+            "session",
+            "lane",
+            "set",
+            "--consumer",
+            "memory_writer",
+            "--backend",
+            "claude-max",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert is_supervisor_degraded(store.read()) is True
 

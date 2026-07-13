@@ -75,6 +75,19 @@ def _require_forge_root(ctx: ExecutionContext) -> Path:
     return ctx.forge_root
 
 
+def _enforce_transfer_mutation_compatibility(forge_root: Path) -> None:
+    """Block transfer writes when the owning Forge root is incompatible."""
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+    )
+
+    try:
+        enforce_project_compatibility(forge_root)
+    except ProjectCompatibilityError as e:
+        raise ForgeOpError(str(e)) from e
+
+
 def _child_names(forge_root: Path, parent: str) -> list[str]:
     """Return sorted child snapshot names (notes overlays excluded by iter_children)."""
     return sorted(path.stem for path in iter_children(forge_root, parent))
@@ -172,6 +185,7 @@ def resolve_notes_target(*, ctx: ExecutionContext, parent: str, child: str) -> P
     forge_root = _require_forge_root(ctx)
     if not child_path(forge_root, parent, child).is_file():
         raise ForgeOpError(f"No child transfer '{child}' under parent '{parent}'.")
+    _enforce_transfer_mutation_compatibility(forge_root)
     return ensure_notes_template(forge_root, parent, child)
 
 
@@ -219,6 +233,7 @@ def regenerate_transfer(
     ``structured``/``1``/``claude`` only when no metadata exists.
     """
     forge_root = _require_forge_root(ctx)
+    _enforce_transfer_mutation_compatibility(forge_root)
     cache = generated_path(forge_root, parent)
 
     eff_strategy = strategy

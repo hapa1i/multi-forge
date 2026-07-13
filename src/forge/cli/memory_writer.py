@@ -53,6 +53,25 @@ def run_cmd(
     worktree = Path(worktree_path).resolve()
     effective_root = Path(forge_root).resolve() if forge_root else worktree
 
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+        format_project_compatibility_recovery,
+    )
+
+    try:
+        enforce_project_compatibility(effective_root)
+    except ProjectCompatibilityError as e:
+        from forge.session.memory_writer import record_memory_writer_outcome
+
+        record_memory_writer_outcome(
+            session_name,
+            "skipped",
+            reason_code="project_compatibility_refused",
+            message=f"state={e.state}; {e.reason}. {format_project_compatibility_recovery()}",
+        )
+        return
+
     # We use SessionStore directly (not resolve_session_store) because this
     # runs as a detached background process without FORGE_SESSION env var set.
     # The marker payload carries session_name explicitly.

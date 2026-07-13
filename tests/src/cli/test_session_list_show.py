@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import IndexStore, SessionStore, create_session_state
 from forge.session.active import ActiveSessionStore
 from forge.session.models import (
@@ -189,7 +190,11 @@ class TestSessionList:
         assert json_result.exit_code == 0
         entry = next(row for row in json.loads(json_result.output) if row["name"] == "model-history")
         assert entry["model"] == "claude-fable-5 -> claude-sonnet-5 -> claude-opus-4-8"
-        assert entry["models"] == ["claude-fable-5", "claude-sonnet-5", "claude-opus-4-8"]
+        assert entry["models"] == [
+            "claude-fable-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+        ]
 
     def test_list_json_reports_active_liveness(self, runner: CliRunner, temp_env: Path) -> None:
         """`session list --json` emits is_active=True for a session the active registry lists as live."""
@@ -308,6 +313,72 @@ class TestSessionList:
         assert result.exit_code == 0
         assert "Cleaned 1 session" in result.output
         assert not SessionStore(str(temp_env), "old-session").exists()
+
+    def test_clean_yes_skips_incompatible_root_and_cleans_compatible_root(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        refused_root = temp_env / "nested-project"
+        _seed_cleanup_session(temp_env, temp_env, "compatible-old")
+        _seed_cleanup_session(temp_env, refused_root, "refused-old")
+
+        def enforce(root: str | Path | None) -> None:
+            if root is not None and Path(root).resolve() == refused_root.resolve():
+                raise ProjectCompatibilityError(
+                    str(refused_root / ".forge" / "project.toml"),
+                    "version mismatch",
+                    state="incompatible",
+                )
+
+        with patch(
+            "forge.session.cleanup.enforce_project_compatibility",
+            side_effect=enforce,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "clean", "--older-than", "30", "--yes", "--force"],
+            )
+
+        assert result.exit_code == 1
+        assert "Cleaned 1 session" in result.output
+        assert "Skipped 1 session for project compatibility" in result.output
+        assert "refused-old (incompatible)" in result.output
+        assert not SessionStore(str(temp_env), "compatible-old").exists()
+        assert SessionStore(str(refused_root), "refused-old").exists()
+
+    def test_clean_preview_marks_incompatible_target_without_writes(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        refused_root = temp_env / "nested-project"
+        _seed_cleanup_session(temp_env, temp_env, "compatible-old")
+        _seed_cleanup_session(temp_env, refused_root, "refused-old")
+
+        def enforce(root: str | Path | None) -> None:
+            if root is not None and Path(root).resolve() == refused_root.resolve():
+                raise ProjectCompatibilityError(
+                    str(refused_root / ".forge" / "project.toml"),
+                    "invalid TOML",
+                    state="malformed",
+                )
+
+        with patch(
+            "forge.cli.session_manage.enforce_project_compatibility",
+            side_effect=enforce,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "clean", "--older-than", "30"],
+            )
+
+        assert result.exit_code == 0
+        assert "Apply would skip" in result.output
+        assert "refused-old (malformed)" in result.output
+        assert "Would delete 1 session, skip 1" in result.output
+        assert SessionStore(str(temp_env), "compatible-old").exists()
+        assert SessionStore(str(refused_root), "refused-old").exists()
 
 
 class TestSessionShow:

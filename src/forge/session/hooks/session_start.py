@@ -273,6 +273,14 @@ def handle_session_start(
     result.session_name = session_name
 
     manifest_store = SessionStore(_resolve_store_root(session_name, cwd, resolved_forge_root), session_name)
+    resolved_forge_root = str(manifest_store.forge_root)
+
+    from forge.install.project_compat import diagnose_project_compatibility_for_hook
+
+    diagnose_project_compatibility_for_hook(
+        manifest_store.forge_root,
+        operation="session-start",
+    )
 
     # Collect transcript rollover capture info under lock, but copy outside lock.
     rollover: tuple[str, str | None] | None = None  # (previous_session_id, previous_transcript_path)

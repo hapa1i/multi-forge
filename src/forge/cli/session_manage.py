@@ -36,6 +36,11 @@ from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    ProjectCompatibilitySkip,
+    enforce_project_compatibility,
+)
 from forge.session import (
     ForgeSessionError,
     IndexStore,
@@ -131,6 +136,9 @@ def delete(
 
     manager = SessionManager()
     _fr = _cwd_forge_root()
+    deleted = 0
+    failed = 0
+    skipped_project_compatibility: list[ProjectCompatibilitySkip] = []
 
     if delete_all:
         if _fr is None:
@@ -173,6 +181,26 @@ def delete(
                 return
             console.print()
 
+        # ``--all`` is project-scoped, so every candidate has the same state
+        # owner. Refuse before the confirmation prompt while still reporting
+        # every session that apply would skip.
+        try:
+            enforce_project_compatibility(_fr)
+        except ProjectCompatibilityError as e:
+            for name in targets:
+                skip = ProjectCompatibilitySkip.from_error(
+                    target=name,
+                    forge_root=_fr,
+                    error=e,
+                )
+                skipped_project_compatibility.append(skip)
+                _print_project_compatibility_skip(skip)
+            console.print(
+                f"\n[dim]Summary: 0 deleted, {len(skipped_project_compatibility)} "
+                "skipped (project compatibility)[/dim]"
+            )
+            raise SystemExit(1)
+
         console.print(f"About to delete [bold]all {len(targets)} session(s)[/bold]:")
         for t in targets:
             console.print(f"  - {t}")
@@ -200,18 +228,17 @@ def delete(
     else:
         targets = list(dict.fromkeys(names))
 
-    deleted = 0
-    failed = 0
-
     for name in targets:
         # Resolve across forge_roots within the repo (named deletes only)
         actual_fr = _fr
+        target_has_project_state = delete_all
         if not delete_all:
             try:
                 from forge.core.ops.resolution import resolve_session_repo_wide
 
                 resolved = resolve_session_repo_wide(name, _fr, manager=manager)
                 actual_fr = resolved.forge_root
+                target_has_project_state = True
                 if resolved.is_cross_project:
                     console.print(f"[dim]Deleting session from {display_path(actual_fr)}[/dim]")
             except AmbiguousSessionError as e:
@@ -228,8 +255,34 @@ def delete(
                     idx_fr = entry.root
                     if idx_fr:
                         actual_fr = idx_fr
+                        target_has_project_state = True
                 except (SessionNotFoundError, AmbiguousSessionError, ForgeSessionError):
                     pass
+
+            if not target_has_project_state:
+                from forge.session.store import SessionStore
+
+                target_has_project_state = SessionStore(str(Path.cwd()), name).session_dir.is_dir()
+
+        if target_has_project_state and actual_fr is not None:
+            try:
+                enforce_project_compatibility(actual_fr)
+            except ProjectCompatibilityError as e:
+                skip = ProjectCompatibilitySkip.from_error(
+                    target=name,
+                    forge_root=actual_fr,
+                    error=e,
+                )
+                if len(targets) == 1:
+                    print_error(
+                        f"Project compatibility refused session '{skip.target}' "
+                        f"at {display_path(skip.forge_root)} ({skip.state}): {skip.reason}"
+                    )
+                    print_tip(skip.recovery, console=err_console)
+                    raise SystemExit(1)
+                skipped_project_compatibility.append(skip)
+                _print_project_compatibility_skip(skip)
+                continue
 
         try:
             _delete_single_session(
@@ -271,12 +324,24 @@ def delete(
 
     if len(targets) > 1:
         parts = [f"{deleted} deleted"]
+        if skipped_project_compatibility:
+            parts.append(f"{len(skipped_project_compatibility)} skipped (project compatibility)")
         if failed:
             parts.append(f"{failed} failed")
         console.print(f"\n[dim]Summary: {', '.join(parts)}[/dim]")
 
-    if failed:
+    if failed or skipped_project_compatibility:
         sys.exit(1)
+
+
+def _print_project_compatibility_skip(skip: ProjectCompatibilitySkip) -> None:
+    """Report one refused target without aborting a multi-target command."""
+
+    print_error(
+        f"Skipped session '{skip.target}' at {display_path(skip.forge_root)} "
+        f"for project compatibility ({skip.state}): {skip.reason}"
+    )
+    print_tip(skip.recovery, blank_before=False, console=err_console)
 
 
 def _delete_single_session(
@@ -634,8 +699,6 @@ def clean(
     if result.aborted:
         print_error("Session cleanup aborted before evaluation completed.")
         err_console.print(f"  [dim]{result.aborted_error}[/dim]")
-    elif result.has_only_skips:
-        console.print("[dim]No sessions cleaned.[/dim]")
 
     if result.deleted:
         console.print(
@@ -656,12 +719,23 @@ def clean(
             f" with unparseable timestamps.[/dim]"
         )
 
-    if result.should_exit_nonzero:
+    if result.skipped_project_compatibility:
+        count = len(result.skipped_project_compatibility)
+        console.print(f"[yellow]Skipped {count} session{'s' if count != 1 else ''} for project compatibility.[/yellow]")
+        for skip in result.skipped_project_compatibility:
+            console.print(
+                f"  [dim]{skip.target} ({skip.state}) at {display_path(skip.forge_root)}: {skip.reason}[/dim]"
+            )
+            print_tip(skip.recovery, blank_before=False, console=console)
+
+    if result.has_failures:
         console.print(
             f"[yellow]Encountered {result.summary_failed_count} cleanup {result.summary_failed_label}.[/yellow]"
         )
         for name, err in result.failure_items():
             console.print(f"  [dim]{name}: {err}[/dim]")
+
+    if result.should_exit_nonzero:
         sys.exit(1)
 
 
@@ -696,6 +770,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
     deletable = 0
     skipped = 0
     any_old = False
+    compatibility_skips: list[ProjectCompatibilitySkip] = []
     for name, entry in all_sessions:
         try:
             dt = parse_iso(entry.last_accessed_at)
@@ -715,14 +790,38 @@ def _clean_sessions_dry_run(older_than_days: int) -> int:
             table.add_row(name, age_str, "[yellow]active (skip)[/yellow]")
             skipped += 1
         else:
-            table.add_row(name, age_str, "[green]will delete[/green]")
-            deletable += 1
+            forge_root = entry.forge_root or entry.worktree_path
+            try:
+                enforce_project_compatibility(forge_root)
+            except ProjectCompatibilityError as e:
+                skip = ProjectCompatibilitySkip.from_error(
+                    target=name,
+                    forge_root=forge_root,
+                    error=e,
+                )
+                compatibility_skips.append(skip)
+                table.add_row(
+                    name,
+                    age_str,
+                    f"[yellow]{skip.state} (apply skip)[/yellow]",
+                )
+                skipped += 1
+            else:
+                table.add_row(name, age_str, "[green]will delete[/green]")
+                deletable += 1
 
     if not any_old:
         console.print(f"[dim]No sessions older than {older_than_days} days found.[/dim]")
         return 0
 
     console.print(table)
+
+    for skip in compatibility_skips:
+        console.print(
+            f"[yellow]Apply would skip[/yellow] {skip.target} ({skip.state}) at "
+            f"{display_path(skip.forge_root)}: {skip.reason}"
+        )
+        print_tip(skip.recovery, blank_before=False, console=console)
 
     if registry_error:
         console.print(

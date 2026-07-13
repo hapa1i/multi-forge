@@ -1,6 +1,11 @@
 """Multi-Forge - Multi-runtime agent toolkit."""
 
+import logging
 from importlib.metadata import PackageNotFoundError, version
+
+# Forge is both a library and a CLI. Keep library warnings from falling through
+# Python's lastResort stderr handler when CLI file logging is disabled.
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 try:
     # Single source of truth is pyproject.toml; reading installed metadata keeps

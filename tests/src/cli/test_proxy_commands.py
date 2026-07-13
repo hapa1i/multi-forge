@@ -1473,6 +1473,36 @@ class TestProxyCreateNoStart:
         assert entry.status == "configured"
         assert entry.pid is None  # Not started
 
+    def test_create_is_global_under_incompatible_project_pin(self, runner: CliRunner, temp_env: Path) -> None:
+        """A project pin does not gate creation of global proxy state."""
+        project_state = temp_env / ".forge"
+        project_state.mkdir()
+        pin = project_state / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        project_files_before = {
+            path.relative_to(temp_env): path.read_bytes() for path in temp_env.rglob("*") if path.is_file()
+        }
+
+        result = runner.invoke(
+            main,
+            [
+                "proxy",
+                "create",
+                "litellm-openai",
+                "--name",
+                "global-proxy",
+                "--no-start",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        forge_home = Path(os.environ["FORGE_HOME"])
+        assert (forge_home / "proxies" / "global-proxy" / "proxy.yaml").is_file()
+        assert "global-proxy" in ProxyRegistryStore().read().proxies
+        assert {
+            path.relative_to(temp_env): path.read_bytes() for path in temp_env.rglob("*") if path.is_file()
+        } == project_files_before
+
     def test_create_already_exists_error(self, runner: CliRunner, temp_env: Path) -> None:
         """Create --no-start errors when proxy already exists."""
         # Create existing proxy

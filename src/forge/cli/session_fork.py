@@ -60,6 +60,10 @@ from forge.core.ops.claude_session import (
 from forge.core.ops.context import _cwd_forge_root
 from forge.core.ops.session import ForgeOpError
 from forge.core.paths import display_path
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    enforce_project_compatibility,
+)
 from forge.policy.semantic.supervisor import validate_checker_model
 from forge.session import (
     LAUNCH_MODE_SIDECAR,
@@ -453,6 +457,20 @@ def fork(
         except ForgeSessionError:
             pass  # Parent not found; fork_session() will raise the right error
 
+    # The existing-worktree target owns the child manifest and transfer state.
+    # Guard it before routing/supervisor preflight can start a proxy; the
+    # manager repeats this check as a defense for non-CLI callers.
+    if into_resolved is not None:
+        try:
+            parent_entry = manager.index_store.get_session(parent, forge_root=_fr)
+            target_forge_root = Path(into_resolved) / (parent_entry.relative_path or ".")
+            enforce_project_compatibility(target_forge_root)
+        except ProjectCompatibilityError as e:
+            print_error(str(e))
+            sys.exit(1)
+        except ForgeSessionError:
+            pass  # Parent not found; fork_session() will raise the right error
+
     # Budget preflight for --strategy full (before fork_session to avoid orphaned sessions/worktrees)
     # Use the child's effective routing: --no-proxy means no proxy, --proxy overrides parent
     is_cross_dir = worktree or into_resolved is not None
@@ -703,6 +721,9 @@ def fork(
         sys.exit(1)
     except InvalidBranchNameError as e:
         print_error(f"{e}")
+        sys.exit(1)
+    except ProjectCompatibilityError as e:
+        print_error(str(e))
         sys.exit(1)
     except SessionNotFoundError:
         if not _hint_cross_project_session(parent, _fr):

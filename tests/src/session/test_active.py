@@ -16,6 +16,9 @@ from forge.session.active import (
     track_active_session,
 )
 from forge.session.config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
+from forge.session.identity import make_scoped_key
+from forge.session.index import INDEX_FILENAME, IndexStore
+from forge.session.store import get_manifest_path
 
 
 @pytest.fixture
@@ -138,6 +141,57 @@ class TestActiveSessionStore:
 
         assert entry is None
         assert store.read().sessions == {}
+
+    def test_cross_root_read_prunes_stale_incompatible_entry_without_touching_index_pair(
+        self,
+        store: ActiveSessionStore,
+        temp_forge_home: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Active-cache self-healing leaves the paired durable row and project files alone."""
+        compatible_root = temp_forge_home.parent / "compatible-project"
+        incompatible_root = temp_forge_home.parent / "incompatible-project"
+        compatible_root.mkdir()
+        incompatible_root.mkdir()
+        incompatible_state = incompatible_root / ".forge"
+        incompatible_state.mkdir()
+        pin = incompatible_state / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        pin_before = pin.read_bytes()
+        manifest_path = get_manifest_path(incompatible_root, "paired-index")
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text("{}", encoding="utf-8")
+        manifest_before = manifest_path.read_bytes()
+
+        index_store = IndexStore(temp_forge_home / "sessions" / INDEX_FILENAME)
+        index_store.add_session(
+            "paired-index",
+            str(incompatible_root),
+            str(incompatible_root),
+            forge_root=str(incompatible_root),
+        )
+        store.upsert_session(
+            "stale-active",
+            worktree_path=str(incompatible_root),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=424242,
+            forge_root=str(incompatible_root),
+        )
+        store.upsert_session(
+            "live-other-root",
+            worktree_path=str(compatible_root),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+            forge_root=str(compatible_root),
+        )
+        monkeypatch.setattr("forge.session.active.is_pid_alive", lambda pid: pid == os.getpid())
+
+        sessions = dict(store.list_sessions())
+
+        assert set(sessions) == {"live-other-root"}
+        assert make_scoped_key("paired-index", str(incompatible_root)) in index_store.read().sessions
+        assert pin.read_bytes() == pin_before
+        assert manifest_path.read_bytes() == manifest_before
 
     def test_list_sessions_keeps_live_sidecar_when_container_running(
         self, store: ActiveSessionStore, monkeypatch: pytest.MonkeyPatch

@@ -146,6 +146,67 @@ print(json.dumps({
         assert result.data["error"] == "SessionExistsError"
         assert result.data["worktree_exists"] is False
 
+    def test_start_create_worktree_rolls_back_incompatible_target(self, manager_workspace: "WorktreeWorkspace") -> None:
+        """A target checkout pin refusal removes the checkout and created branch."""
+        result = manager_workspace.run_python(
+            """
+import json
+import os
+import subprocess
+from pathlib import Path
+from forge.session.index import IndexStore
+from forge.session.manager import SessionManager
+from forge.session.worktree import resolve_worktree_path
+
+repo_root = Path('/workspace')
+os.chdir(repo_root)
+pin = repo_root / '.forge' / 'project.toml'
+pin.parent.mkdir(parents=True, exist_ok=True)
+pin.write_text('schema_version = 1\\nrequired_forge = \">=999\"\\n')
+subprocess.run(['git', 'add', '-f', '.forge/project.toml'], cwd=repo_root, check=True)
+subprocess.run(['git', 'commit', '-m', 'track incompatible pin'], cwd=repo_root, check=True, capture_output=True)
+
+# The source working copy is compatible, while the fresh target sees the
+# incompatible pin from HEAD.
+pin.write_text('schema_version = 1\\nrequired_forge = \">=0\"\\n')
+
+manager = SessionManager(index_store=IndexStore())
+expected_worktree = resolve_worktree_path(repo_root, 'blocked')
+error = None
+state = None
+try:
+    manager.start_session(name='blocked', create_worktree=True)
+except Exception as e:
+    error = type(e).__name__
+    state = getattr(e, 'state', None)
+
+branch = subprocess.run(
+    ['git', 'branch', '--list', 'blocked'],
+    cwd=repo_root,
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.strip()
+
+print(json.dumps({
+    'error': error,
+    'state': state,
+    'worktree_exists': expected_worktree.exists(),
+    'branch_exists': bool(branch),
+    'session_exists': manager.session_exists('blocked'),
+}))
+""",
+            home=HOME,
+        )
+        assert result.ok, f"Failed: {result.stderr}"
+        assert result.data == {
+            "error": "ProjectCompatibilityError",
+            "state": "incompatible",
+            "worktree_exists": False,
+            "branch_exists": False,
+            "session_exists": False,
+        }
+
     def test_start_creates_manifest(self, manager_workspace: "WorktreeWorkspace") -> None:
         """start_session should create manifest file."""
         result = manager_workspace.run_python(

@@ -53,7 +53,12 @@ def _consumer_registry() -> dict[str, Consumer]:
     from forge.session.memory_writer import MEMORY_WRITER_CONSUMER
     from forge.session.shadow_curation import SHADOW_CURATION_CONSUMER
 
-    consumers = (SUPERVISOR_CONSUMER, MEMORY_WRITER_CONSUMER, SHADOW_CURATION_CONSUMER, TEAM_SUPERVISOR_CONSUMER)
+    consumers = (
+        SUPERVISOR_CONSUMER,
+        MEMORY_WRITER_CONSUMER,
+        SHADOW_CURATION_CONSUMER,
+        TEAM_SUPERVISOR_CONSUMER,
+    )
     return {c.id: c for c in consumers}
 
 
@@ -63,7 +68,11 @@ def _resolve_consumer(raw: str) -> Consumer:
     consumer = registry.get(raw.replace("-", "_"))
     if consumer is None:
         print_error(f"Unknown consumer {raw!r}.", console=err_console)
-        print_tip("Choose one of: " + ", ".join(sorted(registry)), blank_before=False, console=err_console)
+        print_tip(
+            "Choose one of: " + ", ".join(sorted(registry)),
+            blank_before=False,
+            console=err_console,
+        )
         sys.exit(1)
     return consumer
 
@@ -105,7 +114,10 @@ class _LaneSetCommand(click.Command):
 
 
 def _reject_frozen(consumer: Consumer, frozen: LaneRecord) -> None:
-    print_error(f"Lane for {consumer.id!r} is frozen for this session ({_lane_str(frozen)}).", console=err_console)
+    print_error(
+        f"Lane for {consumer.id!r} is frozen for this session ({_lane_str(frozen)}).",
+        console=err_console,
+    )
     print_tip(
         "The binding is immutable once a run freezes it; it resets next session.",
         blank_before=False,
@@ -115,7 +127,11 @@ def _reject_frozen(consumer: Consumer, frozen: LaneRecord) -> None:
 
 
 _SESSION_OPTION = click.option(
-    "--session", "-s", "session_name", default=None, help="Target session (default: the current session)."
+    "--session",
+    "-s",
+    "session_name",
+    default=None,
+    help="Target session (default: the current session).",
 )
 
 
@@ -177,6 +193,9 @@ def set_cmd(consumer_id: str, runtime: str | None, backend: str | None, session_
         sys.exit(1)
 
     result = _resolve_session_or_exit(session_name)
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(result.store.forge_root)
 
     # Pre-check the freeze on the unlocked read (fast fail before the lock); the
     # authoritative guard is the under-lock re-check (a dispatch hook may freeze
@@ -229,6 +248,9 @@ def clear_cmd(consumer_id: str, session_name: str | None) -> None:
     """
     consumer = _resolve_consumer(consumer_id)
     result = _resolve_session_or_exit(session_name)
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(result.store.forge_root)
     frozen = confirmed_lane(result.state, consumer)
 
     result.store.update(timeout_s=5.0, mutate=lambda m: clear_intent_lane(m, consumer))
@@ -300,7 +322,11 @@ def show_cmd(session_name: str | None, as_json: bool) -> None:
 def _record_dict(record: LaneRecord | None) -> dict[str, str] | None:
     if record is None:
         return None
-    return {"runtime": record.runtime_id, "backend": record.backend_id, "model": record.model}
+    return {
+        "runtime": record.runtime_id,
+        "backend": record.backend_id,
+        "model": record.model,
+    }
 
 
 def _lane_cell(record: LaneRecord | None) -> str:

@@ -90,6 +90,75 @@ class TestUserPromptSubmitDispatcher:
         updated = store.read()
         assert updated.overrides.get("verification", {}).get("bypass") is True
 
+    @pytest.mark.parametrize(
+        "prompt",
+        [
+            "%policy enable tdd",
+            "%policy disable",
+            "%policy supervisor planner",
+            "%policy supervisor on",
+            "%policy supervisor off",
+            "%policy supervisor remove",
+            "%policy supervisor reload",
+            "%policy supervisor cascade on",
+            "%cancel-verification",
+        ],
+    )
+    def test_mutating_direct_commands_refuse_incompatible_target(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        prompt: str,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        store = SessionStore(str(tmp_path), "test-session")
+        store.write(create_session_state("test-session", worktree_path=str(tmp_path)))
+        (tmp_path / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("FORGE_SESSION", "test-session")
+        before = store.manifest_path.read_bytes()
+
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": prompt, "transcript_path": ""}),
+        )
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "Project compatibility refused (incompatible)" in out["reason"]
+        assert "satisfying required_forge" in out["reason"]
+        assert store.manifest_path.read_bytes() == before
+
+    def test_read_only_supervisor_command_ignores_incompatible_target(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        SessionStore(str(tmp_path), "test-session").write(
+            create_session_state("test-session", worktree_path=str(tmp_path))
+        )
+        (tmp_path / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("FORGE_SESSION", "test-session")
+
+        result = CliRunner().invoke(
+            hooks,
+            ["user-prompt-submit"],
+            input=json.dumps({"prompt": "%policy supervisor", "transcript_path": ""}),
+        )
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert out["reason"] == "No supervisor configured"
+
     def test_ignores_non_percent_prompt(self, tmp_path: Path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()

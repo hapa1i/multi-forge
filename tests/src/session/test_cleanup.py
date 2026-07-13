@@ -5,6 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    ProjectCompatibilitySkip,
+)
 from forge.session.cleanup import (
     SessionCleanupResult,
     auto_clean_old_sessions,
@@ -16,6 +22,8 @@ def _make_entry(last_accessed_at: str, **kwargs):
     """Create a mock SessionIndexEntry with the given last_accessed_at."""
     entry = MagicMock()
     entry.last_accessed_at = last_accessed_at
+    entry.forge_root = "/project"
+    entry.worktree_path = "/project"
     for k, v in kwargs.items():
         setattr(entry, k, v)
     return entry
@@ -70,8 +78,14 @@ class TestCleanOldSessions:
     def test_skips_active_sessions(self, mock_manager_cls, mock_active_cls):
         manager = mock_manager_cls.return_value
         manager.list_sessions.return_value = [
-            ("active-old", _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project")),
-            ("dead-old", _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project")),
+            (
+                "active-old",
+                _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project"),
+            ),
+            (
+                "dead-old",
+                _make_entry(_iso_days_ago(60), forge_root="/project", worktree_path="/project"),
+            ),
         ]
         active_entry = MagicMock()
         active_entry.forge_root = "/project"
@@ -166,6 +180,78 @@ class TestCleanOldSessions:
         assert result.failure_items() == [("active session registry", "corrupt")]
         manager.delete_session.assert_not_called()
 
+    @pytest.mark.parametrize(
+        "state",
+        ["incompatible", "malformed", "unsupported_schema", "unreadable"],
+    )
+    @patch("forge.session.cleanup.ActiveSessionStore", autospec=True)
+    @patch("forge.session.cleanup.SessionManager", autospec=True)
+    def test_project_compatibility_skip_is_typed_and_other_roots_continue(
+        self,
+        mock_manager_cls,
+        mock_active_cls,
+        state,
+    ):
+        manager = mock_manager_cls.return_value
+        manager.list_sessions.return_value = [
+            (
+                "refused",
+                _make_entry(
+                    _iso_days_ago(60),
+                    forge_root="/refused",
+                    worktree_path="/refused",
+                ),
+            ),
+            (
+                "compatible",
+                _make_entry(
+                    _iso_days_ago(60),
+                    forge_root="/compatible",
+                    worktree_path="/compatible",
+                ),
+            ),
+        ]
+        mock_active_cls.return_value.list_sessions.return_value = []
+        refusal = ProjectCompatibilityError(
+            "/refused/.forge/project.toml",
+            f"{state} pin",
+            state=state,
+        )
+
+        with patch(
+            "forge.session.cleanup.enforce_project_compatibility",
+            side_effect=[refusal, None],
+        ):
+            result = clean_old_sessions(30, force=True)
+
+        assert result.deleted == ["compatible"]
+        assert result.failed == []
+        assert result.should_exit_nonzero is True
+        assert result.skipped_project_compatibility == [
+            ProjectCompatibilitySkip(
+                target="refused",
+                forge_root="/refused",
+                state=state,
+                reason=f"{state} pin",
+                recovery=refusal.recovery,
+            )
+        ]
+        assert result.skipped_project_compatibility[0].to_dict() == {
+            "target": "refused",
+            "root": "/refused",
+            "state": state,
+            "reason": f"{state} pin",
+            "recovery": refusal.recovery,
+        }
+        manager.delete_session.assert_called_once_with(
+            "compatible",
+            delete_transcripts=True,
+            delete_worktree=False,
+            delete_branch=False,
+            force=True,
+            forge_root="/compatible",
+        )
+
 
 class TestAutoCleanOldSessions:
     @patch("forge.session.cleanup.get_runtime_config")
@@ -193,6 +279,28 @@ class TestAutoCleanOldSessions:
         """auto_clean_old_sessions never raises."""
         auto_clean_old_sessions()
 
+    @patch("forge.session.cleanup.clean_old_sessions")
+    @patch("forge.session.cleanup.get_runtime_config")
+    def test_logs_project_compatibility_skips_without_raising(self, mock_config, mock_clean, caplog):
+        mock_config.return_value.session_retention_days = 30
+        mock_clean.return_value = SessionCleanupResult(
+            skipped_project_compatibility=[
+                ProjectCompatibilitySkip(
+                    target="old-refused",
+                    forge_root="/refused",
+                    state="incompatible",
+                    reason="version mismatch",
+                    recovery="use a satisfying Forge",
+                )
+            ]
+        )
+
+        with caplog.at_level("DEBUG", logger="forge.session.cleanup"):
+            auto_clean_old_sessions()
+
+        assert "Auto-clean skipped session 'old-refused'" in caplog.text
+        assert "incompatible" in caplog.text
+
 
 class TestSessionCleanupResult:
     def test_default_empty(self):
@@ -200,4 +308,5 @@ class TestSessionCleanupResult:
         assert result.deleted == []
         assert result.skipped_active == []
         assert result.skipped_unparseable == []
+        assert result.skipped_project_compatibility == []
         assert result.failed == []

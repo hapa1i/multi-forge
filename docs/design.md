@@ -91,8 +91,12 @@ project_root    (logical repo -- git identity, shared across worktrees)
    silently (it is a directory, not a config file -- no ambiguity, no interactive prompt needed). User-level install
    (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
 
-`.forge/project.toml` is an optional compatibility guardrail, not part of project identity. Missing file means
-unconstrained; when present, Forge command paths strict-read it before mutating project-local state.
+`.forge/project.toml` is an optional compatibility guardrail, not part of project identity. Missing means unconstrained
+and is silent. Compatibility follows the **target-state owner**: an explicit command checks the `forge_root` whose state
+it will change, even when a named session was resolved from another CWD. Command mutations fail closed; lifecycle and
+context hooks continue after at most one debug diagnostic per invocation; detached/background work refuses the write
+without changing an unrelated foreground command's exit status. Proxy/backend registries and read-time repair of the
+derived global session/active indexes are exempt because they are not owned by a Forge project root.
 
 **Definitions:**
 
@@ -119,8 +123,11 @@ unconstrained; when present, Forge command paths strict-read it before mutating 
   truly ambiguous. Prints a cross-project note when resolving from a different `forge_root`.
 - **`session delete --all`**: project-scoped (current `forge_root` only). Requires being inside a Forge project
   (`_cwd_forge_root() != None`); refuses to run outside one to prevent accidental global deletion.
-- **`session resume`, `session fork`**: project-scoped. Cannot resolve cross-project because Claude Code's `--resume`
-  and CWD namespace are tied to the project directory. Hints where the session lives on cross-project miss.
+- **Claude `session resume`, `session fork`**: project-scoped. Cannot resolve cross-project because Claude Code's
+  `--resume` and CWD namespace are tied to the project directory. Hints where the session lives on cross-project miss.
+  **Codex `session resume`** is intentionally cross-CWD: Forge resolves the named session and runs `codex resume` or
+  `codex exec resume` in its recorded worktree, so compatibility keys on that resolved session's `forge_root`, not the
+  caller's CWD.
 - **`session clean`**: global by default (no `forge_root` filter).
 - **Artifacts, transfer, search**: Forge-project-scoped (all under `<forge_root>/.forge/`).
 - **Cross-project resume** (transfer mode only): allowed within the same logical repo
@@ -858,6 +865,10 @@ Forge project. Hooks use `FORGE_SESSION` + UUID lookup only. No CWD-based scan o
 
 **Implementation:** Artifact capture uses first-class hook handlers (testable Python entrypoints), not ad-hoc scripts.
 
+Before their first project-owned write, lifecycle, policy, team, and Codex hooks perform one lenient compatibility
+diagnostic for all Forge roots that invocation may write. An incompatible, malformed, unreadable, or newer-schema pin is
+debug-logged once and the hook proceeds with its existing stdout, stderr, JSON, and exit-code contract unchanged.
+
 **Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). Runtime hook registrations are
 user-scoped and point at the rendered dispatcher command `<forge-home>/bin/forge-hook <name>`; project/local installs do
 not write hook blocks. The hook handler remains the Forge CLI surface (`forge hook <name>`), so runtime + deps live with
@@ -906,7 +917,11 @@ a genuine duplicate trigger; both may appear.
   snapshot; SessionStart rollover is fallback for `/clear` and defense-in-depth.
 - `forge hook post-compact` (PostCompact): Records compaction metadata (`last_compact_at`, `last_compact_type`).
 - `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code's default `git worktree add` to auto-install Forge
-  extensions. Prints worktree path to stdout. Only hook that exits non-zero on failure.
+  extensions. It strict-checks the source Forge root before creating a checkout, maps a nested source root to the same
+  relative path in the new checkout, then strict-checks that target before config copy, enrollment, or install. A target
+  refusal removes the checkout and any branch created for it; incomplete Git cleanup is surfaced on stderr. Runtime
+  config copying never copies the ignored `.forge/project.toml`; a tracked target pin is authoritative. Prints the
+  worktree path to stdout on success. Only hook that exits non-zero on failure.
 - `forge hook subagent-stop` (SubagentStop): Tracks subagent activity (`total_count`, `by_type`, transcript path,
   message preview). Observe-only (phase 1).
 

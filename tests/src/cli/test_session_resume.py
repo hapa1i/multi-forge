@@ -127,6 +127,22 @@ class TestSessionResumeExtended:
 class TestSessionResume:
     """Tests for 'forge session resume' command."""
 
+    def test_local_claude_resume_refuses_target_before_proxy_resolution(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        runner.invoke(main, ["session", "start", "pinned-resume", "--no-proxy", "--no-launch"])
+        (temp_env / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        with patch("forge.cli.session_lifecycle._resolve_routing_from_cli") as resolve_routing:
+            result = runner.invoke(main, ["session", "resume", "pinned-resume", "--proxy", "test-proxy"])
+
+        assert result.exit_code == 1
+        assert "Project compatibility refused (incompatible)" in result.output
+        assert "satisfying required_forge" in result.output
+        resolve_routing.assert_not_called()
+
     def test_resume_fresh_creates_derived_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh should create a derived session from an existing one."""
         with successful_claude_launch():

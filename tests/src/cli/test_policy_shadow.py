@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from click.testing import CliRunner
 
@@ -72,6 +73,28 @@ def test_group_help_lists_show_hides_run() -> None:
     assert "show" in result.output
     # `run` is the hidden detached worker; it must not appear in user-facing help.
     assert "run " not in result.output.lower().split("commands:")[-1]
+
+
+def test_hidden_worker_refuses_incompatible_root_before_claim(tmp_path: Path) -> None:
+    candidate = tmp_path / ".forge" / "artifacts" / "planner" / "shadow" / "candidate.json"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_text("{}", encoding="utf-8")
+    (tmp_path / ".forge" / "project.toml").write_text(
+        'schema_version = 1\nrequired_forge = ">=9999"\n',
+        encoding="utf-8",
+    )
+
+    with patch("forge.policy.semantic.shadow_runner.run_shadow_for_session") as mock_run:
+        result = CliRunner().invoke(
+            main,
+            ["policy", "shadow", "run", "--session-name", "planner", "--root", str(tmp_path)],
+        )
+
+    assert result.exit_code == 1
+    assert "Project compatibility refused (incompatible)" in result.output
+    mock_run.assert_not_called()
+    assert candidate.is_file()
+    assert not candidate.with_suffix(".processing").exists()
 
 
 def test_show_no_disagreements(monkeypatch, tmp_path) -> None:

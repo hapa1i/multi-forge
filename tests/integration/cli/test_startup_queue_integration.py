@@ -12,6 +12,8 @@ non-exempt commands on startup.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from tests.fixtures.docker import ContainerLike
@@ -43,6 +45,34 @@ def _create_stop_marker(
     return marker_path
 
 
+def _create_index_marker(workspace: ContainerLike, session_id: str = "compat-index") -> str:
+    """Create a current-schema index marker targeting /workspace."""
+    marker_id = f"idx-{session_id}"
+    marker_path = f"$HOME/.forge/pending-work/{marker_id}.json"
+    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
+    workspace.write_json(
+        marker_path,
+        {
+            "schema_version": 1,
+            "kind": "index",
+            "marker_id": marker_id,
+            "forge_version": "0.0.0",
+            "created_at": "2025-01-01T00:00:00Z",
+            "payload": {
+                "session_id": session_id,
+                "session_name": "compat-session",
+                "worktree_path": "/workspace",
+                "forge_root": "/workspace",
+                "transcript_snapshot_rel": f".forge/artifacts/compat-session/transcripts/{session_id}.jsonl",
+            },
+            "attempt_count": 0,
+            "last_attempt_at": None,
+            "last_error": None,
+        },
+    )
+    return marker_path
+
+
 class TestStartupQueueProcessing:
     """Tests for CLI startup queue processing behavior."""
 
@@ -64,16 +94,13 @@ class TestStartupQueueProcessing:
         assert "missing" in check.stdout, "Non-exempt command should process and delete pending-work markers"
 
     def test_forge_status_handles_empty_queue(self, mock_claude_workspace: ContainerLike) -> None:
-        """forge extension status handles empty queue gracefully (fast path)."""
+        """A known-success command handles an empty queue without changing its exit."""
         # Ensure queue directory doesn't exist
         mock_claude_workspace.exec("rm -rf $HOME/.forge/pending-work")
 
-        # Should not crash even with empty queue
-        result = mock_claude_workspace.exec("forge extension status")
+        result = mock_claude_workspace.exec("forge model backend list --json")
 
-        # Command completes (may fail if no install state, but shouldn't crash)
-        # We just verify it produces output without crashing
-        assert result.returncode >= 0
+        assert result.returncode == 0, result.stderr
 
 
 class TestExemptSubcommands:
@@ -114,23 +141,57 @@ class TestStartupQueueRobustness:
     """Tests for startup queue robustness (error handling)."""
 
     def test_corrupted_marker_does_not_crash_cli(self, mock_claude_workspace: ContainerLike) -> None:
-        """Corrupted markers don't crash CLI startup."""
+        """Corrupted markers are quarantined without failing the foreground command."""
         # Create corrupted marker
         mock_claude_workspace.exec("mkdir -p $HOME/.forge/pending-work")
         mock_claude_workspace.exec("echo 'not valid json' > $HOME/.forge/pending-work/corrupted.json")
 
-        # Run non-exempt command
-        result = mock_claude_workspace.exec("forge status")
+        result = mock_claude_workspace.exec("forge model backend list --json")
 
-        # Should not crash (best-effort processing)
-        # We just verify it produces some output without segfault etc
-        assert result.returncode >= 0
+        assert result.returncode == 0, result.stderr
+        json.loads(result.stdout)
+        assert result.stderr == ""
+        assert not mock_claude_workspace.file_exists("$HOME/.forge/pending-work/corrupted.json")
+        assert mock_claude_workspace.file_exists("$HOME/.forge/pending-work/failed/corrupted.json")
 
-        # Corrupted marker should still exist (not deleted on error)
-        check = mock_claude_workspace.exec(
-            "test -f $HOME/.forge/pending-work/corrupted.json && echo exists || echo missing"
+    def test_incompatible_index_marker_retries_without_failing_foreground(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        """The target-root pin blocks indexing through the bounded queue failure path."""
+        mock_claude_workspace.mkdir("/workspace/.forge", parents=True)
+        mock_claude_workspace.write_file(
+            "/workspace/.forge/project.toml",
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
         )
-        assert "exists" in check.stdout
+        marker_path = _create_index_marker(mock_claude_workspace)
+
+        result = mock_claude_workspace.exec("forge model backend list --json")
+
+        assert result.returncode == 0, result.stderr
+        json.loads(result.stdout)
+        assert result.stderr == ""
+        marker = mock_claude_workspace.read_json(marker_path)
+        assert marker["attempt_count"] == 1
+        assert "project compatibility refused (incompatible)" in marker["last_error"]
+        assert not mock_claude_workspace.file_exists("/workspace/.forge/search-index")
+
+    def test_poison_marker_quarantine_preserves_foreground_json_wire(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        marker_path = _create_index_marker(mock_claude_workspace, session_id="poison")
+        marker = mock_claude_workspace.read_json(marker_path)
+        marker["attempt_count"] = 5
+        mock_claude_workspace.write_json(marker_path, marker)
+
+        result = mock_claude_workspace.exec("forge model backend list --json")
+
+        assert result.returncode == 0, result.stderr
+        json.loads(result.stdout)
+        assert result.stderr == ""
+        assert not mock_claude_workspace.file_exists(marker_path)
+        assert mock_claude_workspace.file_exists("$HOME/.forge/pending-work/failed/idx-poison.json")
 
     def test_multiple_markers_processed(self, mock_claude_workspace: ContainerLike) -> None:
         """Multiple markers are processed by startup."""

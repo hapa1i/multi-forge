@@ -16,6 +16,11 @@ from typing import Any
 
 from forge.core.naming import generate_unique_name
 from forge.core.state import now_iso
+from forge.install.project_compat import (
+    ProjectCompatibilityError,
+    enforce_project_compatibility,
+    enforce_project_compatibility_toml,
+)
 
 from .artifacts import resolve_artifact_path
 from .claude.paths import (
@@ -507,6 +512,17 @@ class SessionManager:
                 created_worktree = True
                 worktree_path = wt_result.worktree_path
                 worktree_branch = wt_result.branch
+
+                # A tracked compatibility pin may differ in the new checkout.
+                # Check the target Forge root before copying config or writing
+                # any session state, and let the surrounding rollback remove
+                # the checkout and branch on refusal.
+                if _early_forge_root is not None:
+                    try:
+                        target_relative = _early_forge_root.relative_to(main_repo_root)
+                    except ValueError:
+                        target_relative = Path(".")
+                    enforce_project_compatibility(Path(worktree_path) / target_relative)
 
                 # Copy runtime config (best-effort; does not raise).
                 copy_runtime_config(main_repo_root, Path(worktree_path))
@@ -1144,22 +1160,31 @@ class SessionManager:
         rollback_worktree_path: str | None = None
         rollback_worktree_branch: str | None = None
         rollback_repo_root: Path | None = None
+        replacement_start_point: str | None = None
 
-        def _rollback_created_worktree() -> None:
+        def _rollback_created_worktree() -> list[str]:
             if not created_worktree or rollback_worktree_path is None:
-                return
+                return []
             try:
                 from .worktree import cleanup_worktree
 
-                cleanup_worktree(
+                cleanup_result = cleanup_worktree(
                     worktree_path=Path(rollback_worktree_path),
                     branch=rollback_worktree_branch,
                     delete_branch_flag=True,
                     force=True,
                     repo_root=rollback_repo_root,
                 )
+                if cleanup_result.errors:
+                    logger.warning(
+                        "Fork rollback cleanup incomplete for '%s': %s",
+                        rollback_worktree_path,
+                        "; ".join(cleanup_result.errors),
+                    )
+                return list(cleanup_result.errors)
             except Exception as e:
                 logger.warning("Fork rollback cleanup failed for '%s': %s", rollback_worktree_path, e)
+                return [str(e)]
 
         if into_path is not None:
             # Fork into an existing worktree (--into): land at the equivalent
@@ -1176,6 +1201,8 @@ class SessionManager:
                     f"Run 'forge extension enable' in {target_forge_root} first, "
                     "or use --worktree to create a new checkout with auto-enable."
                 )
+
+            enforce_project_compatibility(target_forge_root)
 
             fork_worktree_path = target_checkout_root
             fork_branch: str | None = branch  # CLI resolves branch from git
@@ -1211,6 +1238,8 @@ class SessionManager:
             from .worktree import create_worktree as git_create_worktree
             from .worktree import (
                 get_main_repo_root,
+                read_file_at_revision,
+                resolve_commit,
                 resolve_worktree_path,
                 sanitize_branch_name,
             )
@@ -1240,17 +1269,45 @@ class SessionManager:
                 )
                 if not replace_stale_target_state:
                     raise SessionExistsError(fork_name)
+
+                # Force replacement destroys the existing checkout and its
+                # auto-derived branch. Refuse against both that checkout's pin
+                # and the exact HEAD commit that will seed its replacement
+                # before authorizing the destructive Git step.
+                enforce_project_compatibility(target_forge_root)
+                replacement_start_point = resolve_commit(repo_root)
+                prospective_pin = read_file_at_revision(
+                    Path(parent_relative) / ".forge" / "project.toml",
+                    revision=replacement_start_point,
+                    cwd=repo_root,
+                )
+                if prospective_pin is not None:
+                    enforce_project_compatibility_toml(
+                        prospective_pin,
+                        path=Path(target_forge_root) / ".forge" / "project.toml",
+                    )
             wt_result = git_create_worktree(
                 session_name=fork_name,
                 branch=branch,
                 cwd=repo_root,
                 force=force,
                 replace_owned_stale_state=replace_stale_target_state,
+                start_point=replacement_start_point,
             )
             created_worktree = True
             rollback_worktree_path = wt_result.worktree_path
             rollback_worktree_branch = wt_result.branch
             rollback_repo_root = repo_root
+            target_forge_root = str(Path(wt_result.worktree_path) / parent_relative)
+            try:
+                enforce_project_compatibility(target_forge_root)
+            except ProjectCompatibilityError as compatibility_error:
+                rollback_errors = _rollback_created_worktree()
+                if rollback_errors:
+                    raise ForgeSessionError(
+                        f"{compatibility_error} Rollback incomplete: {'; '.join(rollback_errors)}"
+                    ) from compatibility_error
+                raise
             copy_runtime_config(repo_root, Path(wt_result.worktree_path))
 
             fork_worktree_path = wt_result.worktree_path

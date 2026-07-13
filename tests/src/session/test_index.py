@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from forge.core.paths import FORGE_DIR, get_forge_home
 from forge.core.state import now_iso
+from forge.session.active import ACTIVE_FILENAME, ActiveSessionStore
+from forge.session.config import LAUNCH_MODE_HOST
 from forge.session.exceptions import (
     IndexCorruptedError,
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
 )
+from forge.session.identity import make_scoped_key
 from forge.session.index import (
     INDEX_DIR,
     INDEX_FILENAME,
@@ -262,6 +266,51 @@ class TestIndexStoreListSessions:
         """list_sessions() should return empty list when no sessions."""
         sessions = store.list_sessions()
         assert sessions == []
+
+    def test_filtered_read_prunes_stale_incompatible_other_root_without_touching_live_pair(
+        self,
+        store: IndexStore,
+        index_path: Path,
+    ) -> None:
+        """Global index repair is exempt, but it must not mutate project or active state."""
+        compatible_root = index_path.parent.parent / "compatible-project"
+        incompatible_root = index_path.parent.parent / "incompatible-project"
+        compatible_root.mkdir()
+        incompatible_root.mkdir()
+        incompatible_state = incompatible_root / ".forge"
+        incompatible_state.mkdir()
+        pin = incompatible_state / "project.toml"
+        pin.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        pin_before = pin.read_bytes()
+
+        _create_manifest_stub(compatible_root, "visible")
+        store.add_session(
+            "visible",
+            str(compatible_root),
+            str(compatible_root),
+            forge_root=str(compatible_root),
+        )
+        store.add_session(
+            "stale-other-root",
+            str(incompatible_root),
+            str(incompatible_root),
+            forge_root=str(incompatible_root),
+        )
+        active_store = ActiveSessionStore(index_path.parent / ACTIVE_FILENAME)
+        active_store.upsert_session(
+            "stale-other-root",
+            worktree_path=str(incompatible_root),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+            forge_root=str(incompatible_root),
+        )
+
+        sessions = store.list_sessions(project_root_filter=str(compatible_root))
+
+        assert [name for name, _entry in sessions] == ["visible"]
+        assert make_scoped_key("stale-other-root", str(incompatible_root)) not in store.read().sessions
+        assert active_store.get_session("stale-other-root", forge_root=str(incompatible_root)) is not None
+        assert pin.read_bytes() == pin_before
 
     def test_list_sessions_sorted_by_last_accessed(self, store: IndexStore) -> None:
         """list_sessions() should sort by last_accessed_at DESC."""

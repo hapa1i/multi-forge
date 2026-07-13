@@ -28,9 +28,9 @@ mutations, search and memory commands, multi-root cleanup, startup queue drains,
 creation, `fork --into`, WorktreeCreate, and global index self-healing. The checklist classifies each rather than
 treating T7's initial list as exhaustive.
 
-The helper `check_project_compatibility_for_hook()` is contract-first until this sweep wires its first production hook
-caller. If this follow-up does not wire a hook caller before release, move that helper with its first caller rather than
-letting unused contract code linger across releases.
+The helper `check_project_compatibility_for_hook()` now has its first production caller through the named invocation
+diagnostic seam used by lifecycle and Codex project-write hooks. Keep that helper paired with its caller rather than
+letting contract-only code drift across releases.
 
 ## Design Rules
 
@@ -44,16 +44,18 @@ letting unused contract code linger across releases.
   partially succeed, but must report refused roots and exit nonzero; background work refuses without changing foreground
   exit.
 - Fresh managed worktrees keep the source precheck and add a target postcheck before target-local state/install writes;
-  refusal rolls back the checkout and branch. Derived global session/active-index self-healing is narrowly exempt, while
-  paired index writes remain behind the owning project mutation's guard.
+  refusal rolls back the checkout and branch. Stale `--worktree --force` replacement checks both the existing target and
+  the exact replacement commit before destroying anything, creates from that pinned commit, then retains the post-create
+  defense. Derived global session/active-index self-healing is narrowly exempt, while paired index writes remain behind
+  the owning project mutation's guard.
 - Prefer small named guard points over sprinkling checks across leaf mutators. If a family is not actually project-local
   state, document the exemption in the checklist and design docs if user-facing behavior depends on it.
 - Do not add `.forge/project.toml` authoring or implicit worktree copying. v1 remains hand-edit only, and a missing pin
   in a new checkout remains unconstrained.
 - `forge_dev_runtime_override` bypass decision -- **resolved by T8 (2026-07-11): T8 adds no special bypass.** A
-  `FORGE_DEV`-resolved forge keeps the existing compatibility posture unchanged, and hook-path pin enforcement remains
-  this sweep's scope (`check_project_compatibility_for_hook` currently has no production caller; strict enforcement is
-  `cli/guards.py` plus direct `cli/extensions.py` command paths).
+  `FORGE_DEV`-resolved forge keeps the existing compatibility posture unchanged. This sweep now routes lifecycle and
+  Codex project-write hooks through a named invocation diagnostic that delegates to
+  `check_project_compatibility_for_hook`; strict command enforcement remains separate.
 
 ## Acceptance Tests
 
@@ -62,10 +64,10 @@ letting unused contract code linger across releases.
 | Hook fail-open               | incompatible/malformed pin; lifecycle and Codex write paths   | write proceeds; one debug diagnostic; stdout/stderr/JSON contracts unchanged                       | `tests/src/cli/hooks/test_project_compat_hooks.py` + existing Codex hook suites                |
 | Direct command fail-closed   | incompatible target; `%policy`/supervisor/cancel mutations    | `decision:block`; no store mutation                                                                | `tests/src/cli/test_user_prompt_dispatcher.py`                                                 |
 | Target-root enforcement      | caller and target roots with opposite pin states              | the target state owner's pin alone controls refusal                                                | session/policy/transfer/memory/search CLI suites                                               |
-| Background refusal           | incompatible memory writer/index/shadow target                | no project write; foreground unchanged; outcome/queue state records the refusal                    | `test_memory_writer_cli.py`, `test_startup_queue.py`, `test_queue.py`, `test_policy_shadow.py` |
+| Background refusal           | incompatible memory writer/index/shadow target                | no project write; foreground JSON/stderr unchanged; outcome/queue records refusal                  | `test_memory_writer_cli.py`, `test_startup_queue.py`, `test_queue.py`, `test_policy_shadow.py` |
 | Multi-root partial result    | compatible + incompatible delete/cleanup/GC roots             | compatible targets mutate; refused targets remain and are reported; explicit command exits nonzero | session cleanup/delete and GC unit/integration suites                                          |
 | `fork --into` atomic refusal | nested target Forge root with proxy-producing flags           | no proxy, child/index/transfer, target replacement, or orphaned state                              | `tests/src/cli/test_session_fork.py` + `tests/integration/docker/test_project_identity.py`     |
-| Managed worktree posture     | compatible source working copy; incompatible tracked target   | target refusal rolls checkout/branch back before target config/state/install writes                | session manager + lifecycle suites                                                             |
+| Managed worktree posture     | fresh mismatch; stale target/future HEAD/branch refusal       | fresh target rolls back; stale checkout/branch/dirty state survives every preflight refusal        | session manager, fork-into, and lifecycle suites                                               |
 | WorktreeCreate posture       | incompatible source or tracked target pin                     | source refusal creates nothing; target refusal rolls back; ignored pin is never copied             | `tests/src/cli/hooks/test_new_hooks.py`                                                        |
 | Proxy/backend exemption      | incompatible CWD pin near global registry mutation            | proxy and backend writes succeed because `~/.forge` has no project owner                           | `tests/src/cli/test_proxy_commands.py` + `tests/src/cli/test_backend_commands.py`              |
 | Global self-heal exemption   | filtered read; stale global index row belongs to another root | proven-stale derived row prunes without touching project files or a refused live mutation          | session index + active-store suites                                                            |

@@ -30,6 +30,7 @@ from forge.core.reactive.env import (
 )
 from forge.core.state import FileLockTimeoutError, atomic_write_text
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -1066,6 +1067,8 @@ def _create_claude_session(
         raise ForgeOpError(str(e)) from e
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt index/manifest -> top-level reset handler
+    except ProjectCompatibilityError as e:
+        raise ForgeOpError(str(e)) from e
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
     except FileNotFoundError as e:

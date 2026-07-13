@@ -53,6 +53,7 @@ from forge.install.models import (
 from forge.install.project_compat import (
     ProjectCompatibilityError,
     enforce_project_compatibility,
+    format_project_compatibility_recovery,
 )
 from forge.install.project_registry import EnrollmentSource, ProjectRegistryStore
 from forge.install.tracking import TrackingStore
@@ -173,10 +174,7 @@ def _enforce_project_compatibility(project_root: Path | None) -> None:
         enforce_project_compatibility(project_root)
     except ProjectCompatibilityError as e:
         print_error(f"{e.reason}")
-        print_tip(
-            "Edit .forge/project.toml, upgrade the global Forge, or reset project state.",
-            console=console,
-        )
+        print_tip(format_project_compatibility_recovery(), console=console)
         sys.exit(1)
 
 

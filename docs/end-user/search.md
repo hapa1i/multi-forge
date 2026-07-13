@@ -49,6 +49,12 @@ Next forge command (any)
 Indexing is **incremental** — only new or modified transcripts are processed. The index is per-project, stored at
 `<forge_root>/.forge/search-index/`.
 
+The startup worker strict-checks that project's `.forge/project.toml` before changing the index. A compatibility refusal
+increments the marker's normal attempt count and records the error; after the bounded retry limit the marker moves to
+`~/.forge/pending-work/failed/`. Queue processing never turns that refusal into failure of the foreground command, and
+later compatible markers continue to run. After installing a Forge version satisfying `required_forge` (or
+editing/resetting the pin), run `forge search rebuild-index` to rebuild explicitly.
+
 ---
 
 ## CLI reference
@@ -78,6 +84,10 @@ forge search clean
 forge search clean --json
 forge search clean --yes
 ```
+
+`status`, `query`, and `search clean` preview/JSON reads remain available under an incompatible pin. `rebuild-index` and
+`search clean --yes` strict-check the current Forge root before replacing or pruning index state; preview output labels
+targets that apply would refuse. `--yes` and other force/confirmation controls do not bypass `required_forge`.
 
 ---
 
@@ -158,3 +168,4 @@ A full rebuild reconstructs all three store files from the source transcripts.
 | `<forge_root>/.forge/search-index/content.json`    | Extracted text content                     |
 | `<forge_root>/.forge/artifacts/*/transcripts/`     | Source transcripts (index input)           |
 | `~/.forge/pending-work/`                           | Work queue markers (index markers pending) |
+| `~/.forge/pending-work/failed/`                    | Markers that exhausted bounded retries     |

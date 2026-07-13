@@ -5,7 +5,33 @@ from unittest.mock import patch
 
 import pytest
 
-from forge.cli.guards import require_main_repo_root, require_repo_root
+from forge.cli.guards import (
+    enforce_target_project_compatibility,
+    require_main_repo_root,
+    require_repo_root,
+)
+
+
+def test_target_project_compatibility_guard_uses_shared_recovery(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge_dir = tmp_path / ".forge"
+    forge_dir.mkdir()
+    (forge_dir / "project.toml").write_text(
+        'schema_version = 1\nrequired_forge = ">=9999"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        enforce_target_project_compatibility(tmp_path)
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "requires Forge >=9999" in captured.err
+    assert "satisfying required_forge" in captured.err
+    assert "global Forge" not in captured.err
 
 
 class TestRequireRepoRoot:

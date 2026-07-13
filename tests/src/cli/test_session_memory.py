@@ -163,6 +163,20 @@ class TestSessionMemoryEnable:
         assert result.exit_code != 0
         assert "session-scoped" in result.stderr.lower()
 
+    def test_disable_refuses_incompatible_target_even_when_already_disabled(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root, _ = seeded_session
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["session", "memory", "disable", "--session", "s1"])
+
+        assert result.exit_code == 1
+        assert "Project compatibility refused (incompatible)" in result.output
+        assert "already disabled" not in result.output
+
 
 class TestMemoryActivationCleanBreak:
     """Activation/report verbs moved to ``forge session memory`` (Slice 02 clean break)."""

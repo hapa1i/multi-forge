@@ -199,6 +199,13 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
     return store, state
 
 
+def _enforce_policy_store_compatibility(store: SessionStore) -> None:
+    """Enforce the pin at the Forge root owning a policy mutation."""
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(store.forge_root)
+
+
 @click.group()
 def policy() -> None:
     """Manage policy enforcement for the current session.
@@ -293,6 +300,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
 
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
+    _enforce_policy_store_compatibility(store)
 
     bundle_config: dict[str, dict[str, object]] = {}
     if permissive and "tdd" in bundles:
@@ -353,6 +361,7 @@ def disable(session_name: str | None) -> None:
     """Disable policy enforcement for the current session."""
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
+    _enforce_policy_store_compatibility(store)
 
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
@@ -1175,6 +1184,7 @@ def supervisor_set(
 
     cwd = Path.cwd().resolve()
     store, _state = _resolve_policy_session(cwd, session_name)
+    _enforce_policy_store_compatibility(store)
     name = _state.name
     manifest = store.read()
     _policy_fr = manifest.forge_root or _resolve_forge_root(cwd)
@@ -1251,6 +1261,7 @@ def supervisor_set(
 def supervisor_off(session_name: str | None) -> None:
     """Suspend the supervisor (preserves config)."""
     store, name, manifest = _resolve_supervisor_session(session_name)
+    _enforce_policy_store_compatibility(store)
     try:
         policy_ops.supervisor_off(store=store, manifest=manifest, lock_timeout_s=5.0)
     except policy_ops.SupervisorNotConfiguredError:
@@ -1270,6 +1281,7 @@ def supervisor_off(session_name: str | None) -> None:
 def supervisor_on(session_name: str | None) -> None:
     """Resume a suspended supervisor."""
     store, name, manifest = _resolve_supervisor_session(session_name)
+    _enforce_policy_store_compatibility(store)
     try:
         policy_ops.supervisor_on(store=store, manifest=manifest, lock_timeout_s=5.0)
     except policy_ops.SupervisorNotConfiguredError:
@@ -1284,6 +1296,7 @@ def supervisor_on(session_name: str | None) -> None:
 def supervisor_remove(session_name: str | None) -> None:
     """Remove the supervisor configuration entirely."""
     store, name, manifest = _resolve_supervisor_session(session_name)
+    _enforce_policy_store_compatibility(store)
     try:
         policy_ops.supervisor_remove(store=store, manifest=manifest, lock_timeout_s=5.0)
     except policy_ops.SupervisorNotConfiguredError:
@@ -1305,6 +1318,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
     """Reload the supervisor's approved plan (auto-resolves the latest unless --from is given)."""
     cwd = Path.cwd().resolve()
     store, _ = _resolve_policy_session(cwd, session_name)
+    _enforce_policy_store_compatibility(store)
     manifest = store.read()
     try:
         result = policy_ops.supervisor_reload(
@@ -1372,6 +1386,7 @@ def supervisor_cascade(
             checker_effort=checker_effort,
         )
         store, name, manifest = _resolve_supervisor_session(session_name)
+        _enforce_policy_store_compatibility(store)
         result = policy_ops.supervisor_cascade(
             store=store,
             manifest=manifest,
@@ -1452,6 +1467,20 @@ def shadow_run_cmd(session_name: str, forge_root: str | None) -> None:
         from forge.session.artifacts import resolve_forge_root
 
         forge_root = str(resolve_forge_root(Path.cwd()))
+
+    from forge.install.project_compat import (
+        ProjectCompatibilityError,
+        enforce_project_compatibility,
+        format_project_compatibility_recovery,
+    )
+
+    try:
+        enforce_project_compatibility(forge_root)
+    except ProjectCompatibilityError as e:
+        raise click.ClickException(
+            f"Project compatibility refused ({e.state}) at {e.path}: {e.reason}. "
+            f"{format_project_compatibility_recovery()}"
+        ) from e
 
     counts = run_shadow_for_session(session_name, forge_root)
     click.echo(json.dumps({"session": session_name, "drained": counts}))

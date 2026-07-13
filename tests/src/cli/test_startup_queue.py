@@ -6,6 +6,7 @@ pending-work queue processing, while exempt commands (like `forge hook`) skip it
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.core.workqueue import (
     enqueue_index_marker,
+    enqueue_shadow_marker,
     enqueue_stop_marker,
     pending_work_dir,
 )
@@ -223,6 +225,74 @@ class TestIndexMarkerProcessing:
         store = SearchDocumentStore(forge_root=tmp_path)
         docs = store.read()
         assert any(d.session_id == "doc-test" for d in docs)
+
+    def test_incompatible_project_retries_without_search_writes(self, tmp_path: Path) -> None:
+        marker = _create_index_marker_with_transcript(tmp_path, session_id="compat-refused")
+        (tmp_path / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+
+        result = CliRunner().invoke(main, ["extension", "status"])
+
+        assert result.exit_code == 0, result.output
+        assert marker.is_file()
+        marker_data = json.loads(marker.read_text(encoding="utf-8"))
+        assert marker_data["attempt_count"] == 1
+        assert "project compatibility refused (incompatible)" in marker_data["last_error"]
+        assert "project.toml" in marker_data["last_error"]
+        assert not (tmp_path / ".forge" / "search-index").exists()
+
+        (tmp_path / ".forge" / "project.toml").unlink()
+        CliRunner().invoke(main, ["extension", "status"])
+        assert not marker.exists()
+
+    def test_incompatible_project_marker_moves_to_failed_at_retry_limit(self, tmp_path: Path) -> None:
+        marker = _create_index_marker_with_transcript(tmp_path, session_id="compat-poison")
+        (tmp_path / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+
+        for _ in range(5):
+            CliRunner().invoke(main, ["extension", "status"])
+
+        assert not marker.exists()
+        assert (pending_work_dir() / "failed" / marker.name).is_file()
+
+
+class TestShadowMarkerCompatibility:
+    def test_incompatible_project_retries_without_spawning_or_claiming_candidate(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        candidate = tmp_path / ".forge" / "artifacts" / "session" / "shadow" / "candidate.json"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_text("{}", encoding="utf-8")
+        (tmp_path / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        marker = enqueue_shadow_marker(
+            session_id="shadow-compat",
+            session_name="session",
+            worktree_path=tmp_path,
+            forge_root=str(tmp_path),
+        )
+        assert marker is not None
+
+        from unittest.mock import patch
+
+        with patch("subprocess.Popen") as mock_popen:
+            result = CliRunner().invoke(main, ["extension", "status"])
+
+        assert result.exit_code == 0, result.output
+        mock_popen.assert_not_called()
+        assert candidate.is_file()
+        assert not candidate.with_suffix(".processing").exists()
+        marker_data = json.loads(marker.read_text(encoding="utf-8"))
+        assert marker_data["attempt_count"] == 1
+        assert "project compatibility refused (incompatible)" in marker_data["last_error"]
 
 
 class TestMemoryWriterRunIdentity:
