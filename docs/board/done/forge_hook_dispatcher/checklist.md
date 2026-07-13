@@ -1,7 +1,7 @@
 # Execution checklist: T4 `forge_hook_dispatcher`
 
 Execution plan for the user-scope hook dispatcher. Coordination/contract lives in the epic
-[`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
+[`card.md`](../../done/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
 
 > **Revised 2026-07-07** after a code-cited review: three-rule behavioral parity (not byte-parity), codegen drift-guard,
 > the structural (not latency) no-import framing, shim-staleness ownership, `$HOME`-normalized golden, two new

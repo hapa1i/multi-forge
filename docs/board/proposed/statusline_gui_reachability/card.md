@@ -1,15 +1,16 @@
 # GUI-safe `statusLine` reachability
 
 **Lane**: `proposed/` -- design and probe work, not yet accepted for execution. Standalone follow-up to
-[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md); it does not keep that epic open.
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md); it does not keep that epic open.
 
 **Accept when**: a maintainer or user confirms that they actually launch Claude from a GUI, Dock, or IDE and want
 Forge's status line supported there. The last confirmed workflow is terminal-only, so this card remains shelf work; a
 synthetic minimal-`PATH` reproduction by itself does not justify moving it to `todo/`.
 
-**Origin**: Follow-up to the skipped [`forge_hook_absolute_command`](../forge_hook_absolute_command/card.md) (T2). The
-final dispatcher made T2's hook rewrite obsolete, but T2 was also the only card that would have made the project-scoped
-`forge status-line` command independent of the launching process's `PATH`.
+**Origin**: Follow-up to the retired, superseded
+[`forge_hook_absolute_command`](../../retired/forge_hook_absolute_command/card.md) (T2). The final dispatcher made T2's
+hook rewrite obsolete, but T2 was also the only card that would have made the project-scoped `forge status-line` command
+independent of the launching process's `PATH`.
 
 **Related**:
 

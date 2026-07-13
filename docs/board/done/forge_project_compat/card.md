@@ -1,6 +1,6 @@
 # Project compatibility guardrail (`required_forge`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/`. Shipped in PR #90 as the first command-path guardrail slice. Independent -- a check layered on
 project state. The remaining mutator-family sweep later shipped via PR #98 as

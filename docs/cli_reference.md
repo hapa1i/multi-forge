@@ -39,7 +39,10 @@ Doctor reports `FORGE_DEV` under `hook_dispatcher.dev_override` as
 `{present: bool, value: string|null, target: string|null, valid: bool, effective: bool, advice: string|null}`. `valid`
 means the value names an absolute checkout whose `.venv/bin/forge` is executable; `effective` also requires the
 installed dispatcher to be current and executable. This is environment-derived state for the doctor process, not proof
-that a separately launched hook inherited the same value.
+that a separately launched hook inherited the same value. Host runtime registrations invoke the absolute
+`<forge-home>/bin/forge-hook <name>` command. With `FORGE_DEV` present, that dispatcher uses only the checkout target;
+otherwise it resolves `forge` from `runtime.json` and then known user-tool directories, independent of inherited `PATH`.
+`on_path_minimal` reports bare `forge` reachability for consumers such as project `statusLine`, not dispatcher health.
 
 User-scope `enable`/`sync` may report one cleanup command per tracked legacy root, but never opens, edits, or enrolls
 those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registrations` independently from
@@ -297,11 +300,11 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### Internal (hidden from `forge --help`)
 
-| Command                   | Purpose                                       |
-| ------------------------- | --------------------------------------------- |
-| `forge hook <name>`       | Hook dispatcher (SessionStart, Stop, etc.)    |
-| `forge status-line`       | Generate status line output                   |
-| `forge memory-writer run` | Run the memory writer for a completed session |
+| Command                   | Purpose                                                         |
+| ------------------------- | --------------------------------------------------------------- |
+| `forge hook <name>`       | Hidden hook-handler surface invoked by the installed dispatcher |
+| `forge status-line`       | Generate status line output                                     |
+| `forge memory-writer run` | Run the memory writer for a completed session                   |
 
 **Design principles:**
 

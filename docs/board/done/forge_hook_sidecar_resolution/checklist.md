@@ -1,6 +1,6 @@
 # Execution checklist: In-container (sidecar) hook resolution (T10)
 
-Member of [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md). Owns seam 5 (host vs sidecar
+Member of [`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md). Owns seam 5 (host vs sidecar
 execution). Card: [`card.md`](card.md). Branch: `forge-hook-sidecar-resolution`.
 
 ## Current focus
@@ -160,4 +160,4 @@ Acceptance table (fixture-grounded):
 - **Deferred:** user-scope-only-enable sidecar sessions have no statusLine (D3). Not fixed by T10 unless review requests
   it (Phase 2).
 - **Out of scope (verified):** Codex-in-sidecar (no codex launch path in the container), host-side resolution
-  (`forge_hook_dispatcher`/`forge_hook_absolute_command`), the container's proxy/audit plumbing.
+  (`forge_hook_dispatcher` and retired `forge_hook_absolute_command` planning), the container's proxy/audit plumbing.

@@ -870,15 +870,15 @@ diagnostic for all Forge roots that invocation may write. An incompatible, malfo
 debug-logged once and the hook proceeds with its existing stdout, stderr, JSON, and exit-code contract unchanged.
 
 **Deployment model:** Forge installs hook **settings only** (no scripts in `.claude/`). Runtime hook registrations are
-user-scoped and point at the rendered dispatcher command `<forge-home>/bin/forge-hook <name>`; project/local installs do
-not write hook blocks. The hook handler remains the Forge CLI surface (`forge hook <name>`), so runtime + deps live with
-the Forge package (single upgrade surface). The dispatcher first applies its no-op gate: a managed session dispatches
-regardless of cwd, while an unmanaged launch dispatches only from an enrolled root. After validating the handler name, a
-present `FORGE_DEV` selects exactly `<absolute-checkout-root>/.venv/bin/forge`; an empty, relative, missing,
-non-executable, or unlaunchable target exits 127 without falling back. When the variable is absent, the dispatcher
-resolves a durable `forge` launcher from `~/.forge/runtime.json` and then known user-tool locations. It `exec`s
-`forge hook <name>` with stdin/stdout/stderr/exit code preserved. `statusLine` remains project/local-scoped because it
-is a scalar setting, not a runtime hook.
+user-scoped and contain the literal absolute dispatcher command `<forge-home>/bin/forge-hook <name>`; project/local
+installs do not write hook blocks. The hidden hook-handler surface remains `forge hook <name>`, so runtime + deps live
+with the Forge package (single upgrade surface). The dispatcher first applies its no-op gate: a managed session
+dispatches regardless of cwd, while an unmanaged launch dispatches only from an enrolled root. After validating the
+handler name, a present `FORGE_DEV` selects exactly `<absolute-checkout-root>/.venv/bin/forge`; an empty, relative,
+missing, non-executable, or unlaunchable target exits 127 without falling back. When the variable is absent, the
+dispatcher resolves a durable `forge` launcher from `~/.forge/runtime.json` and then known user-tool locations, without
+consulting the inherited `PATH`. It `exec`s `forge hook <name>` with stdin/stdout/stderr/exit code preserved.
+`statusLine` remains project/local-scoped because it is a scalar setting, not a runtime hook.
 
 **Operational requirement:** normal dispatch needs an executable `forge` launcher in recorded metadata or a known
 user-tool location. Enable/sync persists only executable non-venv launchers; legacy metadata remains usable until the
@@ -1231,15 +1231,18 @@ Full command inventories live in [cli_reference.md](cli_reference.md): terminal 
 ### 5.1 Extensions install model
 
 **Installing the `forge` tool.** Forge ships on PyPI and is installed as a global tool (`uv tool install multi-forge` or
-`pipx install multi-forge`), placing the `forge` launcher on `PATH` so it resolves from any shell — and from hooks that
-inherit a shell's `PATH` — not only inside an activated project venv. Hooks launched from a GUI/Dock process instead
-inherit launchd's minimal `PATH` (which excludes `~/.local/bin`), so bare `forge` can still be unreachable there;
-`forge extension doctor` surfaces this via `on_path_minimal`. Contributors use an editable install (`uv sync` →
-`.venv/bin/forge`); `FORGE_DEV=<absolute-checkout-root>` selects that checkout for hook subprocesses in a relaunched
-managed session, while `scripts/setup.sh --local` provides the persistent global editable launcher.
-`forge extension doctor` reports how Forge is installed and whether it is globally reachable — install kind (`global` /
-`editable` / `venv` / `unknown`), the resolved launcher path, PATH reachability, and the current process's dev-override
-state. This tool install is the prerequisite to installing the extensions described below.
+`pipx install multi-forge`), placing the bare `forge` launcher on `PATH` so it resolves from any shell and for
+project-scoped `statusLine`, not only inside an activated project venv. Host Claude and Codex runtime hook registrations
+instead invoke the literal absolute dispatcher path `<forge-home>/bin/forge-hook <name>` and do not depend on inherited
+`PATH`; the dispatcher resolves `forge` from `~/.forge/runtime.json` and then known user-tool locations. A GUI/Dock
+process inherits launchd's minimal `PATH` (which excludes `~/.local/bin`), so bare `forge` consumers can still be
+unreachable there; `forge extension doctor` surfaces that fact via `on_path_minimal`. Contributors use an editable
+install (`uv sync` → `.venv/bin/forge`); `FORGE_DEV=<absolute-checkout-root>` is a hard dispatcher branch that selects
+that checkout for hook subprocesses in a relaunched managed session, while `scripts/setup.sh --local` provides the
+persistent global editable launcher. `forge extension doctor` reports how Forge is installed and whether the bare
+launcher is globally reachable — install kind (`global` / `editable` / `venv` / `unknown`), the resolved launcher path,
+PATH reachability, dispatcher state, and the current process's dev-override state. This tool install is the prerequisite
+to installing the extensions described below.
 
 Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
 scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles

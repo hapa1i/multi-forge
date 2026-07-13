@@ -1,6 +1,6 @@
 # User-scope-only hook ownership
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` -- shipped via PR #93 on 2026-07-08 and closed out on `main`. Depends on `forge_hook_dispatcher`
 (shipped -- the dispatcher mechanism + `render_dispatcher_command`) and `forge_project_registry` (shipped -- the gating
@@ -49,9 +49,9 @@ registration. Today the hazard is real and unguarded (see grounding).
 - Hooks are written **one scope per run**; the "both scopes" double-fire arises across separate invocations. **No
   cross-scope dedup exists** -- only within-file (`installer.py:735`, `codex_hooks.py:210-237`). This ticket adds the
   detection.
-- This is **not** the first command-byte change: `forge_hook_absolute_command` already rewrote the bytes once (absolute
-  path). This ticket changes the *scope* (project -> user) and the *form* (to the dispatcher) -- a second command
-  change, hence a second Codex re-trust (see the epic's "two re-trusts" risk).
+- This was the **only shipped command-byte change**. T2's interim absolute-command proposal was skipped, so this ticket
+  changed the scope (project -> user) and form (direct `forge hook` -> absolute dispatcher) in one transition, requiring
+  one Codex re-trust.
 
 ## Risks
 

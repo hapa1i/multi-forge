@@ -1,10 +1,9 @@
 # Global Forge install + Day-1 docs
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
-**Lane**: `doing/`. Foundational member (no dependencies); the epic's first ticket, active on branch
-`global-forge-install` -- execution plan in [`checklist.md`](checklist.md). Ships global-tool Day-1 docs +
-`forge extension doctor`.
+**Lane**: `done/` -- shipped via PR #89 and closed 2026-07-06. Foundational member (no dependencies); execution record
+in [`checklist.md`](checklist.md). Ships global-tool Day-1 docs + `forge extension doctor`.
 
 ## Goal
 

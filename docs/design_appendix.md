@@ -970,7 +970,8 @@ Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 `uv sync`), `venv` (launcher in a `bin`/`Scripts` dir with a sibling `pyvenv.cfg`), or `unknown`. It also probes
 reachability under a GUI/launchd-style minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which excludes `~/.local/bin` —
 so a healthy global install still reports `on_path_minimal=false`. That probe is a reported fact, not a fault: it is the
-mechanical signal for whether a GUI-launched hook subprocess can resolve bare `forge`. The `--json` shape is
+mechanical signal for whether a GUI-launched bare `forge` consumer, notably project `statusLine`, can resolve the CLI.
+Dispatcher-backed host runtime hooks use an absolute command and do not depend on this PATH. The `--json` shape is
 `{install_kind, forge_path, on_path, on_path_minimal, advice, hook_dispatcher, runtime_hooks, project_registry, project_compatibility}`.
 `hook_dispatcher.dev_override` reports `{present, value, target, valid, effective, advice}` for `FORGE_DEV` in the
 doctor process's environment; a hook launch environment may differ. `effective` requires both a valid checkout target
@@ -992,7 +993,7 @@ and a current, executable installed dispatcher. `runtime_hooks` keeps `scopes` a
 | `commands`    | Slash commands markdown                             |                                                                  |
 | `agents`      | Subagents markdown                                  |                                                                  |
 | `skills`      | Skills (SKILL.md + resources/scripts)               | Scripting layer for Forge workflows (see design_workflows.md §3) |
-| `hooks`       | User-scope hook settings entries (`forge-hook ...`) | No hook scripts installed; dispatcher forwards to `forge hook`   |
+| `hooks`       | User-scope settings entries (absolute `forge-hook`) | No hook scripts installed; dispatcher execs `forge hook`         |
 | `status-line` | Project/local `statusLine` setting                  | Invokes `forge status-line`; not installed at user scope         |
 | `permissions` | Forge-required permission entries                   | Merged as unions                                                 |
 | `codex-hooks` | User-scope managed hook block in Codex config       | Best-effort; dispatcher bytes require Codex re-trust (see §C.6)  |
@@ -1084,9 +1085,10 @@ target lives inside a tool venv. A legacy recorded venv launcher is replaced or 
 enable/sync. An explicit internal `forge_binary_path` argument remains authoritative.
 
 With no dev override, the standalone dispatcher first tries the recorded launcher, then known user-tool locations in
-order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`. It verifies executability before `exec`; if no
-target is found, it exits non-zero with a diagnostic naming the checked locations. Sidecar/container resolution is
-separate because host `~/.forge` and host launcher paths are not mounted there.
+order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`. It does not search inherited `PATH`. It
+verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic naming the checked
+locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths are not mounted
+there.
 
 #### Hook dispatcher (`~/.forge/bin/forge-hook`)
 
@@ -1108,11 +1110,11 @@ Rendered hook command strings use a literal absolute path, never `~`, for exampl
 `/home/user/.forge/bin/forge-hook session-start`. The command byte template is golden-pinned with `$HOME` normalized
 because Codex trust hashes cover command definitions.
 
-The rendered script carries `FORGE_HOOK_DISPATCHER_VERSION` and `FORGE_HOOK_DISPATCHER_SOURCE_SHA256` stamps.
-`forge extension sync` re-renders the artifact, and `forge extension doctor` reports missing/stale/unreadable dispatcher
-state so a package upgrade that changes embedded gate or resolver logic does not silently leave hooks disabled
-everywhere. Resolver changes do not alter registered hook command bytes, so re-rendering the script does not itself
-require Codex hook re-trust.
+The rendered script carries `FORGE_HOOK_DISPATCHER_VERSION` and `FORGE_HOOK_DISPATCHER_SOURCE_SHA256` stamps. User-scope
+enable renders the artifact, and `forge extension sync --scope user` re-renders it for an existing tracked user install.
+`forge extension doctor` reports missing/stale/unreadable dispatcher state and the applicable recovery command; without
+a tracked user install, that recovery is the hooks-only user-scope enable recipe. Resolver changes do not alter
+registered hook command bytes, so re-rendering the script does not itself require Codex hook re-trust.
 
 #### Trusted project registry (`~/.forge/projects.json`)
 

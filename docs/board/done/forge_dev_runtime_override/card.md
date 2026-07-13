@@ -1,6 +1,6 @@
 # Dev-mode runtime override (checkout-local Forge)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/` -- shipped via PR #97 (`46ff9ef6`) and closed out on `main`; verification is preserved in
 [`checklist.md`](checklist.md). Off the critical path; pairs with `forge_hook_dispatcher` (the override is honored in

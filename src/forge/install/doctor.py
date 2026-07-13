@@ -1,15 +1,17 @@
 """Install diagnosis for ``forge extension doctor`` (epic_global_forge_runtime T1).
 
 Reports how Forge was installed (global tool vs editable/venv) and whether the
-``forge`` launcher is reachable on PATH -- including a GUI/launchd-style minimal
-PATH.
+bare ``forge`` launcher is reachable on PATH -- including a GUI/launchd-style
+minimal PATH.
 
-The minimal-PATH probe is the mechanical signal behind the exit-127 hook
-incident: GUI-launched apps (Dock/IDE) inherit launchd's PATH, which excludes
-``~/.local/bin`` (where ``uv tool`` / ``pipx`` place the launcher), so a bare
-``forge`` launcher can be unreachable even when Forge is installed. It is
-deliberately reported as a fact, not an error: a correct global install still
-reads ``on_path_minimal=false``. See the epic's D2 decision.
+The minimal-PATH probe preserves the mechanical fact exposed by the original
+exit-127 investigation. GUI-launched apps (Dock/IDE) inherit launchd's PATH,
+which excludes ``~/.local/bin`` (where ``uv tool`` / ``pipx`` place the
+launcher), so bare consumers such as the project ``statusLine`` can remain
+unreachable even when Forge is installed. Host runtime hooks now invoke an
+absolute dispatcher and do not use this probe. It is deliberately reported as
+a fact, not an error: a correct global install still reads
+``on_path_minimal=false``.
 """
 
 from __future__ import annotations
@@ -27,8 +29,9 @@ DIST_NAME = "multi-forge"
 EXECUTABLE = "forge"
 
 # launchd's default PATH for GUI-launched processes -- notably excludes
-# ``~/.local/bin``. Probing against it answers "would a GUI-launched hook
-# subprocess find bare ``forge``?" (epic D2 / the exit-127 incident).
+# ``~/.local/bin``. Probing against it answers whether a GUI-launched bare
+# consumer, such as project ``statusLine``, can find ``forge``. Dispatcher-backed
+# host hooks use an absolute command instead.
 MINIMAL_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 
 # The two recommended global-tool installs (surfaced in advice + Day-1 docs).
@@ -55,7 +58,7 @@ class InstallDiagnosis:
 
     ``install_kind`` is one of ``global`` | ``editable`` | ``venv`` | ``unknown``.
     ``advice`` is populated only when there is a user-actionable fix (it is not
-    driven by ``on_path_minimal``, which is a T2-owned diagnostic signal).
+    driven by ``on_path_minimal``, which reports bare-command reachability).
     """
 
     install_kind: str
@@ -191,7 +194,7 @@ def _advice(install_kind: str, on_path: bool, forge_path: str | None, has_durabl
         location = forge_path or "its install directory"
         return (
             f"Forge is installed at {location}, but that directory is not on your PATH. Add it so "
-            "`forge` resolves in every shell and the hooks launched from one."
+            "`forge` resolves in your shells and shell-launched bare consumers such as project statusLine."
         )
     if install_kind == "editable":
         # setup.sh --local is itself an editable install, so kind stays
@@ -207,8 +210,8 @@ def _advice(install_kind: str, on_path: bool, forge_path: str | None, has_durabl
             "'uv tool install multi-forge')."
         )
     return (
-        "Forge is not installed as a globally reachable tool. Install it as a global tool so shells "
-        "and the hooks they launch resolve it."
+        "Forge is not installed as a globally reachable tool. Install it as a global tool so the CLI has a stable "
+        "launcher and ordinary shells can resolve it."
     )
 
 
@@ -225,12 +228,13 @@ def diagnose_install(
     Seams are injectable for testing (``argv0``, ``which``, ``environ``,
     ``editable``, ``recorded_launcher`` -- the ``runtime.json`` launcher the
     doctor CLI threads in from the dispatcher diagnosis, since importing the
-    dispatcher module here would cycle). ``on_path`` uses the caller's PATH (what a shell or hook
-    inherits); ``on_path_minimal`` uses the launchd minimal PATH -- the
-    GUI-launch reachability signal (epic D2). The launcher path is reported as
-    resolved on PATH (the symlink a user sees, not its target), so a ``uv tool``
-    launcher in ``~/.local/bin`` classifies as global rather than by its
-    tool-venv target.
+    dispatcher module here would cycle). ``on_path`` uses the caller's PATH
+    (what a shell or bare consumer inherits); ``on_path_minimal`` uses the
+    launchd minimal PATH and reports GUI-launch reachability for bare consumers
+    such as project ``statusLine``, not dispatcher health. The launcher path is
+    reported as resolved on PATH (the symlink a user sees, not its target), so a
+    ``uv tool`` launcher in ``~/.local/bin`` classifies as global rather than by
+    its tool-venv target.
 
     Note the subjects differ: ``install_kind`` reflects the *running* interpreter's
     packaging metadata (``importlib.metadata``), while ``forge_path``/``on_path``

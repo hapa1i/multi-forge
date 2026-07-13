@@ -2,7 +2,7 @@
 
 **Origin**: standalone follow-up split from the T7 [`forge_project_compat`](../../done/forge_project_compat/card.md)
 closeout. **Reclassified 2026-07-11: not a member of
-[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md)** and does not hold the epic open -- the
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md)** and does not hold the epic open -- the
 sweep touches none of the epic's five seams and has no sequencing dependence on its members (precedent: the
 consumer_lanes epic re-filed its team-supervisor follow-on as a standalone card).
 

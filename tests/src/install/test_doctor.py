@@ -1,9 +1,9 @@
 """Unit tests for `forge extension doctor` install diagnosis.
 
-Covers install-kind classification, PATH reachability, the D2 minimal-PATH
-probe, and the CLI leaf's JSON/human output. Detection seams (`argv0`, `which`,
-`environ`, `editable`) are injected so tests never depend on how the test
-runner itself was installed.
+Covers install-kind classification, PATH reachability, the minimal-PATH probe
+for bare consumers, and the CLI leaf's JSON/human output. Detection seams
+(`argv0`, `which`, `environ`, `editable`) are injected so tests never depend on
+how the test runner itself was installed.
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def test_editable_with_global_launcher_clears_advice(tmp_path: Path) -> None:
     case), so the clear keys on the launcher's existence in a global bin dir,
     not on PATH resolution order -- mirroring the dispatcher's fallback. The
     contract is reachability, not provenance: any executable launcher counts
-    (hence the arbitrary stub), because it means hooks resolve.
+    (hence the arbitrary stub), because it means the dispatcher can resolve.
     """
     venv_bin = tmp_path / "repo" / ".venv" / "bin"
     venv_bin.mkdir(parents=True)
@@ -207,7 +207,7 @@ def test_unknown_when_forge_not_found() -> None:
 
 
 def test_minimal_path_probe_flags_gui_launch_gap(tmp_path: Path) -> None:
-    """D2 evidence: forge on the user PATH but absent from the launchd minimal PATH."""
+    """A GUI bare consumer can miss Forge even when the user's shell resolves it."""
     bindir = tmp_path / ".local" / "bin"
     bindir.mkdir(parents=True)
     forge = bindir / "forge"

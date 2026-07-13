@@ -1,7 +1,7 @@
 # Work Board
 
 This directory is Forge's lightweight implementation board. It keeps proposed work, scheduled work, active execution,
-active epic coordination, completed work, and project memory in one place.
+active epic coordination, completed work, retired reference records, and project memory in one place.
 
 The authoritative board workflow contract lives in [`docs/developer/board_contract.md`](../developer/board_contract.md).
 This README is a directory guide plus dogfood examples for people inspecting `docs/board/`.
@@ -15,6 +15,7 @@ This README is a directory guide plus dogfood examples for people inspecting `do
 | `doing/<slug>/card.md`    | Work in flight, or active epic coordination           | Add or update `checklist.md` during execution or coordination              |
 | `paused/<slug>/card.md`   | Partially-done work on hold                           | Move back to `doing/` when work resumes                                    |
 | `done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                |
+| `retired/<slug>/card.md`  | Terminal reference for work that did not ship         | Record its outcome, date, and replacement or folded-into evidence          |
 | `change_log.md`           | Completed-work record                                 | Memory writer may update with `strategy=changelog`; humans keep it compact |
 | `impl_notes.md`           | Approved memory for future sessions                   | Human-approved only; memory writer proposes to a shadow doc                |
 
@@ -24,7 +25,8 @@ verification.
 
 Epics are coordinating cards for related implementation cards that share a contract, sequencing decision, or code seam.
 Epic slugs start with `epic_`; an active epic belongs in `doing/` with a lightweight coordination checklist, and member
-cards should link the epic near the top of their `card.md`.
+cards should link the epic near the top of their `card.md`. Retired former members are not live and do not count as
+shipped; their retirement rationale and successor or folded-into evidence remain linked from the epic.
 
 ## Lane Semantics
 
@@ -37,8 +39,13 @@ Moving a card across lanes is a workflow event:
 3. `doing -> paused`: work is partially done but on hold (higher-priority card took over, or waiting on a dependency).
 4. `paused -> doing`: work resumes; checklist picks up where it left off.
 5. `doing -> done`: shipped, verified, design docs updated, and closeout recorded.
+6. Any nonterminal lane `-> retired`: the work will not ship independently because it was superseded, cancelled, folded
+   into other work, or invalidated.
 
-Parking *new* work means leaving it in `todo/`. Parking *in-progress* work means moving it to `paused/`.
+Parking *new* work means leaving it in `todo/`. Parking *in-progress* work means moving it to `paused/`. `retired/` is
+neither kind of parking: it is terminal, does not count as completed or shipped, and is excluded from live work. A
+retired card records its outcome, date, and replacement or folded-into evidence (or explicitly says that none exists),
+and keeps any checklist it already had. Reconsidered work starts as a new `proposed/` card linked to the retired record.
 
 ## Project Memory
 
@@ -192,7 +199,8 @@ conflicts in `change_log.md` are expected when branches interleave completed wor
 
 Closeout rules live in the [work-board contract](../developer/board_contract.md#closeout). In short: finish the
 checklist, record completed work, promote durable lessons after human review, sync design docs, then move
-`doing/<slug>/` to `done/<slug>/`.
+`doing/<slug>/` to `done/<slug>/`. Work that becomes terminal without shipping follows the retirement procedure and
+moves to `retired/<slug>/` instead.
 
 ## End-Of-Session Routine
 

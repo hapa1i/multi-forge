@@ -1,6 +1,6 @@
 # Project registry + enrollment (`~/.forge/projects.json`)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/`. Shipped in PR #90. **Precedes `forge_hook_dispatcher`** -- the dispatcher's shipped no-op gate reads
 this registry, so the schema + read half landed first (correction from the first decomposition, which called it

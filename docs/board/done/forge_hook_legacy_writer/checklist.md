@@ -7,8 +7,8 @@ hooks-only replacement. PR #88 merged as `0458a5ae`; this closeout moved the car
 
 **Current focus**: Done. The parallel `forge hook enable` / `forge hook disable` writer is deleted, and the tracked
 hooks-only replacement is documented and tested. Pre-epic prep for
-[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation path
-so the epic's later byte change (T2/T5) lands in one place.
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md) Seam 1: end with **one** hook mutation path
+so the epic's later shipped byte change (T5; T2 was ultimately skipped) lands in one place.
 
 ---
 
@@ -21,7 +21,7 @@ the shared `entry_is_forge_hook(entry, require_command_type=True)`. **The matche
 Historical second-writer drift, verified before deletion (`cli/hooks/install.py`):
 
 - **Bare command bytes.** `enable` writes `FORGE_HOOK_CONFIG["hooks"]` = `get_builtin_preset()["hooks"]` verbatim — bare
-  `forge hook <name>` (`:131-132`). PATH-dependent; the exact exit-127 form the epic (T2) fixes.
+  `forge hook <name>` (`:131-132`). PATH-dependent; the exact exit-127 form the epic's eventual T5 cutover replaced.
 - **Untracked.** Writes `settings.local.json` directly (`:135`), no `installed.json` / `TrackingStore`. The tracked
   `unmerge` (`settings_merge.py:731`, by `stable_id`) can't remove these entries.
 - **Wholesale key-overwrite (latent data-loss bug).** `settings["hooks"][key] = value` (`:131-132`) replaces the entire

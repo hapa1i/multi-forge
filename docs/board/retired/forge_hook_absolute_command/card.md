@@ -1,11 +1,26 @@
-# Absolute-path hook command (the reachability fix)
+# Absolute-path hook command (retired proposal)
 
-**Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
+> **RETIRED — REFERENCE ONLY. DO NOT IMPLEMENT.**
 
-**Lane**: `proposed/`. Depends on `global_forge_install` -- **for a PATH-stable target to point at**, not just for a
-global `forge` to exist. This is the D2 reachability fix: it ships early and closes the exit-127 incident **without**
-the scope migration. Split out of `forge_hook_dispatcher` after the 2026-07-02 review found the dispatcher ticket built
-a mechanism nothing invoked.
+**Outcome**: `superseded`
+
+**Retired**: 2026-07-13
+
+**Epic**: [`docs/board/done/epic_global_forge_runtime/card.md`](../../done/epic_global_forge_runtime/card.md)
+
+**Lane**: `retired/`. This card did not ship independently and is not live epic work. The shipped
+[`forge_hook_dispatcher`](../../done/forge_hook_dispatcher/card.md) and T5
+[`user_scope_hook_ownership`](../../done/user_scope_hook_ownership/card.md) cutover made direct absolute-path host-hook
+rewrites obsolete. Its shared registered-command and environment-specific resolution groundwork was folded into T5 and
+T10 [`forge_hook_sidecar_resolution`](../../done/forge_hook_sidecar_resolution/card.md). The only remaining concern,
+GUI-safe project `statusLine` reachability, lives in the narrower proposed
+[`statusline_gui_reachability`](../../proposed/statusline_gui_reachability/card.md) card; do not revive this proposal to
+address it.
+
+## Historical proposal
+
+The material below preserves the pre-cutover design and acceptance reasoning. It is historical context, not an
+implementation plan or a description of shipped behavior.
 
 ## Goal
 

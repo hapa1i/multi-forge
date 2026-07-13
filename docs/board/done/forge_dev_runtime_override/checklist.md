@@ -1,15 +1,14 @@
 # Execution checklist: forge_dev_runtime_override (T8)
 
 **Branch**: `forge-dev-runtime-override`. Card: [`card.md`](card.md). Epic:
-[`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.md) -- T8 was the epic's last live member (T2
-stays `proposed/` as superseded-not-abandoned; the split T7 sweep was reclassified a standalone non-member follow-up,
-2026-07-11), so this closeout makes epic closeout actionable (epic-owned, not done here).
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md) -- T8 was the epic's last live member. T2
+was later retired as superseded, and the split T7 sweep was reclassified as a standalone non-member follow-up.
 
 ## Current focus
 
 Shipped via PR #97 (`46ff9ef6`) after the focused suite, Docker installer integration, wheel/clean-install flow, live
-dev-loop smoke, and `make pre-commit` all passed. The card is closed in `done/`; the epic remains in `doing/` for its
-own seam verification and lane closeout.
+dev-loop smoke, and `make pre-commit` all passed. The card is closed in `done/`; the epic's separate seam and lane
+closeout completed 2026-07-13.
 
 ## Grounding (verified against code, 2026-07-11; extended across both review rounds)
 

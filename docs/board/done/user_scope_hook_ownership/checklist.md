@@ -1,7 +1,7 @@
 # Execution checklist: T5 `user_scope_hook_ownership`
 
 Execution plan for the user-scope-only hook registration flip. Coordination/contract lives in the epic
-[`card.md`](../../doing/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
+[`card.md`](../../done/epic_global_forge_runtime/card.md); this member's problem framing is [`card.md`](card.md).
 
 > **Drafted 2026-07-08**, **revised 2026-07-08 after review**. Refinements over the card's 2026-07-02 grounding:
 > presence detection has **five** call sites (not two); T4 already ships `render_dispatcher_command()` as the
