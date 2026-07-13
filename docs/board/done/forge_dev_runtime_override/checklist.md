@@ -48,10 +48,11 @@ File refs are the 2026-07-11 snapshot.
   `uv tool install -e --force .` (~:353), landing an editable launcher at `~/.local/bin/forge` -- a stable location the
   resolver legitimately records. `FORGE_DEV` is therefore the only *first-class transient checkout override*, not "the
   only dev path".
-- **Current hooks do not enforce the `required_forge` pin.** `check_project_compatibility_for_hook`
-  (`project_compat.py:138`) has no production caller; strict enforcement lives on command paths via `cli/guards.py`
-  **and directly in `cli/extensions.py`** (5 call sites). Hook-path enforcement is owned by the standalone
-  `forge_project_compat_mutator_sweep` follow-up (not an epic member).
+- **At T8 closeout, hooks did not enforce the `required_forge` pin.** `check_project_compatibility_for_hook`
+  (`project_compat.py:138`) then had no production caller; strict enforcement lived on command paths via `cli/guards.py`
+  **and directly in `cli/extensions.py`** (5 call sites). The standalone
+  [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) follow-up later shipped
+  hook-path enforcement via PR #98.
 - **`FORGE_DEV` propagates into managed launches.** The managed-session environment builders copy `os.environ`
   (`core/reactive/env.py:240`, `session/codex_invoke.py:152`, `core/invoker/codex.py:134`), so a value exported in the
   launch shell reaches hook subprocesses for both runtimes. (`forge codex start`'s bare-launch scrub drops only listed
@@ -98,11 +99,11 @@ File refs are the 2026-07-11 snapshot.
   normal candidate loop (whose first-executable-wins scan would silently skip an invalid override). Expansion/validation
   errors (`Path.expanduser()` `RuntimeError`) and exec errors (`OSError`: `ENOENT` stale shebang interpreter, `ENOEXEC`
   invalid format) all fail the same loud way.
-- [x] **D5 -- `required_forge`: "T8 adds no special bypass." RATIFIED as reworded.** Current hooks do not enforce the
-  pin at all (`check_project_compatibility_for_hook` has no production caller; strict enforcement is `cli/guards.py`
-  plus direct `cli/extensions.py` command paths); the existing compatibility posture is unchanged by T8, and hook-path
-  enforcement stays owned by the mutator sweep. Outcome written back to the `forge_project_compat_mutator_sweep` card
-  (Design Rules).
+- [x] **D5 -- `required_forge`: "T8 adds no special bypass." RATIFIED as reworded.** At T8 closeout,
+  `check_project_compatibility_for_hook` had no production caller and strict enforcement was limited to `cli/guards.py`
+  plus direct `cli/extensions.py` command paths. T8 left that posture unchanged; the later
+  [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) follow-up shipped hook-path
+  enforcement via PR #98.
 - [x] **D6 -- Classification: Public. RATIFIED (pre-decided); doc surface corrected (round 2).** The accepted
   `env_var_interface_boundary` card classifies T8's dev override as **Public**, and the §A.7b contract requires
   end-user-guide documentation for Public vars -- developer docs alone are insufficient. Surfaces:
@@ -170,9 +171,9 @@ Recording fix (D2):
   six changed doc surfaces passed mdformat; claims were checked against the rendered/package implementation.
 - [x] `tests/src/cli/test_env_vocabulary.py` parity row matches the appendix table (Public class): targeted guard passed
   (`9 passed`).
-- [x] D5 write-back: the `forge_project_compat_mutator_sweep` card's Design Rules record the resolved outcome ("T8 adds
-  no special bypass; sweep owns hook enforcement"). Done 2026-07-11; evidence wording corrected in round 2 (strict
-  enforcement = `cli/guards.py` + `cli/extensions.py`).
+- [x] D5 write-back: the [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) card's
+  Design Rules record the resolved outcome ("T8 adds no special bypass; sweep owns hook enforcement"). Done 2026-07-11;
+  the sweep later shipped via PR #98.
 - [x] Card kept consistent with the ratified decisions: Grounding correction (sticky-sync), Open questions resolved, and
   the Design section rewritten from "Decide between" to the resolved design (round 2). Done 2026-07-11.
 
@@ -246,8 +247,8 @@ Doctor, env, and byte contracts:
 - ~~Stop point: D1-D6 awaiting ratification~~ -- cleared 2026-07-11 (two review rounds; outcomes above).
 - Sidecar override: non-goal by construction (no dispatcher in-container; seam 5). Recorded, not a gap.
 - Multi-checkout / per-project dev mapping: out of scope; `FORGE_DEV` is one process-env value by design.
-- Hook-path `required_forge` enforcement: not this card -- owned by `forge_project_compat_mutator_sweep` (D5; standalone
-  follow-up, not an epic member).
+- Hook-path `required_forge` enforcement: not this card -- later shipped via PR #98 in the standalone
+  [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) follow-up.
 
 ## Closeout
 

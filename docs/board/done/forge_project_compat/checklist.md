@@ -5,9 +5,9 @@ Epic: [`epic_global_forge_runtime`](../../doing/epic_global_forge_runtime/card.m
 ## Current focus
 
 **Closed on `main` 2026-07-07 as the first command-path guardrail slice.** The `.forge/project.toml` reader/enforcer,
-extension/session command-path guard set, and doctor surface landed in PR #90. The broader mutation-family sweep is
-explicitly split to [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md); do
-not claim every state-mutating path observes `.forge/project.toml` until that follow-up lands.
+extension/session command-path guard set, and doctor surface landed in PR #90. The broader mutation-family sweep later
+landed via PR #98 as [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md), completing
+the classified project-state mutation coverage.
 
 ## Scope boundary (what is NOT in T7)
 
@@ -66,20 +66,19 @@ isolation is out of scope.
 
 ## Phase 2 -- Enforcement chokepoint
 
-- [x] **First named guard set called before mutating.** Covered now: extension `enable`/`sync`/`disable`/`disable --all`
-  and shared session repo-root guards. The broader mutation sweep remains open below.
+- [x] **First named guard set called before mutating.** Covered in T7: extension
+  `enable`/`sync`/`disable`/`disable --all` and shared session repo-root guards. The broader mutation sweep later
+  shipped through the follow-up below.
 - [x] **Incompatible-pin behavior for the implemented command paths** applied per D-T7-a. A mismatch on a command/CLI
   path produces an actionable error naming the upgrade/reset path; a compatible pin is a silent no-op. The lenient hook
-  helper is implemented, but live hook warning/wiring is part of the remaining sweep.
+  helper was implemented here; live hook warning/wiring later shipped in the follow-up sweep.
 - [x] **Doctor strict-read surface:** extend `forge extension doctor` to strict-read `.forge/project.toml` and report
   malformed/unsupported-schema or incompatible state with the same fix hint. Missing file remains compatible and should
   not warn.
 - [x] **Remaining mutator sweep split:** hook confirmed-state writes, memory-writer doc writes, and proxy/backend
-  registry mutations moved to
-  [`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md). This is the remaining
-  condition before claiming every state-mutating path observes `.forge/project.toml`. If the sweep does not wire a hook
-  caller before release, move the lenient hook helper with its first production caller rather than shipping unused
-  contract code indefinitely.
+  registry mutations moved to [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md). PR
+  #98 completed that sweep, including a production hook caller for the lenient helper and narrow rationale-backed
+  global-state exemptions.
 
 Acceptance (Phases 1--2):
 

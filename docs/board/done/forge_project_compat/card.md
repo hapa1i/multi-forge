@@ -3,15 +3,14 @@
 **Epic**: [`docs/board/doing/epic_global_forge_runtime/card.md`](../../doing/epic_global_forge_runtime/card.md)
 
 **Lane**: `done/`. Shipped in PR #90 as the first command-path guardrail slice. Independent -- a check layered on
-project state. The remaining mutator-family sweep was split to
-[`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md).
+project state. The remaining mutator-family sweep later shipped via PR #98 as
+[`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md).
 
 ## Goal
 
 `<repo>/.forge/project.toml` carrying `schema_version` + `required_forge`. This slice ships the reader, doctor surface,
 extension lifecycle guard, and shared session repo-root guards. The broader "every command/hook that mutates project
-state" coverage is owned by
-[`forge_project_compat_mutator_sweep`](../../doing/forge_project_compat_mutator_sweep/card.md).
+state" coverage shipped in [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md).
 
 ## Accepted decision (epic D1)
 

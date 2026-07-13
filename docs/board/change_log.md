@@ -27,6 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-12
 
+### forge_project_compat_mutator_sweep closeout
+
+**Goal**: Finish `.forge/project.toml` enforcement across every classified project-state mutator without gating unowned
+global runtime state.
+
+**Key changes**:
+
+- Enforced the target state owner's Forge root across explicit session, policy, transfer, memory, search, cleanup, and
+  direct-command mutations; hooks diagnose without changing their wire, while detached writers and queue work refuse
+  through bounded background contracts.
+- Made managed worktree refusal atomic, including pre-destroy validation of stale roots, the exact replacement commit,
+  and branch safety; retained post-create checks and surfaced incomplete rollback instead of hiding state loss.
+- Kept proxy/backend registries and proven-stale derived-index repair narrowly exempt, added per-root partial cleanup
+  reporting, and documented that `forge clean --yes --json` exits 1 when failures or compatibility skips are present.
+- Moved the card to `done/`, repointed the epic and T7/T8 references, and promoted the reviewed ownership, posture,
+  background-refusal, and exemption invariants to `impl_notes.md`.
+
+**Verification**: PR #98 merged at `aa45114d`; `make test-unit` (`7724 passed, 1 skipped, 117 deselected`);
+`make pre-commit`; required targeted integration suites (`151 passed`) plus focused compatibility/fork regressions
+(`35 passed`). The real Claude-to-Codex bridge command was invoked but failed at its Codex readiness gate before the
+bridge body ran because isolated `CODEX_HOME` requires `CODEX_API_KEY`; host Codex preflight was ready, the no-skip test
+stayed intact, and no product change is pending on that result.
+
 ### forge_dev_runtime_override closeout
 
 **Goal**: Close T8 after PR #97 merged and hand the global-runtime epic its final coordinator closeout.

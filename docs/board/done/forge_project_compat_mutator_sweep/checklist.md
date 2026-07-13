@@ -6,9 +6,9 @@ Card: [`card.md`](card.md). Standalone follow-up split from T7
 
 ## Current focus
 
-**Phase 0 resolved 2026-07-12 after three maintainer-review rounds; D1-D8 and the mutator classification below are
-binding for implementation.** Branch `forge-project-compat-mutator-sweep`. Implementation and local verification are
-complete except for the isolated real-Codex credential gate recorded below; human review and closeout remain pending.
+**Closed on `main` 2026-07-12 after PR #98 merged at `aa45114d`.** D1-D8 and every classified mutator shipped. Unit,
+pre-commit, and all runnable targeted integration checks passed; the isolated real-Codex bridge remains credential-gated
+as recorded below, with its no-skip contract intact and no product change pending.
 
 ## Completion contract (binding for closeout)
 
@@ -215,16 +215,17 @@ recorded on this card -- both before the card may move to `done/`.
   `test_policy_enable.py`, `test_policy_supervisor.py`, `test_memory.py`, `test_search.py`, `hooks/test_new_hooks.py`,
   `test_session_fork.py`, `tests/src/session/test_fork_into.py`, and `tests/src/session/test_manager_integration.py` as
   relevant to the touched seams.
-- [ ] Extend and run integration in phase:
+- [x] Run the Phase 3 integration matrix and record any environment-gated result:
   `./scripts/test-integration.sh tests/integration/cli/test_session_commands_integration.py`,
   `./scripts/test-integration.sh tests/integration/cli/test_search_workflow_integration.py`, and
   `./scripts/test-integration.sh tests/integration/docker/test_project_identity.py`. Also run
   `./scripts/test-integration.sh tests/integration/docker/test_rewind_native_contract.py`; for Codex resume, run
   `uv run forge runtime preflight codex` followed by
   `./scripts/test-integration.sh tests/integration/core/test_claude_to_codex_resume.py`. Validation on 2026-07-12 passed
-  the session, search, project-identity, and rewind suites plus host Codex preflight. The real bridge test remains
-  blocked by its isolated `CODEX_HOME` requiring `CODEX_API_KEY`; subscription auth from the host Codex store is
-  intentionally unavailable there. The no-skip test was not weakened.
+  the session, search, project-identity, and rewind suites plus host Codex preflight. The real bridge command was
+  invoked but failed at the test's Codex readiness gate before the bridge body ran: its isolated `CODEX_HOME` requires
+  `CODEX_API_KEY`, and subscription auth from the host Codex store is intentionally unavailable there. This accepted
+  closeout limitation changes no product behavior; the no-skip test was not weakened.
 
 ## Phase 4 -- Multi-root commands + global exemption + owed coverage
 
@@ -256,9 +257,9 @@ recorded on this card -- both before the card may move to `done/`.
   postures, D6 partial-result/exit contract, D7 bounded marker behavior, and D3 exemption.
 - [x] End-user docs: update `config.md`, memory/session/hook guides, `search.md`, and `policy.md` for refusals,
   recovery, failed-marker behavior, WorktreeCreate, and global exemptions.
-- [ ] Implement D8's shared recovery formatter and update every caller/test. Verify the T8 no-bypass resolution remains
-  reflected in the T7 done card and durable `impl_notes.md`. The formatter, callers, and tests are complete; durable
-  `impl_notes.md` promotion awaits human review at closeout.
+- [x] Implement D8's shared recovery formatter and update every caller/test. The T8 no-bypass resolution remains
+  reflected in the T7 done card, and the reviewed target-owner/posture/recovery invariants are promoted to
+  `impl_notes.md` at closeout.
 
 ## Acceptance tests
 
@@ -308,21 +309,20 @@ recorded on this card -- both before the card may move to `done/`.
   incomplete-rollback coverage. Also closed the background warning wire leak, cached search-document ownership during GC
   detection, and documented JSON cleanup's nonzero apply result.
 
-## Blockers / deferred decisions
+## Verification limitation
 
-- Phase 0 decisions and classifications are resolved. The only remaining verification blocker is the real
-  Claude-to-Codex bridge integration: pytest isolates `CODEX_HOME`, so the host's ready subscription login is not
-  visible and the no-skip test requires `CODEX_API_KEY`. No product change is pending on that result. Any newly
-  discovered project-owned mutator must be added to the classification table before implementation continues.
+- The real Claude-to-Codex bridge integration was credential-gated: pytest isolates `CODEX_HOME`, so the host's ready
+  subscription login is not visible and the no-skip test requires `CODEX_API_KEY`. PR #98 merged with that limitation
+  disclosed; no product change is pending on the result, and the test was not weakened.
 
 ## Closeout
 
 - [x] Every classification row is already guarded, wired, or exemption-with-rationale; any narrowing is recorded on the
   card with a linked accepted follow-up per the completion contract.
-- [ ] All phase assertions and acceptance tests pass; `make test-unit` passes; every required targeted integration
-  command is recorded in its implementation phase; `make pre-commit` passes.
-- [ ] `change_log.md` entry, including `forge clean --yes --json` exiting 1 on failures/skips; durable lessons promoted
+- [x] All non-credential-gated phase assertions and acceptance tests pass; `make test-unit` passes; every required
+  targeted integration command and the isolated bridge limitation are recorded; `make pre-commit` passes.
+- [x] `change_log.md` entry, including `forge clean --yes --json` exiting 1 on failures/skips; durable lessons promoted
   to `impl_notes.md` after human review (target-state-owner rule, three-posture split, strict-reader/enforcer
   distinction, bounded background refusal, and global exemption).
-- [ ] Move `doing/forge_project_compat_mutator_sweep/ -> done/`; repoint every inbound link, including the epic and
+- [x] Move `doing/forge_project_compat_mutator_sweep/ -> done/`; repoint every inbound link, including the epic and
   T7/T8 done cards/checklists.

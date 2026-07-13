@@ -34,8 +34,9 @@ Resolved 2026-07-11 (maintainer review, two rounds; decision record in [`checkli
   launcher never replaces a stable recorded launcher, and classification is lexical (never resolve a global symlink into
   its tool venv). `FORGE_DEV` is the only first-class *transient* checkout override; the persistent dev path is the
   deliberate global editable install (`scripts/setup.sh`).
-- **Guardrail (D5)**: no `required_forge` bypass -- T8 leaves the existing compatibility posture unchanged; hook-path
-  pin enforcement belongs to the mutator sweep.
+- **Guardrail (D5)**: no `required_forge` bypass -- T8 left the compatibility posture unchanged; hook-path pin
+  enforcement later shipped in the [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md)
+  follow-up via PR #98.
 - **Classification (D6)**: `FORGE_DEV` is a **Public** env var (§A.7b), documented in the end-user hook guide and
   developer docs; a running session must be relaunched to pick up a changed value.
 
@@ -68,7 +69,9 @@ Both resolved in maintainer review 2026-07-11; outcomes recorded in [`checklist.
 - ~~`FORGE_DEV=/path` (checkout-pointing) vs `uv run forge`-only~~ -- **resolved: `FORGE_DEV` env override** (D1), with
   the D2 recording fix ending today's implicit sticky dev selection.
 - ~~Does the dev override bypass the `forge_project_compat` `required_forge` guardrail?~~ -- **resolved: T8 adds no
-  special bypass** (D5); current hooks do not enforce the pin, and hook-path enforcement stays with the mutator sweep.
+  special bypass** (D5). At T8 closeout, hooks did not enforce the pin; the later
+  [`forge_project_compat_mutator_sweep`](../forge_project_compat_mutator_sweep/card.md) follow-up shipped that
+  enforcement via PR #98.
 
 ## Acceptance tests
 

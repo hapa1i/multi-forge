@@ -6,7 +6,7 @@ closeout. **Reclassified 2026-07-11: not a member of
 sweep touches none of the epic's five seams and has no sequencing dependence on its members (precedent: the
 consumer_lanes epic re-filed its team-supervisor follow-on as a standalone card).
 
-**Lane**: `doing/` -- active on branch `forge-project-compat-mutator-sweep`. Execution plan:
+**Lane**: `done/`. Shipped via PR #98 (`aa45114d`) and closed on `main` 2026-07-12. The execution record is preserved in
 [`checklist.md`](checklist.md).
 
 ## Goal

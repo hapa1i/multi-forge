@@ -36,6 +36,27 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Project compatibility follows target ownership and mutation posture (forge_project_compat_mutator_sweep, shipped 2026-07-12)
+
+- **Guard the Forge root that owns the state being changed, not the caller's CWD.** Named cross-CWD session operations,
+  nested `fork --into`, and managed worktrees must resolve the target root before any dispatch or write. A strict
+  `check_project_compatibility()` read is not enforcement: a valid version mismatch returns `compatible=False`, so
+  refusing code must call `enforce_project_compatibility()` or reject that result explicitly.
+- **Posture belongs to the operation boundary.** Explicit CLI and mutating `%` commands fail closed before side effects;
+  lifecycle/context hooks diagnose once and preserve their wire; detached work refuses the project write without
+  changing an unrelated foreground command's result. Operation semantics win over transport, so WorktreeCreate and
+  mutating `%` forms remain strict even though they arrive through hooks.
+- **Background refusal must stay bounded.** Index and shadow markers use the existing retry-to-`failed/` queue contract,
+  preserving fairness and poison evidence. The already-detached memory writer instead records
+  `project_compatibility_refused` and exits 0. Do not invent a permanently pending marker state.
+- **Global state is exempt only when it has no Forge-root owner.** Proxy/backend registries and read-time repair of
+  proven-stale derived session/active rows remain available under an incompatible CWD pin. Paired index writes still
+  inherit the owning project mutation's guard; mixed cleanup gates only project-owned items and reports partial refusal.
+- **Destructive worktree replacement needs prospective checks.** Before stale `fork --worktree --force` removes
+  anything, validate the stale root, exact replacement commit, and branch safety; create from that pinned commit and
+  retain the post-create target defense. A refusal must preserve the checkout, branch, dirty files, manifest, index, and
+  transfer state; rollback failures must be surfaced.
+
 ### Dev hook selection is a resolver override; transient venvs are never implicit runtime metadata (forge_dev_runtime_override, reviewed 2026-07-11)
 
 - `FORGE_DEV` changes binary resolution, not dispatch eligibility. The generated dispatcher applies the managed-session
@@ -117,9 +138,9 @@ wc -l docs/board/impl_notes.md
   session/context hook helpers fail open with diagnostics. PEP 440 range checks use
   `SpecifierSet.contains(..., prereleases=True)` so checkout-local dev/rc Forge builds can satisfy numeric ranges.
 - T7 intentionally closed with the remaining mutation-family sweep split to the standalone
-  `forge_project_compat_mutator_sweep` card: confirmed-state hook writes, memory-writer doc writes, and proxy/backend
-  registry mutations must either be wired through the guard or documented as out of scope before claiming all
-  project-state mutators observe `.forge/project.toml`.
+  [`forge_project_compat_mutator_sweep`](done/forge_project_compat_mutator_sweep/card.md) card. That follow-up shipped
+  via PR #98 with every classified project-state mutator guarded or narrowly exempted; the durable posture and ownership
+  rules are recorded above.
 
 ### Install-kind detection: editable-first, launcher-symlink-not-realpath, minimal-PATH is a fact (global_forge_install, shipped 2026-07-06)
 
