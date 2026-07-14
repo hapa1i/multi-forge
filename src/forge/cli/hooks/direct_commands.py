@@ -770,8 +770,8 @@ def _handle_policy_supervisor(argv: list[str]) -> None:
     - ``%policy supervisor``: show current config (including the bound consumer lane)
 
     The consumer-lane *runtime* is intentionally not settable here -- it is a resolving-command
-    flag (``forge policy supervisor set --runtime``) so the binding stays write-once. This path
-    only shows the bound lane.
+    flag (``forge policy supervisor set <target> --runtime``) so the binding stays write-once.
+    This path only shows the bound lane.
     """
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)

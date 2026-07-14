@@ -209,7 +209,7 @@ def validate_key(key: str) -> list[str]:
 
     if first_part == "consumer_lanes":
         # Consumer-lane bindings (epic consumer_lanes, T1b) are set only through resolving commands
-        # (--supervisor-runtime at start/fork, 'forge policy supervisor set --runtime'), which expand a
+        # (--supervisor-runtime at start/fork, 'forge policy supervisor set <target> --runtime'), which expand a
         # runtime to a full validated LaneRecord and enforce the already-bound reject. A raw override --
         # partial (can't rehydrate a 3-field LaneRecord) or full-object (bypasses that validation, and
         # after first dispatch is recorded-but-ignored since dispatch reads the frozen confirmed binding)
@@ -217,7 +217,8 @@ def validate_key(key: str) -> list[str]:
         raise InvalidOverrideKeyError(
             key,
             "consumer lanes are set via resolving commands, not overrides",
-            hint="use --supervisor-runtime at session start/fork or 'forge policy supervisor set --runtime'",
+            hint="use --supervisor-runtime at session start/fork or "
+            "'forge policy supervisor set <target> --runtime'",
         )
 
     if "*" in key:

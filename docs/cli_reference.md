@@ -80,8 +80,8 @@ native resume/native-relocate and prints a code-delta-unavailable note.
 `--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), `--supervisor-effort`
 (`low/medium/high/xhigh/max`), and `--supervisor-runtime` (`claude_code/codex` -- the supervisor's consumer lane, frozen
 at its first policy check; a fork's child gets its own binding). Launch-time `--cascade` sets the flag only; the runtime
-hook escalates to the frontier when no plan exists yet (unlike `forge policy supervisor set --cascade`, which resolves
-the plan eagerly). See [session.md](end-user/session.md).
+hook escalates to the frontier when no plan exists yet (unlike `forge policy supervisor set <target> --cascade` or
+`forge policy supervisor cascade on`, which resolves the plan eagerly). See [session.md](end-user/session.md).
 
 Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)):
 `forge session start <name> --runtime codex` launches the interactive `codex` TUI (bare, or an interactive bridge with
@@ -129,17 +129,18 @@ Session-scoped activation and reports (whether the memory writer runs for a sess
 
 ### Session lane
 
-Per-consumer lane placement (session-owned `intent.consumer_lanes`, frozen at first dispatch). Binds a Forge LLM-work
-consumer -- `supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` (hyphens accepted) -- to a
+Per-consumer lane placement (session-owned `intent.consumer_lanes`). An explicit supervisor lane freezes at the first
+registered policy check; auxiliary-consumer lanes freeze at first real dispatch. Binds a Forge LLM-work consumer --
+`supervisor`, `memory_writer`, `shadow_curation`, `team_supervisor` (hyphens accepted) -- to a
 `(runtime, backend, model)` lane:
 
 - `forge session lane set --consumer <id>` (`--runtime`, `--backend`, `--session`): record a consumer's requested lane.
   `--backend claude-max` attributes a keyless+direct run to a Claude Max subscription
   (`billing_mode=subscription_quota`); rejected once a *different* lane is frozen. The general surface for all four
-  consumers -- the supervisor also has `forge policy supervisor set --runtime/--backend` (same slot). `--runtime codex`
-  selects a real `codex exec` dispatch arm, but only for consumers that declare a codex lane -- the `supervisor` (T4),
-  `shadow_curation` (T6b, read-only), and `memory_writer` (T6c, read-only for review-only / workspace-write for
-  augment); only `team_supervisor` has no codex lane and rejects it.
+  consumers -- the supervisor also has `forge policy supervisor set <target> --runtime/--backend` (same slot).
+  `--runtime codex` selects a real `codex exec` dispatch arm, but only for consumers that declare a codex lane -- the
+  `supervisor` (T4), `shadow_curation` (T6b, read-only), and `memory_writer` (T6c, read-only for review-only /
+  workspace-write for augment); only `team_supervisor` has no codex lane and rejects it.
 - `forge session lane show` (`--session`, `--json`): each consumer's requested (`intent`) and frozen (`confirmed`) lane,
   flagging drift and (supervisor-only) a T7 `degraded` overlay when its spent codex lane is routed to the default.
 - `forge session lane clear --consumer <id>` (`--session`): drop a consumer's requested lane (an already-frozen binding

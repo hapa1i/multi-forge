@@ -103,7 +103,8 @@ def strip_removed_supervisor_runtime(data: dict[str, Any], session_name: str = "
         _store_logger.warning(
             "Session '%s' had a supervisor_runtime lane override; the lane now lives in the "
             "consumer_lanes binding. Stripped on read (dispatch no longer honors it) -- re-pin with "
-            "--supervisor-runtime at start/fork or 'forge policy supervisor set --runtime'.",
+            "--supervisor-runtime at start/fork or "
+            "'forge policy supervisor set <target> --runtime'.",
             session_name,
         )
 

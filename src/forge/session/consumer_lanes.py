@@ -81,7 +81,7 @@ def confirmed_lane(state: SessionState, consumer: Consumer) -> LaneRecord | None
     """Return ``consumer``'s frozen lane record, or None if not yet bound.
 
     The resolving commands' already-bound reject reads this: a non-None result
-    means the lane is frozen, so ``policy supervisor set --runtime`` must refuse to
+    means the lane is frozen, so ``policy supervisor set <target> --runtime`` must refuse to
     change it (the binding is immutable once written, card D2).
     """
     binding = _confirmed_binding(state, consumer)
@@ -148,9 +148,10 @@ def set_intent_lane(state: SessionState, consumer: Consumer, lane_record: LaneRe
     """Record ``consumer``'s requested lane in ``intent`` (the resolving-command setter).
 
     The write companion to ``read_bound_lane``'s intent branch: resolving commands
-    (start/fork ``--supervisor-runtime``, ``policy supervisor set --runtime``) call this
-    to record the requested placement. The freeze (``ensure_consumer_lane_binding``) later
-    copies the lane that actually dispatched into ``confirmed``. Callers enforce the
+    (start/fork ``--supervisor-runtime``, ``policy supervisor set <target> --runtime``) call this
+    to record the requested placement. ``ensure_consumer_lane_binding`` later freezes the
+    lane at the consumer's lifecycle commitment point: first registered policy check for
+    the supervisor, first real dispatch for auxiliary consumers. Callers enforce the
     already-bound reject (``confirmed_lane``) before invoking this -- it does not itself
     guard against overwriting a request on an already-frozen session.
     """
@@ -192,10 +193,12 @@ def clear_intent_lane(state: SessionState, consumer: Consumer) -> None:
 def ensure_consumer_lane_binding(state: SessionState, consumer: Consumer, lane_record: LaneRecord | None) -> None:
     """Freeze ``consumer``'s explicitly-chosen lane into ``confirmed``, write-if-absent.
 
-    The single immutability seam (card D2). ``lane_record`` is the lane the hook injected at
-    registration (``read_bound_lane`` -- confirmed-first, else the intent override), NOT a fresh
-    manifest read, so the freeze records exactly what dispatched even if intent changes during
-    the (multi-second) supervisor call.
+    The single immutability seam (card D2). ``lane_record`` is the lane selected for the
+    consumer's lifecycle commitment (``read_bound_lane`` -- confirmed-first, else the intent
+    override), NOT a fresh manifest read. For the supervisor that commitment is the registered
+    policy check and may precede a runtime dispatch; auxiliary callers invoke this only after
+    committing to a real dispatch. The threaded value prevents a concurrent intent change from
+    freezing a lane the lifecycle event did not select.
 
     **The default lane is never frozen.** ``lane_record is None`` means no explicit choice was
     recorded (neither ``confirmed`` nor ``intent``) and the consumer ran on its default; we leave

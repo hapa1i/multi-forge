@@ -172,8 +172,8 @@ def register_supervisor_and_restore(engine: Any, effective: Any, manifest: Any) 
 
     Returns the supervisor's injected consumer-lane binding (None when no supervisor is
     configured, or when it resolves to the default lane). The caller threads this same
-    value into the post-eval freeze so the binding records the lane that actually
-    dispatched -- not a fresh manifest read that could race a concurrent intent change.
+    value into the post-eval freeze so the binding records the lane committed for this
+    registered check -- not a fresh manifest read that could race an intent change.
     """
     sup = effective.policy.supervisor if effective.policy else None
     has_supervisor = bool(sup and sup.resume_id and not sup.suspended)

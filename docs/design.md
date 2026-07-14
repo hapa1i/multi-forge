@@ -192,7 +192,7 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 | Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
 | Project registry     | `~/.forge/projects.json`                                         | Forge Installer          | Versioned trusted-root registry for user-scope hook gating                              |
 | Project compat pin   | `<forge_root>/.forge/project.toml`                               | User / Forge Installer   | Optional `required_forge` guardrail for project-local state mutations                   |
-| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                            |
+| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff, shadow)                                    |
 | Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
 | Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
 
@@ -385,8 +385,8 @@ To avoid writer conflicts:
   - `intent.consumer_lanes.<consumer>` (a `LaneRecord`) when a command requests a non-default lane for a consumer:
     `forge session lane set --consumer <id> --runtime/--backend` is the general surface for all four consumers
     (supervisor, memory-writer, shadow-curation, team-supervisor); the supervisor also has
-    `forge session start`/`fork --supervisor-runtime` and `forge policy supervisor set --runtime/--backend`. All write
-    the same slot via `set_intent_lane` -- never a raw `set` override (epic consumer_lanes/T1b, T6a)
+    `forge session start`/`fork --supervisor-runtime` and `forge policy supervisor set <target> --runtime/--backend`.
+    All write the same slot via `set_intent_lane` -- never a raw `set` override (epic consumer_lanes/T1b, T6a)
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
@@ -1014,7 +1014,8 @@ points.
 ### 3.13 Async work queue
 
 A **general-purpose, file-based queue** for deferred work. Producers enqueue markers; CLI startup processes them
-opportunistically. This is a core primitive used by the Stop pipeline, search indexing, and the memory writer.
+opportunistically. This is a core primitive used by the Stop pipeline, search indexing, the memory writer, and deferred
+semantic-supervisor shadow drains.
 
 **Module:** `forge.core.workqueue`
 
@@ -1087,18 +1088,18 @@ correlation evidence. Each event also carries metric-evidence provenance — `ro
 `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's own* `cost_micro_usd`:
 `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired everywhere: the workflow
 verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
-supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the action tagger records exact
-provider tokens from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact
-`source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably
-direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p`
-events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`. Run-tree
-correlation instead ties a proxied `claude -p` run to its **exact** cost through the run tree, not a per-request ref:
-Forge stamps the headless subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers
-(only when the target is a proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost
-record, and the read surface (`forge telemetry activity`, `forge +$Y`) sums cost records by `forge_root_run_id` —
-superseding the concurrency-fragile verb snapshot rather than adding to it. `source_refs` stays null by design (one run
-makes many requests; the single-valued ref is the wrong shape — see
-[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+supervisor, and shadow curation record one event per headless dispatch through either their Claude or Codex arm; the
+team supervisor records one event per `claude -p` run; and the action tagger records exact provider tokens from its
+direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact `source_refs.cost_request_id`
+join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably direct + credentialed). All
+emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p` events carry null `source_refs`
+because Forge is not the HTTP client and can't know the proxy `request_id`. Run-tree correlation instead ties a proxied
+`claude -p` run to its **exact** cost through the run tree, not a per-request ref: Forge stamps the headless
+subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a
+proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface
+(`forge telemetry activity`, `forge +$Y`) sums cost records by `forge_root_run_id` — superseding the concurrency-fragile
+verb snapshot rather than adding to it. `source_refs` stays null by design (one run makes many requests; the
+single-valued ref is the wrong shape — see [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
 **Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
 retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost

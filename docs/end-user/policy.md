@@ -3,7 +3,7 @@
 Policies enforce coding rules at Write/Edit boundaries. When Claude Code is about to write or edit a file, Forge
 evaluates registered policies and blocks or warns based on the result.
 
-- Canonical architecture: [`docs/design.md` §4.1](../design.md)
+- Canonical architecture: [`docs/design_workflows.md` §1](../design_workflows.md#1-policy-enforcement)
 - Sessions (policy is session-owned): [`session.md`](session.md)
 - Hooks (enforcement mechanism): [`hook.md`](hook.md)
 - Workflows (multi-model gating via `--check`): [`workflow.md`](workflow.md)
@@ -94,7 +94,8 @@ reviewer stages. Only actions flagged as "architectural" or "migration" reach th
 > **Note:** The `workflow` bundle is **experimental** and has **no CLI surface** — it is not offered by
 > `forge policy enable` and does not appear in `forge policy list`. The only way to activate it is to set
 > `policy.bundles: ["workflow"]` plus `policy.bundle_config.workflow` in the session manifest (e.g., via
-> `forge session set`). See [`design.md` §4.1.2](../design.md) for the configuration schema.
+> `forge session set`). See [`design_workflows.md` §1.2](../design_workflows.md#12-semantic-policy-the-supervisor) for
+> the pipeline architecture.
 
 ---
 
@@ -212,7 +213,8 @@ The semantic supervisor is an LLM session that validates Write/Edit actions agai
 
 Configured in the session manifest under `policy.supervisor`:
 
-- `resume_id` — Claude session UUID of the planning session
+- `resume_id` — supervisor target (a Forge planning-session name or Claude session UUID). The Claude arm resumes it; the
+  Codex arm uses the resolved approved-plan snapshot in-band.
 - `proxy` — proxy for supervisor LLM calls (optional, defaults to session proxy)
 - `timeout_seconds` — max wait for supervisor response (default: 45s). Set at configure time with
   `forge policy supervisor set <target> --timeout N`, or adjust a live session with
@@ -223,11 +225,12 @@ The supervisor only blocks when the verdict is "divergent" with **high confidenc
 plan. Low confidence or missing citations produce a warning instead. Timeouts, errors, and unparseable responses also
 result in a warning, not a block.
 
-**Picking a supervisor model.** The supervisor reads the planner's full conversation via `--resume` and must locate and
-cite specific plan items — that's multi-needle retrieval over a long context, not code writing. SWE-bench Verified is
-the wrong benchmark for this role. For per-family supervisor picks (including the Opus 4.6 vs 4.8 split, when to
-cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient
-alternative), see [model_selection.md](model_selection.md).
+**Picking a supervisor model.** On the default `claude_code` lane, the supervisor reads the planner's full conversation
+via `--resume` and must locate and cite specific plan items — that's multi-needle retrieval over a long context, not
+code writing. SWE-bench Verified is the wrong benchmark for this role. The Codex lane instead receives the approved plan
+snapshot in-band and chooses its own model. For per-family Claude-lane supervisor picks (including the Opus 4.6 vs 4.8
+split, when to cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a
+cost-efficient alternative), see [model_selection.md](model_selection.md).
 
 ### Supervisor runtime (lane)
 
@@ -243,15 +246,17 @@ forge session fork planner --supervise --supervisor-runtime codex
 forge policy supervisor set planner --runtime codex
 ```
 
-The chosen runtime is **frozen on the first check**: once the supervisor has dispatched, the lane is immutable for that
-session. `forge policy supervisor set --runtime <other>` then refuses to change it (re-pinning the *same* lane is a
-no-op). To use a different lane, start or fork a fresh session, or run `forge policy supervisor remove` first — remove
-clears the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
+The chosen runtime is **frozen on the first registered policy check**, the supervisor's commitment point; the check can
+freeze an explicit lane even when preflight or plan validation prevents a runtime dispatch. After that,
+`forge policy supervisor set <target> --runtime <other>` refuses to change it (re-pinning the *same* lane is a no-op).
+To use a different lane, start or fork a fresh session, or run `forge policy supervisor remove` first — remove clears
+the binding so a later re-add starts from the default again. `forge policy supervisor status` shows the bound
 `(runtime, backend, model)` lane.
 
-A project compatibility refusal happens before that first dispatch and therefore cannot freeze the lane. Recover by
-running a Forge version satisfying `required_forge`, or edit/reset project state. If the hook binary comes from
-`FORGE_DEV`, relaunch after changing it; a sidecar must carry the satisfying Forge version in its image.
+A project compatibility refusal happens before the registered check reaches or persists its commitment write and
+therefore cannot freeze the lane. Recover by running a Forge version satisfying `required_forge`, or edit/reset project
+state. If the hook binary comes from `FORGE_DEV`, relaunch after changing it; a sidecar must carry the satisfying Forge
+version in its image.
 
 **If your codex subscription runs out mid-session**, Forge degrades the supervisor to the default `claude -p` lane for
 the rest of the session instead of failing every check open — real plan-enforcement keeps working. The codex binding
@@ -313,8 +318,8 @@ forge session set policy.supervisor.checker_budget_tokens 64000
 How it behaves:
 
 - The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
-  needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search `--reload` uses) and fails
-  with instructions when none exists.
+  needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search
+  `forge policy supervisor reload` uses) and fails with instructions when none exists.
 - The default checker route is OpenRouter `google/gemini-3.5-flash` with an approximate 32K-token total budget for the
   tier-1 checker prompt. Use `--checker-provider litellm-local` to use the local LiteLLM default
   (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable. Local LiteLLM backends generated before that model was

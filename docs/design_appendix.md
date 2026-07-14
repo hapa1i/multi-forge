@@ -465,9 +465,9 @@ never cached). Window: `forge_cost_ttl` (default 10s).
 
 **Supervisor health (`supervisor` suffix, v1).** When the opt-in `supervisor` segment is active, a fail-open suffix
 `!N <kind>` appends to the posture token (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`): N is the
-newest-first contiguous run of frontier-supervisor `claude -p` runs the usage ledger recorded as a non-`success`
-`status` (reset by the first `success`), `<kind>` is `timeout` or `error`. Posture-independent — suspended/off emit no
-events, so prior fail-open history stays visible. ASCII `!` (no unicode glyph; survives `normalize-text`). Tiered like
+newest-first contiguous run of recorded frontier-supervisor non-success outcomes across Claude or Codex lanes (reset by
+the first `success`), and `<kind>` is `timeout` or `error`. Posture-independent — suspended/off emit no events, so prior
+fail-open history stays visible. ASCII `!` (no unicode glyph; survives `normalize-text`). Tiered like
 `format_spend_cap`: YELLOW 1-2, RED `>=3`; the suffix never shows at 0, so a healthy `SUP` is byte-identical to today.
 Read throttled + fail-open by `read_or_compute_session_health` (same `forge_cost_ttl` window, distinct `fhealth-`
 cache); a read error degrades to **posture-only** (no suffix), never hiding the posture (unlike `forge_cost`, whose
@@ -745,12 +745,11 @@ surface. The `route`/`reporter`/`confidence` fields were **added additively at `
 unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local telemetry, and **not** a state to
 migrate around.
 
-**Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
-verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
-not available); the memory writer, semantic supervisor, team supervisor (Phase 5), and shadow curation emit one event
-per `claude -p` run (attributed to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger
-emits a `provider_usage_exact` event from a direct `core.llm` call (exact in-band provider tokens). On the **direct
-path**, Forge resolves the call's base_url synchronously: if it is a registered Forge proxy, the tagger forwards an
+**Instrumented emitters (Phase 4c).** Workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one ambient-run
+`verb_snapshot_estimated` event because per-worker cost is unavailable. Claude subprocesses emit through
+`emit_usage_for_session_result`; the shipped Codex memory-writer, semantic-supervisor, and shadow-curation arms emit
+through `CodexHeadlessInvoker`. The action tagger emits exact in-band provider usage from `core.llm`. On the **direct
+path**, Forge resolves the base URL synchronously: if it is a registered Forge proxy, the tagger forwards an
 `X-Request-ID` and records an exact `source_refs.cost_request_id` join (the proxy logs its cost record under the same
 id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
 `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
@@ -810,9 +809,10 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 
 | Emitter                                                                   | Tags `session`? | Notes                                                                                          |
 | ------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`)                     | Yes             | `session=context.session_name` (= manifest name)                                               |
-| Supervisor shadow (`emit_usage_for_session_result` + upstream)            | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session   |
-| Memory writer (`emit_usage_for_session_result`)                           | Yes             | `session=session_name`                                                                         |
+| Semantic supervisor (Claude helper / Codex invoker)                       | Yes             | `session=context.session_name` (= manifest name)                                               |
+| Supervisor shadow (runtime-arm emitter + upstream)                        | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session   |
+| Memory writer (Claude helper / Codex invoker)                             | Yes             | `session=session_name`                                                                         |
+| Shadow curation (Claude helper / Codex invoker)                           | Yes             | `session=session_name`; `command=curation`                                                     |
 | Workflow verbs panel/analyze/debate/consensus                             | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                                |
 | Transfer curation (`emit_direct_llm_usage`, `transfer-curate`)            | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`       |
 | Rewind code-delta curation (`emit_direct_llm_usage`, `rewind-code-delta`) | Yes             | `session=$FORGE_SESSION`; rewind dropped-window curation; `route=core_llm`/`runtime=forge_cli` |
@@ -915,12 +915,12 @@ Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals 
     "schema_version": 1,
     "kind": "stop",
     "marker_id": "uuid-123",
-    "forge_version": "0.9.0",
+    "forge_version": "<current Forge version>",
     "created_at": "2026-01-07T12:00:00Z",
     "payload": {
         "session_id": "uuid-123",
+        "worktree_path": "/abs/path/to/checkout",
         "forge_root": "/abs/path/to/forge/project",
-        "project_root": "/abs/path/to/repo",
         "session_name": "my-session",
         "transcript_snapshot_rel": ".forge/artifacts/..."
     },
@@ -930,11 +930,11 @@ Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals 
 }
 ```
 
-**Key fields:** `kind` = routing key (which handler); `marker_id` = filename key (caller chooses idempotency, e.g.
-session ID); `payload` = kind-specific data; `attempt_count`/`last_error` = retry tracking. Marker ID validated with
-`^[A-Za-z0-9._-]+$`. The `handoff` marker payload additionally carries `origin_run_id`/`origin_root_run_id` (the
-originating session's run-tree identity, snapshotted at Stop time) so the detached memory writer roots under that
-session rather than the draining CLI ([design_workflows.md §4.5](design_workflows.md#45-operational-constraints)).
+**Key fields:** `kind` routes to a handler; `marker_id` is the idempotency/filename key and must match
+`^[A-Za-z0-9._-]+$`; `payload` is kind-specific; `attempt_count`/`last_error` track retries. `forge_root` is optional
+when resolvable from `worktree_path`. `handoff` and `shadow` snapshot available origin run IDs so detached workers
+retain session attribution ([design_workflows.md §4.5](design_workflows.md#45-operational-constraints)); `handoff` may
+also snapshot the Stop-time `subprocess_proxy`.
 
 ### B.2 Processing contract
 
@@ -946,16 +946,19 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 | Handler succeeds                    | Delete marker under lock                                                |
 | Handler raises                      | Keep marker, increment `attempt_count`, write `last_error` under lock   |
 | Lock contention                     | Skip (another process holds it)                                         |
-| No handler for kind                 | Skip, log warning (leave in place)                                      |
+| No handler for kind                 | Skip and leave marker in place (debug log)                              |
 | `attempt_count >= MAX_ATTEMPTS` (5) | Move to `pending-work/failed/` (poison marker, preserved for debugging) |
 
 ### B.3 Known marker kinds
 
-| Kind      | Producer            | Handler                                 |
-| --------- | ------------------- | --------------------------------------- |
-| `stop`    | Stop hook           | No-op (delete only)                     |
-| `index`   | Stop hook           | Index transcript for search             |
-| `handoff` | Stop hook (planned) | Spawn the memory writer for memory docs |
+| Kind      | Producer                                       | Handler                                  |
+| --------- | ---------------------------------------------- | ---------------------------------------- |
+| `stop`    | Stop / StopFailure hooks                       | No-op (delete only)                      |
+| `index`   | Stop / StopFailure hooks                       | Index transcript for search              |
+| `handoff` | Stop hook when memory auto-update is enabled   | Spawn detached `forge memory-writer run` |
+| `shadow`  | Stop hook when pending shadow candidates exist | Spawn detached `forge policy shadow run` |
+
+`handoff` remains the ephemeral queue routing key for memory-writer work; it is distinct from session-transfer context.
 
 ---
 
@@ -1336,7 +1339,8 @@ Covered by `tests/src/skills/test_walkthrough_state.py`.
 
 ## E. Shared LLM Client (`src/forge/core/llm/`)
 
-`AnthropicClient` deferred; currently uses `OpenAIClient` for all providers via LiteLLM.
+`get_client()` returns `LiteLLMClient` for `litellm_remote`/`litellm_local` and `OpenRouterClient` for explicit
+`provider="openrouter"`. Both use OpenAI-compatible endpoints; native `AnthropicClient` remains deferred.
 
 **Purpose:** Unified async-first LLM client abstraction for Proxy, Policy, and Skills components.
 
@@ -1351,27 +1355,26 @@ Covered by `tests/src/skills/test_walkthrough_state.py`.
 
 ```text
 src/forge/core/llm/
-├── types.py        # Message, StreamEvent, ModelHyperparameters, ToolCall
-├── protocols.py    # LLMClient protocol
-├── credentials.py  # CredentialManager (injectable singleton)
-├── errors.py       # NoApiKeyError, AuthenticationError, ProviderError
-└── clients/        # LiteLLMClient
+├── __init__.py          # Factory + SyncAdapter
+├── types.py             # Request/response models
+├── protocols.py         # LLMClient protocol
+├── credentials.py       # CredentialManager
+├── detection.py         # Prefix detection
+├── errors.py            # Client errors
+└── clients/
+    ├── base.py          # Shared helpers
+    ├── litellm.py       # Remote/local LiteLLM
+    ├── openai_compat.py # OpenAI-shape conversion
+    └── openrouter.py    # Direct OpenRouter
 ```
 
-### E.3 Core types (signatures)
+### E.3 Core types
 
-```python
-class ModelHyperparameters(BaseModel):
-    max_tokens: int; temperature: float | None; reasoning_effort: ReasoningEffort | None
-    thinking: ThinkingConfig | None; strict: bool  # Error vs warn on unsupported params
-
-class Message(BaseModel):
-    role: Literal["system", "user", "assistant", "tool"]
-    content: str | list[dict]; tool_calls: list[ToolCall] | None
-
-class CompletionResponse(BaseModel): text: str; tool_calls: list[ToolCall] | None; usage: dict
-class StreamEvent(BaseModel): type: Literal["text_delta", "tool_call_delta", "response_end", ...]
-```
+- `ModelHyperparameters`: token/temperature/top-p, reasoning/thinking/verbosity, timeout, prompt caching, `strict`, and
+  provider-specific `extra` settings.
+- `Message`: role/content plus optional `tool_call_id` and `tool_calls`.
+- `CompletionResponse`: text/tool calls plus optional usage, cost, provider trace, and raw response.
+- `StreamEvent`: text/tool-call/end/usage/error event with the corresponding optional payloads.
 
 ### E.4 Client protocol
 
@@ -1380,18 +1383,29 @@ class LLMClient(Protocol):
     @property
     def model(self) -> str: ...
     async def complete(self, messages: list[Message], *, tools=None, hyperparams=None) -> CompletionResponse: ...
-    async def stream(self, messages, *, tools=None, hyperparams=None) -> AsyncGenerator[StreamEvent, None]: ...
+    def stream(self, messages, *, tools=None, hyperparams=None) -> AsyncGenerator[StreamEvent, None]: ...
     async def count_tokens(self, messages, tools=None) -> int: ...
 ```
+
+`stream()` returns an async generator directly; callers consume it with `async for`.
 
 ### E.5 Factory and provider detection
 
 ```python
-def get_client(model: str, *, provider: ProviderType | None = None) -> LLMClient:
+def get_client(
+    model: str,
+    *,
+    provider: ProviderType | None = None,
+    credentials: CredentialManager | None = None,
+    default_hyperparams: ModelHyperparameters | None = None,
+) -> LLMClient:
     """Sync factory, async methods. Provider auto-detected from model prefix."""
-    # vertex_ai/, openai/, anthropic/ -> litellm_remote
-    # gemini/ -> litellm_local
+    # provider="openrouter" -> OpenRouterClient
+    # gemini/ -> local LiteLLM; other known prefixes -> remote LiteLLM
 ```
+
+Without `provider`, unprefixed or unknown model IDs fail closed. Explicit OpenRouter bypasses prefix detection. Direct
+Anthropic remains unimplemented; `anthropic/<model>` intentionally selects remote LiteLLM.
 
 ### E.6 Sync adapter
 
@@ -1406,10 +1420,9 @@ class SyncAdapter:
 
 ### E.7 Unsupported parameter policy
 
-| Mode                     | Behavior                         |
-| ------------------------ | -------------------------------- |
-| `strict=False` (default) | Warn + ignore unsupported params |
-| `strict=True`            | Raise `UnsupportedParamError`    |
+`ModelHyperparameters.strict`, `UnsupportedParamError`, and `handle_unsupported_param()` define the intended
+warn-or-raise policy, but the current clients do not invoke that helper. Callers must not rely on `strict=True` to
+reject provider-unsupported parameters until client wiring lands.
 
 ### E.8 Relationship to Proxy
 
@@ -1466,8 +1479,8 @@ with the uniform consumer-lane manifest binding: the lane is now a persisted `La
 override that the policy-check hook freezes into `confirmed.consumer_lanes` at the **first policy check** for a
 registered supervisor -- its commitment point, not a dispatch (**only an explicit lane freezes; a consumer on its
 default lane never freezes and stays re-pinnable**) -- set by the resolving commands (`--supervisor-runtime`,
-`policy supervisor set --runtime`) and rejected as a raw `set` override. Re-pinning the same lane is an idempotent
-no-op; `policy supervisor remove` clears both the intent and confirmed slots.
+`policy supervisor set <target> --runtime`) and rejected as a raw `set` override. Re-pinning the same lane is an
+idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
 
 **Aux consumers on `claude-max` (T6a).** Memory-writer, shadow-curation, and team-supervisor are bindable through the
 same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
