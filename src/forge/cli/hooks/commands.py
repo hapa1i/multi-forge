@@ -1016,7 +1016,7 @@ def worktree_create() -> None:
             # Fallback: try without -b (use detached HEAD)
             logger.debug("worktree-create: branched creation failed: %s", result.stderr.strip())
             result = subprocess.run(
-                [git, "worktree", "add", str(worktree_path)],
+                [git, "worktree", "add", "--detach", str(worktree_path)],
                 cwd=str(repo_root),
                 capture_output=True,
                 text=True,
