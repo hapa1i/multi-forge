@@ -1,6 +1,7 @@
 # OKF-compatible memory documents
 
-**Status**: Proposed.
+**Status**: In progress (`doing/`). Execution branch: `okf-compatible-memory-passports`; active plan in
+[checklist.md](checklist.md).
 
 **Origin**: The Open Knowledge Format (OKF) v0.1 draft at upstream commit `ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a` in
 `GoogleCloudPlatform/knowledge-catalog` looks very close to Forge's memory-doc shape: a directory of Markdown files with
