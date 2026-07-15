@@ -1,15 +1,17 @@
-"""Regression for OKF-reserved official and proposal-shadow targets.
+"""Regression for OKF-reserved memory targets.
 
 Bug ID: okf-reserved-memory-targets
 Root cause: reserved-basename checks were case-sensitive for official docs and
-were not applied to custom proposal shadows. On case-insensitive APFS, a mixed-
-case spelling could therefore mutate ``index.md``; a proposal could also route
-the memory writer into an existing ``docs/log.md``.
+were not applied to custom proposal shadows or the pre-existing shadow-only
+re-track path. On case-insensitive APFS, a mixed-case spelling could therefore
+mutate ``index.md``; proposal flows could route the memory writer into a
+reserved ``log.md``, while re-track could materialize a reserved shadow file
+despite discovery refusing it.
 Affected files: ``src/forge/session/passport.py``, ``src/forge/cli/memory.py``,
 and ``src/forge/session/project_memory.py``.
-Fix: case-fold logical and resolved reserved basenames, validate proposal
-shadows before side effects, and reject hand-authored reserved shadow targets
-during discovery.
+Fix: case-fold logical and resolved reserved basenames, validate every CLI
+shadow materialization before side effects, and reject hand-authored reserved
+shadow targets during discovery.
 """
 
 from __future__ import annotations
@@ -74,3 +76,29 @@ def test_custom_proposal_shadow_cannot_target_reserved_log(
     assert "reserved" in result.output
     assert official.read_bytes() == before_official
     assert reserved_shadow.read_bytes() == before_shadow
+
+
+def test_existing_shadow_only_passport_cannot_create_reserved_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.session.passport import synthesize_passport, write_passport
+
+    forge_root = _forge_project(tmp_path, monkeypatch)
+    official = forge_root / "docs/notes.md"
+    official.write_text("# Notes\n", encoding="utf-8")
+    reserved_shadow = forge_root / ".forge/memory/log.md"
+    passport = synthesize_passport(
+        strategy="generic",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/log.md",
+    )
+    write_passport(official, passport)
+    before_official = official.read_bytes()
+
+    result = CliRunner().invoke(main, ["memory", "track", "docs/notes.md"])
+
+    assert result.exit_code == 1
+    assert "reserved" in result.output
+    assert official.read_bytes() == before_official
+    assert not reserved_shadow.exists()

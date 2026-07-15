@@ -252,6 +252,63 @@ class TestMemoryTrack:
         assert (forge_root / ".forge/memory/shadow_impl_notes.md").is_file()
         assert doc.read_bytes() == before
 
+    def test_existing_shadow_only_rejects_shadow_resolving_to_reserved_file(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        from forge.session.passport import synthesize_passport, write_passport
+
+        reserved = forge_root / "docs/log.md"
+        reserved.write_text("# Reserved OKF log\n", encoding="utf-8")
+        alias_path = ".forge/memory/log-alias.md"
+        (forge_root / alias_path).symlink_to(reserved)
+
+        doc = forge_root / "docs/impl_notes.md"
+        passport = synthesize_passport(
+            strategy="generic",
+            update_mode="shadow-only",
+            shadow_path=alias_path,
+        )
+        write_passport(doc, passport)
+        before_doc = doc.read_bytes()
+        before_reserved = reserved.read_bytes()
+
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--strategy", "checklist"],
+        )
+
+        assert result.exit_code == 1
+        assert "reserved" in result.output
+        assert doc.read_bytes() == before_doc
+        assert reserved.read_bytes() == before_reserved
+
+    def test_existing_shadow_only_reports_unsafe_path_before_reserved_basename(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        from forge.session.passport import synthesize_passport, write_passport
+
+        doc = forge_root / "docs/impl_notes.md"
+        passport = synthesize_passport(
+            strategy="generic",
+            update_mode="shadow-only",
+            shadow_path="/private/tmp/outside/log.md",
+        )
+        write_passport(doc, passport)
+        before_doc = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md"])
+
+        assert result.exit_code == 1
+        assert "absolute path" in result.output
+        assert "reserved" not in result.output
+        assert doc.read_bytes() == before_doc
+
     def test_track_rejects_absolute_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "track", "/etc/passwd", "--strategy", "generic"])
         assert result.exit_code != 0

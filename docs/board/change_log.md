@@ -27,6 +27,18 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-15
 
+### Existing shadow-only reserved-target hotfix
+
+**Goal**: Prevent ordinary re-track of a hand-authored shadow-only passport from materializing an OKF-reserved file.
+
+**Key changes**:
+
+- Existing-shadow re-track now applies generic path safety followed by logical and resolved reserved-basename checks
+  before shadow creation or passport mutation; regressions cover direct `log.md`, resolved aliases, and error ordering.
+
+**Verification**: `make test-unit` (`7886 passed, 1 skipped, 117 deselected`); `make test-regression` (`514 passed`);
+`make pre-commit`; `git diff --check`.
+
 ### okf_compatible_memory_passports remediation
 
 **Goal**: Close the verified post-closeout parser, reserved-target, host-walkthrough, and atomic-mode gaps without

@@ -320,8 +320,18 @@ def _track_existing_shadow_only(
     except PassportError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    created = _auto_create_shadow(shadow_path, forge_root)
+    resolved_base = forge_root.resolve()
+    reason = is_safe_designated_doc_path(shadow_path, forge_root, resolved_base)
+    if reason:
+        raise click.ClickException(f"Invalid shadow path: {reason}")
+
     shadow_abs = (forge_root / shadow_path).resolve()
+    try:
+        validate_okf_reserved_basenames(shadow_path, shadow_abs)
+    except PassportError as exc:
+        raise click.ClickException(f"Invalid shadow path: {exc}") from exc
+
+    created = _auto_create_shadow(shadow_path, forge_root)
     if not shadow_abs.is_file():
         raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
     if created:
