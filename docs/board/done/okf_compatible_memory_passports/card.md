@@ -1,6 +1,6 @@
 # OKF-compatible memory documents
 
-**Status**: In progress (`doing/`). Execution branch: `okf-compatible-memory-passports`; active plan in
+**Status**: Done (`done/`) on 2026-07-14. Implemented in `fae54345`; verification and deferred work are recorded in
 [checklist.md](checklist.md).
 
 **Origin**: The Open Knowledge Format (OKF) v0.1 draft at upstream commit `ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a` in
@@ -60,9 +60,9 @@ OKF provides a shallow interoperability profile without forcing a new storage sy
 This fits Forge's file-based, human-readable, agent-readable architecture while leaving Forge write safety under the
 strict `forge_memory` namespace.
 
-## Current Behavior (Verified)
+## Baseline Behavior (Verified Before Implementation)
 
-Several required properties already hold:
+Before this card, several required properties already held:
 
 - `read_passport()` returns `None` unless a mapping frontmatter block contains `forge_memory`; an OKF-only doc is not a
   Forge memory doc.
@@ -70,20 +70,19 @@ Several required properties already hold:
   ignored by the memory writer.
 - `write_passport()` preserves non-`forge_memory` frontmatter at the parsed-value level, then re-dumps the entire block.
   Comments, anchors, quoting, key order, scalar spelling, and line endings are not a preservation contract.
-- `extract_frontmatter()` currently treats a delimited non-mapping YAML root as if no frontmatter exists. A subsequent
-  `write_passport()` prepends a second block above the original. The corruption is in the mutation path; permissive
-  reads also serve scanners and transfer parsing and should not acquire warning noise merely because an unrelated
-  Markdown file uses non-mapping YAML.
+- The permissive `extract_frontmatter()` treated a delimited non-mapping YAML root as if no frontmatter existed. A
+  subsequent `write_passport()` could prepend a second block above the original. The corruption was in the mutation
+  path; permissive reads also serve scanners and transfer parsing and should not acquire warning noise merely because an
+  unrelated Markdown file uses non-mapping YAML.
 - `yaml.safe_load` maps empty/comment-only frontmatter and explicit YAML null (`null` / `~`) to Python `None`; a strict
   mutation path must distinguish those syntax classes rather than checking only the loaded value.
 - unquoted timestamps load as Python `datetime` values and may re-dump with different spelling. Forge therefore does not
   generate or maintain `timestamp` in this phase.
 - `remove_passport()` deletes only `forge_memory` and preserves all outer frontmatter values.
-- `forge memory track` currently accepts non-`.md` paths even though discovery scans only `*.md`; new envelope
-  generation must close that misleading success path.
-- passport mutations currently call `atomic_write_text()` without the existing file mode. Because the helper replaces
-  the target with a `mkstemp` file, a normal `0644` Markdown file can become `0600` after a successful passport
-  mutation.
+- `forge memory track` accepted non-`.md` paths even though discovery scanned only `*.md`; envelope generation needed to
+  close that misleading success path.
+- Passport mutations called `atomic_write_text()` without the existing file mode. Because the helper replaces the target
+  with a `mkstemp` file, a normal `0644` Markdown file could become `0600` after a successful passport mutation.
 
 ## Non-goals
 
@@ -233,7 +232,7 @@ There is no read-time or bulk auto-migration.
 | AT-14 | Reserved paths have no side effects      | logical/resolved `index.md`/`log.md` via direct track, propose/custom shadow, upgrade                                            | failure precedes official or shadow writes; whole relevant tree unchanged                                                                         | `tests/src/cli/test_memory.py`                                                                                                               |
 | AT-15 | Legacy reserved passports remain usable  | existing Forge-only `index.md`/`log.md` passport                                                                                 | read/scan/re-track work without envelope generation; explicit upgrade still refuses                                                               | `tests/src/session/test_project_memory.py`, `tests/src/cli/test_memory.py`                                                                   |
 | AT-16 | Markdown-only generation                 | new `.txt`/`.MD`, logical `.txt`→`.md` and `.md`→`.txt` symlink aliases, existing legacy `.txt` passport                         | logical `.txt` aliases refuse and logical `.md` aliases remain discoverable; legacy show/remove/re-track compatibility and `.md`-only scan remain | `tests/src/cli/test_memory.py`, `tests/src/session/test_project_memory.py`                                                                   |
-| AT-17 | Upgrade mutator guards                   | outside-root/unsafe/missing path and incompatible project pin                                                                    | command exits non-zero before modification with actionable recovery                                                                               | `tests/src/cli/test_memory.py`                                                                                                               |
+| AT-17 | Upgrade mutator guards                   | outside-root/unsafe/missing path and incompatible/malformed/newer project pin                                                    | command exits non-zero before modification with actionable recovery                                                                               | `tests/src/cli/test_memory.py`                                                                                                               |
 | AT-18 | Successful writes preserve file mode     | `0644` document through write, upgrade, remove                                                                                   | mode remains `0644`; atomic content semantics remain                                                                                              | `tests/src/session/test_passport.py`, `tests/regression/test_bug_passport_atomic_write_mode.py`                                              |
 | AT-19 | Track→scan→writer integration            | container track of new doc followed by memory-writer run                                                                         | generated envelope remains scanner-compatible and the writer processes the document                                                               | `tests/integration/cli/test_handoff_integration.py`                                                                                          |
 

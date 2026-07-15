@@ -3,8 +3,7 @@
 **Companion to [design.md](design.md).** Precision reference material extracted to keep the main doc focused on
 architectural narrative. Each section notes its origin for cross-referencing.
 
-Memory-passport ownership is defined in
-[design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports).
+Memory-passport ownership is defined in [design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports).
 
 ---
 
