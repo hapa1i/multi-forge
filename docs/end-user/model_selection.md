@@ -57,8 +57,8 @@ inherited executor model pins so the supervisor uses that proxy's `opus` tier. I
 conversation, locate the relevant plan section for the action being taken, and emit a verdict with cited evidence.
 
 The model guidance below applies to the default `claude_code` runtime. The supervisor lane is selectable: pinning
-`--supervisor-runtime codex` (or `forge policy supervisor set --runtime codex`) routes checks to OpenAI's Codex instead,
-which picks its own model, so these picks do not apply. The lane is frozen on the first check — see
+`--supervisor-runtime codex` (or `forge policy supervisor set <target> --runtime codex`) routes checks to OpenAI's Codex
+instead, which picks its own model, so these picks do not apply. The lane is frozen on the first check — see
 [policy.md](policy.md#supervisor-runtime-lane).
 
 This is **not** code writing. Coding leaderboards are useful context, but they are not sufficient for choosing a

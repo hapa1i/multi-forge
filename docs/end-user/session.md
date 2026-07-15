@@ -629,13 +629,13 @@ forge session start executor --supervise planner --cascade --checker-model googl
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the
-frontier supervisor when no plan exists yet. This differs from `forge policy supervisor set --cascade`, which resolves
-the plan at the time you run it.
+frontier supervisor when no plan exists yet. This differs from `forge policy supervisor set <target> --cascade` (or
+`forge policy supervisor cascade on`), which resolves the plan at the time you run it.
 
-**Reasoning effort:** `--supervisor-effort` sets the frontier supervisor's `claude --effort`
-(`low/medium/high/xhigh/max`; `max` is Claude-only). `--checker-effort` sets the tier-1 checker's reasoning effort
-(`none/low/medium/high/xhigh`; `none` is checker-only — the checker is an API call, not a `claude -p` subprocess). The
-two vocabularies are distinct: `max` is invalid for the checker and `none` is invalid for the supervisor.
+**Reasoning effort:** `--supervisor-effort` sets the Claude arm's `claude --effort` (`low/medium/high/xhigh/max`); the
+Codex arm does not consume this field. `--checker-effort` sets the tier-1 checker's reasoning effort
+(`none/low/medium/high/xhigh`; the checker is an API call, not a `claude -p` subprocess). The two vocabularies are
+distinct: `max` is invalid for the checker and `none` is invalid for the Claude supervisor arm.
 
 ```bash
 forge session fork planner --worktree --supervise --cascade \

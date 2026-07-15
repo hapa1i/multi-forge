@@ -288,9 +288,8 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
     """
     if not bundles:
         # Fail loud, not a silent no-op: the CLI is the explicit surface and requires
-        # the bundles to enable. Restore-from-intent (re-enable the session's configured
-        # bundles) is the interactive `%policy enable` shortcut's job, not the CLI's --
-        # see design_workflows.md "Re-enable enforcement".
+        # the bundles to enable. The interactive `%policy enable` surface also requires
+        # explicit bundles; its distinction is that it writes overrides rather than intent.
         print_error_with_tip(
             "No policy bundles specified.",
             "Use --bundle tdd and/or --bundle coding_standards.",

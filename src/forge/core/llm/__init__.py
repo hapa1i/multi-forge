@@ -1,7 +1,8 @@
 """Shared LLM client abstraction for Forge components.
 
-This module provides a unified, async-first interface for calling LLMs
-across different providers (LiteLLM, Anthropic).
+This module provides a unified, async-first interface for calling LLMs through
+remote/local LiteLLM endpoints and OpenRouter directly. A native Anthropic
+client is not implemented yet; ``anthropic/`` model ids route through LiteLLM.
 
 Usage:
     # Async usage (Proxy)

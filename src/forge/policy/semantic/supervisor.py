@@ -109,15 +109,14 @@ _CLAUDE_MODEL_PIN_ENV_VARS = (
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
 )
 
-# The supervisor as a consumer-lane binding (epic consumer_lanes, ticket T3). It
-# reads repo files (a `tool_agent` capability floor) and today always runs as
-# `claude -p`. In T3 only `runtime_id` is load-bearing -- it selects the dispatch
-# arm in `_dispatch_supervisor`. `backend_id`/`model` are nominal placement
-# metadata: the `claude_code` arm still derives transport (`base_url`) and the
-# `opus` pin dynamically (byte-identical contract), so they are not yet consulted.
-# `anthropic-direct` is a real catalog source (no single backend is "correct" for a
-# proxied supervisor, which routes through whatever proxy). T2 makes backend
-# load-bearing; T4 adds the `codex` arm + a narrow `SupervisorConfig` override.
+# The supervisor as a consumer-lane binding (epic consumer_lanes). It reads repo
+# files (a `tool_agent` capability floor), and `runtime_id` selects the dispatch arm
+# in `_dispatch_supervisor`: `claude_code` or `codex`. `backend_id`/`model` remain
+# nominal placement metadata for dispatch: the Claude arm derives transport
+# (`base_url`) and its `opus` pin dynamically, while Codex chooses its own model.
+# `backend_id` is nevertheless load-bearing for billing (for example `claude-max`).
+# `anthropic-direct` is a real catalog source; no single backend is "correct" for a
+# proxied Claude supervisor, which routes through whichever proxy was resolved.
 SUPERVISOR_CONSUMER = Consumer(
     id="supervisor",
     capability_floor="tool_agent",
@@ -494,9 +493,9 @@ def _dispatch_supervisor(
 ) -> SessionResult:
     """Dispatch one supervisor run on the resolved lane's runtime.
 
-    T3 implements only the ``claude_code`` arm (the existing path, verbatim).
-    The ``codex`` arm lands in T4 (epic consumer_lanes); any other runtime has
-    no supervisor adapter.
+    The shipped arms are ``claude_code`` (native resume, optionally proxied) and
+    ``codex`` (fresh, plan-fed ``codex exec``). Any other runtime has no supervisor
+    adapter and fails open through ``_SupervisorRoutingError``.
     """
     runtime = lane.runtime_id
     if runtime == "claude_code":

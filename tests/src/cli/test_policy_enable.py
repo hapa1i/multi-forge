@@ -20,9 +20,9 @@ class TestEnableRequiresBundle:
     def test_bare_enable_fails_loud(self, runner: CliRunner) -> None:
         """Bare `policy enable` is a loud stderr error, not a silent stdout no-op.
 
-        A3: the old behavior printed a warning on stdout and exited 0. The CLI is the
-        explicit surface, so it now requires --bundle; restore-from-intent is the
-        interactive `%policy enable` shortcut's job (design_workflows.md).
+        A3: the old behavior printed a warning on stdout and exited 0. Both the terminal
+        and interactive surfaces now require explicit bundles; the terminal form writes
+        intent, while `%policy enable` writes overrides.
         """
         result = runner.invoke(main, ["policy", "enable"])
         err = " ".join(result.stderr.split())

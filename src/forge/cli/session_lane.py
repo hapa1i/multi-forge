@@ -139,8 +139,10 @@ _SESSION_OPTION = click.option(
 def session_lane() -> None:
     """Bind a consumer's LLM-work to a (runtime, backend, model) lane for the session.
 
-    Lanes are session-owned intent, frozen at first dispatch. The supervisor also
-    accepts 'forge policy supervisor set --runtime/--backend' (same storage).
+    Lanes are session-owned intent. An explicit supervisor lane freezes at its first
+    registered policy check; auxiliary-consumer lanes freeze at first real dispatch.
+    The supervisor also accepts
+    'forge policy supervisor set <target> --runtime/--backend' (same storage).
 
     \b
     Examples:

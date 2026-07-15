@@ -86,60 +86,71 @@ policy:
 
 This enables **"Active Alignment"** checking using the **Side-Channel Architecture**.
 
-Promotion flow (`--fork-current`) is deferred so the building blocks (supervisor, panel, session forking) can compose
-before we hardcode a default. For now: `forge session set policy.supervisor.resume_id <uuid>`.
+Automatic promotion of the current session (`--fork-current`) is deferred so the building blocks (supervisor, panel,
+session forking) can compose before Forge hardcodes a default. Configure persistent supervision with
+`forge policy supervisor set <target>`; `forge session start ... --supervise <target>` and
+`forge session fork <parent> --supervise` provide launch-time wiring.
 
-**Mechanism: "CLI-Fork Supervision"**
+**Mechanism: runtime-selectable side-channel supervision**
 
-The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>` (plus `--model opus` for proxied
-supervisors):
+The `policy-check` hook resolves the supervisor's consumer lane. The default `claude_code` lane runs
+`claude -p --resume <supervisor_uuid>` (plus `--model opus` when proxied). A pinned `codex` lane runs a fresh, read-only
+`codex exec` in the action checkout. Codex cannot resume the Claude planning session, so this arm requires an approved
+plan in `plan_override_path` (for example via `forge policy supervisor reload`) and receives that snapshot in-band. A
+missing plan or cold, stale, or unready Codex preflight fails open with a warning.
 
-1. **Configure**: `forge session set policy.supervisor.resume_id <uuid>` (from planning session).
+1. **Configure**: `forge policy supervisor set <target> [--runtime claude_code|codex]` (or use launch/fork supervision).
 2. **Check**: Runs at PreToolUse for Write/Edit, throttled via cache (default 30s).
 3. **Enforce**:
    - **Aligned**: Silent success (cached for throttle window).
-   - **Divergent + high confidence + citations**: Block the tool (exit 2).
+   - **Divergent + high confidence + citations**: Block the tool.
    - **Divergent + low confidence or no citations**: Warn via stderr, allow the tool.
-   - **Unresolved review request**: Block the tool (exit 2) until a supervisor is configured or the user gives a new
-     direction.
+   - **Unresolved review request**: Block the tool until a supervisor is configured or the user gives a new direction.
 
-**Why this works:** Forking the planning session makes the plan's original context the enforcement authority (no RAG).
-Side-channel architecture: Executor uses a high-IQ coder (Opus); Supervisor uses a high-context checker (Gemini).
+**Why this works:** On the Claude lane, native resume supplies the planning conversation; a plan override supersedes it
+when present. On the Codex lane, the in-band approved snapshot is the authority. Executor and supervisor routing are
+independent; specific model identities are lane/proxy choices, not architectural constants.
 
 **Promotion readiness:** Depends on ground truth quality: explicit acceptance criteria, invariant constraints, resolved
 ambiguities.
 
 **Supervisor lifecycle controls:**
 
-- `--off` / `--on`: Toggle without config loss. `--off` sets `suspended=True` (config preserved, hook skips evaluation
-  entirely — not registered in the policy engine); `--on` resumes. `--remove` is the destructive path. Both CLI and
-  direct command surfaces. All three pre-check that a supervisor is configured before acting.
-- `--reload` / `--reload-from <path>`: Inject an updated plan into supervisor evaluation context. `--reload` searches
-  the supervision graph in order: current supervised session, related forks (sessions in the same `forge_root` whose
-  parent is the supervisor target), supervisor target session. Only approved snapshots are considered (no drafts). The
-  plan content is prepended to each evaluation prompt with explicit supersession framing. `--reload-from` takes an
-  explicit file path (resolved relative to CWD, stored absolute). Cache key includes a `path:mtime_ns:size` fingerprint
-  so in-place edits invalidate cached verdicts.
+- `forge policy supervisor off|on|remove`: `off` sets `suspended=True` (config preserved, hook skips evaluation entirely
+  — not registered in the policy engine); `on` resumes; `remove` is destructive. The direct equivalents are
+  `%policy supervisor off|on|remove`. All three pre-check that a supervisor is configured before acting.
+- `forge policy supervisor reload [--from <path>]`: Inject an updated plan into supervisor evaluation context. Without
+  `--from`, reload searches the supervision graph in order: current supervised session, related forks (sessions in the
+  same `forge_root` whose parent is the supervisor target), supervisor target session. Only approved snapshots are
+  considered (no drafts). The plan content is prepended to each evaluation prompt with explicit supersession framing.
+  `--from` takes an explicit file path (resolved relative to CWD, stored absolute). The direct equivalent is
+  `%policy supervisor reload [path]`. Cache keys include a `path:mtime_ns:size` fingerprint so in-place edits invalidate
+  cached verdicts.
 - `plan_override_path` on `SupervisorConfig` stores the override. It can be set while the supervisor is suspended
-  (configure plan, then `--on`). Proxy routing is not re-seeded on `--on` — the preserved config is used as-is.
+  (configure the plan, then run `forge policy supervisor on`). Proxy routing is not re-seeded on `on` — the preserved
+  config is used as-is.
 - Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
-  may still hold the plan). Status surfaces show `Target: <name>` when resolvable and omit it otherwise.
+  may still hold the plan). Status always shows the configured supervisor target; when that target resolves, it adds the
+  Claude UUID and source model facts that are available.
 
-**Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set --cascade` (or `<target> --cascade`) routes checks
-through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
+**Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set <target> --cascade` or
+`forge policy supervisor cascade on` routes checks through a cheap tier before the frontier. The direct toggle is
+`%policy supervisor cascade on`. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
 OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
 configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
 the action against the **approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the
-`--reload` machinery; enabling fails with an actionable error when no approved snapshot resolves). Long plans and
-actions are packed as head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when
-truncated, and prompt metadata explicitly marks whether the plan or action was truncated. Edit actions include the
-matched and replacement fragments when available; Write actions include path and target existence context. Tier-1 emits
-only `allow` (clearly aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and
-**every** tier-1 failure (LLM error, parse failure, unreadable plan) escalates, so the system degrades to
-frontier-always, never to unsupervised. In cascade mode the supervisor is registered as the engine's **resolver** (see
-§1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never pay
-the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
-resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
+`--reload` machinery). The persistent `set ... --cascade` and `cascade on` commands fail with an actionable error when
+no approved snapshot resolves. Launch-time `session start|fork --cascade` records the flag only; until a plan resolves,
+the hook escalates to the frontier instead of treating the missing tier-1 input as an allow. Long plans and actions are
+packed as head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when truncated, and
+prompt metadata explicitly marks whether the plan or action was truncated. Edit actions include the matched and
+replacement fragments when available; Write actions include path and target existence context. Tier-1 emits only `allow`
+(clearly aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and **every** tier-1
+failure (LLM error, parse failure, unreadable plan) escalates, so the system degrades to frontier-always, never to
+unsupervised. In cascade mode the supervisor is registered as the engine's **resolver** (see §1.5): it is invoked only
+when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never pay the frontier call. Tier-1
+reasons ride in low-severity violations (persisted to the decision log, never printed on resolved allows). Measurement
+is built in: session-tagged `plan-check` usage events plus decision-log-derived
 `plan_check_allow`/`plan_check_needs_review` counters in `forge telemetry activity` expose the short-circuit rate; the
 supervisor counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so
 the two can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular
@@ -199,33 +210,35 @@ rerun).
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
   configured path prefixes) and MAY cache the last verdict for identical diffs.
 
-**On-demand invocation (planned):** Every policy — including the supervisor — should be callable manually without
-installing hooks:
+**On-demand invocation:** Deterministic bundles and the semantic supervisor can be evaluated manually without installing
+hooks:
 
 ```bash
-forge policy check supervisor --file src/forge/session/store.py
-forge policy check tdd --diff HEAD~1
+forge policy check --bundle tdd --file src/forge/session/store.py
+git diff -- src/forge/session/store.py | forge policy check --bundle tdd --diff
+forge policy supervisor evaluate --file src/forge/session/store.py --resume-id <planning-session-or-uuid>
 ```
 
-The same evaluation function runs in both modes (hook-triggered and CLI-triggered).
+The deterministic manual and hook paths share `PolicyEngine`; one-shot supervisor evaluation and hook enforcement share
+`invoke_supervisor`. Forge does not expose one universal `forge policy check <policy-id>` registry surface.
 
 **Primary use case: problem reformulation.** When a policy stops the agent, the cause is flawed problem representation
 (too broad/contradictory/ambiguous), genuine agent failure, or an overzealous policy. On-demand checks are diagnostics:
-citations and evidence show *what* failed. Reformulate, then re-check before resuming. The supervisor's `--resume`
-context keeps the original plan in view.
+citations and evidence show *what* failed. Reformulate, then re-check before resuming. The Claude lane's native resume
+context or the Codex lane's in-band approved snapshot keeps the plan authority in view.
 
 **Reactive Patterns (Shared Library)**
 
 Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
-the memory writer (`session/memory_writer.py`), deterministic policies (`policy/deterministic/`), and the planned
-workflow policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node
-types cover current and planned use cases:
+the memory writer (`session/memory_writer.py`), deterministic policies (`policy/deterministic/`), and the experimental,
+manifest-only WorkflowPolicy. The shared pattern: take hook context, classify/evaluate, return a decision or side
+effect. Three node types cover current and planned use cases:
 
-| Node type      | Execution                         | Examples                                  | Cost        |
-| -------------- | --------------------------------- | ----------------------------------------- | ----------- |
-| Code           | Deterministic Python function     | TDD enforcement, path gating, file checks | Free        |
-| LLM call       | Stateless API call via `core.llm` | Tagger (classification), checker          | ~$0.001     |
-| Claude session | `claude -p [--resume]` subprocess | Supervisor, memory writer                 | ~$0.01-0.05 |
+| Node type      | Execution                              | Examples                                  | Cost / billing         |
+| -------------- | -------------------------------------- | ----------------------------------------- | ---------------------- |
+| Code           | Deterministic Python function          | TDD enforcement, path gating, file checks | Free                   |
+| LLM call       | Stateless API call via `core.llm`      | Tagger (classification), checker          | Route-dependent        |
+| Headless agent | `claude -p [--resume]` or `codex exec` | Supervisor, memory writer                 | Billing-mode dependent |
 
 **Library, not framework**: Utilities live in a shared Python library (`core/reactive/`). Hook handlers are plain Python
 functions that import what they need. No YAML workflow engine, no declarative config layer — the same developers who
@@ -518,7 +531,7 @@ Skills vary in what they execute. Four types cover all current and planned cases
 | --------------- | ------------------------------------------- | ------------------------------------------- |
 | Pure Python     | Deterministic function                      | TDD policy, pattern matching, `run_tests()` |
 | Single LLM      | `core.llm` API call                         | Tagger, checker                             |
-| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, memory writer         |
+| Claude session  | `claude -p [--bare]` subprocess (has tools) | Reviewer, panel/analyze worker              |
 | Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts   |
 
 Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
@@ -533,17 +546,19 @@ maximum reasoning. This is orthogonal to proxy-level `reasoning_effort` hyperpar
 model's behavior.
 
 Forge injects `claude --effort` per-caller on its automated `claude -p` subprocesses (never the user's interactive
-session). Each consumer carries its own optional effort field and, where a CLI exists, an `--effort` flag: the
-supervisor frontier (`supervisor_effort`), memory writer (`MemoryWriterConfig.effort`), shadow curation (pass-through),
-team supervisor (`TeamSupervisorConfig.effort`), and the workflow fan-out (`run_multi_review(reasoning_effort=...)`).
-The central builder is `run_claude_session` (`core/reactive/session_runner.py`); the review fan-out builds its argv in
-`review/engine.py:_prepare_worker`. These use the `claude --effort` vocabulary (`low/medium/high/xhigh/max`), distinct
-from the tier-1 checker's `core.llm` `reasoning_effort` (`none/low/medium/high/xhigh`) — the checker is an API call, not
-a `-p` subprocess. An older `claude` that rejects `--effort` fails loud (no silent rerun at default), unlike the
-`--output-format` telemetry retry. There is no global default effort knob; effort is per-caller by design.
+session). Each consumer carries its own optional effort field and, where a CLI exists, an `--effort` flag: the Claude
+arm of the supervisor frontier (`supervisor_effort`), memory writer (`MemoryWriterConfig.effort`), shadow curation
+(pass-through), team supervisor (`TeamSupervisorConfig.effort`), and the workflow fan-out
+(`run_multi_review(reasoning_effort=...)`). For consumers with both Claude and Codex arms, this field affects only the
+Claude dispatch; the Codex arm uses its own runtime configuration. The central Claude builder is `run_claude_session`
+(`core/reactive/session_runner.py`); the review fan-out builds its argv in `review/engine.py:_prepare_worker`. These use
+the `claude --effort` vocabulary (`low/medium/high/xhigh/max`), distinct from the tier-1 checker's `core.llm`
+`reasoning_effort` (`none/low/medium/high/xhigh`) — the checker is an API call, not a `-p` subprocess. An older `claude`
+that rejects `--effort` fails loud (no silent rerun at default), unlike the `--output-format` telemetry retry. There is
+no global default effort knob; effort is per-caller by design.
 
-This maps to the three node types in §4.1.2 (Code, LLM call, Claude session). "Pure text" is a specialization: no Python
-runtime deps, so the prompt is portable across models/runners (the execution environment still has tools).
+This maps to the three reactive node types in §1.2 (Code, LLM call, headless agent). "Pure text" is a specialization: no
+Python runtime deps, so the prompt is portable across models/runners (the execution environment still has tools).
 
 ### 3.5 Workflow runners
 
@@ -612,15 +627,17 @@ Skills and policies are the **same building blocks with different triggers**:
 | Latency  | Adds overhead to every action         | Zero overhead until invoked         |
 | Use case | Continuous enforcement                | Deliberate checks                   |
 
-Both compose from the same primitives: `core/reactive/`, `core.llm`, `run_claude_session()`. Shared code is imported by
-both CLI commands and policy classes—no workflow registry, no declarative config layer. Library, not framework.
+Both compose from the same primitives: `core/reactive/`, `core.llm`, and runtime-specific headless paths
+(`run_claude_session()` / `CodexHeadlessInvoker`). Shared code is imported by both CLI commands and policy classes—no
+workflow registry, no declarative config layer. Library, not framework.
 
 **CLI surfaces (normative):** Forge uses two related command surfaces:
 
 1. **Policy** — deterministic/semantic policies evaluated against an action context.
 
    - Hook surface: `forge hook …` invokes policies automatically.
-   - Manual surface: `forge policy check …` runs policies on demand (after a hook blocks you, or in CI).
+   - Manual surfaces: `forge policy check …` evaluates deterministic bundles, while `forge policy supervisor evaluate …`
+     runs one-shot semantic supervision (after a hook blocks you, or in CI).
 
    **Stuck playbook (target UX):** When a PreToolUse policy blocks repeatedly, give the human an escape hatch without
    uninstalling hooks.
@@ -628,13 +645,14 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
    - **Disable enforcement in-session:** `%policy disable` (hook becomes a no-op for this session)
    - **Fix the issue:** work with the agent or edit manually while enforcement is disabled
    - **Confirm you're unblocked (optional):**
-     - `%policy check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
+     - `%policy check`: defaults to `git diff` (unstaged), supports `--staged`, and uses the session's effective bundles
+       when no `--bundle` is supplied.
      - Terminal fallback: `git diff | forge policy check --bundle tdd --bundle coding_standards --diff`
    - **Re-enable enforcement:**
-     - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
-     - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
-     - Terminal `forge policy enable` requires an explicit `--bundle` and fails loud with none: restore-from-intent is
-       the interactive `%policy enable` shortcut's behavior, not the scriptable CLI's.
+     - `%policy enable --bundle tdd [--bundle coding_standards]`: explicitly sets the override bundles for the session;
+       positional bundle names are also accepted. Bare `%policy enable` shows usage.
+     - Terminal `forge policy enable` likewise requires at least one explicit `--bundle` and fails loud with none; it
+       writes session intent, while the `%` form writes session overrides.
 
    `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the
    next Write/Edit passes the hook.
