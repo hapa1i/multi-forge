@@ -21,7 +21,8 @@ Resolved review decisions:
 
 ## Current focus
 
-Reopened on 2026-07-15 — remediate the verified post-closeout findings, rerun affected gates, and close the card again.
+Complete — post-closeout remediation shipped in `58b7e97`; fresh verification and the bounded deferral are recorded
+below.
 
 ## Phase 0: Characterization pins (no behavior change)
 
@@ -196,22 +197,22 @@ Reopened on 2026-07-15 — remediate the verified post-closeout findings, rerun 
 Post-closeout review found two acceptance-breaking parser/path gaps, two reachable surface failures, and several bounded
 hardening opportunities. The 2026-07-14 verification remains the baseline; the following items require fresh evidence.
 
-- [ ] RF-01: make mutation frontmatter boundary selection agree with permissive reads without losing writable truly
+- [x] RF-01: make mutation frontmatter boundary selection agree with permissive reads without losing writable truly
   empty/comment-only frontmatter; cover the exact three-delimiter corruption shape across read/write/remove/upgrade.
-- [ ] RF-02: compare logical and resolved reserved basenames case-insensitively while preserving the exact lowercase
+- [x] RF-02: compare logical and resolved reserved basenames case-insensitively while preserving the exact lowercase
   `.md` suffix rule; cover mixed-case direct/proposal/upgrade aliases on the Darwin development filesystem.
-- [ ] RF-03: reject logical and resolved `index.md`/`log.md` custom shadow targets before official or shadow side
+- [x] RF-03: reject logical and resolved `index.md`/`log.md` custom shadow targets before official or shadow side
   effects, including mixed-case and symlink aliases.
-- [ ] RF-04: make walkthrough §11.5 host-stdlib-only while retaining order-independent envelope, migration, raw
+- [x] RF-04: make walkthrough §11.5 host-stdlib-only while retaining order-independent envelope, migration, raw
   passport, idempotence, and removal checks.
-- [ ] RF-05: make `synthesize_passport` distinguish omitted intent from explicit blank/whitespace intent; keep the CLI
+- [x] RF-05: make `synthesize_passport` distinguish omitted intent from explicit blank/whitespace intent; keep the CLI
   preflight for failure before proposal side effects.
-- [ ] RF-06: add opt-in preserve-existing-mode support to the shared atomic writer, migrate passport and Codex config
+- [x] RF-06: add opt-in preserve-existing-mode support to the shared atomic writer, migrate passport and Codex config
   rewrites to it, and consolidate passport render/apply tails without changing explicit `0600`/`0755` callers.
-- [ ] RF-07: avoid preparing discarded passport rewrites on unchanged shadow-only re-track/propose flows; retain
+- [x] RF-07: avoid preparing discarded passport rewrites on unchanged shadow-only re-track/propose flows; retain
   effective-passport validation before shadow materialization when values change.
-- [ ] RF-08: bring the two card regression module docstrings into the documented bug-ID/root-cause/affected-file form.
-- [ ] RF-09: rerun focused/full/regression/integration/pre-commit/build/artifact checks affected by remediation, update
+- [x] RF-08: bring the two card regression module docstrings into the documented bug-ID/root-cause/affected-file form.
+- [x] RF-09: rerun focused/full/regression/integration/pre-commit/build/artifact checks affected by remediation, update
   closeout records, and move the card back to `done/`.
 
 Deferred from this remediation: extracting the non-identical track/show/upgrade/remove CLI preflight blocks. That
@@ -230,10 +231,36 @@ correctness patch.
   byte-identical mutation refusal for those shapes.
 - Any generated `resource` or `tags` policy.
 
+## Remediation closeout (2026-07-15)
+
+- Implementation: `58b7e97` (`fix: harden memory passport mutations`).
+
+- Focused passport, CLI, scanner, atomic-I/O, Codex-hook, walkthrough, and regression suites passed; the final
+  walkthrough index reports version `1.0.3` and `98` assertions.
+
+- `make test-unit`: `7884 passed, 1 skipped, 117 deselected`.
+
+- `make test-regression`: `513 passed`.
+
+- `./scripts/test-integration.sh tests/integration/cli/test_handoff_integration.py -v`: `10 passed`.
+
+- `./scripts/test-integration.sh tests/integration/docker/test_installer.py -k 'user_content_preserved_through_cycle or full_profile_memory_passport_assets' -v`:
+  `2 passed, 16 deselected`.
+
+- `make pre-commit` and `git diff --check`: clean. `docs/design_appendix.md` remains within its budget at `29,967`
+  Claude Opus 4.6 tokens.
+
+- `uv build`: wheel and sdist built successfully and were separately reinstalled. Both artifacts passed full-profile
+  user/local extension enable, packaged walkthrough version/assertion/PyYAML checks, three-delimiter upgrade without a
+  duplicate passport block, and blank-intent helper refusal. The wheel also refused mixed-case reserved official and
+  custom reserved-shadow paths without mutation.
+
+- The non-identical CLI preflight extraction remains intentionally separate in
+  [`memory_passport_cli_preflight_cleanup`](../../proposed/memory_passport_cli_preflight_cleanup/card.md).
+
 ## Original closeout baseline (2026-07-14; superseded as final evidence)
 
-This evidence records the original implementation closeout. The reopened remediation requires the fresh RF-09 evidence
-above before the card returns to `done/`.
+This evidence records the original implementation closeout and is superseded by the remediation evidence above.
 
 - `make test-unit`: `7846 passed, 1 skipped, 117 deselected`.
 

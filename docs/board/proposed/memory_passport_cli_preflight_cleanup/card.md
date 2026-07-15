@@ -40,5 +40,4 @@ behavioral defect.
 
 - `src/forge/cli/memory.py`
 - `docs/developer/cli_style_guidelines.md`
-- `docs/board/doing/okf_compatible_memory_passports/checklist.md#reopened-remediation-2026-07-15` (deferred
-  disposition)
+- `docs/board/done/okf_compatible_memory_passports/checklist.md#reopened-remediation-2026-07-15` (deferred disposition)

@@ -25,9 +25,31 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-15
+
+### okf_compatible_memory_passports remediation
+
+**Goal**: Close the verified post-closeout parser, reserved-target, host-walkthrough, and atomic-mode gaps without
+expanding the passport compatibility contract.
+
+**Key changes**:
+
+- Unified read/mutation delimiter selection and pinned the three-delimiter corruption case; blank intent now fails at
+  both CLI and synthesis boundaries.
+- Case-folded logical/resolved reserved official and proposal-shadow targets, blocked hand-authored reserved shadows at
+  discovery, and made the walkthrough's envelope verifier host-stdlib-only.
+- Added opt-in mode preservation to the shared atomic writer, migrated passport and Codex config rewrites, consolidated
+  mutation apply paths, and avoided discarded work on unchanged re-track flows. The non-identical CLI preflight cleanup
+  remains a proposed follow-up.
+
+**Verification**: remediation commit `58b7e97`; `make test-unit` (`7884 passed, 1 skipped, 117 deselected`);
+`make test-regression` (`513 passed`); handoff integration (`10 passed`); installer asset/mode integration
+(`2 passed, 16 deselected`); `make pre-commit`; `git diff --check`; `uv build`; isolated wheel and sdist full-profile
+installs plus delimiter, reserved-path, blank-intent, and packaged-walkthrough smokes.
+
 ## 2026-07-14
 
-### okf_compatible_memory_passports closeout
+### okf_compatible_memory_passports original closeout (superseded by 2026-07-15 remediation)
 
 **Goal**: Make newly tracked and explicitly upgraded Forge Markdown memory docs recognizable as OKF v0.1 concept
 documents without weakening Forge's passport write policy or claiming bundle conformance.
