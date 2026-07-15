@@ -63,8 +63,9 @@ official doc. Already-merged items are self-pruned on the next run.
 ## Configuration
 
 Use `forge memory` to author passports and enable the writer. `track` writes a `forge_memory` passport into each doc;
-that passport is the doc-level contract for strategy, mode, and writer access. `track` is **sessionless** (project-
-lifetime). Memory activation is **session-scoped** -- each session decides whether the memory writer runs.
+that passport is the doc-level contract for strategy, mode, and writer access. A newly tracked Markdown doc also gets
+missing `type`, `title`, and `description` metadata. `track` is **sessionless** (project-lifetime). Memory activation is
+**session-scoped** -- each session decides whether the memory writer runs.
 
 ```bash
 # Author project passports (sessionless; runnable from a bare terminal)
@@ -91,6 +92,9 @@ Example passport written by `forge memory track`:
 
 ```yaml
 ---
+type: Memory Document
+title: Change Log
+description: Compact completed-work record.
 forge_memory:
   version: 1
   intent: "Compact completed-work record."
@@ -112,6 +116,9 @@ forge memory list
 # Author a project passport (sessionless)
 forge memory track docs/checklist.md --strategy checklist
 
+# Explicitly add the outer envelope to an older passport
+forge memory passport upgrade docs/legacy-notes.md
+
 # Remove the project passport so the doc is no longer discovered by scans
 forge memory passport remove docs/checklist.md
 
@@ -122,6 +129,17 @@ forge session memory disable --session planner
 
 One-off doc updates that don't need a passport are ordinary agent instructions -- just ask the agent to update a file
 before it stops.
+
+The outer metadata is descriptive; `forge_memory` remains the only marker that makes a document Forge memory. Forge adds
+the envelope only when creating a passport or when you explicitly run `passport upgrade`. Re-tracking an existing
+passport, even with changed strategy or writer flags, does not migrate it.
+
+Forge preserves existing outer values when it rewrites frontmatter. It generates `type: Memory Document` only when
+`type` is absent, preserves any present non-empty string type, and refuses to mutate a document whose present `type` is
+null, non-string, empty, or whitespace-only when creating or explicitly upgrading the envelope. It fills missing `title`
+from the first ATX H1 outside fenced code (or the filename) and missing `description` from the passport intent. It does
+not generate or maintain `resource`, `tags`, or `timestamp`. YAML values are preserved semantically; comments, anchors,
+quoting, key order, scalar spelling, and line endings may be normalized by a successful rewrite.
 
 ### Inspecting writer output
 
@@ -168,8 +186,15 @@ doc first, then proposes only what's missing as `- [ ]` checkboxes with rational
 
 ## File requirements
 
-**Official docs must already exist.** The writer does not create official project docs for you. Forge-owned shadow files
-under `.forge/memory/` are created by `forge memory track --propose`; non-Forge-owned shadow paths must already exist.
+**Official docs must already exist.** The writer does not create official project docs for you. New tracking and
+explicit upgrade require a path ending exactly in `.md`; logical and resolved basenames are compared case-insensitively
+against the reserved names `index.md` and `log.md` before writing the official doc or a shadow. Custom shadow paths use
+the same reserved-name guard, including symlink targets. Existing legacy passports on reserved paths remain readable and
+removable.
+
+Forge-owned shadow files under `.forge/memory/` are created by `forge memory track --propose`; non-Forge-owned shadow
+paths must already exist. The official doc is the explicitly tracked concept and receives the envelope. An auto-created
+shadow is only a proposal target and gets no envelope unless you explicitly track that shadow later.
 
 Before enabling the memory writer, seed the files you want maintained:
 
@@ -291,19 +316,26 @@ effort unless overridden with its own `--effort`.
 The memory writer validates tracked docs before processing. For passported docs, the passport on the official doc is
 authoritative; session manifests store only activation and runtime state.
 
-| Rule                 | Rejected or skipped if                                                  |
-| -------------------- | ----------------------------------------------------------------------- |
-| Path safety          | A write, official, or shadow path is absolute, unsafe, or escapes root  |
-| Passport validity    | `forge_memory` frontmatter is malformed or violates the passport schema |
-| Mode consistency     | `mode=shadow-only` lacks `shadow_path`, or `mode=direct` has one        |
-| Self-shadowing       | Shadow path resolves to the same file as the official doc               |
-| Writer authorization | Passport `writers` does not allow the current session                   |
-| File existence       | Write target is missing, or a shadow entry's official doc is missing    |
-| Legacy manifest only | Passport-less entries violate old `suggested`/`shadows` coupling        |
+| Rule                     | Rejected or skipped if                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| Path safety              | A write, official, or shadow path is absolute, unsafe, or escapes root             |
+| Passport validity        | `forge_memory` frontmatter is malformed or violates the passport schema            |
+| New-track/upgrade type   | A present outer `type` is not a non-empty string                                   |
+| New-track/upgrade target | The official path is not exact lowercase-suffix `.md`, or its basename is reserved |
+| Proposal shadow target   | A logical/resolved shadow basename case-folds to reserved `index.md` or `log.md`   |
+| Mode consistency         | `mode=shadow-only` lacks `shadow_path`, or `mode=direct` has one                   |
+| Self-shadowing           | Shadow path resolves to the same file as the official doc                          |
+| Writer authorization     | Passport `writers` does not allow the current session                              |
+| File existence           | Write target is missing, or a shadow entry's official doc is missing               |
+| Legacy manifest only     | Passport-less entries violate old `suggested`/`shadows` coupling                   |
 
-`forge memory track` validates these rules up front and writes or updates the passport. Older session manifests are
-still revalidated at runtime; invalid or missing docs are skipped with a log warning. If all docs are invalid or
-missing, the writer exits cleanly (not an error).
+`forge memory track` validates these rules up front and writes or updates the passport. Envelope and new-path checks
+apply only when creating a passport; an ordinary re-track does not migrate existing passports, and a legacy reserved
+official direct passport remains scannable. Stop-time discovery skips hand-authored shadow-only passports whose logical
+or resolved write target is reserved. `forge memory passport upgrade` applies the same mutation guards explicitly to a
+legacy passport and adds only missing outer fields. It never reconstructs the raw `forge_memory` mapping, and a second
+upgrade is a byte-identical no-op. Older session manifests are still revalidated at runtime; invalid or missing docs are
+skipped with a log warning. If all docs are invalid or missing, the writer exits cleanly (not an error).
 
 The transcript path is also validated (same safety checks) since it comes from CLI args / work queue markers.
 

@@ -440,7 +440,7 @@ def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) ->
 
     backup_path = backup_codex_config(config_path)
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(config_path, new_text)
+    atomic_write_text(config_path, new_text, preserve_existing_mode=True)
     return backup_path
 
 
@@ -548,7 +548,7 @@ def remove_codex_block(config_path: Path, entries: tuple[CodexHookEntry, ...]) -
         config_path.unlink()
         return CodexRemoveResult(removed=True, deleted_file=True, leftover_commands=leftover)
 
-    atomic_write_text(config_path, new_text)
+    atomic_write_text(config_path, new_text, preserve_existing_mode=True)
     return CodexRemoveResult(removed=True, leftover_commands=leftover)
 
 

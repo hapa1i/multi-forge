@@ -30,12 +30,17 @@ from forge.session.exceptions import (
 from forge.session.passport import (
     VALID_STRATEGY_NAMES,
     Passport,
+    PreparedPassportWrite,
+    apply_prepared_passport_write,
     derive_shadow_path,
+    prepare_passport_write,
     read_passport,
     remove_passport,
     resolve_passport_source,
     resolve_with_overrides,
     synthesize_passport,
+    upgrade_passport_envelope,
+    validate_okf_reserved_basenames,
     write_passport,
 )
 from forge.session.project_memory import (
@@ -87,6 +92,7 @@ def memory() -> None:
         forge memory track docs/changelog.md --strategy changelog    # author a passport (sessionless)
         forge memory list                                            # show passported docs
         forge memory passport show docs/changelog.md                 # inspect a passport
+        forge memory passport upgrade docs/changelog.md              # add the OKF envelope
         forge memory shadows review --for docs/impl_notes.md         # curate shadow proposals
     """
 
@@ -187,6 +193,9 @@ def track_cmd(
     except PassportError as e:
         raise click.ClickException(f"Malformed passport in {path}: {e}") from e
 
+    if passport is None and intent is not None and not intent.strip():
+        raise click.ClickException("--intent must be a non-empty string when creating a passport.")
+
     # Scan roots power the out-of-root warning and the collision check. A
     # corrupt config must not block authoring (system-boundary warn+degrade).
     roots = _resolve_scan_roots()
@@ -233,9 +242,9 @@ def track_cmd(
             new_pp = synthesize_passport(
                 strategy=strategy,  # type: ignore[arg-type]  # checked above
                 intent=intent,
-                writers=writers or "all-sessions",
+                writers=writers if writers is not None else "all-sessions",
             )
-            write_passport(abs_path, new_pp)
+            write_passport(abs_path, new_pp, okf_path=path)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
         console.print(f"Passport created for [cyan]{path}[/cyan] (strategy: {strategy}).")
@@ -300,17 +309,16 @@ def _track_existing_shadow_only(
         )
 
     has_flags = strategy is not None or writers is not None
-    updated = False
-    if has_flags:
-        try:
+    resolved_pp = passport
+    pp_warnings: list[str] = []
+    prepared: PreparedPassportWrite | None = None
+    try:
+        if has_flags:
             resolved_pp, pp_warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
-        except PassportError as exc:
-            raise click.ClickException(str(exc)) from exc
-        if pp_warnings:
-            write_passport(abs_path, resolved_pp)
-            updated = True
-            for w in pp_warnings:
-                console.print(f"[yellow]Warning:[/yellow] {w}")
+            if pp_warnings:
+                prepared = prepare_passport_write(abs_path, resolved_pp)
+    except PassportError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     created = _auto_create_shadow(shadow_path, forge_root)
     shadow_abs = (forge_root / shadow_path).resolve()
@@ -318,7 +326,11 @@ def _track_existing_shadow_only(
         raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
     if created:
         console.print(f"Shadow file created: {shadow_path}.")
-    if updated:
+    if pp_warnings:
+        assert prepared is not None
+        apply_prepared_passport_write(abs_path, prepared)
+        for w in pp_warnings:
+            console.print(f"[yellow]Warning:[/yellow] {w}")
         console.print(f"Passport updated in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
     else:
         console.print(f"Passport already present in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
@@ -353,6 +365,10 @@ def _track_propose(
     # Self-shadow: compare resolved paths, not raw strings
     resolved_shadow = (forge_root / shadow_path).resolve()
     resolved_official = (forge_root / path).resolve()
+    try:
+        validate_okf_reserved_basenames(shadow_path, resolved_shadow)
+    except PassportError as exc:
+        raise click.ClickException(f"Invalid shadow path: {exc}") from exc
     if resolved_shadow == resolved_official:
         raise click.ClickException("Shadow path cannot be the same as the official doc.")
 
@@ -360,17 +376,15 @@ def _track_propose(
     if collision:
         raise click.ClickException(collision)
 
-    # Auto-create shadow file if Forge-owned
-    created = _auto_create_shadow(shadow_path, forge_root)
-    shadow_abs = (forge_root / shadow_path).resolve()
-    if not shadow_abs.is_file():
-        raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
-
-    # Passport handling: synthesize or update.
+    # Prepare the complete effective passport before materializing the shadow.
+    # For existing passports this deliberately omits ``okf_path`` so re-track
+    # never validates, repairs, or adds an outer envelope.
     # For existing passports, pass strategy only when the user explicitly provided --strategy
     # so the passport's own strategy is preserved by default.
+    pp_warnings: list[str]
+    prepared: PreparedPassportWrite | None = None
+    result_kind: str
     if isinstance(passport, Passport) and passport.update.mode == "shadow-only":
-        # Already shadow-only -- apply overrides if any
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
@@ -378,17 +392,12 @@ def _track_propose(
                 shadow_path=(shadow_path if shadow_path != passport.update.shadow_path else None),
                 writers=writers,
             )
+            if pp_warnings:
+                prepared = prepare_passport_write(abs_path, resolved_pp)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
-        if pp_warnings:
-            write_passport(abs_path, resolved_pp)
-            for w in pp_warnings:
-                console.print(f"[yellow]Warning:[/yellow] {w}")
-            console.print(f"Passport updated in [cyan]{path}[/cyan]. Future sessions will use the new values.")
-        else:
-            console.print(f"Passport already present in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
+        result_kind = "updated" if pp_warnings else "unchanged"
     elif isinstance(passport, Passport):
-        # Convert existing direct passport to shadow-only
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
@@ -397,25 +406,45 @@ def _track_propose(
                 shadow_path=shadow_path,
                 writers=writers,
             )
+            prepared = prepare_passport_write(abs_path, resolved_pp)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
-        write_passport(abs_path, resolved_pp)
-        for w in pp_warnings:
-            console.print(f"[yellow]Warning:[/yellow] {w}")
-        console.print(f"Passport in [cyan]{path}[/cyan] converted to shadow-only proposals at {shadow_path}.")
+        result_kind = "converted"
     else:
-        # No passport -- synthesize with default strategy
         try:
             new_pp = synthesize_passport(
                 strategy=new_passport_strategy,
                 intent=intent,
                 update_mode="shadow-only",
                 shadow_path=shadow_path,
-                writers=writers or "all-sessions",
+                writers=writers if writers is not None else "all-sessions",
             )
-            write_passport(abs_path, new_pp)
+            prepared = prepare_passport_write(abs_path, new_pp, okf_path=path)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
+        pp_warnings = []
+        result_kind = "created"
+
+    # Materialization begins only after path, collision, effective-passport,
+    # frontmatter, and (for new tracking) OKF envelope validation all succeed.
+    created = _auto_create_shadow(shadow_path, forge_root)
+    shadow_abs = (forge_root / shadow_path).resolve()
+    if not shadow_abs.is_file():
+        raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
+
+    if result_kind != "unchanged":
+        assert prepared is not None
+        apply_prepared_passport_write(abs_path, prepared)
+
+    for w in pp_warnings:
+        console.print(f"[yellow]Warning:[/yellow] {w}")
+    if result_kind == "updated":
+        console.print(f"Passport updated in [cyan]{path}[/cyan]. Future sessions will use the new values.")
+    elif result_kind == "unchanged":
+        console.print(f"Passport already present in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
+    elif result_kind == "converted":
+        console.print(f"Passport in [cyan]{path}[/cyan] converted to shadow-only proposals at {shadow_path}.")
+    else:
         console.print(
             f"Shadow-only passport written for [cyan]{path}[/cyan] "
             f"(strategy: {new_passport_strategy}, proposals at {shadow_path})."
@@ -1029,7 +1058,7 @@ def _review_curate(
 
 @memory.group("passport")
 def passport_group() -> None:
-    """Inspect and remove memory-doc passports."""
+    """Inspect, upgrade, and remove memory-doc passports."""
 
 
 @passport_group.command("show")
@@ -1113,6 +1142,58 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
         table.add_row("instruction", passport.update.instruction)
 
     console.print(table)
+
+
+@passport_group.command("upgrade")
+@click.argument("path")
+def passport_upgrade_cmd(path: str) -> None:
+    """Add missing OKF envelope fields to an existing passport."""
+    try:
+        ctx = ExecutionContext.from_cwd()
+    except ForgeOpError as e:
+        print_error(str(e), console=err_console)
+        print_tip("Run this command from an enabled Forge project.", console=err_console)
+        sys.exit(1)
+
+    if ctx.forge_root is None:
+        print_error("Not inside a Forge project.", console=err_console)
+        print_tip("Run 'forge extension enable' first.", console=err_console)
+        sys.exit(1)
+
+    from forge.cli.guards import enforce_target_project_compatibility
+
+    enforce_target_project_compatibility(ctx.forge_root)
+
+    resolved_base = ctx.forge_root.resolve()
+    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
+    if reason:
+        print_error(f"Invalid path: {reason}", console=err_console)
+        print_tip(
+            "Use a project-relative Markdown path inside this Forge project.",
+            console=err_console,
+        )
+        sys.exit(1)
+
+    abs_path = (ctx.forge_root / path).resolve()
+    if not abs_path.is_file():
+        print_error(f"File not found: {path}", console=err_console)
+        print_tip("Check the project-relative path and try again.", console=err_console)
+        sys.exit(1)
+
+    try:
+        added = upgrade_passport_envelope(abs_path, logical_path=path)
+    except PassportError as e:
+        print_error(f"Could not upgrade passport in {path}: {e}", console=err_console)
+        print_tip(
+            "Fix the reported frontmatter or path issue, then rerun this command.",
+            console=err_console,
+        )
+        sys.exit(1)
+
+    if added:
+        console.print(f"OKF envelope upgraded in [cyan]{path}[/cyan] (added: {', '.join(added)}).")
+    else:
+        console.print(f"OKF envelope already complete in [cyan]{path}[/cyan]; no changes made.")
 
 
 @passport_group.command("remove")

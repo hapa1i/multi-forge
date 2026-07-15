@@ -25,6 +25,50 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-15
+
+### okf_compatible_memory_passports remediation
+
+**Goal**: Close the verified post-closeout parser, reserved-target, host-walkthrough, and atomic-mode gaps without
+expanding the passport compatibility contract.
+
+**Key changes**:
+
+- Unified read/mutation delimiter selection and pinned the three-delimiter corruption case; blank intent now fails at
+  both CLI and synthesis boundaries.
+- Case-folded logical/resolved reserved official and proposal-shadow targets, blocked hand-authored reserved shadows at
+  discovery, and made the walkthrough's envelope verifier host-stdlib-only.
+- Added opt-in mode preservation to the shared atomic writer, migrated passport and Codex config rewrites, consolidated
+  mutation apply paths, and avoided discarded work on unchanged re-track flows. The non-identical CLI preflight cleanup
+  remains a proposed follow-up.
+
+**Verification**: remediation commit `58b7e97`; `make test-unit` (`7884 passed, 1 skipped, 117 deselected`);
+`make test-regression` (`513 passed`); handoff integration (`10 passed`); installer asset/mode integration
+(`2 passed, 16 deselected`); `make pre-commit`; `git diff --check`; `uv build`; isolated wheel and sdist full-profile
+installs plus delimiter, reserved-path, blank-intent, and packaged-walkthrough smokes.
+
+## 2026-07-14
+
+### okf_compatible_memory_passports original closeout (superseded by 2026-07-15 remediation)
+
+**Goal**: Make newly tracked and explicitly upgraded Forge Markdown memory docs recognizable as OKF v0.1 concept
+documents without weakening Forge's passport write policy or claiming bundle conformance.
+
+**Key changes**:
+
+- Added creation-only `type`/`title`/`description` envelopes and an explicit idempotent `forge memory passport upgrade`
+  path that preserves the raw legacy passport value; ordinary re-track remains non-migrating, and Forge still generates
+  no `resource`, `tags`, or `timestamp`.
+- Split permissive frontmatter reads from strict mutation parsing, made unsafe shapes fail byte-identically, preserved
+  file modes, and preflighted effective passports and logical/resolved path rules before official or shadow writes.
+- Synchronized architecture, CLI, end-user, QA, walkthrough, packaging, and board guidance; proposed the reusable
+  mutation-boundary lessons through `.forge/memory/shadow_impl_notes.md` for human review.
+
+**Verification**: implementation commit `fae54345`; `make test-unit` (`7846 passed, 1 skipped, 117 deselected`);
+`make test-regression` (`507 passed`); required handoff integration (`10 passed`) and installer asset integration
+(`1 passed, 17 deselected`); `make pre-commit`; `git diff --check`; `uv build`; separate isolated wheel and sdist
+full-profile enables, packaged-asset inspection, legacy-upgrade/idempotence checks, and empty-writer refusal smokes.
+
 ## 2026-07-13
 
 ### epic_global_forge_runtime closeout

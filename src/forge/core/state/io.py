@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,7 @@ def atomic_write_text(
     content: str,
     *,
     mode: int | None = None,
+    preserve_existing_mode: bool = False,
     create_parents: bool = True,
 ) -> None:
     """Write text to a file atomically.
@@ -72,12 +74,21 @@ def atomic_write_text(
         path: Target file path.
         content: Text content to write.
         mode: Optional final file mode (for example, 0o600).
+        preserve_existing_mode: Preserve the target's permission bits when it exists.
+            A missing target retains the secure tempfile default. Mutually exclusive with ``mode``.
         create_parents: Create parent directories if they don't exist.
 
     Raises:
+        ValueError: If ``mode`` and ``preserve_existing_mode`` are both requested.
         OSError: If the write or rename fails.
     """
-    atomic_write_bytes(path, content.encode("utf-8"), mode=mode, create_parents=create_parents)
+    atomic_write_bytes(
+        path,
+        content.encode("utf-8"),
+        mode=mode,
+        preserve_existing_mode=preserve_existing_mode,
+        create_parents=create_parents,
+    )
 
 
 def atomic_write_bytes(
@@ -85,6 +96,7 @@ def atomic_write_bytes(
     content: bytes,
     *,
     mode: int | None = None,
+    preserve_existing_mode: bool = False,
     create_parents: bool = True,
 ) -> None:
     """Write bytes to a file atomically.
@@ -97,11 +109,24 @@ def atomic_write_bytes(
         path: Target file path.
         content: Bytes to write.
         mode: Optional final file mode (for example, 0o600).
+        preserve_existing_mode: Preserve the target's permission bits when it exists.
+            A missing target retains the secure tempfile default. Mutually exclusive with ``mode``.
         create_parents: Create parent directories if they don't exist.
 
     Raises:
+        ValueError: If ``mode`` and ``preserve_existing_mode`` are both requested.
         OSError: If the write or rename fails.
     """
+    if mode is not None and preserve_existing_mode:
+        raise ValueError("mode and preserve_existing_mode are mutually exclusive")
+
+    resolved_mode = mode
+    if preserve_existing_mode:
+        try:
+            resolved_mode = stat.S_IMODE(path.stat().st_mode)
+        except FileNotFoundError:
+            resolved_mode = None
+
     if create_parents:
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -115,8 +140,8 @@ def atomic_write_bytes(
         with os.fdopen(fd, "wb") as f:
             f.write(content)
             f.flush()
-            if mode is not None:
-                os.fchmod(f.fileno(), mode)
+            if resolved_mode is not None:
+                os.fchmod(f.fileno(), resolved_mode)
             os.fsync(f.fileno())
         os.replace(temp_path, str(path))
         try:

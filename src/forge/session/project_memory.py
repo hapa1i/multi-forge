@@ -20,6 +20,7 @@ from forge.session.passport import (
     check_writer_access,
     derive_shadow_path,
     read_passport,
+    validate_okf_reserved_basenames,
 )
 from forge.session.validation import is_safe_designated_doc_path
 
@@ -86,6 +87,18 @@ def _reject_unsafe_path(path: str, forge_root: Path) -> str | None:
     return is_safe_designated_doc_path(path, resolved_root, resolved_root)
 
 
+def _reject_unsafe_shadow_path(path: str, forge_root: Path) -> str | None:
+    """Reject unsafe or OKF-reserved logical/resolved shadow targets."""
+    reason = _reject_unsafe_path(path, forge_root)
+    if reason:
+        return reason
+    try:
+        validate_okf_reserved_basenames(path, (forge_root / path).resolve())
+    except PassportError as exc:
+        return str(exc)
+    return None
+
+
 def is_memory_enabled(manifest: SessionState, effective: SessionIntent) -> bool:
     """Return True if the memory writer should run for this session.
 
@@ -147,7 +160,7 @@ def _build_scanned_doc(
         return DesignatedDoc(path=official_rel, strategy=passport.update.strategy, shadows=None)
 
     shadow_path = passport.update.shadow_path or derive_shadow_path(official_rel)
-    reason = _reject_unsafe_path(shadow_path, forge_root)
+    reason = _reject_unsafe_shadow_path(shadow_path, forge_root)
     if reason:
         logger.warning("Skipping shadow doc %s: unsafe shadow_path %r (%s)", official_rel, shadow_path, reason)
         return None
@@ -243,7 +256,7 @@ def _iter_shadow_passports(forge_root: Path, roots: Sequence[str]) -> Iterator[t
         if passport is None or passport.update.mode != "shadow-only":
             continue
         shadow_path = passport.update.shadow_path or derive_shadow_path(rel)
-        if _reject_unsafe_path(shadow_path, forge_root):
+        if _reject_unsafe_shadow_path(shadow_path, forge_root):
             continue
         yield (rel, shadow_path, passport.update.strategy)
 

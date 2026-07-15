@@ -865,10 +865,14 @@ overwrites).
 
 Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
 authoritative contract for that doc's intent, update strategy, and writer privileges. The memory writer re-reads
-passports at Stop time.
+passports at Stop time. Newly tracked Markdown docs also receive a small outer metadata envelope that is structurally
+compatible with the pinned OKF v0.1 concept shape:
 
 ```yaml
 ---
+type: Memory Document
+title: Change Log
+description: Compact completed-work record for Forge implementation sessions.
 forge_memory:
   version: 1
   intent: "Compact completed-work record for Forge implementation sessions."
@@ -883,6 +887,19 @@ forge_memory:
 ---
 ```
 
+`forge_memory` is the only marker of active Forge tracking. The outer `type`, `title`, and `description` keys describe
+the document but do not make an OKF-only document Forge memory. Forge owns the `forge_memory` value; outer keys are
+producer-owned and preserved at the parsed-value level when Forge rewrites frontmatter. On a new track, Forge adds
+missing `type` (`Memory Document`), `title` (the first ATX H1 outside a fenced code block, then a filename fallback),
+and `description` (the passport intent with whitespace collapsed). A present non-empty string `type` is preserved,
+including an unknown value; a present null, non-string, empty, or whitespace-only `type` blocks envelope generation on a
+new track or explicit upgrade.
+
+Forge does not generate or maintain `resource`, `tags`, or `timestamp`. It cannot authoritatively timestamp meaningful
+human and agent edits, and strategy-derived tags would become stale after later passport changes. Successful rewrites
+preserve existing outer values semantically, but do not promise preservation of YAML comments, anchors, quoting, key
+order, scalar spelling, or line endings.
+
 **Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own activation state
 (enabled, mode, min_turns). There are no session-scoped doc lists; all docs are discovered from passports at Stop time.
 Editing a passport between sessions takes effect without re-running `forge memory track`.
@@ -890,9 +907,11 @@ Editing a passport between sessions takes effect without re-running `forge memor
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
 rejected with deferral messages. Writer access is checked at Stop time by the memory writer.
 
-**Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport for docs without one.
-`forge memory track` with flags on a doc that already has a passport overwrites the passport (flags win, warnings
-printed). `forge memory passport show <path>` displays passport fields.
+**Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport and envelope for a Markdown doc
+without a passport. Re-tracking an existing passport updates only the requested Forge contract; it never adds or repairs
+the outer envelope. `forge memory passport upgrade <path>` is the explicit migration for an existing passport: it adds
+only missing envelope fields while preserving the raw `forge_memory` value. `forge memory passport show <path>` displays
+passport fields, and `remove` deletes only `forge_memory`, leaving outer metadata in place.
 
 ### 5.3 Two operating modes
 
@@ -979,14 +998,26 @@ deferred.
 
 ### 5.7 CLI verbs
 
-- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
-  `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
-- **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
+- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). On a new Markdown
+  doc it also fills the missing `type`, `title`, and `description` envelope fields. Re-track never migrates an existing
+  passport. `--propose` authors a shadow-only passport on the official doc; an auto-created shadow file receives no
+  envelope of its own. A passported doc outside the scan roots is written but warns.
+- **`forge memory passport upgrade <path>`** explicitly adds missing envelope fields to an existing valid passport. It
+  preserves the raw `forge_memory` mapping and is a byte-identical, exit-0 no-op when the envelope is complete.
+- **`forge memory passport remove <path>`** removes only `forge_memory`, preserving outer and unrelated frontmatter.
 - **`forge session memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
   `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
 - **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
 
 **Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer).
+
+New tracking and explicit upgrade require a logical project-relative path ending exactly in `.md`. Logical and resolved
+official basenames are compared case-insensitively against the OKF-reserved `index.md` and `log.md` names before any
+official or shadow write. Proposal shadow paths use the same logical/resolved reserved-name guard, including custom
+git-tracked shadows; they do not use the official document's `.md` envelope-generation check. Existing legacy passports
+on reserved or non-Markdown paths remain readable, removable, and re-trackable without envelope generation. Discovery
+skips a hand-authored shadow-only passport whose write target is reserved, so bypassing CLI authoring cannot route the
+memory writer into an OKF index or log.
 
 ---
 
@@ -1012,10 +1043,13 @@ Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--
 ### 6.2 Passport example (from §5.2)
 
 Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth for
-strategy, writers, and update mode.
+strategy, writers, and update mode; the surrounding concept metadata is descriptive and producer-owned.
 
 ```yaml
 ---
+type: Memory Document
+title: Implementation Notes
+description: Human-approved durable implementation memory for future Forge sessions.
 forge_memory:
   version: 1
   intent: "Human-approved durable implementation memory for future Forge sessions."
@@ -1044,12 +1078,22 @@ forge session memory enable --session planner
 # Verify:
 forge memory passport show docs/board/change_log.md
 forge memory list
+
+# Explicitly add the envelope to an older passport:
+forge memory passport upgrade docs/board/change_log.md
 ```
 
 `forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
-no flags on an already-passported doc it is a no-op. `forge memory passport remove <path>` removes the passport and
-turns the file back into a normal doc, preserving unrelated frontmatter. One-off doc updates that don't need a passport
-are ordinary agent instructions. All docs are processed in one `claude -p` call with per-doc strategy instructions.
+no flags on an already-passported doc it is a no-op. Existing passports gain the outer envelope only through
+`forge memory passport upgrade`; ordinary re-track does not migrate them. `forge memory passport remove <path>` removes
+only `forge_memory`, so any outer `type`, `title`, `description`, and other producer metadata remain. One-off doc
+updates that don't need a passport are ordinary agent instructions. All docs are processed in one `claude -p` call with
+per-doc strategy instructions.
+
+This is document-shape compatibility for newly tracked and explicitly upgraded Markdown docs, not a declaration of an
+OKF bundle. Forge does not generate bundle metadata or maintain reserved `index.md` / `log.md` files. In proposal mode,
+the envelope belongs to the explicitly tracked official document. An auto-materialized `.forge/memory/` shadow does not
+receive one unless a user later tracks that shadow as a separate memory document.
 
 ### 6.3 Worktree resolution (extends §5.5)
 

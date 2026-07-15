@@ -2,19 +2,21 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.25 -->
+<!-- version: 1.0.26 -->
 
-<!-- test-count: 548 -->
+<!-- test-count: 556 -->
 
-<!-- last-updated: 2026-07-13 -->
+<!-- last-updated: 2026-07-14 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-07-13 (hooks-only recipes now retain both Claude and Codex runtime registrations). Earlier
-2026-07-10: section 2.12 now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups, and independent
-doctor cleanup/double-fire state. Earlier 2026-07-08: runtime hook QA moved to tracked user-scope
+**Last updated**: 2026-07-14 (memory §16 now checks the generated `type`/`title`/`description` + `forge_memory`
+envelope, verifies no generated `resource`/`tags`/`timestamp`, and exercises idempotent legacy-passport upgrade).
+Earlier 2026-07-13: hooks-only recipes now retain both Claude and Codex runtime registrations. Earlier 2026-07-10:
+section 2.12 now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups, and independent doctor
+cleanup/double-fire state. Earlier 2026-07-08: runtime hook QA moved to tracked user-scope
 `forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
 same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
 auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:

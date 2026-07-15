@@ -19,6 +19,7 @@ from typing import Any
 
 import yaml
 from ruamel.yaml import YAML
+from yaml.nodes import MappingNode
 
 from forge.core.state.io import atomic_write_text
 from forge.session.exceptions import InvalidSessionNameError, PassportError
@@ -112,6 +113,14 @@ class Passport:
     captures: list[str] = field(default_factory=list)
     excludes: list[str] = field(default_factory=list)
     update: PassportUpdate = field(default_factory=PassportUpdate)
+
+
+@dataclass(frozen=True)
+class PreparedPassportWrite:
+    """Validated passport rewrite ready for one atomic apply."""
+
+    text: str
+    added_okf_fields: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +242,15 @@ def resolve_doc_spec(
 # Frontmatter parsing
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
+_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(?P<yaml>.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
+_MUTATION_FRONTMATTER_RE = re.compile(
+    r"\A---[ \t]*\r?\n(?P<yaml>.*?)^---[ \t]*\r?\n",
+    re.DOTALL | re.MULTILINE,
+)
+_MUTATION_FRONTMATTER_EOF_RE = re.compile(
+    r"\A---[ \t]*\r?\n(?P<yaml>.*?)^---[ \t]*\Z",
+    re.DOTALL | re.MULTILINE,
+)
 
 
 def extract_frontmatter(text: str) -> tuple[dict[str, Any] | None, str]:
@@ -248,7 +265,7 @@ def extract_frontmatter(text: str) -> tuple[dict[str, Any] | None, str]:
     if m is None:
         return None, text
 
-    yaml_block = m.group(1)
+    yaml_block = m.group("yaml")
     body = text[m.end() :]
 
     try:
@@ -261,6 +278,47 @@ def extract_frontmatter(text: str) -> tuple[dict[str, Any] | None, str]:
     if not isinstance(data, dict):
         return None, text
 
+    return data, body
+
+
+def _extract_frontmatter_for_mutation(text: str) -> tuple[dict[str, Any] | None, str]:
+    """Split mapping frontmatter for a write without broadening read behavior."""
+    if text.startswith("\ufeff---"):
+        raise PassportError(
+            "frontmatter",
+            "leading UTF-8 BOM before YAML frontmatter is not supported for mutation",
+            hint="remove the BOM, then retry",
+        )
+
+    # Prefer the delimiter span selected by the permissive read parser. The
+    # mutation-only fallback keeps a truly zero-line empty block writable,
+    # which the legacy read regex intentionally does not recognize.
+    match = _FRONTMATTER_RE.match(text) or _MUTATION_FRONTMATTER_RE.match(text)
+    if match is None:
+        if _MUTATION_FRONTMATTER_EOF_RE.match(text) is not None:
+            raise PassportError(
+                "frontmatter",
+                "closing YAML delimiter at end of file is not supported for mutation",
+                hint="add a newline after the closing '---', then retry",
+            )
+        return None, text
+
+    yaml_block = match.group("yaml")
+    body = text[match.end() :]
+    try:
+        node = yaml.compose(yaml_block)
+        data = yaml.safe_load(yaml_block)
+    except yaml.YAMLError as exc:
+        raise PassportError("frontmatter", f"malformed YAML: {exc}") from exc
+
+    if node is None:
+        return {}, body
+    if not isinstance(node, MappingNode) or not isinstance(data, dict):
+        raise PassportError(
+            "frontmatter",
+            f"must be a mapping (got {type(data).__name__})",
+            hint="replace the YAML root with a mapping before retrying",
+        )
     return data, body
 
 
@@ -491,21 +549,178 @@ def serialize_passport(passport: Passport) -> str:
     return _dump_yaml({"forge_memory": _passport_to_dict(passport)})
 
 
-def write_passport(path: Path, passport: Passport) -> None:
+_RESERVED_OKF_BASENAMES = frozenset({"index.md", "log.md"})
+_FENCE_OPEN_RE = re.compile(r"^[ ]{0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
+_ATX_H1_RE = re.compile(r"^[ ]{0,3}#[ \t]+(?P<title>.*)$")
+_ATX_CLOSING_RE = re.compile(r"[ \t]+#+[ \t]*$")
+
+
+def validate_okf_reserved_basenames(logical_path: str, resolved_path: Path) -> None:
+    """Reject logical or resolved paths whose basename is reserved by OKF."""
+    logical = Path(logical_path)
+    if logical.name.casefold() in _RESERVED_OKF_BASENAMES:
+        raise PassportError(
+            "path",
+            f"'{logical.name}' is reserved by OKF and cannot be a memory concept document",
+            hint="choose a non-reserved Markdown filename",
+        )
+    if resolved_path.name.casefold() in _RESERVED_OKF_BASENAMES:
+        raise PassportError(
+            "path",
+            f"resolved target '{resolved_path.name}' is reserved by OKF",
+            hint="choose a document that does not resolve to index.md or log.md",
+        )
+
+
+def validate_okf_memory_path(logical_path: str, resolved_path: Path) -> None:
+    """Validate the scanner path and resolved target for OKF generation."""
+    logical = Path(logical_path)
+    if logical.suffix != ".md":
+        raise PassportError(
+            "path",
+            f"OKF memory documents require an exact '.md' suffix: {logical_path}",
+            hint="rename the document with a lowercase .md suffix, then retry",
+        )
+    validate_okf_reserved_basenames(logical_path, resolved_path)
+
+
+def _derive_okf_title(body: str, logical_path: str) -> str | None:
+    fence_char: str | None = None
+    fence_length = 0
+    for line in body.splitlines():
+        if fence_char is not None:
+            closing = re.match(rf"^[ ]{{0,3}}{re.escape(fence_char)}{{{fence_length},}}[ \t]*$", line)
+            if closing is not None:
+                fence_char = None
+                fence_length = 0
+            continue
+
+        fence = _FENCE_OPEN_RE.match(line)
+        if fence is not None:
+            marker = fence.group("fence")
+            if marker.startswith("~") or "`" not in fence.group("info"):
+                fence_char = marker[0]
+                fence_length = len(marker)
+                continue
+
+        heading = _ATX_H1_RE.match(line)
+        if heading is None:
+            continue
+        title = heading.group("title").strip()
+        if re.fullmatch(r"#+", title):
+            title = ""
+        else:
+            title = _ATX_CLOSING_RE.sub("", title).strip()
+        if title:
+            return title
+
+    stem = Path(logical_path).stem
+    normalized = re.sub(r"[_-]+", " ", stem)
+    normalized = " ".join(normalized.split())
+    return normalized or None
+
+
+def _add_okf_envelope(
+    frontmatter: dict[str, Any],
+    body: str,
+    passport: Passport,
+    logical_path: str,
+) -> tuple[str, ...]:
+    added: list[str] = []
+    if "type" not in frontmatter:
+        frontmatter["type"] = "Memory Document"
+        added.append("type")
+    else:
+        concept_type = frontmatter["type"]
+        if not isinstance(concept_type, str) or not concept_type.strip():
+            raise PassportError("type", "must be a non-empty string when present")
+
+    if "title" not in frontmatter:
+        title = _derive_okf_title(body, logical_path)
+        if title is not None:
+            frontmatter["title"] = title
+            added.append("title")
+
+    if "description" not in frontmatter:
+        frontmatter["description"] = " ".join(passport.intent.split())
+        added.append("description")
+
+    return tuple(added)
+
+
+def _prepare_frontmatter_rewrite(
+    frontmatter: dict[str, Any],
+    body: str,
+    *,
+    added_okf_fields: tuple[str, ...] = (),
+) -> PreparedPassportWrite:
+    """Render one frontmatter mutation through the shared atomic-apply path."""
+    text = f"---\n{_dump_yaml(frontmatter)}---\n{body}" if frontmatter else body
+    return PreparedPassportWrite(text=text, added_okf_fields=added_okf_fields)
+
+
+def prepare_passport_write(
+    path: Path,
+    passport: Passport,
+    *,
+    okf_path: str | None = None,
+) -> PreparedPassportWrite:
+    """Validate and render a passport rewrite without touching the file."""
+    parse_passport(_passport_to_dict(passport))
+    text = path.read_text(encoding="utf-8")
+    frontmatter, body = _extract_frontmatter_for_mutation(text)
+    if frontmatter is None:
+        frontmatter = {}
+
+    added: tuple[str, ...] = ()
+    if okf_path is not None:
+        validate_okf_memory_path(okf_path, path)
+        added = _add_okf_envelope(frontmatter, body, passport, okf_path)
+
+    frontmatter["forge_memory"] = _passport_to_dict(passport)
+    return _prepare_frontmatter_rewrite(frontmatter, body, added_okf_fields=added)
+
+
+def apply_prepared_passport_write(path: Path, prepared: PreparedPassportWrite) -> tuple[str, ...]:
+    """Apply a previously validated passport rewrite atomically."""
+    atomic_write_text(path, prepared.text, preserve_existing_mode=True)
+    return prepared.added_okf_fields
+
+
+def write_passport(
+    path: Path,
+    passport: Passport,
+    *,
+    okf_path: str | None = None,
+) -> tuple[str, ...]:
     """Write or replace ``forge_memory`` frontmatter in a markdown file.
 
     Preserves non-``forge_memory`` frontmatter keys and markdown body.
     Uses atomic write (tempfile + rename) for crash safety.
     """
+    prepared = prepare_passport_write(path, passport, okf_path=okf_path)
+    return apply_prepared_passport_write(path, prepared)
+
+
+def upgrade_passport_envelope(path: Path, *, logical_path: str) -> tuple[str, ...]:
+    """Add missing OKF fields while preserving the raw ``forge_memory`` mapping."""
+    validate_okf_memory_path(logical_path, path)
     text = path.read_text(encoding="utf-8")
-    fm, body = extract_frontmatter(text)
+    frontmatter, body = _extract_frontmatter_for_mutation(text)
+    if frontmatter is None or "forge_memory" not in frontmatter:
+        raise PassportError(
+            "forge_memory",
+            "passport not found",
+            hint=f"run 'forge memory track {logical_path} --strategy <strategy>' first",
+        )
 
-    if fm is None:
-        fm = {}
-    fm["forge_memory"] = _passport_to_dict(passport)
+    passport = parse_passport(frontmatter["forge_memory"])
+    added = _add_okf_envelope(frontmatter, body, passport, logical_path)
+    if not added:
+        return ()
 
-    new_text = f"---\n{_dump_yaml(fm)}---\n{body}"
-    atomic_write_text(path, new_text)
+    prepared = _prepare_frontmatter_rewrite(frontmatter, body, added_okf_fields=added)
+    return apply_prepared_passport_write(path, prepared)
 
 
 def remove_passport(path: Path) -> bool:
@@ -515,17 +730,13 @@ def remove_passport(path: Path) -> bool:
     when a passport key was removed, False when no passport was present.
     """
     text = path.read_text(encoding="utf-8")
-    fm, body = extract_frontmatter(text)
+    fm, body = _extract_frontmatter_for_mutation(text)
 
     if fm is None or "forge_memory" not in fm:
         return False
 
     del fm["forge_memory"]
-    if fm:
-        new_text = f"---\n{_dump_yaml(fm)}---\n{body}"
-    else:
-        new_text = body
-    atomic_write_text(path, new_text)
+    apply_prepared_passport_write(path, _prepare_frontmatter_rewrite(fm, body))
     return True
 
 
@@ -581,7 +792,12 @@ def synthesize_passport(
 
     validate_writer_spec(writers)
 
-    resolved_intent = intent or _DEFAULT_INTENTS.get(strategy, "Project documentation")
+    if intent is None:
+        resolved_intent = _DEFAULT_INTENTS.get(strategy, "Project documentation")
+    elif not intent.strip():
+        raise PassportError("forge_memory.intent", "must be a non-empty string")
+    else:
+        resolved_intent = intent
 
     return Passport(
         version=PASSPORT_VERSION,

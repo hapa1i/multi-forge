@@ -391,6 +391,18 @@ class TestQaMemoryWriterChecklist:
         assert "forge session memory enable --session" in step
         assert "forge memory list" in step
 
+    def test_memory_setup_checks_okf_envelope_semantically(self):
+        memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
+        content = memory_md.read_text()
+        step = content.split("### 16.1", 1)[1].split("### 16.2", 1)[0]
+
+        assert 'frontmatter["type"]' in step
+        assert 'frontmatter["title"]' in step
+        assert 'frontmatter["description"]' in step
+        assert 'frontmatter["forge_memory"]' in step
+        assert '("resource", "tags", "timestamp")' in step
+        assert "head -5" not in step
+
     def test_memory_includes_shadow_doc_step(self):
         memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
         content = memory_md.read_text()
@@ -409,3 +421,42 @@ class TestQaMemoryWriterChecklist:
         assert "queued_handoff" in step
         assert "forge session list" in step
         assert "forge handoff run" not in code
+
+    def test_memory_includes_idempotent_passport_upgrade(self):
+        memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
+        content = memory_md.read_text()
+        step = content.split("### 16.5", 1)[1]
+
+        assert "forge memory passport upgrade" in step
+        assert 'frontmatter["type"]' in step
+        assert 'frontmatter["title"]' in step
+        assert 'frontmatter["description"]' in step
+        assert 'frontmatter["forge_memory"]' in step
+        assert '("resource", "tags", "timestamp")' in step
+        assert "cmp -s" in step
+
+
+class TestWalkthroughMemoryChecklist:
+    def test_memory_step_covers_envelope_upgrade_and_remove(self):
+        checklist = SKILLS_DIR / "walkthrough" / "resources" / "checklist.md"
+        content = checklist.read_text()
+        step = content.split("### 11.5", 1)[1].split("## 12.", 1)[0]
+
+        assert "forge memory passport upgrade" in step
+        assert "def frontmatter_facts" in step
+        assert 'tracked_values[("type",)]' in step
+        assert 'tracked_values[("title",)]' in step
+        assert 'tracked_values[("description",)]' in step
+        assert '("forge_memory",) in tracked_mappings' in step
+        assert '{"resource", "tags", "timestamp"}' in step
+        assert 'assert "forge_memory" not in removed_top_level' in step
+        assert "cmp -s" in step
+
+    def test_memory_step_uses_only_stdlib_python(self):
+        checklist = SKILLS_DIR / "walkthrough" / "resources" / "checklist.md"
+        content = checklist.read_text()
+        step = content.split("### 11.5", 1)[1].split("## 12.", 1)[0]
+
+        assert "import yaml" not in step
+        assert "import ast" in step
+        assert "from pathlib import Path" in step

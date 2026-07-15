@@ -7,6 +7,7 @@ and synthesis.
 
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 import pytest
@@ -20,16 +21,21 @@ from forge.session.passport import (
     MemoryStrategy,
     Passport,
     PassportUpdate,
+    apply_prepared_passport_write,
     check_writer_access,
     derive_shadow_path,
     extract_frontmatter,
     parse_passport,
+    prepare_passport_write,
     read_passport,
     remove_passport,
     resolve_doc_spec,
     resolve_passport_source,
     resolve_with_overrides,
     synthesize_passport,
+    upgrade_passport_envelope,
+    validate_okf_memory_path,
+    validate_okf_reserved_basenames,
     validate_writer_spec,
     write_passport,
 )
@@ -91,6 +97,18 @@ class TestExtractFrontmatter:
         text = "---\n: invalid: yaml: [[\n---\nBody\n"
         with pytest.raises(PassportError, match="malformed YAML"):
             extract_frontmatter(text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "\ufeff---\ntitle: BOM\n---\n# Body\n",
+            "---\ntitle: EOF\n---",
+        ],
+    )
+    def test_unsupported_delimiter_variants_keep_permissive_read_behavior(self, text: str) -> None:
+        fm, body = extract_frontmatter(text)
+        assert fm is None
+        assert body == text
 
 
 # ---------------------------------------------------------------------------
@@ -467,6 +485,376 @@ class TestRemovePassport:
             remove_passport(doc)
 
 
+class TestMutationFrontmatterSafety:
+    def _passport(self) -> Passport:
+        return Passport(version=1, intent="Safe mutation")
+
+    @pytest.mark.parametrize("yaml_root", ["- item\n", "plain\n", "1\n", "true\n", "null\n", "~\n"])
+    def test_write_rejects_non_mapping_roots_byte_identically(self, tmp_path: Path, yaml_root: str) -> None:
+        doc = tmp_path / "doc.md"
+        original = f"---\n{yaml_root}---\n# Body\n"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match="frontmatter: must be a mapping"):
+            write_passport(doc, self._passport())
+
+        assert doc.read_text() == original
+        assert doc.read_text().count("---") == 2
+
+    @pytest.mark.parametrize("yaml_block", ["", "# comment only\n"])
+    def test_empty_and_comment_only_frontmatter_remain_writable(self, tmp_path: Path, yaml_block: str) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(f"---\n{yaml_block}---\n# Body\n")
+
+        write_passport(doc, self._passport())
+
+        assert read_passport(doc) is not None
+        assert "# Body\n" in doc.read_text()
+
+    def test_read_uses_later_delimiter_when_first_yaml_line_is_document_start(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "---\n"
+            "# Body\n"
+        )
+
+        passport = read_passport(doc)
+
+        assert passport is not None
+        assert passport.intent == "Legacy"
+
+    @pytest.mark.parametrize("operation", ["write", "remove", "upgrade"])
+    def test_mutations_use_same_delimiter_as_read_parser(self, tmp_path: Path, operation: str) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "---\n"
+            "# Body\n"
+        )
+
+        if operation == "write":
+            write_passport(doc, self._passport())
+            passport = read_passport(doc)
+            assert passport is not None
+            assert passport.intent == "Safe mutation"
+        elif operation == "remove":
+            assert remove_passport(doc) is True
+            assert doc.read_text() == "# Body\n"
+        else:
+            assert upgrade_passport_envelope(doc, logical_path="docs/doc.md") == (
+                "type",
+                "title",
+                "description",
+            )
+            passport = read_passport(doc)
+            assert passport is not None
+            assert passport.intent == "Legacy"
+
+        assert doc.read_text().count("---") == (0 if operation == "remove" else 2)
+
+    @pytest.mark.parametrize(
+        "original, error",
+        [
+            ("\ufeff---\ntitle: BOM\n---\n# Body\n", "leading UTF-8 BOM"),
+            ("---\ntitle: EOF\n---", "closing YAML delimiter"),
+        ],
+    )
+    def test_unsupported_delimiter_variants_fail_byte_identically(
+        self,
+        tmp_path: Path,
+        original: str,
+        error: str,
+    ) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match=error):
+            write_passport(doc, self._passport())
+
+        assert doc.read_text() == original
+
+    @pytest.mark.parametrize(
+        "original, error",
+        [
+            ("---\n- forge_memory\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\nplain\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\n1\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\ntrue\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\nnull\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\n~\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("\ufeff---\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Body\n", "leading UTF-8 BOM"),
+            ("---\nforge_memory:\n  version: 1\n  intent: Test\n---", "closing YAML delimiter"),
+        ],
+    )
+    def test_remove_rejects_unsafe_frontmatter_byte_identically(
+        self,
+        tmp_path: Path,
+        original: str,
+        error: str,
+    ) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match=error):
+            remove_passport(doc)
+
+        assert doc.read_text() == original
+
+
+class TestOKFEnvelope:
+    def _passport(self, *, intent: str = "Project documentation") -> Passport:
+        return Passport(version=1, intent=intent, update=PassportUpdate(strategy="generic"))
+
+    def test_new_passport_gets_exact_envelope_without_deferred_fields(self, tmp_path: Path) -> None:
+        doc = tmp_path / "implementation_notes.md"
+        doc.write_text("# Implementation Notes\nBody\n")
+
+        added = write_passport(doc, self._passport(), okf_path="docs/implementation_notes.md")
+
+        fm, body = extract_frontmatter(doc.read_text())
+        assert fm is not None
+        assert added == ("type", "title", "description")
+        assert fm["type"] == "Memory Document"
+        assert fm["title"] == "Implementation Notes"
+        assert fm["description"] == "Project documentation"
+        assert "forge_memory" in fm
+        assert not {"resource", "tags", "timestamp"} & fm.keys()
+        assert body == "# Implementation Notes\nBody\n"
+
+    @pytest.mark.parametrize(
+        "body, logical_path, expected",
+        [
+            (
+                "```md\n# Fake\n```\n# Real Heading ###\n",
+                "docs/fallback.md",
+                "Real Heading",
+            ),
+            ("~~~\n# Fake\n~~~~\nNo heading\n", "docs/OKF_api-v2.md", "OKF api v2"),
+            ("No heading\n", "docs/iOS-guide.md", "iOS guide"),
+            ("# First\n# Second\n", "docs/fallback.md", "First"),
+            ("# ###\n# Real Heading\n", "docs/fallback.md", "Real Heading"),
+        ],
+    )
+    def test_title_derivation_preserves_authored_case(
+        self,
+        tmp_path: Path,
+        body: str,
+        logical_path: str,
+        expected: str,
+    ) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(body)
+
+        write_passport(doc, self._passport(), okf_path=logical_path)
+
+        fm, _ = extract_frontmatter(doc.read_text())
+        assert fm is not None
+        assert fm["title"] == expected
+
+    def test_separator_only_stem_omits_optional_title(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("No heading\n")
+
+        added = write_passport(doc, self._passport(), okf_path="docs/---.md")
+
+        fm, _ = extract_frontmatter(doc.read_text())
+        assert fm is not None
+        assert "title" not in fm
+        assert added == ("type", "description")
+
+    def test_description_collapses_intent_whitespace(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Doc\n")
+
+        write_passport(
+            doc,
+            self._passport(intent="  Durable\n\tproject   memory  "),
+            okf_path="docs/doc.md",
+        )
+
+        fm, _ = extract_frontmatter(doc.read_text())
+        assert fm is not None
+        assert fm["description"] == "Durable project memory"
+
+    @pytest.mark.parametrize("type_yaml", ["null", "''", "'   '", "true", "1", "[]", "{}"])
+    def test_invalid_present_type_fails_byte_identically(self, tmp_path: Path, type_yaml: str) -> None:
+        doc = tmp_path / "doc.md"
+        original = f"---\ntype: {type_yaml}\n---\n# Doc\n"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match="type: must be a non-empty string"):
+            write_passport(doc, self._passport(), okf_path="docs/doc.md")
+
+        assert doc.read_text() == original
+
+    def test_existing_outer_values_are_not_repaired_or_overwritten(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "type: Custom Concept\n"
+            "title:\n"
+            "description: 7\n"
+            "tags: [custom]\n"
+            "timestamp: 2026-07-14\n"
+            "custom_key:\n"
+            "  nested: true\n"
+            "---\n"
+            "# Replacement Heading\n"
+        )
+
+        write_passport(doc, self._passport(), okf_path="docs/doc.md")
+
+        fm, _ = extract_frontmatter(doc.read_text())
+        assert fm is not None
+        assert fm["type"] == "Custom Concept"
+        assert fm["title"] is None
+        assert fm["description"] == 7
+        assert fm["tags"] == ["custom"]
+        assert str(fm["timestamp"]) == "2026-07-14"
+        assert fm["custom_key"] == {"nested": True}
+
+    @pytest.mark.parametrize(
+        "logical_path",
+        ["docs/doc.txt", "docs/doc.MD", "docs/index.md", "docs/log.md", "docs/Index.md", "docs/LOG.md"],
+    )
+    def test_invalid_logical_paths_are_rejected(self, tmp_path: Path, logical_path: str) -> None:
+        resolved = tmp_path / "doc.md"
+        with pytest.raises(PassportError, match="path:"):
+            validate_okf_memory_path(logical_path, resolved)
+
+    @pytest.mark.parametrize("basename", ["index.md", "Index.md", "LOG.md"])
+    def test_resolved_reserved_target_is_rejected(self, tmp_path: Path, basename: str) -> None:
+        resolved = tmp_path / basename
+        with pytest.raises(PassportError, match="resolved target.*reserved"):
+            validate_okf_memory_path("docs/alias.md", resolved)
+
+    def test_reserved_basename_validator_does_not_apply_suffix_policy(self, tmp_path: Path) -> None:
+        validate_okf_reserved_basenames("docs/alias.txt", tmp_path / "target.txt")
+
+    def test_suffix_policy_uses_logical_path(self, tmp_path: Path) -> None:
+        validate_okf_memory_path("docs/alias.md", tmp_path / "target.txt")
+        with pytest.raises(PassportError, match="exact '.md' suffix"):
+            validate_okf_memory_path("docs/alias.txt", tmp_path / "target.md")
+
+    def test_prepare_validates_without_writing(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        original = "# Doc\n"
+        doc.write_text(original)
+
+        prepared = prepare_passport_write(doc, self._passport(), okf_path="docs/doc.md")
+
+        assert doc.read_text() == original
+        assert prepared.added_okf_fields == ("type", "title", "description")
+        assert apply_prepared_passport_write(doc, prepared) == prepared.added_okf_fields
+        assert "forge_memory" in doc.read_text()
+
+
+class TestUpgradePassportEnvelope:
+    def test_upgrade_preserves_raw_passport_and_is_idempotent(self, tmp_path: Path) -> None:
+        doc = tmp_path / "legacy.md"
+        doc.write_text(
+            "---\n"
+            "custom: keep\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy durable memory\n"
+            "  update:\n"
+            "    writers: all-sessions\n"
+            "    inherit_on_fork: false\n"
+            "---\n"
+            "# Legacy Notes\n"
+        )
+        before_fm, _ = extract_frontmatter(doc.read_text())
+        assert before_fm is not None
+        raw_passport = before_fm["forge_memory"]
+
+        added = upgrade_passport_envelope(doc, logical_path="docs/legacy.md")
+
+        assert added == ("type", "title", "description")
+        after_fm, _ = extract_frontmatter(doc.read_text())
+        assert after_fm is not None
+        assert after_fm["forge_memory"] == raw_passport
+        assert after_fm["forge_memory"]["update"] == {
+            "writers": "all-sessions",
+            "inherit_on_fork": False,
+        }
+        upgraded = doc.read_bytes()
+        assert upgrade_passport_envelope(doc, logical_path="docs/legacy.md") == ()
+        assert doc.read_bytes() == upgraded
+
+    def test_upgrade_requires_existing_valid_passport(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Doc\n")
+
+        with pytest.raises(PassportError, match="passport not found"):
+            upgrade_passport_envelope(doc, logical_path="docs/doc.md")
+
+    def test_upgrade_invalid_type_is_byte_identical(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        original = "---\ntype: []\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Doc\n"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match="type: must be a non-empty string"):
+            upgrade_passport_envelope(doc, logical_path="docs/doc.md")
+
+        assert doc.read_text() == original
+
+    @pytest.mark.parametrize(
+        "original, error",
+        [
+            ("---\n- forge_memory\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\nplain\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\n1\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\ntrue\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\nnull\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("---\n~\n---\n# Body\n", "frontmatter: must be a mapping"),
+            ("\ufeff---\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Body\n", "leading UTF-8 BOM"),
+            ("---\nforge_memory:\n  version: 1\n  intent: Test\n---", "closing YAML delimiter"),
+        ],
+    )
+    def test_upgrade_rejects_unsafe_frontmatter_byte_identically(
+        self,
+        tmp_path: Path,
+        original: str,
+        error: str,
+    ) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(original)
+
+        with pytest.raises(PassportError, match=error):
+            upgrade_passport_envelope(doc, logical_path="docs/doc.md")
+
+        assert doc.read_text() == original
+
+    @pytest.mark.parametrize("operation", ["write", "upgrade", "remove"])
+    def test_successful_mutations_preserve_file_mode(self, tmp_path: Path, operation: str) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("---\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Doc\n")
+        doc.chmod(0o644)
+
+        if operation == "write":
+            write_passport(doc, Passport(version=1, intent="Changed"))
+        elif operation == "upgrade":
+            upgrade_passport_envelope(doc, logical_path="docs/doc.md")
+        else:
+            remove_passport(doc)
+
+        assert stat.S_IMODE(doc.stat().st_mode) == 0o644
+
+
 # ---------------------------------------------------------------------------
 # TestSynthesizePassport
 # ---------------------------------------------------------------------------
@@ -482,6 +870,11 @@ class TestSynthesizePassport:
         p = synthesize_passport(strategy="changelog")
         assert p.intent  # non-empty
         assert p.version == PASSPORT_VERSION
+
+    @pytest.mark.parametrize("intent", ["", "   ", "\t\n"])
+    def test_explicit_blank_intent_raises(self, intent: str) -> None:
+        with pytest.raises(PassportError, match="forge_memory.intent: must be a non-empty string"):
+            synthesize_passport(strategy="generic", intent=intent)
 
     def test_shadow_only_mode_with_shadow_path(self) -> None:
         p = synthesize_passport(

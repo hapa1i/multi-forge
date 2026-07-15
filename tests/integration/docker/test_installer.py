@@ -70,6 +70,28 @@ print('hooks present')
         assert check.returncode == 0, f"Settings check failed: {check.stderr}"
         assert "hooks present" in check.stdout
 
+    def test_full_profile_memory_passport_assets(self, synced_container: ContainerLike) -> None:
+        """Full installs ship the envelope and explicit-upgrade QA guidance."""
+        synced_container.exec("rm -rf ~/.claude ~/.forge")
+
+        result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile full")
+        assert result.returncode == 0, f"Enable failed: {result.stderr}"
+
+        qa = synced_container.read_file("$HOME/.claude/skills/qa/resources/checklist/16-memory.md")
+        walkthrough = synced_container.read_file("$HOME/.claude/skills/walkthrough/resources/checklist.md")
+
+        for content in (qa, walkthrough):
+            assert "Memory Document" in content
+            assert "forge_memory" in content
+            assert "forge memory passport upgrade" in content
+
+        assert 'assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))' in qa
+        assert 'forbidden = {"resource", "tags", "timestamp"}' in walkthrough
+        assert "forbidden.isdisjoint" in walkthrough
+        assert "import yaml" not in walkthrough
+        assert "cmp -s .forge/memory/legacy-passport.md /tmp/legacy-passport.upgraded" in qa
+        assert "cmp -s .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded" in walkthrough
+
     def test_init_is_idempotent(self, synced_container: ContainerLike) -> None:
         """Verify running extension enable twice doesn't error."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
@@ -562,6 +584,7 @@ class TestCodexHooksModule:
             " && chmod +x /tmp/fake-bin/codex"
         )
         synced_container.write_file("/tmp/codex-home/config.toml", 'model = "gpt-5.5-codex"\n')
+        synced_container.exec("chmod 0644 /tmp/codex-home/config.toml")
 
         enable = (
             "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
@@ -572,9 +595,11 @@ class TestCodexHooksModule:
         config = synced_container.read_file("/tmp/codex-home/config.toml")
         assert config.startswith('model = "gpt-5.5-codex"\n')
         assert "# >>> forge hooks >>>" in config
+        assert synced_container.exec("stat -c %a /tmp/codex-home/config.toml").stdout.strip() == "644"
 
         result = synced_container.exec(
             "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension disable --scope user --yes"
         )
         assert result.returncode == 0
         assert synced_container.read_file("/tmp/codex-home/config.toml") == 'model = "gpt-5.5-codex"\n'
+        assert synced_container.exec("stat -c %a /tmp/codex-home/config.toml").stdout.strip() == "644"
