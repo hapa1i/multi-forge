@@ -374,6 +374,58 @@ class TestWorktreeCreate:
         mock_installer.assert_not_called()
 
     @patch("subprocess.run")
+    def test_incompatible_fallback_target_uses_detached_worktree(
+        self,
+        mock_run: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        checkout_root = tmp_path / "repo"
+        checkout_root.mkdir()
+        target_checkout = tmp_path / "repo-target-refused"
+        target_compat = target_checkout / ".forge" / "project.toml"
+        target_compat.parent.mkdir(parents=True)
+        target_compat.write_text('schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8")
+        mock_run.side_effect = [
+            MagicMock(returncode=128, stdout="", stderr="branch already exists"),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]
+
+        with (
+            patch("forge.session.worktree.create.get_repo_root", return_value=checkout_root),
+            patch("forge.core.ops.context.find_forge_root", return_value=checkout_root),
+            patch("forge.session.worktree.create.get_main_repo_root", return_value=checkout_root),
+            patch("forge.session.worktree.create.find_git_binary", return_value="/usr/bin/git"),
+            patch("forge.session.worktree.create.resolve_worktree_path", return_value=target_checkout),
+            patch(
+                "forge.session.worktree.cleanup.cleanup_worktree",
+                return_value=MagicMock(errors=[]),
+            ) as mock_cleanup,
+        ):
+            result = CliRunner().invoke(
+                hooks,
+                ["worktree-create"],
+                input=json.dumps({"cwd": str(checkout_root), "name": "target-refused"}),
+                catch_exceptions=False,
+            )
+
+        assert result.exit_code == 1
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[1].args[0] == [
+            "/usr/bin/git",
+            "worktree",
+            "add",
+            "--detach",
+            str(target_checkout),
+        ]
+        mock_cleanup.assert_called_once_with(
+            worktree_path=target_checkout,
+            branch=None,
+            delete_branch_flag=False,
+            force=True,
+            repo_root=checkout_root,
+        )
+
+    @patch("subprocess.run")
     def test_target_refusal_surfaces_incomplete_rollback(
         self,
         mock_run: MagicMock,
