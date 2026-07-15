@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 
 import pytest
+import yaml
 
 from forge.session.models import (
     MemoryIntent,
@@ -349,6 +350,19 @@ class TestHandoffRunMultiDoc:
         )
         assert result.returncode == 0, result.stderr
 
+        tracked_content = mock_claude_workspace.read_file("/workspace/docs/state.md")
+        _, serialized_frontmatter, _ = tracked_content.split("---\n", 2)
+        frontmatter = yaml.safe_load(serialized_frontmatter)
+        assert isinstance(frontmatter, dict)
+        assert frontmatter["type"] == "Memory Document"
+        assert frontmatter["title"] == "State"
+        assert frontmatter["description"] == "Current project focus and handoff state"
+        assert {"resource", "tags", "timestamp"}.isdisjoint(frontmatter)
+
+        passport = frontmatter["forge_memory"]
+        assert passport["intent"] == "Current project focus and handoff state"
+        assert passport["update"]["strategy"] == "project-state"
+
         result = mock_claude_workspace.exec(
             f"cd /workspace && forge session memory enable --review-only --session {session_name}"
         )
@@ -375,6 +389,10 @@ class TestHandoffRunMultiDoc:
             timeout=20,
         )
         assert result.returncode == 0, result.stderr
+
+        # Review-only processing must leave the tracked document, including its
+        # generated envelope, untouched after discovery and prompt construction.
+        assert mock_claude_workspace.read_file("/workspace/docs/state.md") == tracked_content
 
         prompt = claude_capture_file("/tmp/claude_stdin_*.log")
         assert "Do NOT modify any files" in prompt

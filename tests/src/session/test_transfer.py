@@ -669,7 +669,11 @@ class TestDecisionCitationValidation:
             ("turn 4", {1, 2, 3}, False),  # out of range
             ("turn 0", {1, 2, 3}, False),  # turns are 1-indexed
             ("turn 1", set(), False),  # unknown range -> not trusted
-            ("turn 2", {1, 3}, False),  # SPARSE: turn 2 was skipped (never emitted) -> fabricated
+            (
+                "turn 2",
+                {1, 3},
+                False,
+            ),  # SPARSE: turn 2 was skipped (never emitted) -> fabricated
             ("[turn 2]", {1, 2, 3}, True),  # bracketed form
             ("src/forge/session/transfer.py:80", {1, 2, 3}, True),
             ("src/forge/session/transfer.py:80-95", {1, 2, 3}, True),  # line range
@@ -886,7 +890,10 @@ class TestAICuratedStrategy:
                 {"text": "Fabricated turn decision", "citation": "turn 99"},
                 {"text": "Vague decision", "citation": "because the user said so"},
                 {"text": "Grounded turn decision", "citation": "turn 1"},
-                {"text": "Grounded file decision", "citation": "src/forge/session/transfer.py:80"},
+                {
+                    "text": "Grounded file decision",
+                    "citation": "src/forge/session/transfer.py:80",
+                },
             ],
             "current_state": "State",
             "files": [],
@@ -910,7 +917,11 @@ class TestAICuratedStrategy:
 
         assert schema == "full"
         # All decision text survives; only the false provenance is removed.
-        for text in ("Fabricated turn decision", "Vague decision", "Grounded turn decision"):
+        for text in (
+            "Fabricated turn decision",
+            "Vague decision",
+            "Grounded turn decision",
+        ):
             assert text in content
         assert "turn 99" not in content
         assert "because the user said so" not in content
@@ -1143,7 +1154,10 @@ class TestInlinePlan:
             plan_file = plan_dir / "plan_test.md"
             plan_file.write_text("# Test Plan\n\n1. Do X\n2. Do Y")
             state.confirmed.artifacts["plans"] = [
-                {"kind": "approved", "snapshot_path": ".forge/artifacts/parent/plans/plan_test.md"}
+                {
+                    "kind": "approved",
+                    "snapshot_path": ".forge/artifacts/parent/plans/plan_test.md",
+                }
             ]
         return state
 
@@ -1243,7 +1257,10 @@ class TestInlinePlan:
 
         state = self._make_parent_state(worktree, with_plan=False)
         state.confirmed.artifacts["plans"] = [
-            {"kind": "approved", "snapshot_path": ".forge/artifacts/parent/plans/plan.md"}
+            {
+                "kind": "approved",
+                "snapshot_path": ".forge/artifacts/parent/plans/plan.md",
+            }
         ]
 
         result = assemble_transfer_context(
@@ -1436,6 +1453,20 @@ class TestTransferFrontmatter:
         assert warning is None
         assert "Just a body" in body
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "---\n- third-party\n---\nbody text\n",
+            "\ufeff---\nforge_transfer:\n  schema: test\n---\nbody text\n",
+            "---\nforge_transfer:\n  schema: test\n---",
+        ],
+    )
+    def test_parse_frontmatter_keeps_permissive_behavior_for_unsupported_shapes(self, text: str) -> None:
+        frontmatter, body, warning = parse_transfer_frontmatter(text)
+        assert frontmatter is None
+        assert body == text
+        assert warning is None
+
 
 class TestCurationUsageEmission:
     """Slice 5e: the ai-curated curation ``core.llm`` call is attributed to the usage
@@ -1455,7 +1486,8 @@ class TestCurationUsageEmission:
 
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = _fake_completion(
-            json.dumps(self._CURATED), usage={"prompt_tokens": 321, "completion_tokens": 12}
+            json.dumps(self._CURATED),
+            usage={"prompt_tokens": 321, "completion_tokens": 12},
         )
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -1561,7 +1593,13 @@ class TestCurationProviderUser:
     stamps, tagged with the ``transfer-curate`` role.
     """
 
-    _CURATED = {"goal": "g", "decisions": [], "current_state": "s", "files": [], "open_questions": []}
+    _CURATED = {
+        "goal": "g",
+        "decisions": [],
+        "current_state": "s",
+        "files": [],
+        "open_questions": [],
+    }
 
     def _captured_user(
         self,

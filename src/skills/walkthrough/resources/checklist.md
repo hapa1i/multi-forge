@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.1 -->
+<!-- version: 1.0.2 -->
 
-<!-- test-count: 95 assertions -->
+<!-- test-count: 98 assertions -->
 
-<!-- last-updated: 2026-07-10 -->
+<!-- last-updated: 2026-07-14 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -559,19 +559,87 @@ cat > .forge/memory/walkthrough-notes.md <<'EOF'
 EOF
 
 forge memory track .forge/memory/walkthrough-notes.md --strategy generic
+
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/walkthrough-notes.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+assert frontmatter["type"] == "Memory Document"
+assert frontmatter["title"] == "Walkthrough Notes"
+assert isinstance(frontmatter["description"], str) and frontmatter["description"].strip()
+assert isinstance(frontmatter["forge_memory"], dict)
+assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
+PY
+
 forge memory list
 forge memory list --json
 forge session memory enable --session walkthrough-demo
 forge session memory status
+
+cat > .forge/memory/walkthrough-legacy.md <<'EOF'
+---
+producer: walkthrough
+forge_memory:
+  version: 1
+  intent: "Legacy walkthrough notes."
+  update:
+    strategy: generic
+---
+# Walkthrough Legacy
+EOF
+
+forge memory passport upgrade .forge/memory/walkthrough-legacy.md
+cp .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded
+forge memory passport upgrade .forge/memory/walkthrough-legacy.md
+cmp -s .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded
+
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/walkthrough-legacy.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+assert frontmatter["type"] == "Memory Document"
+assert frontmatter["title"] == "Walkthrough Legacy"
+assert frontmatter["description"] == "Legacy walkthrough notes."
+assert frontmatter["producer"] == "walkthrough"
+assert frontmatter["forge_memory"] == {
+    "version": 1,
+    "intent": "Legacy walkthrough notes.",
+    "update": {"strategy": "generic"},
+}
+assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
+PY
+
 forge memory passport remove .forge/memory/walkthrough-notes.md
 forge memory list
+
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/walkthrough-notes.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+assert "forge_memory" not in frontmatter
+assert frontmatter["type"] == "Memory Document"
+assert frontmatter["title"] == "Walkthrough Notes"
+assert isinstance(frontmatter["description"], str) and frontmatter["description"].strip()
+PY
 ```
 
-- [ ] `track` writes a passport into the doc
+- [ ] Explicitly tracking `.forge/memory/walkthrough-notes.md` writes `type`, `title`, `description`, and `forge_memory`
+- [ ] Track generates no `resource`, `tags`, or `timestamp`; auto-created proposal shadows likewise get no envelope
 - [ ] `list` shows the path with `generic` strategy
 - [ ] `list --json` emits the passported doc in JSON form
 - [ ] `enable --session` sets activation for the session
-- [ ] `passport remove` succeeds and the final list no longer includes the doc
+- [ ] `passport upgrade` adds the envelope while preserving outer metadata and raw `forge_memory`; a second run is
+  byte-identical
+- [ ] `passport remove` deletes only `forge_memory`; the envelope remains and the final list excludes the doc
 
 ---
 

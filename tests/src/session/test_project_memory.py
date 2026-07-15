@@ -15,12 +15,25 @@ from forge.session.project_memory import (
 # ---------------------------------------------------------------------------
 
 
-def _write_doc(tmp_path, rel, *, strategy="generic", writers="all-sessions", update_mode="direct", shadow_path=None):
+def _write_doc(
+    tmp_path,
+    rel,
+    *,
+    strategy="generic",
+    writers="all-sessions",
+    update_mode="direct",
+    shadow_path=None,
+):
     """Write a markdown file with a valid forge_memory passport."""
     path = tmp_path / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("# Body\n", encoding="utf-8")
-    passport = synthesize_passport(strategy=strategy, update_mode=update_mode, shadow_path=shadow_path, writers=writers)
+    passport = synthesize_passport(
+        strategy=strategy,
+        update_mode=update_mode,
+        shadow_path=shadow_path,
+        writers=writers,
+    )
     write_passport(path, passport)
     return path
 
@@ -40,6 +53,25 @@ def test_scan_finds_passported_doc(tmp_path):
 
 def test_scan_skips_no_passport(tmp_path):
     _write_plain(tmp_path, "docs/notes.md")
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+
+
+def test_scan_ignores_okf_only_docs_and_bundle_index(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "concept.md").write_text("---\ntype: Memory Document\n---\n# Concept\n")
+    (docs / "index.md").write_text("---\ntype: Knowledge Bundle\n---\n# Index\n")
+
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+
+
+def test_scan_keeps_legacy_reserved_passport_compatibility(tmp_path):
+    _write_doc(tmp_path, "docs/index.md")
+    assert [doc.path for doc in scan_passported_docs(tmp_path, ["docs/"], "any-session")] == ["docs/index.md"]
+
+
+def test_scan_does_not_discover_legacy_non_markdown_passport(tmp_path):
+    _write_doc(tmp_path, "docs/notes.txt")
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
 
 
@@ -124,10 +156,28 @@ def test_scan_writer_filtering(tmp_path):
 def test_scan_malformed_passport_skips(tmp_path):
     _write_doc(tmp_path, "docs/good.md")
     bad = tmp_path / "docs/bad.md"
-    bad.write_text("---\nforge_memory:\n  version: not-an-int\n  intent: x\n---\n# Body\n", encoding="utf-8")
+    bad.write_text(
+        "---\nforge_memory:\n  version: not-an-int\n  intent: x\n---\n# Body\n",
+        encoding="utf-8",
+    )
     paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/"], "any-session")]
     assert "docs/good.md" in paths
     assert "docs/bad.md" not in paths
+
+
+def test_scan_silently_ignores_permissive_third_party_frontmatter(tmp_path, caplog):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    fixtures = {
+        "list.md": "---\n- third-party\n---\n# Body\n",
+        "bom.md": "\ufeff---\nforge_memory:\n  version: 1\n  intent: Hidden by BOM\n---\n# Body\n",
+        "eof.md": "---\nforge_memory:\n  version: 1\n  intent: Hidden at EOF\n---",
+    }
+    for name, content in fixtures.items():
+        (docs / name).write_text(content)
+
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+    assert caplog.records == []
 
 
 def test_scan_deterministic_order(tmp_path):
@@ -160,6 +210,19 @@ def test_scan_paths_forge_root_relative(tmp_path):
             assert not d.shadows.startswith("/")
 
 
+def test_scan_suffix_policy_uses_logical_symlink_name(tmp_path):
+    target_txt = _write_doc(tmp_path, "other/target.txt")
+    alias_md = tmp_path / "docs/alias.md"
+    alias_md.parent.mkdir(parents=True, exist_ok=True)
+    alias_md.symlink_to(target_txt)
+
+    target_md = _write_doc(tmp_path, "other/target.md")
+    (tmp_path / "docs/alias.txt").symlink_to(target_md)
+
+    paths = [doc.path for doc in scan_passported_docs(tmp_path, ["docs/"], "any-session")]
+    assert paths == ["docs/alias.md"]
+
+
 def test_scan_cap_after_filtering(tmp_path):
     # Plain files sort BEFORE passported ones; they must not consume the cap.
     for i in range(5):
@@ -185,9 +248,19 @@ def test_scan_unsafe_shadow_path_skipped(tmp_path):
     # Hand-authored shadow-only passports with absolute/escaping shadow_path
     # must be skipped, not emitted with an out-of-tree DesignatedDoc.
     _write_doc(
-        tmp_path, "docs/escaping.md", strategy="generic", update_mode="shadow-only", shadow_path="../../escape.md"
+        tmp_path,
+        "docs/escaping.md",
+        strategy="generic",
+        update_mode="shadow-only",
+        shadow_path="../../escape.md",
     )
-    _write_doc(tmp_path, "docs/absolute.md", strategy="generic", update_mode="shadow-only", shadow_path="/tmp/x.md")
+    _write_doc(
+        tmp_path,
+        "docs/absolute.md",
+        strategy="generic",
+        update_mode="shadow-only",
+        shadow_path="/tmp/x.md",
+    )
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
 
 

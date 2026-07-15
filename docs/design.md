@@ -431,6 +431,12 @@ To avoid writer conflicts:
 - Forge Installer writes:
   - `~/.forge/installed.json`
   - installed extension files + merged settings per chosen scope
+- Forge memory passport commands write:
+  - `forge_memory`, the Forge-owned tracking and writer contract
+  - missing outer `type`, `title`, and `description` only when a passport is first created or explicitly upgraded
+  - does not generate or maintain producer-owned `resource`, `tags`, or `timestamp`; removal deletes only `forge_memory`
+  - detailed generation, preservation, and mutation boundaries are normative in
+    [design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports)
 - Proxy writes:
   - proxy-owned snapshot/cache files (if any)
 - Status:
@@ -1277,7 +1283,9 @@ again because its config location and command bytes changed.
 Forge's workflow layer is documented in [design_workflows.md](design_workflows.md): policy enforcement and supervisor
 composition, skills as the scripting layer, workflow runners, memory writer/project memory, and their reference tables.
 The main design doc keeps the ownership boundary: workflow settings are session-owned unless explicitly proxy-owned;
-enforcement results are hook-written runtime facts.
+enforcement results are hook-written runtime facts. For project-memory documents, `forge_memory` is Forge-owned while
+outer concept metadata is producer-owned; the normative compatibility and mutation contract lives in
+[design_workflows.md §5.2](design_workflows.md#52-memory-doc-passports).
 
 ### 5.3 Test Infrastructure (Docker-based)
 

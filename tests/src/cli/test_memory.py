@@ -11,6 +11,14 @@ from click.testing import CliRunner
 from forge.cli.main import main
 
 
+def _frontmatter(path: Path) -> dict[str, object]:
+    from forge.session.passport import extract_frontmatter
+
+    frontmatter, _ = extract_frontmatter(path.read_text(encoding="utf-8"))
+    assert frontmatter is not None
+    return frontmatter
+
+
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
@@ -90,6 +98,12 @@ class TestMemoryTrack:
         pp = read_passport(forge_root / "docs/checklist.md")
         assert pp is not None and pp.update.strategy == "checklist"
 
+        frontmatter = _frontmatter(forge_root / "docs/checklist.md")
+        assert frontmatter["type"] == "Memory Document"
+        assert frontmatter["title"] == "Test doc"
+        assert frontmatter["description"] == "Active task tracking"
+        assert {"resource", "tags", "timestamp"}.isdisjoint(frontmatter)
+
         state = SessionStore(str(forge_root), "s1").read()
         assert "memory" not in state.overrides
 
@@ -144,11 +158,13 @@ class TestMemoryTrack:
         from forge.session.passport import synthesize_passport, write_passport
 
         write_passport(forge_root / "docs/changelog.md", synthesize_passport(strategy="changelog"))
+        before = (forge_root / "docs/changelog.md").read_bytes()
 
         result = runner.invoke(main, ["memory", "track", "docs/changelog.md"])
         assert result.exit_code == 0, result.output
         assert "already present" in result.output.lower()
         assert "changelog" in result.output
+        assert (forge_root / "docs/changelog.md").read_bytes() == before
 
     def test_track_strategy_flag_overrides_and_rewrites_passport(
         self, runner: CliRunner, seeded_session: tuple[Path, str]
@@ -173,6 +189,7 @@ class TestMemoryTrack:
         reread = read_passport(forge_root / "docs/changelog.md")
         assert reread is not None
         assert reread.update.strategy == "checklist"
+        assert "type" not in _frontmatter(forge_root / "docs/changelog.md")
 
     def test_track_rewrite_is_idempotent_at_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """Re-running track updates the passport in place; never writes a manifest entry."""
@@ -257,6 +274,164 @@ class TestMemoryTrack:
         assert pp is not None
         assert pp.intent == "Active task tracking"
 
+    @pytest.mark.parametrize("intent", ["", " \t "])
+    def test_track_rejects_explicit_blank_intent_before_writing(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        intent: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/checklist.md"
+        before = doc.read_bytes()
+
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/checklist.md",
+                "--strategy",
+                "checklist",
+                "--intent",
+                intent,
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "non-empty" in result.output
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize(
+        ("path", "extra_args"),
+        [
+            ("docs/checklist.md", ["--strategy", "checklist"]),
+            ("docs/impl_notes.md", ["--propose"]),
+        ],
+        ids=["direct", "proposal"],
+    )
+    @pytest.mark.parametrize("writer", ["none", "", "   "], ids=["none", "empty", "whitespace"])
+    def test_new_track_rejects_invalid_writer_without_official_or_shadow_mutation(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
+        extra_args: list[str],
+        writer: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / path
+        before_doc = doc.read_bytes()
+        shadow_root = forge_root / ".forge" / "memory"
+        before_shadows = {
+            candidate.relative_to(shadow_root).as_posix(): candidate.read_bytes()
+            for candidate in shadow_root.rglob("*")
+            if candidate.is_file()
+        }
+
+        result = runner.invoke(main, ["memory", "track", path, *extra_args, "--writers", writer])
+
+        after_shadows = {
+            candidate.relative_to(shadow_root).as_posix(): candidate.read_bytes()
+            for candidate in shadow_root.rglob("*")
+            if candidate.is_file()
+        }
+        assert result.exit_code == 1
+        assert "writers" in result.output
+        assert doc.read_bytes() == before_doc
+        assert after_shadows == before_shadows
+
+    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt", "docs/UPPER.MD"])
+    def test_new_track_rejects_reserved_and_non_markdown_paths_without_writing(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / path
+        doc.write_text("# Legacy\n", encoding="utf-8")
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "track", path, "--strategy", "generic"])
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt"])
+    def test_existing_legacy_passport_retrack_does_not_generate_envelope(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / path
+        doc.write_text("# Legacy\n", encoding="utf-8")
+        from forge.session.passport import (
+            read_passport,
+            synthesize_passport,
+            write_passport,
+        )
+
+        write_passport(doc, synthesize_passport(strategy="generic"))
+
+        result = runner.invoke(main, ["memory", "track", path, "--strategy", "changelog"])
+
+        assert result.exit_code == 0, result.output
+        passport = read_passport(doc)
+        assert passport is not None and passport.update.strategy == "changelog"
+        assert "type" not in _frontmatter(doc)
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "---\n- third-party\n---\n# Legacy\n",
+            "\ufeff---\ntype: Memory Document\n---\n# Legacy\n",
+            "---\ntype: Memory Document\n---",
+        ],
+    )
+    def test_new_track_rejects_unsupported_frontmatter_without_modifying_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        content: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/unsupported.md"
+        doc.write_text(content, encoding="utf-8")
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "track", "docs/unsupported.md", "--strategy", "generic"])
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+
+    def test_new_track_suffix_policy_uses_logical_symlink_path(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        other = forge_root / "other"
+        other.mkdir()
+        txt_target = other / "target.txt"
+        txt_target.write_text("# Alias target\n")
+        (forge_root / "docs/alias.md").symlink_to(txt_target)
+
+        accepted = runner.invoke(main, ["memory", "track", "docs/alias.md", "--strategy", "generic"])
+
+        assert accepted.exit_code == 0, accepted.output
+        assert _frontmatter(txt_target)["type"] == "Memory Document"
+
+        md_target = other / "target.md"
+        md_target.write_text("# Rejected alias target\n")
+        (forge_root / "docs/alias.txt").symlink_to(md_target)
+        before = md_target.read_bytes()
+
+        rejected = runner.invoke(main, ["memory", "track", "docs/alias.txt", "--strategy", "generic"])
+
+        assert rejected.exit_code == 1
+        assert md_target.read_bytes() == before
+
 
 # ---------------------------------------------------------------------------
 # track --propose
@@ -285,6 +460,8 @@ class TestMemoryTrackPropose:
         result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
         assert result.exit_code == 0, result.output
         assert (forge_root / self.DERIVED).is_file()
+        assert (forge_root / self.DERIVED).read_text(encoding="utf-8") == ""
+        assert _frontmatter(forge_root / "docs/impl_notes.md")["type"] == "Memory Document"
         assert "Shadow file created" in result.output
 
     def test_propose_creates_shadow_only_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
@@ -421,6 +598,27 @@ class TestMemoryTrackPropose:
         pp = read_passport(forge_root / "docs/impl_notes.md")
         assert pp is not None and pp.update.mode == "shadow-only"
 
+    def test_propose_converts_legacy_direct_passport_without_adding_envelope(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        from forge.session.passport import (
+            read_passport,
+            synthesize_passport,
+            write_passport,
+        )
+
+        write_passport(doc, synthesize_passport(strategy="generic"))
+        assert "type" not in _frontmatter(doc)
+
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+
+        assert result.exit_code == 0, result.output
+        passport = read_passport(doc)
+        assert passport is not None and passport.update.mode == "shadow-only"
+        assert "type" not in _frontmatter(doc)
+
     def test_propose_output_mentions_shadow(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
         assert result.exit_code == 0, result.output
@@ -445,6 +643,90 @@ class TestMemoryTrackPropose:
         pp = read_passport(forge_root / "docs/impl_notes.md")
         assert pp is not None
         assert pp.intent == "Durable memory"
+
+    @pytest.mark.parametrize("intent", ["", "   "])
+    def test_propose_rejects_blank_intent_before_materializing_shadow(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        intent: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        before = doc.read_bytes()
+        shadow = forge_root / self.DERIVED
+
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--intent", intent],
+        )
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+        assert not shadow.exists()
+
+    def test_propose_rejects_invalid_outer_type_before_materializing_shadow(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        doc.write_text("---\ntype: ''\n---\n# Notes\n", encoding="utf-8")
+        before = doc.read_bytes()
+        shadow = forge_root / self.DERIVED
+
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+
+        assert result.exit_code == 1
+        assert "type" in result.output
+        assert doc.read_bytes() == before
+        assert not shadow.exists()
+
+    def test_propose_rejects_invalid_effective_passport_before_materializing_shadow(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        from forge.session.passport import synthesize_passport, write_passport
+
+        write_passport(doc, synthesize_passport(strategy="generic"))
+        before = doc.read_bytes()
+        shadow = forge_root / self.DERIVED
+
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--writers", "none"],
+        )
+
+        assert result.exit_code == 1
+        assert "writers" in result.output
+        assert doc.read_bytes() == before
+        assert not shadow.exists()
+
+    def test_reserved_proposal_with_custom_shadow_has_no_side_effects(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/index.md"
+        doc.write_text("# Reserved\n", encoding="utf-8")
+        before = doc.read_bytes()
+        shadow_path = ".forge/memory/custom_reserved_attempt.md"
+        shadow = forge_root / shadow_path
+
+        result = runner.invoke(
+            main,
+            [
+                "memory",
+                "track",
+                "docs/index.md",
+                "--propose",
+                "--shadow-path",
+                shadow_path,
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+        assert not shadow.exists()
 
     def test_propose_upsert_updates_shadow_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root = seeded_session[0]
@@ -1334,6 +1616,234 @@ class TestPassportShow:
 
 
 # ---------------------------------------------------------------------------
+# passport upgrade
+# ---------------------------------------------------------------------------
+
+
+class TestPassportUpgrade:
+    @staticmethod
+    def _write_legacy_passport(path: Path, *, outer: str = "") -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\n"
+            f"{outer}"
+            "custom:\n"
+            "  owner: third-party\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Durable project memory\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "    inherit_on_fork: true\n"
+            "---\n"
+            "# Legacy title\n",
+            encoding="utf-8",
+        )
+
+    def test_upgrade_adds_envelope_preserves_raw_passport_and_is_idempotent(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        self._write_legacy_passport(doc)
+        raw_passport = _frontmatter(doc)["forge_memory"]
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert result.exit_code == 0, result.output
+        assert "upgraded" in result.output.lower()
+        for field in ("type", "title", "description"):
+            assert field in result.output
+        frontmatter = _frontmatter(doc)
+        assert frontmatter["type"] == "Memory Document"
+        assert frontmatter["title"] == "Legacy title"
+        assert frontmatter["description"] == "Durable project memory"
+        assert frontmatter["custom"] == {"owner": "third-party"}
+        assert frontmatter["forge_memory"] == raw_passport
+        assert {"resource", "tags", "timestamp"}.isdisjoint(frontmatter)
+
+        upgraded = doc.read_bytes()
+        second = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert second.exit_code == 0, second.output
+        assert "already complete" in second.output.lower()
+        assert doc.read_bytes() == upgraded
+
+    def test_upgrade_preserves_existing_unknown_type(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        self._write_legacy_passport(doc, outer="type: Vendor Memory\n")
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert result.exit_code == 0, result.output
+        assert _frontmatter(doc)["type"] == "Vendor Memory"
+
+    def test_upgrade_requires_existing_valid_passport_without_modifying_doc(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/checklist.md"
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/checklist.md"])
+
+        assert result.exit_code == 1
+        assert "Error:" in result.stderr
+        assert "Tip:" in result.stderr
+        assert "forge_memory" in result.stderr
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize("outer", ["type:\n", "type: ''\n", "type: []\n"])
+    def test_upgrade_rejects_invalid_type_without_modifying_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        outer: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        self._write_legacy_passport(doc, outer=outer)
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert result.exit_code == 1
+        assert "type" in result.stderr
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "---\n- third-party\n---\n# Legacy\n",
+            "\ufeff---\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Legacy\n",
+            "---\nforge_memory:\n  version: 1\n  intent: Test\n---",
+        ],
+    )
+    def test_upgrade_rejects_unsupported_frontmatter_without_modifying_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        content: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/unsupported.md"
+        doc.write_text(content, encoding="utf-8")
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/unsupported.md"])
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt", "docs/legacy.MD"])
+    def test_upgrade_rejects_reserved_and_non_markdown_paths_without_modifying_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / path
+        self._write_legacy_passport(doc)
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", path])
+
+        assert result.exit_code == 1
+        assert doc.read_bytes() == before
+
+    def test_upgrade_refuses_incompatible_project_without_modifying_doc(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        self._write_legacy_passport(doc)
+        before = doc.read_bytes()
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert result.exit_code == 1
+        assert "requires Forge" in result.output
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize(
+        ("project_toml", "message"),
+        [
+            ("not = valid = toml\n", "invalid TOML"),
+            ('schema_version = 2\nrequired_forge = ">=1"\n', "unsupported schema_version"),
+        ],
+        ids=["malformed", "newer-schema"],
+    )
+    def test_upgrade_refuses_invalid_project_config_without_modifying_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        project_toml: str,
+        message: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        self._write_legacy_passport(doc)
+        before = doc.read_bytes()
+        (forge_root / ".forge" / "project.toml").write_text(project_toml, encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
+
+        assert result.exit_code == 1
+        assert message in result.output
+        assert doc.read_bytes() == before
+
+    def test_upgrade_suffix_policy_uses_logical_symlink_path(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        other = forge_root / "other"
+        other.mkdir()
+        txt_target = other / "legacy.txt"
+        self._write_legacy_passport(txt_target)
+        (forge_root / "docs/legacy-alias.md").symlink_to(txt_target)
+
+        accepted = runner.invoke(main, ["memory", "passport", "upgrade", "docs/legacy-alias.md"])
+
+        assert accepted.exit_code == 0, accepted.output
+        assert _frontmatter(txt_target)["type"] == "Memory Document"
+
+        md_target = other / "legacy.md"
+        self._write_legacy_passport(md_target)
+        (forge_root / "docs/legacy-alias.txt").symlink_to(md_target)
+        before = md_target.read_bytes()
+
+        rejected = runner.invoke(main, ["memory", "passport", "upgrade", "docs/legacy-alias.txt"])
+
+        assert rejected.exit_code == 1
+        assert md_target.read_bytes() == before
+
+    @pytest.mark.parametrize("path", ["../outside.md", "/tmp/outside.md", "docs/missing.md"])
+    def test_upgrade_rejects_unsafe_or_missing_path(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
+    ) -> None:
+        result = runner.invoke(main, ["memory", "passport", "upgrade", path])
+
+        assert result.exit_code == 1
+        assert "Error:" in result.stderr
+        assert "Tip:" in result.stderr
+
+    def test_passport_group_help_includes_upgrade(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["memory", "passport", "--help"])
+
+        assert result.exit_code == 0, result.output
+        assert "Inspect, upgrade, and remove" in result.output
+        assert "upgrade" in result.output
+
+
+# ---------------------------------------------------------------------------
 # passport remove
 # ---------------------------------------------------------------------------
 
@@ -1413,6 +1923,20 @@ class TestPassportRemove:
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
         assert result.exit_code != 0
         assert "Malformed frontmatter" in result.output
+
+    def test_remove_non_mapping_frontmatter_errors_without_modifying_doc(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/checklist.md"
+        original = "---\n- third-party\n---\n# Doc\n"
+        doc.write_text(original, encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+
+        assert result.exit_code == 1
+        assert "frontmatter: must be a mapping" in result.output
+        assert doc.read_text(encoding="utf-8") == original
 
     def test_remove_json(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root, _ = seeded_session

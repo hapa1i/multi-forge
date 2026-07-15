@@ -19,7 +19,21 @@ EOF
 
 # Author a project passport (sessionless).
 forge memory track .forge/memory/debugging.md --strategy generic
-head -5 .forge/memory/debugging.md | grep -q 'forge_memory'
+
+# Inspect the complete frontmatter semantically; key order is not part of the contract.
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/debugging.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+assert isinstance(frontmatter["type"], str) and frontmatter["type"].strip()
+assert frontmatter["title"] == "Debugging Notes"
+assert isinstance(frontmatter["description"], str) and frontmatter["description"].strip()
+assert isinstance(frontmatter["forge_memory"], dict)
+assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
+PY
 
 # Enable memory for the session.
 forge session memory enable --session test-session-1
@@ -35,7 +49,8 @@ forge memory list --json | jq -e '
 cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 ```
 
-- [ ] `forge memory track` writes a passport into the doc (sessionless)
+- [ ] `forge memory track` writes non-empty `type`, `title`, `description`, and `forge_memory` fields (sessionless)
+- [ ] Track does not generate `resource`, `tags`, or `timestamp`
 - [ ] `forge session memory enable --session` sets activation override
 - [ ] `forge memory list` discovers passported docs via scan
 - [ ] Memory writer config written to session overrides (`enabled`, `min_turns`)
@@ -213,5 +228,69 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 - [ ] A later Forge CLI startup processes the queued memory-writer work automatically
 - [ ] The background memory writer updates passported docs without a direct `forge memory-writer run`
 - [ ] Pending handoff marker is gone after processing completes
+
+### 16.5 Upgrade a Legacy Passport Envelope
+
+<!-- prereq: 16.1 -->
+
+<!-- auto -->
+
+```bash
+cd $FORGE_TEST_REPO
+
+cat > .forge/memory/legacy-passport.md <<'EOF'
+---
+producer_key:
+  keep: true
+forge_memory:
+  version: 1
+  intent: "Legacy durable notes."
+  update:
+    strategy: generic
+    inherit_on_fork: true
+---
+# Legacy Passport
+EOF
+
+# Record the raw parsed Forge value before migration.
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/legacy-passport.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+Path("/tmp/legacy-forge-memory.json").write_text(json.dumps(frontmatter["forge_memory"], sort_keys=True))
+PY
+
+forge memory passport upgrade .forge/memory/legacy-passport.md
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+import yaml
+
+text = Path(".forge/memory/legacy-passport.md").read_text()
+frontmatter = yaml.safe_load(text.split("---", 2)[1])
+assert frontmatter["type"] == "Memory Document"
+assert frontmatter["title"] == "Legacy Passport"
+assert frontmatter["description"] == "Legacy durable notes."
+assert frontmatter["producer_key"] == {"keep": True}
+assert frontmatter["forge_memory"] == json.loads(Path("/tmp/legacy-forge-memory.json").read_text())
+assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
+PY
+
+# A complete envelope is an exit-0, byte-identical no-op.
+cp .forge/memory/legacy-passport.md /tmp/legacy-passport.upgraded
+forge memory passport upgrade .forge/memory/legacy-passport.md
+cmp -s .forge/memory/legacy-passport.md /tmp/legacy-passport.upgraded
+```
+
+- [ ] `forge memory passport upgrade` adds `type`, `title`, and `description` to a legacy passport
+- [ ] Upgrade preserves the raw parsed `forge_memory` value and unrelated outer metadata
+- [ ] Upgrade does not generate `resource`, `tags`, or `timestamp`
+- [ ] A second upgrade succeeds without changing the file bytes
 
 ---

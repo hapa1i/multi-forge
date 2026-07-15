@@ -134,6 +134,15 @@ def test_read_leaves_expose_json() -> None:
     _assert_ledger(violations, JSON_MISSING_ALLOWLIST, "read leaf should expose --json")
 
 
+def test_memory_passport_upgrade_is_a_reachable_mutation_leaf() -> None:
+    tree = dict(_tree())
+    command = tree.get("forge memory passport upgrade")
+
+    assert command is not None
+    assert not isinstance(command, click.Group)
+    assert not _json_dests(command), "mutating upgrade leaf should not expose --json"
+
+
 # --- Rule: editable config objects expose the core {show, edit, reset} vocabulary
 # Tiered decision (forge_cli_cleanup Slice 08 / D7): editable-config objects share a
 # core verb set; lifecycle resources follow the sibling-verbs rule instead. This guard

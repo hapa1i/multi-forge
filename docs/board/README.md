@@ -58,14 +58,18 @@ decides whether it runs.
 | `impl_notes.md`           | Memory writer, shadow proposal at Stop | Passported as `generic`, shadow mode      |
 | card `checklist.md` files | In-session agent, at your direction    | Edited as normal files during the session |
 
-| Command                        | Writes           | Meaning                                           |
-| ------------------------------ | ---------------- | ------------------------------------------------- |
-| `forge memory track <doc>`     | The markdown doc | Adds or updates the doc's `forge_memory` passport |
-| `forge memory passport remove` | The markdown doc | Removes the passport; stops project discovery     |
-| `forge session memory enable`  | Session manifest | Enables the memory writer for a session           |
-| `forge session memory disable` | Session manifest | Disables the memory writer for a session          |
+| Command                         | Writes           | Meaning                                                                   |
+| ------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `forge memory track <doc>`      | The Markdown doc | Creates a passport + envelope, or updates an existing passport            |
+| `forge memory passport upgrade` | The Markdown doc | Explicitly adds missing envelope fields to a valid legacy passport        |
+| `forge memory passport remove`  | The Markdown doc | Removes only `forge_memory`; stops discovery while outer metadata remains |
+| `forge session memory enable`   | Session manifest | Enables the memory writer for a session                                   |
+| `forge session memory disable`  | Session manifest | Disables the memory writer for a session                                  |
 
 Forge discovers docs by scanning hardcoded roots (`docs/` plus `.forge/memory/`) for passports at Stop time.
+`forge_memory` is the Forge-owned tracking marker. New tracks also fill missing outer `type`, `title`, and `description`
+metadata; existing passports are migrated only by `forge memory passport upgrade`. Forge preserves other outer values
+and does not generate `resource`, `tags`, or `timestamp`.
 
 ### Setup
 
@@ -74,6 +78,9 @@ Passport your docs once (sessionless). Then enable memory per session:
 ```bash
 forge memory track docs/board/change_log.md --strategy changelog
 forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/shadow_impl_notes.md
+
+# Existing projects only: migrate a hand-authored legacy passport explicitly.
+forge memory passport upgrade docs/board/legacy_memory.md
 
 # Start a session with memory on:
 forge session start planner --memory on
@@ -99,6 +106,9 @@ To stop a board doc from being project memory, remove its passport:
 ```bash
 forge memory passport remove docs/board/change_log.md
 ```
+
+Removal leaves the document's outer metadata intact. In proposal mode the tracked official doc gets the envelope; an
+auto-created `.forge/memory/` shadow does not, unless a user explicitly tracks that shadow as its own memory document.
 
 One-off doc updates that don't need a passport are ordinary agent instructions.
 
