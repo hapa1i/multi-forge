@@ -1245,9 +1245,9 @@ was verified.
 
 Mechanics (`src/forge/install/codex_hooks.py`):
 
-- **Forge never rewrites the user's config.toml** — codex-cli owns it. Merge appends or replaces only the managed block,
-  re-validates the merged content with `tomllib` before an atomic write, and backs up first
-  (`.config.toml.forge.backup.<ts>`). Disable removes only the block (a whitespace-only remainder deletes the file).
+- **Managed-block only** — codex-cli owns `config.toml`. Forge appends or replaces only its block, validates with
+  `tomllib`, backs up, then atomically writes while preserving the existing mode. Disable removes only that block; a
+  whitespace-only remainder deletes the file.
 - **Trust-byte stability**: the rendered entry bytes are golden-pinned — Codex's `trusted_hash` covers the registration
   definition, so changing a command string or entry shape silently invalidates existing enrollment.
 - **Dedupe vs manual registrations**: all Forge commands already registered outside the markers → skip (manual

@@ -35,6 +35,7 @@ from forge.session.passport import (
     synthesize_passport,
     upgrade_passport_envelope,
     validate_okf_memory_path,
+    validate_okf_reserved_basenames,
     validate_writer_spec,
     write_passport,
 )
@@ -510,6 +511,60 @@ class TestMutationFrontmatterSafety:
         assert read_passport(doc) is not None
         assert "# Body\n" in doc.read_text()
 
+    def test_read_uses_later_delimiter_when_first_yaml_line_is_document_start(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "---\n"
+            "# Body\n"
+        )
+
+        passport = read_passport(doc)
+
+        assert passport is not None
+        assert passport.intent == "Legacy"
+
+    @pytest.mark.parametrize("operation", ["write", "remove", "upgrade"])
+    def test_mutations_use_same_delimiter_as_read_parser(self, tmp_path: Path, operation: str) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text(
+            "---\n"
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "---\n"
+            "# Body\n"
+        )
+
+        if operation == "write":
+            write_passport(doc, self._passport())
+            passport = read_passport(doc)
+            assert passport is not None
+            assert passport.intent == "Safe mutation"
+        elif operation == "remove":
+            assert remove_passport(doc) is True
+            assert doc.read_text() == "# Body\n"
+        else:
+            assert upgrade_passport_envelope(doc, logical_path="docs/doc.md") == (
+                "type",
+                "title",
+                "description",
+            )
+            passport = read_passport(doc)
+            assert passport is not None
+            assert passport.intent == "Legacy"
+
+        assert doc.read_text().count("---") == (0 if operation == "remove" else 2)
+
     @pytest.mark.parametrize(
         "original, error",
         [
@@ -671,16 +726,23 @@ class TestOKFEnvelope:
         assert str(fm["timestamp"]) == "2026-07-14"
         assert fm["custom_key"] == {"nested": True}
 
-    @pytest.mark.parametrize("logical_path", ["docs/doc.txt", "docs/doc.MD", "docs/index.md", "docs/log.md"])
+    @pytest.mark.parametrize(
+        "logical_path",
+        ["docs/doc.txt", "docs/doc.MD", "docs/index.md", "docs/log.md", "docs/Index.md", "docs/LOG.md"],
+    )
     def test_invalid_logical_paths_are_rejected(self, tmp_path: Path, logical_path: str) -> None:
         resolved = tmp_path / "doc.md"
         with pytest.raises(PassportError, match="path:"):
             validate_okf_memory_path(logical_path, resolved)
 
-    def test_resolved_reserved_target_is_rejected(self, tmp_path: Path) -> None:
-        resolved = tmp_path / "index.md"
+    @pytest.mark.parametrize("basename", ["index.md", "Index.md", "LOG.md"])
+    def test_resolved_reserved_target_is_rejected(self, tmp_path: Path, basename: str) -> None:
+        resolved = tmp_path / basename
         with pytest.raises(PassportError, match="resolved target.*reserved"):
             validate_okf_memory_path("docs/alias.md", resolved)
+
+    def test_reserved_basename_validator_does_not_apply_suffix_policy(self, tmp_path: Path) -> None:
+        validate_okf_reserved_basenames("docs/alias.txt", tmp_path / "target.txt")
 
     def test_suffix_policy_uses_logical_path(self, tmp_path: Path) -> None:
         validate_okf_memory_path("docs/alias.md", tmp_path / "target.txt")
@@ -808,6 +870,11 @@ class TestSynthesizePassport:
         p = synthesize_passport(strategy="changelog")
         assert p.intent  # non-empty
         assert p.version == PASSPORT_VERSION
+
+    @pytest.mark.parametrize("intent", ["", "   ", "\t\n"])
+    def test_explicit_blank_intent_raises(self, intent: str) -> None:
+        with pytest.raises(PassportError, match="forge_memory.intent: must be a non-empty string"):
+            synthesize_passport(strategy="generic", intent=intent)
 
     def test_shadow_only_mode_with_shadow_path(self) -> None:
         p = synthesize_passport(

@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.2 -->
+<!-- version: 1.0.3 -->
 
 <!-- test-count: 98 assertions -->
 
-<!-- last-updated: 2026-07-14 -->
+<!-- last-updated: 2026-07-15 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -559,20 +559,7 @@ cat > .forge/memory/walkthrough-notes.md <<'EOF'
 EOF
 
 forge memory track .forge/memory/walkthrough-notes.md --strategy generic
-
-python3 - <<'PY'
-from pathlib import Path
-
-import yaml
-
-text = Path(".forge/memory/walkthrough-notes.md").read_text()
-frontmatter = yaml.safe_load(text.split("---", 2)[1])
-assert frontmatter["type"] == "Memory Document"
-assert frontmatter["title"] == "Walkthrough Notes"
-assert isinstance(frontmatter["description"], str) and frontmatter["description"].strip()
-assert isinstance(frontmatter["forge_memory"], dict)
-assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
-PY
+cp .forge/memory/walkthrough-notes.md /tmp/walkthrough-notes.tracked
 
 forge memory list
 forge memory list --json
@@ -596,44 +583,84 @@ cp .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded
 forge memory passport upgrade .forge/memory/walkthrough-legacy.md
 cmp -s .forge/memory/walkthrough-legacy.md /tmp/walkthrough-legacy.upgraded
 
-python3 - <<'PY'
-from pathlib import Path
-
-import yaml
-
-text = Path(".forge/memory/walkthrough-legacy.md").read_text()
-frontmatter = yaml.safe_load(text.split("---", 2)[1])
-assert frontmatter["type"] == "Memory Document"
-assert frontmatter["title"] == "Walkthrough Legacy"
-assert frontmatter["description"] == "Legacy walkthrough notes."
-assert frontmatter["producer"] == "walkthrough"
-assert frontmatter["forge_memory"] == {
-    "version": 1,
-    "intent": "Legacy walkthrough notes.",
-    "update": {"strategy": "generic"},
-}
-assert all(key not in frontmatter for key in ("resource", "tags", "timestamp"))
-PY
-
 forge memory passport remove .forge/memory/walkthrough-notes.md
 forge memory list
 
 python3 - <<'PY'
+import ast
 from pathlib import Path
 
-import yaml
 
-text = Path(".forge/memory/walkthrough-notes.md").read_text()
-frontmatter = yaml.safe_load(text.split("---", 2)[1])
-assert "forge_memory" not in frontmatter
-assert frontmatter["type"] == "Memory Document"
-assert frontmatter["title"] == "Walkthrough Notes"
-assert isinstance(frontmatter["description"], str) and frontmatter["description"].strip()
+def frontmatter_facts(path):
+    """Read the simple mapping shape emitted by Forge without requiring PyYAML."""
+    text = Path(path).read_text()
+    assert text.startswith("---\n")
+    block, separator, _ = text[4:].partition("\n---\n")
+    assert separator
+
+    values = {}
+    mappings = set()
+    parents = []
+    for line in block.splitlines():
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        key, separator, raw_value = stripped.partition(":")
+        assert separator
+        while parents and parents[-1][0] >= indent:
+            parents.pop()
+        key_path = tuple(parent_key for _, parent_key in parents) + (key,)
+        raw_value = raw_value.strip()
+        if raw_value:
+            try:
+                values[key_path] = ast.literal_eval(raw_value)
+            except (SyntaxError, ValueError):
+                values[key_path] = raw_value
+        else:
+            mappings.add(key_path)
+            parents.append((indent, key))
+    return values, mappings
+
+
+forbidden = {"resource", "tags", "timestamp"}
+
+tracked_values, tracked_mappings = frontmatter_facts("/tmp/walkthrough-notes.tracked")
+tracked_top_level = {path[0] for path in set(tracked_values) | tracked_mappings}
+assert tracked_values[("type",)] == "Memory Document"
+assert tracked_values[("title",)] == "Walkthrough Notes"
+assert isinstance(tracked_values[("description",)], str) and tracked_values[("description",)].strip()
+assert ("forge_memory",) in tracked_mappings
+assert forbidden.isdisjoint(tracked_top_level)
+
+legacy_values, legacy_mappings = frontmatter_facts(".forge/memory/walkthrough-legacy.md")
+legacy_top_level = {path[0] for path in set(legacy_values) | legacy_mappings}
+assert legacy_values[("type",)] == "Memory Document"
+assert legacy_values[("title",)] == "Walkthrough Legacy"
+assert legacy_values[("description",)] == "Legacy walkthrough notes."
+assert legacy_values[("producer",)] == "walkthrough"
+assert {path: value for path, value in legacy_values.items() if path[0] == "forge_memory"} == {
+    ("forge_memory", "version"): 1,
+    ("forge_memory", "intent"): "Legacy walkthrough notes.",
+    ("forge_memory", "update", "strategy"): "generic",
+}
+assert {path for path in legacy_mappings if path[0] == "forge_memory"} == {
+    ("forge_memory",),
+    ("forge_memory", "update"),
+}
+assert forbidden.isdisjoint(legacy_top_level)
+
+removed_values, removed_mappings = frontmatter_facts(".forge/memory/walkthrough-notes.md")
+removed_top_level = {path[0] for path in set(removed_values) | removed_mappings}
+assert "forge_memory" not in removed_top_level
+assert removed_values[("type",)] == "Memory Document"
+assert removed_values[("title",)] == "Walkthrough Notes"
+assert isinstance(removed_values[("description",)], str) and removed_values[("description",)].strip()
 PY
 ```
 
 - [ ] Explicitly tracking `.forge/memory/walkthrough-notes.md` writes `type`, `title`, `description`, and `forge_memory`
-- [ ] Track generates no `resource`, `tags`, or `timestamp`; auto-created proposal shadows likewise get no envelope
+- [ ] Track generates no `resource`, `tags`, or `timestamp`
 - [ ] `list` shows the path with `generic` strategy
 - [ ] `list --json` emits the passported doc in JSON form
 - [ ] `enable --session` sets activation for the session

@@ -1,4 +1,8 @@
-"""Regression: atomic passport rewrites must retain the authored document mode."""
+"""Regression for ``okf_compatible_memory_passports`` AT-18.
+
+Root cause: an atomic replacement inherited the temporary file's restrictive mode instead of the authored document's
+mode. Affected files: ``src/forge/core/state/io.py`` and ``src/forge/session/passport.py``.
+"""
 
 import stat
 from pathlib import Path

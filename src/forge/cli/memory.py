@@ -40,6 +40,7 @@ from forge.session.passport import (
     resolve_with_overrides,
     synthesize_passport,
     upgrade_passport_envelope,
+    validate_okf_reserved_basenames,
     write_passport,
 )
 from forge.session.project_memory import (
@@ -243,8 +244,7 @@ def track_cmd(
                 intent=intent,
                 writers=writers if writers is not None else "all-sessions",
             )
-            prepared = prepare_passport_write(abs_path, new_pp, okf_path=path)
-            apply_prepared_passport_write(abs_path, prepared)
+            write_passport(abs_path, new_pp, okf_path=path)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
         console.print(f"Passport created for [cyan]{path}[/cyan] (strategy: {strategy}).")
@@ -311,10 +311,12 @@ def _track_existing_shadow_only(
     has_flags = strategy is not None or writers is not None
     resolved_pp = passport
     pp_warnings: list[str] = []
+    prepared: PreparedPassportWrite | None = None
     try:
         if has_flags:
             resolved_pp, pp_warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
-        prepared = prepare_passport_write(abs_path, resolved_pp)
+            if pp_warnings:
+                prepared = prepare_passport_write(abs_path, resolved_pp)
     except PassportError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -325,6 +327,7 @@ def _track_existing_shadow_only(
     if created:
         console.print(f"Shadow file created: {shadow_path}.")
     if pp_warnings:
+        assert prepared is not None
         apply_prepared_passport_write(abs_path, prepared)
         for w in pp_warnings:
             console.print(f"[yellow]Warning:[/yellow] {w}")
@@ -362,6 +365,10 @@ def _track_propose(
     # Self-shadow: compare resolved paths, not raw strings
     resolved_shadow = (forge_root / shadow_path).resolve()
     resolved_official = (forge_root / path).resolve()
+    try:
+        validate_okf_reserved_basenames(shadow_path, resolved_shadow)
+    except PassportError as exc:
+        raise click.ClickException(f"Invalid shadow path: {exc}") from exc
     if resolved_shadow == resolved_official:
         raise click.ClickException("Shadow path cannot be the same as the official doc.")
 
@@ -375,7 +382,7 @@ def _track_propose(
     # For existing passports, pass strategy only when the user explicitly provided --strategy
     # so the passport's own strategy is preserved by default.
     pp_warnings: list[str]
-    prepared: PreparedPassportWrite
+    prepared: PreparedPassportWrite | None = None
     result_kind: str
     if isinstance(passport, Passport) and passport.update.mode == "shadow-only":
         try:
@@ -385,7 +392,8 @@ def _track_propose(
                 shadow_path=(shadow_path if shadow_path != passport.update.shadow_path else None),
                 writers=writers,
             )
-            prepared = prepare_passport_write(abs_path, resolved_pp)
+            if pp_warnings:
+                prepared = prepare_passport_write(abs_path, resolved_pp)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
         result_kind = "updated" if pp_warnings else "unchanged"
@@ -425,6 +433,7 @@ def _track_propose(
         raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
 
     if result_kind != "unchanged":
+        assert prepared is not None
         apply_prepared_passport_write(abs_path, prepared)
 
     for w in pp_warnings:

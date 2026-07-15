@@ -21,7 +21,7 @@ Resolved review decisions:
 
 ## Current focus
 
-Complete — all AT-01…AT-19 rows are implemented and verified in `fae54345`; closeout evidence is recorded below.
+Reopened on 2026-07-15 — remediate the verified post-closeout findings, rerun affected gates, and close the card again.
 
 ## Phase 0: Characterization pins (no behavior change)
 
@@ -191,6 +191,35 @@ Complete — all AT-01…AT-19 rows are implemented and verified in `fae54345`; 
 
 - [x] Update card risks/decisions and the acceptance table if implementation evidence forces a contract change.
 
+## Reopened remediation (2026-07-15)
+
+Post-closeout review found two acceptance-breaking parser/path gaps, two reachable surface failures, and several bounded
+hardening opportunities. The 2026-07-14 verification remains the baseline; the following items require fresh evidence.
+
+- [ ] RF-01: make mutation frontmatter boundary selection agree with permissive reads without losing writable truly
+  empty/comment-only frontmatter; cover the exact three-delimiter corruption shape across read/write/remove/upgrade.
+- [ ] RF-02: compare logical and resolved reserved basenames case-insensitively while preserving the exact lowercase
+  `.md` suffix rule; cover mixed-case direct/proposal/upgrade aliases on the Darwin development filesystem.
+- [ ] RF-03: reject logical and resolved `index.md`/`log.md` custom shadow targets before official or shadow side
+  effects, including mixed-case and symlink aliases.
+- [ ] RF-04: make walkthrough §11.5 host-stdlib-only while retaining order-independent envelope, migration, raw
+  passport, idempotence, and removal checks.
+- [ ] RF-05: make `synthesize_passport` distinguish omitted intent from explicit blank/whitespace intent; keep the CLI
+  preflight for failure before proposal side effects.
+- [ ] RF-06: add opt-in preserve-existing-mode support to the shared atomic writer, migrate passport and Codex config
+  rewrites to it, and consolidate passport render/apply tails without changing explicit `0600`/`0755` callers.
+- [ ] RF-07: avoid preparing discarded passport rewrites on unchanged shadow-only re-track/propose flows; retain
+  effective-passport validation before shadow materialization when values change.
+- [ ] RF-08: bring the two card regression module docstrings into the documented bug-ID/root-cause/affected-file form.
+- [ ] RF-09: rerun focused/full/regression/integration/pre-commit/build/artifact checks affected by remediation, update
+  closeout records, and move the card back to `done/`.
+
+Deferred from this remediation: extracting the non-identical track/show/upgrade/remove CLI preflight blocks. That
+cleanup must preserve read-versus-mutation compatibility semantics and the upgrade leaf's deliberate recovery-output
+contract, so it is tracked in
+[`memory_passport_cli_preflight_cleanup`](../../proposed/memory_passport_cli_preflight_cleanup/card.md) rather than this
+correctness patch.
+
 ## Deferred work (unchanged)
 
 - `timestamp` ownership and maintenance across human/agent edits.
@@ -201,9 +230,10 @@ Complete — all AT-01…AT-19 rows are implemented and verified in `fae54345`; 
   byte-identical mutation refusal for those shapes.
 - Any generated `resource` or `tags` policy.
 
-## Closeout
+## Original closeout baseline (2026-07-14; superseded as final evidence)
 
-Verification recorded on 2026-07-14:
+This evidence records the original implementation closeout. The reopened remediation requires the fresh RF-09 evidence
+above before the card returns to `done/`.
 
 - `make test-unit`: `7846 passed, 1 skipped, 117 deselected`.
 

@@ -111,6 +111,43 @@ class TestAtomicWriteText:
         atomic_write_text(target, "secret", mode=0o600)
         assert stat.S_IMODE(target.stat().st_mode) == 0o600
 
+    def test_preserves_existing_mode_when_requested(self, tmp_path: Path) -> None:
+        target = tmp_path / "user-owned.txt"
+        target.write_text("original")
+        target.chmod(0o644)
+
+        atomic_write_text(target, "updated", preserve_existing_mode=True)
+
+        assert target.read_text() == "updated"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+    def test_preserve_existing_mode_keeps_secure_new_file_default(self, tmp_path: Path) -> None:
+        target = tmp_path / "new.txt"
+
+        atomic_write_text(target, "content", preserve_existing_mode=True)
+
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    def test_default_overwrite_still_uses_secure_tempfile_mode(self, tmp_path: Path) -> None:
+        target = tmp_path / "existing.txt"
+        target.write_text("original")
+        target.chmod(0o644)
+
+        atomic_write_text(target, "updated")
+
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    def test_explicit_and_preserved_modes_are_mutually_exclusive(self, tmp_path: Path) -> None:
+        target = tmp_path / "unchanged.txt"
+        target.write_text("original")
+        target.chmod(0o644)
+
+        with pytest.raises(ValueError, match="mode and preserve_existing_mode are mutually exclusive"):
+            atomic_write_text(target, "updated", mode=0o600, preserve_existing_mode=True)
+
+        assert target.read_text() == "original"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
 
 class TestAtomicWriteBytes:
     """Tests for atomic_write_bytes function."""
@@ -126,6 +163,25 @@ class TestAtomicWriteBytes:
         atomic_write_bytes(target, b"secret", mode=0o600)
         assert target.read_bytes() == b"secret"
         assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    def test_preserves_existing_mode_when_requested(self, tmp_path: Path) -> None:
+        target = tmp_path / "user-owned.bin"
+        target.write_bytes(b"original")
+        target.chmod(0o640)
+
+        atomic_write_bytes(target, b"updated", preserve_existing_mode=True)
+
+        assert target.read_bytes() == b"updated"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o640
+
+    def test_explicit_and_preserved_modes_are_mutually_exclusive(self, tmp_path: Path) -> None:
+        target = tmp_path / "unchanged.bin"
+        target.write_bytes(b"original")
+
+        with pytest.raises(ValueError, match="mode and preserve_existing_mode are mutually exclusive"):
+            atomic_write_bytes(target, b"updated", mode=0o600, preserve_existing_mode=True)
+
+        assert target.read_bytes() == b"original"
 
 
 class TestAtomicWriteJson:

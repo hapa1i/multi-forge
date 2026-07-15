@@ -294,8 +294,8 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
 - **registered by `forge extension enable --scope user`** (codex-hooks module, standard profile): the installer writes a
-  managed block into `$CODEX_HOME/config.toml`. Project/local installs do not write runtime Codex blocks. Skipped with a
-  notice when `codex` is not installed.
+  managed block into `$CODEX_HOME/config.toml` and preserves an existing file's mode during atomic merge/remove.
+  Project/local installs do not write runtime Codex blocks. Skipped with a notice when `codex` is not installed.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
   prompted) — Codex hooks only fire from trust-enrolled registrations
 

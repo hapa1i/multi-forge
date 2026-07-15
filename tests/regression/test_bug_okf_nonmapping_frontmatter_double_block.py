@@ -1,4 +1,8 @@
-"""Regression: passport writes must not prepend a second block above scalar frontmatter."""
+"""Regression for ``okf_compatible_memory_passports`` AT-08.
+
+Root cause: passport mutation treated a non-mapping YAML root as absent frontmatter and prepended a new block while
+leaving the original metadata block in place. Affected file: ``src/forge/session/passport.py``.
+"""
 
 from pathlib import Path
 

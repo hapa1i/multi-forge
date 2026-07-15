@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import re
-import stat
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
@@ -121,7 +120,6 @@ class PreparedPassportWrite:
     """Validated passport rewrite ready for one atomic apply."""
 
     text: str
-    mode: int
     added_okf_fields: tuple[str, ...] = ()
 
 
@@ -244,7 +242,7 @@ def resolve_doc_spec(
 # Frontmatter parsing
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
+_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n(?P<yaml>.*?\r?\n)---[ \t]*\r?\n", re.DOTALL)
 _MUTATION_FRONTMATTER_RE = re.compile(
     r"\A---[ \t]*\r?\n(?P<yaml>.*?)^---[ \t]*\r?\n",
     re.DOTALL | re.MULTILINE,
@@ -267,7 +265,7 @@ def extract_frontmatter(text: str) -> tuple[dict[str, Any] | None, str]:
     if m is None:
         return None, text
 
-    yaml_block = m.group(1)
+    yaml_block = m.group("yaml")
     body = text[m.end() :]
 
     try:
@@ -292,7 +290,10 @@ def _extract_frontmatter_for_mutation(text: str) -> tuple[dict[str, Any] | None,
             hint="remove the BOM, then retry",
         )
 
-    match = _MUTATION_FRONTMATTER_RE.match(text)
+    # Prefer the delimiter span selected by the permissive read parser. The
+    # mutation-only fallback keeps a truly zero-line empty block writable,
+    # which the legacy read regex intentionally does not recognize.
+    match = _FRONTMATTER_RE.match(text) or _MUTATION_FRONTMATTER_RE.match(text)
     if match is None:
         if _MUTATION_FRONTMATTER_EOF_RE.match(text) is not None:
             raise PassportError(
@@ -554,8 +555,25 @@ _ATX_H1_RE = re.compile(r"^[ ]{0,3}#[ \t]+(?P<title>.*)$")
 _ATX_CLOSING_RE = re.compile(r"[ \t]+#+[ \t]*$")
 
 
+def validate_okf_reserved_basenames(logical_path: str, resolved_path: Path) -> None:
+    """Reject logical or resolved paths whose basename is reserved by OKF."""
+    logical = Path(logical_path)
+    if logical.name.casefold() in _RESERVED_OKF_BASENAMES:
+        raise PassportError(
+            "path",
+            f"'{logical.name}' is reserved by OKF and cannot be a memory concept document",
+            hint="choose a non-reserved Markdown filename",
+        )
+    if resolved_path.name.casefold() in _RESERVED_OKF_BASENAMES:
+        raise PassportError(
+            "path",
+            f"resolved target '{resolved_path.name}' is reserved by OKF",
+            hint="choose a document that does not resolve to index.md or log.md",
+        )
+
+
 def validate_okf_memory_path(logical_path: str, resolved_path: Path) -> None:
-    """Validate the logical scanner path and resolved reserved target for OKF generation."""
+    """Validate the scanner path and resolved target for OKF generation."""
     logical = Path(logical_path)
     if logical.suffix != ".md":
         raise PassportError(
@@ -563,18 +581,7 @@ def validate_okf_memory_path(logical_path: str, resolved_path: Path) -> None:
             f"OKF memory documents require an exact '.md' suffix: {logical_path}",
             hint="rename the document with a lowercase .md suffix, then retry",
         )
-    if logical.name in _RESERVED_OKF_BASENAMES:
-        raise PassportError(
-            "path",
-            f"'{logical.name}' is reserved by OKF and cannot be a memory concept document",
-            hint="choose a non-reserved Markdown filename",
-        )
-    if resolved_path.name in _RESERVED_OKF_BASENAMES:
-        raise PassportError(
-            "path",
-            f"resolved target '{resolved_path.name}' is reserved by OKF",
-            hint="choose a document that does not resolve to index.md or log.md",
-        )
+    validate_okf_reserved_basenames(logical_path, resolved_path)
 
 
 def _derive_okf_title(body: str, logical_path: str) -> str | None:
@@ -641,6 +648,17 @@ def _add_okf_envelope(
     return tuple(added)
 
 
+def _prepare_frontmatter_rewrite(
+    frontmatter: dict[str, Any],
+    body: str,
+    *,
+    added_okf_fields: tuple[str, ...] = (),
+) -> PreparedPassportWrite:
+    """Render one frontmatter mutation through the shared atomic-apply path."""
+    text = f"---\n{_dump_yaml(frontmatter)}---\n{body}" if frontmatter else body
+    return PreparedPassportWrite(text=text, added_okf_fields=added_okf_fields)
+
+
 def prepare_passport_write(
     path: Path,
     passport: Passport,
@@ -660,14 +678,12 @@ def prepare_passport_write(
         added = _add_okf_envelope(frontmatter, body, passport, okf_path)
 
     frontmatter["forge_memory"] = _passport_to_dict(passport)
-    new_text = f"---\n{_dump_yaml(frontmatter)}---\n{body}"
-    mode = stat.S_IMODE(path.stat().st_mode)
-    return PreparedPassportWrite(text=new_text, mode=mode, added_okf_fields=added)
+    return _prepare_frontmatter_rewrite(frontmatter, body, added_okf_fields=added)
 
 
 def apply_prepared_passport_write(path: Path, prepared: PreparedPassportWrite) -> tuple[str, ...]:
     """Apply a previously validated passport rewrite atomically."""
-    atomic_write_text(path, prepared.text, mode=prepared.mode)
+    atomic_write_text(path, prepared.text, preserve_existing_mode=True)
     return prepared.added_okf_fields
 
 
@@ -703,9 +719,8 @@ def upgrade_passport_envelope(path: Path, *, logical_path: str) -> tuple[str, ..
     if not added:
         return ()
 
-    new_text = f"---\n{_dump_yaml(frontmatter)}---\n{body}"
-    atomic_write_text(path, new_text, mode=stat.S_IMODE(path.stat().st_mode))
-    return added
+    prepared = _prepare_frontmatter_rewrite(frontmatter, body, added_okf_fields=added)
+    return apply_prepared_passport_write(path, prepared)
 
 
 def remove_passport(path: Path) -> bool:
@@ -721,11 +736,7 @@ def remove_passport(path: Path) -> bool:
         return False
 
     del fm["forge_memory"]
-    if fm:
-        new_text = f"---\n{_dump_yaml(fm)}---\n{body}"
-    else:
-        new_text = body
-    atomic_write_text(path, new_text, mode=stat.S_IMODE(path.stat().st_mode))
+    apply_prepared_passport_write(path, _prepare_frontmatter_rewrite(fm, body))
     return True
 
 
@@ -781,7 +792,12 @@ def synthesize_passport(
 
     validate_writer_spec(writers)
 
-    resolved_intent = intent or _DEFAULT_INTENTS.get(strategy, "Project documentation")
+    if intent is None:
+        resolved_intent = _DEFAULT_INTENTS.get(strategy, "Project documentation")
+    elif not intent.strip():
+        raise PassportError("forge_memory.intent", "must be a non-empty string")
+    else:
+        resolved_intent = intent
 
     return Passport(
         version=PASSPORT_VERSION,

@@ -110,7 +110,8 @@ Project-doc passports (project-scoped, git-tracked; sessionless):
 
 - `forge memory track <path>`: author a project passport on a Markdown doc, sessionless (`--strategy`, `--intent`,
   `--writers`, `--propose`, `--shadow-path`). A new passport also receives missing `type`, `title`, and `description`
-  envelope fields; re-track does not migrate an existing passport.
+  envelope fields; re-track does not migrate an existing passport. New official tracking and explicit upgrade reject
+  logical/resolved `index.md` or `log.md` basenames case-insensitively; proposal shadows always reject those targets.
 - `forge memory list`: list passported memory docs under scan roots (`--json`).
 - `forge memory shadows list|show|review`: list accumulated shadow proposals, inspect one doc's proposals, or curate
   them (`--scope`, `--for`, `--curate`, `--show-latest`, `--effort` with `--curate`).

@@ -51,6 +51,27 @@ def test_scan_finds_passported_doc(tmp_path):
     assert docs[0].strategy == "changelog"
 
 
+def test_scan_uses_read_selected_delimiter_for_three_delimiter_frontmatter(tmp_path):
+    doc = tmp_path / "docs/legacy.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        "---\n"
+        "---\n"
+        "forge_memory:\n"
+        "  version: 1\n"
+        "  intent: Legacy\n"
+        "  update:\n"
+        "    strategy: generic\n"
+        "---\n"
+        "# Body\n",
+        encoding="utf-8",
+    )
+
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+
+    assert [entry.path for entry in docs] == ["docs/legacy.md"]
+
+
 def test_scan_skips_no_passport(tmp_path):
     _write_plain(tmp_path, "docs/notes.md")
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
@@ -262,6 +283,31 @@ def test_scan_unsafe_shadow_path_skipped(tmp_path):
         shadow_path="/tmp/x.md",
     )
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+
+
+def test_scan_skips_logical_and_resolved_reserved_shadow_targets(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/logical-reserved.md",
+        update_mode="shadow-only",
+        shadow_path="docs/Log.md",
+    )
+
+    reserved = tmp_path / "docs/index.md"
+    reserved.write_text("# Reserved OKF index\n", encoding="utf-8")
+    alias = tmp_path / ".forge/memory/index-alias.md"
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    alias.symlink_to(reserved)
+    _write_doc(
+        tmp_path,
+        "docs/resolved-reserved.md",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/index-alias.md",
+    )
+
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+    assert scan_shadow_passports(tmp_path, ["docs/"]) == []
+    assert reserved.read_text(encoding="utf-8") == "# Reserved OKF index\n"
 
 
 # ---------------------------------------------------------------------------

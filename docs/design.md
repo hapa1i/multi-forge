@@ -1256,15 +1256,16 @@ scope model (`--scope user` / `--scope project` / `--scope local`) and provides 
 (`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,
 codex-hooks) are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union). The
 `codex-hooks` module registers Forge's Codex hooks (`codex-session-start`, `codex-policy-check`) as a marker-delimited
-managed block in the user Codex config (`$CODEX_HOME/config.toml`). Project/local installs do not write runtime hook
-blocks for either Claude or Codex. Ordinary enable/sync keeps Codex installation best-effort: it is skipped with a
-notice when `codex` is not on PATH, and its conflicts never block the Claude install. Registration alone is inert —
-Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which `forge extension enable` names
-in its next steps but cannot perform or verify. Enrollment is unverifiable from a config read (the `trusted_hash` is not
-computable), so `forge runtime preflight codex --verify-enrollment` confirms it empirically instead — it runs one
-trivial managed `codex exec` turn and reports the user-scope hook as enrolled iff the `codex-session-start` hook fired
-(the observation receipt appeared). `~/.forge/installed.json` tracks what was installed for clean update/uninstall.
-Project/local enablement requires a `.claude/` anchor at the target directory (created if missing); user-level install
+managed block in the user Codex config (`$CODEX_HOME/config.toml`); atomic managed-block rewrites preserve an existing
+config's filesystem mode. Project/local installs do not write runtime hook blocks for either Claude or Codex. Ordinary
+enable/sync keeps Codex installation best-effort: it is skipped with a notice when `codex` is not on PATH, and its
+conflicts never block the Claude install. Registration alone is inert — Codex hooks fire only after the user's one-time
+interactive trust ceremony (§3.9), which `forge extension enable` names in its next steps but cannot perform or verify.
+Enrollment is unverifiable from a config read (the `trusted_hash` is not computable), so
+`forge runtime preflight codex --verify-enrollment` confirms it empirically instead — it runs one trivial managed
+`codex exec` turn and reports the user-scope hook as enrolled iff the `codex-session-start` hook fired (the observation
+receipt appeared). `~/.forge/installed.json` tracks what was installed for clean update/uninstall. Project/local
+enablement requires a `.claude/` anchor at the target directory (created if missing); user-level install
 (`--scope user`) goes to `~/.claude/` and does not require a project anchor. This establishes the Forge project per the
 identity model (§3).
 

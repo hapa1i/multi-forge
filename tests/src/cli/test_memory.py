@@ -218,7 +218,12 @@ class TestMemoryTrack:
 
         assert read_passport(forge_root / "notes.md") is not None
 
-    def test_track_shadow_only_passport_accepted(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+    def test_track_shadow_only_passport_accepted_without_preparing_discarded_rewrite(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Shadow-only passport without --propose: shadow file ensured, no manifest entry."""
         forge_root = seeded_session[0]
         from forge.session.passport import synthesize_passport, write_passport
@@ -228,16 +233,24 @@ class TestMemoryTrack:
             update_mode="shadow-only",
             shadow_path=".forge/memory/shadow_impl_notes.md",
         )
-        write_passport(forge_root / "docs/impl_notes.md", pp)
+        doc = forge_root / "docs/impl_notes.md"
+        write_passport(doc, pp)
+        before = doc.read_bytes()
 
         # Ensure the shadow file exists
         (forge_root / ".forge/memory/shadow_impl_notes.md").parent.mkdir(parents=True, exist_ok=True)
         (forge_root / ".forge/memory/shadow_impl_notes.md").write_text("", encoding="utf-8")
 
+        def fail_prepare(*args: object, **kwargs: object) -> None:
+            raise AssertionError("unchanged re-track must not prepare a rewrite")
+
+        monkeypatch.setattr("forge.cli.memory.prepare_passport_write", fail_prepare)
+
         result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md"])
         assert result.exit_code == 0, result.output
         assert "shadow-only" in result.output
         assert (forge_root / ".forge/memory/shadow_impl_notes.md").is_file()
+        assert doc.read_bytes() == before
 
     def test_track_rejects_absolute_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "track", "/etc/passwd", "--strategy", "generic"])
@@ -341,7 +354,10 @@ class TestMemoryTrack:
         assert doc.read_bytes() == before_doc
         assert after_shadows == before_shadows
 
-    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt", "docs/UPPER.MD"])
+    @pytest.mark.parametrize(
+        "path",
+        ["docs/index.md", "docs/Index.md", "docs/log.md", "docs/Log.md", "docs/legacy.txt", "docs/UPPER.MD"],
+    )
     def test_new_track_rejects_reserved_and_non_markdown_paths_without_writing(
         self,
         runner: CliRunner,
@@ -357,6 +373,40 @@ class TestMemoryTrack:
 
         assert result.exit_code == 1
         assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize("propose", [False, True], ids=["direct", "proposal"])
+    def test_new_track_rejects_alias_resolving_to_reserved_official_without_side_effects(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        propose: bool,
+    ) -> None:
+        forge_root = seeded_session[0]
+        reserved = forge_root / "docs/index.md"
+        reserved.write_text("# Reserved OKF index\n", encoding="utf-8")
+        alias = forge_root / "docs/reserved-alias.md"
+        alias.symlink_to(reserved)
+        before_reserved = reserved.read_bytes()
+        shadow_root = forge_root / ".forge/memory"
+        before_shadows = {
+            candidate.relative_to(shadow_root).as_posix(): candidate.read_bytes()
+            for candidate in shadow_root.rglob("*")
+            if candidate.is_file()
+        }
+        args = ["memory", "track", "docs/reserved-alias.md"]
+        args.extend(["--propose"] if propose else ["--strategy", "generic"])
+
+        result = runner.invoke(main, args)
+
+        after_shadows = {
+            candidate.relative_to(shadow_root).as_posix(): candidate.read_bytes()
+            for candidate in shadow_root.rglob("*")
+            if candidate.is_file()
+        }
+        assert result.exit_code == 1
+        assert "reserved" in result.output
+        assert reserved.read_bytes() == before_reserved
+        assert after_shadows == before_shadows
 
     @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt"])
     def test_existing_legacy_passport_retrack_does_not_generate_envelope(
@@ -382,6 +432,38 @@ class TestMemoryTrack:
         passport = read_passport(doc)
         assert passport is not None and passport.update.strategy == "changelog"
         assert "type" not in _frontmatter(doc)
+
+    def test_flagged_retrack_uses_same_frontmatter_delimiter_as_read(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        doc.write_text(
+            "---\n"
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            "  intent: Legacy\n"
+            "  update:\n"
+            "    strategy: generic\n"
+            "---\n"
+            "# Body\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--strategy", "changelog"])
+
+        assert result.exit_code == 0, result.output
+        frontmatter = _frontmatter(doc)
+        passport_data = frontmatter["forge_memory"]
+        assert isinstance(passport_data, dict)
+        update = passport_data["update"]
+        assert isinstance(update, dict)
+        assert passport_data["intent"] == "Legacy"
+        assert update["strategy"] == "changelog"
+        assert doc.read_text(encoding="utf-8").count("---") == 2
 
     @pytest.mark.parametrize(
         "content",
@@ -463,6 +545,29 @@ class TestMemoryTrackPropose:
         assert (forge_root / self.DERIVED).read_text(encoding="utf-8") == ""
         assert _frontmatter(forge_root / "docs/impl_notes.md")["type"] == "Memory Document"
         assert "Shadow file created" in result.output
+
+    def test_unchanged_propose_does_not_prepare_discarded_rewrite(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        forge_root = seeded_session[0]
+        doc = forge_root / "docs/impl_notes.md"
+        first = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert first.exit_code == 0, first.output
+        before = doc.read_bytes()
+
+        def fail_prepare(*args: object, **kwargs: object) -> None:
+            raise AssertionError("unchanged proposal must not prepare a rewrite")
+
+        monkeypatch.setattr("forge.cli.memory.prepare_passport_write", fail_prepare)
+
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+
+        assert result.exit_code == 0, result.output
+        assert "already present" in result.output
+        assert doc.read_bytes() == before
 
     def test_propose_creates_shadow_only_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root = seeded_session[0]
@@ -702,11 +807,15 @@ class TestMemoryTrackPropose:
         assert doc.read_bytes() == before
         assert not shadow.exists()
 
+    @pytest.mark.parametrize("path", ["docs/index.md", "docs/Index.md", "docs/log.md", "docs/Log.md"])
     def test_reserved_proposal_with_custom_shadow_has_no_side_effects(
-        self, runner: CliRunner, seeded_session: tuple[Path, str]
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        path: str,
     ) -> None:
         forge_root = seeded_session[0]
-        doc = forge_root / "docs/index.md"
+        doc = forge_root / path
         doc.write_text("# Reserved\n", encoding="utf-8")
         before = doc.read_bytes()
         shadow_path = ".forge/memory/custom_reserved_attempt.md"
@@ -717,7 +826,7 @@ class TestMemoryTrackPropose:
             [
                 "memory",
                 "track",
-                "docs/index.md",
+                path,
                 "--propose",
                 "--shadow-path",
                 shadow_path,
@@ -727,6 +836,55 @@ class TestMemoryTrackPropose:
         assert result.exit_code == 1
         assert doc.read_bytes() == before
         assert not shadow.exists()
+
+    @pytest.mark.parametrize("shadow_path", ["docs/index.md", "docs/Index.md", "docs/log.md", "docs/Log.md"])
+    def test_propose_rejects_reserved_custom_shadow_without_modifying_either_doc(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        shadow_path: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        official = forge_root / "docs/impl_notes.md"
+        shadow = forge_root / shadow_path
+        shadow.write_text("# Reserved OKF file\n", encoding="utf-8")
+        before_official = official.read_bytes()
+        before_shadow = shadow.read_bytes()
+
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", shadow_path],
+        )
+
+        assert result.exit_code == 1
+        assert "reserved" in result.output
+        assert official.read_bytes() == before_official
+        assert shadow.read_bytes() == before_shadow
+
+    def test_propose_rejects_shadow_resolving_to_reserved_file_without_modification(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        official = forge_root / "docs/impl_notes.md"
+        reserved = forge_root / "docs/log.md"
+        reserved.write_text("# Reserved OKF log\n", encoding="utf-8")
+        alias_path = ".forge/memory/log-alias.md"
+        alias = forge_root / alias_path
+        alias.symlink_to(reserved)
+        before_official = official.read_bytes()
+        before_reserved = reserved.read_bytes()
+
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", alias_path],
+        )
+
+        assert result.exit_code == 1
+        assert "reserved" in result.output
+        assert official.read_bytes() == before_official
+        assert reserved.read_bytes() == before_reserved
 
     def test_propose_upsert_updates_shadow_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root = seeded_session[0]
@@ -1736,7 +1894,10 @@ class TestPassportUpgrade:
         assert result.exit_code == 1
         assert doc.read_bytes() == before
 
-    @pytest.mark.parametrize("path", ["docs/index.md", "docs/log.md", "docs/legacy.txt", "docs/legacy.MD"])
+    @pytest.mark.parametrize(
+        "path",
+        ["docs/index.md", "docs/Index.md", "docs/log.md", "docs/Log.md", "docs/legacy.txt", "docs/legacy.MD"],
+    )
     def test_upgrade_rejects_reserved_and_non_markdown_paths_without_modifying_doc(
         self,
         runner: CliRunner,
@@ -1752,6 +1913,24 @@ class TestPassportUpgrade:
 
         assert result.exit_code == 1
         assert doc.read_bytes() == before
+
+    def test_upgrade_rejects_alias_resolving_to_reserved_doc_without_modification(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        reserved = forge_root / "docs/log.md"
+        self._write_legacy_passport(reserved)
+        alias = forge_root / "docs/reserved-alias.md"
+        alias.symlink_to(reserved)
+        before = reserved.read_bytes()
+
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/reserved-alias.md"])
+
+        assert result.exit_code == 1
+        assert "reserved" in result.output
+        assert reserved.read_bytes() == before
 
     def test_upgrade_refuses_incompatible_project_without_modifying_doc(
         self, runner: CliRunner, seeded_session: tuple[Path, str]
