@@ -72,6 +72,259 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
 
 
 # ---------------------------------------------------------------------------
+# shared passport-target preflight
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rootless_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Create a hermetic cwd whose git boundary prevents parent Forge-root discovery."""
+    root = tmp_path / "rootless"
+    (root / ".git").mkdir(parents=True)
+    doc = root / "docs/checklist.md"
+    doc.parent.mkdir()
+    doc.write_text("# Rootless doc\n", encoding="utf-8")
+    monkeypatch.chdir(root)
+    return root
+
+
+class TestMemoryPassportTargetPreflight:
+    @pytest.mark.parametrize(
+        ("args", "expected_stderr"),
+        [
+            pytest.param(
+                ["memory", "track", "docs/checklist.md", "--strategy", "generic"],
+                "Error: Not inside a Forge project. Run `forge extension enable` first.\n",
+                id="track",
+            ),
+            pytest.param(
+                ["memory", "passport", "show", "docs/checklist.md"],
+                "Error: Not inside a Forge project. Run `forge extension enable` first.\n",
+                id="show",
+            ),
+            pytest.param(
+                ["memory", "passport", "upgrade", "docs/checklist.md"],
+                "Error: Not inside a Forge project.\n\nTip: Run 'forge extension enable' first.\n",
+                id="upgrade",
+            ),
+            pytest.param(
+                ["memory", "passport", "remove", "docs/checklist.md"],
+                "Error: Not inside a Forge project. Run `forge extension enable` first.\n",
+                id="remove",
+            ),
+        ],
+    )
+    def test_rootless_message_and_streams(
+        self,
+        runner: CliRunner,
+        rootless_cwd: Path,
+        args: list[str],
+        expected_stderr: str,
+    ) -> None:
+        doc = rootless_cwd / "docs/checklist.md"
+        before = doc.read_bytes()
+
+        result = runner.invoke(main, args)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert result.stderr == expected_stderr
+        assert doc.read_bytes() == before
+
+    @pytest.mark.parametrize(
+        ("args", "expected_stderr"),
+        [
+            pytest.param(
+                ["memory", "track", "../outside.md", "--strategy", "generic"],
+                "Error: Invalid path: escapes base directory: ../outside.md\n",
+                id="track",
+            ),
+            pytest.param(
+                ["memory", "passport", "show", "../outside.md"],
+                "Error: Invalid path: escapes base directory: ../outside.md\n",
+                id="show",
+            ),
+            pytest.param(
+                ["memory", "passport", "upgrade", "../outside.md"],
+                "Error: Invalid path: escapes base directory: ../outside.md\n\n"
+                "Tip: Use a project-relative Markdown path inside this Forge project.\n",
+                id="upgrade",
+            ),
+            pytest.param(
+                ["memory", "passport", "remove", "../outside.md"],
+                "Error: Invalid path: escapes base directory: ../outside.md\n",
+                id="remove",
+            ),
+        ],
+    )
+    def test_unsafe_message_streams_and_no_mutation(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        args: list[str],
+        expected_stderr: str,
+    ) -> None:
+        forge_root = seeded_session[0]
+        outside = forge_root.parent / "outside.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        before = outside.read_bytes()
+
+        result = runner.invoke(main, args)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert result.stderr == expected_stderr
+        assert outside.read_bytes() == before
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            pytest.param(["memory", "track", "../missing.md", "--strategy", "generic"], id="track"),
+            pytest.param(["memory", "passport", "show", "../missing.md"], id="show"),
+            pytest.param(["memory", "passport", "upgrade", "../missing.md"], id="upgrade"),
+            pytest.param(["memory", "passport", "remove", "../missing.md"], id="remove"),
+        ],
+    )
+    def test_unsafe_path_precedes_missing_file(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        args: list[str],
+    ) -> None:
+        missing = seeded_session[0].parent / "missing.md"
+        expected_stderr = "Error: Invalid path: escapes base directory: ../missing.md\n"
+        if "upgrade" in args:
+            expected_stderr += "\nTip: Use a project-relative Markdown path inside this Forge project.\n"
+
+        result = runner.invoke(main, args)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert result.stderr == expected_stderr
+        assert not missing.exists()
+
+    @pytest.mark.parametrize(
+        ("args", "expected_stderr"),
+        [
+            pytest.param(
+                ["memory", "track", "docs/missing.md", "--strategy", "generic"],
+                "Error: File does not exist: docs/missing.md\n",
+                id="track",
+            ),
+            pytest.param(
+                ["memory", "passport", "show", "docs/missing.md", "--json"],
+                "Error: File not found: docs/missing.md\n",
+                id="show-json",
+            ),
+            pytest.param(
+                ["memory", "passport", "upgrade", "docs/missing.md"],
+                "Error: File not found: docs/missing.md\n\n" "Tip: Check the project-relative path and try again.\n",
+                id="upgrade",
+            ),
+            pytest.param(
+                ["memory", "passport", "remove", "docs/missing.md", "--json"],
+                "Error: File not found: docs/missing.md\n",
+                id="remove-json",
+            ),
+        ],
+    )
+    def test_missing_message_streams_and_no_creation(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        args: list[str],
+        expected_stderr: str,
+    ) -> None:
+        missing = seeded_session[0] / "docs/missing.md"
+
+        result = runner.invoke(main, args)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert result.stderr == expected_stderr
+        assert not missing.exists()
+
+    @pytest.mark.parametrize(
+        ("extra_args", "expected_stderr"),
+        [
+            pytest.param(
+                ["--strategy", "invalid"],
+                "Error: Unknown strategy 'invalid'. Valid strategies: changelog, checklist, generic, project-state\n",
+                id="invalid-strategy",
+            ),
+            pytest.param(
+                ["--shadow-path", ".forge/memory/proposed.md"],
+                "Error: --shadow-path requires --propose.\n",
+                id="shadow-path-without-propose",
+            ),
+        ],
+    )
+    def test_track_argument_validation_precedes_root_resolution(
+        self,
+        runner: CliRunner,
+        rootless_cwd: Path,
+        extra_args: list[str],
+        expected_stderr: str,
+    ) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/checklist.md", *extra_args])
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert result.stderr == expected_stderr
+        assert "Not inside a Forge project" not in result.stderr
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            pytest.param(
+                ["memory", "track", "../outside.md", "--strategy", "generic"],
+                id="track-unsafe",
+            ),
+            pytest.param(
+                ["memory", "track", "docs/missing.md", "--strategy", "generic"],
+                id="track-missing",
+            ),
+            pytest.param(["memory", "passport", "upgrade", "../outside.md"], id="upgrade-unsafe"),
+            pytest.param(["memory", "passport", "upgrade", "docs/missing.md"], id="upgrade-missing"),
+            pytest.param(["memory", "passport", "remove", "../outside.md"], id="remove-unsafe"),
+            pytest.param(["memory", "passport", "remove", "docs/missing.md"], id="remove-missing"),
+        ],
+    )
+    def test_compatibility_refusal_precedes_path_preflight(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+        args: list[str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        if "../outside.md" in args:
+            target = forge_root.parent / "outside.md"
+            target.write_text("# Outside\n", encoding="utf-8")
+            before = target.read_bytes()
+        else:
+            target = forge_root / "docs/missing.md"
+            before = None
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, args)
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "Error:" in result.stderr
+        assert "requires Forge >=9999" in result.stderr
+        assert "Tip:" in result.stderr
+        assert "Invalid path:" not in result.stderr
+        assert "File not found:" not in result.stderr
+        assert "File does not exist:" not in result.stderr
+        if before is None:
+            assert not target.exists()
+        else:
+            assert target.read_bytes() == before
+
+
+# ---------------------------------------------------------------------------
 # track
 # ---------------------------------------------------------------------------
 
@@ -93,7 +346,8 @@ class TestMemoryTrack:
 
         result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--strategy", "checklist"])
         assert result.exit_code == 0, result.output
-        assert "Passport created" in result.output
+        assert "Passport created" in result.stdout
+        assert result.stderr == ""
 
         pp = read_passport(forge_root / "docs/checklist.md")
         assert pp is not None and pp.update.strategy == "checklist"
@@ -120,7 +374,10 @@ class TestMemoryTrack:
         result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--strategy", "checklist"])
 
         assert result.exit_code == 1
-        assert "requires Forge" in result.output
+        assert result.stdout == ""
+        assert "Error:" in result.stderr
+        assert "requires Forge" in result.stderr
+        assert "Tip:" in result.stderr
         assert doc.read_bytes() == before
 
     def test_track_ignores_ambient_session(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
@@ -313,11 +570,6 @@ class TestMemoryTrack:
         result = runner.invoke(main, ["memory", "track", "/etc/passwd", "--strategy", "generic"])
         assert result.exit_code != 0
         assert "Invalid path" in result.output
-
-    def test_track_rejects_missing_file(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "track", "docs/nonexistent.md", "--strategy", "generic"])
-        assert result.exit_code != 0
-        assert "does not exist" in result.output
 
     def test_track_rejects_invalid_strategy(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--strategy", "invalid"])
@@ -1780,9 +2032,10 @@ class TestPassportShow:
 
         result = runner.invoke(main, ["memory", "passport", "show", "docs/changelog.md"])
         assert result.exit_code == 0, result.output
-        assert "changelog" in result.output
-        assert "version" in result.output
-        assert "intent" in result.output
+        assert "changelog" in result.stdout
+        assert "version" in result.stdout
+        assert "intent" in result.stdout
+        assert result.stderr == ""
 
     def test_show_json_output(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root, _ = seeded_session
@@ -1793,11 +2046,34 @@ class TestPassportShow:
 
         result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md", "--json"])
         assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert data["version"] == 1
         assert data["update"]["strategy"] == "checklist"
         assert "intent" in data
         assert isinstance(data["captures"], list)
+        assert result.stderr == ""
+
+    def test_show_ignores_incompatible_project_pin(
+        self,
+        runner: CliRunner,
+        seeded_session: tuple[Path, str],
+    ) -> None:
+        forge_root = seeded_session[0]
+        from forge.session.passport import synthesize_passport, write_passport
+
+        doc = forge_root / "docs/changelog.md"
+        write_passport(doc, synthesize_passport(strategy="changelog"))
+        before = doc.read_bytes()
+        (forge_root / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n', encoding="utf-8"
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/changelog.md"])
+
+        assert result.exit_code == 0
+        assert "changelog" in result.stdout
+        assert result.stderr == ""
+        assert doc.read_bytes() == before
 
     def test_show_no_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md"])
@@ -1815,11 +2091,6 @@ class TestPassportShow:
             "path": "docs/checklist.md",
             "tip": "forge memory track docs/checklist.md --strategy <strategy>",
         }
-
-    def test_show_file_not_found(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "passport", "show", "docs/nonexistent.md"])
-        assert result.exit_code != 0
-        assert "not found" in (result.output or "").lower()
 
     def test_show_malformed_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         forge_root, _ = seeded_session
@@ -1866,7 +2137,8 @@ class TestPassportUpgrade:
         result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
 
         assert result.exit_code == 0, result.output
-        assert "upgraded" in result.output.lower()
+        assert "upgraded" in result.stdout.lower()
+        assert result.stderr == ""
         for field in ("type", "title", "description"):
             assert field in result.output
         frontmatter = _frontmatter(doc)
@@ -1881,7 +2153,8 @@ class TestPassportUpgrade:
         second = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
 
         assert second.exit_code == 0, second.output
-        assert "already complete" in second.output.lower()
+        assert "already complete" in second.stdout.lower()
+        assert second.stderr == ""
         assert doc.read_bytes() == upgraded
 
     def test_upgrade_preserves_existing_unknown_type(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
@@ -2003,7 +2276,10 @@ class TestPassportUpgrade:
         result = runner.invoke(main, ["memory", "passport", "upgrade", "docs/impl_notes.md"])
 
         assert result.exit_code == 1
-        assert "requires Forge" in result.output
+        assert result.stdout == ""
+        assert "Error:" in result.stderr
+        assert "requires Forge" in result.stderr
+        assert "Tip:" in result.stderr
         assert doc.read_bytes() == before
 
     @pytest.mark.parametrize(
@@ -2058,16 +2334,11 @@ class TestPassportUpgrade:
         assert rejected.exit_code == 1
         assert md_target.read_bytes() == before
 
-    @pytest.mark.parametrize("path", ["../outside.md", "/tmp/outside.md", "docs/missing.md"])
-    def test_upgrade_rejects_unsafe_or_missing_path(
-        self,
-        runner: CliRunner,
-        seeded_session: tuple[Path, str],
-        path: str,
-    ) -> None:
-        result = runner.invoke(main, ["memory", "passport", "upgrade", path])
+    def test_upgrade_rejects_absolute_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "upgrade", "/tmp/outside.md"])
 
         assert result.exit_code == 1
+        assert result.stdout == ""
         assert "Error:" in result.stderr
         assert "Tip:" in result.stderr
 
@@ -2097,7 +2368,8 @@ class TestPassportRemove:
 
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
         assert result.exit_code == 0, result.output
-        assert "Passport removed" in result.output
+        assert "Passport removed" in result.stdout
+        assert result.stderr == ""
         assert read_passport(forge_root / "docs/checklist.md") is None
 
     def test_remove_refuses_incompatible_project_without_editing_doc(
@@ -2116,7 +2388,10 @@ class TestPassportRemove:
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
 
         assert result.exit_code == 1
-        assert "requires Forge" in result.output
+        assert result.stdout == ""
+        assert "Error:" in result.stderr
+        assert "requires Forge" in result.stderr
+        assert "Tip:" in result.stderr
         assert doc.read_bytes() == before
 
     def test_remove_no_passport_is_noop(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
@@ -2182,11 +2457,12 @@ class TestPassportRemove:
 
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md", "--json"])
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output) == {
+        assert json.loads(result.stdout) == {
             "success": True,
             "removed": True,
             "path": "docs/checklist.md",
         }
+        assert result.stderr == ""
 
     def test_remove_json_no_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md", "--json"])
