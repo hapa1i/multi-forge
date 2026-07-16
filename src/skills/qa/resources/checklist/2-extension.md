@@ -1,15 +1,15 @@
 <!-- prereq: 0.3, 1.1 -->
 
-## 2. Claude Code Extensions (`forge extension enable`)
+## 2. Runtime Extensions (`forge extension`)
 
 ### 2.1 Basic Installation (User Scope)
 
 <!-- auto -->
 
 ```bash
-# Install Forge extensions (default: standard profile, user scope)
+# Install Forge extensions (full profile is required for the QA skill itself)
 cd $FORGE_TEST_REPO
-forge extension enable --scope user --symlink
+forge extension enable --scope user --symlink --profile full --runtime claude
 
 # Optional: preview changes instead of applying
 forge extension enable --scope user --dry-run
@@ -26,7 +26,7 @@ cat $CLAUDE_HOME/settings.json | jq '.permissions'
 
 - [ ] `modules_enabled` in `installed.json` lists `commands` and `agents` (directories created only if source has
   installable files)
-- [ ] Skills installed to `$CLAUDE_HOME/skills/` (standard profile)
+- [ ] All eleven full-profile Claude skills are installed to `$CLAUDE_HOME/skills/`
 - [ ] Runtime hooks configured in `$CLAUDE_HOME/settings.json`
 - [ ] `statusLine` is absent from user scope
 - [ ] `$FORGE_HOME/installed.json` tracking file created
@@ -84,7 +84,7 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 ```bash
 # Install Forge extensions to LOCAL scope (this project only)
 cd $FORGE_TEST_REPO
-forge extension enable --scope local
+forge extension enable --scope local --runtime claude
 
 # Verify local installation: statusLine yes, runtime hooks no
 cat .claude/settings.local.json | jq '.statusLine'
@@ -132,7 +132,7 @@ cat $FORGE_HOME/installed.json | jq --arg key "$LOCAL_KEY" '.installations[$key]
 
 ```bash
 # Try to install local again to same project
-forge extension enable --scope local
+forge extension enable --scope local --runtime claude
 
 # Should either:
 # - Say "already installed" and skip
@@ -195,7 +195,7 @@ forge extension sync
 # Enable with a fake codex binary on PATH + isolated CODEX_HOME
 export CODEX_HOME=$(mktemp -d)
 FAKE_BIN=$(mktemp -d) && printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/codex" && chmod +x "$FAKE_BIN/codex"
-PATH="$FAKE_BIN:$PATH" forge extension enable --scope user --force
+PATH="$FAKE_BIN:$PATH" forge extension enable --scope user --runtime claude --force
 
 cat "$CODEX_HOME/config.toml"
 forge extension status --scope user
@@ -217,13 +217,13 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 <!-- auto -->
 
 ```bash
-# Re-enable with codex absent from PATH (minimal PATH without codex)
+# Re-enable with codex absent from PATH while keeping the installed Claude binary visible.
 export CODEX_HOME=$(mktemp -d)
-PATH="/usr/bin:/bin" $HOME/.local/bin/forge extension enable --scope user --force
+PATH="$HOME/.local/bin:/usr/bin:/bin" forge extension enable --scope user --runtime claude --force
 test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
 
 # Restore: re-enable normally and clear the env override
-forge extension enable --scope user --force
+forge extension enable --scope user --runtime claude --force
 unset CODEX_HOME
 ```
 
@@ -261,5 +261,101 @@ find .claude -name '.settings.local.json.forge.backup.*' -print -quit | grep -q 
 - [ ] Apply removes the direct project hook while leaving the user dispatcher registration present
 - [ ] Doctor reports neither cleanup-required nor double-fire after migration
 - [ ] A project settings backup exists
+
+### 2.13 Runtime-Aware Skill Packages
+
+<!-- prereq: 2.1, 2.4 -->
+
+<!-- auto -->
+
+Exercise the Codex user target only here, inside Docker's isolated `$HOME`. Then restore the user installation to
+Claude-only and keep the Codex project target for later status, disable, and uninstall checks.
+
+```bash
+cd "$FORGE_TEST_REPO"
+
+# Make Codex selectable without depending on a real Codex binary in the QA image.
+QA_RUNTIME_BIN=/tmp/forge-qa-runtime-bin
+mkdir -p "$QA_RUNTIME_BIN"
+printf '#!/bin/sh\nexit 0\n' > "$QA_RUNTIME_BIN/codex"
+chmod +x "$QA_RUNTIME_BIN/codex"
+
+# User target: Docker QA is the only manual flow allowed to touch $HOME/.agents.
+PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope user --symlink --profile full --runtime all --force
+printf '%s\n' challenge review review-docs smoke-test understand > /tmp/forge-portable-skills.expected
+find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-portable-skills.expected -
+jq -e '([.installations.user.skill_packages[] | select(.runtime == "claude_code")] | length == 11)
+  and ([.installations.user.skill_packages[] | select(.runtime == "codex")] | length == 5)' \
+  "$FORGE_HOME/installed.json"
+
+# Remove the user Codex target and restore the Claude user installation used by later sections.
+forge extension disable --scope user --yes
+! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
+forge extension enable --scope user --symlink --profile full --runtime claude
+jq -e '(.installations.user.skill_packages | length == 11)
+  and all(.installations.user.skill_packages[]; .runtime == "claude_code")' \
+  "$FORGE_HOME/installed.json"
+
+# Project target: portable Codex skills live in the repository, never under CODEX_HOME.
+PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
+  --profile minimal --with skills --without commands --runtime codex
+find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-portable-skills.expected -
+test ! -d "${CODEX_HOME:-$HOME/.codex}/skills"
+
+# An explicit Codex local/private request must fail and leave the existing local Claude runtime set unchanged.
+LOCAL_KEY="local:$(pwd -P)"
+LOCAL_BEFORE=$(jq -c --arg key "$LOCAL_KEY" \
+  '[.installations[$key].skill_packages[].runtime] | unique' "$FORGE_HOME/installed.json")
+if PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope local --runtime codex --force \
+  >/tmp/forge-codex-local.txt 2>&1; then
+  echo "ERROR: Codex local scope unexpectedly succeeded" >&2
+  exit 1
+fi
+rg -q 'scope_unsupported' /tmp/forge-codex-local.txt
+LOCAL_AFTER=$(jq -c --arg key "$LOCAL_KEY" \
+  '[.installations[$key].skill_packages[].runtime] | unique' "$FORGE_HOME/installed.json")
+test "$LOCAL_BEFORE" = '["claude_code"]' && test "$LOCAL_AFTER" = "$LOCAL_BEFORE"
+
+# Runtime selection is persisted: sync still owns Codex with a PATH that cannot find the fake binary.
+PATH="/usr/bin:/bin" "$HOME/.local/bin/forge" extension sync --scope project
+jq -e --arg root "$(pwd -P)" \
+  '[.installations["project:" + $root].skill_packages[] | select(.runtime == "codex")] | length == 5' \
+  "$FORGE_HOME/installed.json"
+
+# A same-name user package is never overwritten, even with --force.
+mkdir -p "$HOME/.agents/skills/challenge"
+printf 'user-owned duplicate\n' > "$HOME/.agents/skills/challenge/SKILL.md"
+DUPLICATE_BEFORE=$(shasum -a 256 "$HOME/.agents/skills/challenge/SKILL.md" | cut -d' ' -f1)
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | jq -e '.[0].skill_packages[] | select(.skill == "challenge")
+    | .state == "duplicate" and (.duplicate_dirs | length == 1) and (.recovery | contains("Remove or rename"))'
+if PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
+  --profile minimal --with skills --without commands --runtime codex --force \
+  >/tmp/forge-codex-duplicate.txt 2>&1; then
+  echo "ERROR: explicit duplicate unexpectedly succeeded" >&2
+  exit 1
+fi
+rg -q 'duplicate_scan_chain' /tmp/forge-codex-duplicate.txt
+DUPLICATE_AFTER=$(shasum -a 256 "$HOME/.agents/skills/challenge/SKILL.md" | cut -d' ' -f1)
+test "$DUPLICATE_BEFORE" = "$DUPLICATE_AFTER"
+
+rm -rf "$HOME/.agents/skills/challenge"
+forge extension sync --scope project
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | jq -e '.[0].skill_packages | length == 5 and all(.[];
+      .runtime == "codex" and .state == "present" and .target_present == true
+      and .missing_file_paths == [] and .duplicate_dirs == [] and .recovery == null)'
+```
+
+- [ ] Full-profile user `all` tracks eleven Claude packages and exactly the five portable Codex packages
+- [ ] Disabling the user install removes its Codex packages; the restored user install tracks Claude packages only
+- [ ] Project Codex target contains exactly the five portable skills under `.agents/skills`, not `CODEX_HOME`
+- [ ] Explicit Codex local scope fails with `scope_unsupported` and leaves the local Claude package set unchanged
+- [ ] Project sync preserves the recorded Codex runtime set when Codex is temporarily absent from `PATH`
+- [ ] JSON status reports the injected same-name package as `duplicate` with its path and recovery guidance
+- [ ] Explicit enable refuses the duplicate even with `--force`, and its checksum remains unchanged
+- [ ] After duplicate cleanup and sync, all five project Codex packages report healthy `present` state
 
 ---

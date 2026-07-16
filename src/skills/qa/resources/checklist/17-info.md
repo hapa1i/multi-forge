@@ -63,4 +63,34 @@ forge runtime list --json
 - [ ] `--json` emits a valid JSON array (one object per runtime, each with `id` and `installed`)
 - [ ] A `codex` row is present with honest hook/pretool capability values
 
+### 17.4 Runtime Skill Package Health
+
+<!-- auto -->
+
+```bash
+cd "$FORGE_TEST_REPO"
+
+forge extension status --scope project --root "$FORGE_TEST_REPO" | tee /tmp/forge-project-status.txt
+rg -q 'Skill packages:' /tmp/forge-project-status.txt
+test "$(rg -c 'present[[:space:]]+codex[[:space:]]+' /tmp/forge-project-status.txt)" -eq 5
+
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | tee /tmp/forge-project-status.json \
+  | jq -e 'length == 1 and .[0].scope == "project"
+      and (.[0].skill_packages | length == 5)
+      and all(.[0].skill_packages[];
+        . as $package
+        | $package.runtime == "codex" and ($package.skill | length > 0)
+        and ($package.target_dir | endswith("/.agents/skills/" + $package.skill))
+        and ($package.file_paths | length > 0)
+        and all($package.file_paths[]; startswith($package.target_dir + "/"))
+        and $package.state == "present" and $package.target_present == true
+        and $package.missing_file_paths == [] and $package.duplicate_dirs == [] and $package.recovery == null)'
+```
+
+- [ ] Human status shows a runtime-package table with the five project Codex packages in `present` state
+- [ ] JSON status reports one project installation and five healthy Codex package records
+- [ ] Every JSON package record names its skill/runtime/target/files and has no missing files, duplicates, or recovery
+  action
+
 ---

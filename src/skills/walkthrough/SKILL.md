@@ -442,7 +442,7 @@ This returns JSON with:
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0 (Setup)          | "Test repo ready. Your real `~/.claude/` timestamps are recorded as a baseline."                                                                                            |
 | 1 (Terminal)       | "You now have a sandboxed terminal. Commands there target the test repo, not your real system."                                                                             |
-| 2 (Install)        | "Extensions installed. The wrapper enforced 4 safety gates before running the install."                                                                                     |
+| 2 (Install)        | "Extensions installed. The wrapper enforced its path denylist and 6 safety gates before running the install."                                                               |
 | 3 (Verify)         | "Hooks, skills, commands all landed correctly. Pre-existing settings survived the install."                                                                                 |
 | 4 (Untouched)      | "Real system confirmed untouched -- all timestamps match the baseline."                                                                                                     |
 | 5 (CLI)            | "You've seen the Forge CLI surface -- sessions, proxies, config, policy, all managed through `forge`."                                                                      |
@@ -575,19 +575,22 @@ Tip: "For a quick non-interactive check, use `/forge:smoke-test`. For the full Q
 
 ## Safety Model
 
-| Tier        | Scripts involved                | What can go wrong           | Mitigation                                |
-| ----------- | ------------------------------- | --------------------------- | ----------------------------------------- |
-| Walkthrough | `run-in-repo.sh` (agent-driven) | Install targets real system | 4 safety gates + agent mtime verification |
+| Tier        | Scripts involved                | What can go wrong           | Mitigation                                         |
+| ----------- | ------------------------------- | --------------------------- | -------------------------------------------------- |
+| Walkthrough | `run-in-repo.sh` (agent-driven) | Install targets real system | Path denylist + 6 gates + agent mtime verification |
 
 ### Safety Gates (run-in-repo.sh)
 
-Every command in the walkthrough passes through these gates:
+Every command in the walkthrough passes through a path denylist and these numbered gates:
 
-1. **Denylist** -- refuses FORGE_TEST_REPO = empty, `/`, `$HOME`, `/Users`, `/tmp`, `/var`, etc.
-2. **Gate 1** -- env.sh exists (test repo not deleted)
-3. **Gate 2** -- marker file exists (this is actually a test repo)
-4. **Gate 3** -- FORGE_HOME isolation: FORGE_HOME points to `$FORGE_TEST_REPO/.forge-home` (not real `~/.forge/`)
-5. **Gate 4** -- structure check: `.forge/walkthrough/` and `CLAUDE.md` exist
+- **Denylist** -- refuses FORGE_TEST_REPO = empty, `/`, `$HOME`, `/Users`, `/tmp`, `/var`, etc.
+
+1. **Gate 1** -- env.sh exists (test repo not deleted)
+2. **Gate 2** -- marker file exists (this is actually a test repo)
+3. **Gate 3** -- FORGE_HOME points to `$FORGE_TEST_REPO/.forge-home` (not real `~/.forge/`)
+4. **Gate 4** -- CLAUDE_HOME points to `$FORGE_TEST_REPO/.claude-user`
+5. **Gate 5** -- CODEX_HOME points to `$FORGE_TEST_REPO/.codex-user`
+6. **Gate 6** -- `.forge/walkthrough/` and `CLAUDE.md` establish the expected test-repo structure
 
 Any gate failure = loud error message + exit 1. No silent fallthrough.
 

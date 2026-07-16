@@ -1,4 +1,4 @@
-<!-- prereq: 0.3, 2.4 -->
+<!-- prereq: 0.3, 2.13 -->
 
 ## 18. Uninstallation (Incremental)
 
@@ -68,14 +68,40 @@ cat .claude/settings.local.json | jq '.env.MY_CUSTOM_VAR'
 
 ```bash
 # Re-install local scope so we can test complete uninstall
-forge extension enable --scope local
+forge extension enable --scope local --runtime claude
 
-# Verify both scopes installed again
+# Verify user, local, and project scopes are installed
 cat ~/.forge/installed.json | jq '.installations | keys'
-# Should show: ["user", "local:/Users/..."]
+# Should include: user, local:/workspace, project:/workspace
 ```
 
 - [ ] Local scope re-installed
-- [ ] Both installations tracked
+- [ ] User, local, and project installations are tracked
+
+### 18.4 Disable and Restore Project Codex Packages
+
+<!-- auto -->
+
+<!-- destructive -->
+
+```bash
+cd "$FORGE_TEST_REPO"
+PROJECT_KEY="project:$(pwd -P)"
+
+forge extension disable --scope project --yes
+! find .agents/skills -name SKILL.md -print -quit 2>/dev/null | grep -q .
+jq -e --arg key "$PROJECT_KEY" '.installations[$key] == null' "$FORGE_HOME/installed.json"
+test -f "$CLAUDE_HOME/skills/review/SKILL.md"
+
+# Restore the project package set so complete uninstall must clean both runtime surfaces.
+PATH="/tmp/forge-qa-runtime-bin:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
+  --profile minimal --with skills --without commands --runtime codex
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | jq -e '.[0].skill_packages | length == 5 and all(.[]; .runtime == "codex" and .state == "present")'
+```
+
+- [ ] Project disable removes all tracked `.agents/skills` packages and its tracking row
+- [ ] Disabling project Codex packages leaves the Claude user installation intact
+- [ ] Re-enable restores exactly five healthy project Codex packages for complete-uninstall coverage
 
 ---

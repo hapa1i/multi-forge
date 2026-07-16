@@ -1,6 +1,6 @@
-<!-- prereq: 0.3, 2.1, 4.2, 5.1 -->
+<!-- prereq: 0.3, 2.13, 4.2, 5.1 -->
 
-## 15. Skills (`/forge:review`, `/forge:understand`, `/forge:panel`, `/forge:consensus`)
+## 15. Skills (Portable and Claude-Only)
 
 Validates the user-facing skill invocation UX. Section 14 tested the underlying `forge workflow` CLI engine; this
 section tests the skills that wrap it with auto-detection and model-aware resource selection.
@@ -151,5 +151,53 @@ Expected:
 
 Failure cue: if output says the default model set is unusable because OpenRouter proxies are missing, or falls back to
 Claude-only workers, mark this step failed. That means 4.2 did not create the workflow proxy aliases for this run.
+
+### 15.7 Compiled Runtime Package Inventory
+
+<!-- auto -->
+
+```bash
+cd "$FORGE_TEST_REPO"
+
+printf '%s\n' analyze challenge consensus debate panel qa review review-docs smoke-test understand walkthrough \
+  > /tmp/forge-claude-skills.expected
+find "$CLAUDE_HOME/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-claude-skills.expected -
+
+printf '%s\n' challenge review review-docs smoke-test understand > /tmp/forge-portable-skills.expected
+find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-portable-skills.expected -
+
+printf '%s\n' analyze consensus debate panel qa walkthrough > /tmp/forge-claude-only-skills.expected
+comm -23 /tmp/forge-claude-skills.expected /tmp/forge-portable-skills.expected \
+  | diff -u /tmp/forge-claude-only-skills.expected -
+
+while read -r skill; do
+  rg -q "^name: ${skill}$" ".agents/skills/$skill/SKILL.md"
+done < /tmp/forge-portable-skills.expected
+
+! rg -n '\$\{CLAUDE_SKILL_DIR\}|\$ARGUMENTS|subagent_type:[[:space:]]*["]?Explore' .agents/skills
+```
+
+- [ ] Claude user target contains exactly eleven compiled skill packages
+- [ ] Codex project target contains exactly the five portable skills: challenge, smoke-test, review, review-docs, and
+  understand
+- [ ] The exact Claude-only set is analyze, consensus, debate, panel, qa, and walkthrough
+- [ ] Every Codex `SKILL.md` name matches its package directory and the full Codex tree has no prohibited Claude tokens
+
+### 15.8 `/forge:smoke-test` Explicit Invocation
+
+<!-- human:guided -->
+
+In the live Claude session, explicitly invoke the portable smoke skill:
+
+```
+/forge:smoke-test
+```
+
+Expected:
+
+- [ ] Explicit invocation is accepted and reports `Forge Smoke Test (claude_code)`
+- [ ] The read-only probe table completes without modifying tracked Claude or Forge installation paths
 
 ---

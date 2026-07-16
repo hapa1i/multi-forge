@@ -2,22 +2,24 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.26 -->
+<!-- version: 1.0.27 -->
 
-<!-- test-count: 556 -->
+<!-- test-count: 581 -->
 
-<!-- last-updated: 2026-07-14 -->
+<!-- last-updated: 2026-07-17 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-07-14 (memory §16 now checks the generated `type`/`title`/`description` + `forge_memory`
-envelope, verifies no generated `resource`/`tags`/`timestamp`, and exercises idempotent legacy-passport upgrade).
-Earlier 2026-07-13: hooks-only recipes now retain both Claude and Codex runtime registrations. Earlier 2026-07-10:
-section 2.12 now seeds a pre-T5 project hook and verifies preview/apply cleanup, backups, and independent doctor
-cleanup/double-fire state. Earlier 2026-07-08: runtime hook QA moved to tracked user-scope
-`forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
+**Last updated**: 2026-07-17 (runtime-aware skill QA now covers explicit runtime selection, user/project Codex targets,
+scope rejection, persisted sync, duplicate safety, package health, compiled inventories, smoke invocation, cleanup, and
+restoration after the hooks-only probe). Earlier 2026-07-14: memory §16 checks the generated
+`type`/`title`/`description` + `forge_memory` envelope, verifies no generated `resource`/`tags`/`timestamp`, and
+exercises idempotent legacy-passport upgrade. Earlier 2026-07-13: hooks-only recipes now retain both Claude and Codex
+runtime registrations. Earlier 2026-07-10: section 2.12 now seeds a pre-T5 project hook and verifies preview/apply
+cleanup, backups, and independent doctor cleanup/double-fire state. Earlier 2026-07-08: runtime hook QA moved to tracked
+user-scope `forge extension enable --scope user --profile minimal --with hooks --without commands`; earlier 2026-07-06:
 same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and the `--strategy`/`--inline-plan`
 auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12: codex-hooks installer module:
 registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex binary (2.11). Earlier
@@ -43,7 +45,7 @@ targeting, memory 16.4 re-track)
 
 <!-- section: 1 checklist/1-preflight.md -->
 
-- [2. Claude Code Extensions (`forge extension`)](checklist/2-extension.md)
+- [2. Runtime Extensions (`forge extension`)](checklist/2-extension.md)
 
 <!-- section: 2 checklist/2-extension.md -->
 
@@ -95,7 +97,7 @@ targeting, memory 16.4 re-track)
 
 <!-- section: 14 checklist/14-workflow.md -->
 
-- [15. Skills (`/forge:review`, `/forge:understand`, `/forge:panel`, `/forge:consensus`)](checklist/15-skills.md)
+- [15. Skills (Portable and Claude-Only)](checklist/15-skills.md)
 
 <!-- section: 15 checklist/15-skills.md -->
 
