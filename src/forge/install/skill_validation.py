@@ -233,27 +233,24 @@ def validate_neutral_skill_source(
     """Reject runtime syntax in every textual neutral source file.
 
     Capability placeholders are the normal escape from the neutral layer into an
-    adapter. An exact runtime/path/rule allowance may retain literal syntax in a
-    reference that documents another runtime; every other occurrence remains an
-    error.
+    adapter. Token allowances never weaken the neutral-source gate. An auxiliary
+    declared ineligible for Codex is explicitly Claude-specific and is therefore
+    outside the shared neutral layer.
     """
 
     diagnostics: list[SkillDiagnostic] = []
-    allowances = {
-        (allowance.path, allowance.rule)
-        for allowance in source.manifest.token_allowances
-        if allowance.runtime == runtime
-    }
     source_files = [(PurePosixPath("SKILL.md"), source.body)]
-    source_files.extend((source_file.path, source_file.content) for source_file in source.files)
+    source_files.extend((source_file.path, source_file.content) for source_file in source.files_for_runtime(runtime))
     for path, content in source_files:
+        if runtime == SkillRuntime.CLAUDE_CODE and path in source.manifest.runtime_excluded_files.get(
+            SkillRuntime.CODEX, frozenset()
+        ):
+            continue
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
             continue
         for rule in _CODEX_TOKEN_RULES:
-            if (path, rule.id) in allowances:
-                continue
             if rule.pattern.search(text):
                 diagnostics.append(
                     SkillDiagnostic(
@@ -485,11 +482,15 @@ def _validate_token_isolation(
     file_map: Mapping[PurePosixPath, CompiledSkillFile],
 ) -> list[SkillDiagnostic]:
     rules = _COMMON_TOKEN_RULES + (_CODEX_TOKEN_RULES if package.runtime == SkillRuntime.CODEX else ())
-    allowances = {
-        (allowance.path, allowance.rule)
-        for allowance in package.token_allowances
-        if allowance.runtime == package.runtime
-    }
+    allowances = (
+        {
+            (allowance.path, allowance.rule)
+            for allowance in package.token_allowances
+            if allowance.runtime == package.runtime
+        }
+        if package.runtime != SkillRuntime.CODEX
+        else set()
+    )
     diagnostics: list[SkillDiagnostic] = []
     for path, package_file in sorted(file_map.items(), key=lambda item: item[0].as_posix()):
         try:
@@ -771,6 +772,16 @@ def _validate_allowances(
                     "allowance.unknown-rule",
                     f"token allowance names unknown rule '{allowance.rule}'",
                     "Use a stable validator token rule id.",
+                    allowance.path,
+                )
+            )
+        elif package.runtime == SkillRuntime.CODEX:
+            diagnostics.append(
+                _diagnostic(
+                    package,
+                    "allowance.codex-token-gate",
+                    f"Codex token rule '{allowance.rule}' cannot be suppressed by an allowance",
+                    "Remove the allowance and neutralize or explicitly exclude the runtime-specific documentary file.",
                     allowance.path,
                 )
             )

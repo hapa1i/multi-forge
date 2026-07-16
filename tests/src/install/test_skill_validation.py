@@ -81,17 +81,27 @@ def test_whole_tree_scan_covers_operational_claude_couplings(text: str, rule: st
     assert diagnostic.recovery
 
 
-def test_exact_token_allowance_is_machine_readable_and_path_scoped() -> None:
+@pytest.mark.parametrize(
+    ("content", "rule"),
+    [
+        (b"Literal compatibility example: $ARGUMENTS\n", "token.claude-arguments"),
+        (b"Literal ${CLAUDE_SKILL_DIR} example.\n", "token.claude-skill-dir"),
+        (b'Literal subagent_type: "Explore" example.\n', "token.claude-subagent-type"),
+    ],
+)
+def test_codex_falsifier_token_allowance_never_suppresses_gate(content: bytes, rule: str) -> None:
     path = PurePosixPath("references/compatibility.md")
     package = _package(
         CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document(), 0o644),
-        CompiledSkillFile(path, b"Literal compatibility example: $ARGUMENTS\n", 0o644),
-        allowances=(TokenAllowance(SkillRuntime.CODEX, path, "token.claude-arguments"),),
+        CompiledSkillFile(path, content, 0o644),
+        allowances=(TokenAllowance(SkillRuntime.CODEX, path, rule),),
     )
 
     diagnostics = validate_compiled_skill(package)
 
-    assert not any(item.rule == "token.claude-arguments" for item in diagnostics)
+    rules = {item.rule for item in diagnostics}
+    assert rule in rules
+    assert "allowance.codex-token-gate" in rules
 
 
 def test_codex_frontmatter_uses_closed_agent_skills_contract() -> None:

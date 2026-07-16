@@ -47,6 +47,7 @@ def _neutral_source(
     claude_frontmatter: Mapping[str, Any] | None = None,
     codex_interface: CodexSkillInterface | None = None,
     token_allowances: tuple[TokenAllowance, ...] = (),
+    runtime_excluded_files: Mapping[SkillRuntime, frozenset[PurePosixPath]] | None = None,
 ) -> SkillSource:
     return SkillSource(
         manifest=SkillManifest(
@@ -62,6 +63,7 @@ def _neutral_source(
             claude_frontmatter=claude_frontmatter or {},
             codex_interface=codex_interface,
             token_allowances=token_allowances,
+            runtime_excluded_files=runtime_excluded_files or {},
         ),
         body=body.encode(),
         files=files,
@@ -149,11 +151,15 @@ def test_packaged_script_path_uses_runtime_specific_loaded_skill_root_binding() 
     claude = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
     codex = compile_skill_for_runtime(source, SkillRuntime.CODEX)
 
-    assert 'bash "${CLAUDE_SKILL_DIR}/scripts/check.sh"' in claude.file("SKILL.md").content.decode()
+    assert (
+        'FORGE_SKILL_RUNTIME=claude_code bash "${CLAUDE_SKILL_DIR}/scripts/check.sh"'
+        in claude.file("SKILL.md").content.decode()
+    )
     codex_body = codex.file("SKILL.md").content.decode()
     assert "`scripts/check.sh`" in codex_body
     assert "directory containing this SKILL.md" in codex_body
     assert "execute the resulting absolute path" in codex_body
+    assert "`FORGE_SKILL_RUNTIME=codex`" in codex_body
 
 
 def test_resource_path_uses_claude_absolute_and_codex_package_relative_binding() -> None:
@@ -172,7 +178,7 @@ def test_resource_path_uses_claude_absolute_and_codex_package_relative_binding()
     assert "directory containing this SKILL.md" in codex_body
 
 
-def test_codex_task_arguments_bind_to_explicit_invocation_task_text() -> None:
+def test_codex_task_arguments_bind_to_explicit_or_implicit_activation_text() -> None:
     source = _neutral_source(
         body="Use {{forge:task_arguments}}.\n",
         required=frozenset({SkillCapability.TASK_ARGUMENTS}),
@@ -181,7 +187,8 @@ def test_codex_task_arguments_bind_to_explicit_invocation_task_text() -> None:
     package = compile_skill_for_runtime(source, SkillRuntime.CODEX)
 
     assert (
-        "Use the task text supplied with the explicit $skill invocation." in package.file("SKILL.md").content.decode()
+        "Use the task text supplied when this skill was invoked or selected."
+        in package.file("SKILL.md").content.decode()
     )
 
 
@@ -221,26 +228,32 @@ def test_exploration_binding_preserves_claude_tool_and_is_codex_native() -> None
     assert "subagent_type" not in codex_body
 
 
-def test_neutral_reference_token_allowance_is_exactly_runtime_path_and_rule_scoped() -> None:
+def test_neutral_reference_token_allowance_never_weakens_shared_source_gate() -> None:
     reference_path = PurePosixPath("references/skills-writing-guide.md")
     reference = SkillSourceFile(reference_path, b"Document the literal $ARGUMENTS token.\n")
     exact = TokenAllowance(SkillRuntime.CODEX, reference_path, "token.claude-arguments")
     source = _neutral_source(files=(reference,), token_allowances=(exact,))
 
-    package = compile_skill_for_runtime(source, SkillRuntime.CODEX)
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CODEX)
 
-    assert package.file(reference_path).content == reference.content
+    assert any(item.rule == "neutral.token.claude-arguments" for item in exc_info.value.diagnostics)
 
-    for mismatch in (
-        replace(exact, runtime=SkillRuntime.CLAUDE_CODE),
-        replace(exact, path=PurePosixPath("references/other.md")),
-        replace(exact, rule="token.claude-skill-dir"),
-    ):
-        with pytest.raises(SkillCompilationError) as exc_info:
-            compile_skill_for_runtime(
-                replace(source, manifest=replace(source.manifest, token_allowances=(mismatch,))), SkillRuntime.CODEX
-            )
-        assert any(item.rule == "neutral.token.claude-arguments" for item in exc_info.value.diagnostics)
+
+def test_runtime_specific_document_is_preserved_in_claude_and_absent_from_codex() -> None:
+    reference_path = PurePosixPath("references/skills-writing-guide.md")
+    reference = SkillSourceFile(reference_path, b"Document Claude's literal $ARGUMENTS token.\n")
+    source = _neutral_source(
+        files=(reference,),
+        runtime_excluded_files={SkillRuntime.CODEX: frozenset({reference_path})},
+    )
+
+    claude = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+    codex = compile_skill_for_runtime(source, SkillRuntime.CODEX)
+
+    assert claude.file(reference_path).content == reference.content
+    with pytest.raises(KeyError):
+        codex.file(reference_path)
 
 
 def test_mixed_loader_discovers_neutral_and_legacy_sources(tmp_path: Path) -> None:
@@ -262,6 +275,8 @@ description: Neutral test skill. Use when testing discovery.
 runtimes: [claude_code, codex]
 capabilities: [forge_cli, packaged_script]
 template_files: [references/template.md]
+runtime_excluded_files:
+  codex: [references/claude-only.md]
 codex_interface:
   display_name: Neutral Skill
 """,
@@ -275,6 +290,7 @@ codex_interface:
     script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     script.chmod(0o755)
     (neutral / "references" / "template.md").write_text("Run {{forge:forge_cli}} status.\n", encoding="utf-8")
+    (neutral / "references" / "claude-only.md").write_text("Literal $ARGUMENTS documentation.\n", encoding="utf-8")
     (neutral / "SKILL.md").write_text("generated migration artifact\n", encoding="utf-8")
 
     sources = load_skill_sources(tmp_path)
@@ -287,12 +303,16 @@ codex_interface:
     neutral_source = sources[1]
     assert {source_file.path for source_file in neutral_source.files} == {
         PurePosixPath("references/template.md"),
+        PurePosixPath("references/claude-only.md"),
         PurePosixPath("scripts/check.sh"),
     }
     assert next(item for item in neutral_source.files if item.path == PurePosixPath("scripts/check.sh")).mode == 0o755
     package = compile_skill_for_runtime(neutral_source, SkillRuntime.CODEX)
+    assert PurePosixPath("references/claude-only.md") not in {item.path for item in package.files}
     assert "Run forge status." in package.file("references/template.md").content.decode()
     assert "directory containing this SKILL.md" in package.file("SKILL.md").content.decode()
+    claude_package = compile_skill_for_runtime(neutral_source, SkillRuntime.CLAUDE_CODE)
+    assert claude_package.file("references/claude-only.md").content == b"Literal $ARGUMENTS documentation.\n"
 
 
 @pytest.mark.parametrize(
@@ -302,6 +322,9 @@ codex_interface:
         "runtimes: [unknown]\n",
         "capabilities: [unknown]\n",
         "template_files: [references/missing.md]\n",
+        "runtime_excluded_files: {codex: [content.md]}\n",
+        "runtime_excluded_files: {codex: [references/missing.md]}\n",
+        "runtime_excluded_files: {codex: [scripts/check.sh]}\n",
     ],
 )
 def test_neutral_loader_rejects_invalid_manifest_contract(tmp_path: Path, manifest_patch: str) -> None:

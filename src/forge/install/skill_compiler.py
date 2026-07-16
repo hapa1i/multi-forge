@@ -140,6 +140,7 @@ class SkillManifest:
     claude_frontmatter: Mapping[str, Any] = field(default_factory=dict)
     codex_interface: CodexSkillInterface | None = None
     token_allowances: tuple[TokenAllowance, ...] = ()
+    runtime_excluded_files: Mapping[SkillRuntime, frozenset[PurePosixPath]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,12 @@ class SkillSource:
     source_format: SkillSourceFormat = SkillSourceFormat.NEUTRAL
     source_path: str | None = None
     claude_document: bytes | None = None
+
+    def files_for_runtime(self, runtime: SkillRuntime) -> tuple[SkillSourceFile, ...]:
+        """Return auxiliary files eligible for one emitted runtime package."""
+
+        excluded = self.manifest.runtime_excluded_files.get(runtime, frozenset())
+        return tuple(source_file for source_file in self.files if source_file.path not in excluded)
 
 
 @dataclass(frozen=True)
@@ -250,7 +257,9 @@ CLAUDE_SKILL_ADAPTER = SkillAdapter(
     capability_bindings={
         SkillCapability.TASK_ARGUMENTS: CapabilityBinding("$ARGUMENTS"),
         SkillCapability.RESOURCE_LOADING: CapabilityBinding(relative_path_template="${CLAUDE_SKILL_DIR}/{path}"),
-        SkillCapability.PACKAGED_SCRIPT: CapabilityBinding(relative_path_template='bash "${CLAUDE_SKILL_DIR}/{path}"'),
+        SkillCapability.PACKAGED_SCRIPT: CapabilityBinding(
+            relative_path_template='FORGE_SKILL_RUNTIME=claude_code bash "${CLAUDE_SKILL_DIR}/{path}"'
+        ),
         SkillCapability.MODEL_FAMILY: CapabilityBinding(
             "Model family: !`forge session show --field model_family 2>/dev/null || true` Main model:\n"
             "!`forge session show --field main_model 2>/dev/null || true`"
@@ -266,14 +275,16 @@ CLAUDE_SKILL_ADAPTER = SkillAdapter(
 CODEX_SKILL_ADAPTER = SkillAdapter(
     runtime=SkillRuntime.CODEX,
     capability_bindings={
-        SkillCapability.TASK_ARGUMENTS: CapabilityBinding("the task text supplied with the explicit $skill invocation"),
+        SkillCapability.TASK_ARGUMENTS: CapabilityBinding(
+            "the task text supplied when this skill was invoked or selected"
+        ),
         SkillCapability.RESOURCE_LOADING: CapabilityBinding(
             relative_path_template="Read `{path}` relative to the directory containing this SKILL.md"
         ),
         SkillCapability.PACKAGED_SCRIPT: CapabilityBinding(
             relative_path_template=(
                 "Resolve `{path}` against the directory containing this SKILL.md, "
-                "then execute the resulting absolute path"
+                "then execute the resulting absolute path with `FORGE_SKILL_RUNTIME=codex`"
             )
         ),
         SkillCapability.MODEL_FAMILY: CapabilityBinding(
@@ -297,6 +308,13 @@ _PORTABLE_RELATIVE_PATH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 NEUTRAL_SKILL_MANIFEST = "forge-skill.yaml"
 NEUTRAL_SKILL_CONTENT = "content.md"
 NEUTRAL_SKILL_SCHEMA_VERSION = 1
+_COMPILER_OWNED_SOURCE_PATHS = frozenset(
+    {
+        PurePosixPath(NEUTRAL_SKILL_MANIFEST),
+        PurePosixPath(NEUTRAL_SKILL_CONTENT),
+        PurePosixPath("SKILL.md"),
+    }
+)
 _NEUTRAL_MANIFEST_FIELDS = {
     "schema_version",
     "name",
@@ -312,6 +330,7 @@ _NEUTRAL_MANIFEST_FIELDS = {
     "codex_interface",
     "template_files",
     "token_allowances",
+    "runtime_excluded_files",
 }
 _CODEX_INTERFACE_FIELDS = {
     "display_name",
@@ -485,6 +504,41 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     if len(template_files) != len(template_file_values):
         raise ValueError(f"{manifest_path}: template_files contains duplicate paths")
 
+    runtime_exclusions_value = raw_manifest.get("runtime_excluded_files", {})
+    if not isinstance(runtime_exclusions_value, dict) or any(
+        not isinstance(key, str) for key in runtime_exclusions_value
+    ):
+        raise ValueError(f"{manifest_path}: runtime_excluded_files must be a runtime-keyed mapping")
+    runtime_excluded_files: dict[SkillRuntime, frozenset[PurePosixPath]] = {}
+    for raw_runtime, raw_paths in runtime_exclusions_value.items():
+        try:
+            excluded_runtime = SkillRuntime(raw_runtime)
+        except ValueError as exc:
+            raise ValueError(f"{manifest_path}: runtime_excluded_files has unknown runtime {raw_runtime!r}") from exc
+        if excluded_runtime not in runtimes:
+            raise ValueError(
+                f"{manifest_path}: runtime_excluded_files names undeclared runtime {excluded_runtime.value!r}"
+            )
+        if not isinstance(raw_paths, list) or any(
+            not isinstance(raw_path, str) or not raw_path for raw_path in raw_paths
+        ):
+            raise ValueError(
+                f"{manifest_path}: runtime_excluded_files.{excluded_runtime.value} must be a list of explicit paths"
+            )
+        excluded_paths: set[PurePosixPath] = set()
+        for raw_path in raw_paths:
+            problem = _runtime_exclusion_path_problem(raw_path)
+            if problem is not None:
+                raise ValueError(
+                    f"{manifest_path}: runtime_excluded_files.{excluded_runtime.value} path {raw_path!r} {problem}"
+                )
+            excluded_paths.add(PurePosixPath(raw_path))
+        if len(excluded_paths) != len(raw_paths):
+            raise ValueError(
+                f"{manifest_path}: runtime_excluded_files.{excluded_runtime.value} contains duplicate paths"
+            )
+        runtime_excluded_files[excluded_runtime] = frozenset(excluded_paths)
+
     token_allowances_value = raw_manifest.get("token_allowances", [])
     if not isinstance(token_allowances_value, list):
         raise ValueError(f"{manifest_path}: token_allowances must be a list")
@@ -519,17 +573,12 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     if allow_implicit_invocation is not None and not isinstance(allow_implicit_invocation, bool):
         raise ValueError(f"{manifest_path}: allow_implicit_invocation must be a boolean when present")
 
-    reserved = {
-        PurePosixPath(NEUTRAL_SKILL_MANIFEST),
-        PurePosixPath(NEUTRAL_SKILL_CONTENT),
-        PurePosixPath("SKILL.md"),
-    }
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
         if source_file.is_dir():
             continue
         relative_path = PurePosixPath(source_file.relative_to(package_root).as_posix())
-        if relative_path in reserved or not _is_skill_source_file(relative_path):
+        if relative_path in _COMPILER_OWNED_SOURCE_PATHS or not _is_skill_source_file(relative_path):
             continue
         content, mode = _read_contained_source_file(package_root, source_file)
         auxiliary_files.append(
@@ -544,6 +593,15 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     missing_template_files = sorted(template_files - available_paths, key=PurePosixPath.as_posix)
     if missing_template_files:
         raise ValueError(f"{manifest_path}: template_files names missing auxiliary files: {missing_template_files}")
+    missing_runtime_exclusions = {
+        runtime.value: sorted(paths - available_paths, key=PurePosixPath.as_posix)
+        for runtime, paths in runtime_excluded_files.items()
+        if paths - available_paths
+    }
+    if missing_runtime_exclusions:
+        raise ValueError(
+            f"{manifest_path}: runtime_excluded_files names missing auxiliary files: {missing_runtime_exclusions}"
+        )
 
     return SkillSource(
         manifest=SkillManifest(
@@ -559,6 +617,7 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
             claude_frontmatter=dict(claude_frontmatter),
             codex_interface=codex_interface,
             token_allowances=tuple(token_allowances),
+            runtime_excluded_files=runtime_excluded_files,
         ),
         body=content_path.read_bytes(),
         files=tuple(auxiliary_files),
@@ -625,7 +684,7 @@ def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPa
                 mode=0o644,
             )
         )
-    for source_file in source.files:
+    for source_file in source.files_for_runtime(adapter.runtime):
         content = source_file.content
         if source_file.template:
             content = _render_template(content, source, adapter, source_file.path)
@@ -804,6 +863,71 @@ def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDi
                 )
             )
 
+    available_paths = seen - {PurePosixPath("SKILL.md")}
+    for excluded_runtime in sorted(manifest.runtime_excluded_files, key=lambda item: item.value):
+        excluded_paths = manifest.runtime_excluded_files[excluded_runtime]
+        if source.source_format != SkillSourceFormat.NEUTRAL:
+            diagnostics.append(
+                SkillDiagnostic(
+                    skill=manifest.name,
+                    runtime=runtime,
+                    path=None,
+                    rule="source.runtime-exclusion-format",
+                    message="runtime-specific file exclusions are valid only for neutral source packages",
+                    recovery="Remove the exclusions from a legacy bridge or migrate the package to neutral source.",
+                )
+            )
+        if excluded_runtime not in manifest.runtime_eligibility:
+            diagnostics.append(
+                SkillDiagnostic(
+                    skill=manifest.name,
+                    runtime=runtime,
+                    path=None,
+                    rule="source.runtime-exclusion-runtime",
+                    message=f"file exclusions name undeclared runtime '{excluded_runtime.value}'",
+                    recovery="Remove the stale runtime key or add that runtime to runtime_eligibility.",
+                )
+            )
+        for excluded_path in sorted(excluded_paths, key=PurePosixPath.as_posix):
+            path_problem = _runtime_exclusion_path_problem(excluded_path.as_posix())
+            if path_problem is not None:
+                diagnostics.append(
+                    SkillDiagnostic(
+                        skill=manifest.name,
+                        runtime=runtime,
+                        path=excluded_path,
+                        rule="source.runtime-exclusion-path",
+                        message=f"runtime-specific exclusion path {path_problem}",
+                        recovery="Name an explicit Markdown auxiliary under references/.",
+                    )
+                )
+            elif excluded_path not in available_paths:
+                diagnostics.append(
+                    SkillDiagnostic(
+                        skill=manifest.name,
+                        runtime=runtime,
+                        path=excluded_path,
+                        rule="source.runtime-exclusion-missing",
+                        message="runtime-specific exclusion names no auxiliary source file",
+                        recovery="Add the documentary auxiliary or remove the stale exclusion.",
+                    )
+                )
+    for source_path in sorted(available_paths, key=PurePosixPath.as_posix):
+        if manifest.runtime_eligibility and all(
+            source_path in manifest.runtime_excluded_files.get(eligible_runtime, frozenset())
+            for eligible_runtime in manifest.runtime_eligibility
+        ):
+            diagnostics.append(
+                SkillDiagnostic(
+                    skill=manifest.name,
+                    runtime=runtime,
+                    path=source_path,
+                    rule="source.runtime-exclusion-all",
+                    message="auxiliary source file is excluded from every eligible runtime",
+                    recovery="Remove the unused file or keep it in at least one runtime package.",
+                )
+            )
+
     if source.skill_mode < 0 or source.skill_mode & ~0o777:
         diagnostics.append(
             SkillDiagnostic(
@@ -819,7 +943,11 @@ def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDi
     templated: list[tuple[PurePosixPath, bytes]] = []
     if source.source_format == SkillSourceFormat.NEUTRAL:
         templated.append((PurePosixPath("SKILL.md"), source.body))
-    templated.extend((source_file.path, source_file.content) for source_file in source.files if source_file.template)
+    templated.extend(
+        (source_file.path, source_file.content)
+        for source_file in source.files_for_runtime(runtime)
+        if source_file.template
+    )
     for path, content in templated:
         diagnostics.extend(_validate_placeholders(content, source, adapter, path))
     if source.source_format == SkillSourceFormat.NEUTRAL:
@@ -850,7 +978,7 @@ def _validate_placeholders(
         ]
 
     diagnostics: list[SkillDiagnostic] = []
-    available_paths = {source_file.path for source_file in source.files}
+    available_paths = {source_file.path for source_file in source.files_for_runtime(adapter.runtime)}
     for match in _PLACEHOLDER_CANDIDATE_RE.finditer(text):
         payload = match.group(1)
         capability_id, separator, argument = payload.partition(":")
@@ -1210,6 +1338,18 @@ def _path_argument_problem(raw: str) -> str | None:
         return "is not normalized"
     if ".." in parts:
         return "escapes the skill package"
+    return None
+
+
+def _runtime_exclusion_path_problem(raw: str) -> str | None:
+    problem = _path_argument_problem(raw)
+    if problem is not None:
+        return problem
+    path = PurePosixPath(raw)
+    if path in _COMPILER_OWNED_SOURCE_PATHS:
+        return "targets a compiler-owned source document"
+    if not path.parts or path.parts[0] != "references" or path.suffix.lower() not in {".md", ".markdown"}:
+        return "is not a Markdown documentary auxiliary under references/"
     return None
 
 
