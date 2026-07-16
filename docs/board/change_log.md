@@ -37,8 +37,8 @@ wc -l docs/board/change_log.md
   leaf's wording and rendering; removed dead `ExecutionContext.from_cwd()` `ForgeOpError` wrappers and superseded weak
   tests with exact stream, precedence, and no-mutation characterization.
 
-**Verification**: focused CLI suites (`228 passed`); `make test-unit` (`7907 passed, 1 skipped, 117 deselected`);
-`make pre-commit`; `git diff --check`.
+**Verification**: PR #105 merged at `9288bed2`; focused CLI suites (`228 passed`); `make test-unit`
+(`7907 passed, 1 skipped, 117 deselected`); `make pre-commit`; post-merge `make pre-commit-md`; `git diff --check`.
 
 ## 2026-07-15
 

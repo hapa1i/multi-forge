@@ -4,8 +4,8 @@
 
 ## Current focus
 
-Implementation and branch verification are complete. The card remains in `doing/` for human review; the lane move,
-inbound-link repoint, and final post-move checks are intentionally still open.
+Closeout complete. PR #105 merged to `main` at `9288bed2`; the card is in `done/`, inbound links are repointed, and
+post-move Markdown validation is green.
 
 ## Preflight matrix (shipped behavior to preserve)
 
@@ -170,8 +170,6 @@ stream placement. Before Phase 1, partial coverage included incompatible-pin ref
 - [x] Compact entry added to `docs/board/change_log.md` (names the dead-wrap removal).
 - [x] Durable-lessons disposition: no new stable architecture or operational invariant emerged beyond the local resolver
   contract and its characterization tests, so no shadow proposal was added.
-- [ ] Card moved `doing/` -> `done/`; inbound links repointed to `done/` (the two
-  `done/okf_compatible_memory_passports/checklist.md` references currently pointing at `doing/`).
-- [ ] Final `make pre-commit-md` and `git diff --check` run AFTER the change-log and lane-move edits, as the last
-  closeout step. Pre-review Markdown validation is run on the `doing/` snapshot; this checkbox remains open for the
-  required post-move rerun.
+- [x] Card moved `doing/` -> `done/`; the two inbound references in `done/okf_compatible_memory_passports/checklist.md`
+  now point at `done/`.
+- [x] Final `make pre-commit-md` and `git diff --check` passed after the change-log, lane-move, and inbound-link edits.

@@ -1,8 +1,8 @@
 # Consolidate memory-passport CLI target preflight
 
-**Status**: Implementation and branch verification completed on 2026-07-16; awaiting human review in `doing/` before the
-lane move. Branch: `memory-passport-cli-preflight-cleanup`. Proposed on 2026-07-15 from the
-`okf_compatible_memory_passports` post-closeout review.
+**Status**: Completed and merged via PR #105 on 2026-07-16 at `9288bed2`; moved to `done/` after post-merge closeout.
+Branch: `memory-passport-cli-preflight-cleanup`. Proposed on 2026-07-15 from the `okf_compatible_memory_passports`
+post-closeout review.
 
 ## Goal
 

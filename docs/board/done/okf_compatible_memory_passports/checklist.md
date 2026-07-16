@@ -218,7 +218,7 @@ hardening opportunities. The 2026-07-14 verification remains the baseline; the f
 Deferred from this remediation: extracting the non-identical track/show/upgrade/remove CLI preflight blocks. That
 cleanup must preserve read-versus-mutation compatibility semantics and the upgrade leaf's deliberate recovery-output
 contract, so it is tracked in
-[`memory_passport_cli_preflight_cleanup`](../../doing/memory_passport_cli_preflight_cleanup/card.md) rather than this
+[`memory_passport_cli_preflight_cleanup`](../../done/memory_passport_cli_preflight_cleanup/card.md) rather than this
 correctness patch.
 
 ## Deferred work (unchanged)
@@ -256,7 +256,7 @@ correctness patch.
   custom reserved-shadow paths without mutation.
 
 - The non-identical CLI preflight extraction remains intentionally separate in
-  [`memory_passport_cli_preflight_cleanup`](../../doing/memory_passport_cli_preflight_cleanup/card.md).
+  [`memory_passport_cli_preflight_cleanup`](../../done/memory_passport_cli_preflight_cleanup/card.md).
 
 ## Original closeout baseline (2026-07-14; superseded as final evidence)
 
