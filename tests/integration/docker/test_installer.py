@@ -6,12 +6,25 @@ against real filesystem paths without risk to host machine.
 
 from __future__ import annotations
 
+import json
+import subprocess
+
 import pytest
 
 from tests.fixtures.docker import ContainerLike
 
 # Mark all tests as integration + docker_in
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
+
+
+_CODEX_PORTABLE_SKILLS = (
+    "challenge",
+    "review",
+    "review-docs",
+    "smoke-test",
+    "understand",
+)
+_PATH_WITHOUT_CODEX = "/usr/bin:/bin"
 
 
 def _get_tracking_path(container: ContainerLike) -> str:
@@ -24,6 +37,68 @@ print(get_tracking_path())
     """)
     assert result.returncode == 0, f"Tracking path probe failed: {result.stderr}"
     return result.stdout.strip()
+
+
+def _exec_with_extension_source(
+    container: ContainerLike,
+    command: str,
+    *,
+    bundled: bool,
+) -> subprocess.CompletedProcess[str]:
+    """Run Forge from the checkout or temporarily force its bundled extension assets."""
+    if not bundled:
+        return container.exec(command)
+
+    return container.exec(f"""
+set -eu
+bundled_root=$(/forge/.venv/bin/python -c "from forge.install.installer import _get_bundled_extensions_path; print(_get_bundled_extensions_path())")
+if [ -e "$bundled_root" ]; then
+    mv "$bundled_root" "${{bundled_root}}.integration-original"
+fi
+restore_checkout_extensions() {{
+    for module in skills agents commands; do
+        if [ -d "/forge/src/${{module}}.integration-hidden" ]; then
+            mv "/forge/src/${{module}}.integration-hidden" "/forge/src/${{module}}"
+        fi
+    done
+    rm -rf "$bundled_root"
+    if [ -e "${{bundled_root}}.integration-original" ]; then
+        mv "${{bundled_root}}.integration-original" "$bundled_root"
+    fi
+}}
+trap restore_checkout_extensions EXIT
+mkdir -p "$bundled_root"
+for module in skills agents commands; do
+    cp -a "/forge/src/${{module}}" "$bundled_root/${{module}}"
+done
+for module in skills agents commands; do
+    mv "/forge/src/${{module}}" "/forge/src/${{module}}.integration-hidden"
+done
+{command}
+""")
+
+
+def _read_codex_skill_root(container: ContainerLike, project_root: str | None) -> dict[str, object]:
+    """Return the resolved Codex skill root and its immediate package directories."""
+    root_expression = (
+        f"Path({project_root!r}) / '.agents' / 'skills'"
+        if project_root is not None
+        else "Path.home() / '.agents' / 'skills'"
+    )
+    result = container.exec(f"""
+/forge/.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+root = {root_expression}
+print(json.dumps({{
+    "root": str(root),
+    "packages": sorted(path.name for path in root.iterdir() if path.is_dir()),
+}}))
+PY
+""")
+    assert result.returncode == 0, f"Codex skill-root probe failed: {result.stderr}"
+    return json.loads(result.stdout)
 
 
 class TestForgeExtensionEnable:
@@ -226,6 +301,137 @@ print('preserved')
 "
         """)
         assert "preserved" in check.stdout
+
+
+class TestCrossRuntimeSkillLifecycle:
+    """Packaged Codex skills stay isolated and tracked through their CLI lifecycle."""
+
+    @pytest.mark.parametrize(
+        ("scope", "project_root", "bundled_assets"),
+        [
+            pytest.param("user", None, False, id="user-checkout-assets"),
+            pytest.param(
+                "project",
+                "/tmp/forge-codex-skills-project",
+                True,
+                id="project-bundled-assets",
+            ),
+        ],
+    )
+    def test_codex_only_packages_survive_runtime_absence_and_disable_tracked_only(
+        self,
+        synced_container: ContainerLike,
+        scope: str,
+        project_root: str | None,
+        bundled_assets: bool,
+    ) -> None:
+        """Enable, status, sync, and disable the five portable Codex packages."""
+        setup = synced_container.exec("""
+rm -rf ~/.agents ~/.claude ~/.forge /tmp/forge-codex-skills-project /tmp/forge-codex-skills-bin
+mkdir -p /tmp/forge-codex-skills-bin /tmp/forge-codex-skills-project
+printf '#!/bin/sh\nprintf "codex-cli 0.144.0\\n"\n' > /tmp/forge-codex-skills-bin/codex
+chmod +x /tmp/forge-codex-skills-bin/codex
+""")
+        assert setup.returncode == 0, f"Fixture setup failed: {setup.stderr}"
+
+        if scope == "user":
+            enable_target = "--scope user"
+            status_target = "--scope user"
+            lifecycle_cwd = "/forge"
+            tracking_key = "user"
+            claude_anchor = "$HOME/.claude"
+            opposite_codex_anchor = "/tmp/forge-codex-skills-project/.agents"
+        else:
+            assert project_root is not None
+            enable_target = f"--scope project --root {project_root}"
+            status_target = f"--scope project --root {project_root}"
+            lifecycle_cwd = project_root
+            tracking_key = f"project:{project_root}"
+            claude_anchor = f"{project_root}/.claude"
+            opposite_codex_anchor = "$HOME/.agents"
+
+        enable = _exec_with_extension_source(
+            synced_container,
+            (
+                f"cd {lifecycle_cwd}\n"
+                "PATH=/tmp/forge-codex-skills-bin:$PATH "
+                f"/forge/.venv/bin/forge extension enable {enable_target} "
+                "--profile minimal --with skills --without commands --runtime codex"
+            ),
+            bundled=bundled_assets,
+        )
+        assert enable.returncode == 0, f"Codex enable failed: stdout={enable.stdout!r} stderr={enable.stderr!r}"
+        assert synced_container.exec(f"test ! -e {claude_anchor}").returncode == 0
+        assert synced_container.exec(f"test ! -e {opposite_codex_anchor}").returncode == 0
+
+        target = _read_codex_skill_root(synced_container, project_root)
+        target_root = str(target["root"])
+        assert target["packages"] == list(_CODEX_PORTABLE_SKILLS)
+
+        manifest = synced_container.read_json(_get_tracking_path(synced_container))
+        assert manifest["version"] == 2
+        installation = manifest["installations"][tracking_key]
+        assert installation["modules_enabled"] == ["skills"]
+        packages = installation["skill_packages"]
+        assert [(package["runtime"], package["skill"]) for package in packages] == [
+            ("codex", skill) for skill in _CODEX_PORTABLE_SKILLS
+        ]
+        for package in packages:
+            expected_dir = f"{target_root}/{package['skill']}"
+            assert package["target_dir"] == expected_dir
+            assert package["file_paths"] == sorted(package["file_paths"])
+            assert package["file_paths"]
+            assert all(path.startswith(f"{expected_dir}/") for path in package["file_paths"])
+
+        codex_absent = synced_container.exec(f"PATH={_PATH_WITHOUT_CODEX} command -v codex")
+        assert codex_absent.returncode != 0, "The sync probe PATH unexpectedly contains Codex"
+        sync = _exec_with_extension_source(
+            synced_container,
+            (
+                f"cd {lifecycle_cwd}\n"
+                f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge extension sync --scope {scope}"
+            ),
+            bundled=bundled_assets,
+        )
+        assert sync.returncode == 0, f"Codex sync failed: stdout={sync.stdout!r} stderr={sync.stderr!r}"
+        assert _read_codex_skill_root(synced_container, project_root)["packages"] == list(_CODEX_PORTABLE_SKILLS)
+
+        status = synced_container.exec(
+            f"cd {lifecycle_cwd}\n"
+            f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge extension status {status_target} --json"
+        )
+        assert status.returncode == 0, f"Codex status failed: {status.stderr}"
+        payload = json.loads(status.stdout)
+        assert len(payload) == 1
+        assert payload[0]["scope"] == scope
+        observed_packages = payload[0]["skill_packages"]
+        assert [(package["runtime"], package["skill"]) for package in observed_packages] == [
+            ("codex", skill) for skill in _CODEX_PORTABLE_SKILLS
+        ]
+        for package in observed_packages:
+            assert package["state"] == "present"
+            assert package["target_present"] is True
+            assert package["missing_file_paths"] == []
+            assert package["duplicate_dirs"] == []
+            assert package["recovery"] is None
+
+        operator_package = f"{target_root}/operator-owned"
+        add_operator_package = synced_container.exec(
+            f'mkdir -p "{operator_package}"\n' f'printf "operator-owned\\n" > "{operator_package}/SKILL.md"'
+        )
+        assert add_operator_package.returncode == 0, add_operator_package.stderr
+
+        disable = synced_container.exec(
+            f"cd {lifecycle_cwd}\n"
+            f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge extension disable --scope {scope} --yes"
+        )
+        assert disable.returncode == 0, f"Codex disable failed: stdout={disable.stdout!r} stderr={disable.stderr!r}"
+        remaining = _read_codex_skill_root(synced_container, project_root)
+        assert remaining["packages"] == ["operator-owned"]
+        assert synced_container.read_file(f"{operator_package}/SKILL.md") == "operator-owned\n"
+
+        after_disable = synced_container.read_json(_get_tracking_path(synced_container))
+        assert tracking_key not in after_disable["installations"]
 
 
 class TestHookDispatcherRuntime:
