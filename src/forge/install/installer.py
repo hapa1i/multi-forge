@@ -325,6 +325,61 @@ def _codex_scan_roots(project_root: Path | None, *, include_cwd: bool = True) ->
     return tuple(dict.fromkeys(roots))
 
 
+def _tracked_skill_package_target(
+    package: InstalledSkillPackage,
+    scope: InstallScope,
+    project_root: Path | None,
+    operation: str,
+) -> tuple[Path, Path]:
+    """Validate one tracked package location and return target/expected paths."""
+
+    runtime_root = _runtime_skill_root(package.runtime, scope, project_root)
+    expected_target = runtime_root / package.skill
+    validate_path_within_boundary(expected_target, runtime_root, operation)
+    target = Path(package.target_dir)
+    expected_location = expected_target.parent.resolve() / expected_target.name
+    target_location = target.parent.resolve() / target.name
+    if target_location != expected_location:
+        raise PathBoundaryViolationError(str(target), str(expected_target), operation)
+    return target, expected_target
+
+
+def _validate_tracked_skill_package_files(
+    package: InstalledSkillPackage,
+    expected_target: Path,
+    operation: str,
+) -> None:
+    for tracked_file in package.file_paths:
+        validate_path_within_boundary(Path(tracked_file), expected_target, operation)
+
+
+def _assert_tracked_skill_packages_syncable(
+    installation: Installation,
+    scope: InstallScope,
+    project_root: Path | None,
+) -> None:
+    """Block mutation when persisted package ownership cannot be validated."""
+
+    invalid: list[str] = []
+    for package in installation.skill_packages:
+        try:
+            _target, expected_target = _tracked_skill_package_target(
+                package,
+                scope,
+                project_root,
+                "sync skill package",
+            )
+            _validate_tracked_skill_package_files(package, expected_target, "sync skill package")
+        except (KeyError, PathBoundaryViolationError, ValueError):
+            invalid.append(f"{package.runtime}/{package.skill}")
+    if invalid:
+        names = ", ".join(sorted(invalid))
+        raise ForgeInstallError(
+            f"Cannot change extensions while tracked skill package ownership is invalid: {names}. "
+            "Run 'forge extension status' for details, then repair or remove the invalid tracking row."
+        )
+
+
 def inspect_skill_package_status(
     installation: Installation,
     scope: InstallScope,
@@ -335,27 +390,14 @@ def inspect_skill_package_status(
     statuses: list[SkillPackageStatus] = []
     codex_scan_roots = _codex_scan_roots(project_root, include_cwd=project_root is None)
     for package in sorted(installation.skill_packages, key=lambda item: (item.runtime, item.skill)):
-        target = Path(package.target_dir)
         try:
-            runtime_root = _runtime_skill_root(package.runtime, scope, project_root)
-            expected_target = runtime_root / package.skill
-            validate_path_within_boundary(expected_target, runtime_root, "inspect skill package")
-            expected_location = expected_target.parent.resolve() / expected_target.name
-            target_location = target.parent.resolve() / target.name
-        except (KeyError, PathBoundaryViolationError, ValueError):
-            statuses.append(
-                SkillPackageStatus(
-                    runtime=package.runtime,
-                    skill=package.skill,
-                    target_dir=package.target_dir,
-                    state="invalid-target",
-                    target_present=False,
-                    file_paths=tuple(package.file_paths),
-                    recovery="Repair or remove the invalid tracking row before sync or disable.",
-                )
+            target, expected_target = _tracked_skill_package_target(
+                package,
+                scope,
+                project_root,
+                "inspect skill package",
             )
-            continue
-        if target_location != expected_location:
+        except (KeyError, PathBoundaryViolationError, ValueError):
             statuses.append(
                 SkillPackageStatus(
                     runtime=package.runtime,
@@ -371,8 +413,7 @@ def inspect_skill_package_status(
 
         target_present = target.is_dir() and (target / "SKILL.md").is_file()
         try:
-            for tracked_file in package.file_paths:
-                validate_path_within_boundary(Path(tracked_file), expected_target, "inspect skill package")
+            _validate_tracked_skill_package_files(package, expected_target, "inspect skill package")
         except PathBoundaryViolationError:
             statuses.append(
                 SkillPackageStatus(
@@ -713,6 +754,8 @@ class Installer:
         source_root = get_extensions_root()
         target_root = get_target_root(self._scope, self._project_root)
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
+        if existing is not None:
+            _assert_tracked_skill_packages_syncable(existing, self._scope, self._project_root)
 
         # The legacy file-module contract creates the Claude anchor even when a
         # selected source directory currently contains no installable files
@@ -906,10 +949,12 @@ class Installer:
                 )
 
             cache_dir = compiled_skill_cache_dir(compiled)
+            runtime_root = _runtime_skill_root(decision.runtime, self._scope, self._project_root)
             file_plans: list[FilePlan] = []
             for package_file in compiled.files:
                 source_file = cache_dir.joinpath(*package_file.path.parts)
                 target_file = decision.target_dir.joinpath(*package_file.path.parts)
+                validate_path_within_boundary(target_file, runtime_root, "write skill package")
                 file_plan = self._plan_compiled_file(
                     package_file,
                     source_file,
@@ -1371,8 +1416,11 @@ class Installer:
             _ensure_hook_dispatcher()
 
         installed_files: list[InstalledFile] = []
+        newly_created_files: list[InstalledFile] = []
         for file_plan in plan.files:
             if file_plan.action in ("install", "update"):
+                target = Path(file_plan.target_path)
+                target_existed = target.exists() or target.is_symlink()
                 try:
                     installed_file = self._execute_file(file_plan, mode)
                 except OSError as e:
@@ -1384,6 +1432,8 @@ class Installer:
                         "their ownership boundary."
                     ) from e
                 installed_files.append(installed_file)
+                if not target_existed:
+                    newly_created_files.append(installed_file)
 
         backup_path: Path | None = None
         if modules & _CLAUDE_SETTINGS_MODULES:
@@ -1469,9 +1519,11 @@ class Installer:
                     try:
                         target.unlink(missing_ok=True)
                         logger.debug("Removed stale tracked file: %s", target)
-                    except OSError:
-                        logger.debug("Could not remove stale target: %s", target)
-                        continue
+                    except OSError as e:
+                        raise ForgeInstallError(
+                            f"Failed to remove stale tracked extension file '{target}': {e}. "
+                            "Tracking was not updated; restore write access and rerun 'forge extension sync'."
+                        ) from e
                     # Collect parent dirs for empty-directory cleanup
                     parent = target.parent
                     while parent != boundary and parent.is_relative_to(boundary):
@@ -1538,9 +1590,58 @@ class Installer:
             installed_at=existing.installed_at if existing else now,
             updated_at=now,
         )
-        self._tracking.set_installation(self._scope.value, installation, self._project_path_str)
+        try:
+            self._tracking.set_installation(self._scope.value, installation, self._project_path_str)
+        except OSError as e:
+            rollback_failures = self._rollback_newly_created_files(newly_created_files, plan)
+            rollback_note = (
+                f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
+                if rollback_failures
+                else " Newly created extension files were rolled back; rerun the same command after repairing state storage."
+            )
+            raise ForgeInstallError(f"Failed to commit extension tracking: {e}.{rollback_note}") from e
 
         return plan
+
+    def _rollback_newly_created_files(
+        self,
+        installed_files: list[InstalledFile],
+        plan: InstallPlan,
+    ) -> list[str]:
+        """Best-effort rollback for files created before a tracking commit fails."""
+
+        package_boundaries = {
+            file_path: Path(package.target_dir).parent
+            for package in plan.skill_packages
+            if package.target_dir is not None
+            for file_path in package.file_paths
+        }
+        failures: list[str] = []
+        dirs_to_clean: set[tuple[Path, Path]] = set()
+        for record in reversed(installed_files):
+            target = Path(record.target_path)
+            boundary = package_boundaries.get(record.target_path, get_target_root(self._scope, self._project_root))
+            try:
+                validate_path_within_boundary(target, boundary, "roll back extension file")
+                if self._is_forge_owned(target, record):
+                    target.unlink(missing_ok=True)
+                elif target.exists() or target.is_symlink():
+                    failures.append(str(target))
+                    continue
+            except (OSError, PathBoundaryViolationError):
+                failures.append(str(target))
+                continue
+            parent = target.parent
+            while parent != boundary and parent.is_relative_to(boundary):
+                dirs_to_clean.add((parent, boundary))
+                parent = parent.parent
+
+        for directory, _boundary in sorted(dirs_to_clean, key=lambda item: len(item[0].parts), reverse=True):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        return failures
 
     def _execute_file(self, file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
         """Execute a file operation.

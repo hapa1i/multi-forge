@@ -654,6 +654,159 @@ def test_mid_apply_failure_keeps_tracking_uncommitted_and_requires_explicit_part
     assert tracking.get_installation("user", None) is not None
 
 
+def test_package_directory_symlink_blocks_before_writing_outside_runtime_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    extensions_root, _source_package = _write_portable_source(tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    package_dir = home / ".agents" / "skills" / "portable"
+    package_dir.parent.mkdir(parents=True)
+    package_dir.symlink_to(external, target_is_directory=True)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+        pytest.raises(ForgeInstallError, match="security violation"),
+    ):
+        installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    assert list(external.iterdir()) == []
+    assert tracking.get_installation("user", None) is None
+
+
+def test_invalid_tracked_runtime_blocks_sync_without_dropping_ownership(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    extensions_root, _source_package = _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+    ):
+        installer.init(**kwargs)
+
+    installation = tracking.get_installation("user", None)
+    assert installation is not None
+    target = Path(installation.skill_packages[0].target_dir) / "SKILL.md"
+    installation.skill_packages[0].runtime = "unknown-runtime"
+    tracking.set_installation("user", installation, None)
+    before = tracking.path.read_bytes()
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        pytest.raises(ForgeInstallError, match="tracked skill package ownership is invalid"),
+    ):
+        installer.update()
+
+    assert target.is_file()
+    assert tracking.path.read_bytes() == before
+
+
+def test_stale_unlink_failure_preserves_tracking_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    extensions_root, source_package = _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+    ):
+        installer.init(**kwargs)
+
+    stale_target = home / ".agents" / "skills" / "portable" / "references" / "note.md"
+    (source_package / "references" / "note.md").unlink()
+    before = tracking.path.read_bytes()
+    real_unlink = Path.unlink
+
+    def fail_stale_unlink(path: Path, *args, **kwargs) -> None:
+        if path == stale_target:
+            raise PermissionError("injected stale unlink failure")
+        real_unlink(path, *args, **kwargs)
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=[]),
+        patch.object(Path, "unlink", fail_stale_unlink),
+        pytest.raises(ForgeInstallError, match="Failed to remove stale tracked extension file"),
+    ):
+        installer.update()
+
+    assert stale_target.is_file()
+    assert tracking.path.read_bytes() == before
+
+
+def test_tracking_commit_failure_rolls_back_new_package_files_for_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    extensions_root, _source_package = _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+    package_dir = home / ".agents" / "skills" / "portable"
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+        patch.object(tracking, "set_installation", side_effect=OSError("disk full")),
+        pytest.raises(ForgeInstallError, match="Failed to commit extension tracking"),
+    ):
+        installer.init(**kwargs)
+
+    assert not package_dir.exists()
+    assert tracking.get_installation("user", None) is None
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+    ):
+        recovered = installer.init(**kwargs)
+    assert not recovered.has_conflicts
+    assert (package_dir / "SKILL.md").is_file()
+
+
 def test_explicit_duplicate_blocks_all_targets_even_with_force_but_auto_skips_codex(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
