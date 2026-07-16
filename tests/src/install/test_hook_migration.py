@@ -188,7 +188,7 @@ def test_cleanup_preview_rejects_unsupported_tracking_before_settings_read(
     assert tracking.path.read_text(encoding="utf-8") == original
 
 
-def test_cleanup_preview_reads_v1_without_persisting_upgrade(
+def test_cleanup_v1_preview_is_read_only_then_apply_writes_current(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -215,6 +215,13 @@ def test_cleanup_preview_reads_v1_without_persisting_upgrade(
 
     assert plan.root == root.resolve()
     assert tracking.path.read_text(encoding="utf-8") == original
+
+    monkeypatch.setattr("forge.install.hook_migration.install_hook_dispatcher", lambda: None)
+    apply_project_hook_migration(root, tracking=tracking)
+
+    persisted = json.loads(tracking.path.read_text(encoding="utf-8"))
+    assert persisted["version"] == 2
+    assert persisted["installations"][f"project:{root}"]["skill_packages"] == []
 
 
 def test_v1_candidate_without_recoverable_path_is_not_guessed(tmp_path: Path) -> None:
