@@ -21,6 +21,7 @@ from .models import (
     Installation,
     InstalledFile,
     InstalledManifest,
+    InstalledSkillPackage,
     InstalledSettingsEntry,
     InstallMode,
     InstallModule,
@@ -38,6 +39,7 @@ __all__ = [
     "InstallModule",
     # Tracking dataclasses
     "InstalledFile",
+    "InstalledSkillPackage",
     "InstalledSettingsEntry",
     "Installation",
     "InstalledManifest",
