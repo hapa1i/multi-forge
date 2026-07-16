@@ -867,6 +867,31 @@ def test_doctor_advises_sync_when_custom_launcher_is_discoverable_but_not_record
     assert str(custom_forge) in diagnosis.advice
 
 
+def test_doctor_keeps_best_effort_sync_advice_when_tracking_is_corrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tracking is supplementary to doctor and must never make diagnosis raise."""
+    from forge.install.tracking import TrackingStore
+
+    custom_forge, _record = _make_fake_forge(tmp_path / "custom")
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    tracking = TrackingStore()
+    tracking.path.parent.mkdir(parents=True, exist_ok=True)
+    tracking.path.write_text('{"version": 999}', encoding="utf-8")
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: str(custom_forge),
+    )
+
+    assert diagnosis.status == "current"
+    assert diagnosis.advice is not None
+    assert "extension sync --scope user" in diagnosis.advice
+
+
 def test_doctor_advises_enable_when_never_enabled_and_launcher_unrecorded(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

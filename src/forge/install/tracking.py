@@ -7,7 +7,8 @@ reversible update and uninstall operations.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict
+import json
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -17,20 +18,48 @@ from forge.core.paths import get_forge_home
 from forge.core.state import (
     atomic_write_json,
     file_lock_for_target,
-    read_versioned_json_object,
 )
 
 from .exceptions import TrackingCorruptedError, TrackingUnreadableError
 from .models import (
     TRACKING_VERSION,
     Installation,
+    InstalledFile,
     InstalledManifest,
+    InstalledSettingsEntry,
     make_installation_key,
     parse_installation_key,
 )
 
 # Constants
 TRACKING_FILENAME = "installed.json"
+LEGACY_TRACKING_VERSION = 1
+
+
+@dataclass
+class _LegacyInstallation:
+    """Strict v1 installation shape used only for side-effect-free migration."""
+
+    scope: str
+    mode: str
+    profile: str
+    project_path: str | None = None
+    modules_enabled: list[str] = field(default_factory=list)
+    files: list[InstalledFile] = field(default_factory=list)
+    settings_entries: list[InstalledSettingsEntry] = field(default_factory=list)
+    settings_backup_path: str | None = None
+    codex_config_path: str | None = None
+    codex_commands: list[str] = field(default_factory=list)
+    installed_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass
+class _LegacyInstalledManifest:
+    """Released v1 root shape; unknown fields remain hard errors."""
+
+    version: int = LEGACY_TRACKING_VERSION
+    installations: dict[str, _LegacyInstallation] = field(default_factory=dict)
 
 
 def get_tracking_path() -> Path:
@@ -60,6 +89,71 @@ def _handle_tracking_version_mismatch(path: Path, _data: dict[str, Any], version
         f"incompatible version {version} (this Forge expects {TRACKING_VERSION}). "
         f"Delete this file and run 'forge extension enable' again.",
     )
+
+
+def _read_tracking_object(path: Path) -> tuple[int, dict[str, Any]]:
+    """Read the JSON object and accept only released v1 or current v2.
+
+    The shared single-version helper cannot express an accepted legacy version.
+    Keep the same domain error mapping here while preserving v1's historical
+    missing-version default. Reading never rewrites the file.
+    """
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise TrackingCorruptedError(str(path), f"invalid JSON: {e}") from e
+    except OSError as e:
+        raise TrackingUnreadableError(str(path), f"read error: {e}") from e
+
+    if not isinstance(data, dict):
+        raise TrackingCorruptedError(str(path), f"expected JSON object, got {type(data).__name__}")
+
+    version = data.get("version", LEGACY_TRACKING_VERSION)
+    if isinstance(version, bool) or not isinstance(version, int):
+        _handle_tracking_version_mismatch(path, data, version)
+    if version not in {LEGACY_TRACKING_VERSION, TRACKING_VERSION}:
+        _handle_tracking_version_mismatch(path, data, version)
+    return version, data
+
+
+def _deserialize_manifest(path: Path, data_class: type[Any], data: dict[str, Any]) -> Any:
+    try:
+        return dacite.from_dict(
+            data_class=data_class,
+            data=data,
+            config=dacite.Config(strict=True),
+        )
+    except (dacite.DaciteError, TypeError, KeyError) as e:
+        raise TrackingCorruptedError(str(path), f"deserialization error: {e}") from e
+
+
+def _upgrade_legacy_manifest(legacy: _LegacyInstalledManifest) -> InstalledManifest:
+    """Normalize v1 to the current in-memory model without inventing packages."""
+
+    installations = {
+        key: Installation(
+            scope=installation.scope,
+            mode=installation.mode,
+            profile=installation.profile,
+            project_path=installation.project_path,
+            modules_enabled=list(installation.modules_enabled),
+            files=list(installation.files),
+            # Runtime/package grouping is not provable from arbitrary legacy
+            # paths. The first successful installer mutation may derive Claude
+            # ownership from its reviewed target boundary.
+            skill_packages=[],
+            settings_entries=list(installation.settings_entries),
+            settings_backup_path=installation.settings_backup_path,
+            codex_config_path=installation.codex_config_path,
+            codex_commands=list(installation.codex_commands),
+            installed_at=installation.installed_at,
+            updated_at=installation.updated_at,
+        )
+        for key, installation in legacy.installations.items()
+    }
+    return InstalledManifest(version=TRACKING_VERSION, installations=installations)
 
 
 class TrackingStore:
@@ -106,25 +200,11 @@ class TrackingStore:
         if not self.exists():
             return InstalledManifest()
 
-        data = read_versioned_json_object(
-            self._path,
-            version_key="version",
-            expected_version=TRACKING_VERSION,
-            corrupted_error=TrackingCorruptedError,
-            unreadable_error=TrackingUnreadableError,
-            missing_version=1,
-            none_is_missing=False,
-            on_version_mismatch=_handle_tracking_version_mismatch,
-        )
-
-        try:
-            return dacite.from_dict(
-                data_class=InstalledManifest,
-                data=data,
-                config=dacite.Config(strict=True),
-            )
-        except (dacite.DaciteError, TypeError, KeyError) as e:
-            raise TrackingCorruptedError(str(self._path), f"deserialization error: {e}")
+        version, data = _read_tracking_object(self._path)
+        if version == LEGACY_TRACKING_VERSION:
+            legacy = _deserialize_manifest(self._path, _LegacyInstalledManifest, data)
+            return _upgrade_legacy_manifest(legacy)
+        return _deserialize_manifest(self._path, InstalledManifest, data)
 
     def write(self, manifest: InstalledManifest) -> None:
         """Write tracking manifest atomically.
@@ -136,6 +216,10 @@ class TrackingStore:
             manifest: The manifest to write.
         """
         data = asdict(manifest)
+        # Writes are always current even when the caller is persisting an
+        # in-memory normalization of a legacy manifest after a successful
+        # mutation. Read-only previews never call this method.
+        data["version"] = TRACKING_VERSION
         atomic_write_json(self._path, data)
 
     def get_installation(self, scope: str, project_path: str | None = None) -> Installation | None:

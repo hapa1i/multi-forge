@@ -168,6 +168,27 @@ class InstalledSettingsEntry:
 
 
 @dataclass
+class InstalledSkillPackage:
+    """One runtime-specific skill package managed by Forge.
+
+    ``Installation.files`` remains the canonical checksum and removal ledger.
+    This record supplies the runtime/package grouping that cannot be recovered
+    safely from arbitrary target paths after a runtime target changes.
+
+    Attributes:
+        runtime: Runtime registry id (for example, ``claude_code`` or ``codex``).
+        skill: Neutral Forge skill name before runtime-specific name transforms.
+        target_dir: Absolute installed package directory.
+        file_paths: Stable, sorted absolute target paths belonging to the package.
+    """
+
+    runtime: str
+    skill: str
+    target_dir: str
+    file_paths: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Installation:
     """Installation record for a single scope.
 
@@ -179,6 +200,8 @@ class Installation:
         profile: InstallProfile value ("minimal", "standard", "full").
         modules_enabled: List of InstallModule values that were enabled.
         files: List of InstalledFile records.
+        skill_packages: Runtime/package ownership records. InstalledFile remains
+                        canonical for checksums and removal.
         settings_entries: List of InstalledSettingsEntry records.
         settings_backup_path: Path to settings backup file (if created).
         codex_config_path: Codex config.toml carrying the Forge-managed hook
@@ -194,6 +217,7 @@ class Installation:
     project_path: str | None = None
     modules_enabled: list[str] = field(default_factory=list)
     files: list[InstalledFile] = field(default_factory=list)
+    skill_packages: list[InstalledSkillPackage] = field(default_factory=list)
     settings_entries: list[InstalledSettingsEntry] = field(default_factory=list)
     settings_backup_path: str | None = None
     codex_config_path: str | None = None
@@ -241,7 +265,7 @@ def parse_installation_key(key: str) -> tuple[str, str | None]:
 
 
 # Tracking manifest version
-TRACKING_VERSION = 1
+TRACKING_VERSION = 2
 
 
 @dataclass

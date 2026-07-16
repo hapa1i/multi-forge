@@ -12,6 +12,7 @@ from forge.install.models import (
     TRACKING_VERSION,
     Installation,
     InstalledManifest,
+    InstalledSkillPackage,
 )
 from forge.install.tracking import (
     TrackingStore,
@@ -94,6 +95,106 @@ class TestTrackingStore:
 
         assert "incompatible version" in str(exc_info.value)
 
+    def test_read_v1_normalizes_in_memory_without_rewriting(self, tracking_store: TrackingStore) -> None:
+        legacy = {
+            "version": 1,
+            "installations": {
+                "user": {
+                    "scope": "user",
+                    "mode": "copy",
+                    "profile": "standard",
+                    "modules_enabled": ["skills"],
+                    "files": [
+                        {
+                            "target_path": "/home/user/.claude/skills/challenge/SKILL.md",
+                            "source_path": "/src/skills/challenge/SKILL.md",
+                            "checksum": "abc",
+                            "mode": "copy",
+                            "installed_at": "2026-01-01T00:00:00Z",
+                        }
+                    ],
+                    "settings_entries": [
+                        {
+                            "key_path": "permissions.allow",
+                            "value": "Read",
+                            "merge_type": "union",
+                            "stable_id": "Read",
+                        }
+                    ],
+                    "settings_backup_path": "/home/user/.claude/settings.json.forge-backup",
+                    "codex_config_path": "/home/user/.codex/config.toml",
+                    "codex_commands": ["forge-hook codex-session-start"],
+                    "installed_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                }
+            },
+        }
+        original = json.dumps(legacy, indent=2)
+        tracking_store.path.write_text(original, encoding="utf-8")
+
+        manifest = tracking_store.read()
+
+        assert manifest.version == TRACKING_VERSION == 2
+        installation = manifest.installations["user"]
+        assert installation.modules_enabled == ["skills"]
+        assert installation.files[0].target_path.endswith("/challenge/SKILL.md")
+        assert installation.settings_entries[0].stable_id == "Read"
+        assert installation.settings_backup_path == "/home/user/.claude/settings.json.forge-backup"
+        assert installation.codex_config_path == "/home/user/.codex/config.toml"
+        assert installation.codex_commands == ["forge-hook codex-session-start"]
+        assert installation.skill_packages == []
+        assert tracking_store.path.read_text(encoding="utf-8") == original
+
+    def test_read_v1_rejects_current_only_skill_packages_field(self, tracking_store: TrackingStore) -> None:
+        tracking_store.path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "installations": {
+                        "user": {
+                            "scope": "user",
+                            "mode": "copy",
+                            "profile": "standard",
+                            "skill_packages": [],
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(TrackingCorruptedError, match="deserialization error"):
+            tracking_store.read()
+
+    def test_read_v2_rejects_unknown_package_field(self, tracking_store: TrackingStore) -> None:
+        tracking_store.path.write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "installations": {
+                        "user": {
+                            "scope": "user",
+                            "mode": "copy",
+                            "profile": "standard",
+                            "skill_packages": [
+                                {
+                                    "runtime": "codex",
+                                    "skill": "challenge",
+                                    "target_dir": "/home/user/.agents/skills/challenge",
+                                    "file_paths": [],
+                                    "future": True,
+                                }
+                            ],
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(TrackingCorruptedError, match="deserialization error"):
+            tracking_store.read()
+
     def test_read_rejects_manifest_with_removed_patched_files_field(self, tracking_store: TrackingStore) -> None:
         """A manifest carrying the removed patched_files field is rejected, not silently loaded.
 
@@ -158,6 +259,35 @@ class TestTrackingStore:
         assert "user" in loaded.installations
         assert loaded.installations["user"].scope == "user"
         assert loaded.installations["user"].profile == "standard"
+
+    def test_read_write_roundtrip_preserves_runtime_skill_packages(self, tracking_store: TrackingStore) -> None:
+        package = InstalledSkillPackage(
+            runtime="codex",
+            skill="challenge",
+            target_dir="/home/user/.agents/skills/challenge",
+            file_paths=["/home/user/.agents/skills/challenge/SKILL.md"],
+        )
+        manifest = InstalledManifest(
+            installations={
+                "user": Installation(
+                    scope="user",
+                    mode="copy",
+                    profile="standard",
+                    modules_enabled=["skills"],
+                    skill_packages=[package],
+                )
+            }
+        )
+
+        tracking_store.write(manifest)
+        loaded = tracking_store.read()
+
+        assert loaded.installations["user"].skill_packages == [package]
+
+    def test_write_always_emits_current_version(self, tracking_store: TrackingStore) -> None:
+        tracking_store.write(InstalledManifest(version=1))
+
+        assert json.loads(tracking_store.path.read_text(encoding="utf-8"))["version"] == TRACKING_VERSION == 2
 
     def test_get_installation_returns_none_when_empty(self, tracking_store: TrackingStore) -> None:
         result = tracking_store.get_installation("user")

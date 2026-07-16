@@ -784,6 +784,7 @@ def _apply_user_runtime_transition(
         profile=(existing.profile if existing is not None else InstallProfile.STANDARD.value),
         modules_enabled=sorted(modules),
         files=list(existing.files) if existing is not None else [],
+        skill_packages=list(existing.skill_packages) if existing is not None else [],
         settings_entries=final_entries,
         settings_backup_path=(
             str(settings_backups[plan.settings.path])
