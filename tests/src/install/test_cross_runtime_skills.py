@@ -407,6 +407,29 @@ def test_duplicate_policy_depends_on_selection_origin(
     assert codex.duplicate_dirs == (duplicate,)
 
 
+def test_automatic_duplicate_conflicts_when_the_codex_package_is_already_managed(
+    tmp_path: Path,
+) -> None:
+    selection = select_skill_runtimes(installed_runtime_ids=(CODEX_RUNTIME,))
+    duplicate = tmp_path / "elsewhere" / ".agents" / "skills" / "portable"
+
+    plan = plan_runtime_skills(
+        scope=InstallScope.USER,
+        profile=InstallProfile.STANDARD,
+        skills_module_selected=True,
+        candidates=(_PORTABLE,),
+        selection=selection,
+        managed_packages=((CODEX_RUNTIME, "portable"),),
+        untracked_codex_packages={"portable": (duplicate,)},
+        **_paths(tmp_path),
+    )
+
+    codex = _decision(plan, CODEX_RUNTIME, "portable")
+    assert codex.action == SkillPlanAction.CONFLICT
+    assert codex.reason == SkillPlanReason.DUPLICATE_SCAN_CHAIN
+    assert codex.duplicate_dirs == (duplicate,)
+
+
 def test_duplicate_candidate_names_are_rejected(tmp_path: Path) -> None:
     selection = select_skill_runtimes(installed_runtime_ids=())
 

@@ -365,7 +365,7 @@ def plan_runtime_skills(
             if runtime == CODEX_RUNTIME and duplicate_dirs:
                 action = (
                     SkillPlanAction.SKIP
-                    if selection.origin == RuntimeSelectionOrigin.AUTO
+                    if selection.origin == RuntimeSelectionOrigin.AUTO and not already_managed
                     else SkillPlanAction.CONFLICT
                 )
                 decisions.append(
