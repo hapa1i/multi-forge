@@ -1358,7 +1358,16 @@ class Installer:
         installed_files: list[InstalledFile] = []
         for file_plan in plan.files:
             if file_plan.action in ("install", "update"):
-                installed_file = self._execute_file(file_plan, mode)
+                try:
+                    installed_file = self._execute_file(file_plan, mode)
+                except OSError as e:
+                    raise ForgeInstallError(
+                        f"Failed to write extension file '{file_plan.target_path}': {e}. "
+                        "Tracking was not updated; files written earlier in this attempt may be untracked. "
+                        "Inspect and remove only those partial generated files, then rerun the same enable or sync "
+                        "command. Codex skill duplicates must be removed explicitly because --force never bypasses "
+                        "their ownership boundary."
+                    ) from e
                 installed_files.append(installed_file)
 
         backup_path: Path | None = None

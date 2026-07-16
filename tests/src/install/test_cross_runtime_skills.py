@@ -12,9 +12,12 @@ from click.testing import CliRunner
 
 from forge.cli.extensions import _parse_skill_runtimes, extensions
 from forge.core.runtime import get_runtime
+from forge.install.exceptions import ForgeInstallError
 from forge.install.installer import Installer, find_forge_installation, inspect_skill_package_status
 from forge.install.models import (
+    FilePlan,
     Installation,
+    InstalledFile,
     InstalledSkillPackage,
     InstallMode,
     InstallModule,
@@ -590,6 +593,65 @@ def test_dry_run_does_not_materialize_cache_and_symlinks_use_stable_cache(
     assert target.is_symlink()
     assert target.resolve().is_relative_to(Path(package.cache_dir).resolve())  # type: ignore[arg-type]
     assert "/cache/compiled-skills/v1/codex/portable/" in str(target.resolve())
+
+
+def test_mid_apply_failure_keeps_tracking_uncommitted_and_requires_explicit_partial_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    extensions_root, _source_package = _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+    original_execute = installer._execute_file
+    written_targets: list[Path] = []
+
+    def fail_second_write(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+        if written_targets:
+            raise OSError("injected write failure")
+        installed = original_execute(file_plan, mode)
+        written_targets.append(Path(file_plan.target_path))
+        return installed
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+        patch.object(installer, "_execute_file", side_effect=fail_second_write),
+        pytest.raises(ForgeInstallError, match="Tracking was not updated") as exc_info,
+    ):
+        installer.init(**kwargs)
+
+    assert "--force never bypasses" in str(exc_info.value)
+    assert tracking.get_installation("user", None) is None
+    assert written_targets == [home / ".agents" / "skills" / "portable" / "SKILL.md"]
+    assert written_targets[0].is_file()
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+    ):
+        blocked = installer.plan(**kwargs)
+    assert blocked.has_conflicts
+    assert any("duplicate_scan_chain" in conflict for conflict in blocked.conflicts)
+
+    written_targets[0].unlink()
+    written_targets[0].parent.rmdir()
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+    ):
+        recovered = installer.init(**kwargs)
+
+    assert not recovered.has_conflicts
+    assert tracking.get_installation("user", None) is not None
 
 
 def test_explicit_duplicate_blocks_all_targets_even_with_force_but_auto_skips_codex(
