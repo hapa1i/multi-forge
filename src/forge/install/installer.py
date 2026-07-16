@@ -6,14 +6,18 @@ managing Claude Code extensions.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import shutil
+import stat
 import subprocess
 from copy import deepcopy
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from forge.core.paths import find_git_root
+from forge.core.runtime import installed_runtimes
 from forge.core.state import now_iso
 
 # Import for CLAUDE_HOME support
@@ -38,19 +42,39 @@ from .hook_dispatcher import install_hook_dispatcher
 from .models import (
     MODULE_DEPENDENCIES,
     PROFILE_MODULES,
-    PROFILE_RANK,
     SETTINGS_ONLY_MODULES,
     SKILL_PROFILE_REQUIREMENTS,
     CodexPlan,
     FilePlan,
     Installation,
     InstalledFile,
+    InstalledSkillPackage,
     InstallMode,
     InstallModule,
     InstallPlan,
     InstallProfile,
     InstallScope,
     SettingsPlan,
+    SkillPackagePlan,
+    SkillPackageStatus,
+)
+from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
+from .skill_compiler import (
+    CompiledSkillFile,
+    CompiledSkillPackage,
+    SkillRuntime,
+    compile_skill_for_runtime,
+    load_skill_sources,
+)
+from .skill_planning import (
+    CLAUDE_CODE_RUNTIME,
+    CODEX_RUNTIME,
+    SkillCandidate,
+    SkillPlanAction,
+    plan_runtime_skills,
+    runtime_skill_root,
+    scan_codex_skill_duplicates,
+    select_skill_runtimes,
 )
 from .settings_merge import (
     backup_settings,
@@ -133,6 +157,11 @@ _EXCLUDED_DIR_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cac
 _EXCLUDED_EXTENSIONS = {".pyc", ".pyo"}
 _RUNTIME_HOOK_MODULES = {InstallModule.HOOKS, InstallModule.CODEX_HOOKS}
 _USER_SCOPE_OMITTED_MODULES = {InstallModule.STATUSLINE}
+_CLAUDE_SETTINGS_MODULES = {
+    InstallModule.HOOKS,
+    InstallModule.STATUSLINE,
+    InstallModule.PERMISSIONS,
+}
 
 
 def _format_modules(modules: set[InstallModule]) -> str:
@@ -245,6 +274,162 @@ def get_target_root(scope: InstallScope, project_root: Path | None = None) -> Pa
         return project_root / ".claude"
 
 
+def _runtime_skill_root(runtime: str, scope: InstallScope, project_root: Path | None) -> Path:
+    return runtime_skill_root(
+        runtime,
+        scope,
+        user_home=Path.home(),
+        claude_home=get_claude_home(),
+        project_root=project_root,
+    )
+
+
+def _legacy_claude_skill_packages(
+    installation: Installation | None,
+    scope: InstallScope,
+    project_root: Path | None,
+) -> set[tuple[str, str]]:
+    """Derive only provable v1 Claude package ownership from tracked paths."""
+
+    if installation is None or installation.skill_packages:
+        return set()
+    skills_root = _runtime_skill_root(CLAUDE_CODE_RUNTIME, scope, project_root)
+    result: set[tuple[str, str]] = set()
+    for tracked_file in installation.files:
+        target = Path(tracked_file.target_path)
+        try:
+            relative = target.relative_to(skills_root)
+        except ValueError:
+            continue
+        if len(relative.parts) >= 2:
+            result.add((CLAUDE_CODE_RUNTIME, relative.parts[0]))
+    return result
+
+
+def _codex_scan_roots(project_root: Path | None, *, include_cwd: bool = True) -> tuple[Path, ...]:
+    """Codex user/admin roots plus applicable CWD-to-repository project roots."""
+
+    roots: list[Path] = [Path.home() / ".agents" / "skills"]
+    anchors = [anchor for anchor in (project_root, Path.cwd() if include_cwd else None) if anchor is not None]
+    for anchor in anchors:
+        resolved = anchor.resolve()
+        git_root = find_git_root(resolved)
+        stop = git_root or resolved
+        current = resolved
+        while True:
+            roots.append(current / ".agents" / "skills")
+            if current == stop or current == current.parent:
+                break
+            current = current.parent
+    roots.append(Path("/etc/codex/skills"))
+    return tuple(dict.fromkeys(roots))
+
+
+def inspect_skill_package_status(
+    installation: Installation,
+    scope: InstallScope,
+    project_root: Path | None,
+) -> tuple[SkillPackageStatus, ...]:
+    """Read tracked package health and Codex duplicate discovery without mutation."""
+
+    statuses: list[SkillPackageStatus] = []
+    codex_scan_roots = _codex_scan_roots(project_root, include_cwd=project_root is None)
+    for package in sorted(installation.skill_packages, key=lambda item: (item.runtime, item.skill)):
+        target = Path(package.target_dir)
+        try:
+            runtime_root = _runtime_skill_root(package.runtime, scope, project_root)
+            expected_target = runtime_root / package.skill
+            validate_path_within_boundary(expected_target, runtime_root, "inspect skill package")
+            expected_location = expected_target.parent.resolve() / expected_target.name
+            target_location = target.parent.resolve() / target.name
+        except (KeyError, PathBoundaryViolationError, ValueError):
+            statuses.append(
+                SkillPackageStatus(
+                    runtime=package.runtime,
+                    skill=package.skill,
+                    target_dir=package.target_dir,
+                    state="invalid-target",
+                    target_present=False,
+                    file_paths=tuple(package.file_paths),
+                    recovery="Repair or remove the invalid tracking row before sync or disable.",
+                )
+            )
+            continue
+        if target_location != expected_location:
+            statuses.append(
+                SkillPackageStatus(
+                    runtime=package.runtime,
+                    skill=package.skill,
+                    target_dir=package.target_dir,
+                    state="invalid-target",
+                    target_present=False,
+                    file_paths=tuple(package.file_paths),
+                    recovery="Repair or remove the invalid tracking row before sync or disable.",
+                )
+            )
+            continue
+
+        target_present = target.is_dir() and (target / "SKILL.md").is_file()
+        try:
+            for tracked_file in package.file_paths:
+                validate_path_within_boundary(Path(tracked_file), expected_target, "inspect skill package")
+        except PathBoundaryViolationError:
+            statuses.append(
+                SkillPackageStatus(
+                    runtime=package.runtime,
+                    skill=package.skill,
+                    target_dir=package.target_dir,
+                    state="invalid-target",
+                    target_present=target_present,
+                    file_paths=tuple(package.file_paths),
+                    recovery="Repair or remove the invalid tracking row before sync or disable.",
+                )
+            )
+            continue
+        missing_file_paths = tuple(
+            sorted(
+                tracked_file
+                for tracked_file in package.file_paths
+                if not Path(tracked_file).is_file() and not Path(tracked_file).is_symlink()
+            )
+        )
+        duplicate_dirs: tuple[str, ...] = ()
+        if package.runtime == CODEX_RUNTIME:
+            duplicate_scan = scan_codex_skill_duplicates(
+                package.skill,
+                scan_roots=codex_scan_roots,
+                managed_package_dirs=(target,),
+            )
+            duplicate_dirs = tuple(str(path) for path in duplicate_scan.untracked_package_dirs)
+        if duplicate_dirs:
+            state = "duplicate"
+            recovery = (
+                "Remove or rename untracked duplicates, then run 'forge extension sync' to restore missing files."
+                if not target_present or missing_file_paths
+                else "Remove or rename untracked duplicates, then run 'forge extension sync'."
+            )
+        elif target_present and not missing_file_paths:
+            state = "present"
+            recovery = None
+        else:
+            state = "missing"
+            recovery = "Run 'forge extension sync' to restore the tracked package."
+        statuses.append(
+            SkillPackageStatus(
+                runtime=package.runtime,
+                skill=package.skill,
+                target_dir=package.target_dir,
+                state=state,
+                target_present=target_present,
+                file_paths=tuple(package.file_paths),
+                missing_file_paths=missing_file_paths,
+                duplicate_dirs=duplicate_dirs,
+                recovery=recovery,
+            )
+        )
+    return tuple(statuses)
+
+
 def validate_path_within_boundary(
     path: Path,
     boundary: Path,
@@ -335,8 +520,9 @@ def find_forge_installation(
     auto-detect scope. Walks up from start directory, checking LOCAL then
     PROJECT at each level, then USER at home.
 
-    Detection is based on file evidence (.settings.*.json.forge.* files)
-    which works across multiple projects, not just tracking store state.
+    Claude settings use file evidence when present. Runtime-only skill installs
+    can have no ``.claude`` directory, so exact project/local tracking rows are
+    also consulted at each walked directory.
 
     Args:
         start: Starting directory. Defaults to cwd.
@@ -371,6 +557,13 @@ def find_forge_installation(
             project_added = find_added_files(project_settings)
             # Only check project at non-home locations (home uses USER scope)
             if current != home and (project_backups or project_added):
+                return (InstallScope.PROJECT, current)
+
+        if current != home:
+            current_key = str(current)
+            if tracking.get_installation(InstallScope.LOCAL.value, current_key):
+                return (InstallScope.LOCAL, current)
+            if tracking.get_installation(InstallScope.PROJECT.value, current_key):
                 return (InstallScope.PROJECT, current)
 
         if current == home:
@@ -458,6 +651,7 @@ class Installer:
         self._scope = scope
         self._project_root = project_root
         self._tracking = tracking_store or TrackingStore()
+        self._compiled_skill_packages: dict[tuple[str, str], CompiledSkillPackage] = {}
 
     @property
     def _project_path_str(self) -> str | None:
@@ -473,8 +667,10 @@ class Installer:
         with_modules: set[InstallModule] | None = None,
         without_modules: set[InstallModule] | None = None,
         force: bool = False,
+        skill_runtimes: tuple[str, ...] | None = None,
         *,
         _modules_override: set[InstallModule] | None = None,
+        _managed_runtime_ids: tuple[str, ...] | None = None,
     ) -> InstallPlan:
         """Compute installation plan without making changes.
 
@@ -484,9 +680,11 @@ class Installer:
             with_modules: Modules to add.
             without_modules: Modules to remove.
             force: If True, override conflicts.
+            skill_runtimes: Explicit runtime ids for skill packages; None selects automatically.
             _modules_override: Internal. If provided, use exactly these modules
                 instead of resolving from profile. Used by update() to ensure
                 only tracked modules are touched.
+            _managed_runtime_ids: Internal persisted runtime set used by update/sync.
 
         Returns:
             InstallPlan describing what would be done.
@@ -510,6 +708,7 @@ class Installer:
             profile=profile.value,
             modules=sorted_modules,
         )
+        self._compiled_skill_packages = {}
 
         source_root = get_extensions_root()
         target_root = get_target_root(self._scope, self._project_root)
@@ -522,19 +721,20 @@ class Installer:
         forge_source = get_forge_source_root()
         git_tracked = _get_git_tracked_files(forge_source) if _is_repo_checkout(forge_source) else None
 
-        # Precompute installed skill names from manifest (skill-level, not file-level)
-        # so that update keeps the entire skill coherent when new files are added
-        installed_skills: set[str] = set()
-        if existing:
-            skills_prefix = str(target_root / "skills") + "/"
-            for f in existing.files:
-                if f.target_path.startswith(skills_prefix):
-                    suffix = f.target_path[len(skills_prefix) :]
-                    if "/" in suffix:
-                        installed_skills.add(suffix.split("/", 1)[0])
+        if InstallModule.SKILLS in modules:
+            self._plan_runtime_skill_packages(
+                plan,
+                source_root=source_root,
+                profile=profile,
+                mode=mode,
+                existing=existing,
+                force=force,
+                explicit_runtime_ids=skill_runtimes,
+                managed_runtime_ids=_managed_runtime_ids,
+            )
 
         for module in sorted(modules, key=lambda m: m.value):
-            if module in SETTINGS_ONLY_MODULES:
+            if module in SETTINGS_ONLY_MODULES or module == InstallModule.SKILLS:
                 continue
 
             source_dir = source_root / get_module_source_dir(module)
@@ -557,20 +757,13 @@ class Installer:
                 rel_path = source_file.relative_to(source_dir)
                 target_file = target_dir / rel_path
 
-                # Per-skill profile gating: skip skills that require a higher profile,
-                # unless the skill is already installed (update keeps entire skill coherent)
-                if module == InstallModule.SKILLS and rel_path.parts:
-                    skill_name = rel_path.parts[0]
-                    required = SKILL_PROFILE_REQUIREMENTS.get(skill_name)
-                    if required and PROFILE_RANK[profile] < PROFILE_RANK[required]:
-                        if skill_name not in installed_skills:
-                            continue
-
                 file_plan = self._plan_file(source_file, target_file, mode, existing, force)
                 plan.files.append(file_plan)
                 if file_plan.action == "conflict":
                     plan.has_conflicts = True
                     plan.conflicts.append(f"File: {file_plan.target_path} - {file_plan.reason}")
+                elif file_plan.action in {"install", "update"}:
+                    plan.requires_claude_version = True
 
         # Sort files for deterministic output
         plan.files.sort(key=lambda f: f.target_path)
@@ -581,6 +774,8 @@ class Installer:
             if sp.action == "conflict":
                 plan.has_conflicts = True
                 plan.conflicts.append(f"Setting: {sp.key_path} - {sp.reason}")
+            elif sp.action != "skip":
+                plan.requires_claude_version = True
 
         # Sort settings for determinism
         plan.settings.sort(key=lambda s: (s.key_path, str(s.value)))
@@ -591,6 +786,216 @@ class Installer:
         plan.codex = self._plan_codex(modules)
 
         return plan
+
+    def _plan_runtime_skill_packages(
+        self,
+        plan: InstallPlan,
+        *,
+        source_root: Path,
+        profile: InstallProfile,
+        mode: InstallMode,
+        existing: Installation | None,
+        force: bool,
+        explicit_runtime_ids: tuple[str, ...] | None,
+        managed_runtime_ids: tuple[str, ...] | None,
+    ) -> None:
+        try:
+            sources = load_skill_sources(source_root / InstallModule.SKILLS.value)
+        except (OSError, ValueError) as e:
+            raise ForgeInstallError(f"Failed to load skill sources: {e}") from e
+
+        source_by_name = {source.manifest.name: source for source in sources}
+        candidates = tuple(
+            SkillCandidate(
+                name=source.manifest.name,
+                supported_runtimes=tuple(sorted(runtime.value for runtime in source.manifest.runtime_eligibility)),
+                minimum_profile=SKILL_PROFILE_REQUIREMENTS.get(source.manifest.name, InstallProfile.MINIMAL),
+            )
+            for source in sources
+        )
+        managed_packages = {
+            (package.runtime, package.skill) for package in (existing.skill_packages if existing is not None else [])
+        }
+        managed_packages |= _legacy_claude_skill_packages(existing, self._scope, self._project_root)
+        try:
+            selection = select_skill_runtimes(
+                installed_runtime_ids=tuple(runtime.id for runtime in installed_runtimes()),
+                explicit_runtime_ids=explicit_runtime_ids,
+                managed_runtime_ids=managed_runtime_ids,
+            )
+        except ValueError as e:
+            raise ForgeInstallError(f"Invalid skill runtime selection: {e}") from e
+        for unavailable_runtime in selection.unavailable_runtime_ids:
+            plan.has_conflicts = True
+            plan.conflicts.append(
+                f"Skill runtime: {unavailable_runtime} - explicitly requested runtime is not installed"
+            )
+
+        untracked_codex: dict[str, tuple[Path, ...]] = {}
+        if CODEX_RUNTIME in selection.runtime_ids:
+            scan_roots = _codex_scan_roots(self._project_root)
+            for candidate in candidates:
+                managed_dirs = tuple(
+                    Path(package.target_dir)
+                    for package in (existing.skill_packages if existing is not None else [])
+                    if package.runtime == CODEX_RUNTIME and package.skill == candidate.name
+                )
+                scan = scan_codex_skill_duplicates(
+                    candidate.name,
+                    scan_roots=scan_roots,
+                    managed_package_dirs=managed_dirs,
+                )
+                if scan.untracked_package_dirs:
+                    untracked_codex[candidate.name] = scan.untracked_package_dirs
+
+        try:
+            runtime_plan = plan_runtime_skills(
+                scope=self._scope,
+                profile=profile,
+                skills_module_selected=True,
+                candidates=candidates,
+                selection=selection,
+                user_home=Path.home(),
+                claude_home=get_claude_home(),
+                project_root=self._project_root,
+                managed_packages=managed_packages,
+                untracked_codex_packages=untracked_codex,
+            )
+        except ValueError as e:
+            raise ForgeInstallError(f"Invalid runtime skill plan: {e}") from e
+
+        for decision in runtime_plan.decisions:
+            if decision.action != SkillPlanAction.INSTALL:
+                package_plan = SkillPackagePlan(
+                    runtime=decision.runtime,
+                    skill=decision.skill,
+                    action=decision.action.value,
+                    target_dir=str(decision.target_dir) if decision.target_dir is not None else None,
+                    reason=decision.reason.value,
+                    duplicate_dirs=[str(path) for path in decision.duplicate_dirs],
+                )
+                plan.skill_packages.append(package_plan)
+                if decision.action == SkillPlanAction.CONFLICT:
+                    plan.has_conflicts = True
+                    detail = (
+                        f"; duplicates: {', '.join(package_plan.duplicate_dirs)}" if package_plan.duplicate_dirs else ""
+                    )
+                    plan.conflicts.append(
+                        f"Skill package: {decision.runtime}/{decision.skill} - {decision.reason.value}{detail}"
+                    )
+                continue
+
+            source = source_by_name[decision.skill]
+            try:
+                compiled = compile_skill_for_runtime(source, SkillRuntime(decision.runtime))
+            except (OSError, ValueError) as e:
+                raise ForgeInstallError(
+                    f"Failed to compile skill '{decision.skill}' for runtime '{decision.runtime}': {e}"
+                ) from e
+            if decision.target_dir is None:
+                raise ForgeInstallError(
+                    f"Skill planner omitted target for eligible package {decision.runtime}/{decision.skill}"
+                )
+
+            cache_dir = compiled_skill_cache_dir(compiled)
+            file_plans: list[FilePlan] = []
+            for package_file in compiled.files:
+                source_file = cache_dir.joinpath(*package_file.path.parts)
+                target_file = decision.target_dir.joinpath(*package_file.path.parts)
+                file_plan = self._plan_compiled_file(
+                    package_file,
+                    source_file,
+                    target_file,
+                    mode,
+                    existing,
+                    force,
+                )
+                file_plans.append(file_plan)
+                plan.files.append(file_plan)
+                if file_plan.action == "conflict":
+                    plan.has_conflicts = True
+                    plan.conflicts.append(f"File: {file_plan.target_path} - {file_plan.reason}")
+
+            actions = {file_plan.action for file_plan in file_plans}
+            if "conflict" in actions:
+                package_action = "conflict"
+            elif "update" in actions:
+                package_action = "update"
+            elif "install" in actions:
+                package_action = "install"
+            else:
+                package_action = "skip"
+            package_plan = SkillPackagePlan(
+                runtime=decision.runtime,
+                skill=decision.skill,
+                action=package_action,
+                target_dir=str(decision.target_dir),
+                cache_dir=str(cache_dir),
+                file_paths=sorted(file_plan.target_path for file_plan in file_plans),
+                reason="files unchanged" if package_action == "skip" else decision.reason.value,
+            )
+            plan.skill_packages.append(package_plan)
+            self._compiled_skill_packages[(decision.runtime, decision.skill)] = compiled
+            if decision.runtime == CLAUDE_CODE_RUNTIME and actions & {
+                "install",
+                "update",
+            }:
+                plan.requires_claude_version = True
+
+    def _plan_compiled_file(
+        self,
+        package_file: CompiledSkillFile,
+        source: Path,
+        target: Path,
+        mode: InstallMode,
+        existing: Installation | None,
+        force: bool,
+    ) -> FilePlan:
+        """Plan compiled bytes against a future cache path without materializing it."""
+
+        if not target.exists() and not target.is_symlink():
+            return FilePlan(action="install", target_path=str(target), source_path=str(source))
+
+        target_location = target.parent.resolve() / target.name
+        is_managed = existing is not None and any(
+            Path(tracked.target_path).parent.resolve() / Path(tracked.target_path).name == target_location
+            for tracked in existing.files
+        )
+        if is_managed:
+            if mode == InstallMode.SYMLINK:
+                if target.is_symlink() and target.resolve(strict=False) == source.resolve(strict=False):
+                    return FilePlan(
+                        action="skip",
+                        target_path=str(target),
+                        source_path=str(source),
+                        reason="symlink already correct",
+                    )
+            elif target.is_file() and not target.is_symlink():
+                target_checksum = compute_checksum(target)
+                source_checksum = hashlib.sha256(package_file.content).hexdigest()
+                target_mode = stat.S_IMODE(target.stat().st_mode)
+                if source_checksum == target_checksum and target_mode == package_file.mode:
+                    return FilePlan(
+                        action="skip",
+                        target_path=str(target),
+                        source_path=str(source),
+                        reason="file unchanged",
+                    )
+            return FilePlan(action="update", target_path=str(target), source_path=str(source))
+
+        if force:
+            return FilePlan(
+                action="install",
+                target_path=str(target),
+                source_path=str(source),
+                reason="force overwrite",
+            )
+        return FilePlan(
+            action="conflict",
+            target_path=str(target),
+            source_path=str(source),
+            reason="file exists and is not Forge-managed",
+        )
 
     def _plan_codex(self, modules: set[InstallModule]) -> CodexPlan | None:
         """Plan the Codex hook registration for the scope-mapped config.toml."""
@@ -887,8 +1292,10 @@ class Installer:
         with_modules: set[InstallModule] | None = None,
         without_modules: set[InstallModule] | None = None,
         force: bool = False,
+        skill_runtimes: tuple[str, ...] | None = None,
         *,
         _modules_override: set[InstallModule] | None = None,
+        _managed_runtime_ids: tuple[str, ...] | None = None,
     ) -> InstallPlan:
         """Install extensions.
 
@@ -898,7 +1305,9 @@ class Installer:
             with_modules: Modules to add.
             without_modules: Modules to remove.
             force: If True, override conflicts.
+            skill_runtimes: Explicit runtime ids for skill packages; None selects automatically.
             _modules_override: Internal. If provided, use exactly these modules.
+            _managed_runtime_ids: Internal persisted runtime set used by update/sync.
 
         Returns:
             The executed plan.
@@ -909,11 +1318,13 @@ class Installer:
             with_modules,
             without_modules,
             force,
+            skill_runtimes,
             _modules_override=_modules_override,
+            _managed_runtime_ids=_managed_runtime_ids,
         )
 
-        if plan.has_conflicts and not force:
-            return plan  # Don't execute if conflicts
+        if plan.has_conflicts:
+            return plan  # Planning conflicts are a hard preflight boundary.
 
         if _modules_override is not None:
             modules = _modules_override
@@ -932,10 +1343,17 @@ class Installer:
             from .hook_migration import plan_user_legacy_hook_files
 
             plan_user_legacy_hook_files(tuple(existing.settings_entries) if existing is not None else ())
-        _ensure_hook_dispatcher()
 
-        settings_path = get_settings_path(self._scope, self._project_root)
-        backup_path = backup_settings(settings_path)
+        # Materialize only after all conflicts have cleared.  Dry-run calls
+        # plan() directly and therefore cannot create or repair cache entries.
+        for compiled in self._compiled_skill_packages.values():
+            materialize_compiled_skill(compiled)
+
+        # Historical extension installs rendered the dispatcher even when
+        # scope policy filtered hook modules. Preserve that lifecycle contract,
+        # while a skills-only Codex install stays free of unrelated writes.
+        if InstallModule.HOOKS in modules or modules - {InstallModule.SKILLS}:
+            _ensure_hook_dispatcher()
 
         installed_files: list[InstalledFile] = []
         for file_plan in plan.files:
@@ -943,50 +1361,59 @@ class Installer:
                 installed_file = self._execute_file(file_plan, mode)
                 installed_files.append(installed_file)
 
-        settings = read_settings(settings_path)
-        removed_entry_ids: set[tuple[str, str]] = set()
-        if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
-            old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
-            if old_hook_entries:
-                unmerge(settings, old_hook_entries)
-                removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
-        if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
-            # T6 migration: stage safe same-file legacy cleanup with the
-            # dispatcher merge so settings.json changes in one atomic write.
-            from .hook_migration import remove_known_legacy_hook_entries
+        backup_path: Path | None = None
+        if modules & _CLAUDE_SETTINGS_MODULES:
+            settings_path = get_settings_path(self._scope, self._project_root)
+            backup_path = backup_settings(settings_path)
+            settings = read_settings(settings_path)
+            removed_entry_ids: set[tuple[str, str]] = set()
+            if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+                old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
+                if old_hook_entries:
+                    unmerge(settings, old_hook_entries)
+                    removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
+            if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+                # T6 migration: stage safe same-file legacy cleanup with the
+                # dispatcher merge so settings.json changes in one atomic write.
+                from .hook_migration import remove_known_legacy_hook_entries
 
-            settings, removed_legacy_count = remove_known_legacy_hook_entries(settings)
-            if removed_legacy_count:
-                plan.legacy_hook_cleanup_paths.append(str(settings_path))
-        forge_settings = self._load_forge_settings()
-        include_permissions = InstallModule.PERMISSIONS in modules
-        entries = merge(
-            settings,
-            forge_settings,
-            force=force,
-            include_statusline=InstallModule.STATUSLINE in modules,
-            include_hooks=InstallModule.HOOKS in modules,
-            include_permissions=include_permissions,
-            include_env=include_permissions,
-        )
-        write_settings(settings_path, settings)
+                settings, removed_legacy_count = remove_known_legacy_hook_entries(settings)
+                if removed_legacy_count:
+                    plan.legacy_hook_cleanup_paths.append(str(settings_path))
+            forge_settings = self._load_forge_settings()
+            include_permissions = InstallModule.PERMISSIONS in modules
+            entries = merge(
+                settings,
+                forge_settings,
+                force=force,
+                include_statusline=InstallModule.STATUSLINE in modules,
+                include_hooks=InstallModule.HOOKS in modules,
+                include_permissions=include_permissions,
+                include_env=include_permissions,
+            )
+            write_settings(settings_path, settings)
 
-        entry_ids = {(e.key_path, e.stable_id) for e in entries}
-        final_entries = list(entries)
-        if existing:
-            for existing_entry in existing.settings_entries:
-                existing_entry_id = (
-                    existing_entry.key_path,
-                    existing_entry.stable_id,
-                )
-                if existing_entry_id not in entry_ids and existing_entry_id not in removed_entry_ids:
-                    final_entries.append(existing_entry)
+            entry_ids = {(entry.key_path, entry.stable_id) for entry in entries}
+            final_entries = list(entries)
+            if existing:
+                for existing_entry in existing.settings_entries:
+                    existing_entry_id = (
+                        existing_entry.key_path,
+                        existing_entry.stable_id,
+                    )
+                    if existing_entry_id not in entry_ids and existing_entry_id not in removed_entry_ids:
+                        final_entries.append(existing_entry)
 
-        # Save everything Forge still needs to remove on disable before the
-        # potentially long stale-file cleanup walk. This includes legacy entries
-        # preserved for cleanup after scope filtering.
-        added_structure = entries_to_added_structure(final_entries)
-        save_added_settings(settings_path, added_structure)
+            # Save everything Forge still needs to remove on disable before the
+            # potentially long stale-file cleanup walk. This includes legacy entries
+            # preserved for cleanup after scope filtering.
+            added_structure = entries_to_added_structure(final_entries)
+            save_added_settings(settings_path, added_structure)
+        else:
+            final_entries = list(existing.settings_entries) if existing else []
+            if final_entries:
+                settings_path = get_settings_path(self._scope, self._project_root)
+                save_added_settings(settings_path, entries_to_added_structure(final_entries))
 
         # Merge newly installed files with existing tracked files (for idempotent re-runs)
         now = now_iso()
@@ -999,14 +1426,14 @@ class Installer:
         # current plan's target set — meaning no source file maps to that target anymore.
         # Only auto-delete if ownership is verified (symlink target or checksum matches);
         # otherwise drop from manifest silently — the user may have repurposed the path.
-        base_dir = get_target_root(self._scope, self._project_root)
-        dirs_to_clean: set[Path] = set()
+        dirs_to_clean: set[tuple[Path, Path]] = set()
         if existing:
             for existing_file in existing.files:
                 if existing_file.target_path not in planned_targets:
                     target = Path(existing_file.target_path)
                     try:
-                        validate_path_within_boundary(target, base_dir, "remove stale file")
+                        boundary = self._tracked_file_boundary(existing, target, "remove stale file")
+                        validate_path_within_boundary(target, boundary, "remove stale file")
                     except PathBoundaryViolationError:
                         continue
                     if not self._is_forge_owned(target, existing_file):
@@ -1023,12 +1450,12 @@ class Installer:
                         continue
                     # Collect parent dirs for empty-directory cleanup
                     parent = target.parent
-                    while parent != base_dir and parent.is_relative_to(base_dir):
-                        dirs_to_clean.add(parent)
+                    while parent != boundary and parent.is_relative_to(boundary):
+                        dirs_to_clean.add((parent, boundary))
                         parent = parent.parent
 
         # Clean up empty directories left by stale file removal (deepest first)
-        for dir_path in sorted(dirs_to_clean, key=lambda p: len(p.parts), reverse=True):
+        for dir_path, _boundary in sorted(dirs_to_clean, key=lambda item: len(item[0].parts), reverse=True):
             try:
                 dir_path.rmdir()
             except OSError:
@@ -1058,14 +1485,30 @@ class Installer:
         else:
             codex_path, codex_commands = None, []
 
+        final_skill_packages = [
+            InstalledSkillPackage(
+                runtime=package.runtime,
+                skill=package.skill,
+                target_dir=package.target_dir,
+                file_paths=list(package.file_paths),
+            )
+            for package in plan.skill_packages
+            if package.cache_dir is not None
+            and package.target_dir is not None
+            and package.action in {"install", "update", "skip"}
+        ]
+
         installation = Installation(
             scope=self._scope.value,
             mode=mode.value,
             profile=profile.value,
             modules_enabled=[m.value for m in sorted(modules, key=lambda m: m.value)],
             files=final_files,
+            skill_packages=final_skill_packages,
             settings_entries=final_entries,
-            settings_backup_path=str(backup_path) if backup_path else None,
+            settings_backup_path=(
+                str(backup_path) if backup_path else existing.settings_backup_path if existing is not None else None
+            ),
             codex_config_path=codex_path,
             codex_commands=codex_commands,
             installed_at=existing.installed_at if existing else now,
@@ -1105,6 +1548,39 @@ class Installer:
             mode=mode.value,
             installed_at=now_iso(),
         )
+
+    def _tracked_file_boundary(self, installation: Installation, target: Path, operation: str) -> Path:
+        """Return the runtime boundary for a tracked file and validate package ownership.
+
+        Legacy rows have no package grouping and remain constrained to the
+        historical Claude target.  A v2 package row narrows the file to the
+        reviewed runtime root and its exact package directory.
+        """
+
+        target_key = str(target)
+        package_matches = [package for package in installation.skill_packages if target_key in package.file_paths]
+        if not package_matches:
+            return get_target_root(self._scope, self._project_root)
+        if len(package_matches) != 1:
+            raise PathBoundaryViolationError(target_key, "one tracked skill package", operation)
+
+        package = package_matches[0]
+        try:
+            runtime_root = _runtime_skill_root(package.runtime, self._scope, self._project_root)
+        except (KeyError, ValueError) as e:
+            raise PathBoundaryViolationError(
+                target_key, f"known {self._scope.value} runtime skill root", operation
+            ) from e
+        expected_package_dir = runtime_root / package.skill
+        validate_path_within_boundary(expected_package_dir, runtime_root, operation)
+
+        tracked_package_dir = Path(package.target_dir)
+        expected_location = expected_package_dir.parent.resolve() / expected_package_dir.name
+        tracked_location = tracked_package_dir.parent.resolve() / tracked_package_dir.name
+        if tracked_location != expected_location:
+            raise PathBoundaryViolationError(target_key, str(expected_package_dir), operation)
+        validate_path_within_boundary(target, expected_package_dir, operation)
+        return runtime_root
 
     @staticmethod
     def _is_forge_owned(target: Path, record: InstalledFile) -> bool:
@@ -1151,14 +1627,46 @@ class Installer:
         if existing is None:
             raise NotInstalledError(self._scope.value)
 
-        # Use exact modules from existing installation
         existing_modules = {InstallModule(m) for m in existing.modules_enabled}
+        managed_runtime_ids = self._managed_skill_runtime_ids(existing, existing_modules)
 
         return self.init(
             profile=InstallProfile(existing.profile),
             mode=InstallMode(existing.mode),
             force=force,
             _modules_override=existing_modules,
+            _managed_runtime_ids=managed_runtime_ids,
+        )
+
+    def plan_update(self, force: bool = False) -> InstallPlan:
+        """Plan sync using the persisted runtime set without applying changes."""
+
+        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
+        if existing is None:
+            raise NotInstalledError(self._scope.value)
+        existing_modules = {InstallModule(module) for module in existing.modules_enabled}
+        managed_runtime_ids = self._managed_skill_runtime_ids(existing, existing_modules)
+        return self.plan(
+            profile=InstallProfile(existing.profile),
+            mode=InstallMode(existing.mode),
+            force=force,
+            _modules_override=existing_modules,
+            _managed_runtime_ids=managed_runtime_ids,
+        )
+
+    def _managed_skill_runtime_ids(
+        self,
+        existing: Installation,
+        modules: set[InstallModule],
+    ) -> tuple[str, ...] | None:
+        if InstallModule.SKILLS not in modules:
+            return None
+        packages = {(package.runtime, package.skill) for package in existing.skill_packages}
+        packages |= _legacy_claude_skill_packages(existing, self._scope, self._project_root)
+        return tuple(
+            runtime
+            for runtime in (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
+            if any(package_runtime == runtime for package_runtime, _skill in packages)
         )
 
     def uninstall(self) -> None:
@@ -1171,62 +1679,67 @@ class Installer:
         if existing is None:
             raise NotInstalledError(self._scope.value)
 
-        dirs_to_clean: set[Path] = set()
         base_dir = get_target_root(self._scope, self._project_root)
-
+        removals: list[tuple[InstalledFile, Path, Path]] = []
         for file_record in existing.files:
             target = Path(file_record.target_path)
-            # Security: validate path is within expected boundary
-            validate_path_within_boundary(target, base_dir, "delete file")
+            boundary = self._tracked_file_boundary(existing, target, "delete file")
+            validate_path_within_boundary(target, boundary, "delete file")
+            removals.append((file_record, target, boundary))
+
+        settings_path = get_settings_path(self._scope, self._project_root)
+        backup_files = find_backup_files(settings_path)
+        added_files = find_added_files(settings_path)
+        has_settings_state = bool(existing.settings_entries or existing.settings_backup_path or added_files)
+        if has_settings_state:
+            validate_path_within_boundary(settings_path, base_dir, "delete settings")
+            for added_file in added_files:
+                validate_path_within_boundary(added_file, base_dir, "delete added file")
+
+        dirs_to_clean: set[tuple[Path, Path]] = set()
+        for _file_record, target, boundary in removals:
             if target.exists() or target.is_symlink():
                 target.unlink()
             parent = target.parent
-            while parent != base_dir and parent.is_relative_to(base_dir):
-                dirs_to_clean.add(parent)
+            while parent != boundary and parent.is_relative_to(boundary):
+                dirs_to_clean.add((parent, boundary))
                 parent = parent.parent
 
         # Clean up empty directories (deepest first)
-        for dir_path in sorted(dirs_to_clean, key=lambda p: len(p.parts), reverse=True):
+        for dir_path, _boundary in sorted(dirs_to_clean, key=lambda item: len(item[0].parts), reverse=True):
             try:
                 dir_path.rmdir()
             except OSError:
                 pass  # Directory not empty or doesn't exist
 
-        settings_path = get_settings_path(self._scope, self._project_root)
-        backup_files = find_backup_files(settings_path)
-        added_files = find_added_files(settings_path)
+        if has_settings_state:
+            current = read_settings(settings_path)
+            backup = read_settings(backup_files[0]) if backup_files else {}
+            added = load_added_settings(settings_path)  # Already finds most recent
 
-        current = read_settings(settings_path)
-        backup = read_settings(backup_files[0]) if backup_files else {}
-        added = load_added_settings(settings_path)  # Already finds most recent
+            if added:
+                # Use smart unmerge: removes our additions, preserves user changes
+                result = smart_unmerge(current, backup, added)
+                result = cleanup_empty_settings(result)
 
-        if added:
-            # Use smart unmerge: removes our additions, preserves user changes
-            result = smart_unmerge(current, backup, added)
-            result = cleanup_empty_settings(result)
-
-            backup_cleaned = cleanup_empty_settings(backup)
-            if settings_equal(result, backup_cleaned):
-                if backup_files and backup_cleaned:
-                    # Had content before, restore it (use cleaned for consistency)
-                    write_settings(settings_path, backup_cleaned)
-                elif settings_path.is_file():
-                    # Was empty/non-existent before, delete
-                    # Security: validate settings path is within expected boundary
-                    validate_path_within_boundary(settings_path, base_dir, "delete settings")
-                    settings_path.unlink()
+                backup_cleaned = cleanup_empty_settings(backup)
+                if settings_equal(result, backup_cleaned):
+                    if backup_files and backup_cleaned:
+                        # Had content before, restore it (use cleaned for consistency)
+                        write_settings(settings_path, backup_cleaned)
+                    elif settings_path.is_file():
+                        # Was empty/non-existent before, delete
+                        settings_path.unlink()
+                else:
+                    write_settings(settings_path, result)
             else:
-                write_settings(settings_path, result)
-        else:
-            # Fallback to old unmerge if no .forge-added file
-            unmerge(current, existing.settings_entries)
-            write_settings(settings_path, current)
+                # Fallback to old unmerge if no .forge-added file
+                unmerge(current, existing.settings_entries)
+                write_settings(settings_path, current)
 
-        # Clean up .forge.added files only (keep .forge.backup files for history)
-        for added_file in added_files:
-            # Security: validate added file path is within expected boundary
-            validate_path_within_boundary(added_file, base_dir, "delete added file")
-            added_file.unlink()
+            # Clean up .forge.added files only (keep .forge.backup files for history)
+            for added_file in added_files:
+                added_file.unlink()
 
         self._remove_codex_registration(existing)
 

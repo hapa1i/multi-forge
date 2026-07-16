@@ -29,6 +29,8 @@ from .models import (
     InstallProfile,
     InstallScope,
     SettingsPlan,
+    SkillPackagePlan,
+    SkillPackageStatus,
 )
 
 __all__ = [
@@ -46,6 +48,8 @@ __all__ = [
     # Plan dataclasses
     "FilePlan",
     "SettingsPlan",
+    "SkillPackagePlan",
+    "SkillPackageStatus",
     "InstallPlan",
     # Exceptions
     "ForgeInstallError",

@@ -175,12 +175,26 @@ class TestVersionGateOnExtensionsSync:
         from click.testing import CliRunner
 
         from forge.cli.extensions import extensions
+        from forge.install.models import InstallPlan, InstallScope
 
         monkeypatch.chdir(tmp_path)
         (tmp_path / ".claude").mkdir()
 
-        with patch("forge.install.version.get_claude_runtime_version", return_value="2.1.70"):
+        preview = InstallPlan(scope="local", mode="copy", profile="minimal", requires_claude_version=True)
+        with (
+            patch(
+                "forge.install.version.get_claude_runtime_version",
+                return_value="2.1.70",
+            ),
+            patch(
+                "forge.cli.extensions.find_forge_installation",
+                return_value=(InstallScope.LOCAL, tmp_path),
+            ),
+            patch("forge.cli.extensions.Installer") as installer_class,
+        ):
+            installer_class.return_value.plan_update.return_value = preview
             runner = CliRunner()
             result = runner.invoke(extensions, ["sync"])
             assert result.exit_code != 0
             assert "below" in result.output or "2.1.70" in result.output
+            installer_class.return_value.update.assert_not_called()

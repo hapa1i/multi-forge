@@ -301,6 +301,7 @@ class TestEnableFailureCleanup:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
             runner = CliRunner()
@@ -340,7 +341,9 @@ class TestEnableProjectRegistry:
             patch("forge.cli.extensions.Installer") as MockInstaller,
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
-            MockInstaller.return_value.init.return_value = self._successful_plan()
+            plan = self._successful_plan()
+            MockInstaller.return_value.plan.return_value = plan
+            MockInstaller.return_value.init.return_value = plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
 
@@ -357,7 +360,9 @@ class TestEnableProjectRegistry:
             patch("forge.cli.extensions.Installer") as MockInstaller,
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
-            MockInstaller.return_value.init.return_value = self._successful_plan()
+            plan = self._successful_plan()
+            MockInstaller.return_value.plan.return_value = plan
+            MockInstaller.return_value.init.return_value = plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, ["--scope", "user"])
 
@@ -634,6 +639,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
 
@@ -674,6 +680,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
 
@@ -711,6 +718,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, [])
@@ -1136,7 +1144,20 @@ class TestCleanupProject:
         selected_settings = selected / ".claude" / "settings.json"
         selected_settings.write_text(
             json.dumps(
-                {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "forge hook session-start"}]}]}}
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge hook session-start",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
             ),
             encoding="utf-8",
         )
@@ -1392,8 +1413,14 @@ class TestCleanupProject:
             enrollment_created=False,
             user_codex_action="update",
         )
-        monkeypatch.setattr("forge.cli.extensions.plan_project_hook_migration", lambda _root: preview_plan)
-        monkeypatch.setattr("forge.cli.extensions.apply_project_hook_migration", lambda _root: applied_result)
+        monkeypatch.setattr(
+            "forge.cli.extensions.plan_project_hook_migration",
+            lambda _root: preview_plan,
+        )
+        monkeypatch.setattr(
+            "forge.cli.extensions.apply_project_hook_migration",
+            lambda _root: applied_result,
+        )
 
         result = CliRunner().invoke(
             extensions,

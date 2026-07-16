@@ -343,6 +343,35 @@ class CodexPlan:
 
 
 @dataclass
+class SkillPackagePlan:
+    """Plan summary for one runtime-specific skill package."""
+
+    runtime: str
+    skill: str
+    action: str
+    target_dir: str | None = None
+    cache_dir: str | None = None
+    file_paths: list[str] = field(default_factory=list)
+    reason: str | None = None
+    duplicate_dirs: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SkillPackageStatus:
+    """Observed state for one tracked runtime-specific skill package."""
+
+    runtime: str
+    skill: str
+    target_dir: str
+    state: str
+    target_present: bool
+    file_paths: tuple[str, ...] = ()
+    missing_file_paths: tuple[str, ...] = ()
+    duplicate_dirs: tuple[str, ...] = ()
+    recovery: str | None = None
+
+
+@dataclass
 class InstallPlan:
     """Complete installation plan.
 
@@ -353,6 +382,7 @@ class InstallPlan:
         modules: List of modules being installed.
         files: List of file operations.
         settings: List of settings operations.
+        skill_packages: Runtime-specific package planning outcomes.
         codex: Codex hook registration plan (None when module not selected).
         legacy_hook_cleanup_paths: User settings files whose legacy direct hooks
             were removed while executing this plan.
@@ -366,7 +396,9 @@ class InstallPlan:
     modules: list[str] = field(default_factory=list)
     files: list[FilePlan] = field(default_factory=list)
     settings: list[SettingsPlan] = field(default_factory=list)
+    skill_packages: list[SkillPackagePlan] = field(default_factory=list)
     codex: CodexPlan | None = None
     legacy_hook_cleanup_paths: list[str] = field(default_factory=list)
     has_conflicts: bool = False
     conflicts: list[str] = field(default_factory=list)
+    requires_claude_version: bool = False
