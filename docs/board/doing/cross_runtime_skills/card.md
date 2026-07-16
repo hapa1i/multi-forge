@@ -1,8 +1,14 @@
 # cross_runtime_skills -- run Forge skills under Codex (and other Agent-Skills runtimes), not just Claude Code
 
-**Lane**: `proposed/` -- design sketch, not yet accepted for execution. Relates to the runtime-abstraction lineage
-(`core/runtime/registry.py`; `done/codex_frontend/`, `done/runtime_abstraction/`) and the installer/scope redesign in
-[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md).
+**Lane**: `doing/` -- activated 2026-07-16 for planning and checklist review. Production implementation is held until
+the checklist's Phase 0 decisions are reviewed and approved.
+
+**Branch**: `cross-runtime-skills`. Execution plan: [`checklist.md`](checklist.md).
+
+This is a standalone follow-up to the shipped runtime-abstraction lineage (`core/runtime/registry.py`;
+`done/codex_frontend/`, `done/runtime_abstraction/`) and the closed installer/scope redesign in
+[`epic_global_forge_runtime`](../../done/epic_global_forge_runtime/card.md). It consumes those contracts but cannot join
+the closed epic as a live member.
 
 **Type**: portability + install-surface work, structured as a **compile model, not a strip pass**: neutral skill content
 
@@ -112,7 +118,7 @@ from Codex, until the engine dispatches through the runtime registry. Likely its
    convention). Align the binding surface with `RuntimeSpec`.
 3. **Layer-3 build + install**: extend the `SKILLS` module to compose + write per runtime -- Claude to
    `.claude/skills/`, Codex to `.agents/skills` / `$HOME/.agents/skills` (**not** `$CODEX_HOME`). Track per runtime in
-   `installed.json`. Prefer riding the installer/scope work in `epic_global_forge_runtime`.
+   `installed.json`, building on the contracts already shipped by `epic_global_forge_runtime`.
 4. **Model skills in `RuntimeSpec`**: add `skill_scopes`, with **per-runtime values, not a mirror of `install_scopes`**.
    Codex skills are **user (`$HOME/.agents/skills`) + project (`.agents/skills`, shared/committed)**; Codex has no
    analog to Forge's personal-per-project `local`, so `local` is **unsupported** for Codex skills (or a named untracked
@@ -141,7 +147,8 @@ from Codex, until the engine dispatches through the runtime registry. Likely its
 4. **Confirm the Codex scan chain** (`/etc/codex/skills`, bundled) with a real `codex >= 0.141.0` probe; map
    `.agents/skills` / `$HOME/.agents/skills` onto Forge's user/project/local scopes.
 5. **Argument model** per skill (task-text vs `$`-mention for `--code`/`--models`).
-6. **Axis 2 + epic membership**: own card? reuse `CodexHeadlessInvoker`? does layer 3 join `epic_global_forge_runtime`?
+6. **Axis 2 disposition**: confirm it becomes a separate card, whether it reuses `CodexHeadlessInvoker`, and which
+   runtime-neutral worker contract it needs. `epic_global_forge_runtime` is closed and is not a membership option.
 
 ## Blast radius / risks
 
