@@ -1,7 +1,7 @@
 # cross_runtime_skills -- run Forge skills under Codex (and other Agent-Skills runtimes), not just Claude Code
 
-**Lane**: `doing/` -- activated 2026-07-16 for planning and checklist review. Production implementation is held until
-the checklist's Phase 0 decisions are reviewed and approved.
+**Lane**: `doing/` -- activated 2026-07-16; the reviewed checklist was approved for execution on 2026-07-16. Keep the
+card in `doing/` after implementation and verification until the user reviews the result.
 
 **Branch**: `cross-runtime-skills`. Execution plan: [`checklist.md`](checklist.md).
 
@@ -90,22 +90,25 @@ leak `subagent_type: Explore`, so that extraction is the concrete first task.
 | `name: forge:<x>`                                                                                                      | **non-conformant** (colon; `!=` dir) -- rejected/mis-matched                                                                              | layer 2 emits the runtime's `name`: Claude keeps `forge:<x>`; spec/Codex gets dir-matching `<x>`                                                                                 |
 | Claude-only keys: `disable-model-invocation`, `argument-hint`, `context`, `effort`, `agent`, `hooks`, `user-invocable` | **not in the spec allowlist** (packager may reject)                                                                                       | layer 2 **omits** them from the spec/Codex build (non-policy extras -> `metadata`); `disable-model-invocation` -> `agents/openai.yaml` `policy.allow_implicit_invocation: false` |
 | `allowed-tools: Read, Grep, Glob, Bash, Agent`                                                                         | **spec field**, but Forge's value is comma-style Claude tool names; the spec wants space-separated, and it's experimental (Codex ignores) | layer 2 rewrites to space-separated + reconciles values, **or** omits it (experimental)                                                                                          |
-| `${CLAUDE_SKILL_DIR}/...`                                                                                              | **unresolved**                                                                                                                            | layer-1 relative `resources/x.md` + a layer-2 path convention                                                                                                                    |
+| read-only `${CLAUDE_SKILL_DIR}/resources/...` references                                                               | **no variable**, but Codex is told the selected `SKILL.md` path                                                                            | layer 1 names a package-relative resource; layer 2 tells the runtime to resolve it from the selected skill root                                                                  |
+| executable `${CLAUDE_SKILL_DIR}/scripts/...` references                                                                | **no variable and shell CWD remains the repository**                                                                                       | distinct packaged-script capability; the Codex binding resolves against the loaded `SKILL.md` parent before execution                                                           |
 | `$ARGUMENTS`                                                                                                           | **no substitution**                                                                                                                       | layer-1 "read the task"/capability; layer 2 binds the arg source                                                                                                                 |
 | inline `` !`forge ...` `` pre-step                                                                                     | **inert text**                                                                                                                            | layer-1 capability ("resolve model family"), pinned + **all three family branches tested**; not "just run it"                                                                    |
 | `subagent_type: "Explore"` / `Agent` in rubrics                                                                        | absent                                                                                                                                    | layer-1 "explore" capability; layer-2 binds (Claude `Agent`/`Explore` vs Codex-native)                                                                                           |
 | `AskUserQuestion`, `Write`, `$CLAUDE_SESSION_ID`                                                                       | absent                                                                                                                                    | per-skill capability/degrade                                                                                                                                                     |
 
-**Slice by coupling depth.** `challenge` (no resources, no `forge` call) and `smoke-test` (one bundled script) are
-near-neutral -- ship them first to prove the template+build pipeline. `review` / `understand` / `review-docs` carry the
-behavioral coupling in their rubrics -- their layer-1 neutralization is the substantive work.
+**Slice by coupling depth.** `challenge` and `smoke-test` are shallow-coupling candidates, not neutral artifacts:
+`challenge` needs an argument binding, while `smoke-test` needs both packaged-script resolution and runtime-specific
+install-home probes. The approved sequence proves those bindings first, then migrates `review`, `understand`, and
+`review-docs`; the rubric neutralization remains the substantive layer-1 work.
 
 ## Axis 2 -- fan-out worker runtime (a separate engine change)
 
 `panel`, `analyze`, `debate`, `consensus` shell out to `forge workflow`, whose engine **hardwires `claude -p` workers**
 (`review/engine.py:283`, hard binary requirement `:64-67`). A `CodexHeadlessInvoker` exists (`core/invoker/__init__.py`)
 but `review/engine.py` does **not** use it -- so these skills need `claude` on PATH for their workers even when driven
-from Codex, until the engine dispatches through the runtime registry. Likely its own card.
+from Codex, until the engine dispatches through the runtime registry. That engine change is tracked separately in
+[`runtime_neutral_workflow_workers`](../../proposed/runtime_neutral_workflow_workers/card.md).
 
 ## Target shape
 
@@ -123,8 +126,11 @@ from Codex, until the engine dispatches through the runtime registry. Likely its
    Codex skills are **user (`$HOME/.agents/skills`) + project (`.agents/skills`, shared/committed)**; Codex has no
    analog to Forge's personal-per-project `local`, so `local` is **unsupported** for Codex skills (or a named untracked
    convention) -- never mapped onto the shared `.agents/skills`.
-5. **(Axis 2, likely separate)** route the fan-out engine's workers through the runtime registry /
-   `CodexHeadlessInvoker`.
+5. **Runtime selection**: `forge extension enable --runtime <claude|codex|all>` selects skill-package targets; the
+   default keeps Claude and adds detected Codex, while sync preserves the tracked managed set instead of deleting a
+   package when a runtime temporarily disappears from `PATH`.
+6. **(Axis 2, separate)** route the fan-out engine's workers through the runtime registry / `CodexHeadlessInvoker` in
+   `runtime_neutral_workflow_workers`.
 
 ## Non-goals / must-not-break
 
@@ -133,22 +139,40 @@ from Codex, until the engine dispatches through the runtime registry. Likely its
 - **No family x runtime blow-up** -- runtime binding stays in layer 2, never in the family variants.
 - **Not the manual-test skills** -- `walkthrough` / `qa` orchestrate Claude Code *itself* (`AskUserQuestion` loop,
   agent-adjudicated checklist, `docker exec`); Claude-by-nature.
-- **Axis 2 may be deferred** -- ship the near-neutral skills Codex-native first; document that fan-out skills still need
-  `claude` for workers.
+- **Not sidecar parity** -- sidecars launch Claude, preserve project-scoped Claude skill visibility through the mounted
+  workspace, and do not gain host-user skill mounts or a Codex runtime in this card.
+- **Axis 2 is deferred** -- `panel`, `analyze`, `debate`, and `consensus` remain Claude-only until the separate worker
+  dispatch card ships; do not label a Claude-worker frontend Codex-native.
+- **No plugin marketplace expansion** -- Forge's direct filesystem installer remains the delivery surface. A reusable
+  Codex plugin artifact is separate distribution work.
 
-## Open questions / decisions owed
+## Ratified Phase 0 decisions
 
-1. **`name` reconciliation.** Per-runtime `name` (Claude `forge:<x>`, Codex `<x>`) is the recommendation; confirm Claude
-   still namespaces `/forge:<x>` when the source of truth is a template, not a checked-in `SKILL.md`.
-2. **Authoring ergonomics.** Where does the neutral content live -- one `content.md` + `template.{claude,codex}.yaml`
-   per skill, or a single annotated `SKILL.md` the build parses? Keep "edit one file" cheap for contributors.
-3. **How thin can layer 2 be?** For near-neutral skills a template is just frontmatter; for behavioral skills it also
-   carries capability bindings. Is one adapter interface enough for both?
-4. **Confirm the Codex scan chain** (`/etc/codex/skills`, bundled) with a real `codex >= 0.141.0` probe; map
-   `.agents/skills` / `$HOME/.agents/skills` onto Forge's user/project/local scopes.
-5. **Argument model** per skill (task-text vs `$`-mention for `--code`/`--models`).
-6. **Axis 2 disposition**: confirm it becomes a separate card, whether it reuses `CodexHeadlessInvoker`, and which
-   runtime-neutral worker contract it needs. `epic_global_forge_runtime` is closed and is not a membership option.
+1. **Card shape.** Keep Axis 1 in this card with reviewable compiler, installer/tracking, and migration commits; do not
+   reopen the closed `epic_global_forge_runtime`.
+2. **Authoring source.** Portable skills use one typed manifest plus neutral templated content/resources. Generated
+   Claude and Codex packages are adapter outputs, never independently edited sources. Claude-only skills may retain the
+   legacy direct package shape until they gain another runtime.
+3. **Generated artifacts.** Compilation is deterministic and installer-facing. Copy mode writes compiled bytes; symlink
+   mode may point only to a stable Forge-managed compiled cache, never a temporary directory.
+4. **Adapter contract.** One typed adapter interface owns frontmatter, names, invocation policy, task arguments,
+   package-relative resource/script resolution, model-family selection, exploration/subagents, user interaction, and
+   Forge CLI bindings. Missing required bindings fail compilation.
+5. **Runtime/scope model.** `RuntimeSpec.skill_scopes` is independent of `install_scopes`. Claude supports
+   user/project/local; Codex supports user/project only. Codex local is an explicit unsupported package result, never a
+   write to shared `.agents/skills`.
+6. **Names and invocation.** Claude keeps `forge:<skill>` and `/forge:<skill>`; Codex emits directory-matching `<skill>`
+   and uses explicit `$<skill>` task text. `disable-model-invocation` maps only to the matching
+   `agents/openai.yaml` implicit-invocation policy.
+7. **Delivery and duplicates.** Forge remains the direct installer. It never overwrites or deletes an untracked
+   same-name Codex skill. A duplicate elsewhere in the Codex scan chain is surfaced explicitly; an automatic target may
+   skip, while an explicitly requested Codex target fails for recovery.
+8. **Migration tranches.** Prove `challenge` task arguments and `smoke-test` packaged-script/install-home bindings, then
+   migrate `review`, `review-docs`, and `understand`. `walkthrough`, `qa`, and the four Claude-worker workflow frontends
+   remain Claude-only in this card.
+9. **Probe fact (Codex CLI 0.144.5).** Codex loads the selected `SKILL.md` by absolute path, exposes no skill-root
+   environment variable, and executes a literal `bash scripts/x.sh` from the repository CWD. A binding that tells Codex
+   to resolve `scripts/x.sh` against the loaded `SKILL.md` parent produces and executes the correct absolute path.
 
 ## Blast radius / risks
 
@@ -166,12 +190,13 @@ from Codex, until the engine dispatches through the runtime registry. Likely its
 
 ## Metric / falsifiable prediction
 
-After layer-1+2+3 for the near-neutral skills, `forge extension enable` on a Codex machine makes `challenge` (then
-`review`/`understand` after rubric neutralization) run **Codex-native** -- no `claude -p`. **The gate validates the
-whole built package** (`SKILL.md` + `resources/` + `references/` + `agents/openai.yaml`): falsifiers -- any file
-contains `${CLAUDE_SKILL_DIR}`, `$ARGUMENTS`, `subagent_type: "Explore"`, or a Claude-only top-level frontmatter key;
-`name` fails spec validation; or the skill is absent from Codex's `/skills`. Fan-out skills (`panel`, `debate`) are
-predicted to still need `claude` for workers until Axis 2 -- a scoped limitation, not a regression.
+After layers 1--3 for the approved portable tranche, `forge extension enable` on a Codex machine makes `challenge`,
+`smoke-test`, `review`, `review-docs`, and `understand` discoverable and explicitly invocable as Codex-native skills --
+no `claude -p`. **The gate validates the whole built package** (`SKILL.md` + `resources/` + `references/` +
+`scripts/` + `agents/openai.yaml`): falsifiers -- a Codex package leaks `${CLAUDE_SKILL_DIR}`, `$ARGUMENTS`,
+`subagent_type: "Explore"`, or a Claude-only top-level frontmatter key; `name` fails spec validation; a packaged script
+depends on process CWD; or the skill is absent from Codex discovery. The four fan-out frontends remain Claude-only until
+Axis 2; that is an explicit boundary rather than a Codex-native claim.
 
 ## References
 

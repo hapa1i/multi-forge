@@ -2,16 +2,14 @@
 
 **Branch**: `cross-runtime-skills` · **Card**: [`card.md`](card.md) · **Activated**: 2026-07-16
 
-> **Review draft.** The card is active for planning and review only. Do not edit production code, generated skill
-> packages, installer state, or normative design docs until the Phase 0 decisions and resulting execution shape are
-> approved by the user.
+> **Execution approved 2026-07-16.** Implement and verify the ratified shape below, but keep this card in `doing/` after
+> completion until the user reviews the result.
 
 ## Current focus
 
-Activate the card, correct its stale assumptions against the current repository and public specifications, and obtain
-human approval for the decomposition and contracts below. The card is large enough to be an epic: neutral authoring,
-runtime compilation, installer/tracking lifecycle, and behavioral-skill migration can ship independently. Phase 0 must
-decide whether this directory becomes an epic coordinator with member cards before implementation begins.
+Execute the approved Axis 1 contract: a typed neutral compiler, runtime-specific skill targets and tracking, and the
+portable skill tranche. Keep Axis 2 worker dispatch and all other explicit scope boundaries separate, and retain the
+card in the active lane for post-implementation review.
 
 ## Scope boundary for review
 
@@ -64,55 +62,56 @@ decide whether this directory becomes an epic coordinator with member cards befo
 - [x] Move the card with `git mv` from `proposed/cross_runtime_skills/` to `doing/cross_runtime_skills/`.
 - [x] Update the card lane, branch, activation posture, closed-epic relationship, and checklist link.
 - [x] Repoint the inbound board reference in `done/epic_global_forge_runtime/checklist.md` to the active lane.
-- [ ] **Human review gate:** approve or revise Phase 0 before any production implementation.
+- [x] **Human review gate:** user approved Phase 0 and execution on 2026-07-16, with a required review hold in `doing/`
+  after completion.
 
 ## Phase 0 -- decisions and decomposition (blocking)
 
-- [ ] **Card shape:** decide whether Axis 1 remains one card or becomes `epic_cross_runtime_skills` with independently
+- [x] **Card shape:** decide whether Axis 1 remains one card or becomes `epic_cross_runtime_skills` with independently
   shippable member cards. If split, define member boundaries and sequencing, create the member cards, and update every
   link before production edits.
   - _Recommendation for review:_ coordinate neutral-authoring/compiler, installer/runtime/tracking, and skill-migration
     slices separately. They have distinct rollback and verification boundaries.
-- [ ] **Axis 2:** confirm fan-out worker-runtime dispatch is a separate proposed card. Record the boundary here and in
+- [x] **Axis 2:** confirm fan-out worker-runtime dispatch is a separate proposed card. Record the boundary here and in
   that card; do not let Axis 1 imply that a Codex-hosted `panel` has Codex workers.
-- [ ] **Authoring source:** choose the single editable source shape, such as neutral `content.md` plus runtime adapter
+- [x] **Authoring source:** choose the single editable source shape, such as neutral `content.md` plus runtime adapter
   data, or a typed/annotated source parsed by the compiler. Reject any design that asks contributors to edit generated
   Claude and Codex `SKILL.md` files independently.
   - _Assertion:_ one author edit changes both packages through a deterministic build; generated artifacts identify their
     source and are never accepted as an independent source of truth.
-- [ ] **Generated-artifact policy:** decide whether runtime packages are built in memory during install, materialized in
+- [x] **Generated-artifact policy:** decide whether runtime packages are built in memory during install, materialized in
   a package-data build directory, or checked in. Account for copy and symlink install modes: no tracked symlink may
   point into an ephemeral build directory.
-- [ ] **Capability vocabulary:** define the smallest neutral vocabulary for task arguments, read-only resource loading,
+- [x] **Capability vocabulary:** define the smallest neutral vocabulary for task arguments, read-only resource loading,
   packaged script execution/skill-root resolution, model family selection, exploration/subagents, invocation policy,
   user interaction, and Forge CLI calls. Treat executable resolution as a first-class binding rather than assuming it
   follows prose-link behavior. Specify which capabilities may degrade, which exclude a runtime, and which fail
   compilation.
-- [ ] **Adapter interface:** decide whether one typed adapter covers shallow frontmatter/path transforms and behavioral
+- [x] **Adapter interface:** decide whether one typed adapter covers shallow frontmatter/path transforms and behavioral
   capability bindings. Keep runtime bindings outside model-family resources.
   - _Assertion:_ adding a runtime does not create `*-<family>-<runtime>.md` files.
-- [ ] **Runtime capability shape:** define `RuntimeSpec.skill_scopes` or an equivalent per-feature declaration rather
+- [x] **Runtime capability shape:** define `RuntimeSpec.skill_scopes` or an equivalent per-feature declaration rather
   than overloading `install_scopes`. Specify runtime values independently.
-- [ ] **Scope mapping and privacy:** ratify Codex `user -> $HOME/.agents/skills` and
+- [x] **Scope mapping and privacy:** ratify Codex `user -> $HOME/.agents/skills` and
   `project -> <forge_root>/.agents/skills`; reject or explicitly define Forge `local` for Codex. Never map personal
   local scope onto a shared/committed project directory.
-- [ ] **Delivery surface:** reconcile direct filesystem installation with the current Codex recommendation to use
+- [x] **Delivery surface:** reconcile direct filesystem installation with the current Codex recommendation to use
   plugins for reusable distribution. Decide whether Forge remains the installer for locally built cross-runtime
   packages, additionally emits a plugin, or splits plugin distribution into later work.
-- [ ] **Name and invocation model:** ratify per-runtime names (`forge:<skill>` for Claude, directory-matching `<skill>`
+- [x] **Name and invocation model:** ratify per-runtime names (`forge:<skill>` for Claude, directory-matching `<skill>`
   for Codex/spec) and define how users invoke each without promising a shared textual namespace that the runtimes do not
   support.
-- [ ] **Arguments:** probe explicit `$skill-name ...` task delivery under current Codex and define the neutral argument
+- [x] **Arguments:** probe explicit `$skill-name ...` task delivery under current Codex and define the neutral argument
   contract. Do not assume Claude's `$ARGUMENTS` substitution exists.
-- [ ] **Packaged script invocation:** from an arbitrary nested repository CWD, probe whether Codex exposes a selected
+- [x] **Packaged script invocation:** from an arbitrary nested repository CWD, probe whether Codex exposes a selected
   skill-root variable, anchors relative executable paths to the selected package, or needs an installer/runtime-created
   absolute binding. Prove that `smoke-test` executes the exact installed user- or project-scope script without depending
   on the source checkout or process CWD. Classify its internal Claude-home probes separately from locating the script.
 - [ ] **Invocation policy:** map Claude `disable-model-invocation` semantics to Codex
   `agents/openai.yaml::policy.allow_implicit_invocation` only where behavior truly matches; document mismatches.
-- [ ] **Duplicate discovery:** define conflict behavior when the same built skill name exists at multiple Codex scan
+- [x] **Duplicate discovery:** define conflict behavior when the same built skill name exists at multiple Codex scan
   levels. Enable/sync must not create ambiguous duplicate selectors silently.
-- [ ] **First tranche:** choose it from a whole-package coupling inventory, not from the original near-neutral labels.
+- [x] **First tranche:** choose it from a whole-package coupling inventory, not from the original near-neutral labels.
   Classify at least:
   - instruction/argument coupling (`challenge`),
   - script/path/install coupling (`smoke-test`),
@@ -124,7 +123,7 @@ decide whether this directory becomes an epic coordinator with member cards befo
   reload expectations. Build the reproducible harness under `scripts/experiments/codex-skills/`, following the
   `codex-hooks` precedent with a README, versioned preflight, named stages, and sanitized committed verdicts rather than
   raw captures.
-- [ ] Record all ratified decisions in the card, revise the later phases to match, and obtain explicit approval to lift
+- [x] Record all ratified decisions in the card, revise the later phases to match, and obtain explicit approval to lift
   the implementation hold. Reconcile the card's `${CLAUDE_SKILL_DIR}` Axis 1 row, **Slice by coupling depth**,
   **Non-goals / must-not-break**, and **Metric / falsifiable prediction** explicitly; none may retain the unproved
   `challenge`/`smoke-test` first-tranche commitment.
