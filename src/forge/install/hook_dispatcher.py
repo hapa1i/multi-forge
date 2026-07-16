@@ -636,17 +636,21 @@ def _diagnose_dev_override(
 
 
 def _has_user_installation() -> bool:
-    """Best-effort: is a user-scope extension installation tracked?
+    """Best-effort: does the tracked user install require the dispatcher?
 
     The dispatcher is user-scoped, so an unrelated project installation must
     not select ``sync``: bare sync cannot discover that installation from an
-    arbitrary working directory. Corrupt/unreadable tracking keeps the
-    user-sync advice so the command surfaces the existing reset path.
+    arbitrary working directory. A skills-only user install deliberately does
+    not render the dispatcher, so its recovery must name an enable command that
+    adds runtime hooks instead of an ineffective skills-only sync. Corrupt or
+    unreadable tracking keeps the user-sync advice so the command surfaces the
+    existing reset path.
     """
     try:
         from .tracking import TrackingStore
 
-        return TrackingStore().has_installation("user")
+        installation = TrackingStore().get_installation("user")
+        return installation is not None and any(module != "skills" for module in installation.modules_enabled)
     except Exception:  # Diagnosis must never raise; degrade to the sync advice.
         return True
 
