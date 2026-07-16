@@ -855,6 +855,37 @@ def test_enable_codex_only_skips_claude_version_gate_and_claude_directory(
     assert "forge claude preset edit" not in result.output
 
 
+@pytest.mark.parametrize("scope", (InstallScope.USER, InstallScope.PROJECT, InstallScope.LOCAL))
+def test_minimal_profile_preserves_legacy_claude_anchor_when_commands_are_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scope: InstallScope,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("CLAUDE_HOME", str(home / ".claude"))
+    project = tmp_path / "repo" if scope != InstallScope.USER else None
+    if project is not None:
+        project.mkdir()
+    extensions_root = tmp_path / "extensions"
+    (extensions_root / "commands").mkdir(parents=True)
+    tracking = TrackingStore()
+
+    with (
+        patch("forge.install.installer.get_extensions_root", return_value=extensions_root),
+        patch("forge.install.installer._ensure_hook_dispatcher"),
+    ):
+        plan = Installer(scope=scope, project_root=project, tracking_store=tracking).init(
+            profile=InstallProfile.MINIMAL,
+            mode=InstallMode.COPY,
+        )
+
+    expected = home / ".claude" if project is None else project / ".claude"
+    assert plan.requires_claude_version
+    assert expected.is_dir()
+
+
 def test_runtime_option_filters_skills_but_mixed_profile_still_runs_claude_gate(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

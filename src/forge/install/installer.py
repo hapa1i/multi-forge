@@ -714,6 +714,14 @@ class Installer:
         target_root = get_target_root(self._scope, self._project_root)
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
 
+        # The legacy file-module contract creates the Claude anchor even when a
+        # selected source directory currently contains no installable files
+        # (the minimal profile's commands directory is intentionally empty).
+        # A skills-only Codex plan has no legacy file modules and therefore
+        # remains free of unrelated .claude writes and version gating.
+        if modules & {InstallModule.COMMANDS, InstallModule.AGENTS} and not target_root.is_dir():
+            plan.requires_claude_version = True
+
         # Only filter by git when extensions come from a repo checkout. When
         # running from a wheel install, source_root is forge/_extensions/ inside
         # site-packages — typically gitignored, so a git-tracked filter would
@@ -1335,6 +1343,13 @@ class Installer:
             scope=self._scope,
             explicit_modules=None if _modules_override is not None else with_modules,
         )
+
+        # Planning treats creation of a missing Claude anchor as a Claude
+        # surface mutation. Materialize it only after the conflict preflight;
+        # project CLI flows may already have created it after the version gate.
+        if plan.requires_claude_version:
+            get_target_root(self._scope, self._project_root).mkdir(parents=True, exist_ok=True)
+
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
         if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
             # Read both user settings targets before rendering the dispatcher or
