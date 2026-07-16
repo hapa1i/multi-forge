@@ -25,6 +25,21 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-16
+
+### Memory-passport CLI preflight cleanup
+
+**Goal**: Consolidate repeated document-target preflight without changing leaf-specific mutation or output contracts.
+
+**Key changes**:
+
+- Added a structured private resolver for project root, compatibility, path safety, and file checks while keeping each
+  leaf's wording and rendering; removed dead `ExecutionContext.from_cwd()` `ForgeOpError` wrappers and superseded weak
+  tests with exact stream, precedence, and no-mutation characterization.
+
+**Verification**: focused CLI suites (`228 passed`); `make test-unit` (`7907 passed, 1 skipped, 117 deselected`);
+`make pre-commit`; `git diff --check`.
+
 ## 2026-07-15
 
 ### Existing shadow-only reserved-target hotfix

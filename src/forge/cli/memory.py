@@ -10,7 +10,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, assert_never
 
 import click
 
@@ -57,6 +57,46 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+_MemoryTargetPreflightKind = Literal["rootless", "unsafe", "missing"]
+
+
+class _MemoryTargetPreflightError(Exception):
+    """Presentation-neutral failure while resolving a memory-document target."""
+
+    def __init__(self, kind: _MemoryTargetPreflightKind, detail: str = "") -> None:
+        super().__init__(detail or kind)
+        self.kind: _MemoryTargetPreflightKind = kind
+        self.detail = detail
+
+
+def _resolve_memory_doc_target(path: str, *, enforce_compatibility: bool) -> tuple[Path, Path]:
+    """Resolve a target, leaving target-failure rendering to the calling leaf.
+
+    When enabled, the compatibility guard retains its existing stderr-and-exit behavior.
+    """
+    ctx = ExecutionContext.from_cwd()
+    if ctx.forge_root is None:
+        raise _MemoryTargetPreflightError("rootless")
+    forge_root = ctx.forge_root
+
+    if enforce_compatibility:
+        from forge.cli.guards import enforce_target_project_compatibility
+
+        # This existing guard owns its stderr recovery output and exits on refusal.
+        enforce_target_project_compatibility(forge_root)
+
+    resolved_base = forge_root.resolve()
+    reason = is_safe_designated_doc_path(path, forge_root, resolved_base)
+    if reason:
+        raise _MemoryTargetPreflightError("unsafe", reason)
+
+    abs_path = (forge_root / path).resolve()
+    if not abs_path.is_file():
+        raise _MemoryTargetPreflightError("missing")
+
+    return forge_root, abs_path
 
 
 def _auto_create_shadow(shadow_path: str, forge_root: Path) -> bool:
@@ -170,22 +210,17 @@ def track_cmd(
     if shadow_override and not propose:
         raise click.ClickException("--shadow-path requires --propose.")
 
-    ctx = ExecutionContext.from_cwd()
-    if ctx.forge_root is None:
-        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
-    forge_root = ctx.forge_root
-    from forge.cli.guards import enforce_target_project_compatibility
-
-    enforce_target_project_compatibility(forge_root)
-
-    resolved_base = forge_root.resolve()
-    reason = is_safe_designated_doc_path(path, forge_root, resolved_base)
-    if reason:
-        raise click.ClickException(f"Invalid path: {reason}")
-
-    abs_path = (forge_root / path).resolve()
-    if not abs_path.is_file():
-        raise click.ClickException(f"File does not exist: {path}")
+    try:
+        forge_root, abs_path = _resolve_memory_doc_target(path, enforce_compatibility=True)
+    except _MemoryTargetPreflightError as e:
+        kind = e.kind
+        if kind == "rootless":
+            raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.") from e
+        if kind == "unsafe":
+            raise click.ClickException(f"Invalid path: {e.detail}") from e
+        if kind == "missing":
+            raise click.ClickException(f"File does not exist: {path}") from e
+        assert_never(kind)
 
     # Read existing passport on the official doc
     try:
@@ -1079,22 +1114,16 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
     from dataclasses import asdict
 
     try:
-        ctx = ExecutionContext.from_cwd()
-    except ForgeOpError as e:
-        raise click.ClickException(str(e)) from e
-
-    if ctx.forge_root is None:
-        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
-
-    resolved_base = ctx.forge_root.resolve()
-    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
-    if reason:
-        raise click.ClickException(f"Invalid path: {reason}")
-
-    abs_path = (ctx.forge_root / path).resolve()
-
-    if not abs_path.is_file():
-        raise click.ClickException(f"File not found: {path}")
+        _, abs_path = _resolve_memory_doc_target(path, enforce_compatibility=False)
+    except _MemoryTargetPreflightError as e:
+        kind = e.kind
+        if kind == "rootless":
+            raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.") from e
+        if kind == "unsafe":
+            raise click.ClickException(f"Invalid path: {e.detail}") from e
+        if kind == "missing":
+            raise click.ClickException(f"File not found: {path}") from e
+        assert_never(kind)
 
     try:
         passport = read_passport(abs_path)
@@ -1159,35 +1188,22 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
 def passport_upgrade_cmd(path: str) -> None:
     """Add missing OKF envelope fields to an existing passport."""
     try:
-        ctx = ExecutionContext.from_cwd()
-    except ForgeOpError as e:
-        print_error(str(e), console=err_console)
-        print_tip("Run this command from an enabled Forge project.", console=err_console)
-        sys.exit(1)
-
-    if ctx.forge_root is None:
-        print_error("Not inside a Forge project.", console=err_console)
-        print_tip("Run 'forge extension enable' first.", console=err_console)
-        sys.exit(1)
-
-    from forge.cli.guards import enforce_target_project_compatibility
-
-    enforce_target_project_compatibility(ctx.forge_root)
-
-    resolved_base = ctx.forge_root.resolve()
-    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
-    if reason:
-        print_error(f"Invalid path: {reason}", console=err_console)
-        print_tip(
-            "Use a project-relative Markdown path inside this Forge project.",
-            console=err_console,
-        )
-        sys.exit(1)
-
-    abs_path = (ctx.forge_root / path).resolve()
-    if not abs_path.is_file():
-        print_error(f"File not found: {path}", console=err_console)
-        print_tip("Check the project-relative path and try again.", console=err_console)
+        _, abs_path = _resolve_memory_doc_target(path, enforce_compatibility=True)
+    except _MemoryTargetPreflightError as e:
+        kind = e.kind
+        if kind == "rootless":
+            error_message = "Not inside a Forge project."
+            tip = "Run 'forge extension enable' first."
+        elif kind == "unsafe":
+            error_message = f"Invalid path: {e.detail}"
+            tip = "Use a project-relative Markdown path inside this Forge project."
+        elif kind == "missing":
+            error_message = f"File not found: {path}"
+            tip = "Check the project-relative path and try again."
+        else:
+            assert_never(kind)
+        print_error(error_message, console=err_console)
+        print_tip(tip, console=err_console)
         sys.exit(1)
 
     try:
@@ -1212,25 +1228,16 @@ def passport_upgrade_cmd(path: str) -> None:
 def passport_remove_cmd(path: str, as_json: bool) -> None:
     """Remove the project-memory passport from a doc."""
     try:
-        ctx = ExecutionContext.from_cwd()
-    except ForgeOpError as e:
-        raise click.ClickException(str(e)) from e
-
-    if ctx.forge_root is None:
-        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
-
-    from forge.cli.guards import enforce_target_project_compatibility
-
-    enforce_target_project_compatibility(ctx.forge_root)
-
-    resolved_base = ctx.forge_root.resolve()
-    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
-    if reason:
-        raise click.ClickException(f"Invalid path: {reason}")
-
-    abs_path = (ctx.forge_root / path).resolve()
-    if not abs_path.is_file():
-        raise click.ClickException(f"File not found: {path}")
+        _, abs_path = _resolve_memory_doc_target(path, enforce_compatibility=True)
+    except _MemoryTargetPreflightError as e:
+        kind = e.kind
+        if kind == "rootless":
+            raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.") from e
+        if kind == "unsafe":
+            raise click.ClickException(f"Invalid path: {e.detail}") from e
+        if kind == "missing":
+            raise click.ClickException(f"File not found: {path}") from e
+        assert_never(kind)
 
     try:
         removed = remove_passport(abs_path)
