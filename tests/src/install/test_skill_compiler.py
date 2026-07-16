@@ -19,17 +19,30 @@ from forge.install.skill_compiler import (
     SkillSourceFormat,
     TokenAllowance,
     compile_skill_for_runtime,
+    load_claude_skill_source,
     load_neutral_skill_source,
     load_skill_sources,
 )
 
 SKILLS_ROOT = Path(__file__).parents[3] / "src" / "skills"
 ALL_RUNTIMES = frozenset({SkillRuntime.CLAUDE_CODE, SkillRuntime.CODEX})
+SOURCE_ARTIFACT_DIRS = frozenset({"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"})
+SOURCE_ARTIFACT_SUFFIXES = frozenset({".pyc", ".pyo"})
 
 
 def _frontmatter(document: bytes) -> dict[str, object]:
     text = document.decode()
     return yaml.safe_load(text.split("---", 2)[1])
+
+
+def _is_expected_source_file(package_root: Path, path: Path) -> bool:
+    relative = PurePosixPath(path.relative_to(package_root).as_posix())
+    return (
+        path.is_file()
+        and not any(part.startswith(".") for part in relative.parts)
+        and not SOURCE_ARTIFACT_DIRS.intersection(relative.parts)
+        and relative.suffix not in SOURCE_ARTIFACT_SUFFIXES
+    )
 
 
 def _neutral_source(
@@ -82,7 +95,7 @@ def test_mixed_sources_preserve_legacy_claude_bridge_byte_and_mode_fidelity() ->
             (
                 PurePosixPath(path.relative_to(package_root).as_posix())
                 for path in package_root.rglob("*")
-                if path.is_file()
+                if _is_expected_source_file(package_root, path)
             ),
             key=PurePosixPath.as_posix,
         )
@@ -91,6 +104,30 @@ def test_mixed_sources_preserve_legacy_claude_bridge_byte_and_mode_fidelity() ->
             source_file = package_root / package_file.path
             assert package_file.content == source_file.read_bytes(), package_file.path
             assert package_file.mode == stat.S_IMODE(source_file.stat().st_mode), package_file.path
+
+
+def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -> None:
+    package_root = tmp_path / "legacy-skill"
+    (package_root / "resources").mkdir(parents=True)
+    (package_root / "scripts" / "__pycache__").mkdir(parents=True)
+    (package_root / ".pytest_cache").mkdir()
+    (package_root / "SKILL.md").write_text(
+        "---\nname: forge:legacy-skill\ndescription: Legacy test skill. Use when testing artifact filters.\n---\n"
+        "\n# Legacy\n",
+        encoding="utf-8",
+    )
+    (package_root / "resources" / "guide.md").write_text("# Guide\n", encoding="utf-8")
+    (package_root / "scripts" / "__pycache__" / "helper.cpython-312.pyc").write_bytes(b"compiled")
+    (package_root / "scripts" / "helper.pyo").write_bytes(b"optimized")
+    (package_root / ".pytest_cache" / "state").write_text("generated\n", encoding="utf-8")
+
+    source = load_claude_skill_source(package_root)
+    package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+
+    assert [package_file.path.as_posix() for package_file in package.files] == [
+        "SKILL.md",
+        "resources/guide.md",
+    ]
 
 
 def test_mixed_loader_preserves_internal_symlink_alias_content() -> None:

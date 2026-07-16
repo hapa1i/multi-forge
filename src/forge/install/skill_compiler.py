@@ -383,6 +383,9 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
     for source_file in sorted(package_root.rglob("*")):
         if source_file == skill_document_path or source_file.is_dir():
             continue
+        relative_path = PurePosixPath(source_file.relative_to(package_root).as_posix())
+        if not _is_skill_source_file(relative_path):
+            continue
         if source_file.is_symlink():
             try:
                 resolved = source_file.resolve(strict=True)
@@ -394,7 +397,7 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
             continue
         auxiliary_files.append(
             SkillSourceFile(
-                path=PurePosixPath(source_file.relative_to(package_root).as_posix()),
+                path=relative_path,
                 content=source_file.read_bytes(),
                 mode=stat.S_IMODE(source_file.stat().st_mode),
             )
