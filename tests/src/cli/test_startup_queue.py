@@ -7,18 +7,38 @@ pending-work queue processing, while exempt commands (like `forge hook`) skip it
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from forge.cli.main import main
+from forge.cli.main import _EXEMPT_SUBCOMMANDS, main
 from forge.core.workqueue import (
     enqueue_index_marker,
     enqueue_shadow_marker,
     enqueue_stop_marker,
     pending_work_dir,
 )
+
+_REPO_ROOT = Path(__file__).parents[3]
+_QUEUE_GUIDES = (
+    _REPO_ROOT / "docs" / "end-user" / "memory.md",
+    _REPO_ROOT / "docs" / "end-user" / "search.md",
+)
+_DOCUMENTED_EXEMPTIONS = re.compile(r"\((?P<commands>[^()]*) are exempt\)")
+
+
+def _documented_exempt_subcommands(path: Path) -> frozenset[str]:
+    matches = list(_DOCUMENTED_EXEMPTIONS.finditer(path.read_text(encoding="utf-8")))
+    assert len(matches) == 1, f"Expected one startup-queue exemption clause in {path}"
+    commands = matches[0].group("commands").replace(", and ", ",")
+    return frozenset(command.strip(" `") for command in commands.split(","))
+
+
+@pytest.mark.parametrize("guide", _QUEUE_GUIDES, ids=lambda path: path.stem)
+def test_startup_queue_exemption_guides_match_runtime_constant(guide: Path) -> None:
+    assert _documented_exempt_subcommands(guide) == _EXEMPT_SUBCOMMANDS
 
 
 def _create_test_marker(tmp_path: Path, session_id: str = "test-marker-123") -> Path:

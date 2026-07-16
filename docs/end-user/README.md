@@ -12,7 +12,7 @@ Running `claude` directly works, but you lose session tracking. Forge wraps Clau
 - **Status line** -- proxy, session, and policy info in the Claude UI
 - **Policy enforcement** -- TDD, coding standards, semantic supervisor
 - **Search** -- `forge search` across past sessions
-- **Memory writer** -- auto-updates project docs on session exit
+- **Memory writer** -- queues project-doc updates when a session exits
 
 These features require launching through Forge because they depend on a Forge-managed session's launch environment,
 hooks being wired, and the session manifest existing. Running `claude` directly bypasses all of this.
@@ -130,8 +130,8 @@ See [authentication.md](authentication.md) for profiles and credential resolutio
 
 ### Sessions -- Named Work Units
 
-`forge session start` creates a managed Forge session (1:1 with the Claude process). Sessions track intent, artifacts,
-and confirmed state:
+`forge session start` creates a managed Forge session. A session tracks a runtime conversation and may reattach multiple
+process launches to it; the manifest also records intent, artifacts, and confirmed state:
 
 ```bash
 forge session start                                            # Auto-named, direct to Anthropic
@@ -212,8 +212,8 @@ See [hook.md](hook.md).
 
 ### Memory Writer -- Automatic Memory Docs
 
-The memory writer is queued at session end and runs on the next Forge CLI startup to update designated project docs
-(checklists, changelogs, pattern files) based on what happened in the session.
+The memory writer is queued at session end and launched by a later queue-processing Forge CLI startup to update
+designated project docs (checklists, changelogs, pattern files) based on what happened in the session.
 
 See [memory.md](memory.md).
 

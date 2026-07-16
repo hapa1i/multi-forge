@@ -2,8 +2,8 @@
 
 A passport is a ``forge_memory`` YAML frontmatter block embedded in a markdown
 memory doc. It describes the doc's intent, update contract, and writer privileges.
-Sessions store participation only; the memory writer re-reads the passport at
-stop time for the authoritative contract.
+Sessions store participation only; the detached memory writer re-reads the
+passport when it executes to obtain the authoritative contract.
 """
 
 from __future__ import annotations

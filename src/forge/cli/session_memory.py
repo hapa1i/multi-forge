@@ -1,8 +1,8 @@
 """``forge session memory`` -- session-scoped memory activation and reports.
 
 Activation is a property of a session, not a project doc: enable/disable whether
-the memory writer runs at Stop, inspect activation across sessions, and read the
-writer's reports. Project-doc passports (``track``/``list``/``passport``/
+Stop queues the deferred memory writer, inspect activation across sessions, and
+read the writer's reports. Project-doc passports (``track``/``list``/``passport``/
 ``shadows``) live under the top-level ``forge memory`` group.
 """
 
@@ -37,7 +37,7 @@ def session_memory() -> None:
 
     \b
     Examples:
-        forge session memory enable --session planner    # run the memory writer at Stop
+        forge session memory enable --session planner    # queue the writer when the session stops
         forge session memory status --scope workspace    # activation across sessions
         forge session memory report                      # latest writer report
     """

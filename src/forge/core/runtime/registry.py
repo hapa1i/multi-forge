@@ -116,7 +116,8 @@ class RuntimeSpec:
     pretool_policy: PolicyEnforcement
     usage_source: UsageSource
     native_resume: bool
-    install_scopes: tuple[str, ...]  # config scopes Forge manages (empty = not Forge-managed)
+    # Forge extension/session participation scopes, not per-feature runtime-hook targets.
+    install_scopes: tuple[str, ...]  # empty = not Forge-managed
     curated_transfer_in: bool  # can accept a context doc at session start
     curated_transfer_out: bool  # can generate a curation of its own transcript
     # Hook registration/enablement floor (None when ungated): a preflight checks these
@@ -173,9 +174,9 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         pretool_policy="partial",  # Phase 1 probe: deny + updatedInput confirmed post-enrollment; partial -- enrollment-gated, malformed output fails open, PermissionRequest unpinned (see PolicyEnforcement)
         usage_source="jsonl_events",
         native_resume=True,  # codex exec resume, by thread_id; works cross-CWD (Phase 6 probe, 0.138.0)
-        # Mirrors the Forge install scope (codex_frontend Phase 6): user ->
-        # $CODEX_HOME/config.toml; project/local -> <project>/.codex/config.toml
-        # (Codex has no settings.local analog).
+        # Forge extension/session assets support every install scope. Codex runtime
+        # hook registration is narrower: user scope writes $CODEX_HOME/config.toml;
+        # project/local installs write no runtime hook block.
         install_scopes=("user", "project", "local"),
         curated_transfer_in=True,  # initial user message is the zero-setup default; SessionStart additionalContext delivery is probe-confirmed in enrolled homes (Phase 1 30e PASS; build is codex_frontend Phase 4)
         curated_transfer_out=True,  # via headless invoker
@@ -191,16 +192,13 @@ RUNTIMES: dict[str, RuntimeSpec] = {
             "interactive TUI ceremony (one 'trust all' grant enrolls every entry in that registration): the "
             "`[hooks.state]` trusted_hash covers the registration *command string* (not the script bytes) "
             "and is not black-box computable, so Forge cannot pre-enroll programmatically. Trust is keyed by "
-            "the registering config's PATH: a project-scope registration survives that project's `git "
-            "worktree` checkouts (path-stable command) but is NOT trusted in an unrelated repo (stage 84, "
-            "codex 0.139.0: a fresh repo's byte-identical project hook did not fire while the path-stable "
-            "user-level hook did). The Phase 6 installer registers Forge's two hooks "
-            "(`codex-session-start`, `codex-policy-check`) as a managed block in the Codex config the "
-            "Forge install scope maps to -- user -> `$CODEX_HOME/config.toml` (one ceremony covers all "
-            "projects), project/local -> `<project>/.codex/config.toml` (per-repo ceremony; trade-off "
-            "accepted by the scope-mirroring decision). Registration alone is inert: enrollment is still "
-            "the user's one-time interactive trust ceremony, which the installer names but cannot perform "
-            "or verify. Caveats: malformed PreToolUse "
+            "the registering config's path. The installer registers Forge's two hooks "
+            "(`codex-session-start`, `codex-policy-check`) as a managed block only in the user Codex config "
+            "(`$CODEX_HOME/config.toml`, so one ceremony covers all projects). Project/local extension "
+            "installs write no Codex runtime block; per-project managed blocks are legacy migration inputs, "
+            "not a supported target. Registration alone is inert: enrollment is still "
+            "the user's one-time interactive trust ceremony, which the installer names but cannot perform; "
+            "`forge runtime preflight codex --verify-enrollment` can verify firing afterward. Caveats: malformed PreToolUse "
             "output FAILS OPEN (never rely on Codex fail-closing "
             "on bad hook output); PermissionRequest has not been observed firing headless; PreToolUse "
             "matchers must use Codex tool names (`Bash`, `apply_patch`). Registration validation is shallow "

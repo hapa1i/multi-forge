@@ -220,6 +220,26 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 (override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
 `workspace-write`). For direct use without a proxy, run native `codex`.
 
+### Runtime management
+
+| Command                         | Purpose                                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `forge runtime list`            | List detected agent runtimes and their static capability matrix (`--json`)                      |
+| `forge runtime preflight codex` | Check native headless Codex auth, hook seam, and Responses readiness (`--json`, `--proxy <id>`) |
+
+`list` reports installed versions plus interactive, headless, hook, pre-tool policy, usage, resume, and install-scope
+capabilities for Claude Code and Codex. Its JSON form also carries curated-transfer support and the full static runtime
+record. It is an inventory surface, not a dynamic auth-readiness check. Install scopes describe where Forge's
+extension/session assets can participate; Codex runtime hook registration itself remains user-scope-only.
+
+`preflight codex` is the dynamic readiness surface. It resolves native Codex auth, reads `codex doctor`, reports the
+hook seam, and exits non-zero when Codex is not ready. A direct preflight refreshes the cached readiness used by Codex
+consumer-lane dispatches. `--proxy <id>` reads the existing proxy configuration and checks that it exposes a compatible
+Responses ingress; it starts nothing and does not replace the direct-readiness cache. `--verify-enrollment` goes beyond
+static hook registration by running one cheap `codex exec` turn and confirming by effect that the user-scope
+SessionStart hook fired. With `--json`, ordinary preflight emits the secret-free readiness record; enrollment
+verification emits its registered/attempted/enrolled result instead.
+
 ### Model management
 
 `forge model catalog` lists Forge's static model catalog: canonical model ids, aliases, provider defaults, context

@@ -4,7 +4,8 @@ This module provides utilities for deleting Claude session data:
 - Transcript files (.jsonl)
 - Agent log files (agent-*.jsonl)
 
-Under the 1:1 session model, each Forge session has one current claude_session_id.
+Each Claude-runtime Forge session has one current ``claude_session_id`` even though
+multiple process launches may reattach to that conversation.
 If /compact or /clear rolled over to a new UUID, older raw transcript UUIDs may
 also be tracked via transcript artifacts and should be cleaned up too.
 """

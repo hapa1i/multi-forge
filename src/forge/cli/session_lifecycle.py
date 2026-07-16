@@ -1557,7 +1557,7 @@ def _launch_in_place(
     direct: bool = False,
     direct_model_override: str | None = None,
 ) -> None:
-    """Launch a never-used session in-place (satisfies 1:1)."""
+    """Launch a never-used session in place under its existing Forge identity."""
     manager.switch_session(name, forge_root=manifest.forge_root)
 
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
@@ -1632,9 +1632,9 @@ def _reconnect_in_place(
 ) -> None:
     """Reconnect to the same Claude conversation without creating a child.
 
-    Advanced escape hatch for resuming in-place after the previous launch has
-    fully ended. Relaxes the 1:1 invariant (new process invocation on the same
-    Forge session) but is gated: a resumable conversation must exist.
+    Advanced escape hatch for resuming in place after the previous launch has
+    fully ended. It starts a new process attached to the same conversation and is
+    gated on durable evidence that the conversation is resumable.
 
     The caller is responsible for the active-session check (see resume()
     dispatch) -- this function assumes the session is not active.

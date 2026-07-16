@@ -2,15 +2,15 @@
 
 Shadow/propose mode and topic strategies available.
 
-The memory writer is queued automatically when a session ends and runs on the next Forge CLI startup to update tracked
-memory docs based on what happened in the session. It reads the session transcript and writes updates to pre-existing
-official files or Forge-owned shadow proposal files.
+The memory writer is queued automatically when a session ends. A later queue-processing Forge CLI startup launches it as
+a detached process to update tracked memory docs based on what happened in the session. It reads the session transcript
+and writes updates to pre-existing official files or Forge-owned shadow proposal files.
 
 - Canonical architecture: [`docs/design.md` §5.6](../design.md)
 - Sessions (unit of work): [`session.md`](session.md)
 - Hooks (lifecycle events): [`hook.md`](hook.md)
 
-> **Memory writer vs. transfer.** This guide covers the **memory writer**: the Stop-time worker that curates project
+> **Memory writer vs. transfer.** This guide covers the **memory writer**: the deferred worker that curates project
 > memory docs (`docs/checklist.md`, shadow files for coding standards, etc.). Its per-session output lives under
 > `<forge_root>/.forge/artifacts/<session>/handoff/review-*.md` -- see `forge session memory report`. For **transfer**
 > -- the parent-context file assembled for `forge session resume --fresh` (at
@@ -20,8 +20,8 @@ official files or Forge-owned shadow proposal files.
 
 ## What the memory writer does
 
-After a session stops, the Stop hook enqueues a work marker. On next CLI startup, Forge spawns a headless writer
-subprocess -- `claude -p` on the default Claude lane, or `codex exec` on the codex lane
+After a session stops, the Stop hook enqueues a work marker. A later queue-processing CLI startup spawns a headless
+writer subprocess -- `claude -p` on the default Claude lane, or `codex exec` on the codex lane
 ([Runtime: claude or codex](#runtime-claude-or-codex)) -- that:
 
 1. Reads the session transcript
@@ -241,7 +241,7 @@ forge session fork parent-session --worktree --memory off    # force off in chil
 forge session resume parent-session --fresh --memory off     # requires --fresh
 ```
 
-Memory docs are not inherited -- they are discovered from passports at Stop time in whatever checkout the child runs in.
+Memory docs are not inherited -- the detached writer discovers them from passports when it runs in the child's checkout.
 Passports are git-tracked, so worktree forks see the same docs as the parent.
 
 ---
@@ -254,7 +254,7 @@ Session stops
   → Stop hook enqueues "handoff" work marker
   → (session ends)
 
-Next CLI startup (any forge command)
+Later queue-processing CLI startup (hook, status-line, logs, and clean are exempt)
   → Work queue processes pending markers
   → Memory-writer handler spawns detached background process:
       forge memory-writer run --session-name <name> --worktree-path <path> --transcript-rel <rel>
@@ -277,8 +277,8 @@ relaunching the managed session; a sidecar requires a satisfying Forge version i
 
 ### Runtime: claude or codex
 
-By default the writer dispatches `claude -p`. Bind it to a codex subscription lane to run `codex exec` instead (direct
-to OpenAI on your ChatGPT login, no Forge proxy):
+By default the writer dispatches `claude -p`. Bind it to the Codex lane to run `codex exec` instead (direct to OpenAI
+with the auth posture resolved by `forge runtime preflight codex`, no Forge proxy):
 
 ```bash
 forge session lane set --consumer memory_writer --runtime codex
@@ -331,7 +331,7 @@ authoritative; session manifests store only activation and runtime state.
 
 `forge memory track` validates these rules up front and writes or updates the passport. Envelope and new-path checks
 apply only when creating a passport; an ordinary re-track does not migrate existing passports, and a legacy reserved
-official direct passport remains scannable. Stop-time discovery skips hand-authored shadow-only passports whose logical
+official direct passport remains scannable. Deferred discovery skips hand-authored shadow-only passports whose logical
 or resolved write target is reserved. `forge memory passport upgrade` applies the same mutation guards explicitly to a
 legacy passport and adds only missing outer fields. It never reconstructs the raw `forge_memory` mapping, and a second
 upgrade is a byte-identical no-op. Older session manifests are still revalidated at runtime; invalid or missing docs are
@@ -348,6 +348,8 @@ The transcript path is also validated (same safety checks) since it comes from C
 Checklist:
 
 - `memory.auto_update.enabled` must be `true` in effective intent (`forge session memory enable`)
+- Run a queue-processing Forge command after Stop; `hook`, `status-line`, `logs`, and `clean` do not drain markers, and
+  the detached writer may still be running when the triggering command returns
 - Session must have ≥ `min_turns` conversation turns (default: 5)
 - The bound runtime must be available: `claude` on PATH (default lane), or a ready `codex` preflight (codex lane)
 - At least one memory doc must be discoverable: a passported doc under the scan roots

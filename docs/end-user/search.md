@@ -1,7 +1,7 @@
 # Forge Search — Transcript Search Guide
 
-Search past session transcripts by keyword. Forge indexes transcripts automatically via the Stop hook and stores a
-per-project BM25 index for fast lookup.
+Search past session transcripts by keyword. The Stop hook enqueues transcript indexing; a later queue-processing CLI
+startup drains that work into a per-project BM25 index for fast lookup.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
 - Sessions (unit of work): [`session.md`](session.md)
@@ -41,7 +41,7 @@ Session stops
   → Stop hook enqueues "index" work marker
   → (session ends)
 
-Next forge command (any)
+Later queue-processing forge command (hook, status-line, logs, and clean are exempt)
   → Work queue processes pending markers
   → Transcript is extracted, tokenized, and added to the BM25 index
 ```
@@ -130,8 +130,8 @@ The three-file split keeps queries fast (~300KB loaded vs ~5MB for full content)
 
 ### "Index not built"
 
-The index builds automatically when sessions end (via Stop hook). If you haven't ended any sessions since installing
-Forge, build manually:
+The Stop hook queues indexing when sessions end, and a later eligible Forge command builds the index. If you haven't
+ended any sessions since installing Forge, build manually:
 
 ```bash
 forge search rebuild-index

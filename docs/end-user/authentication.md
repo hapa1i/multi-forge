@@ -99,8 +99,13 @@ withheld.
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, direct Anthropic workers, `litellm-anthropic-local`, `anthropic-passthrough` |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` and `codex-responses-local` proxies                                       |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                                     |
-| `codex-api`      | `CODEX_API_KEY`                                         | Native Codex headless runs (`codex exec`); not `OPENAI_API_KEY` or the ChatGPT login             |
+| `codex-api`      | `CODEX_API_KEY`                                         | Forge-managed API-key path for native Codex headless runs (`codex exec`)                         |
 | `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                                           |
+
+`codex-api` is only Forge's credential-store entry for `CODEX_API_KEY`; it is not the whole Codex auth model.
+`forge runtime preflight codex` also accepts an environment-only `CODEX_ACCESS_TOKEN` or native Codex stored auth
+(stored API key, agent identity, or ChatGPT tokens). A ChatGPT login therefore needs no `codex-api` entry and is
+reported as subscription quota.
 
 ### Anthropic API key disambiguation
 

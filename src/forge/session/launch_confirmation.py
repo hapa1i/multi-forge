@@ -177,7 +177,7 @@ def _infer_launch_confirmation(
         return
 
     def _mutate(state: SessionState) -> None:
-        # 1:1 model: overwrite UUID directly (no accumulation)
+        # Keep one current conversation UUID; overwrite rather than accumulate.
         state.confirmed.claude_session_id = session_id
         state.confirmed.transcript_path = str(transcript_path)
         state.confirmed.confirmed_at = now_iso()

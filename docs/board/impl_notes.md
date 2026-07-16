@@ -180,17 +180,18 @@ wc -l docs/board/impl_notes.md
 
 ### Forge hook-command detection is single-sourced in `install/hooks.py` (forge_hook_matcher_consolidation, shipped 2026-07-06)
 
-- `install/hooks.py::is_forge_hook_command` is the one predicate for "does this command invoke a Forge hook?". It uses
-  shell-token semantics: `shlex.split`, command basename `forge`, second token `hook`, and optional third-token handler
-  matching. This intentionally accepts bare `forge hook ...` and absolute-path `/.../forge hook ...`, while rejecting
-  contains-only strings such as `echo forge hook stop`.
+- `install/hooks.py::{forge_hook_handler,is_forge_hook_command}` are the shared parser/predicate for "does this command
+  invoke a Forge hook?". Shell-token parsing maps both legacy `forge hook <handler>` commands and dispatcher
+  `forge-hook <handler>` commands (bare, quoted, or absolute-path) to the same logical handler, while rejecting
+  contains-only strings such as `echo forge hook stop` and `echo forge-hook stop`.
 - Entry-level settings scans should use `entry_is_forge_hook`. Any cleanup path that removes hook entries from Claude
   settings must pass `require_command_type=True` so non-command entries are preserved while still sharing the same
   command predicate.
 - The registered-command contract lives in `tests/src/install/test_registered_commands_contract.py` and must key Claude
   hook rows on `(event, matcher, command, timeout)`, not a set of command strings. The two `policy-check` rows share
-  bytes under different matchers/timeouts; a string set is blind to that drift. T5 may extend the predicate for
-  dispatcher-shim bytes, but should update this one predicate and the golden together.
+  bytes under different matchers/timeouts; a string set is blind to that drift. Cleanup and migration code should key
+  command identity through the shared parser; any future command-byte change must update that parser and the golden
+  contract together.
 
 ### Claude hook registration is owned by the tracked installer (forge_hook_legacy_writer, 2026-07-06)
 
@@ -267,6 +268,9 @@ caller-facing contract with characterization tests.
   `StateUnreadableError` family, while invalid JSON, missing/wrong schema versions, and malformed payloads stay in the
   corrupted family. Search stores keep domain-specific unreadable subclasses so CLI surfaces can say check/retry instead
   of rebuild/delete.
+- **JSONL readers accept objects only.** Use `core.state.decode_json_object()` so blank, malformed, and
+  valid-but-non-object lines (`[]`, `1`, `"x"`, `null`) are skipped before a reader calls `.get()`. Cost, usage, and
+  telemetry/audit readers share this guard; do not re-copy ad hoc `json.loads` checks.
 
 ### Every real provider call must emit a provider-trace; retry paths included (Defect B, shipped 2026-07-04)
 
@@ -434,6 +438,9 @@ Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command re
   rationale-backed UX affordance); new top-level nouns get NO alias by default (`telemetry`/`model` have none);
   canonical names follow user vocabulary (`auth` is canonical, not `authentication`); rename/back-compat shims are
   temporary -- remove them in a cleanup slice, never keep them indefinitely.
+- **Surface vocabulary does not rename durable domain state.** `forge telemetry activity` reports Forge automation
+  activity, while the internal usage-ledger plane keeps `UsageEvent`, `usage/events/`, `read_usage_events`, and
+  `usage_summary.py`. Rename the user-facing surface only when the underlying domain has not changed.
 - **Removing an alias for a canonical command is atomic with the registration rename.** `forge <alias>` resolves only
   via `_ALIASES`, so deleting `"auth": "authentication"` is coherent only when `main.add_command(auth, ...)` is flipped
   to `name="auth"` in the SAME change. Delete-without-rename breaks the command; rename-without-delete leaves a stale
@@ -445,14 +452,14 @@ Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command re
   `forge extensions` (with a space) never matches `forge.cli.extensions` (dots), so it is a safe `replace_all` pattern
   -- the bare word `extensions` is not.
 - **Clean-break + drift verification.** `test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks` pins
-  removed aliases (bare AND leaf forms) to exit 2 "No such command" and canonical names to resolve; assert on
-  `result.output` (this repo's `CliRunner()` surfaces the Click usage error there even though Click writes it to
-  stderr). For a CLI rename run a zero-tolerance command-form drift sweep
-  (`rg "forge authentication|forge extensions" --glob '!docs/board/**'` must be empty) plus a broader prefix-less sweep
-  that is a *classify* step (English prose like "Show extensions status" is fine, not a hit). Installer/extension-path
-  renames need the Docker integration run (`test_installer.py` etc.): `CliRunner` cannot catch a test asserting on the
-  real binary's tip text (a latent plural-vs-singular assertion at `test_installer.py:158` was only proven correct by
-  the live run).
+  removed aliases (bare AND leaf forms) to exit 2 "No such command" and canonical names to resolve. Removed paths stay
+  absent; do not add hidden tombstone groups or flag-tolerant compatibility leaves. Assert on `result.output` (this
+  repo's `CliRunner()` surfaces the Click usage error there even though Click writes it to stderr). For a CLI rename run
+  a zero-tolerance command-form drift sweep (`rg "forge authentication|forge extensions" --glob '!docs/board/**'` must
+  be empty) plus a broader prefix-less sweep that is a *classify* step (English prose like "Show extensions status" is
+  fine, not a hit). Installer/extension-path renames need the Docker integration run (`test_installer.py` etc.):
+  `CliRunner` cannot catch a test asserting on the real binary's tip text (a latent plural-vs-singular assertion at
+  `test_installer.py:158` was only proven correct by the live run).
 
 ### Backend identity axes: backend instance vs managed process vs telemetry origin (shipped)
 
@@ -539,9 +546,10 @@ newly-created modules are usually still present. Always `git status` before ever
 Two primitives: passports select docs (project-scoped, git-tracked frontmatter); session activation decides whether the
 memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no session-scoped doc lists.
 
-- **Passports are the sole doc source**: `forge_memory` YAML frontmatter in docs declares strategy, writers, intent.
-  Stop-time `scan_passported_docs()` discovers them under hardcoded roots (`docs/` + `.forge/memory/`). No manifest doc
-  lists; `DesignatedDoc` is a runtime-only type for the scanner -> memory-writer pipeline.
+- **Passports are the sole doc source**: `forge_memory` YAML frontmatter in docs declares strategy, writers, intent. The
+  detached runner's `scan_passported_docs()` discovers them under hardcoded roots (`docs/` + `.forge/memory/`) when it
+  executes; the Stop hook only enqueues the marker. No manifest doc lists; `DesignatedDoc` is a runtime-only type for
+  the scanner -> memory-writer pipeline.
 - **Session activation**: `forge session memory enable/disable --session` or `--memory on|off` at start/fork/resume.
   Both gates (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never
   enqueues.
@@ -552,7 +560,7 @@ memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no 
   `cli/session_memory.py` (+ the flattened `report` from `cli/memory_report.py`); both subgroups are wired onto the
   `session` group in `cli/main.py` (not `session.py`) because `transfer.py`/`session_memory.py` import `console` from
   `session.py`, so parent-imports-child would cycle.
-- **Stop-time chain**: stop hook -> work queue marker -> fire-and-forget `forge memory-writer run` -> passport scan ->
+- **Deferred chain**: stop hook -> work queue marker -> fire-and-forget `forge memory-writer run` -> passport scan ->
   writer filter -> `run_claude_session()`. Detached failures are not retried.
 - **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions.
   `check_shadow_path_collision_in_roots()` catches remaining edge cases.
@@ -567,7 +575,7 @@ memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no 
 
 The `memory_substrate` card split the overloaded "handoff" term into two concepts. Keep them distinct in future work:
 
-- **Memory writer** — Stop-time project-doc curation: `session/memory_writer.py` (`run_memory_writer`,
+- **Memory writer** — deferred project-doc curation: `session/memory_writer.py` (`run_memory_writer`,
   `resolve_writer_base_url`, `memory_report_dir`), `MemoryWriterConfig`, `memory_writer_timeout`,
   `forge memory-writer run`, `forge session memory report`.
 - **Transfer** — resume/fork context assembly: `session/transfer.py` (`assemble_transfer_context`, `TransferResult`),
@@ -639,8 +647,10 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   default→themed. `default` palette == empty remap == byte-identical no-op (golden-safe). Glyphs thread ONLY into the
   `get_context_display` progress bar (block chars can't be safely output-remapped). Do not thread a `palette` arg
   through the `format_*` helpers.
-- **Billing mode uses RAW `os.environ["ANTHROPIC_API_KEY"]`**, never `resolve_env_or_credential` (which falls back to
-  the credential file / honors `auth_ignore_env` and would misclassify an OAuth session as API).
+- **Billing posture is evidence-based, never inferred from key presence.** Only an explicit `statusline.cost_mode`
+  (`api` or `subscription`) declares the payer. The default `auto` stays ambiguous: direct-session rate-limit evidence
+  shows subscription quota when present, otherwise the cost is hedged as `≈$`; raw `ANTHROPIC_API_KEY` presence never
+  flips the display to API dollars because Forge may have hydrated that key into an OAuth session.
 - **Forge-unique segments read EFFECTIVE state** (`apply_overrides(intent, overrides)` on the raw manifest, not raw
   intent) AND honor `policy.enabled` — a disabled policy makes the hook exit early (commands.py:1116), so
   `supervisor`/`policy` show `SUP(off)`/`pol:…(off)`, not active. `drift` must mirror proxy routing precedence: an
@@ -680,21 +690,23 @@ Durable invariants for Forge's first alternate agent runtime. Sources: `src/forg
   `ActionContext`. Non-Claude runtimes encode their **limits as capability values** (`pretool_policy="partial"`,
   `native_hooks="enrollment_gated"`, `usage_source="jsonl_events"`), never as omissions — a consumer must never mistake
   a capability gap for parity. Adding a runtime = a new `RUNTIMES` row + an invoker, not scattered `if codex` branches.
-- **Codex hooks are enrollment-gated; the `trusted_hash` is not black-box computable.** Stage 83 matched 0/13 harvested
-  hashes across 15 canonicalizations, so Forge can never programmatically pre-enroll. The Phase 6 installer
-  (`install/codex_hooks.py`) writes a marker-delimited managed TOML block to the Codex config its install scope maps to
-  (`user -> $CODEX_HOME/config.toml`; `project`/`local -> <project>/.codex/config.toml`), but **registration is inert
-  until the user's one-time interactive `codex` trust ceremony**. Trust keys on the registering config's path + the
-  *command-string definition* (not script bytes): it survives `git worktree` checkouts of the enrolled project
-  (canonicalization) but does NOT cross to an unrelated repo (stage 84). Rendered entry bytes are golden-pinned so
-  sync/update never breaks enrollment. **Malformed PreToolUse hook output FAILS OPEN** (probe 30h) — never rely on Codex
-  fail-closing on bad hook output.
-- **Codex routes native-direct to OpenAI's Responses API by default; Forge governs at the seams, not the wire.**
-  `core/runtime/codex_preflight.py`: no `--proxy` -> `native_direct` (preferred); `--proxy` is rejected unless that
-  proxy already serves Responses on its Codex-facing endpoint (Forge adds no `/v1/responses` route). Usage therefore
-  comes from `jsonl_events`, not a proxy transcript, and the proxy/cost-routing features stay Claude-side. **Test
-  isolation:** codex hook/installer tests MUST use the autouse `isolate_codex_home` fixture (`tests/conftest.py`) or
-  they write the real `~/.codex/config.toml` (a real leak caught and fixed in Phase 6 slice 2).
+- **Codex hooks are user-scope-only and enrollment-gated; the `trusted_hash` is not black-box computable.** Stage 83
+  matched 0/13 harvested hashes across 15 canonicalizations, so Forge cannot programmatically pre-enroll. The installer
+  writes its marker-delimited runtime-hook block only to `$CODEX_HOME/config.toml`; project/local extension installs
+  write no Codex runtime block, and explicit project/local `--with codex-hooks` is rejected. Per-project managed blocks
+  are legacy migration inputs, not a supported installation target. Registration remains inert until the user's one-time
+  interactive `codex` trust ceremony; `forge runtime preflight codex --verify-enrollment` verifies firing empirically
+  after enrollment. Rendered entry bytes are golden-pinned because trust covers the config location and command-string
+  definition (not dispatcher script bytes). **Malformed PreToolUse hook output FAILS OPEN** (probe 30h) — never rely on
+  Codex fail-closing on bad hook output.
+- **Native Codex uses OpenAI's Responses API; proxy mode uses Forge-owned passthrough routes.**
+  `core/runtime/codex_preflight.py`: no `--proxy` -> `native_direct` (preferred); `--proxy` requires the full Responses
+  capability conjunction. Forge registers `POST /v1/responses` plus the method-aware `/v1/responses/{rest:path}` surface
+  in `proxy/responses_ingress.py`, capability-gates it, and relays raw Responses traffic through
+  `proxy/responses_passthrough.py` without chat translation. The generation route also owns spend-cap, cost/usage, and
+  provider-lifecycle accounting; native-direct usage still comes from Codex `jsonl_events`. **Test isolation:** Codex
+  hook/installer tests MUST use the autouse `isolate_codex_home` fixture (`tests/conftest.py`) or they write the real
+  `~/.codex/config.toml` (a real leak caught and fixed in Phase 6 slice 2).
 
 ### Sessionless Codex proxy launcher: Responses passthrough + identity gates (shipped 2026-06-23)
 
@@ -889,9 +901,10 @@ JSONL plane: CLI/core provider-trace readers should project from `DownstreamReco
   metadata as soon as the first provider id is seen so a stream killed before final usage still keeps the provider
   generation id.
 - **OpenRouter grouping uses `user`, not a custom `session_id`.** Probe evidence showed OpenRouter retains the
-  OpenAI-standard `user` field and ignores custom `session_id`. Proxied injection is therefore opt-in per proxy via
-  `provider_trace.inject_openrouter_user`, sends only hashed Forge ids, and defaults off. Direct `core.llm` callers are
-  a separate card because they need an in-process opt-in owner, not a proxy-owned setting.
+  OpenAI-standard `user` field and ignores custom `session_id`. Injection is default-off behind the single global
+  `~/.forge/config.yaml` toggle `provider_trace.inject_provider_user`, which governs both proxied and direct `core.llm`
+  paths. The proxied path also requires a backend with `provider_user_grouping`; both paths send only the shared opaque,
+  hashed Forge grouping id.
 
 ### Upstream/downstream telemetry ledgers (shipped 2026-06-18)
 
@@ -988,30 +1001,3 @@ spans both planes:
   (`FORGE_ROOT_RUN_ID` else `FORGE_RUN_ID`). Lock this with an equality test, not two independent format assertions
   (`test_correlation.py::test_matches_proxied_derivation`). User-config relocation is warn-and-degrade (system
   boundary), not reject.
-
-### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
-
-Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move
-the durable items into the body above, then delete this section.
-
-- **"Forge is not a cost oracle" — cost-unavailable must be `None`, never `0`.** The original bug was `cost_micros: int`
-  - hardcoded `estimated: True`, so `0` meant both "free" and "unknown". Cost is now nullable + provenance-tagged
-    (`reporter` + `confidence`); a route reporting no dollars logs `cost_micros=null` / `confidence="unavailable"` and
-    does **not** advance spend caps. Never reintroduce a local price table on the accounting path.
-- **The two strict-preflight catalog callsites had to die together.** `cap_mode: strict` priced an unsent request from
-  the catalog at two sites — `server.py` passthrough **and** translated. Removing only one would have left the catalog
-  dependency (and strict semantics) alive on the other path. When deleting a cross-path behavior, the type-checker (not
-  a hand list) is the change-detector — grep every call site.
-- **One `isinstance(record, dict)` guard for every JSONL cost/usage/audit reader.** A valid-but-non-object line
-  (`[]`/`1`/`"x"`) must skip, not crash `.get()`. `cost_tracker.bootstrap_from_logs` is already broad-except guarded
-  (its guard is an honesty fix, tested by calling `_parse_record` directly); the other readers genuinely crash without
-  it.
-- **`billing_mode` ≠ key presence.** The status line must never infer an API payer from `ANTHROPIC_API_KEY` in the env
-  (Forge may hydrate it into an OAuth session). `RenderContext.has_api_key` was deleted; `billing_mode` is a declaration
-  (`cost_mode`) + `rate_limits` evidence. The interactive/headless key axis is `interactive_anthropic_api_key: omit`,
-  distinct from `auth_ignore_env` (source-only, both interactive + headless).
-- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` →
-  `forge telemetry activity` (it reports Forge *automation* activity, not total interactive usage), but the durable
-  **usage ledger** plane (`UsageEvent`, `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name.
-  Removed CLI commands become hidden, **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old
-  `--flag` invocations reach the rename message, not Click's "No such option".

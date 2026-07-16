@@ -11,22 +11,22 @@ Proxy** regime in `docs/design.md`.
 
 ## What a session is (and is not)
 
-A **session** is a human unit of work with a **1:1 relationship** to a Claude process invocation:
+A **session** is a durable human unit of work. It tracks a runtime conversation, not one process invocation:
 
 - named session identity (portable name)
 - worktree association (optional for parallel work — multiple sessions can also run in the same directory)
 - session manifest (`<forge_root>/.forge/sessions/<name>/forge.session.json`) storing intent/overrides/confirmed facts,
   including relaunch preferences
 - artifacts (approved plans, transcripts)
-- exactly one `claude_session_id` (pre-seeded by `forge session start` and by transfer/fresh children, then validated by
-  the SessionStart hook; only a native `--fork-session` lets Claude mint it, which the hook records)
+- a single current runtime conversation identity when established: `confirmed.claude_session_id` for Claude or
+  `confirmed.codex.thread_id` for Codex. Multiple process invocations may reattach to that conversation.
 
-**1:1 invariant:** Each Forge session maps to one Claude process invocation. `forge session start` **pre-seeds**
-`claude_session_id` (the CLI generates it and imposes it via `--session-id`; the SessionStart hook validates it), so a
-non-null value does **not** by itself mean the session ran — "used" means it has hook-confirmed or transcript-backed
-evidence (a `--no-launch` session carries a pre-seeded UUID but never launched). `forge session resume` **reattaches**
-to the same conversation by default; `resume --fresh` derives a **child session** (a fork with lineage). Related
-sessions are grouped by lineage (`parent_session`), not by UUID accumulation.
+For Claude, `forge session start` **pre-seeds** `claude_session_id` (the CLI generates it and imposes it via
+`--session-id`; the SessionStart hook validates it), so a non-null value does **not** by itself mean the session ran —
+"used" means it has hook-confirmed or transcript-backed evidence (a `--no-launch` session carries a pre-seeded UUID but
+never launched). `forge session resume` **reattaches** to the same conversation by default when that evidence is safe;
+`resume --fresh` derives a **child session** (a fork with lineage). Related sessions are grouped by lineage
+(`parent_session`), not by UUID accumulation.
 
 A session is **not** a proxy routing identity.
 
@@ -134,8 +134,9 @@ forge session start [name] \
   [--sidecar|--host-proxy] [--mount <host:container>] [--image <name>] \
   [--no-launch]
 
-# Resume an existing session (default: reattach; --fresh: context assembly)
+# Resume an existing session (default: reattach when safe; --fresh: context assembly)
 forge session resume <name>
+forge session resume <name> --force  # active Claude session: launch a lineage child
 forge session resume <name> --fresh
 
 # Derive a fresh child session (PARENT optional; interactive picker)
@@ -335,7 +336,7 @@ Why use sidecar mode:
 - custom image: `--image my-dev-image:latest`
 - Forge injects its runtime hooks into the container's user settings on every launch; project `.claude` files are not
   rewritten
-- Stop-time indexing and memory work is persisted to the host queue and drained by a later host `forge` command
+- indexing, memory, and shadow markers enqueued at Stop persist in the host queue for a later host `forge` drain
 - Forge records sidecar mode, extra mounts, and image in the session manifest so `forge session resume <name>` can
   replay them later
 
@@ -362,11 +363,14 @@ the existing conversation in place after the previous launch has ended.
 - If the session was created in sidecar mode, Forge relaunches it in sidecar mode again using the recorded image and
   extra mounts.
 
-**Gates** (hard-fail, not warn):
+**Dispatch rules:**
 
-- Session must have **resumable evidence**. Hook-confirmed sessions work, and transcript-backed sessions also work if
-  the SessionStart hook missed confirmation. Pre-seeded UUIDs by themselves are not enough.
-- Session must **not be currently active**. Fails if another launcher is still running for this session.
+- A session with no durable hook confirmation or usable transcript launches in place, including a never-launched session
+  that carries only its pre-seeded UUID.
+- A session with safe **resumable evidence** (hook confirmation or a usable transcript) reconnects in place when it is
+  inactive. A pre-seeded UUID by itself is not enough evidence.
+- If that resumable session appears active, resume fails unless `--force` is supplied; `--force` launches a new lineage
+  child instead of attaching a second process to the active conversation.
 
 ### Derive a fresh session from an existing one
 

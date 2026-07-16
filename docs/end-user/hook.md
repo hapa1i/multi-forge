@@ -49,9 +49,10 @@ Hooks need to identify the current session to read/write confirmed facts. The re
 3. **IndexStore UUID lookup** — matches the Claude session UUID against the global index
    (`~/.forge/sessions/index.json`), searching `claude_session_id` only (no previous-ID history)
 
-No CWD-based directory scanning — `FORGE_SESSION` is the authoritative source. Under the 1:1 model, each session has at
-most one `claude_session_id`. On `/compact` or `/clear`, the UUID is **overwritten** (not accumulated). The env var
-chain typically resolves in step 1 or 2; step 3 is a fallback for edge cases where env vars are not propagated.
+No CWD-based directory scanning — `FORGE_SESSION` is the authoritative source. Each Claude-runtime session stores one
+current `claude_session_id`, even though later process launches may reattach to that conversation. On `/compact` or
+`/clear`, the UUID is **overwritten** (not accumulated). The env var chain typically resolves in step 1 or 2; step 3 is
+a fallback for edge cases where env vars are not propagated.
 
 <!-- forge-env-vocab: diagnostic:end -->
 

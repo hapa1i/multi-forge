@@ -22,6 +22,7 @@ flowchart TB
     Claude -->|"hook events"| Hooks["Forge Hooks<br/>(confirmed facts + artifacts)"]
     Codex -->|"hook events / receipts"| Hooks
     Codex -->|"native-direct by default"| OpenAI["OpenAI Responses API"]
+    Codex -.->|"optional --proxy<br/>/v1/responses*"| Proxy
 
     CLI --> Ops["Session / proxy / policy ops"]
     Ops --> State["Forge State<br/>(sessions, proxy registry, runtime config)"]
@@ -59,10 +60,10 @@ Color note: white nodes are Forge control-plane components; blue is the proxy/mo
 teal are durable state/artifact/telemetry stores; orange is external model infrastructure.
 
 **Runtime asymmetry:** Claude Code routes model traffic through the Forge proxy (`ANTHROPIC_BASE_URL`), so Forge sees
-its usage on the wire. Codex runs `codex exec` native-direct to OpenAI's Responses API by default; Forge governs it at
-the session and hook seams, not the wire (`--proxy` is rejected unless that proxy already serves Responses on its
-Codex-facing endpoint — Forge adds no `/v1/responses` route). Both runtimes share the same hooks, state, and artifact
-paths.
+its usage on the wire. Codex runs `codex exec` native-direct to OpenAI's Responses API by default, so Forge governs that
+path at the session and hook seams. Optional `--proxy` mode requires a proxy whose Codex-facing endpoint advertises the
+Responses passthrough capability; Forge then serves `/v1/responses*`, relays the raw wire shape, and records its
+accounting evidence. Both runtimes share the same hooks, state, and artifact paths.
 
 **Deployment note:** Sidecar mode is omitted from this overview because it packages proxy/runtime lifecycle without
 changing the data-flow boundaries shown here.

@@ -93,8 +93,9 @@ A new command-core op (`core/ops/session_adopt.py`), CLI leaf under `forge sessi
    `claude --resume <uuid>` reads Claude's own `~/.claude/projects` store, so plain reattach still requires the original
    native JSONL to survive (a limitation, not a gap -- see Risks). Queue the normal search-index marker for that copied
    artifact, or otherwise index it through the same idempotent path as Stop; do **not** enqueue memory-writer work at
-   adopt time. Memory remains tied to Stop/StopFailure, so the first Forge-managed Stop after adoption curates the
-   complete transcript if session memory is enabled.
+   adopt time. Memory remains tied to a successful Stop handoff; StopFailure captures and indexes only. The first
+   Forge-managed successful Stop after adoption therefore queues curation of the complete transcript when session memory
+   is enabled.
 6. **Index entry** via `add_from_state` (copies the UUID, `session/index.py:485`), so UUID-collision checks and
    `session show <uuid>` work immediately.
 
@@ -136,8 +137,8 @@ All ingredients exist; nothing constructs a manifest *from* a rollout today:
 ### Invariant amendments (design-doc sync owed with Phase 1)
 
 - design.md §3.3/§3.5: `claude_session_id` gains a third origination path -- start **pre-seeds**, native fork
-  **records**, adopt **binds** an existing native UUID. The 1:1 invariant is preserved (one manifest per conversation;
-  reattach semantics identical to a used Forge-born session).
+  **records**, adopt **binds** an existing native UUID. The manifest/conversation identity remains scalar (one manifest
+  per current conversation; reattach semantics identical to a used Forge-born session).
 - design.md §3.5 / `session/models.py`: add `confirmed.adoption` to the strict manifest schema and document that
   adoption provenance survives later hook-confirmed facts.
 - design.md §3.10 unchanged (hooks still never scan CWD); the discovery scan is a CLI command.
@@ -162,8 +163,8 @@ All ingredients exist; nothing constructs a manifest *from* a rollout today:
 - Manifest reads are strict (`SessionStore.read` with dacite `strict=True`), so new confirmed fields must be model
   fields, not ad hoc dict keys.
 - Search indexing is work-queue/rebuild driven; copying an artifact is necessary but not sufficient unless adoption also
-  queues or performs indexing through the established idempotent path. The memory writer similarly runs from Stop-time
-  handoff markers, not from artifact presence alone.
+  queues or performs indexing through the established idempotent path. The memory writer similarly runs from a
+  successful Stop's deferred handoff marker, not from artifact presence alone.
 
 ## Risks
 

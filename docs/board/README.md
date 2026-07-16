@@ -54,8 +54,8 @@ decides whether it runs.
 
 | Doc                       | Update model                           | How it is maintained                      |
 | ------------------------- | -------------------------------------- | ----------------------------------------- |
-| `change_log.md`           | Memory writer, direct write at Stop    | Passported as `changelog`                 |
-| `impl_notes.md`           | Memory writer, shadow proposal at Stop | Passported as `generic`, shadow mode      |
+| `change_log.md`           | Deferred memory-writer direct update   | Passported as `changelog`                 |
+| `impl_notes.md`           | Deferred memory-writer shadow proposal | Passported as `generic`, shadow mode      |
 | card `checklist.md` files | In-session agent, at your direction    | Edited as normal files during the session |
 
 | Command                         | Writes           | Meaning                                                                   |
@@ -66,10 +66,11 @@ decides whether it runs.
 | `forge session memory enable`   | Session manifest | Enables the memory writer for a session                                   |
 | `forge session memory disable`  | Session manifest | Disables the memory writer for a session                                  |
 
-Forge discovers docs by scanning hardcoded roots (`docs/` plus `.forge/memory/`) for passports at Stop time.
-`forge_memory` is the Forge-owned tracking marker. New tracks also fill missing outer `type`, `title`, and `description`
-metadata; existing passports are migrated only by `forge memory passport upgrade`. Forge preserves other outer values
-and does not generate `resource`, `tags`, or `timestamp`.
+The detached memory writer discovers docs when it runs by scanning hardcoded roots (`docs/` plus `.forge/memory/`) for
+passports. The Stop hook only enqueues its work marker. `forge_memory` is the Forge-owned tracking marker. New tracks
+also fill missing outer `type`, `title`, and `description` metadata; existing passports are migrated only by
+`forge memory passport upgrade`. Forge preserves other outer values and does not generate `resource`, `tags`, or
+`timestamp`.
 
 ### Setup
 
@@ -121,7 +122,8 @@ The important memory behavior:
 
 - Passports are git-tracked, so worktree forks see the same board memory contract.
 - Children inherit the parent's memory activation by default (`--memory on|off` overrides).
-- The executor can update `change_log.md` and shadow `impl_notes.md` at Stop without per-session `track`.
+- After the executor stops and a later eligible CLI startup drains its marker, the detached writer can update
+  `change_log.md` and shadow `impl_notes.md` without per-session `track`.
 
 ### 1. Planner
 
@@ -134,7 +136,9 @@ forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memor
 forge session start planner --memory on --proxy openrouter-openai
 ```
 
-Have the planner produce and approve the plan. After the planner stops, inspect the memory report:
+Have the planner produce and approve the plan. After the planner stops, a normal CLI command launches its queued,
+detached writer. Once that writer finishes, inspect the memory report (rerun the report command if the first invocation
+only triggered the drain):
 
 ```bash
 forge session memory report planner --latest
@@ -168,8 +172,9 @@ during implementation, use the supervisor reload flow instead of removing superv
 %policy supervisor on
 ```
 
-When the executor stops, the memory writer runs in the executor checkout. The executor inherited memory activation from
-the planner, and git carried the passports, so it can update `docs/board/change_log.md` and write proposals to its own
+When the executor stops, Forge enqueues memory-writer work for the executor checkout. A later eligible CLI startup
+launches the detached writer there. The executor inherited memory activation from the planner, and git carried the
+passports, so the writer can update `docs/board/change_log.md` and write proposals to the executor's own
 `.forge/memory/shadow_impl_notes.md`.
 
 ### 3. Reviewer

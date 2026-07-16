@@ -89,11 +89,11 @@ class LaunchIntent:
 class MemoryWriterConfig:
     """Memory writer configuration for automatic memory doc updates.
 
-    The memory writer runs after session stop to update designated
-    project memory documents (e.g., project-state.md) using ``claude -p``.
+    The Stop hook queues the writer, which later updates designated project
+    memory documents (e.g., project-state.md) using its bound runtime lane.
 
     Fields:
-        enabled: Whether the memory writer should run on session stop.
+        enabled: Whether Stop should enqueue deferred memory-writer work.
         mode: "augment" (add missing info) or "review-only" (report only, no edits).
         proxy: Optional proxy (proxy_id or template name) to route the writer's
                LLM calls through. If None, inherits the session's confirmed proxy.
@@ -295,7 +295,7 @@ class ConsumerLaneIntent:
 
 @dataclass
 class ConsumerLaneBinding:
-    """A consumer's frozen, resolved lane -- written once at first dispatch.
+    """A consumer's frozen, resolved lane -- written at its commitment/dispatch seam.
 
     Inert record plus the anchor the "already bound" reject checks. A binding exists
     iff an *explicit* lane choice was frozen (the default lane never freezes), so
@@ -310,7 +310,7 @@ class ConsumerLaneBinding:
 
 @dataclass
 class ConsumerLaneConfirmed:
-    """Frozen per-consumer lane bindings (hook-written, write-once per consumer)."""
+    """Frozen per-consumer lane bindings, written at each consumer's freeze seam."""
 
     supervisor: ConsumerLaneBinding | None = None
     memory_writer: ConsumerLaneBinding | None = None
@@ -334,11 +334,11 @@ class SessionIntent:
     memory: MemoryIntent | None = None
     policy: PolicyIntent | None = None
     verification: VerificationConfig | None = None
-    # Frozen-at-first-dispatch consumer-lane overrides (epic consumer_lanes, T1b).
+    # Requested consumer lanes; explicit choices freeze at consumer-specific seams.
     consumer_lanes: ConsumerLaneIntent | None = None
 
 
-# --- Confirmed section - what Claude Code actually did (filled by hooks) ---
+# --- Confirmed section - field-owned runtime and workflow facts ---
 
 
 @dataclass
@@ -554,9 +554,11 @@ class CodexConfirmed:
 
 @dataclass
 class SessionConfirmed:
-    """What Claude Code actually reported via hooks.
+    """Recorded runtime and workflow facts for a session.
 
-    Ownership: hook-owned runtime facts only (see docs/design.md ownership boundaries).
+    Ownership is field-specific: the CLI writes launch, derivation, and Codex runtime facts;
+    hooks write observed Claude runtime, artifact, and enforcement facts. Consumer lanes
+    freeze at their consumer-specific commitment or dispatch seam.
 
     Notes:
     - Paths recorded in `artifacts` are repo-root-relative (e.g., `.forge/artifacts/...`) unless
@@ -606,8 +608,8 @@ class SessionConfirmed:
     # namespace (~/.claude/projects/<encoded-cwd>/).
     claude_project_root: str | None = None
 
-    # Frozen consumer-lane bindings (epic consumer_lanes, T1b). Hook-written
-    # (policy-check `_mutate`), write-once per consumer dispatch.
+    # Frozen consumer-lane bindings (epic consumer_lanes, T1b). Written at each
+    # consumer's commitment/dispatch seam; general intent clearing preserves the freeze.
     consumer_lanes: ConsumerLaneConfirmed | None = None
 
     confirmed_at: str | None = None  # ISO8601 string

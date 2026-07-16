@@ -1,10 +1,10 @@
 """SessionStart hook handler.
 
 Claude Code invokes this hook with session info on stdin. The hook:
-1. Resolves session name using env var / UUID lookup / directory scan
+1. Resolves session name using launch env vars or UUID lookup (no CWD scan)
 2. Updates manifest confirmed fields (claude_session_id, transcript_path, proxy)
 
-1:1 model: UUID is overwritten on /compact or /clear (no accumulation).
+The current conversation UUID is overwritten on /compact or /clear (no accumulation).
 Transcript rollover still captured before overwriting.
 
 CRITICAL: Always exit 0 - don't break Claude on errors.
@@ -107,7 +107,7 @@ def resolve_session_name(
         uuid_result = None
     except Exception as e:
         # Logged broad catch: IndexStore can raise IndexCorruptedError, OSError,
-        # KeyError, etc. Hook must degrade to directory scan, never crash.
+        # KeyError, etc. Hook must degrade to an unresolved result, never crash.
         logger.debug("UUID lookup failed for %s: %s", session_id, e)
         uuid_result = None
     if uuid_result:
@@ -325,7 +325,7 @@ def handle_session_start(
 
                 clear_supervisor_degrade(state)
 
-            # 1:1 model: overwrite UUID (no accumulation)
+            # Keep one current conversation UUID; overwrite rather than accumulate.
             confirmed.claude_session_id = new_uuid
 
             confirmed.transcript_path = hook_input.transcript_path

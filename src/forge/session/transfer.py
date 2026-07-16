@@ -3,7 +3,7 @@
 Resume-phase context processing: when resuming a session, process the parent's
 transcript artifacts to assemble a context document for the child session.
 
-The memory writer (``memory_writer.py``) is the Stop-time doc updater --
+The memory writer (``memory_writer.py``) is the deferred project-doc updater --
 a separate concept.
 
 Strategies:

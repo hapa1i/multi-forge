@@ -1,7 +1,7 @@
 """Memory activation inheritance for fork and resume --fresh.
 
 Copies parent's memory activation (``auto_update``) to the child session.
-Memory docs are passport-discovered at Stop time, not inherited.
+Memory docs are passport-discovered by the detached writer, not inherited.
 """
 
 from __future__ import annotations

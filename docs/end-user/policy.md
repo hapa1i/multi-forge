@@ -266,9 +266,10 @@ itself stays put (it resets next session; clear it now with `forge policy superv
 
 ### Claude Max subscription billing (`--backend claude-max`)
 
-By default the `claude_code` lane uses the `anthropic-direct` backend, so the supervisor's spend is labeled like any API
-run. If you run on a Claude Max/Pro subscription and want headless checks attributed to it, pin the lane's **backend**
-(`claude-max` and the default share the `claude_code` runtime, so `--runtime` alone can't select it):
+By default the `claude_code` lane uses the `anthropic-direct` backend. A direct run with a resolvable key is labeled
+`api`; a keyless run on that default backend remains `unknown`. If you run on a Claude Max/Pro subscription and want
+headless checks attributed to it, pin the lane's **backend** (`claude-max` and the default share the `claude_code`
+runtime, so `--runtime` alone can't select it):
 
 ```bash
 forge policy supervisor set planner --backend claude-max
@@ -291,9 +292,10 @@ forge session lane show          # requested vs frozen lane per consumer
 ```
 
 Same rules as the supervisor: the run must be **keyless and direct** to be labeled `subscription_quota` (a resolvable
-key → `api`, a proxy → `unknown`), and the lane freezes on that consumer's first dispatch. These consumers only offer
-the `claude-max` backend on the default `claude_code` runtime, so this changes the billing label only — never where or
-how the work runs.
+key → `api`, a proxy → `unknown`), and the lane freezes on that consumer's first dispatch. A `--backend claude-max`
+binding stays on the default `claude_code` runtime, so that particular pin changes only the billing label. Separately,
+memory writer and shadow curation accept `--runtime codex` as a real `codex exec` dispatch lane; team supervisor has no
+Codex lane and remains billing-only.
 
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 

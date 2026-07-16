@@ -3,7 +3,7 @@
 Passports (YAML frontmatter in docs) select which docs the memory writer
 should update. Session activation (``memory.auto_update.enabled``) decides
 whether the writer runs. This module owns the scan that discovers passported
-docs under configured roots at Stop time.
+docs under configured roots when the detached memory writer runs.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ DEFAULT_SCAN_ROOTS: tuple[str, ...] = ("docs/",)
 
 
 # ---------------------------------------------------------------------------
-# Passport discovery (Stop-time scan)
+# Passport discovery (detached-writer scan)
 # ---------------------------------------------------------------------------
 
 _SCAN_EXCLUDE_DIRS: frozenset[str] = frozenset({".git", "node_modules", "__pycache__", ".venv"})

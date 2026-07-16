@@ -184,7 +184,7 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 | Artifact             | Path                                                             | Owned by                 | Purpose                                                                                 |
 | -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                 |
+| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, and field-owned `confirmed` runtime facts                |
 | Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
 | Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
 | Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
@@ -221,8 +221,12 @@ just this Forge project. **`all`** shows everything globally.
 
 ### 3.3 Session file schema (`forge.session.json`)
 
-**1:1 invariant:** Each Forge session corresponds to exactly one Claude process invocation.
-`confirmed.claude_session_id` is **launch-owned**, but how it is first set depends on the launch path.
+A Forge session is a durable workflow record, not a process-invocation record. A Claude-runtime session records its
+current or last-seen conversation in `confirmed.claude_session_id`; multiple process invocations may reattach to that
+conversation, and hooks reconcile the identity when Claude rolls it over. Codex-runtime sessions use the analogous
+`confirmed.codex.thread_id` and leave `claude_session_id` unset.
+
+For Claude, `confirmed.claude_session_id` has field-specific CLI/hook ownership depending on the launch path.
 `forge session start` **pre-seeds** it: the CLI generates a UUID, writes it to the manifest at creation, and imposes it
 on Claude via `--session-id`; the SessionStart hook then **validates** that UUID. The same pre-seed applies to
 **transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): the CLI mints a
@@ -232,24 +236,31 @@ records** it (`native-relocate` instead reuses the parent's UUID). Stop and Stop
 `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
 sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
 mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
-"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior). Relaunching a
-used session creates a child with lineage (`parent_session`), not a reuse of the same session.
+"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
-child. This relaxes the 1:1 model (a new process invocation on the same Forge session) and is the default path: the
-session must have resumable evidence (hook confirmation or transcript-backed state) and must not currently be active.
-Reattach mutates `confirmed` runtime facts (`confirmed_at`, `transcript_path`) — the confirmed section reflects "last
-seen state." Use `--fresh` to derive a new child session with context assembly instead.
+child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
+active. Reattach refreshes `confirmed` runtime facts such as `confirmed_at` and `transcript_path`; those fields reflect
+last-seen state rather than immutable launch facts. A never-launched session with no durable confirmation or transcript
+evidence launches in place, even though `session start --no-launch` may have pre-seeded its UUID. Use `--fresh` to
+derive a new child session with context assembly. `--force` against an active, resumable session launches a lineage
+child instead of attaching a second process to that conversation.
 
 The session file has three sections:
 
 > Schema is intentionally strict: unknown fields and unknown override keys are rejected.
 
-| Section         | Definition                    | Written by            | Semantics                          |
-| --------------- | ----------------------------- | --------------------- | ---------------------------------- |
-| **`intent`**    | Baseline config Forge *wants* | `forge session start` | Session-owned fields only          |
-| **`overrides`** | Live toggles on top of intent | `forge session set`   | Diff (can be cleared)              |
-| **`confirmed`** | Ground truth of what happened | Hooks                 | Observed facts, immutable once set |
+| Section         | Definition                    | Written by              | Semantics                                    |
+| --------------- | ----------------------------- | ----------------------- | -------------------------------------------- |
+| **`intent`**    | Baseline config Forge *wants* | `forge session start`   | Session-owned fields only                    |
+| **`overrides`** | Live toggles on top of intent | `forge session set`     | Diff (can be cleared)                        |
+| **`confirmed`** | Ground truth of what happened | CLI and hooks, by field | Recorded facts; mutability is field-specific |
+
+`confirmed` ownership and mutability are not section-wide. The CLI owns bootstrap, derivation, launch, and Codex runtime
+facts; hooks own observed Claude runtime facts, artifacts, and enforcement state. Some fields are write-once or frozen
+(`launch`, explicit consumer-lane bindings), some are additive (`artifacts`), and some are reconciled or refreshed as
+the runtime advances (`claude_session_id`, `transcript_path`, `confirmed_at`, and Codex turn facts). The field-level
+rules in §3.5 are normative.
 
 **`intent.launch`**: Forge-owned relaunch preferences for reproducible session launch:
 
@@ -287,10 +298,10 @@ started_with_proxy:
 
 #### Effective vs Confirmed (normative distinction)
 
-| Term            | What it answers                | How computed                      | Stored?                |
-| --------------- | ------------------------------ | --------------------------------- | ---------------------- |
-| **`effective`** | "What *should* the config be?" | `intent` with `overrides` applied | No (derived on-demand) |
-| **`confirmed`** | "What *actually happened*?"    | Hooks record facts                | Yes (persisted)        |
+| Term            | What it answers                | How computed                       | Stored?                |
+| --------------- | ------------------------------ | ---------------------------------- | ---------------------- |
+| **`effective`** | "What *should* the config be?" | `intent` with `overrides` applied  | No (derived on-demand) |
+| **`confirmed`** | "What *actually happened*?"    | CLI/hooks record field-owned facts | Yes (persisted)        |
 
 **Override rules** (for session `intent + overrides` only):
 
@@ -862,9 +873,10 @@ UUID `<R>`, not the parent's UUID.
 
 ### 3.10 Hook handlers
 
-Session-state hooks write ground truth to the session file: the session manager writes `intent` (and user `overrides`);
-hooks write `confirmed` facts (transcript paths, plan paths, proxy identity, etc.). Exception: the Codex
-`codex-session-start` hook writes only receipt files (delivery or observation), never the manifest (§3.5).
+The session manager writes `intent` and user `overrides`; CLI launch/derivation paths and hooks write their field-owned
+`confirmed` facts. Hooks own observed Claude facts such as transcript and plan paths, while the CLI owns launch facts
+and reconciled Codex runtime state (§3.5). The Codex `codex-session-start` hook writes only receipt files (delivery or
+observation), never the manifest; the CLI reconciles those receipts after the turn.
 
 **Session identification:** Hooks locate the session via `FORGE_SESSION` (set at launch), enabling multiple sessions per
 Forge project. Hooks use `FORGE_SESSION` + UUID lookup only. No CWD-based scan or fallback detection.
@@ -933,8 +945,8 @@ a genuine duplicate trigger; both may appear.
 
 **Stop hook pipeline:**
 
-The Stop hook does multiple things. To avoid blocking exit and ensure idempotency across repeated invocations, it's
-split into **sync** and **async** phases:
+The Stop hook does multiple things. To avoid blocking exit and ensure idempotency across repeated invocations, it
+performs synchronous capture/verification and then only enqueues deferred work:
 
 ```
 Stop Pipeline:
@@ -943,27 +955,38 @@ Stop Pipeline:
   1. capture_artifacts()    Copy transcript to .forge/artifacts/ (idempotent via UUID)
   2. run_verification()     Check completion promise → returns allow|block
 
-  [Async - enqueued, fire and forget]
-  3. enqueue memory-writer work  Mark session for the memory writer + indexing
+  [Deferred - Stop writes markers; it does not launch a writer]
+  3. enqueue stop/index markers
+  4. enqueue handoff marker when memory is enabled
+  5. enqueue shadow marker when pending shadow candidates exist
 
   return verification_decision
+
+Later eligible Forge CLI startup:
+  6. opportunistically drain pending work
+  7. handoff handler launches detached `forge memory-writer run` and returns
+  8. detached writer scans passports and synthesizes updates
 ```
 
-The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent; this is
-acceptable because they benefit future sessions, not the exiting session.
+The memory writer runs asynchronously in a detached process after a later, non-exempt Forge CLI startup drains the
+handoff marker. Memory doc updates are eventually consistent; this is acceptable because they benefit future sessions,
+not the exiting session.
 
 **Idempotency rules** (verification can trigger Stop multiple times per session):
 
-| Step          | Multiple invocations safe? | How                                                 |
-| ------------- | -------------------------- | --------------------------------------------------- |
-| Artifact copy | ✔ Yes                      | Writes to UUID-named path, overwrites are identical |
-| Verification  | ✔ Yes                      | Stateless check of last message                     |
-| Async enqueue | ✔ Yes                      | Marker file is idempotent (same content = no-op)    |
+| Step             | Multiple invocations safe? | How                                                 |
+| ---------------- | -------------------------- | --------------------------------------------------- |
+| Artifact copy    | ✔ Yes                      | Writes to UUID-named path, overwrites are identical |
+| Verification     | ✔ Yes                      | Stateless check of last message                     |
+| Deferred enqueue | ✔ Yes                      | Marker file is idempotent (same content = no-op)    |
 
-**Async enqueue:** The Stop hook enqueues a marker via `enqueue_stop_marker()` for deferred processing. See §3.13 (Async
-Work Queue) for the queue contract, schema, and processing model.
+**Deferred enqueue:** The Stop hook attempts stop and index markers, a handoff marker when memory is enabled, and a
+shadow marker when pending shadow candidates exist. A later eligible CLI startup drains the handoff marker and launches
+the detached writer; the Stop hook never spawns it. See §3.13 (Async Work Queue) for the queue contract, schema, and
+processing model.
 
-This keeps the Stop hook fast (\<100ms) while ensuring memory-writer work + indexing happen soon.
+This keeps the Stop hook fast (\<100ms) while arranging memory-writer work and indexing after subsequent eligible CLI
+activity.
 
 Design rule: hooks emit machine-readable JSON; no `systemMessage` required (the memory writer replaces manual
 reminders).
@@ -1367,20 +1390,21 @@ every launch and the entrypoint merges `apiKeyHelper` into it idempotently; proj
 never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
 host checkout and manifest-owned Forge root separately.
 
-The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so Stop-time
-index/memory/shadow work survives `--rm` and is drained only by the host CLI. **Narrow exception (§7.x audit path):**
-when a session launches with a proxy id, the sidecar additionally mounts that proxy's `~/.forge/proxies/<id>/` read-only
-(so the in-container proxy loads its intercept/audit overlay) and `~/.forge/audit/`, `~/.forge/costs/`,
-`~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost files, downstream/upstream telemetry, cap
-state, and the usage-attribution ledger persist on the host instead of dying with the `--rm` container — the ledger is
-the only record of the in-container supervisor/verb activity, and it feeds `forge telemetry activity` and the
-session-end summary for sidecar sessions). These are the only global `~/.forge` subdirectories mounted, preserving the
-port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the
-launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can
-reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox,
-**not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in
-`intent.launch` so `forge session resume <name>` can replay the same runtime wiring later. Project-scoped `statusLine`
-remains the D3 exception to user-scope hook ownership and resolves through the sidecar image's `PATH`.
+The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so
+index/memory/shadow markers enqueued at Stop survive `--rm` and are drained only by the host CLI. **Narrow exception
+(§7.x audit path):** when a session launches with a proxy id, the sidecar additionally mounts that proxy's
+`~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and `~/.forge/audit/`,
+`~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost files,
+downstream/upstream telemetry, cap state, and the usage-attribution ledger persist on the host instead of dying with the
+`--rm` container — the ledger is the only record of the in-container supervisor/verb activity, and it feeds
+`forge telemetry activity` and the session-end summary for sidecar sessions). These are the only global `~/.forge`
+subdirectories mounted, preserving the port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`;
+that uid has no passwd entry, so the launcher pins `HOME=/root` and the image makes `/root` traversable/writable
+(`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for
+the ephemeral single-session `--rm` sandbox, **not** a security-sandbox guarantee. Sidecar sessions also persist their
+launch mode, extra mounts, and image in `intent.launch` so `forge session resume <name>` can replay the same runtime
+wiring later. Project-scoped `statusLine` remains the D3 exception to user-scope hook ownership and resolves through the
+sidecar image's `PATH`.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.

@@ -250,8 +250,14 @@ Six atomic credentials (defined in `forge.core.auth.capabilities`):
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, `litellm-anthropic-local` + `anthropic-passthrough` proxies |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                    |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                    |
-| `codex-api`      | `CODEX_API_KEY`                                         | Native Codex headless runs (`codex exec`); not `OPENAI_API_KEY` / ChatGPT login |
+| `codex-api`      | `CODEX_API_KEY`                                         | Forge-managed API-key path for native Codex headless runs (`codex exec`)        |
 | `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                          |
+
+`codex-api` is Forge's registry entry for `CODEX_API_KEY`, distinct from `OPENAI_API_KEY`. Environment values pass
+directly; Forge injects `~/.forge/credentials.yaml` values into managed `codex exec` children because Codex cannot read
+that store. `forge runtime preflight codex` also checks env-only `CODEX_ACCESS_TOKEN`, then `codex doctor`'s store.
+Stored API keys, agent identity, and ChatGPT tokens yield `auth_source=codex_store`. ChatGPT needs no `codex-api` entry
+and yields `auth_method=chatgpt_tokens`, `billing_mode=subscription_quota`; Codex reads its store directly.
 
 `auth_ignore_env: true` in runtime config (`~/.forge/config.yaml`) skips all env vars for credential resolution. Both
 the sync path (`resolve_env_or_credential`) and async path (`CredentialManager` via `EnvSecretsProvider`) respect the
@@ -1452,16 +1458,15 @@ changes vs $5.00 reviewing everything.
 Extracted from [design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative). Resolution chain concept,
 fail-open/fail-closed semantics, and per-invocation routing plan remain in design.md.
 
-**Consumer-lane layering (epic consumer_lanes).** Forge subprocess consumers are migrating to a *consumer-lane* model: a
-`(runtime, backend, model)` lane resolved per consumer and dispatched by runtime (`forge.core.lanes`; the pure resolver
-is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- the policy-check hook resolves its lane
-from the `consumer_lanes` binding (`SUPERVISOR_CONSUMER`) and **injects** it into `run_supervisor_check`, which converts
-the injected `LaneRecord` and dispatches by runtime through an in-module seam (`_dispatch_supervisor`). Two arms ship:
+**Consumer-lane layering (epic consumer_lanes).** Forge resolves each consumer's `(runtime, backend, model)` lane and
+dispatches by runtime (`forge.core.lanes`; `resolve_lane` is pure). Persisted `consumer_lanes` bindings cover semantic
+supervisor, shadow-curation, memory-writer, and team-supervisor. Policy-check resolves `SUPERVISOR_CONSUMER` and
+**injects** its `LaneRecord` into `run_supervisor_check` for the two `_dispatch_supervisor` arms:
 
 - **`claude_code`** (default lane) -- the byte-identical `claude -p` path; transport (direct vs proxy / `base_url`) is
   still derived inside the arm by `resolve_subprocess_routing` (the chain below). The lane layer never touches the proxy
   registry.
-- **`codex`** -- the first non-claude consumer lane, selected by the supervisor's `consumer_lanes` binding (a declared
+- **`codex`** -- the non-Claude supervisor lane, selected by the supervisor's `consumer_lanes` binding (a declared
   `SUPERVISOR_CONSUMER` candidate on the `chatgpt` subscription backend, `reachable_via=("codex",)`, T2). The
   policy-check hook reads the binding (`read_bound_lane`, confirmed-first then intent) and **injects** the resolved lane
   into `run_supervisor_check`, which never reads the store. Runs headless `codex exec` **direct** to OpenAI (no proxy,
@@ -1475,38 +1480,33 @@ the injected `LaneRecord` and dispatches by runtime through an in-module seam (`
   double-count). Every failure (bad override, cold/stale/unready cache, plan-absent, or any setup exception) **fails
   open** -- the supervisor's contract (design_workflows §1.2).
 
-Only `runtime_id` is load-bearing (it selects the arm); `backend_id`/`model` on the lane are nominal (codex picks its
-own model). All other consumers still call the resolver directly. T1b replaced the narrow `supervisor_runtime` override
-with the uniform consumer-lane manifest binding: the lane is now a persisted `LaneRecord` -- an `intent.consumer_lanes`
-override that the policy-check hook freezes into `confirmed.consumer_lanes` at the **first policy check** for a
-registered supervisor -- its commitment point, not a dispatch (**only an explicit lane freezes; a consumer on its
-default lane never freezes and stays re-pinnable**) -- set by the resolving commands (`--supervisor-runtime`,
-`policy supervisor set <target> --runtime`) and rejected as a raw `set` override. Re-pinning the same lane is an
-idempotent no-op; `policy supervisor remove` clears both the intent and confirmed slots.
+For supervisor, shadow-curation, and memory-writer, `runtime_id` selects the Claude Code or Codex arm. Codex
+`backend_id`/`model` are placement metadata: Codex selects its model; preflight auth determines billing. Claude Code
+`backend_id` drives `resolve_billing_mode` (for example, `claude-max`). Team-supervisor lacks a Codex candidate and is
+billing-only. T1b replaced `supervisor_runtime` with a persisted consumer-lane `LaneRecord`. The **first policy check**
+for a registered supervisor freezes an explicit `intent.consumer_lanes` override into `confirmed.consumer_lanes` -- a
+commitment, not a dispatch. Default lanes never freeze and remain re-pinnable. `--supervisor-runtime` and
+`policy supervisor set <target> --runtime` set the override; raw `set` is rejected. Re-pinning is an idempotent no-op;
+`policy supervisor remove` clears intent and confirmed.
 
-**Aux consumers on `claude-max` (T6a).** Memory-writer, shadow-curation, and team-supervisor are bindable through the
-same machinery, but **billing-only** -- their sole declared override is the `claude-max` backend, which rides the same
-`claude_code` runtime as the default, so the `claude-max` binding changes the **billing label, not dispatch** (the
-separate `codex` lane that *does* change dispatch is T6b, below -- shadow-curation only).
-`forge session lane set --consumer <id> --backend claude-max` writes the `intent` override; each consumer freezes it
-into `confirmed` from an `on_dispatch` hook at its actual runtime dispatch (the `run_claude_session` call, or
-`codex exec` on shadow-curation's codex lane, T6b) (`persist_lane_freeze`, best-effort -- a lock failure never blocks
-the run, and a skipped/throttled run never freezes), threading the dispatched lane with the same under-lock
-`read_bound_lane(m) == dispatched_lane` equality guard the supervisor uses. The guard mechanism is shared; the *trigger*
-differs by design -- the supervisor freezes eagerly at registration, these only on a real dispatch, because aux
-consumers have no registration commitment point. `read_bound_backend_id` yields `claude-max`, and a **keyless + direct**
-run is labeled `subscription_quota` (a resolvable key wins -> `api`; a proxied run -> `unknown`). Billing is honest from
-the `intent` write alone (the read is confirmed-first **then intent**); the freeze adds immutability + a stable
-observable binding, not the billing label.
+**Aux consumers on `claude-max` (T6a).** All three aux consumers use the same machinery. A `claude-max` binding keeps
+the default `claude_code` runtime, changing the **billing label, not dispatch**. Shadow-curation and memory-writer also
+have dispatch-changing Codex lanes (T6b/T6c); team-supervisor is billing-only.
+`forge session lane set --consumer <id> --backend claude-max` writes `intent`; `on_dispatch` freezes it into `confirmed`
+on Claude dispatch, or `codex exec` for shadow-curation and memory-writer. `persist_lane_freeze` is best-effort: lock
+failure never blocks a run; skipped/throttled runs never freeze. Under lock, it uses the supervisor's
+`read_bound_lane(m) == dispatched_lane` guard. Unlike the supervisor's first-check commitment, aux consumers freeze only
+on dispatch; they lack a registration commitment point. `read_bound_backend_id` yields `claude-max`; a **keyless +
+direct** run is `subscription_quota`, a resolvable key wins as `api`, and a proxied run is `unknown`. Billing works from
+`intent` alone (confirmed-first **then intent**); freezing adds immutability and a stable observable binding, not the
+label.
 
-**Shadow-curation codex arm (T6b).** Shadow-curation -- the clean mirror-T4 aux consumer (blind, read-only,
-stdout-is-output) -- is the first aux consumer with a real non-claude dispatch arm. Its `allowed_lanes` gain
-`Lane(codex, chatgpt, gpt-5-codex)`; the curate CLI threads the bound `LaneRecord` into `run_shadow_curation`, which
-validates it against the consumer's declared candidates (`LaneRecord -> Lane -> resolve_lane`, the supervisor's guard --
-a drifted/invalid explicit binding fails loud, never a wrong-arm dispatch) and branches on the resolved runtime, before
-the claude `on_dispatch`, into `_dispatch_codex_shadow_curation` (the `claude_code` path stays byte-identical). The arm
-mirrors `_dispatch_codex_supervisor` -- cached preflight, read-only `codex exec` direct to OpenAI, self-contained
-inlined prompt -- but maps into shadow-curation's own contract, which diverges from the supervisor's on three axes:
+**Shadow-curation codex arm (T6b).** This clean mirror-T4 consumer (blind, read-only, stdout-is-output) allows
+`Lane(codex, chatgpt, gpt-5-codex)`. The curate CLI passes its `LaneRecord` to `run_shadow_curation`, which validates
+`LaneRecord -> Lane -> resolve_lane`; invalid explicit bindings fail loud before any wrong-arm dispatch. Runtime
+branches into `_dispatch_codex_shadow_curation` before Claude `on_dispatch`; the `claude_code` path stays
+byte-identical. The arm mirrors `_dispatch_codex_supervisor` -- cached preflight, read-only direct `codex exec`,
+self-contained prompt -- but its contract differs on three axes:
 
 - **Degrade: fail-loud, not fail-open.** User-invoked, so a cold/unready preflight or a failed turn returns
   `CurationResult(success=False)` carrying a refresh hint surfaced by the CLI (human via `print_error` + `--json`, the
@@ -1519,11 +1519,10 @@ inlined prompt -- but maps into shadow-curation's own contract, which diverges f
   folded (the invoker's `success` is returncode-only) so an exit-0-but-failed turn fails loud instead of persisting an
   empty report.
 
-**Memory-writer codex arm (T6c).** The memory writer -- the first aux consumer whose codex lane can **write the repo**
--- gains `Lane(codex, chatgpt, gpt-5-codex)`. `forge memory-writer run` threads the bound `LaneRecord` into
-`run_memory_writer`, which resolves the runtime (`LaneRecord -> Lane -> resolve_lane`, the T6b guard) **before** the
-claude-availability check and branches into `_dispatch_codex_memory_writer` ahead of the claude `on_dispatch`. Two
-divergences from the T6b template:
+**Memory-writer codex arm (T6c).** Its `Lane(codex, chatgpt, gpt-5-codex)` can **write the repo** in augment mode.
+`forge memory-writer run` passes the bound `LaneRecord` to `run_memory_writer`, which resolves
+`LaneRecord -> Lane -> resolve_lane` **before** the Claude-availability check, then branches into
+`_dispatch_codex_memory_writer` ahead of Claude `on_dispatch`. It differs from T6b in two ways:
 
 - **Degrade: best-effort async, not fail-loud.** The writer runs detached from the work queue (stdout -> DEVNULL), so
   every failure logs + records an outcome + `return False` (never raises, never fails-open). Resolving the runtime

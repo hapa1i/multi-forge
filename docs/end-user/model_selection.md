@@ -248,7 +248,7 @@ strengths matter.
 | `/forge:review` | `src/skills/review/SKILL.md` (Claude Code skill)   | `src/forge/core/ops/session_context.py` for family detection |
 | `/forge:panel`  | `forge workflow panel ...`                         | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
 | `/forge:debate` | `forge workflow debate ...`                        | `src/forge/review/engine.py` (adversarial runner)            |
-| Memory writer   | Runs at Stop hook + async work queue               | `src/forge/session/memory_writer.py`                         |
+| Memory writer   | Stop enqueues; a later CLI drain launches it       | `src/forge/session/memory_writer.py`                         |
 
 Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
 need runtime readiness for panel/debate workflow runners.

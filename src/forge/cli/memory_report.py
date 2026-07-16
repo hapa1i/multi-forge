@@ -1,8 +1,8 @@
 """``forge session memory report`` -- inspect memory writer reports.
 
-The memory writer (``session/memory_writer.py``) runs detached from the Stop
-work queue, so its stdout vanishes to ``DEVNULL``. To make the writer's
-proposed or applied changes visible, ``run_memory_writer`` persists each run's
+The memory writer (``session/memory_writer.py``) runs as a detached process
+launched by a later pending-work drain, so its stdout vanishes to ``DEVNULL``.
+To make the writer's proposed or applied changes visible, ``run_memory_writer`` persists each run's
 output to ``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md``.
 This module surfaces that file via ``forge session memory report`` (a flat leaf;
 the former ``forge memory report show`` group was collapsed in the CLI cleanup).

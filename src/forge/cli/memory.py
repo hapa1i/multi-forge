@@ -317,7 +317,7 @@ def _warn_if_out_of_root(path: str, forge_root: Path, roots: tuple[str, ...]) ->
         return
     console.print(
         f"[yellow]Warning:[/yellow] {path} is outside the default scan roots ({', '.join(roots)}). "
-        "The passport is written, but Stop-time memory will not process it."
+        "The passport is written, but the deferred memory writer will not process it."
     )
 
 

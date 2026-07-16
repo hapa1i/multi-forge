@@ -18,8 +18,8 @@ the slice-5a checklist note). Concretely:
 * ``overallStatus`` is **informational only** and never gates readiness: it goes
   ``"warning"`` for unrelated reasons (stale rollout DB rows, update checks) while
   auth is perfectly fine.
-* ``doctor`` exposes **no per-hook trust** signal, so 5a can never prove the (not yet
-  built) transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The
+* ``doctor`` exposes **no per-hook trust** signal, so preflight cannot prove the
+  registered transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The
   codex_frontend probes (2026-06-10) pinned that hooks DO fire under headless
   ``codex exec`` once trust-enrolled (registry ``native_hooks="enrollment_gated"``),
   so the normal enabled+version-OK case returns ``"enrollment_gated"``: hooks can
@@ -97,9 +97,9 @@ CODEX_PROXY_CONTRACT_VALIDATED = "0.141.0"
 # is just one way to obtain the former.
 CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none"]
 
-# Whether Forge's (future) SessionStart transfer hook can deliver context. This
-# preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry,
-# unprovable before the hook exists. ``enrollment_gated`` is the normal
+# Whether Forge's SessionStart transfer hook can deliver context. This
+# preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry
+# and cannot be inferred from the static config. ``enrollment_gated`` is the normal
 # enabled+version-OK verdict and is NOT a per-home enrolled-state claim: it means
 # "hooks can fire (probe-confirmed: enrolled hooks fire headless AND interactively),
 # but enrollment state is unchecked" -- never treat it as ``active``. Reading
@@ -112,9 +112,9 @@ CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none
 HookSeam = Literal["active", "untrusted", "managed_suppressed", "enrollment_gated", "disabled", "unknown"]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
-# ``wire_api="responses"`` only; no current Forge proxy serves Responses on its
-# Codex-facing endpoint, so a ``--proxy`` is ``proxy_unsupported`` and direct
-# ``codex exec`` (``native_direct``) is the supported path.
+# ``wire_api="responses"`` only. Direct ``codex exec`` is ``native_direct``;
+# ``--proxy`` is supported only when the proxy's wire shape and backend source
+# advertise Forge's Responses passthrough capability.
 ProxyResponses = Literal["native_direct", "proxy_supported", "proxy_unsupported"]
 
 

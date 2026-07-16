@@ -78,8 +78,11 @@ Bundles are enabled per-session:
 ```yaml
 # In session intent
 policy:
+  enabled: true
   bundles: [tdd, coding_standards]
-  tdd_mode: strict  # off | permissive | strict
+  bundle_config:
+    tdd:
+      strict: true  # false = permissive warnings
 ```
 
 ### 1.2 Semantic Policy (The Supervisor)
@@ -202,11 +205,11 @@ rerun).
   rule (LLM output is external data), not an exception to coding-standards §5. See coding_standards.md §5 (boundary
   framework) for the general framework.
 - **Subscription-exhaustion degrade (T7)**: the one sanctioned lane-fallback exception. When the supervisor's bound
-  codex subscription lane exhausts mid-session (`failure_type="subscription_exhausted"`), the policy hook persists a
-  sticky degrade overlay and routes subsequent checks to the default `claude -p` lane -- restoring real enforcement
-  instead of a silent per-check fail-open. One hop only (codex -> default; no chains), still fail-open on the degrade
-  path itself, sticky for the session (reset on `supervisor remove`/re-pin or a fresh process resume). This is the
-  *only* general fallback the consumer-lane epic permits; see design_appendix §G for the overlay/reset mechanics.
+  Codex lane fails with confirmed subscription exhaustion (`failure_type="subscription_exhausted"`), the policy hook
+  persists a sticky degrade overlay and routes subsequent checks to the default `claude -p` lane -- restoring real
+  enforcement instead of a silent per-check fail-open. One hop only (codex -> default; no chains), still fail-open on
+  the degrade path itself, sticky for the session (reset on `supervisor remove`/re-pin or a fresh process resume). This
+  is the *only* general fallback the consumer-lane epic permits; see design_appendix §G for the overlay/reset mechanics.
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
   configured path prefixes) and MAY cache the last verdict for identical diffs.
 
@@ -229,10 +232,11 @@ context or the Codex lane's in-band approved snapshot keeps the plan authority i
 
 **Reactive Patterns (Shared Library)**
 
-Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
-the memory writer (`session/memory_writer.py`), deterministic policies (`policy/deterministic/`), and the experimental,
-manifest-only WorkflowPolicy. The shared pattern: take hook context, classify/evaluate, return a decision or side
-effect. Three node types cover current and planned use cases:
+Several components react to hook events, directly or through deferred markers: semantic supervisor
+(`policy/semantic/supervisor.py`), the memory writer (`session/memory_writer.py`), deterministic policies
+(`policy/deterministic/`), and the experimental, manifest-only WorkflowPolicy. The shared pattern is to take event or
+marker context, classify/evaluate, and return a decision or side effect. Three node types cover current and planned use
+cases:
 
 | Node type      | Execution                              | Examples                                  | Cost / billing         |
 | -------------- | -------------------------------------- | ----------------------------------------- | ---------------------- |
@@ -383,16 +387,20 @@ telemetry in the hook command, not part of either wire contract.
 ### 1.6 Policy state and ownership
 
 Policy has two aspects with different ownership: **definition** (configuration — who sets the rules) and **state**
-(runtime — what happened). Supervisor model and throttling are proxy-owned (routing decisions). TDD mode, policy
-enabled/disabled, and verification config are session-owned (workflow decisions). All enforcement results are
-hook-written to `confirmed.policy`.
+(runtime — what happened). `SupervisorConfig` is session-owned policy intent: it controls the target, lifecycle,
+timeout, throttle/cache window, plan override, cascade/checker settings, effort, shadow sampling, and which routing
+reference the session requests. Explicit supervisor consumer-lane intent is session-owned as well. A referenced proxy
+still owns its endpoint, tier-to-model mappings, and default hyperparameters; selecting that proxy does not let a
+session rewrite its `opus` tier. Direct and Codex supervisor lanes do not acquire proxy-owned tier routing merely by
+being supervisor invocations. TDD strictness, policy enablement, and verification config are also session-owned. All
+enforcement results are hook-written to `confirmed.policy`.
 
 **Policy provenance:** `confirmed.policy` records `forge_version`, `bundles`, `rules_active`, and `decisions` for
 audit/debugging ("why did this block?").
 
-**Ownership rationale:** Supervisor model = routing decision → proxy. TDD mode = workflow decision → session.
-Enforcement results = observed facts → hook-written `confirmed`. Stateful policies (e.g., "tests touched") write only to
-`confirmed.policy`.
+**Ownership rationale:** Supervisor invocation controls and routing references are workflow decisions → session. The
+selected proxy's tier mappings are routing implementation → proxy. Enforcement results are observed facts → hook-written
+`confirmed`. Stateful policies (e.g., "tests touched") write only to `confirmed.policy`.
 
 > Full policy definition and state ownership tables in [§2](#2-policy-internals).
 
@@ -445,15 +453,16 @@ user rather than working around the check.
 
 ### 2.3 Policy definition ownership (from §1.6)
 
-| Setting                                             | Owner   | Location                                                                                                                                                   |
-| --------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                                                                                         |
-| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                                                                                         |
-| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                                                                                                                             |
-| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                                                                                                                          |
-| Verification config                                 | Session | Session file `intent.verification`                                                                                                                         |
-| Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens`                                                           |
-| Checker + frontier reasoning effort                 | Session | `intent.policy.supervisor.checker_effort` (core.llm: `none/low/medium/high/xhigh`) / `.supervisor_effort` (`claude --effort`: `low/medium/high/xhigh/max`) |
+| Setting                                         | Owner   | Location                                                                                               |
+| ----------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| Policy enablement, fail mode, and bundles       | Session | `intent.policy.enabled` / `.fail_mode` / `.bundles`                                                    |
+| TDD strictness                                  | Session | `intent.policy.bundle_config.tdd.strict` (`false` = permissive)                                        |
+| Supervisor target, lifecycle, timeout, throttle | Session | `intent.policy.supervisor`                                                                             |
+| Supervisor lane request                         | Session | `intent.consumer_lanes.supervisor`                                                                     |
+| Referenced proxy endpoint, tiers, and defaults  | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                                     |
+| Verification config                             | Session | `intent.verification`                                                                                  |
+| Cascade and tier-1 checker route/budget         | Session | `intent.policy.supervisor.cascade` / `.checker_provider` / `.checker_model` / `.checker_budget_tokens` |
+| Checker and frontier reasoning effort           | Session | `intent.policy.supervisor.checker_effort` (`none`–`xhigh`) / `.supervisor_effort` (`low`–`max`)        |
 
 ### 2.4 Policy state ownership (from §1.6)
 
@@ -780,8 +789,10 @@ disagreement areas, evidence-weighted recommendation). Temp file cleaned up via 
 ### 4.5 Operational constraints
 
 **Recursion guard:** Skills invoke `forge` commands. `forge` commands spawn `claude -p` subprocesses. Those subprocesses
-trigger hooks. If a hook spawns another subprocess, you get recursion. `build_claude_env()` sets `FORGE_DEPTH` (starting
-at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, memory writer) skip at depth >= 2.
+trigger hooks. If a hook or worker launches another agent without a guard, it can recurse. `build_claude_env()` sets
+`FORGE_DEPTH` (starting at 0, incremented per subprocess layer); the semantic supervisor, team supervisor, and workflow
+fan-out check that depth before dispatch. The memory writer does not belong to the hook-spawn category: the Stop hook
+only enqueues its marker, and a later CLI drain launches the detached writer.
 
 **Run-tree identity (attribution, orthogonal to the recursion guard):** alongside `FORGE_DEPTH`, `build_claude_env()`
 stamps `FORGE_RUN_ID` (this process), `FORGE_PARENT_RUN_ID` (the spawner), and `FORGE_ROOT_RUN_ID` (the tree root). A
@@ -817,8 +828,8 @@ installed script. The same principle applies to skill scripts.
 
 ## 5. Designated Memory Docs
 
-Cross-session continuity via designated markdown files that sessions keep updated—no knowledge graphs or async
-synthesis.
+Cross-session continuity via designated markdown files that sessions keep updated—no knowledge graphs. Automated
+project-memory synthesis is deferred through the pending-work queue.
 
 Forge memory has three layers; this section covers **project memory** -- the designated docs the memory writer curates:
 
@@ -828,7 +839,8 @@ Forge memory has three layers; this section covers **project memory** -- the des
 | **Project memory**  | Passported docs (changelog, impl notes) -- this section | `docs/`, `.forge/memory/` |
 | **Transfer memory** | Curated context for fork/resume (§3.9)                  | `.forge/prev_sessions/`   |
 
-The **memory writer** curates project memory at Stop time; **transfer** (§3.9) assembles context for a child session.
+The Stop hook schedules the **memory writer**, which later curates project memory asynchronously; **transfer** (§3.9)
+assembles context for a child session.
 
 The simplest memory system is:
 
@@ -839,14 +851,16 @@ The simplest memory system is:
 
 ### 5.1 Memory writer (automated doc maintenance)
 
-The memory writer runs at session end to fill gaps automatically:
+The memory writer is requested at session end and runs later to fill gaps automatically:
 
 ```
-Stop hook → spawn memory writer → reads transcript + current docs → updates
+Stop hook → enqueue handoff marker → later CLI drain → detached memory writer → read transcript/docs → update
 ```
 
-The memory writer runs `claude -p` (headless prompt mode) on the full session transcript. It operates
-**retrospectively**, selecting what mattered with full-session hindsight (higher signal than incremental capture).
+The Stop hook never launches the writer. A later, non-exempt Forge CLI startup opportunistically drains the marker and
+spawns `forge memory-writer run` as a detached process. The writer then dispatches its configured consumer lane on the
+full session transcript (`claude -p` by default, or `codex exec` when pinned). It operates **retrospectively**,
+selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
 # In session intent (set via forge session memory enable or --memory on)
@@ -858,15 +872,15 @@ memory:
     min_turns: 5               # skip for very short sessions
 ```
 
-**Multi-agent workflow:** In parallel runs, each agent spawns its own memory writer. `augment` mode stays additive (no
-overwrites).
+**Multi-agent workflow:** In parallel session runs, each session's Stop hook enqueues its own handoff marker. Later
+drains launch the corresponding detached writers. `augment` mode stays additive (no overwrites).
 
 ### 5.2 Memory doc passports
 
 Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
-authoritative contract for that doc's intent, update strategy, and writer privileges. The memory writer re-reads
-passports at Stop time. Newly tracked Markdown docs also receive a small outer metadata envelope that is structurally
-compatible with the pinned OKF v0.1 concept shape:
+authoritative contract for that doc's intent, update strategy, and writer privileges. The detached memory writer reads
+passports at execution time, not in the Stop hook. Newly tracked Markdown docs also receive a small outer metadata
+envelope that is structurally compatible with the pinned OKF v0.1 concept shape:
 
 ```yaml
 ---
@@ -901,11 +915,11 @@ preserve existing outer values semantically, but do not promise preservation of 
 order, scalar spelling, or line endings.
 
 **Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own activation state
-(enabled, mode, min_turns). There are no session-scoped doc lists; all docs are discovered from passports at Stop time.
-Editing a passport between sessions takes effect without re-running `forge memory track`.
+(enabled, mode, min_turns). There are no session-scoped doc lists; the detached runner discovers all docs from passports
+when it executes. Editing a passport before that scan takes effect without re-running `forge memory track`.
 
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
-rejected with deferral messages. Writer access is checked at Stop time by the memory writer.
+rejected with deferral messages. The detached memory writer checks access when it executes.
 
 **Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport and envelope for a Markdown doc
 without a passport. Re-tracking an existing passport updates only the requested Forge contract; it never adds or repairs
@@ -947,8 +961,8 @@ Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `
 defaults change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `MemoryWriterConfig`
 defaults.
 
-Memory docs are not inherited. Passports are git-tracked and discovered live at Stop time in whatever checkout the child
-session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
+Memory docs are not inherited. Passports are git-tracked and discovered live by the detached writer in whatever checkout
+the child session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
 
 ### 5.5 Strategy registry
 
@@ -988,10 +1002,10 @@ forge session start planner --memory on
 Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge memory-writer run`)
 check `effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
 
-**Stop-time discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus
-`.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
-shadow-only passports, and passes the result to `run_memory_writer()`. Capped at 50 docs after filtering. The Stop hook
-only decides whether to enqueue; the scan runs in the background runner.
+**Deferred discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus `.forge/memory/`)
+for `forge_memory` passports the session is authorized to write, materializes shadow files for shadow-only passports,
+and passes the result to `run_memory_writer()`. Capped at 50 docs after filtering. The Stop hook only decides whether to
+enqueue; the scan runs in the background runner.
 
 **Scan roots** are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots are
 deferred.
@@ -1150,7 +1164,7 @@ Memory activation is session-scoped. The effective `memory.auto_update.enabled` 
 
 | Field                   | Type        | Default   | Meaning                                    |
 | ----------------------- | ----------- | --------- | ------------------------------------------ |
-| `auto_update.enabled`   | bool        | `false`   | Whether the memory writer runs at Stop     |
+| `auto_update.enabled`   | bool        | `false`   | Whether Stop enqueues deferred writer work |
 | `auto_update.mode`      | str         | `augment` | `augment` (edit) or `review-only` (report) |
 | `auto_update.min_turns` | int         | `5`       | Skip sessions shorter than this            |
 | `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the memory writer  |
