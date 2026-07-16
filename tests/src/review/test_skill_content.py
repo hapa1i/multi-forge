@@ -85,14 +85,35 @@ class TestReviewCodeSkill:
 class TestModelDocDrift:
     """Lightweight checks for model-name and reasoning-effort drift in skills."""
 
+    def test_openai_family_resources_use_default_neutral_titles(self):
+        expected_titles = {
+            "review/resources/code-openai.md": "# OpenAI Code Review",
+            "review-docs/resources/docs-openai.md": "# OpenAI Design Document Review",
+            "understand/resources/code-openai.md": "# OpenAI Code Understanding",
+            "understand/resources/docs-openai.md": "# OpenAI Documentation Understanding",
+        }
+
+        for relative_path, expected_title in expected_titles.items():
+            first_line = (SKILLS_DIR / relative_path).read_text().splitlines()[0]
+            assert first_line == expected_title
+
     def test_multi_model_skills_reference_current_gpt_proxy_requirement(self):
-        expected = "GPT-5.5 and Gemini require active proxies"
-        stale = "GPT-5.4 and Gemini require active proxies"
+        expected = "GPT-5.6 Sol and Gemini require active proxies"
+        stale = (
+            "GPT-5.4 and Gemini require active proxies",
+            "GPT-5.5 and Gemini require active proxies",
+        )
 
         for skill_name in ("panel", "debate", "consensus"):
             content = (SKILLS_DIR / skill_name / "SKILL.md").read_text()
             assert expected in content
-            assert stale not in content
+            assert all(value not in content for value in stale)
+
+    def test_panel_skill_describes_current_claude_opus_default(self):
+        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
+
+        assert "Default Claude Opus 4.8 reasoning" in content
+        assert "Stable Claude Opus 4.6 reasoning" not in content
 
     def test_gpt_55_parallel_tool_note_uses_supported_reasoning_effort(self):
         content = (SKILLS_DIR / "review" / "references" / "gpt-5.5.md").read_text()

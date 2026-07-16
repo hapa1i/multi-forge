@@ -13,7 +13,7 @@ Issues found by **2 or more models** have higher confidence. List these first:
 ## Consensus Findings (High Confidence)
 
 ### Critical
-- **[Issue]** (found by: gpt-5.5, gemini-3.1-pro-preview)
+- **[Issue]** (found by: gpt-5.6-sol, gemini-3.1-pro-preview)
   - Location: `file.py:123`
   - Impact: [description]
   - Fix: [suggestion]
@@ -25,7 +25,7 @@ Each model has different strengths. Unique findings may be valid insights others
 
 | Model                  | Strength     | Unique Finding Type                        |
 | ---------------------- | ------------ | ------------------------------------------ |
-| gpt-5.5                | Logic errors | Edge cases, off-by-one, null handling      |
+| gpt-5.6-sol            | Logic errors | Edge cases, off-by-one, null handling      |
 | gemini-3.1-pro-preview | Pragmatic    | Missing tests, documentation gaps          |
 | claude-opus            | Architecture | Coupling, abstraction leaks, design issues |
 
@@ -40,7 +40,7 @@ When models disagree:
 ```markdown
 ## Disputed Findings
 
-- **[Issue]**: gpt-5.5 says X, gemini says Y
+- **[Issue]**: gpt-5.6-sol says X, gemini says Y
   - My assessment: [your determination after examining the target]
 ```
 
@@ -84,7 +84,7 @@ Consider dependencies when ordering fixes:
 # Multi-Model Review: [Target Name]
 
 ## Summary
-- Models consulted: 3 (gpt-5.5, gemini-3.1-pro-preview, claude-opus)
+- Models consulted: 3 (gpt-5.6-sol, gemini-3.1-pro-preview, claude-opus)
 - Consensus issues: N
 - Unique findings: N
 - Conflicts resolved: N

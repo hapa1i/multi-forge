@@ -15,8 +15,10 @@ import os
 import socket
 import subprocess
 import tempfile
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Generator
 
@@ -44,6 +46,14 @@ class RegisteredProxyServer:
     base_url: str
     port: int
     forge_home: Path
+
+
+@dataclass
+class FakeOpenAIUpstream:
+    """Captured requests for a local OpenAI-compatible test upstream."""
+
+    base_url: str
+    requests: list[dict[str, Any]]
 
 
 def _check_port(port: int) -> bool:
@@ -309,9 +319,128 @@ def local_litellm() -> Generator[str, None, None]:
 
     # Cleanup - stop the test instance
     subprocess.run(
-        ["uv", "run", "forge", "model", "backend", "stop", "litellm", "--port", str(test_port)],
+        ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
         check=False,
     )
+
+
+@pytest.fixture(scope="module")
+def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
+    """Start an isolated local LiteLLM from the current bundled config."""
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.fail("OPENAI_API_KEY not set (required for local OpenAI LiteLLM tests)")
+
+    test_port = allocate_ephemeral_port()
+    base_url = f"http://localhost:{test_port}"
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+
+    create_result = subprocess.run(
+        ["uv", "run", "forge", "model", "backend", "create", "litellm"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if create_result.returncode != 0:
+        pytest.fail(f"Failed to create isolated LiteLLM config: {create_result.stderr[-500:]}")
+
+    start_result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "forge",
+            "model",
+            "backend",
+            "start",
+            "litellm",
+            "--port",
+            str(test_port),
+        ],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if start_result.returncode != 0:
+        pytest.fail(f"Failed to start isolated LiteLLM: {start_result.stderr[-500:]}")
+    if not wait_for_port(test_port, timeout=30):
+        pytest.fail(f"Isolated LiteLLM failed to start on port {test_port}")
+
+    try:
+        yield base_url
+    finally:
+        subprocess.run(
+            ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+
+@pytest.fixture(scope="module")
+def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
+    """Serve a hermetic Responses API endpoint and capture its request bodies."""
+    port = allocate_ephemeral_port()
+    requests: list[dict[str, Any]] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            content_length = int(self.headers.get("Content-Length", "0"))
+            request_body = json.loads(self.rfile.read(content_length))
+            requests.append({"path": self.path, "body": request_body})
+
+            if self.path != "/v1/responses":
+                self.send_error(404)
+                return
+
+            response_body = json.dumps(
+                {
+                    "id": "resp_fake_sol",
+                    "created_at": 0.0,
+                    "model": request_body["model"],
+                    "object": "response",
+                    "output": [
+                        {
+                            "id": "msg_fake_sol",
+                            "content": [
+                                {
+                                    "annotations": [],
+                                    "text": "FAKE-SOL-OK",
+                                    "type": "output_text",
+                                }
+                            ],
+                            "role": "assistant",
+                            "status": "completed",
+                            "type": "message",
+                        }
+                    ],
+                    "parallel_tool_calls": True,
+                    "tool_choice": "auto",
+                    "tools": [],
+                    "status": "completed",
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response_body)))
+            self.end_headers()
+            self.wfile.write(response_body)
+
+        def log_message(self, _format: str, *args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        yield FakeOpenAIUpstream(base_url=f"http://127.0.0.1:{port}/v1", requests=requests)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 @pytest.fixture(scope="module")
@@ -467,6 +596,90 @@ def proxy_server_remote_openai(module_forge_home: Path, tmp_path_factory) -> Gen
 
 
 @pytest.fixture(scope="module")
+def proxy_server_fake_litellm_openai(
+    fake_litellm_openai: FakeOpenAIUpstream,
+    module_forge_home: Path,
+    tmp_path_factory,
+) -> Generator[tuple[str, FakeOpenAIUpstream], None, None]:
+    """Start the remote LiteLLM template against the hermetic Responses API upstream."""
+    port = allocate_ephemeral_port()
+    env = os.environ.copy()
+    for credential_name in (
+        "ANTHROPIC_API_KEY",
+        "AZURE_OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
+        env.pop(credential_name, None)
+    env["FORGE_HOME"] = str(module_forge_home)
+    env["LITELLM_BASE_URL"] = fake_litellm_openai.base_url
+    env["LITELLM_API_KEY"] = "test-litellm-key"
+
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
+    proc = _start_proxy_subprocess(
+        template="litellm-openai",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+    )
+    proxy_base_url = f"http://localhost:{port}"
+
+    try:
+        _preflight_proxy(
+            proxy_base_url=proxy_base_url,
+            request_model="claude-sonnet-4-6",
+            max_tokens=16,
+            unreachable_fail_reason="Hermetic LiteLLM OpenAI proxy unreachable",
+            template="litellm-openai",
+        )
+        fake_litellm_openai.requests.clear()
+        yield proxy_base_url, fake_litellm_openai
+    finally:
+        kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
+def proxy_server_local_openai(
+    local_litellm_openai: str,
+    module_forge_home: Path,
+    tmp_path_factory,
+) -> Generator[str, None, None]:
+    """Start the OpenAI-family Forge proxy against an isolated local LiteLLM backend."""
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.fail("OPENAI_API_KEY not set (required for litellm-openai-local proxy tests)")
+
+    port = allocate_ephemeral_port()
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+    env["LITELLM_LOCAL_BASE_URL"] = local_litellm_openai
+
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
+    proc = _start_proxy_subprocess(
+        template="litellm-openai-local",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+    )
+    proxy_base_url = f"http://localhost:{port}"
+
+    try:
+        _preflight_proxy(
+            proxy_base_url=proxy_base_url,
+            request_model="claude-sonnet-4-6",
+            max_tokens=8,
+            unreachable_fail_reason="Local LiteLLM (OpenAI) unreachable from this environment",
+            template="litellm-openai-local",
+        )
+        yield proxy_base_url
+    finally:
+        kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
 def proxy_server_remote_gemini(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
     _require_remote_litellm_env()
 
@@ -527,6 +740,39 @@ def proxy_server_openrouter(module_forge_home: Path, tmp_path_factory) -> Genera
 
     yield proxy_base_url
     kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
+def proxy_server_openrouter_openai(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    """Start the OpenAI-family OpenRouter proxy with its sonnet tier selected during preflight."""
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        pytest.fail("OPENROUTER_API_KEY not set (required for OpenRouter proxy tests)")
+
+    port = allocate_ephemeral_port()
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
+    proc = _start_proxy_subprocess(
+        template="openrouter-openai",
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+    )
+    proxy_base_url = f"http://localhost:{port}"
+
+    try:
+        _preflight_proxy(
+            proxy_base_url=proxy_base_url,
+            request_model="claude-sonnet-4-6",
+            max_tokens=8,
+            unreachable_fail_reason="OpenRouter OpenAI proxy unreachable",
+            template="openrouter-openai",
+        )
+        yield proxy_base_url
+    finally:
+        kill_process(proc.pid)
 
 
 @pytest.fixture(scope="module")

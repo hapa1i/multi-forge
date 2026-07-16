@@ -98,8 +98,8 @@ def _build_available_models() -> dict[str, ModelSpec]:
     """Build available review models from the model catalog.
 
     Model names derive from model_catalog.yaml so updating defaults is
-    a single YAML change. Provider-specific model refs come from the
-    corresponding proxy template tier configs.
+    a single YAML change. Provider refs either derive from that same
+    canonical name or use the provider-specific slug required by the proxy.
     """
     from forge.core.models.catalog import get_default_model
 
@@ -117,7 +117,10 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=openai_opus,
             model_id=openai_opus,
             family="openai",
-            provider_refs=(("openrouter", "openai/gpt-5.5"), ("litellm", "openai/gpt-5.5")),
+            provider_refs=(
+                ("openrouter", f"openai/{openai_opus}"),
+                ("litellm", f"openai/{openai_opus}"),
+            ),
             preferred_proxy="openrouter-openai",
             description="Logical problems, systematic code review",
         ),

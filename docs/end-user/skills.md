@@ -123,7 +123,7 @@ consensus findings, unique insights, and conflicts.
 
 | Model                    | Strength                            | Via                     |
 | ------------------------ | ----------------------------------- | ----------------------- |
-| `gpt-5.5`                | Logical problems, systematic review | openrouter-openai proxy |
+| `gpt-5.6-sol`            | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
 | `claude-opus`            | Default Claude Opus 4.8 reasoning   | Direct Anthropic        |
 
@@ -132,7 +132,7 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
 model.
 
-**Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
+**Requirements:** GPT-5.6 Sol and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
@@ -159,11 +159,11 @@ key disagreements, and an evidence-weighted recommendation.
 
 | Model                    | Stance  | Role                     | Via                     |
 | ------------------------ | ------- | ------------------------ | ----------------------- |
-| `gpt-5.5`                | FOR     | Supporter -- strengths   | openrouter-openai proxy |
+| `gpt-5.6-sol`            | FOR     | Supporter -- strengths   | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | AGAINST | Critic -- risks          | openrouter-gemini       |
 | `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
-**Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
+**Requirements:** GPT-5.6 Sol and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
@@ -279,7 +279,7 @@ See [design_appendix.md §C.5](../design_appendix.md#c5-multi-scope-installation
 
 ### Panel fails with "No active proxy found"
 
-The panel's default model set includes `gpt-5.5` and `gemini-3.1-pro-preview`, which require active proxies:
+The panel's default model set includes `gpt-5.6-sol` and `gemini-3.1-pro-preview`, which require active proxies:
 
 ```bash
 forge proxy create openrouter-openai

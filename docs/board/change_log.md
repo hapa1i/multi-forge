@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-16
 
+### GPT-5.6 catalog and Sol proxy defaults
+
+**Goal**: Add GPT-5.6 Sol, Terra, and Luna and promote Sol across Forge's bundled OpenAI defaults.
+
+**Key changes**:
+
+- Added the three canonical catalog profiles plus base/provider aliases, kept GPT-5.5 compatible, left haiku on GPT-5.4
+  Mini, and moved OpenAI sonnet/opus and workflow provider references to Sol.
+- Updated all six affected OpenAI proxy templates and the fresh local LiteLLM adapter routes; existing user-owned proxy,
+  backend, and custom-template snapshots remain unchanged and now have an explicit upgrade path.
+- Synchronized bundled multi-model skills, CLI help, and user docs; added drift guards for executable workflow examples;
+  documented intelligence scores as coarse peer buckets; and added hermetic LiteLLM Responses routing plus live
+  OpenRouter coverage for the exact Sol slug.
+
+**Verification**: focused implementation suite (`611 passed`) and review follow-up suite (`554 passed`);
+`make test-unit` (`7936 passed, 1 skipped, 117 deselected`); targeted LiteLLM/OpenRouter integration (`2 passed`);
+`make pre-commit`; `uv build`; separate wheel and sdist clean installs, full-profile extension enables, doctor checks,
+and packaged catalog/template/backend/skill assertions. Additional live probes found environment limits rather than code
+failures: the direct OpenAI key returned 401 for GPT-5.6, and remote LiteLLM credentials were absent.
+
 ### Memory-passport CLI preflight cleanup
 
 **Goal**: Consolidate repeated document-target preflight without changing leaf-specific mutation or output contracts.

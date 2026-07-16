@@ -1097,7 +1097,7 @@ def debate(
     Examples:
       forge workflow debate "Should we use event sourcing?" --json
       forge workflow debate src/forge/cli/ --code --check
-      forge workflow debate --worker gpt-5.5:for --worker "claude-opus:Focus on security" "proposal"
+      forge workflow debate --worker gpt-5.6-sol:for --worker "claude-opus:Focus on security" "proposal"
     """
     from forge.review.adversarial import run_adversarial, validate_resource
 
@@ -1634,7 +1634,7 @@ def consensus(
     Examples:
       forge workflow consensus "Should we use event sourcing?" --json
       forge workflow consensus src/forge/cli/ --code --check
-      forge workflow consensus --worker gpt-5.5:security --worker "claude-opus:Focus on DX" "proposal"
+      forge workflow consensus --worker gpt-5.6-sol:security --worker "claude-opus:Focus on DX" "proposal"
     """
     from forge.review.consensus import run_consensus, validate_resource
 

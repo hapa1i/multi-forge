@@ -1,4 +1,4 @@
-# GPT-5.5 Design Document Review
+# OpenAI Design Document Review
 
 Review the design document for completeness, consistency, and implementability.
 

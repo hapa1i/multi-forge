@@ -64,3 +64,26 @@ class TestProxyWithOpenRouter:
         assert data["type"] == "message"
         text = _anthropic_response_text(data)
         assert "OR-PROXY-OK" in text
+
+
+class TestOpenAIProxyWithOpenRouter:
+    """GPT-family defaults route through the exact OpenRouter Sol slug."""
+
+    def test_sonnet_completion_resolves_to_gpt_56_sol(self, proxy_server_openrouter_openai: str) -> None:
+        with httpx.Client(timeout=90) as client:
+            resp = client.post(
+                f"{proxy_server_openrouter_openai}/v1/messages",
+                json={
+                    "model": "claude-sonnet-4-6",
+                    "max_tokens": 16,
+                    "messages": [{"role": "user", "content": "Say hello"}],
+                },
+                headers={
+                    "x-api-key": "test",
+                    "user-agent": "claude-code/integration-test",
+                },
+            )
+
+        assert resp.status_code == 200, resp.text[:500]
+        assert resp.headers.get("X-Resolved-Tier") == "sonnet"
+        assert resp.headers.get("X-Resolved-Model") == "openai/gpt-5.6-sol"

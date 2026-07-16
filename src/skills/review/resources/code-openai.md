@@ -1,4 +1,4 @@
-# GPT-5.5 Code Review
+# OpenAI Code Review
 
 Review the code for design conformance, correctness, and architecture alignment.
 

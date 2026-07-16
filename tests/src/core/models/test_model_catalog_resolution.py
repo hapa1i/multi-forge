@@ -62,6 +62,72 @@ class TestGetModelSpec:
             get_model_spec("nonexistent-model")
 
 
+class TestGPT56Family:
+    """Tests for the GPT-5.6 Sol, Terra, and Luna catalog profiles."""
+
+    def test_variants_are_canonical(self):
+        catalog = load_model_catalog()
+
+        for model_id in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+            assert model_id in catalog.models
+            assert model_id not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        ("alias", "canonical"),
+        [
+            ("gpt-5.6", "gpt-5.6-sol"),
+            ("openai/gpt-5.6", "gpt-5.6-sol"),
+            ("openai/gpt-5.6-sol", "gpt-5.6-sol"),
+            ("openai/gpt-5.6-terra", "gpt-5.6-terra"),
+            ("openai/gpt-5.6-luna", "gpt-5.6-luna"),
+        ],
+    )
+    def test_aliases_resolve_to_variants(self, alias, canonical):
+        assert resolve_model_id(alias) == canonical
+
+    @pytest.mark.parametrize(
+        ("model_id", "friendly_name", "intelligence_score"),
+        [
+            ("gpt-5.6-sol", "GPT-5.6 Sol", 100),
+            ("gpt-5.6-terra", "GPT-5.6 Terra", 98),
+            ("gpt-5.6-luna", "GPT-5.6 Luna", 90),
+        ],
+    )
+    def test_shared_capabilities(self, model_id, friendly_name, intelligence_score):
+        spec = get_model_spec(model_id)
+
+        assert spec.friendly_name == friendly_name
+        assert spec.context_window_tokens == 1_050_000
+        assert spec.max_output_tokens == 128_000
+        assert spec.max_thinking_tokens is None
+        assert spec.supports_thinking is True
+        assert spec.supports_images is True
+        assert spec.supports_verbosity is True
+        assert spec.verbosity_levels == ("low", "medium", "high")
+        assert spec.temperature_constraint == "fixed"
+        assert spec.temperature.default == 1.0
+        assert spec.supports_top_p is False
+        assert spec.native_thinking_param == "reasoning_effort"
+        assert spec.litellm_reasoning_efforts == (
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+        )
+        assert spec.default_reasoning_effort == "medium"
+        assert spec.use_responses_api is True
+        assert spec.intelligence_score == intelligence_score
+        assert spec.system_prompt_addendum == "system_prompt_addendums/openai.md"
+
+    def test_intelligence_scores_use_intentional_peer_tiers(self):
+        score = lambda model: get_model_spec(model).intelligence_score  # noqa: E731
+
+        assert score("gpt-5.6-sol") == score("claude-fable-5") == score("gpt-5.5-pro")
+        assert score("gpt-5.6-sol") > score("gpt-5.5")
+        assert score("gpt-5.6-terra") == score("claude-sonnet-5") == score("claude-opus-4-7")
+
+
 class TestClaudeFable5:
     """Tests for the claude-fable-5 catalog entry and its aliases."""
 

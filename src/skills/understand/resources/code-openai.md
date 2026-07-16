@@ -1,4 +1,4 @@
-# Code Understanding (GPT-5.5 Optimized)
+# OpenAI Code Understanding
 
 Analyze code and technical concepts, then explain clearly at the appropriate depth.
 
