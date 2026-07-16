@@ -107,7 +107,7 @@ card in the active lane for post-implementation review.
   skill-root variable, anchors relative executable paths to the selected package, or needs an installer/runtime-created
   absolute binding. Prove that `smoke-test` executes the exact installed user- or project-scope script without depending
   on the source checkout or process CWD. Classify its internal Claude-home probes separately from locating the script.
-- [ ] **Invocation policy:** map Claude `disable-model-invocation` semantics to Codex
+- [x] **Invocation policy:** map Claude `disable-model-invocation` semantics to Codex
   `agents/openai.yaml::policy.allow_implicit_invocation` only where behavior truly matches; document mismatches.
 - [x] **Duplicate discovery:** define conflict behavior when the same built skill name exists at multiple Codex scan
   levels. Enable/sync must not create ambiguous duplicate selectors silently.
@@ -118,7 +118,7 @@ card in the active lane for post-implementation review.
   - behavioral rubric coupling (`review`, `review-docs`, `understand`),
   - Claude-worker workflow frontends (`panel`, `analyze`, `debate`, `consensus`), and
   - Claude-by-nature manual-test skills (`walkthrough`, `qa`).
-- [ ] **Live Codex probe:** on `codex-cli 0.144.5`, verify user and nested repository discovery, duplicate-name
+- [x] **Live Codex probe:** on `codex-cli 0.144.5`, verify user and nested repository discovery, duplicate-name
   behavior, explicit invocation/task text, implicit-invocation policy, resource/script resolution, symlink behavior, and
   reload expectations. Build the reproducible harness under `scripts/experiments/codex-skills/`, following the
   `codex-hooks` precedent with a README, versioned preflight, named stages, and sanitized committed verdicts rather than
