@@ -1,4 +1,4 @@
-# Documentation Understanding (GPT-5.5 Optimized)
+# OpenAI Documentation Understanding
 
 Analyze project documentation to extract clear explanations of design decisions, architecture, and technical approach.
 

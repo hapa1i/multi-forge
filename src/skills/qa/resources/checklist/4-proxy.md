@@ -426,9 +426,9 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k2.6)
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
 - [ ] `openrouter-qwen` maps tiers to Qwen models (haiku=qwen3.6-flash, sonnet=qwen3.6-plus, opus=qwen3.6-max-preview)
-- [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.5, opus=gpt-5.5)
+- [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.6-sol, opus=gpt-5.6-sol)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
-  opus=gpt-5.5)
+  opus=gpt-5.6-sol)
 - [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.5-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
 - [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.5-flash with tier_overrides for reasoning_effort

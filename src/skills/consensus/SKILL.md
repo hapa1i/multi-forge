@@ -97,7 +97,7 @@ Models are assigned roles cyclically. Default roles differ by mode:
 
 | Order | Default Model          | Role         | Focus                                        |
 | ----- | ---------------------- | ------------ | -------------------------------------------- |
-| 1st   | gpt-5.5                | architecture | Structural alignment, coupling, abstractions |
+| 1st   | gpt-5.6-sol            | architecture | Structural alignment, coupling, abstractions |
 | 2nd   | gemini-3.1-pro-preview | security     | Vulnerabilities, trust boundaries, risks     |
 | 3rd   | claude-opus            | correctness  | Logic errors, edge cases, invariants         |
 
@@ -105,7 +105,7 @@ Models are assigned roles cyclically. Default roles differ by mode:
 
 | Order | Default Model          | Role            | Focus                                  |
 | ----- | ---------------------- | --------------- | -------------------------------------- |
-| 1st   | gpt-5.5                | architecture    | Component boundaries, dependency flow  |
+| 1st   | gpt-5.6-sol            | architecture    | Component boundaries, dependency flow  |
 | 2nd   | gemini-3.1-pro-preview | security        | Injection, auth, secrets, trust        |
 | 3rd   | claude-opus            | maintainability | Readability, complexity, test coverage |
 
@@ -117,4 +117,4 @@ Use `--models` to control which models participate. Use `--worker` for explicit 
 
 - **Forge CLI**: `forge` must be on PATH
 - **Claude CLI**: workflow workers run through local `claude -p`; `claude` must be on PATH in this Bash environment
-- **Proxies**: GPT-5.5 and Gemini require active proxies (`forge proxy create openrouter-openai`)
+- **Proxies**: GPT-5.6 Sol and Gemini require active proxies (`forge proxy create openrouter-openai`)

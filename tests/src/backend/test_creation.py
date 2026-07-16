@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from forge.backend.creation import create_backend_config, get_backend_config_path
 
@@ -25,6 +26,31 @@ class TestCreateBackendConfig:
         content = config_path.read_text()
         assert "model_list:" in content
         assert "gemini" in content.lower()
+
+    @pytest.mark.parametrize(
+        ("model_name", "upstream_model"),
+        [
+            ("openai/gpt-5.6", "openai/gpt-5.6"),
+            ("openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
+            ("openai/gpt-5.6-terra", "openai/gpt-5.6-terra"),
+            ("openai/gpt-5.6-luna", "openai/gpt-5.6-luna"),
+        ],
+    )
+    def test_default_config_has_gpt_5_6_model_route(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        model_name: str,
+        upstream_model: str,
+    ) -> None:
+        """The generated LiteLLM config exposes each GPT-5.6 model route."""
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        config_path = create_backend_config(adapter_type="litellm")
+        config = yaml.safe_load(config_path.read_text())
+        model_pairs = {(entry["model_name"], entry["litellm_params"]["model"]) for entry in config["model_list"]}
+
+        assert (model_name, upstream_model) in model_pairs
 
     def test_creates_config_from_custom_source(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify config can be created from custom source."""

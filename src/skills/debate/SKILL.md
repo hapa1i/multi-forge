@@ -95,7 +95,7 @@ Models are assigned stances cyclically. Default models:
 
 | Order | Default Model          | Stance  | Role                     |
 | ----- | ---------------------- | ------- | ------------------------ |
-| 1st   | gpt-5.5                | FOR     | Supporter -- strengths   |
+| 1st   | gpt-5.6-sol            | FOR     | Supporter -- strengths   |
 | 2nd   | gemini-3.1-pro-preview | AGAINST | Critic -- risks          |
 | 3rd   | claude-opus            | NEUTRAL | Analyst -- balanced view |
 
@@ -113,4 +113,4 @@ When `--code` is specified, models evaluate the target code from adversarial per
 
 - **Forge CLI**: `forge` must be on PATH
 - **Claude CLI**: workflow workers run through local `claude -p`; `claude` must be on PATH in this Bash environment
-- **Proxies**: GPT-5.5 and Gemini require active proxies (`forge proxy create openrouter-openai`)
+- **Proxies**: GPT-5.6 Sol and Gemini require active proxies (`forge proxy create openrouter-openai`)

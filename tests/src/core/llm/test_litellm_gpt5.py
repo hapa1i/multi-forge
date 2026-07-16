@@ -39,6 +39,10 @@ class TestGPT5ModelDetection:
             "openai/gpt-5.4-mini",
             "openai/gpt-5.4-nano",
             "openai/gpt-5.5-pro",
+            "openai/gpt-5.6",
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.6-terra",
+            "openai/gpt-5.6-luna",
         ]
         for model in gpt5_model_specs:
             client = make_client(model)

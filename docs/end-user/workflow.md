@@ -23,7 +23,7 @@ command -v claude
 # Deep analysis on a topic (single model, default: claude-opus)
 forge workflow analyze "Should we use event sourcing for the audit log?"
 
-# Multi-model code review (default worker set: gpt-5.5, gemini-3.1-pro-preview, claude-opus)
+# Multi-model code review (default worker set: gpt-5.6-sol, gemini-3.1-pro-preview, claude-opus)
 forge workflow panel src/forge/session/store.py --code
 
 # Multi-model document review
@@ -44,7 +44,7 @@ forge workflow consensus "Should we adopt gRPC for internal services?"
 
 Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
-- `gpt-5.5` -- OpenRouter (preferred proxy: `openrouter-openai`)
+- `gpt-5.6-sol` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 4.8
 
@@ -58,7 +58,7 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)
-forge workflow panel src/ --code -m gpt-5.5,deepseek-v4-pro --proxy openrouter-openai
+forge workflow panel src/ --code -m gpt-5.6-sol,deepseek-v4-pro --proxy openrouter-openai
 
 # Explicit direct Claude workers
 forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.8
@@ -106,7 +106,7 @@ forge workflow panel src/ --code --review-type security --severity high
 - `--code` -- use code review framework (default: document review)
 - `-p` -- custom review prompt (overrides target+framework and --review-type)
 - `--context` -- `blind` (default: fresh subprocess) or `resume:<uuid>` (fork session context)
-- `-m` -- models to use (default: `gpt-5.5,gemini-3.1-pro-preview,claude-opus`)
+- `-m` -- models to use (default: `gpt-5.6-sol,gemini-3.1-pro-preview,claude-opus`)
 - `--roles` -- comma-separated reviewer roles (security, performance, architecture, maintainability, correctness)
 - `--review-type` -- review focus: `full` (default), `security`, `performance`, `quick` (security/performance need
   --code)
@@ -123,7 +123,7 @@ to code evaluation.
 forge workflow debate "Should we use event sourcing?"                    # proposal evaluation (default)
 forge workflow debate src/forge/session/ --code                          # code evaluation
 forge workflow debate "Evaluate the auth module" --check
-forge workflow debate --worker gpt-5.5:for --worker "claude-opus:Focus on security" "proposal"
+forge workflow debate --worker gpt-5.6-sol:for --worker "claude-opus:Focus on security" "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)
@@ -147,7 +147,7 @@ shared recommendation in round 2. Uses proposal evaluation by default; `--code` 
 forge workflow consensus "Should we adopt gRPC for internal services?"      # proposal evaluation
 forge workflow consensus src/forge/proxy/ --code                             # code evaluation
 forge workflow consensus "Evaluate the caching strategy" --check
-forge workflow consensus --worker gpt-5.5:architect --worker claude-opus:security "proposal"
+forge workflow consensus --worker gpt-5.6-sol:architect --worker claude-opus:security "proposal"
 ```
 
 - First argument -- subject to evaluate (proposal text, or file/directory path with `--code`)

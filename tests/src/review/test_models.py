@@ -85,6 +85,12 @@ class TestDefaultModels:
     def test_gpt_uses_preferred_proxy(self):
         assert DEFAULT_MODELS[OPENAI_DEFAULT].preferred_proxy == "openrouter-openai"
 
+    def test_gpt_provider_refs_follow_catalog_default(self):
+        assert DEFAULT_MODELS[OPENAI_DEFAULT].provider_refs == (
+            ("openrouter", f"openai/{OPENAI_DEFAULT}"),
+            ("litellm", f"openai/{OPENAI_DEFAULT}"),
+        )
+
     def test_gemini_uses_preferred_proxy(self):
         assert DEFAULT_MODELS[GEMINI_DEFAULT].preferred_proxy == "openrouter-gemini"
 

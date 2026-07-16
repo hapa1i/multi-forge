@@ -40,9 +40,9 @@ and stop.
 
 | Model                    | Strength                            | Via                     |
 | ------------------------ | ----------------------------------- | ----------------------- |
-| `gpt-5.5`                | Logical problems, systematic review | openrouter-openai proxy |
+| `gpt-5.6-sol`            | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini proxy |
-| `claude-opus`            | Stable Claude Opus 4.6 reasoning    | Direct Anthropic        |
+| `claude-opus`            | Default Claude Opus 4.8 reasoning   | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
 (most capable). Use `claude-opus-4.8` as a bounded review/quorum worker when the prompt has a concrete target and should
@@ -89,14 +89,14 @@ Parse the JSON output. The structure is:
 {
   "prompt": "...",
   "results": {
-    "gpt-5.5": {"response": "...", "error": null, "success": true, "duration_seconds": 45.2},
+    "gpt-5.6-sol": {"response": "...", "error": null, "success": true, "duration_seconds": 45.2},
     "gemini-3.1-pro-preview": {"response": "...", "error": null, "success": true, "duration_seconds": 38.1},
     "claude-opus": {"response": "...", "error": null, "success": true, "duration_seconds": 52.7}
   },
   "resolved_models": {
-    "gpt-5.5": {
-      "requested_model": "gpt-5.5",
-      "resolved_model": "openai/gpt-5.5",
+    "gpt-5.6-sol": {
+      "requested_model": "gpt-5.6-sol",
+      "resolved_model": "openai/gpt-5.6-sol",
       "provider": "openrouter",
       "proxy": "openrouter-openai",
       "template": "openrouter-openai",
@@ -137,5 +137,5 @@ result in the conversation. If `--output` was not specified, print the result in
 
 - **Forge CLI**: `forge` must be on PATH
 - **Claude CLI**: workflow workers run through local `claude -p`; `claude` must be on PATH in this Bash environment
-- **Proxies**: GPT-5.5 and Gemini require active proxies (`forge proxy create openrouter-openai`)
+- **Proxies**: GPT-5.6 Sol and Gemini require active proxies (`forge proxy create openrouter-openai`)
 - **List available models**: `forge workflow list-models`

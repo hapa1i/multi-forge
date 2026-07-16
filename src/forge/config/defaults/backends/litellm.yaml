@@ -17,6 +17,7 @@
 #     - openai/gpt-5.3-codex
 #     - openai/gpt-5.4, gpt-5.4-pro
 #     - openai/gpt-5.5
+#     - openai/gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
 #
 # Start with: forge model backend start litellm --port 4000
 
@@ -186,6 +187,27 @@ model_list:
   - model_name: openai/gpt-5.5
     litellm_params:
       model: openai/gpt-5.5
+      api_key: os.environ/OPENAI_API_KEY
+
+  # --- GPT-5.6 family ---
+  - model_name: openai/gpt-5.6
+    litellm_params:
+      model: openai/gpt-5.6
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: openai/gpt-5.6-sol
+    litellm_params:
+      model: openai/gpt-5.6-sol
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: openai/gpt-5.6-terra
+    litellm_params:
+      model: openai/gpt-5.6-terra
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: openai/gpt-5.6-luna
+    litellm_params:
+      model: openai/gpt-5.6-luna
       api_key: os.environ/OPENAI_API_KEY
 
 litellm_settings:

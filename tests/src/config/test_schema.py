@@ -37,6 +37,15 @@ class TestIsOpenAIModel:
         assert is_openai_model("gpt-5.2-codex") is True
         assert is_openai_model("openai/gpt-5.2-codex") is True
 
+    @pytest.mark.parametrize(
+        "model",
+        ["gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+    )
+    def test_gpt56_family_recognized(self, model):
+        """The base GPT-5.6 name and all named variants are recognized as OpenAI."""
+        assert is_openai_model(model) is True
+        assert is_openai_model(f"openai/{model}") is True
+
     def test_openai_prefix_stripped(self):
         """openai/ prefix is stripped before matching."""
         assert is_openai_model("openai/gpt-5.2") is True

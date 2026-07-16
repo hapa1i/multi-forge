@@ -150,8 +150,8 @@ class TestLoadConfig:
         assert config.proxy.preferred_provider == "litellm"
         assert config.proxy.default_port == 8089
         assert config.proxy.litellm.tiers.haiku == "openai/gpt-5.4-mini"
-        assert config.proxy.litellm.tiers.sonnet == "openai/gpt-5.5"
-        assert config.proxy.litellm.tiers.opus == "openai/gpt-5.5"
+        assert config.proxy.litellm.tiers.sonnet == "openai/gpt-5.6-sol"
+        assert config.proxy.litellm.tiers.opus == "openai/gpt-5.6-sol"
 
     def test_template_loading_openai_codex_local(self):
         """OpenAI Codex local template loads with correct tier models."""
@@ -162,7 +162,66 @@ class TestLoadConfig:
         assert config.proxy.default_port == 8090
         assert config.proxy.litellm.tiers.haiku == "openai/gpt-5.1-codex-mini"
         assert config.proxy.litellm.tiers.sonnet == "openai/gpt-5.3-codex"
-        assert config.proxy.litellm.tiers.opus == "openai/gpt-5.5"
+        assert config.proxy.litellm.tiers.opus == "openai/gpt-5.6-sol"
+
+    @pytest.mark.parametrize(
+        ("template", "provider", "expected_tiers"),
+        [
+            (
+                "openrouter-openai",
+                "openrouter",
+                ("openai/gpt-5.4-mini", "openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
+            ),
+            (
+                "litellm-openai",
+                "litellm",
+                ("openai/gpt-5.4-mini", "openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
+            ),
+            (
+                "litellm-openai-local",
+                "litellm",
+                ("openai/gpt-5.4-mini", "openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
+            ),
+            (
+                "openrouter-openai-codex",
+                "openrouter",
+                (
+                    "openai/gpt-5.1-codex-mini",
+                    "openai/gpt-5.3-codex",
+                    "openai/gpt-5.6-sol",
+                ),
+            ),
+            (
+                "litellm-openai-codex-local",
+                "litellm",
+                (
+                    "openai/gpt-5.1-codex-mini",
+                    "openai/gpt-5.3-codex",
+                    "openai/gpt-5.6-sol",
+                ),
+            ),
+            (
+                "codex-responses-local",
+                "litellm",
+                ("openai/gpt-5.4-mini", "openai/gpt-5.6-sol", "openai/gpt-5.6-sol"),
+            ),
+        ],
+    )
+    def test_openai_templates_use_expected_gpt_5_6_sol_tiers(
+        self,
+        template: str,
+        provider: str,
+        expected_tiers: tuple[str, str, str],
+    ) -> None:
+        """OpenAI templates promote GPT-5.6 Sol without changing their other tiers."""
+        config = load_config(template=template)
+        provider_config = getattr(config.proxy, provider)
+
+        assert (
+            provider_config.tiers.haiku,
+            provider_config.tiers.sonnet,
+            provider_config.tiers.opus,
+        ) == expected_tiers
 
     def test_template_sets_active_template(self):
         """load_config(template=...) sets proxy.active_template."""

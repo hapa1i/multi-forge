@@ -107,6 +107,45 @@ local backend whose credential it is configured for. The default config serves G
 it `(shared)`; starting a second matching backend reuses the running process rather than launching a new one. This is
 expected -- there is one local LiteLLM process, not one per backend.
 
+### Picking up GPT-5.6 Sol defaults after an upgrade
+
+New proxies created from the current built-in OpenAI templates use GPT-5.6 Sol as follows:
+
+| Template                     | GPT-5.6 Sol tiers |
+| ---------------------------- | ----------------- |
+| `openrouter-openai`          | sonnet, opus      |
+| `litellm-openai`             | sonnet, opus      |
+| `litellm-openai-local`       | sonnet, opus      |
+| `openrouter-openai-codex`    | opus              |
+| `litellm-openai-codex-local` | opus              |
+| `codex-responses-local`      | sonnet, opus      |
+
+An existing `proxy.yaml` is a user-owned snapshot, so upgrading Forge does not rewrite its tiers. Either edit the
+affected tiers to `openai/gpt-5.6-sol` with `forge proxy edit <proxy_id>`, or create a fresh proxy from the built-in
+template with `forge proxy create <template> --name <new_proxy_id>`. Then restart the affected proxy and verify real
+upstream access:
+
+```bash
+forge proxy stop <proxy_id>
+forge proxy start <proxy_id> --smoke-test
+```
+
+Local LiteLLM adapter configuration is also user-owned. For `litellm-openai-local`, `litellm-openai-codex-local`, or
+`codex-responses-local`, add the GPT-5.6 routes to `~/.forge/backends/litellm/config.yaml`; alternatively, back up
+customizations and recreate the adapter config from the current built-in default:
+
+```bash
+forge model backend list
+forge model backend stop <runtime-id> # for example, litellm-4000
+cp ~/.forge/backends/litellm/config.yaml ~/.forge/backends/litellm/config.yaml.bak
+forge model backend delete litellm
+forge model backend create litellm
+forge model backend start litellm --port 4000
+```
+
+After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
+`~/.forge/templates/` are also preserved and must be updated explicitly.
+
 ---
 
 ## Core commands (cheat sheet)
@@ -393,8 +432,8 @@ upstream_base_url: https://openrouter.ai/api/v1
 
 tiers:
   haiku: openai/gpt-5.4-mini
-  sonnet: openai/gpt-5.5
-  opus: openai/gpt-5.5
+  sonnet: openai/gpt-5.6-sol
+  opus: openai/gpt-5.6-sol
 
 default_tier: sonnet
 

@@ -4,6 +4,7 @@ import pytest
 
 from forge.core.models import ModelCatalogError
 from forge.core.models.catalog import (
+    _load_catalog_yaml,
     _parse_model_spec,
     _validate_and_build_catalog,
     load_model_catalog,
@@ -334,6 +335,22 @@ class TestCatalogEffortRankAlignment:
         assert len(values) == len(set(values)), (
             f"Duplicate rank values in _EFFORT_RANK (excluding aliases): " f"{non_alias}"
         )
+
+
+class TestGPT56CatalogMetadata:
+    """Tests for GPT-5.6 metadata that is retained in the raw catalog."""
+
+    def test_timeout_and_prompt_caching(self):
+        models = _load_catalog_yaml()["models"]
+
+        for model_id in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+            profile = models[model_id]
+            assert profile["default_timeout_seconds"] == 180
+            assert profile["prompt_caching"] == {
+                "supports": True,
+                "mechanism": "auto",
+                "min_tokens": 1024,
+            }
 
 
 class TestClaude48CatalogProfile:
