@@ -2,6 +2,8 @@
 
 ## Contents
 
+- [Forge repository authoring contract](#forge-repository-authoring-contract)
+
 1. [Introduction](#introduction)
 2. [Fundamentals](#chapter-1-fundamentals)
 3. [Planning and design](#chapter-2-planning-and-design)
@@ -10,6 +12,54 @@
 6. [Patterns and troubleshooting](#chapter-5-patterns-and-troubleshooting)
 7. [Claude Code specifics](#chapter-6-claude-code-specifics)
 8. [Resources and references](#chapter-7-resources-and-references)
+
+## Forge repository authoring contract
+
+This chapter is the source-authoring rule for skills under Forge's `src/skills/`. The rest of this document describes
+the general Agent Skills package format and Claude-specific features; do not copy its generated-package examples into a
+portable Forge source unchanged.
+
+A skill intended for more than Claude Code is authored as one neutral source package:
+
+```text
+src/skills/<name>/
+  forge-skill.yaml  # typed identity, runtime eligibility, capabilities, adapter metadata
+  content.md        # neutral instructions; the compiler owns generated SKILL.md
+  resources/        # shared auxiliary files, templated only when declared
+  references/
+  scripts/
+```
+
+The installer compiles that source into complete runtime packages. Generated `SKILL.md` files and `agents/openai.yaml`
+are outputs and must not be checked in or edited as parallel sources. A package with no `forge-skill.yaml` may retain a
+checked-in `SKILL.md`, but that is the legacy Claude-only bridge, not a portable skill.
+
+Neutral Markdown expresses runtime behavior through declared capabilities. Wrap each marker below in two opening and two
+closing braces; the delimiters are omitted here so this documentary file is not mistaken for a template input:
+
+- `forge:task_arguments` for invocation text.
+- `forge:resource_loading:path/to/file` for a read-only package-relative resource.
+- `forge:packaged_script:path/to/script` for an executable bundled script. This is separate from resource loading
+  because the runtime must resolve and execute the installed script correctly from an arbitrary working directory.
+- `forge:model_family`, `forge:exploration`, `forge:subagents`, `forge:user_interaction`, and `forge:forge_cli` for the
+  corresponding runtime behavior.
+- Invocation policy is declared structurally in `forge-skill.yaml`; it is not handwritten into neutral content.
+
+List every used capability in the manifest's `capabilities`. Put Claude-only frontmatter such as `argument-hint`,
+`effort`, `allowed-tools`, and `disable-model-invocation` under `claude_frontmatter`. Put optional Codex UI metadata
+under `codex_interface`. Runtime bindings stay in the compiler adapters, never in model-family resources; adding a
+runtime must not create files such as `code-openai-codex.md`.
+
+The neutral-source and emitted-package gates scan the whole tree. Do not place `$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`,
+Claude tool names/invocation syntax, or other runtime-specific instructions in neutral content or shared auxiliaries.
+`token_allowances` cannot suppress the neutral-source or Codex token gates. Use `runtime_excluded_files` only for
+explicit Markdown documentary references under `references/` that do not belong in a runtime package; it is not a way to
+hide scripts, resources, or incomplete neutralization. Unknown, undeclared, unbound, malformed, or leftover placeholders
+fail compilation with a source path and recovery.
+
+Keep a skill Claude-only when its behavior has no reviewed runtime binding. Today that includes Forge's workflow
+frontends whose engine still launches `claude -p` workers and the `walkthrough`/`qa` manual-test frontends. Portability
+is an explicit eligibility decision backed by whole-package compile, discovery, and invocation tests.
 
 ---
 

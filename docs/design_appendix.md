@@ -991,23 +991,30 @@ and a current, executable installed dispatcher. `runtime_hooks` keeps `scopes` a
 
 ### C.1 Scope model
 
-| Scope     | Extensions Path                       | Settings Path                 | Use case                                           |
-| --------- | ------------------------------------- | ----------------------------- | -------------------------------------------------- |
-| `user`    | `~/.claude/{commands,agents,skills}/` | `~/.claude/settings.json`     | Personal global (default; prevents worktree drift) |
-| `project` | `.claude/{commands,agents,skills}/`   | `.claude/settings.json`       | Team-shared (checked in)                           |
-| `local`   | `.claude/{commands,agents,skills}/`   | `.claude/settings.local.json` | Personal per-project                               |
+`RuntimeSpec.skill_scopes` is separate from general `install_scopes`: a runtime can participate in project setup without
+having a safe skill directory for every Forge scope.
+
+| Scope     | Claude skill target      | Codex skill target       | Claude settings                      |
+| --------- | ------------------------ | ------------------------ | ------------------------------------ |
+| `user`    | `$CLAUDE_HOME/skills/`   | `$HOME/.agents/skills/`  | `$CLAUDE_HOME/settings.json`         |
+| `project` | `<root>/.claude/skills/` | `<root>/.agents/skills/` | `<root>/.claude/settings.json`       |
+| `local`   | `<root>/.claude/skills/` | Unsupported              | `<root>/.claude/settings.local.json` |
+
+Claude declares user/project/local skill scopes. Codex declares user/project only: it has no private local-only target,
+so Forge never maps local scope onto the shared project `.agents/skills/`. Codex skill discovery never uses
+`$CODEX_HOME`; that variable remains the Codex configuration/session home.
 
 ### C.2 Installable modules + profiles
 
-| Module        | Installs                                            | Notes                                                            |
-| ------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| `commands`    | Slash commands markdown                             |                                                                  |
-| `agents`      | Subagents markdown                                  |                                                                  |
-| `skills`      | Skills (SKILL.md + resources/scripts)               | Scripting layer for Forge workflows (see design_workflows.md §3) |
-| `hooks`       | User-scope settings entries (absolute `forge-hook`) | No hook scripts installed; dispatcher execs `forge hook`         |
-| `status-line` | Project/local `statusLine` setting                  | Invokes `forge status-line`; not installed at user scope         |
-| `permissions` | Forge-required permission entries                   | Merged as unions                                                 |
-| `codex-hooks` | User-scope managed hook block in Codex config       | Best-effort; dispatcher bytes require Codex re-trust (see §C.6)  |
+| Module        | Installs                                            | Notes                                                           |
+| ------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| `commands`    | Slash commands markdown                             |                                                                 |
+| `agents`      | Subagents markdown                                  |                                                                 |
+| `skills`      | Runtime packages (`SKILL.md` + resources/scripts)   | Compiled from neutral sources or a legacy Claude bridge         |
+| `hooks`       | User-scope settings entries (absolute `forge-hook`) | No hook scripts installed; dispatcher execs `forge hook`        |
+| `status-line` | Project/local `statusLine` setting                  | Invokes `forge status-line`; not installed at user scope        |
+| `permissions` | Forge-required permission entries                   | Merged as unions                                                |
+| `codex-hooks` | User-scope managed hook block in Codex config       | Best-effort; dispatcher bytes require Codex re-trust (see §C.6) |
 
 Profiles:
 
@@ -1015,19 +1022,18 @@ Profiles:
 - `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
-Profiles are filtered by scope before writing: `hooks` and `codex-hooks` are user-only; `status-line` is project/local
-only. Commands, agents, skills, and permissions keep their existing scope behavior.
+Scope filtering keeps `hooks`/`codex-hooks` user-only and `status-line` project/local. SKILLS then filters by
+scope/runtime/profile/skill; repeatable `--runtime claude|codex|all` affects only SKILLS. Automatic enable adds detected
+Codex to Claude, while sync reuses the tracked runtime set.
 
 User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
 reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
 candidate checkout, mutate its tracking row, or read/write `projects.json`; it cannot change ambient dispatcher
 eligibility in another root.
 
-**Sidecar exception.** Host user settings are not mounted into the container. Before every managed sidecar launch, Forge
-stages the same canonical Claude hook inventory into the Forge-owned `.forge/sidecar-home/settings.json`, mounted at
-`/root/.claude/settings.json`, with bare image-PATH commands (`forge hook <name>`). The entrypoint merges its
-`apiKeyHelper` without replacing the hook block. This is runtime injection, not another install scope: it does not
-mutate project `.claude` files or add tracking rows to `installed.json`.
+**Sidecar exception.** Sidecars launch Claude and stage canonical hooks plus `apiKeyHelper` in the Forge-owned
+`.forge/sidecar-home`; this runtime injection adds no install row. They mount the workspace (so project Claude skills
+remain visible), but no host user skill directory, and have no Codex skill target.
 
 ### C.3 Settings merge rules
 
@@ -1057,27 +1063,19 @@ The installer must track what it changed so:
 `installed.json` tracks extension ownership only. Runtime launcher metadata deliberately lives elsewhere so extension
 tracking's strict schema (`version` + `installations`) does not grow a second responsibility.
 
-Project/local installation keys are the candidate source for legacy migration. `cleanup-project` reads only rows that
-match its explicitly selected canonical root. After physical Claude/Codex cleanup, it removes only hook ownership from
-`modules_enabled`, `settings_entries`, `codex_config_path`, and `codex_commands`; unrelated modules, files, scope data,
-and `installed_at` survive. The newest `.forge-added` payload is validated during preflight and rewritten before the
-tracking row, so a later disable cannot act on migrated hook ownership. A stale or v1 row without a recoverable root is
-report-only and is never guessed, enrolled, or deleted by discovery.
+Schema v2 adds `{runtime, skill, target_dir, file_paths}` rows under `skill_packages`; `files` remains the checksum and
+removal ledger. Strict v1 reads normalize in memory without writing, and the next successful mutation writes v2;
+unknown, malformed, corrupt, older, or newer state fails. `cleanup-project` validates before mutation. Doctor only uses
+a best-effort user-install boolean for hook recovery advice; it exposes neither tracking degradation nor skill health.
+
+For legacy migration, `cleanup-project` reads only the selected canonical project/local row, validates the newest
+`.forge-added` payload, then removes only hook ownership; unrelated fields survive. Stale/v1 rows without recoverable
+roots remain report-only.
 
 #### Runtime metadata (`~/.forge/runtime.json`)
 
-The hook dispatcher stores host runtime resolution metadata in `~/.forge/runtime.json`, schema version 1:
-
-```json
-{
-  "schema_version": 1,
-  "forge_binary_path": "/absolute/path/to/forge",
-  "dispatcher_path": "/home/user/.forge/bin/forge-hook",
-  "dispatcher_version": "0.0.0",
-  "dispatcher_source_sha256": "sha256-of-rendered-stdlib-source",
-  "updated_at": "2026-07-08T00:00:00Z"
-}
-```
+The hook dispatcher stores schema-v1 host resolution metadata in `~/.forge/runtime.json`: launcher/dispatcher paths,
+dispatcher version/source hash, and update time.
 
 For an implicit install/sync write, `forge_binary_path` follows this ordered transition table:
 
@@ -1088,44 +1086,22 @@ For an implicit install/sync write, `forge_binary_path` follows this ordered tra
 | 3        | Otherwise, a known user-tool location contains an executable non-venv target | Record the first such target       |
 | 4        | No usable target exists                                                      | Record `null`; do not guess a path |
 
-This prevents a project `.venv/bin/forge` found by `which` or `argv0` from sticky-pointing all hooks at that checkout,
-while preserving custom non-venv launchers and deliberate launcher migrations. Venv classification is lexical: a
-launcher is a venv launcher only when its own parent is `bin`/`Scripts` and the parent directory has `pyvenv.cfg`. Forge
-never resolves a launcher symlink for this test, so a stable `~/.local/bin/forge` symlink remains eligible even when its
-target lives inside a tool venv. A legacy recorded venv launcher is replaced or cleared by this table on the next
-enable/sync. An explicit internal `forge_binary_path` argument remains authoritative.
-
-With no dev override, the standalone dispatcher first tries the recorded launcher, then known user-tool locations in
-order: `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, `PIPX_BIN_DIR`. It does not search inherited `PATH`. It
-verifies executability before `exec`; if no target is found, it exits non-zero with a diagnostic naming the checked
-locations. Sidecar/container resolution is separate because host `~/.forge` and host launcher paths are not mounted
-there.
+Venv classification is lexical (`bin`/`Scripts` beside `pyvenv.cfg`) and does not resolve symlinks, preserving stable
+user-tool links while replacing legacy venv records. Without `FORGE_DEV`, dispatch tries the recorded launcher then
+`~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`, and `PIPX_BIN_DIR`; it ignores inherited `PATH`, verifies
+executability, and names checked locations on failure. Explicit internal `forge_binary_path` remains authoritative;
+sidecars resolve separately.
 
 #### Hook dispatcher (`~/.forge/bin/forge-hook`)
 
-The dispatcher is a generated stdlib-only Python script. The no-op gate mirrors the project registry hook read posture:
-walk upward to `.forge/` while stopping at `.git`, read `~/.forge/projects.json` fail-open, and match exact canonical
-paths before `samefile()`. Unexpected gate errors, such as a deleted cwd or transient filesystem permission error, also
-fail open to exit 0. If the hook environment already identifies a managed Forge session, the dispatcher dispatches even
-when the cwd is not enrolled.
+The stdlib-only dispatcher gates by managed session or an enrolled `.forge/` ancestor (stopping at `.git`); registry and
+unexpected gate errors fail open to no-op. `FORGE_DEV` is a hard branch to an absolute executable
+`<root>/.venv/bin/forge`: invalid values or exec failures exit 127 without fallback, changes require relaunch, and the
+variable neither updates metadata nor bypasses compatibility. Sidecars do not use this host path.
 
-After the gate and missing-handler check, presence of `FORGE_DEV` creates a hard resolution branch. Its non-empty value
-must expand to an absolute checkout root, and `<root>/.venv/bin/forge` must be executable. The dispatcher uses exactly
-that target. Empty or relative values, expansion errors, missing/non-executable targets, and `exec` errors exit 127 with
-a diagnostic naming `FORGE_DEV`; none falls through to recorded/global resolution. The variable is process-scoped and
-does not update `runtime.json`; managed Claude and Codex launches inherit it, so a changed or removed value requires a
-relaunch. It has no effect on the gate and adds no `required_forge` bypass. Sidecar hooks do not use the host dispatcher
-and are outside this override contract.
-
-Rendered hook command strings use a literal absolute path, never `~`, for example
-`/home/user/.forge/bin/forge-hook session-start`. The command byte template is golden-pinned with `$HOME` normalized
-because Codex trust hashes cover command definitions.
-
-The rendered script carries `FORGE_HOOK_DISPATCHER_VERSION` and `FORGE_HOOK_DISPATCHER_SOURCE_SHA256` stamps. User-scope
-enable renders the artifact, and `forge extension sync --scope user` re-renders it for an existing tracked user install.
-`forge extension doctor` reports missing/stale/unreadable dispatcher state and the applicable recovery command; without
-a tracked user install, that recovery is the hooks-only user-scope enable recipe. Resolver changes do not alter
-registered hook command bytes, so re-rendering the script does not itself require Codex hook re-trust.
+Registered commands use a golden-pinned literal absolute dispatcher path because Codex trusts command bytes. The script
+carries version/source-hash stamps; user enable/sync renders it, and doctor reports drift plus enable/sync recovery.
+Re-rendering unchanged registration bytes needs no Codex re-trust.
 
 #### Trusted project registry (`~/.forge/projects.json`)
 
@@ -1204,35 +1180,41 @@ not a bypass; sidecars need a satisfying image. `forge extension doctor` remains
 
 ### C.5 Multi-scope installation (skill resolution)
 
-Skills use `${CLAUDE_SKILL_DIR}` (a Claude Code built-in) to reference co-located resources. This variable resolves to
-the directory of the **executing** SKILL.md, so each installation is self-contained -- resources always come from the
-same scope as the SKILL.md that was invoked.
+Portable sources use `forge-skill.yaml` plus neutral `content.md`; packages without that manifest remain legacy
+Claude-only `SKILL.md`. Declared capabilities bind runtime arguments, resources, scripts, model family, exploration,
+invocation policy, and interaction. Script execution is distinct from resource loading and resolves from the selected
+package, never process CWD. Adapters emit Claude `forge:<skill>` or directory-matching Codex names, then strict
+whole-tree validation rejects invalid metadata, paths, placeholders, or runtime-token leaks. Only non-templated
+documentary Markdown under `references/` may be runtime-excluded. See
+[design_workflows.md §3.1](design_workflows.md#31-reflective-architecture).
 
-**Dual-scope behavior:** Installing Forge at two scopes (e.g., `--scope user` + `--scope project`) creates independent
-copies of every skill. Each copy has its own SKILL.md, resources, and scripts. Forge does **not** deduplicate across
-scopes.
+SKILLS planning is explicit over scope/runtime/profile/skill:
 
-| Concern             | Behavior                                                                     |
-| ------------------- | ---------------------------------------------------------------------------- |
-| Resource resolution | Safe: `${CLAUDE_SKILL_DIR}` is self-referential (no cross-scope mismatch)    |
-| Which copy runs     | Determined by Claude Code's scope precedence (not controlled by Forge)       |
-| Version skew        | If scopes are updated independently, one copy may be stale                   |
-| Hook duplication    | New installs use user scope; legacy roots require explicit `cleanup-project` |
-| Uninstall           | Scope-specific: `forge extension disable` removes only the targeted scope    |
+| Runtime       | User target                    | Project target                  | Local target                      |
+| ------------- | ------------------------------ | ------------------------------- | --------------------------------- |
+| `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
+| `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-**Recommendation:** Use one skill scope per project. If you keep project-level skills, reinstall only the user-scope
-runtime hooks:
+Repeatable `enable --runtime claude|codex|all` filters only SKILLS; automatic enable adds detected Codex to Claude, and
+sync preserves tracked runtimes. Explicit unavailable/local Codex requests fail before writes. Codex duplicate scans are
+read-only across user/project/admin roots: automatic new packages skip, while explicit or already-managed packages
+conflict; Forge never changes the untracked match, even with `--force`.
 
-```bash
-forge extension disable --scope user
-forge extension enable --scope project
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
-```
+Blocking plans write nothing. Compiled output uses the stable content-addressed `$FORGE_HOME/cache/compiled-skills/v1`
+cache; tracking commits last. Interrupted first-time Codex output must be removed before retry, while tracked updates
+remain syncable. Status owns package health (`present`, `missing`, `duplicate`, `invalid-target`); doctor does not emit
+`skill_packages`. Claude scopes may drift; Codex should use one visible scope.
+
+The portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. The four `claude -p` workflow
+frontends plus `walkthrough`/`qa` remain Claude-only.
 
 ### C.6 Codex hook registration (codex-hooks module)
 
 `forge extension enable --scope user` registers Forge's two Codex hooks by appending a marker-delimited managed block
-(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the user Codex config:
+(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the user Codex config.
+
+This module is independent of Codex skill packages. `$CODEX_HOME` selects the hook configuration below; Codex skills
+always use `$HOME/.agents/skills` or a project `.agents/skills` target from §C.5:
 
 | Forge scope | Codex config target                                        |
 | ----------- | ---------------------------------------------------------- |
@@ -1279,13 +1261,13 @@ those gaps with deterministic checklists and explicit human-verification points.
 prompts that hang the Bash tool, and leaked API keys. The fix: pre-written checklists where commands and assertions are
 deterministic and the agent only interprets results. Checklist edits change tests without modifying skill instructions.
 
-**Three skills** with escalating isolation, tied to install profiles:
+**Three skills** with escalating isolation and explicit runtime boundaries:
 
-| Skill                | Profile    | Isolation                                          | Audience          |
-| -------------------- | ---------- | -------------------------------------------------- | ----------------- |
-| `/forge:smoke-test`  | `standard` | Host, read-only probes                             | End users         |
-| `/forge:walkthrough` | `standard` | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
-| `/forge:qa`          | `full`     | Docker container                                   | Maintainers       |
+| Skill                               | Runtime        | Install requirement | Isolation                                          | Audience          |
+| ----------------------------------- | -------------- | ------------------- | -------------------------------------------------- | ----------------- |
+| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | SKILLS module       | Host, read-only probes                             | End users         |
+| `/forge:walkthrough`                | Claude only    | SKILLS module       | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
+| `/forge:qa`                         | Claude only    | `full` profile      | Docker container                                   | Maintainers       |
 
 **Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
 mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
@@ -1296,7 +1278,7 @@ verification.
 **Key design decisions:**
 
 - Share the pattern/convention, not the prompt — each skill is self-contained (no cross-mode confusion)
-- Checklist is single source of truth — editing it changes tests without SKILL.md modifications
+- Checklist is single source of truth — editing it changes tests without changing orchestration instructions
 - Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
   script counts
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
@@ -1316,10 +1298,10 @@ verification.
 
 ### D.2 Wrapper abstraction
 
-| Skill                | Wrapper                        | Isolation                        |
-| -------------------- | ------------------------------ | -------------------------------- |
-| `/forge:walkthrough` | `bash run-in-repo.sh <cmd>`    | env redirection + 4 safety gates |
-| `/forge:qa`          | `docker exec $CONTAINER <cmd>` | OS-level container boundary      |
+| Skill                | Wrapper                        | Isolation                               |
+| -------------------- | ------------------------------ | --------------------------------------- |
+| `/forge:walkthrough` | `bash run-in-repo.sh <cmd>`    | path denylist + 6 numbered safety gates |
+| `/forge:qa`          | `docker exec $CONTAINER <cmd>` | OS-level container boundary             |
 
 **Three-window model:** Session A prompts the user to open Terminal early. Session B is launched only when the checklist
 first needs interactive verification.
@@ -1330,8 +1312,8 @@ first needs interactive verification.
 
 **Walkthrough** (checklist-driven via `run-in-repo.sh`): Annotated checklist covering setup, install verification,
 real-system isolation checks, CLI exploration, proxy/session creation, live Claude session, sidecar execution, and
-cleanup. Hermetic isolation via `setup-test-repo.sh` (FORGE_HOME redirection, marker file, 4 safety gates in
-`run-in-repo.sh`).
+cleanup. Hermetic isolation via `setup-test-repo.sh` (Forge/Claude/Codex home redirection, a path denylist, and six
+numbered gates in `run-in-repo.sh`).
 
 **Full QA** (checklist-driven via `docker exec`): Checklist split into an index and per-section files
 (`resources/checklist.md` + `resources/checklist/*.md`). Includes `human:guided` items for interactive verification.
@@ -1807,8 +1789,14 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 - `pretool_policy="partial"`: post-enrollment PreToolUse deny + `updatedInput` are pinned headless, but enforcement
   exists only in enrolled homes. Malformed hook output fails open; PermissionRequest has not been observed firing.
 - `interactive="default"`: Forge-managed interactive sessions (bare TUI start and `codex resume` reattach, §3.9).
+- `skill_scopes=("user", "project")`: Codex skills target `$HOME/.agents/skills` and project `.agents/skills` only. This
+  is independent of `install_scopes`; local remains unsupported because Codex has no private local-only skill directory.
+  Claude declares user/project/local for both fields.
 - `hook_min_version`: machine-readable registration floor a preflight checks — not a firing guarantee.
 - `hook_feature_flag=None`: Codex hooks are default-on.
+
+`forge runtime list` shows `SKILL SCOPES` separately from general `SCOPES`; its JSON records both `skill_scopes` and
+`install_scopes`.
 
 ### I.3 Codex operational guards (probe-churn + enrollment)
 

@@ -566,7 +566,7 @@ def test_proxy_create(clean_workspace: ContainerLike):
 
 ---
 
-## Interactive Manual Testing (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`)
+## Interactive Manual Testing (`/forge:smoke-test` / `$smoke-test`, `/forge:walkthrough`, `/forge:qa`)
 
 Automated tests miss UX/latency/real-system failures. Three skills provide three tiers of verification.
 
@@ -574,7 +574,8 @@ Automated tests miss UX/latency/real-system failures. Three skills provide three
 
 ```
 src/skills/smoke-test/
-├── SKILL.md                          # Read-only health check runner
+├── forge-skill.yaml                  # Portable runtime/capability manifest
+├── content.md                        # Neutral read-only health check runner
 └── scripts/
     └── smoke-test.sh                 # Read-only probes + mtime assertions
 
@@ -584,7 +585,7 @@ src/skills/walkthrough/
 │   └── checklist.md      # Annotated checklist
 └── scripts/
     ├── setup-test-repo.sh           # Hermetic repo setup
-    ├── run-in-repo.sh              # Safety wrapper (4 gates)
+    ├── run-in-repo.sh              # Safety wrapper (path denylist + 6 gates)
     └── walkthrough-state.py        # Deterministic state machine (walkthrough-owned)
 
 src/skills/qa/
@@ -604,9 +605,12 @@ but each skill owns its copy so checklist/state behavior can change independentl
 
 ### Running
 
-```bash
-# In Claude Code:
-/forge:smoke-test                           # Read-only health check
+```text
+# In Claude Code or Codex:
+/forge:smoke-test                           # Claude: read-only health check
+$smoke-test                                 # Codex: same portable health check
+
+# Claude Code only:
 /forge:walkthrough                          # Walkthrough (hermetic functional test)
 /forge:walkthrough --setup-only             # Create test repo only
 /forge:qa                                   # Docker QA
@@ -617,20 +621,22 @@ but each skill owns its copy so checklist/state behavior can change independentl
 
 Risky operations go through safety scripts. The agent handles read-only checks directly.
 
-| Mode                 | Safety layer                    | Isolation                                          |
-| -------------------- | ------------------------------- | -------------------------------------------------- |
-| `/forge:smoke-test`  | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after      |
-| `/forge:walkthrough` | `run-in-repo.sh` (agent-driven) | 4 safety gates; agent mtime verification           |
-| `/forge:qa`          | `start-container.sh` + Docker   | OS-level isolation; `docker exec` for all commands |
+| Mode                                | Safety layer                    | Isolation                                          |
+| ----------------------------------- | ------------------------------- | -------------------------------------------------- |
+| `/forge:smoke-test` / `$smoke-test` | `smoke-test.sh`                 | Read-only probes; mtime snapshot before/after      |
+| `/forge:walkthrough`                | `run-in-repo.sh` (agent-driven) | Path denylist + 6 gates; agent mtime verification  |
+| `/forge:qa`                         | `start-container.sh` + Docker   | OS-level isolation; `docker exec` for all commands |
 
 ### Install profiles
 
 `/forge:qa` requires the `full` install profile (`forge extension enable --profile full`). The walkthrough and
-smoke-test skills install with any profile that includes the SKILLS module (standard or higher).
+smoke-test skills install with any resolved module set that includes SKILLS; standard includes it by default, while
+minimal requires `--with skills`.
 
 ### When to run
 
-- After installing Forge: `/forge:smoke-test` then `/forge:walkthrough`
+- After installing Forge: run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; use `/forge:walkthrough` for the
+  Claude-only interactive tour
 - After upgrading Forge: walkthrough catches regressions
 - Before releases: `/forge:qa` for full Docker QA
 

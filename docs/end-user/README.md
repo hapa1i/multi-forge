@@ -162,13 +162,15 @@ See [policy.md](policy.md).
 
 ### Skills -- Review, Understand, Panel
 
-Skills teach Claude how to compose Forge capabilities. Model family is auto-detected from session context:
+Skills teach supported agent runtimes how to compose Forge capabilities. Portable skills use `/forge:<name>` in Claude
+Code and `$<name>` in Codex; model family is auto-detected from session context where the skill uses family resources:
 
-```bash
-/forge:review src/forge/session/           # code review
-/forge:review-docs docs/design.md          # document review
-/forge:understand src/forge/core/ops/      # explain code structure
-/forge:panel src/forge/session/ --code     # multi-model code review
+```text
+/forge:review src/forge/session/           # Claude: code review
+$review src/forge/session/                 # Codex: same portable review
+/forge:review-docs docs/design.md          # Claude portable document review
+$understand src/forge/core/ops/            # Codex portable explanation
+/forge:panel src/forge/session/ --code     # Claude-only workflow frontend
 ```
 
 See [skills.md](skills.md).
@@ -245,10 +247,10 @@ See [config.md](config.md).
 
 Three tiers of verification:
 
-| Skill                | What it does                        |
-| -------------------- | ----------------------------------- |
-| `/forge:smoke-test`  | Read-only health check (30 seconds) |
-| `/forge:walkthrough` | Interactive feature tour (hermetic) |
-| `/forge:qa`          | Full Docker-based QA                |
+| Skill                               | Runtime        | What it does                        |
+| ----------------------------------- | -------------- | ----------------------------------- |
+| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | Read-only health check (30 seconds) |
+| `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic) |
+| `/forge:qa`                         | Claude only    | Full Docker-based QA                |
 
 See [manual_testing.md](manual_testing.md).
