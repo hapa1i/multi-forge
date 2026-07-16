@@ -3,24 +3,39 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
+from forge.install.skill_compiler import (
+    SkillRuntime,
+    compile_skill_for_runtime,
+    load_skill_source,
+)
+
 SKILLS_DIR = Path(__file__).parent.parent.parent.parent / "src" / "skills"
+
+
+@lru_cache
+def _compiled_skill(name: str, runtime: SkillRuntime = SkillRuntime.CLAUDE_CODE) -> str:
+    source = load_skill_source(SKILLS_DIR / name)
+    return compile_skill_for_runtime(source, runtime).file("SKILL.md").content.decode()
 
 
 class TestReviewCodeSkill:
     """Code review skill (forge:review)."""
 
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "review" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "review" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "review" / "content.md").exists()
+        assert _compiled_skill("review")
 
     def test_name_is_review(self):
-        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        content = _compiled_skill("review")
         assert "name: forge:review" in content
 
     def test_no_mode_detection(self):
         """Auto-detection removed; always code mode."""
-        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        content = _compiled_skill("review")
         assert "--mode" not in content
 
     def test_no_codereview_resource(self):
@@ -28,18 +43,18 @@ class TestReviewCodeSkill:
         assert not (SKILLS_DIR / "review" / "resources" / "codereview.md").exists()
 
     def test_auto_detects_model_family(self):
-        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        content = _compiled_skill("review")
         assert "forge session show" in content
         assert "model_family" in content
         assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
-        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        content = _compiled_skill("review")
         assert "--field main_model" in content
         assert "exact model not exposed to Forge" in content
 
     def test_no_style_flag(self):
-        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        content = _compiled_skill("review")
         assert "--style" not in content
 
     def test_code_resources_exist(self):
@@ -127,10 +142,12 @@ class TestReviewDocsSkill:
     """Document review skill (forge:review-docs)."""
 
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "review-docs" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "review-docs" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "review-docs" / "content.md").exists()
+        assert _compiled_skill("review-docs")
 
     def test_name_is_review_docs(self):
-        content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
+        content = _compiled_skill("review-docs")
         assert "name: forge:review-docs" in content
 
     def test_docs_resources_exist(self):
@@ -140,13 +157,13 @@ class TestReviewDocsSkill:
         assert (resources / "docs-gemini.md").exists()
 
     def test_auto_detects_model_family(self):
-        content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
+        content = _compiled_skill("review-docs")
         assert "forge session show" in content
         assert "model_family" in content
         assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
-        content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
+        content = _compiled_skill("review-docs")
         assert "--field main_model" in content
         assert "exact model not exposed to Forge" in content
 
@@ -274,21 +291,23 @@ class TestDebateSkill:
 
 class TestUnderstandSkill:
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "understand" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "understand" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "understand" / "content.md").exists()
+        assert _compiled_skill("understand")
 
     def test_auto_detects_model_family(self):
-        content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
+        content = _compiled_skill("understand")
         assert "forge session show" in content
         assert "model_family" in content
         assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
-        content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
+        content = _compiled_skill("understand")
         assert "--field main_model" in content
         assert "exact model not exposed to Forge" in content
 
     def test_allows_bash_for_model_detection(self):
-        content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
+        content = _compiled_skill("understand")
         assert "allowed-tools: Read, Grep, Glob, Bash" in content
 
     def test_code_resources_exist(self):
@@ -308,31 +327,33 @@ class TestChallengeSkill:
     """Challenge skill (forge:challenge)."""
 
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "challenge" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "challenge" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "challenge" / "content.md").exists()
+        assert _compiled_skill("challenge")
 
     def test_name_is_challenge(self):
-        content = (SKILLS_DIR / "challenge" / "SKILL.md").read_text()
+        content = _compiled_skill("challenge")
         assert "name: forge:challenge" in content
 
     def test_is_model_invocable(self):
         """Challenge must be auto-invocable (no disable-model-invocation)."""
-        content = (SKILLS_DIR / "challenge" / "SKILL.md").read_text()
+        content = _compiled_skill("challenge")
         assert "disable-model-invocation" not in content
 
     def test_has_read_only_tools(self):
         """Challenge is evaluative -- no Write or Edit access."""
-        content = (SKILLS_DIR / "challenge" / "SKILL.md").read_text()
+        content = _compiled_skill("challenge")
         assert "allowed-tools:" in content
         assert "Write" not in content
         assert "Edit" not in content
 
     def test_defaults_to_skepticism(self):
-        content = (SKILLS_DIR / "challenge" / "SKILL.md").read_text()
+        content = _compiled_skill("challenge")
         assert "skepticism" in content.lower()
 
     def test_infers_from_context_when_empty(self):
         """Empty args should infer from conversation, not default to cwd."""
-        content = (SKILLS_DIR / "challenge" / "SKILL.md").read_text()
+        content = _compiled_skill("challenge")
         assert "infer" in content.lower()
         assert "current working directory" not in content.lower()
 

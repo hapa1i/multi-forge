@@ -3,11 +3,13 @@
 # Runs a fixed whitelist of probes and asserts no filesystem side effects.
 #
 # Usage:
-#   bash smoke-test.sh
+#   FORGE_SKILL_RUNTIME=claude_code bash smoke-test.sh
+#   FORGE_SKILL_RUNTIME=codex bash smoke-test.sh
 #
 # Exit codes:
 #   0  All checks passed
 #   1  One or more checks failed
+#   2  Unsupported runtime selection
 
 set -euo pipefail
 
@@ -15,6 +17,33 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo "ERROR: python3 not found on PATH. Smoke test requires python3 for mtime snapshots." >&2
     exit 1
 fi
+
+RUNTIME="${FORGE_SKILL_RUNTIME:-claude_code}"
+FORGE_STATE_HOME="${FORGE_HOME:-$HOME/.forge}"
+case "$0" in
+    /*)
+        SCRIPT_PATH="$0"
+        ;;
+    *)
+        SCRIPT_PATH="$PWD/$0"
+        ;;
+esac
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+PACKAGE_DIR=$(dirname "$SCRIPT_DIR")
+SKILLS_DIR=$(dirname "$PACKAGE_DIR")
+RUNTIME_ROOT=$(dirname "$SKILLS_DIR")
+case "$RUNTIME" in
+    claude_code)
+        RUNTIME_FLAG="claude"
+        ;;
+    codex)
+        RUNTIME_FLAG="codex"
+        ;;
+    *)
+        echo "ERROR: unsupported FORGE_SKILL_RUNTIME '$RUNTIME' (expected claude_code or codex)." >&2
+        exit 2
+        ;;
+esac
 
 PASS=0
 FAIL=0
@@ -29,13 +58,23 @@ snapshot_mtime() {
     fi
 }
 
-SNAP_SETTINGS=$(snapshot_mtime "$HOME/.claude/settings.json")
-SNAP_LOCAL=$(snapshot_mtime "$HOME/.claude/settings.local.json")
-SNAP_COMMANDS=$(snapshot_mtime "$HOME/.claude/commands")
-SNAP_AGENTS=$(snapshot_mtime "$HOME/.claude/agents")
-SNAP_SKILLS=$(snapshot_mtime "$HOME/.claude/skills")
-SNAP_FORGE=$(snapshot_mtime "$HOME/.forge")
-SNAP_INSTALLED=$(snapshot_mtime "$HOME/.forge/installed.json")
+SNAP_FORGE=$(snapshot_mtime "$FORGE_STATE_HOME")
+SNAP_INSTALLED=$(snapshot_mtime "$FORGE_STATE_HOME/installed.json")
+
+case "$RUNTIME" in
+    claude_code)
+        SNAP_SETTINGS=$(snapshot_mtime "$RUNTIME_ROOT/settings.json")
+        SNAP_LOCAL=$(snapshot_mtime "$RUNTIME_ROOT/settings.local.json")
+        SNAP_COMMANDS=$(snapshot_mtime "$RUNTIME_ROOT/commands")
+        SNAP_AGENTS=$(snapshot_mtime "$RUNTIME_ROOT/agents")
+        SNAP_SKILLS=$(snapshot_mtime "$SKILLS_DIR")
+        ;;
+    codex)
+        CODEX_CONFIG_HOME="${CODEX_HOME:-$HOME/.codex}"
+        SNAP_CODEX_SKILLS=$(snapshot_mtime "$SKILLS_DIR")
+        SNAP_CODEX_CONFIG=$(snapshot_mtime "$CODEX_CONFIG_HOME/config.toml")
+        ;;
+esac
 
 # --- Probe helpers ---
 check() {
@@ -68,11 +107,11 @@ check_file() {
 # --- Run probes (read-only only -- no forge subcommands that trigger pending-work queue) ---
 check "forge on PATH" command -v forge
 check "forge --version" forge --version
-check_file "installed.json" "$HOME/.forge/installed.json" "exists"
+check_file "installed.json" "$FORGE_STATE_HOME/installed.json" "exists"
 
 # Direct file read -- no Forge CLI invocation, no startup side effects
-if [ -f "$HOME/.forge/installed.json" ] && command -v jq >/dev/null 2>&1; then
-    check "tracking version" jq -r '.version // "unknown"' "$HOME/.forge/installed.json"
+if [ -f "$FORGE_STATE_HOME/installed.json" ] && command -v jq >/dev/null 2>&1; then
+    check "tracking version" jq -r '.version // "unknown"' "$FORGE_STATE_HOME/installed.json"
 fi
 
 # --- Assert no side effects ---
@@ -91,18 +130,26 @@ assert_unchanged() {
     fi
 }
 
-assert_unchanged "settings.json intact" "$HOME/.claude/settings.json" "$SNAP_SETTINGS"
-assert_unchanged "settings.local intact" "$HOME/.claude/settings.local.json" "$SNAP_LOCAL"
-assert_unchanged "commands dir intact" "$HOME/.claude/commands" "$SNAP_COMMANDS"
-assert_unchanged "agents dir intact" "$HOME/.claude/agents" "$SNAP_AGENTS"
-assert_unchanged "skills dir intact" "$HOME/.claude/skills" "$SNAP_SKILLS"
-assert_unchanged "~/.forge intact" "$HOME/.forge" "$SNAP_FORGE"
-assert_unchanged "installed.json intact" "$HOME/.forge/installed.json" "$SNAP_INSTALLED"
+case "$RUNTIME" in
+    claude_code)
+        assert_unchanged "settings.json intact" "$RUNTIME_ROOT/settings.json" "$SNAP_SETTINGS"
+        assert_unchanged "settings.local intact" "$RUNTIME_ROOT/settings.local.json" "$SNAP_LOCAL"
+        assert_unchanged "commands dir intact" "$RUNTIME_ROOT/commands" "$SNAP_COMMANDS"
+        assert_unchanged "agents dir intact" "$RUNTIME_ROOT/agents" "$SNAP_AGENTS"
+        assert_unchanged "skills dir intact" "$SKILLS_DIR" "$SNAP_SKILLS"
+        ;;
+    codex)
+        assert_unchanged "Codex skills dir intact" "$SKILLS_DIR" "$SNAP_CODEX_SKILLS"
+        assert_unchanged "Codex config intact" "$CODEX_CONFIG_HOME/config.toml" "$SNAP_CODEX_CONFIG"
+        ;;
+esac
+assert_unchanged "Forge state intact" "$FORGE_STATE_HOME" "$SNAP_FORGE"
+assert_unchanged "installed.json intact" "$FORGE_STATE_HOME/installed.json" "$SNAP_INSTALLED"
 
 # --- Print results ---
 TOTAL=$((PASS + FAIL))
 echo ""
-echo "Forge Smoke Test"
+echo "Forge Smoke Test ($RUNTIME)"
 echo "------------------------------------"
 for line in "${RESULTS[@]}"; do
     echo "$line"
@@ -112,7 +159,7 @@ echo "  $PASS/$TOTAL passed"
 
 if [ "$FAIL" -gt 0 ]; then
     echo ""
-    echo "  Some checks failed. Run 'forge extension enable --scope user' to install."
+    echo "  Some checks failed for $RUNTIME. Run 'forge extension enable --runtime $RUNTIME_FLAG' for the intended scope."
     exit 1
 fi
 exit 0

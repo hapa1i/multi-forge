@@ -29,7 +29,7 @@ This skill EXPLAINS -- it does not EVALUATE.
 - Describe the structure and organization the author chose
 - Note absent topics factually: "The document does not specify X" (observation)
 - Do NOT rate quality, score completeness, or call sections "critically incomplete" (judgment)
-- Do NOT recommend fixes or improvements -- that is /forge:review-docs
+- Do NOT recommend fixes or improvements -- use the review-docs skill for evaluation
 - When gaps exist, explain what the document DOES cover in that area, not what it fails to cover
 </intent>
 ```
@@ -40,45 +40,30 @@ This skill EXPLAINS -- it does not EVALUATE.
 
 This skill requires:
 
-- **Explore subagent**: The `Agent` tool with `subagent_type: "Explore"` must be available
-- **File reading**: Read tool access to analyze target documentation
-- **Local analysis only**: Use only the tools allowed by this skill. Do not call external MCP analysis tools from this
-  skill.
+- **Repository exploration**: Search and file-reading access for the target documentation and related context
+- **Local analysis only**: Use only local runtime capabilities made available to this skill; do not call external
+  analysis services
 
 ---
 
 ## Phase 1: Exploration
 
-Gather context before analysis. Use the Explore agent to build understanding efficiently.
+Use {{forge:exploration}} to analyze the project documentation:
 
-```
-Tool: Agent
-Parameters:
-  subagent_type: "Explore"
-  description: "Analyze project documentation"
-  prompt: |
-    Analyze project documentation:
-    1. If no specific target: Find docs (README, CLAUDE.md, docs/**/*.md)
-    2. If specific file/directory: Read and analyze it
-    3. If question: Find docs that answer it
+1. With no specific target, find repository instructions, README files, and relevant project documentation.
+2. For a file or directory, read and analyze it.
+3. For a question, find the documents that answer it.
 
-    Explain what the document states and how it is structured.
-    Do not score quality, recommend fixes, or perform a review.
-
-    Return structured analysis:
-    - Design Decisions: Key choices, rationale, documented considerations
-    - Architecture: System structure, components, boundaries
-    - Technology Stack: Languages, frameworks, why chosen
-    - Design Patterns: Patterns used, where applied, why they fit
-```
+Explain what the documents state and how they are structured without scoring quality or recommending fixes. Return the
+documented design decisions, architecture, technology stack, and design patterns.
 
 ---
 
 ## Phase 2: Context-Aware Synthesis
 
-After receiving agent analysis:
+After exploration:
 
-1. Review agent's findings
+1. Review the exploration findings
 2. Enrich with conversation context
 3. Verify against code only when needed to resolve ambiguity or check implementation status
 4. Present synthesized results

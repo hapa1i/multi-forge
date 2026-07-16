@@ -47,21 +47,13 @@ Depth:
 </context_gathering>
 ```
 
-**Subagent invocation:**
+Use {{forge:exploration}} to gather the document-review context efficiently:
 
-```
-Tool: Agent
-Parameters:
-  subagent_type: "Explore"
-  description: "Explore design docs and related code"
-  prompt: |
-    Find and analyze:
-    1. Design documents: docs/**/*.md, **/design.md, **/architecture.md, **/ADR*.md
-    2. Existing implementation: grep for key abstractions, glob for component names
-    3. Cross-references: parse for links to other docs, resolve references
+1. Find relevant design, architecture, decision, and repository instruction documents.
+2. Locate existing implementation for the design's key abstractions and components.
+3. Trace cross-references and resolve links to related documents.
 
-    Return: List of relevant files with brief descriptions of their content.
-```
+Return the relevant files with brief descriptions of their content before reviewing.
 
 ---
 

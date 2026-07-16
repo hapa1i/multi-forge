@@ -1,0 +1,19 @@
+schema_version: 1
+name: understand
+description: Explain code, documentation, or technical concepts. Auto-detects code vs docs mode.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
+allow_implicit_invocation: true
+claude_frontmatter:
+  disable-model-invocation: false
+  argument-hint: '[target: path or question or instruction] [--output path] [--mode code|docs] [--depth quick|detailed|deep]'
+  allowed-tools: Read, Grep, Glob, Bash, Agent
+template_files:
+  - resources/code-anthropic.md
+  - resources/code-gemini.md
+  - resources/code-openai.md
+  - resources/code.md
+  - resources/docs-anthropic.md
+  - resources/docs-gemini.md
+  - resources/docs-openai.md
+  - resources/docs.md

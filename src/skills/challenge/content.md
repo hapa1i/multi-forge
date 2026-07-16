@@ -1,20 +1,10 @@
----
-name: forge:challenge
-description: Pressure-test a claim, recommendation, or assumption. Defaults to skepticism.
-argument-hint: '[claim or objection]'
-effort: high
-allowed-tools: Read, Grep, Glob, Bash, Agent
----
-
 # Challenge
 
 Pressure-test a claim, recommendation, or assumption with adversarial skepticism.
 
 ## Usage
 
-```
-/forge:challenge [claim]
-```
+Invoke this skill with an optional claim, objection, or question to pressure-test.
 
 ## Arguments
 
@@ -28,14 +18,14 @@ Pressure-test a claim, recommendation, or assumption with adversarial skepticism
 
 ### Step 1: Resolve Claim
 
-`$ARGUMENTS` is the claim to challenge. It should be a statement, objection, question, or instruction -- not a bare file
-path. If it starts with `@`, strip the prefix (Claude Code file reference syntax).
+The task input is {{forge:task_arguments}}. Treat it as the claim to challenge. It should be a statement, objection,
+question, or instruction -- not a bare file path. If it starts with `@`, strip that optional file-reference prefix.
 
-If `$ARGUMENTS` is empty, infer the claim from the immediately preceding conversation context: the last recommendation,
-decision, assertion, or proposed change. Only ask the user what to challenge if no prior claim is identifiable from
-context.
+If the task input is empty, infer the claim from the immediately preceding conversation context: the last
+recommendation, decision, assertion, or proposed change. Only ask the user what to challenge if no prior claim is
+identifiable from context.
 
-Never ask the user to clarify if a claim was provided. If `$ARGUMENTS` contains anything, proceed immediately.
+Never ask the user to clarify if a claim was provided. If the task input contains anything, proceed immediately.
 
 ### Step 2: Challenge
 
@@ -57,9 +47,9 @@ Execute these steps:
    - Simpler alternatives that would invalidate the complexity
    - Contradictions with existing architecture or decisions
 
-3. **Investigate the repo.** Use Read, Grep, and Glob to find evidence. Check whether the claim holds against actual
-   code, tests, configuration, and documented decisions. Do not reason from first principles alone when evidence is
-   available.
+3. **Investigate the repo.** Search and read repository files to find evidence. Check whether the claim holds against
+   actual code, tests, configuration, and documented decisions. Do not reason from first principles alone when evidence
+   is available.
 
 4. **Test the skeptical case.** Is the counterargument strong, or does it fall apart under scrutiny?
 

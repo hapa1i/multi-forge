@@ -1,0 +1,22 @@
+schema_version: 1
+name: review
+description: Review code for conformance, correctness, and architecture alignment.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
+allow_implicit_invocation: true
+claude_frontmatter:
+  disable-model-invocation: false
+  argument-hint: '[target: path or instruction] [--output path]'
+  allowed-tools: Read, Grep, Glob, Bash, Agent
+template_files:
+  - resources/code-anthropic.md
+  - resources/code-gemini.md
+  - resources/code-openai.md
+  - resources/code.md
+runtime_excluded_files:
+  codex:
+    - references/claude-4.6.md
+    - references/claude-4.8.md
+    - references/gemini-3.1.md
+    - references/gpt-5.5.md
+    - references/skills-writing-guide.md

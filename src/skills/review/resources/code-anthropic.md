@@ -29,22 +29,14 @@ You provide actionable, evidence-based feedback.
 
 ## Phase 1: Exploration
 
-Gather context before reviewing. Use the Explore agent to build understanding efficiently.
+Use {{forge:exploration}} to gather the review context efficiently:
 
-```
-Tool: Agent
-Parameters:
-  subagent_type: "Explore"
-  description: "Explore design docs and code dependencies"
-  prompt: |
-    Find and analyze:
-    1. Design documents: docs/design.md, docs/architecture.md, CLAUDE.md, docs/**/*.md
-    2. Target code: Read the specified files/directory
-    3. Dependencies: What this code imports, what imports this code
-    4. Related tests: Find test files for this code
+1. Find relevant design, architecture, and repository instruction documents.
+2. Read the target files or directory.
+3. Trace what the target imports and what imports it.
+4. Locate related tests.
 
-    Return: Design contracts relevant to this code, dependency graph, test coverage.
-```
+Return the relevant design contracts, dependency graph, and test coverage before reviewing.
 
 ---
 

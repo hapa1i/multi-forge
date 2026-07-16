@@ -1,20 +1,10 @@
----
-name: forge:understand
-description: Explain code, documentation, or technical concepts. Auto-detects code vs docs mode.
-disable-model-invocation: false
-argument-hint: '[target: path or question or instruction] [--output path] [--mode code|docs] [--depth quick|detailed|deep]'
-allowed-tools: Read, Grep, Glob, Bash, Agent
----
-
 # Understand
 
 Analyze code or documentation to extract clear explanations of structure, design, and behavior.
 
 ## Usage
 
-```
-/forge:understand [target] [--mode code|docs] [--depth quick|detailed|deep]
-```
+Invoke this skill with an optional target, mode, and depth.
 
 ## Arguments
 
@@ -31,17 +21,17 @@ Follow these steps in order. Do not skip steps.
 
 ### Step 1: Resolve Target
 
-`$ARGUMENTS` is the target. It may be a file path, directory, question, or free-form instruction. If it starts with `@`,
-strip the prefix (Claude Code file reference syntax). If `$ARGUMENTS` is empty, default to the current working
+The task input is {{forge:task_arguments}}. It may be a file path, directory, question, or free-form instruction. If it
+starts with `@`, strip that optional file-reference prefix. If the task input is empty, default to the current working
 directory.
 
-Recognized flags (extract from `$ARGUMENTS` if present):
+Recognized flags (extract from the task input if present):
 
 - `--mode <value>` — code or docs
 - `--depth <value>` — quick, detailed, or deep
 - `--output <path>` — write result to file instead of conversation
 
-Never ask the user to clarify. If `$ARGUMENTS` contains anything, proceed immediately.
+Never ask the user to clarify. If the task input contains anything, proceed immediately.
 
 ### Step 2: Detect Mode
 
@@ -53,7 +43,7 @@ If `--mode` was not specified, auto-detect from the target (first match wins):
 | `*.py`, `*.ts`, `*.js`, `*.go`, `*.rs`, `*.java`                               | code |
 | Path starts with `docs/`, `design/`, `adr/`, `rfcs/`                           | docs |
 | Path starts with `src/`, `lib/`, `pkg/`, `cmd/`                                | code |
-| `README*`, `CLAUDE.md`, `CHANGELOG*`                                           | docs |
+| `README*`, repository instruction files, `CHANGELOG*`                          | docs |
 | Question contains "design", "architecture", "rationale", "ADR", "why we chose" | docs |
 | Question contains "bug", "function", "class", "method", "how does"             | code |
 | Default                                                                        | code |
@@ -64,45 +54,34 @@ Do not ask the user -- just apply the rules.
 
 **Do NOT start the analysis until this step is complete.**
 
-Model family: !`forge session show --field model_family 2>/dev/null || true` Main model:
-!`forge session show --field main_model 2>/dev/null || true`
+{{forge:model_family}}
 
-Resolve session context from `$FORGE_SESSION` or the local environment. Do not force `$CLAUDE_SESSION_ID`: unmanaged
-direct Claude sessions are not in Forge's session index, but may still expose direct-model environment metadata.
+Let Forge resolve session context from its session environment or the local project. Do not force a runtime-specific
+session identifier: unmanaged direct sessions may not be in Forge's session index but can still expose model metadata.
 
 Pick **one** instruction file (first match wins, read only one):
 
-1. If model family is `openai` or `gemini`: `${CLAUDE_SKILL_DIR}/resources/{mode}-{family}.md`
-2. Otherwise: `${CLAUDE_SKILL_DIR}/resources/{mode}.md`
+1. Code mode with model family `openai`: {{forge:resource_loading:resources/code-openai.md}}
+2. Code mode with model family `gemini`: {{forge:resource_loading:resources/code-gemini.md}}
+3. Code mode with any other family: {{forge:resource_loading:resources/code.md}}
+4. Docs mode with model family `openai`: {{forge:resource_loading:resources/docs-openai.md}}
+5. Docs mode with model family `gemini`: {{forge:resource_loading:resources/docs-gemini.md}}
+6. Docs mode with any other family: {{forge:resource_loading:resources/docs.md}}
 
-If model family lookup returns empty output, `anthropic`, or errors, treat it as the default family and immediately
-select `${CLAUDE_SKILL_DIR}/resources/{mode}.md`. Do not probe multiple variants.
+If model family lookup returns empty output, `anthropic`, or errors, treat it as the default family and immediately load
+the default resource for the selected mode. Do not probe multiple variants.
 
-### Tool-call hygiene (normative)
+### Resource-loading contract (normative)
 
-When reading the selected instruction file, call `Read` with exactly one argument:
-
-```json
-{"file_path":"/absolute/path/to/instruction-file.md"}
-```
-
-Rules:
-
-- Do NOT send empty-string values for optional fields
-- Do NOT include assistant-generated commentary or repair text in tool arguments
-
-A PreToolUse hook may strip extra Read parameters (`offset`, `limit`, `pages`) for skill instruction files, but callers
-must still send `Read` with only `file_path`.
-
-Read that one file using the Read tool with just the file_path parameter. Do not read both. If the chosen file is
-missing, report the path and stop.
+Load exactly the selected instruction file and no other family or mode variant. If the chosen file is missing, report
+its path and stop. Do not attach unrelated commentary or optional parameters to the file-loading operation.
 
 **After loading, tell the user in one message:**
 
 ```
 Analyzing {target} in {mode} mode (depth: {depth}).
   model_family: {family or "anthropic"}
-  model:        {main_model or "Claude Code default (exact model not exposed to Forge)"}
+  model:        {main_model or "runtime default (exact model not exposed to Forge)"}
   instruction:  {instruction_file_name}
 ```
 
@@ -115,11 +94,8 @@ Do not read target files or begin analysis until after you have:
 
 ### Step 4: Execute Analysis
 
-If the selected instruction file refers to an Explore subagent, use the `Agent` tool with `subagent_type: "Explore"`. Do
-not interpret `Task` in resource files as a separate tool.
-
-If the selected instruction file mentions disallowed or unavailable tools, stop and report the mismatch instead of
-substituting another tool.
+Use the runtime's available local exploration behavior exactly as directed by the selected resource. If required local
+behavior is unavailable, stop and report the mismatch instead of silently substituting an external analysis service.
 
 For depth handling inside this skill:
 
@@ -127,7 +103,7 @@ For depth handling inside this skill:
 - `detailed`: perform a fuller local analysis using the allowed tools in this skill
 - `deep`: perform the deepest local analysis available with the allowed tools in this skill
 
-Do not call `mcp__zen__*` tools from this skill.
+Use only local runtime capabilities made available to this skill; do not call external analysis services.
 
 Execute analysis following the loaded instructions with the specified depth. The instruction file defines the structure
 and output format -- follow it.
@@ -143,6 +119,6 @@ and output format -- follow it.
 When a resource file contains tool guidance that conflicts with this skill's allowed tools, this SKILL.md file wins. Do
 not improvise around the conflict.
 
-**Output routing:** If `--output` was specified, write the complete explanation to that path using the Write tool
-(create parent directories if needed). Print a one-line confirmation: `Wrote explanation to {path}`. Do not also print
-the full result in the conversation. If `--output` was not specified, print the result in the conversation as usual.
+**Output routing:** If `--output` was specified, write the complete explanation to that path, creating parent
+directories if needed. Print a one-line confirmation: `Wrote explanation to {path}`. Do not also print the full result
+in the conversation. If `--output` was not specified, print the result in the conversation as usual.

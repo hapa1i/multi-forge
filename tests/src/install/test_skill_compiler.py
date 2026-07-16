@@ -19,8 +19,6 @@ from forge.install.skill_compiler import (
     SkillSourceFormat,
     TokenAllowance,
     compile_skill_for_runtime,
-    load_claude_skill_source,
-    load_claude_skill_sources,
     load_neutral_skill_source,
     load_skill_sources,
 )
@@ -71,11 +69,13 @@ def _neutral_source(
     )
 
 
-def test_claude_bridge_compiles_every_current_skill_with_byte_and_mode_fidelity() -> None:
-    sources = load_claude_skill_sources(SKILLS_ROOT)
+def test_mixed_sources_preserve_legacy_claude_bridge_byte_and_mode_fidelity() -> None:
+    sources = load_skill_sources(SKILLS_ROOT)
 
     assert [source.manifest.name for source in sources] == sorted(path.name for path in SKILLS_ROOT.iterdir())
-    for source in sources:
+    bridge_sources = [source for source in sources if source.source_format == SkillSourceFormat.CLAUDE_BRIDGE]
+    assert bridge_sources
+    for source in bridge_sources:
         package_root = SKILLS_ROOT / source.manifest.name
         package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
         expected_paths = sorted(
@@ -93,8 +93,9 @@ def test_claude_bridge_compiles_every_current_skill_with_byte_and_mode_fidelity(
             assert package_file.mode == stat.S_IMODE(source_file.stat().st_mode), package_file.path
 
 
-def test_claude_bridge_preserves_internal_symlink_alias_content() -> None:
-    source = load_claude_skill_source(SKILLS_ROOT / "review")
+def test_mixed_loader_preserves_internal_symlink_alias_content() -> None:
+    source = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "review")
+    assert source.source_format == SkillSourceFormat.NEUTRAL
 
     package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
 
@@ -295,7 +296,10 @@ codex_interface:
 
     sources = load_skill_sources(tmp_path)
 
-    assert [source.manifest.name for source in sources] == ["legacy-skill", "neutral-skill"]
+    assert [source.manifest.name for source in sources] == [
+        "legacy-skill",
+        "neutral-skill",
+    ]
     assert [source.source_format for source in sources] == [
         SkillSourceFormat.CLAUDE_BRIDGE,
         SkillSourceFormat.NEUTRAL,
@@ -351,7 +355,10 @@ runtimes: [codex]
         ("{{forge:packaged_script:/tmp/check.sh}}", "template.invalid-path-argument"),
         ("{{forge:packaged_script:../check.sh}}", "template.invalid-path-argument"),
         ("{{forge:packaged_script:C:/check.sh}}", "template.invalid-path-argument"),
-        ("{{forge:packaged_script:scripts/missing.sh}}", "template.missing-package-path"),
+        (
+            "{{forge:packaged_script:scripts/missing.sh}}",
+            "template.missing-package-path",
+        ),
         ("{{forge:task_arguments:unexpected}}", "template.unexpected-argument"),
     ],
 )
@@ -412,7 +419,8 @@ def test_invocation_policy_capability_requires_an_explicit_portable_value() -> N
 
 
 def test_codex_bridge_rejects_raw_claude_tokens_after_explicit_opt_in() -> None:
-    bridge = load_claude_skill_source(SKILLS_ROOT / "challenge")
+    bridge = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "panel")
+    assert bridge.source_format == SkillSourceFormat.CLAUDE_BRIDGE
     bridge = replace(
         bridge,
         manifest=replace(bridge.manifest, runtime_eligibility=ALL_RUNTIMES),

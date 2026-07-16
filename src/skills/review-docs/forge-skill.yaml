@@ -1,0 +1,15 @@
+schema_version: 1
+name: review-docs
+description: Review design documents, specs, and technical writing for completeness and consistency.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, model_family, resource_loading, exploration, invocation_policy]
+allow_implicit_invocation: true
+claude_frontmatter:
+  disable-model-invocation: false
+  argument-hint: '[target: path or instruction] [--output path]'
+  allowed-tools: Read, Grep, Glob, Bash, Agent
+template_files:
+  - resources/docs-anthropic.md
+  - resources/docs-gemini.md
+  - resources/docs-openai.md
+  - resources/docs.md
