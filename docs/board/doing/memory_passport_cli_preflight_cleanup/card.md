@@ -1,6 +1,7 @@
 # Consolidate memory-passport CLI target preflight
 
-**Status**: Proposed on 2026-07-15 from the `okf_compatible_memory_passports` post-closeout review.
+**Status**: Accepted into `doing/` on 2026-07-16 (branch `memory-passport-cli-preflight-cleanup`). Proposed on
+2026-07-15 from the `okf_compatible_memory_passports` post-closeout review.
 
 ## Goal
 
@@ -13,7 +14,7 @@ stdout/stderr contract.
 The blocks look similar but are not interchangeable:
 
 - `show` is read-only and must not acquire the mutating commands' project-compatibility refusal;
-- track/remove use established `ClickException` output;
+- track/show/remove use established `ClickException` output for their local root/path failures;
 - upgrade deliberately uses `forge.cli.output` recovery messages on stderr;
 - existing commands use different missing-file wording that may already be consumed by tests or users.
 
