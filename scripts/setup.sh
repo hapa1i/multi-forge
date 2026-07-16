@@ -549,7 +549,7 @@ uninstall_forge() {
     if [[ -n "$forge_cmd" ]]; then
         # Remove ALL tracked extensions (user + all local/project)
         info "Removing Claude Code extensions (all scopes)..."
-        "$forge_cmd" extension disable --all --force 2>/dev/null || {
+        "$forge_cmd" extension disable --all --yes 2>/dev/null || {
             warn "Could not run 'forge extension disable --all' (may need manual cleanup)"
         }
     else
