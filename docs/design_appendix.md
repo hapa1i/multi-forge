@@ -389,6 +389,7 @@ variables must be added here and documented in the relevant end-user guide befor
 | `FORGE_SIDECAR`                    | Internal wiring   | Sidecar runtime marker                                              |
 | `FORGE_SIDECAR_HOST_FORGE_ROOT`    | Internal wiring   | Host Forge root retained for sidecar deferred-work markers          |
 | `FORGE_SIDECAR_HOST_WORKTREE_PATH` | Internal wiring   | Host worktree path retained for sidecar deferred-work markers       |
+| `FORGE_SKILL_RUNTIME`              | Internal wiring   | Compiled skill-to-packaged-script runtime binding                   |
 | `FORGE_SUBPROCESS_BASE_URL`        | Internal wiring   | Child-process proxy routing metadata                                |
 | `FORGE_SUBPROCESS_PROXY`           | Internal wiring   | Child-process proxy selection                                       |
 | `FORGE_SUBPROCESS_PROXY_ID`        | Internal wiring   | Child-process resolved proxy id                                     |
