@@ -28,7 +28,6 @@ _AGENT_SKILL_FIELDS = {
     "allowed-tools",
 }
 _AGENT_SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))")
 _OPENAI_TOP_LEVEL_FIELDS = {"interface", "policy", "dependencies"}
 _OPENAI_INTERFACE_FIELDS = {
     "display_name",
@@ -38,6 +37,48 @@ _OPENAI_INTERFACE_FIELDS = {
     "brand_color",
     "default_prompt",
 }
+_BINARY_ASSET_SUFFIXES = frozenset(
+    {
+        ".7z",
+        ".avi",
+        ".bin",
+        ".bmp",
+        ".bz2",
+        ".class",
+        ".db",
+        ".dylib",
+        ".eot",
+        ".flac",
+        ".gif",
+        ".gz",
+        ".ico",
+        ".jar",
+        ".jpeg",
+        ".jpg",
+        ".m4a",
+        ".mov",
+        ".mp3",
+        ".mp4",
+        ".otf",
+        ".pdf",
+        ".png",
+        ".pyc",
+        ".pyo",
+        ".so",
+        ".sqlite",
+        ".tar",
+        ".ttf",
+        ".wav",
+        ".webm",
+        ".webp",
+        ".woff",
+        ".woff2",
+        ".xz",
+        ".zip",
+    }
+)
+_CLAUDE_EFFORT_VALUES = frozenset({"low", "medium", "high", "max"})
+_NON_SUPPRESSIBLE_TOKEN_RULES = frozenset({"token.unresolved-placeholder"})
 
 
 @dataclass(frozen=True)
@@ -66,7 +107,7 @@ _CODEX_TOKEN_RULES = (
     ),
     _TokenRule(
         id="token.claude-skill-dir",
-        pattern=re.compile(r"\$\{CLAUDE_SKILL_DIR\}"),
+        pattern=re.compile(r"\$(?:\{CLAUDE_SKILL_DIR\}|CLAUDE_SKILL_DIR\b)"),
         message="Claude's skill-directory variable leaked into a Codex package",
         recovery="Use resource_loading or packaged_script explicitly; packaged scripts need their own proven binding.",
     ),
@@ -359,6 +400,112 @@ def _validate_claude_frontmatter(
                 PurePosixPath("SKILL.md"),
             )
         )
+
+    string_fields = {
+        "argument-hint": "a non-empty string",
+        "agent": "a non-empty string",
+        "license": "a non-empty string",
+        "model": "a non-empty string",
+    }
+    for field, expected in string_fields.items():
+        value = frontmatter.get(field)
+        if field in frontmatter and (not isinstance(value, str) or not value.strip()):
+            diagnostics.append(
+                _diagnostic(
+                    package,
+                    f"claude.{field}",
+                    f"Claude frontmatter {field} must be {expected} when present",
+                    f"Set {field} to {expected}, or omit it.",
+                    PurePosixPath("SKILL.md"),
+                )
+            )
+
+    compatibility = frontmatter.get("compatibility")
+    if "compatibility" in frontmatter and (
+        not isinstance(compatibility, str) or not compatibility.strip() or len(compatibility) > 500
+    ):
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.compatibility",
+                "Claude frontmatter compatibility must be a non-empty string of at most 500 characters",
+                "Omit compatibility or describe concrete requirements in 1-500 characters.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
+
+    metadata = frontmatter.get("metadata")
+    if "metadata" in frontmatter and not isinstance(metadata, dict):
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.metadata",
+                "Claude frontmatter metadata must be a mapping",
+                "Use a YAML mapping for metadata, or omit it.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
+
+    for field in ("disable-model-invocation", "user-invocable"):
+        value = frontmatter.get(field)
+        if field in frontmatter and not isinstance(value, bool):
+            diagnostics.append(
+                _diagnostic(
+                    package,
+                    f"claude.{field}",
+                    f"Claude frontmatter {field} must be a boolean",
+                    f"Set {field} to true or false without quotes, or omit it.",
+                    PurePosixPath("SKILL.md"),
+                )
+            )
+
+    allowed_tools = frontmatter.get("allowed-tools")
+    if "allowed-tools" in frontmatter and (not isinstance(allowed_tools, str) or not allowed_tools.strip()):
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.allowed-tools",
+                "Claude frontmatter allowed-tools must be a non-empty string",
+                "Set allowed-tools to Claude's documented tool-selector string, or omit it.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
+
+    effort = frontmatter.get("effort")
+    if "effort" in frontmatter and (not isinstance(effort, str) or effort not in _CLAUDE_EFFORT_VALUES):
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.effort",
+                f"Claude frontmatter effort must be one of {sorted(_CLAUDE_EFFORT_VALUES)}",
+                "Use low, medium, high, or max, or omit the effort override.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
+
+    context = frontmatter.get("context")
+    if "context" in frontmatter and context != "fork":
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.context",
+                "Claude frontmatter context must be 'fork' when present",
+                "Use context: fork for isolated execution, or omit context.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
+
+    hooks = frontmatter.get("hooks")
+    if "hooks" in frontmatter and not isinstance(hooks, dict):
+        diagnostics.append(
+            _diagnostic(
+                package,
+                "claude.hooks",
+                "Claude frontmatter hooks must be a mapping",
+                "Use Claude's documented skill-scoped hooks mapping, or omit hooks.",
+                PurePosixPath("SKILL.md"),
+            )
+        )
     return diagnostics
 
 
@@ -496,9 +643,19 @@ def _validate_token_isolation(
         try:
             text = package_file.content.decode("utf-8")
         except UnicodeDecodeError:
+            if _requires_utf8_token_scan(package_file):
+                diagnostics.append(
+                    _diagnostic(
+                        package,
+                        "token.utf8",
+                        "an executable or text-like package file is not valid UTF-8, so token isolation cannot be verified",
+                        "Encode executable and textual package files as UTF-8; reserve binary suffixes for inert assets.",
+                        path,
+                    )
+                )
             continue
         for rule in rules:
-            if (path, rule.id) in allowances:
+            if (path, rule.id) in allowances and rule.id not in _NON_SUPPRESSIBLE_TOKEN_RULES:
                 continue
             if rule.pattern.search(text):
                 diagnostics.append(_diagnostic(package, rule.id, rule.message, rule.recovery, path))
@@ -517,11 +674,21 @@ def _validate_references(
             text = package_file.content.decode("utf-8")
         except UnicodeDecodeError:
             continue
-        for match in _MARKDOWN_LINK_RE.finditer(text):
-            raw_target = match.group(1) or match.group(2)
+        for raw_target in _iter_markdown_reference_targets(text):
             if not raw_target or _is_dynamic_reference(raw_target):
                 continue
             split = urlsplit(raw_target)
+            if split.scheme.lower() == "file":
+                diagnostics.append(
+                    _diagnostic(
+                        package,
+                        "reference.absolute",
+                        f"reference '{raw_target}' uses a local file URI",
+                        "Reference bundled files with a package-relative path.",
+                        source_path,
+                    )
+                )
+                continue
             if split.scheme or split.netloc or not split.path:
                 continue
             referenced = unquote(split.path)
@@ -560,6 +727,117 @@ def _validate_references(
                     )
                 )
     return diagnostics
+
+
+def _iter_markdown_reference_targets(text: str) -> tuple[str, ...]:
+    """Return inline-link and reference-definition destinations.
+
+    This deliberately small parser tracks balanced label brackets and destination
+    parentheses. Regex-only matching misses nested labels such as
+    ``[outer [inner]](path)`` and reference definitions such as ``[label]: path``.
+    """
+
+    targets = list(_iter_inline_markdown_targets(text))
+    targets.extend(_iter_markdown_definition_targets(text))
+    return tuple(targets)
+
+
+def _iter_inline_markdown_targets(text: str) -> tuple[str, ...]:
+    targets: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        label_start = text.find("[", cursor)
+        if label_start < 0:
+            break
+        if _is_escaped(text, label_start):
+            cursor = label_start + 1
+            continue
+        label_end = _find_balanced_end(text, label_start, "[", "]")
+        if label_end is None or label_end + 1 >= len(text) or text[label_end + 1] != "(":
+            cursor = label_start + 1
+            continue
+        target = _markdown_destination(text, label_end + 2, require_closing_parenthesis=True)
+        if target is not None:
+            targets.append(target)
+        cursor = label_end + 2
+    return tuple(targets)
+
+
+def _iter_markdown_definition_targets(text: str) -> tuple[str, ...]:
+    targets: list[str] = []
+    for line in text.splitlines():
+        stripped = line.lstrip(" ")
+        if len(line) - len(stripped) > 3 or not stripped.startswith("["):
+            continue
+        label_end = _find_balanced_end(stripped, 0, "[", "]")
+        if label_end is None or stripped[label_end + 1 : label_end + 2] != ":":
+            continue
+        target = _markdown_destination(stripped, label_end + 2, require_closing_parenthesis=False)
+        if target is not None:
+            targets.append(target)
+    return tuple(targets)
+
+
+def _markdown_destination(text: str, start: int, *, require_closing_parenthesis: bool) -> str | None:
+    cursor = start
+    while cursor < len(text) and text[cursor] in " \t\r\n":
+        cursor += 1
+    if cursor >= len(text):
+        return None
+    if text[cursor] == "<":
+        end = cursor + 1
+        while end < len(text):
+            if text[end] == ">" and not _is_escaped(text, end):
+                return text[cursor + 1 : end]
+            if text[end] in "\r\n":
+                return None
+            end += 1
+        return None
+
+    destination_start = cursor
+    parenthesis_depth = 0
+    while cursor < len(text):
+        character = text[cursor]
+        if character == "\\":
+            cursor += 2
+            continue
+        if character == "(":
+            parenthesis_depth += 1
+        elif character == ")":
+            if parenthesis_depth == 0:
+                return text[destination_start:cursor] or None
+            parenthesis_depth -= 1
+        elif character in " \t\r\n" and parenthesis_depth == 0:
+            if require_closing_parenthesis and ")" not in text[cursor:]:
+                return None
+            return text[destination_start:cursor] or None
+        cursor += 1
+    if require_closing_parenthesis:
+        return None
+    return text[destination_start:cursor] or None
+
+
+def _find_balanced_end(text: str, start: int, opening: str, closing: str) -> int | None:
+    depth = 0
+    for index in range(start, len(text)):
+        if _is_escaped(text, index):
+            continue
+        if text[index] == opening:
+            depth += 1
+        elif text[index] == closing:
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _is_escaped(text: str, index: int) -> bool:
+    backslashes = 0
+    cursor = index - 1
+    while cursor >= 0 and text[cursor] == "\\":
+        backslashes += 1
+        cursor -= 1
+    return backslashes % 2 == 1
 
 
 def _validate_openai_yaml(
@@ -775,6 +1053,16 @@ def _validate_allowances(
                     allowance.path,
                 )
             )
+        elif allowance.rule in _NON_SUPPRESSIBLE_TOKEN_RULES:
+            diagnostics.append(
+                _diagnostic(
+                    package,
+                    "allowance.token-gate",
+                    f"token rule '{allowance.rule}' cannot be suppressed by an allowance",
+                    "Remove the allowance and ensure the compiler resolves every Forge capability placeholder.",
+                    allowance.path,
+                )
+            )
         elif package.runtime == SkillRuntime.CODEX:
             diagnostics.append(
                 _diagnostic(
@@ -786,6 +1074,10 @@ def _validate_allowances(
                 )
             )
     return diagnostics
+
+
+def _requires_utf8_token_scan(package_file: CompiledSkillFile) -> bool:
+    return bool(package_file.mode & 0o111) or package_file.path.suffix.lower() not in _BINARY_ASSET_SUFFIXES
 
 
 def _path_problem(path: PurePosixPath) -> str | None:
