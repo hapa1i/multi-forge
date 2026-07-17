@@ -12,13 +12,14 @@ import shutil
 import stat
 import subprocess
 from copy import deepcopy
+from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, NoReturn
 
 from forge.core.paths import find_git_root
 from forge.core.runtime import installed_runtimes
-from forge.core.state import StateError, now_iso
+from forge.core.state import StateError, atomic_write_bytes, now_iso
 
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
@@ -58,24 +59,6 @@ from .models import (
     SkillPackagePlan,
     SkillPackageStatus,
 )
-from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
-from .skill_compiler import (
-    CompiledSkillFile,
-    CompiledSkillPackage,
-    SkillRuntime,
-    compile_skill_for_runtime,
-    load_skill_sources,
-)
-from .skill_planning import (
-    CLAUDE_CODE_RUNTIME,
-    CODEX_RUNTIME,
-    SkillCandidate,
-    SkillPlanAction,
-    plan_runtime_skills,
-    runtime_skill_root,
-    scan_codex_skill_duplicates,
-    select_skill_runtimes,
-)
 from .settings_merge import (
     backup_settings,
     cleanup_empty_settings,
@@ -94,6 +77,24 @@ from .settings_merge import (
     smart_unmerge,
     unmerge,
     write_settings,
+)
+from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
+from .skill_compiler import (
+    CompiledSkillFile,
+    CompiledSkillPackage,
+    SkillRuntime,
+    compile_skill_for_runtime,
+    load_skill_sources,
+)
+from .skill_planning import (
+    CLAUDE_CODE_RUNTIME,
+    CODEX_RUNTIME,
+    SkillCandidate,
+    SkillPlanAction,
+    plan_runtime_skills,
+    runtime_skill_root,
+    scan_codex_skill_duplicates,
+    select_skill_runtimes,
 )
 from .tracking import TrackingStore, compute_checksum
 
@@ -162,6 +163,16 @@ _CLAUDE_SETTINGS_MODULES = {
     InstallModule.STATUSLINE,
     InstallModule.PERMISSIONS,
 }
+
+
+@dataclass(frozen=True)
+class _SettingsRollbackState:
+    """Exact pre-apply settings and ownership-sidecar state."""
+
+    settings_path: Path
+    settings_content: bytes | None
+    settings_mode: int | None
+    added_files: tuple[tuple[Path, bytes, int], ...]
 
 
 def _format_modules(modules: set[InstallModule]) -> str:
@@ -1427,6 +1438,7 @@ class Installer:
 
         installed_files: list[InstalledFile] = []
         newly_created_files: list[InstalledFile] = []
+        existing_files_by_target = {record.target_path: record for record in existing.files} if existing else {}
         for file_plan in plan.files:
             if file_plan.action in ("install", "update"):
                 target = Path(file_plan.target_path)
@@ -1434,23 +1446,37 @@ class Installer:
                 try:
                     installed_file = self._execute_file(file_plan, mode)
                 except OSError as e:
-                    raise ForgeInstallError(
-                        f"Failed to write extension file '{file_plan.target_path}': {e}. "
-                        "Tracking was not updated; files written earlier in this attempt may be untracked. "
-                        "Inspect and remove only those partial generated files, then rerun the same enable or sync "
-                        "command. Codex skill duplicates must be removed explicitly because --force never bypasses "
-                        "their ownership boundary."
-                    ) from e
+                    self._raise_post_file_failure(
+                        f"Failed to write extension file '{file_plan.target_path}'; tracking was not updated",
+                        e,
+                        newly_created_files,
+                        plan,
+                        unrecorded_targets=() if target_existed else (target,),
+                    )
                 installed_files.append(installed_file)
                 if not target_existed:
                     newly_created_files.append(installed_file)
             elif file_plan.action == "skip" and file_plan.source_path is not None:
-                installed_files.append(self._installed_file_record(file_plan, mode))
+                try:
+                    installed_file = self._installed_file_record(file_plan, mode)
+                except OSError as e:
+                    self._raise_post_file_failure(
+                        f"Failed to refresh extension file ownership '{file_plan.target_path}'",
+                        e,
+                        newly_created_files,
+                        plan,
+                    )
+                previous = existing_files_by_target.get(installed_file.target_path)
+                if previous is not None:
+                    installed_file.installed_at = previous.installed_at
+                installed_files.append(installed_file)
 
         backup_path: Path | None = None
+        settings_rollback_state: _SettingsRollbackState | None = None
         if modules & _CLAUDE_SETTINGS_MODULES:
             settings_path = get_settings_path(self._scope, self._project_root)
             try:
+                settings_rollback_state = self._capture_settings_rollback_state(settings_path)
                 backup_path = backup_settings(settings_path)
                 settings = read_settings(settings_path)
             except OSError as e:
@@ -1459,6 +1485,7 @@ class Installer:
                     e,
                     newly_created_files,
                     plan,
+                    settings_rollback_state=settings_rollback_state,
                 )
             removed_entry_ids: set[tuple[str, str]] = set()
             if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
@@ -1493,6 +1520,7 @@ class Installer:
                     e,
                     newly_created_files,
                     plan,
+                    settings_rollback_state=settings_rollback_state,
                 )
 
             entry_ids = {(entry.key_path, entry.stable_id) for entry in entries}
@@ -1518,12 +1546,14 @@ class Installer:
                     e,
                     newly_created_files,
                     plan,
+                    settings_rollback_state=settings_rollback_state,
                 )
         else:
             final_entries = list(existing.settings_entries) if existing else []
             if final_entries:
                 settings_path = get_settings_path(self._scope, self._project_root)
                 try:
+                    settings_rollback_state = self._capture_settings_rollback_state(settings_path)
                     save_added_settings(settings_path, entries_to_added_structure(final_entries))
                 except OSError as e:
                     self._raise_post_file_failure(
@@ -1531,6 +1561,7 @@ class Installer:
                         e,
                         newly_created_files,
                         plan,
+                        settings_rollback_state=settings_rollback_state,
                     )
 
         # Merge newly installed files with existing tracked files (for idempotent re-runs)
@@ -1569,6 +1600,7 @@ class Installer:
                             e,
                             newly_created_files,
                             plan,
+                            settings_rollback_state=settings_rollback_state,
                         )
                     # Collect parent dirs for empty-directory cleanup
                     parent = target.parent
@@ -1644,6 +1676,7 @@ class Installer:
                 e,
                 newly_created_files,
                 plan,
+                settings_rollback_state=settings_rollback_state,
             )
 
         return plan
@@ -1654,21 +1687,99 @@ class Installer:
         cause: Exception,
         newly_created_files: list[InstalledFile],
         plan: InstallPlan,
+        *,
+        unrecorded_targets: tuple[Path, ...] = (),
+        settings_rollback_state: _SettingsRollbackState | None = None,
     ) -> NoReturn:
-        rollback_failures = self._rollback_newly_created_files(newly_created_files, plan)
+        rollback_failures = self._rollback_newly_created_files(
+            newly_created_files,
+            plan,
+            unrecorded_targets=unrecorded_targets,
+        )
+        if settings_rollback_state is not None:
+            rollback_failures.extend(self._restore_settings_rollback_state(settings_rollback_state))
         rollback_note = (
             f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
             if rollback_failures
-            else " Newly created extension files were rolled back; rerun the same command after repairing the failure."
+            else (
+                " Newly created extension files and settings ownership state were rolled back; "
+                "rerun the same command after repairing the failure."
+                if settings_rollback_state is not None
+                else " Newly created extension files were rolled back; rerun the same command after repairing the failure."
+            )
         )
         raise ForgeInstallError(f"{message}: {cause}.{rollback_note}") from cause
+
+    @staticmethod
+    def _capture_settings_rollback_state(settings_path: Path) -> _SettingsRollbackState:
+        """Capture settings and all ownership sidecars before an apply mutation."""
+
+        if settings_path.is_file():
+            settings_content = settings_path.read_bytes()
+            settings_mode = stat.S_IMODE(settings_path.stat().st_mode)
+        else:
+            settings_content = None
+            settings_mode = None
+        added_files = tuple(
+            (path, path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in find_added_files(settings_path)
+        )
+        return _SettingsRollbackState(
+            settings_path=settings_path,
+            settings_content=settings_content,
+            settings_mode=settings_mode,
+            added_files=added_files,
+        )
+
+    @staticmethod
+    def _restore_settings_rollback_state(state: _SettingsRollbackState) -> list[str]:
+        """Best-effort restore of settings and ownership sidecars after apply failure."""
+
+        failures: list[str] = []
+        try:
+            if state.settings_content is None:
+                state.settings_path.unlink(missing_ok=True)
+            else:
+                atomic_write_bytes(
+                    state.settings_path,
+                    state.settings_content,
+                    mode=state.settings_mode,
+                )
+        except OSError:
+            failures.append(str(state.settings_path))
+
+        prior_added_paths = {path for path, _content, _mode in state.added_files}
+        try:
+            current_added_files = find_added_files(state.settings_path)
+        except OSError:
+            failures.append(f"{state.settings_path} ownership sidecars")
+            current_added_files = []
+        for path in current_added_files:
+            if path in prior_added_paths:
+                continue
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                failures.append(str(path))
+        for path, content, mode in state.added_files:
+            try:
+                atomic_write_bytes(path, content, mode=mode)
+            except OSError:
+                failures.append(str(path))
+        return failures
 
     def _rollback_newly_created_files(
         self,
         installed_files: list[InstalledFile],
         plan: InstallPlan,
+        *,
+        unrecorded_targets: tuple[Path, ...] = (),
     ) -> list[str]:
-        """Best-effort rollback for files created before a tracking commit fails."""
+        """Best-effort rollback for files created before tracking commits.
+
+        Unrecorded targets are paths that were absent immediately before an
+        attempted write but whose ownership record could not be built because
+        that write failed. Existing targets are never passed through this path.
+        """
 
         package_boundaries = {
             file_path: Path(package.target_dir).parent
@@ -1678,6 +1789,20 @@ class Installer:
         }
         failures: list[str] = []
         dirs_to_clean: set[tuple[Path, Path]] = set()
+        for target in reversed(unrecorded_targets):
+            boundary = package_boundaries.get(str(target), get_target_root(self._scope, self._project_root))
+            try:
+                validate_path_within_boundary(target, boundary, "roll back partial extension file")
+                target.unlink(missing_ok=True)
+            except (OSError, PathBoundaryViolationError):
+                if target.exists() or target.is_symlink():
+                    failures.append(str(target))
+                continue
+            parent = target.parent
+            while parent != boundary and parent.is_relative_to(boundary):
+                dirs_to_clean.add((parent, boundary))
+                parent = parent.parent
+
         for record in reversed(installed_files):
             target = Path(record.target_path)
             boundary = package_boundaries.get(record.target_path, get_target_root(self._scope, self._project_root))
