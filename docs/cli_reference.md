@@ -42,6 +42,10 @@ aliases the shared project target; Codex skills never use `$CODEX_HOME`. A proje
 module with `--runtime codex` can succeed without `.claude/` or the Claude version gate. A standard-profile
 `--runtime codex` is not Codex-only because the other profile modules still plan their normal Claude surfaces.
 
+Without an explicit scope, `sync`, `disable`, and `status` walk upward from the current directory. They combine
+`.claude/` ownership sidecars with exact scope/path rows in `~/.forge/installed.json`, so a tracked Codex-only project
+remains discoverable even when it has no `.claude/` directory.
+
 Codex package planning scans the user/project/admin skill chain for same-name directories containing `SKILL.md` and
 cross-references valid Forge tracking rows. Automatic selection skips an affected new Codex package. Explicit selection,
 or a duplicate beside a package that Forge already manages, makes the duplicate a whole-plan conflict. A package managed
@@ -57,6 +61,11 @@ registry activation. `--yes` recomputes the plan and applies it; ambiguous regis
 state exit non-zero without a preflight write. If cleanup has begun and user registration or final enrollment fails, the
 command retains backups and prints the exact retry command for the temporary hooks-off state. There is no `--json` mode;
 `forge extension doctor --json` is the scriptable diagnostic surface.
+
+`forge extension disable --all --yes` attempts every tracked scope and reports all failures. Any failure makes the
+command exit non-zero even when other scopes were removed. The setup-script uninstaller treats that exit as terminal and
+preserves `$FORGE_HOME`, including `installed.json`, for repair and retry; it also refuses to remove that state when the
+Forge command is unavailable.
 
 Doctor reports `FORGE_DEV` under `hook_dispatcher.dev_override` as
 `{present: bool, value: string|null, target: string|null, valid: bool, effective: bool, advice: string|null}`. `valid`
@@ -75,8 +84,10 @@ For each tracked runtime skill package, status JSON includes `runtime`, `skill`,
 `duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A Forge-managed
 cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports remove-or-rename
 guidance. A package root or descendant directory replaced by a symlink is `invalid-target`; enable, sync, and disable
-refuse to traverse it. Symlink install mode remains supported because only the tracked leaf files are links. Runtime-
-package health belongs to `extension status`; `extension doctor` does not emit `skill_packages`.
+refuse to traverse it. Symlink install mode remains supported because only tracked leaves are links; a dangling leaf is
+`missing`, not `present`. Runtime-package health belongs to `extension status`; `extension doctor` does not emit
+`skill_packages`. V2 tracking also requires every package path to stay under its package, include `SKILL.md`, and appear
+in the canonical file ledger. Incoherent tracking is reported as corrupt state before status or mutation proceeds.
 
 Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
 best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings

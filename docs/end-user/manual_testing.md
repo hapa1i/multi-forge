@@ -38,7 +38,8 @@ and `walkthrough` remain Claude-only.
 
 Runs a fixed set of read-only probes: `forge --version`, installation status, file existence checks. Prints a pass/fail
 table. No intentional writes; sensitive paths are snapshotted before and after and asserted unchanged. No test repo
-needed. Its compiled invocation identifies the selected runtime to the shared read-only script.
+needed. Its compiled invocation identifies the selected runtime and directly executes the installed script, whose entry
+point selects the interpreter independently of the session CWD.
 
 ## Walkthrough
 
@@ -89,7 +90,8 @@ the container for resume via `--from X.Y`. `--to X.Y` always means "stop before 
 The Docker QA is the only manual flow that exercises the Codex user target (`$HOME/.agents/skills`), because its home is
 container-isolated. It also verifies project targets, managed-runtime retention during automatic re-enable, explicit
 runtime narrowing, persisted runtime selection during sync, duplicate safety and recovery output, local-scope rejection,
-package health in human/JSON status, and disable/uninstall cleanup.
+package health (including dangling leaves) in human/JSON status, strict tracking ownership, and disable/uninstall
+cleanup.
 
 ## Runtime-aware extension checks
 
@@ -117,7 +119,18 @@ runtimes but preserves omitted tracked packages; disable owns removal. Cross-sco
 owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance. User-scope checks
 include valid, present tracked project/local packages outside the current directory chain because a user package would
 be visible from those projects. A package root or descendant directory replaced by a symlink must report
-`invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row.
+`invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row. A dangling
+tracked leaf symlink must instead report `missing`, and sync must recreate it.
+
+Run the following failure-path checks only in a disposable Forge home:
+
+- From a subdirectory of a tracked Codex-only project, unscoped sync/disable/status must resolve the exact project row
+  even without `.claude/`.
+- A v2 `skill_packages` row with empty, out-of-package, or non-ledger-backed `file_paths` must make status/sync/disable
+  fail before package or tracking mutation.
+- If one target makes `forge extension disable --all --yes` fail, the command must still attempt the remaining rows and
+  exit non-zero. `scripts/setup.sh --uninstall` must then preserve `$FORGE_HOME/installed.json`; it must also preserve
+  that state when the Forge command is unavailable.
 
 ---
 

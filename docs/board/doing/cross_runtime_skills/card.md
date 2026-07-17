@@ -159,13 +159,15 @@ from Codex, until the engine dispatches through the runtime registry. That engin
    mode may point only to a stable Forge-managed compiled cache, never a temporary directory.
 4. **Adapter contract.** One typed adapter interface owns frontmatter, names, invocation policy, task arguments,
    package-relative resource/script resolution, model-family selection, exploration/subagents, user interaction, and
-   Forge CLI bindings. Missing required bindings fail compilation.
+   Forge CLI bindings. Missing required bindings fail compilation. Packaged executables use their shebang or OS entry
+   point; adapters do not silently force Bash.
 5. **Runtime/scope model.** `RuntimeSpec.skill_scopes` is independent of `install_scopes`. Claude supports
    user/project/local; Codex supports user/project only. Codex local is an explicit unsupported package result, never a
    write to shared `.agents/skills`.
 6. **Names and invocation.** Claude keeps `forge:<skill>` and `/forge:<skill>`; Codex emits directory-matching `<skill>`
    and uses explicit `$<skill>` task text. `disable-model-invocation` maps only to the matching `agents/openai.yaml`
-   implicit-invocation policy.
+   implicit-invocation policy. Neutral sources express this policy only through the typed portable field; raw
+   adapter-owned invocation fields are invalid.
 7. **Delivery and duplicates.** Forge remains the direct installer. It never overwrites or deletes a same-name Codex
    skill. Duplicate discovery cross-references valid tracking rows with one path-normalization rule: an untracked match
    gets remove-or-rename guidance, while a match managed by another Forge scope stays a conflict whose recovery names
@@ -220,6 +222,24 @@ Axis 2; that is an explicit boundary rather than a Codex-native claim.
   `$HOME/.agents/skills` discovery, no personal-per-project scope; `[[skills.config]]` disable; `agents/openai.yaml`
   `policy.allow_implicit_invocation`).
 
+## Second-review boundary hardening (2026-07-17)
+
+The follow-up review found real fail-open edges beyond the earlier package-root substitution fix. The implemented
+remediation now:
+
+- propagates batch-disable failure to callers and makes complete uninstall preserve tracking and `$FORGE_HOME` until
+  every tracked extension is removed;
+- rejects symlinked source/package roots and applies the checkout's Git eligibility set throughout skill discovery and
+  file loading, so ignored packages or bytes cannot enter the stable compiled cache;
+- strictly cross-validates package rows against the canonical installation file ledger and reports dangling tracked leaf
+  symlinks as missing;
+- keeps invocation policy under typed neutral authority, honors executable entry points, hardens negative Codex probes
+  against false passes, and documents exact tracking-row discovery in lifecycle help.
+
+The final affected compiler/cache/lifecycle/CLI/setup/regression suite passed `378` tests. QA parses as v1.0.29 / 588
+assertions, and strengthened real-Codex policy/script stages passed on codex-cli 0.144.5. Broad verification passed; the
+card stays in `doing/` for review.
+
 ## Closeout
 
 Implementation is complete on `cross-runtime-skills` and intentionally remains in `doing/` for the requested human
@@ -257,9 +277,10 @@ review.
 - Clean wheel project/Codex and sdist user/all-runtime enable -> status -> doctor -> sync -> disable lifecycles passed
   from isolated installs. Claude smoke reported `11/11`, Codex smoke `8/8`, and no bytecode, symlink,
   checkout-reference, compiler-source, or post-disable ownership leak remained.
-- `uv build`, final `make pre-commit`, `make pre-commit-md`, and `git diff --check` passed after the hooks corrected
-  formatting and exposed one test `TypedDict` annotation. QA index parsing reports v1.0.28 / 585 assertions;
-  walkthrough-state tests report `93 passed`; `docs/design_appendix.md` remains below its limit at 29,990 tokens.
+- The second-review gates passed: `8,153` unit tests with one skip, `521` regression tests, `2` targeted Docker
+  lifecycle tests, `uv build`, `make pre-commit`, `make pre-commit-md`, and `git diff --check`. The current QA parser
+  reports v1.0.29 / 588 assertions; walkthrough-state reports `93 passed`, and `docs/design_appendix.md` remains below
+  its limit at 29,959 tokens.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 
@@ -276,6 +297,10 @@ review.
 - Codex duplicate discovery is an ownership boundary: `--force` never adopts or deletes an untracked same-name package.
 - Runtime package directories are ownership boundaries: validate each directory entry with `lstat` near every mutation;
   permit symlink mode only at tracked leaf files.
+- Skill source eligibility is a compiler input, not just an installer-copy filter: reject symlinked roots and require
+  both a leaf alias and its contained target to be eligible before reading or caching either path.
+- Treat `skill_packages` as a strict projection of the canonical file ledger. Empty, outside-root, unbacked, duplicate,
+  or multiply claimed package paths are corrupted state and must fail before teardown mutates files or tracking.
 - The content-addressed compiled-skill cache currently has no eviction. Symlink-mode installs reference digest
   directories directly, so any future cleanup must prove a digest is not the target of a tracked install before removing
   it.

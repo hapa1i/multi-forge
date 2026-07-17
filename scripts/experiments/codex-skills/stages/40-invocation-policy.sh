@@ -10,19 +10,27 @@ mkdir -p "$skill/agents"
 cat >"$skill/SKILL.md" <<'EOF'
 ---
 name: probe-explicit-only
-description: Handles a deliberately unnamed policy probe when explicitly selected.
+description: Handles the deliberately unnamed policy probe.
 ---
 Return exactly EXPLICIT_POLICY_9E8D7 and nothing else.
 EOF
 cat >"$skill/agents/openai.yaml" <<'EOF'
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
 EOF
 
-run_exec implicit "$PROJ" 'Run the deliberately unnamed policy probe and report its result.' || true
-if rg -q --fixed-strings EXPLICIT_POLICY_9E8D7 "$PROBE_CAPTURE_DIR/results/implicit.last-message.txt"; then
+implicit_prompt='Run the deliberately unnamed policy probe and report its result.'
+run_exec implicit-enabled "$PROJ" "$implicit_prompt" || err "implicit-enabled Codex turn failed"
+assert_last_contains implicit-enabled EXPLICIT_POLICY_9E8D7
+
+cat >"$skill/agents/openai.yaml" <<'EOF'
+policy:
+  allow_implicit_invocation: false
+EOF
+run_exec implicit-blocked "$PROJ" "$implicit_prompt" || err "implicit-blocked Codex turn failed"
+if rg -q --fixed-strings EXPLICIT_POLICY_9E8D7 "$PROBE_CAPTURE_DIR/results/implicit-blocked.last-message.txt"; then
     err "implicit invocation loaded an explicit-only skill"
 fi
 run_exec explicit "$PROJ" '$probe-explicit-only Run the explicit policy probe.' || err "explicit Codex turn failed"
 assert_last_contains explicit EXPLICIT_POLICY_9E8D7
-note "VERDICT [40]: PASS implicit blocked, explicit invocation preserved"
+note "VERDICT [40]: PASS implicit control loaded, explicit-only policy blocked the same prompt, explicit invocation preserved"

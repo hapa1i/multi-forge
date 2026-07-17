@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-17
 
+### Cross-runtime skill boundary hardening
+
+**Goal**: Close fail-open source, ownership, teardown, and probe-evidence paths found during the second review without
+moving the card out of its review hold.
+
+**Key changes**:
+
+- Batch disable now exits nonzero after any failed row, and complete uninstall preserves tracking and `$FORGE_HOME` when
+  tracked teardown cannot complete.
+- Skill loading rejects symlinked roots and applies checkout Git eligibility before discovery, reads, or caching.
+  Tracking strictly cross-validates package ownership against the canonical file ledger, and status treats dangling
+  tracked leaf symlinks as missing.
+- Neutral invocation policy is typed-only, packaged executables honor their entry point, negative Codex probes require
+  successful turns plus exact command/exit evidence, and lifecycle help names exact tracking-row discovery.
+
+**Verification**: affected suite (`378 passed`); unit (`8,153 passed`, one skipped); regression (`521 passed`); targeted
+Docker lifecycle (`2 passed`); `uv build`, pre-commit, Markdown, and diff checks passed; QA parser v1.0.29 / 588
+assertions; strengthened real-Codex stages 40 and 50 passed on codex-cli 0.144.5.
+
 ### Cross-runtime skill review remediation
 
 **Goal**: Close the review-found ownership, duplicate-classification, status, compiler-boundary, and clean-package gaps

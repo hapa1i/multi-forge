@@ -40,7 +40,8 @@ closing braces; the delimiters are omitted here so this documentary file is not 
 - `forge:task_arguments` for invocation text.
 - `forge:resource_loading:path/to/file` for a read-only package-relative resource.
 - `forge:packaged_script:path/to/script` for an executable bundled script. This is separate from resource loading
-  because the runtime must resolve and execute the installed script correctly from an arbitrary working directory.
+  because the runtime resolves and directly executes the installed file from an arbitrary working directory. Give the
+  file executable mode and a shebang for its interpreter; do not assume the adapter wraps every script in Bash.
 - `forge:model_family`, `forge:exploration`, `forge:subagents`, `forge:user_interaction`, and `forge:forge_cli` for the
   corresponding runtime behavior.
 - Invocation policy is declared structurally in `forge-skill.yaml`; it is not handwritten into neutral content.
@@ -49,9 +50,9 @@ List every used capability in the manifest's `capabilities`. Shared `license`, `
 `allowed_tools` values belong in their typed manifest fields. Put genuinely Claude-only frontmatter such as
 `argument-hint`, `effort`, or a Claude-tool-specific `allowed-tools` value under `claude_frontmatter`, but never declare
 the same field in both places. Declare invocation policy once with `allow_implicit_invocation`; the adapter derives
-Claude's `disable-model-invocation` and Codex's matching policy. Put optional Codex UI metadata under `codex_interface`.
-Runtime bindings stay in the compiler adapters, never in model-family resources; adding a runtime must not create files
-such as `code-openai-codex.md`.
+Claude's `disable-model-invocation` and Codex's matching policy. The Claude field is forbidden in a neutral
+`claude_frontmatter` block. Put optional Codex UI metadata under `codex_interface`. Runtime bindings stay in compiler
+adapters, never in model-family resources; adding a runtime must not create files such as `code-openai-codex.md`.
 
 The neutral-source and emitted-package gates scan the whole tree. Do not place `$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`,
 Claude tool names/invocation syntax, or other runtime-specific instructions in neutral content or shared auxiliaries.
@@ -59,6 +60,10 @@ Claude tool names/invocation syntax, or other runtime-specific instructions in n
 explicit Markdown documentary references under `references/` that do not belong in a runtime package; it is not a way to
 hide scripts, resources, or incomplete neutralization. Unknown, undeclared, unbound, malformed, or leftover placeholders
 fail compilation with a source path and recovery.
+
+When Forge runs from a repository checkout, Git-tracked and unignored untracked paths form the source eligibility set
+for package discovery and every compiler read. Keep ignored secrets, generated outputs, and whole ignored packages out
+of skill inputs; a contained source symlink is usable only when both the link and its target are eligible.
 
 Keep a skill Claude-only when its behavior has no reviewed runtime binding. Today that includes Forge's workflow
 frontends whose engine still launches `claude -p` workers and the `walkthrough`/`qa` manual-test frontends. Portability

@@ -589,11 +589,7 @@ def inspect_skill_package_status(
             )
             continue
         missing_file_paths = tuple(
-            sorted(
-                tracked_file
-                for tracked_file in package.file_paths
-                if not Path(tracked_file).is_file() and not Path(tracked_file).is_symlink()
-            )
+            sorted(tracked_file for tracked_file in package.file_paths if not Path(tracked_file).is_file())
         )
         duplicate_dirs: tuple[str, ...] = ()
         managed_owners: tuple[_TrackedCodexPackageLocation, ...] = ()
@@ -974,7 +970,22 @@ class Installer:
         # site-packages — typically gitignored, so a git-tracked filter would
         # exclude every file. _is_installable() handles the wheel-install case.
         forge_source = get_forge_source_root()
-        git_tracked = _get_git_tracked_files(forge_source) if _is_repo_checkout(forge_source) else None
+        checkout_source_root = forge_source / "src"
+        checkout_sources = _is_repo_checkout(forge_source) and source_root == checkout_source_root
+        if checkout_sources:
+            try:
+                source_root_mode = source_root.lstat().st_mode
+            except OSError as e:
+                raise ForgeInstallError(f"Failed to inspect checkout extension source root '{source_root}': {e}") from e
+            if not stat.S_ISDIR(source_root_mode):
+                raise ForgeInstallError(
+                    f"Checkout extension source root must be a real directory, not a symlink: {source_root}"
+                )
+        git_eligible = _get_git_tracked_files(forge_source) if checkout_sources else None
+        if checkout_sources and (forge_source / ".git").exists() and git_eligible is None:
+            raise ForgeInstallError(
+                "Failed to determine Git-eligible extension sources; repair the checkout or Git command before retrying"
+            )
 
         if InstallModule.SKILLS in modules:
             self._plan_runtime_skill_packages(
@@ -987,6 +998,7 @@ class Installer:
                 explicit_runtime_ids=skill_runtimes,
                 managed_runtime_ids=_managed_runtime_ids,
                 tracked_installations=tracked_installations,
+                eligible_source_paths=git_eligible,
             )
 
         for module in sorted(modules, key=lambda m: m.value):
@@ -1001,12 +1013,12 @@ class Installer:
             target_dir = target_root / get_module_source_dir(module)
 
             # Find installable source files (sorted for determinism)
-            # _is_installable excludes __pycache__/.pyc unconditionally (works in Docker
-            # where .git/ is absent and _get_git_tracked_files returns None).
+            # _is_installable excludes __pycache__/.pyc unconditionally (works in
+            # sanitized source trees where Git metadata is intentionally absent).
             source_files = sorted(
                 f
                 for f in source_dir.rglob("*")
-                if f.is_file() and _is_installable(f) and (git_tracked is None or f in git_tracked)
+                if f.is_file() and _is_installable(f) and (git_eligible is None or f in git_eligible)
             )
 
             for source_file in source_files:
@@ -1055,9 +1067,13 @@ class Installer:
         explicit_runtime_ids: tuple[str, ...] | None,
         managed_runtime_ids: tuple[str, ...] | None,
         tracked_installations: list[tuple[str, str | None, Installation]],
+        eligible_source_paths: set[Path] | None,
     ) -> None:
         try:
-            sources = load_skill_sources(source_root / InstallModule.SKILLS.value)
+            sources = load_skill_sources(
+                source_root / InstallModule.SKILLS.value,
+                eligible_source_paths=eligible_source_paths,
+            )
         except (OSError, ValueError) as e:
             raise ForgeInstallError(f"Failed to load skill sources: {e}") from e
 

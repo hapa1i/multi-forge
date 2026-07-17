@@ -226,24 +226,32 @@ card in the active lane for post-implementation review.
 
 ## Acceptance tests
 
-| Test                       | Fixture                                                             | Assertion                                                                                      | Test File                                                                                                     |
-| -------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Claude package fidelity    | all in-scope source skills + Claude adapter                         | compiled files, modes, and behavior contract match the characterized Claude package            | `tests/src/install/test_skill_compiler.py`                                                                    |
-| Codex spec conformance     | each Codex package                                                  | directory/name match; only allowed frontmatter; relative references and `openai.yaml` validate | `tests/src/install/test_skill_compiler.py`                                                                    |
-| Whole-tree isolation       | nested resources, references, and scripts with one prohibited token | validation fails with runtime, path, and violated rule                                         | `tests/src/install/test_skill_validation.py`                                                                  |
-| No family x runtime matrix | all model-family rubric variants                                    | runtime bindings are absent from family resources; output count does not multiply by runtime   | `tests/src/install/test_skill_compiler.py`                                                                    |
-| User discovery             | isolated `$HOME`, Codex user install                                | skill appears once from `$HOME/.agents/skills` and can be explicitly invoked                   | `tests/integration/docker/test_installer.py` + `scripts/experiments/codex-skills/stages/10-user-discovery.sh` |
-| Nested project discovery   | nested CWD under an enabled Forge project                           | applicable `.agents/skills` package is discovered up to the repository root                    | `scripts/experiments/codex-skills/stages/20-project-discovery.sh`                                             |
-| Local-scope privacy        | local Forge install with Codex requested                            | reviewed refusal/convention applies; no personal skill is written to shared `.agents/skills`   | `tests/src/install/test_cross_runtime_skills.py`                                                              |
-| Duplicate safety           | same skill name already present at another Codex scan level         | reviewed conflict/warning is deterministic; user-owned file is untouched                       | `tests/src/install/test_cross_runtime_skills.py`                                                              |
-| Invocation policy          | explicit-only skill with `allow_implicit_invocation: false`         | implicit prompt does not select it; explicit `$skill` remains usable                           | `scripts/experiments/codex-skills/stages/40-invocation-policy.sh`                                             |
-| Packaged script resolution | user and project `smoke-test` installs invoked from unrelated CWDs  | exact installed script runs without checkout/CWD coupling and probes runtime-correct homes     | `scripts/experiments/codex-skills/stages/50-script-resolution.sh`                                             |
-| Runtime-aware lifecycle    | Claude + Codex packages tracked for one scope                       | enable/sync/status/disable are idempotent and remove only tracked files                        | `tests/src/install/test_cross_runtime_skills.py`                                                              |
-| Package-root substitution  | tracked package directory replaced by a symlink to a sibling        | status is invalid; sync/disable preserve sibling bytes and tracking                            | `tests/regression/test_bug_runtime_skill_package_symlink_escape.py`                                           |
-| Partial conflict           | user-owned target conflicts in one runtime                          | plan/apply follows the reviewed atomicity rule and records no half-install as complete         | `tests/src/install/test_cross_runtime_skills.py`                                                              |
-| Copy and symlink modes     | compiled package installed in both modes                            | targets are stable and no symlink points into temporary build output                           | `tests/src/install/test_cross_runtime_skills.py`                                                              |
-| Wheel clean install        | isolated wheel/sdist tool install                                   | packaged sources/adapters compile and install both runtime packages without checkout paths     | `tests/integration/docker/test_installer.py` + release smoke                                                  |
-| Claude-worker limitation   | Codex-hosted workflow frontend before Axis 2                        | UI/docs name the `claude` worker prerequisite; no Codex-native claim is made                   | `tests/src/review/test_skill_content.py`                                                                      |
+| Test                       | Fixture                                                              | Assertion                                                                                      | Test File                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Claude package fidelity    | all in-scope source skills + Claude adapter                          | compiled files, modes, and behavior contract match the characterized Claude package            | `tests/src/install/test_skill_compiler.py`                                                                    |
+| Codex spec conformance     | each Codex package                                                   | directory/name match; only allowed frontmatter; relative references and `openai.yaml` validate | `tests/src/install/test_skill_compiler.py`                                                                    |
+| Whole-tree isolation       | nested resources, references, and scripts with one prohibited token  | validation fails with runtime, path, and violated rule                                         | `tests/src/install/test_skill_validation.py`                                                                  |
+| No family x runtime matrix | all model-family rubric variants                                     | runtime bindings are absent from family resources; output count does not multiply by runtime   | `tests/src/install/test_skill_compiler.py`                                                                    |
+| User discovery             | isolated `$HOME`, Codex user install                                 | skill appears once from `$HOME/.agents/skills` and can be explicitly invoked                   | `tests/integration/docker/test_installer.py` + `scripts/experiments/codex-skills/stages/10-user-discovery.sh` |
+| Nested project discovery   | nested CWD under an enabled Forge project                            | applicable `.agents/skills` package is discovered up to the repository root                    | `scripts/experiments/codex-skills/stages/20-project-discovery.sh`                                             |
+| Local-scope privacy        | local Forge install with Codex requested                             | reviewed refusal/convention applies; no personal skill is written to shared `.agents/skills`   | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Duplicate safety           | same skill name already present at another Codex scan level          | reviewed conflict/warning is deterministic; user-owned file is untouched                       | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Invocation policy          | explicit-only skill with `allow_implicit_invocation: false`          | implicit prompt does not select it; explicit `$skill` remains usable                           | `scripts/experiments/codex-skills/stages/40-invocation-policy.sh`                                             |
+| Packaged script resolution | user and project `smoke-test` installs invoked from unrelated CWDs   | exact installed script runs without checkout/CWD coupling and probes runtime-correct homes     | `scripts/experiments/codex-skills/stages/50-script-resolution.sh`                                             |
+| Runtime-aware lifecycle    | Claude + Codex packages tracked for one scope                        | enable/sync/status/disable are idempotent and remove only tracked files                        | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Package-root substitution  | tracked package directory replaced by a symlink to a sibling         | status is invalid; sync/disable preserve sibling bytes and tracking                            | `tests/regression/test_bug_runtime_skill_package_symlink_escape.py`                                           |
+| Partial conflict           | user-owned target conflicts in one runtime                           | plan/apply follows the reviewed atomicity rule and records no half-install as complete         | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Copy and symlink modes     | compiled package installed in both modes                             | targets are stable and no symlink points into temporary build output                           | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Wheel clean install        | isolated wheel/sdist tool install                                    | packaged sources/adapters compile and install both runtime packages without checkout paths     | `tests/integration/docker/test_installer.py` + release smoke                                                  |
+| Claude-worker limitation   | Codex-hosted workflow frontend before Axis 2                         | UI/docs name the `claude` worker prerequisite; no Codex-native claim is made                   | `tests/src/review/test_skill_content.py`                                                                      |
+| Source eligibility         | symlinked package root plus Git-ignored package/file                 | compiler rejects the root and never caches or installs ineligible bytes                        | `tests/src/install/test_skill_compiler.py`; `tests/src/install/test_cross_runtime_skills.py`                  |
+| Invocation authority       | neutral manifest with raw Claude invocation policy                   | loader rejects adapter-owned policy; typed portable field remains authoritative                | `tests/src/install/test_skill_compiler.py`                                                                    |
+| Script interpreter         | executable packaged Python script with a shebang                     | Claude binding invokes the executable directly rather than forcing Bash                        | `tests/src/install/test_skill_compiler.py`                                                                    |
+| Package-ledger coherence   | empty, outside-root, missing-SKILL, or unbacked package file set     | tracking read fails before package removal or tracking mutation                                | `tests/src/install/test_tracking.py`; `tests/regression/test_bug_runtime_skill_tracking_ledger_coherence.py`  |
+| Dangling leaf health       | tracked resource symlink whose target is absent                      | status reports the exact missing path and sync recovery                                        | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Batch teardown failure     | one failing tracked installation in `disable --all` or setup removal | all rows are attempted, the command exits nonzero, and setup preserves `$FORGE_HOME`           | `tests/src/cli/test_extension_enable.py`; `tests/src/install/test_setup_script.py`                            |
+| Negative probe evidence    | failed turn, wrong command, or wrong exit in policy/script probes    | the stage fails instead of accepting marker absence as evidence                                | `tests/regression/test_bug_codex_skills_probe_false_negative.py`                                              |
+| Tracked-row discovery help | Codex-only installation with no `.claude` ownership sidecar          | sync, disable, and status help name exact `installed.json` scope/path rows                     | `tests/src/cli/test_extension_enable.py`                                                                      |
 
 ## Post-implementation review remediation (2026-07-17)
 
@@ -265,6 +273,30 @@ card in the active lane for post-implementation review.
   mutation remains Docker-QA-only.
 - [x] Run the targeted real-wheel Docker lifecycle for both Claude and Codex packages.
 - [x] Run the final unit, build, pre-commit, Markdown, and diff-integrity gates and record the results below.
+
+## Second-review boundary remediation (2026-07-17)
+
+- [x] Make `disable --all` retain its attempt-all diagnostics but exit nonzero after any failed installation. Make
+  `setup.sh --uninstall` stop before package-manager or `$FORGE_HOME` removal when tracked teardown fails or the Forge
+  command is unavailable.
+- [x] Reject symlinked skill source/package roots and apply the checkout's Git eligibility set to package discovery and
+  every required, auxiliary, and symlink-target read before cache materialization.
+- [x] Make invocation policy typed-only for neutral sources and invoke packaged scripts as executable files so their
+  shebang, rather than a hard-coded Bash interpreter, defines the runtime.
+- [x] Validate `skill_packages` against the canonical installation file ledger: each unique package has a nonempty,
+  sorted in-root file set containing `SKILL.md`, and no package file is unbacked or multiply claimed.
+- [x] Treat dangling tracked leaf symlinks as missing package content while preserving valid live leaf symlinks and the
+  existing package-root substitution refusal.
+- [x] Require successful negative-probe turns plus exact completed-command/exit evidence; remove marker-absence paths
+  that could pass on authentication, turn, or command failures.
+- [x] Name exact `installed.json` scope/path rows alongside `.claude` ownership sidecars in sync, disable, and status
+  help.
+- [x] Extend QA §2.13 with dangling-leaf, corrupt-ledger, and discovery-help checks; regenerate the index to v1.0.29 /
+  588 assertions.
+- [x] Rerun the strengthened real-Codex invocation-policy and script-resolution stages and record a fresh verdict; the
+  historical 0.144.5 capture does not satisfy the stricter evidence gates retroactively.
+- [x] Complete the final unit, regression, targeted Docker, package-build, pre-commit, Markdown, and diff-integrity
+  gates for this remediation, then update the verification record without moving the card from `doing/`.
 
 ## Documentation and operator verification
 

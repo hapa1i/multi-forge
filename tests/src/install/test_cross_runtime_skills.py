@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from itertools import product
 from pathlib import Path
 from typing import TypedDict
@@ -15,7 +16,7 @@ from click.testing import CliRunner
 from forge.cli.extensions import _parse_skill_runtimes, extensions
 from forge.core.runtime import get_runtime
 from forge.core.state import FileLockTimeoutError
-from forge.install.exceptions import ForgeInstallError
+from forge.install.exceptions import ForgeInstallError, TrackingCorruptedError
 from forge.install.installer import (
     Installer,
     find_forge_installation,
@@ -610,6 +611,147 @@ def test_runtime_packages_copy_sync_stale_cleanup_and_disable(
     assert tracking.get_installation("user", None) is None
 
 
+def test_checkout_git_eligibility_filters_runtime_skill_files_and_packages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, fixture_package = _write_portable_source(tmp_path)
+    repo = tmp_path / "repo"
+    source_root = repo / "src"
+    package = source_root / "skills" / "portable"
+    (source_root / "forge").mkdir(parents=True)
+    shutil.copytree(fixture_package, package)
+    ignored_file = package / "token.secret"
+    ignored_file.write_text("must not enter compiled output\n", encoding="utf-8")
+
+    ignored_package = source_root / "skills" / "ignored-package"
+    shutil.copytree(package, ignored_package)
+    (ignored_package / "forge-skill.yaml").write_text(
+        """\
+schema_version: 1
+name: ignored-package
+description: Ignored checkout-only package.
+runtimes: [codex]
+""",
+        encoding="utf-8",
+    )
+
+    eligible_paths = {path for path in package.rglob("*") if path.is_file() and path != ignored_file}
+    monkeypatch.setattr("forge.install.installer.get_forge_source_root", lambda: repo)
+    monkeypatch.setattr("forge.install.installer.get_extensions_root", lambda: source_root)
+    monkeypatch.setattr(
+        "forge.install.installer._get_git_tracked_files",
+        lambda _repo: eligible_paths,
+    )
+
+    project = tmp_path / "project"
+    project.mkdir()
+    tracking = _tracking(tmp_path)
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=project,
+        tracking_store=tracking,
+    )
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        plan = installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    target = project / ".agents" / "skills" / "portable"
+    assert (target / "SKILL.md").is_file()
+    assert (target / "references" / "note.md").is_file()
+    assert not (target / ignored_file.name).exists()
+    assert not (project / ".agents" / "skills" / "ignored-package").exists()
+    package_plan = next(item for item in plan.skill_packages if item.skill == "portable")
+    assert package_plan.cache_dir is not None
+    assert not (Path(package_plan.cache_dir) / ignored_file.name).exists()
+    installation = tracking.get_installation("project", str(project))
+    assert installation is not None
+    assert [(item.runtime, item.skill) for item in installation.skill_packages] == [(CODEX_RUNTIME, "portable")]
+    assert all(not path.target_path.endswith(ignored_file.name) for path in installation.files)
+
+
+def test_checkout_git_eligibility_probe_failure_blocks_skill_planning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, fixture_package = _write_portable_source(tmp_path)
+    repo = tmp_path / "checkout"
+    source_root = repo / "src"
+    (repo / ".git").mkdir(parents=True)
+    (source_root / "forge").mkdir(parents=True)
+    shutil.copytree(fixture_package, source_root / "skills" / "portable")
+
+    monkeypatch.setattr("forge.install.installer.get_forge_source_root", lambda: repo)
+    monkeypatch.setattr("forge.install.installer.get_extensions_root", lambda: source_root)
+    monkeypatch.setattr("forge.install.installer._get_git_tracked_files", lambda _repo: None)
+
+    project = tmp_path / "project"
+    project.mkdir()
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=project,
+        tracking_store=_tracking(tmp_path),
+    )
+    with (
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+        pytest.raises(ForgeInstallError, match="Git-eligible extension sources"),
+    ):
+        installer.plan(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+
+def test_checkout_source_root_symlink_substitution_blocks_skill_planning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, fixture_package = _write_portable_source(tmp_path)
+    repo = tmp_path / "checkout"
+    source_root = repo / "src"
+    (source_root / "forge").mkdir(parents=True)
+    shutil.copytree(fixture_package, source_root / "skills" / "portable")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "src"], check=True)
+
+    external_source_root = tmp_path / "substituted-src"
+    source_root.rename(external_source_root)
+    source_root.symlink_to(external_source_root, target_is_directory=True)
+    (external_source_root / "skills" / "portable" / "token.secret").write_text(
+        "must not be read\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("forge.install.installer.get_forge_source_root", lambda: repo)
+    monkeypatch.setattr("forge.install.installer.get_extensions_root", lambda: source_root)
+    project = tmp_path / "project"
+    project.mkdir()
+    installer = Installer(
+        scope=InstallScope.PROJECT,
+        project_root=project,
+        tracking_store=_tracking(tmp_path),
+    )
+    with (
+        patch("forge.install.installer.installed_runtimes", return_value=_runtime_specs(CODEX_RUNTIME)),
+        pytest.raises(ForgeInstallError, match="source root must be a real directory"),
+    ):
+        installer.plan(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+
 def test_fresh_enable_rejects_substituted_skill_package_symlink(
     tmp_path: Path,
 ) -> None:
@@ -1062,6 +1204,28 @@ def test_malformed_tracking_cannot_claim_codex_duplicate_provenance(
     )
     project_path = "." if project_key == "relative" else str(project)
     tracking = _tracking(tmp_path)
+    if not with_coherent_files:
+        with pytest.raises(TrackingCorruptedError, match="file_paths must not be empty"):
+            tracking.set_installation(
+                "project",
+                Installation(
+                    scope="project",
+                    mode="copy",
+                    profile="standard",
+                    modules_enabled=[InstallModule.SKILLS.value],
+                    files=installed_files,
+                    skill_packages=[
+                        InstalledSkillPackage(
+                            runtime=CODEX_RUNTIME,
+                            skill="portable",
+                            target_dir=str(duplicate_file.parent),
+                            file_paths=package_files,
+                        )
+                    ],
+                ),
+                project_path,
+            )
+        return
     tracking.set_installation(
         "project",
         Installation(
@@ -1988,6 +2152,13 @@ def test_codex_only_project_install_is_detectable_in_status_and_disable_without_
     missing_human = CliRunner().invoke(extensions, ["status"])
     assert missing_human.exit_code == 0, missing_human.output
     assert "missing files" in missing_human.output
+
+    missing_resource.symlink_to(missing_resource.with_name("gone.md"))
+    dangling_status = CliRunner().invoke(extensions, ["status", "--json"])
+    dangling_payload = json.loads(dangling_status.output)
+    observed = dangling_payload[0]["skill_packages"][0]
+    assert observed["state"] == "missing"
+    assert observed["missing_file_paths"] == [str(missing_resource)]
 
     disabled = CliRunner().invoke(extensions, ["disable", "--yes"])
     assert disabled.exit_code == 0, disabled.output

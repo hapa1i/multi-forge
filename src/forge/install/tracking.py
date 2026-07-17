@@ -129,6 +129,83 @@ def _deserialize_manifest(path: Path, data_class: type[Any], data: dict[str, Any
         raise TrackingCorruptedError(str(path), f"deserialization error: {e}") from e
 
 
+def _validate_current_manifest(path: Path, manifest: InstalledManifest) -> None:
+    """Validate cross-field ownership invariants that dacite cannot express."""
+
+    for installation_key, installation in manifest.installations.items():
+        tracked_file_paths = {record.target_path for record in installation.files}
+        claimed_package_paths: set[str] = set()
+        package_keys: set[tuple[str, str]] = set()
+
+        for package in installation.skill_packages:
+            label = f"installation {installation_key!r} package {package.runtime}/{package.skill}"
+            package_key = (package.runtime, package.skill)
+            if package_key in package_keys:
+                raise TrackingCorruptedError(str(path), f"ownership invariant error: {label} is duplicated")
+            package_keys.add(package_key)
+
+            package_dir = Path(package.target_dir)
+            if not package_dir.is_absolute():
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} target_dir must be absolute",
+                )
+            if not package.file_paths:
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} file_paths must not be empty",
+                )
+            if package.file_paths != sorted(set(package.file_paths)):
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} file_paths must be unique and sorted",
+                )
+
+            package_paths = set(package.file_paths)
+            skill_document = str(package_dir / "SKILL.md")
+            if skill_document not in package_paths:
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} must track {skill_document}",
+                )
+
+            for raw_file_path in package.file_paths:
+                file_path = Path(raw_file_path)
+                if not file_path.is_absolute():
+                    raise TrackingCorruptedError(
+                        str(path),
+                        f"ownership invariant error: {label} contains non-absolute file path {raw_file_path!r}",
+                    )
+                try:
+                    relative_path = file_path.relative_to(package_dir)
+                except ValueError as e:
+                    raise TrackingCorruptedError(
+                        str(path),
+                        f"ownership invariant error: {label} contains file outside target_dir: {raw_file_path}",
+                    ) from e
+                if not relative_path.parts or ".." in relative_path.parts:
+                    raise TrackingCorruptedError(
+                        str(path),
+                        f"ownership invariant error: {label} contains invalid package file path {raw_file_path}",
+                    )
+
+            missing_ledger_paths = package_paths - tracked_file_paths
+            if missing_ledger_paths:
+                missing = ", ".join(sorted(missing_ledger_paths))
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} is not backed by files ledger: {missing}",
+                )
+            duplicate_claims = package_paths & claimed_package_paths
+            if duplicate_claims:
+                duplicate = ", ".join(sorted(duplicate_claims))
+                raise TrackingCorruptedError(
+                    str(path),
+                    f"ownership invariant error: {label} reuses package file paths: {duplicate}",
+                )
+            claimed_package_paths.update(package_paths)
+
+
 def _upgrade_legacy_manifest(legacy: _LegacyInstalledManifest) -> InstalledManifest:
     """Normalize v1 to the current in-memory model without inventing packages."""
 
@@ -204,7 +281,9 @@ class TrackingStore:
         if version == LEGACY_TRACKING_VERSION:
             legacy = _deserialize_manifest(self._path, _LegacyInstalledManifest, data)
             return _upgrade_legacy_manifest(legacy)
-        return _deserialize_manifest(self._path, InstalledManifest, data)
+        manifest = _deserialize_manifest(self._path, InstalledManifest, data)
+        _validate_current_manifest(self._path, manifest)
+        return manifest
 
     def write(self, manifest: InstalledManifest) -> None:
         """Write tracking manifest atomically.
@@ -215,6 +294,7 @@ class TrackingStore:
         Args:
             manifest: The manifest to write.
         """
+        _validate_current_manifest(self._path, manifest)
         data = asdict(manifest)
         # Writes are always current even when the caller is persisting an
         # in-memory normalization of a legacy manifest after a successful

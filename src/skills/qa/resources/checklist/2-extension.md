@@ -400,6 +400,51 @@ rm .agents/skills/review
 mv .agents/skills/review-sibling .agents/skills/review
 forge extension sync --scope project
 
+# A dangling tracked leaf symlink is missing package content, not a healthy symlink-mode file.
+DANGLING_RESOURCE="$(pwd -P)/.agents/skills/understand/resources/docs.md"
+mv "$DANGLING_RESOURCE" /tmp/forge-understand-docs.backup
+ln -s docs-never-exists.md "$DANGLING_RESOURCE"
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | jq -e --arg path "$DANGLING_RESOURCE" '.[0].skill_packages[] | select(.skill == "understand")
+    | .state == "missing" and (.missing_file_paths | index($path)) != null
+      and (.recovery | contains("extension sync"))'
+rm "$DANGLING_RESOURCE"
+mv /tmp/forge-understand-docs.backup "$DANGLING_RESOURCE"
+
+# Package ownership must be coherent with the canonical file ledger. Probe a copied manifest so live QA state stays safe.
+QA_CORRUPT_FORGE_HOME=/tmp/forge-corrupt-skill-ledger
+rm -rf "$QA_CORRUPT_FORGE_HOME"
+mkdir -p "$QA_CORRUPT_FORGE_HOME"
+PROJECT_KEY="project:$(pwd -P)"
+PACKAGE_BEFORE=$(shasum -a 256 .agents/skills/challenge/SKILL.md | cut -d' ' -f1)
+jq --arg key "$PROJECT_KEY" \
+  '(.installations[$key].skill_packages[0].file_paths) = []' \
+  "$FORGE_HOME/installed.json" > "$QA_CORRUPT_FORGE_HOME/installed.json"
+TRACKING_BEFORE=$(shasum -a 256 "$QA_CORRUPT_FORGE_HOME/installed.json" | cut -d' ' -f1)
+if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension status --scope project --root "$FORGE_TEST_REPO" \
+  >/tmp/forge-invalid-skill-ledger-status.txt 2>&1; then
+  echo "ERROR: status accepted an incoherent skill-package ledger" >&2
+  exit 1
+fi
+rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-status.txt
+if FORGE_HOME="$QA_CORRUPT_FORGE_HOME" forge extension disable --scope project --yes \
+  >/tmp/forge-invalid-skill-ledger-disable.txt 2>&1; then
+  echo "ERROR: disable accepted an incoherent skill-package ledger" >&2
+  exit 1
+fi
+rg -q 'file_paths must not be empty' /tmp/forge-invalid-skill-ledger-disable.txt
+PACKAGE_AFTER=$(shasum -a 256 .agents/skills/challenge/SKILL.md | cut -d' ' -f1)
+TRACKING_AFTER=$(shasum -a 256 "$QA_CORRUPT_FORGE_HOME/installed.json" | cut -d' ' -f1)
+test "$PACKAGE_AFTER" = "$PACKAGE_BEFORE"
+test "$TRACKING_AFTER" = "$TRACKING_BEFORE"
+rm -rf "$QA_CORRUPT_FORGE_HOME"
+forge extension sync --scope project
+
+# Codex-only tracked projects are found from installed.json even when no Claude ownership sidecar exists.
+for verb in sync disable status; do
+  forge extension "$verb" --help | rg -q 'exact scope/path tracking rows'
+done
+
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | jq -e '.[0].skill_packages | length == 5 and all(.[];
       .runtime == "codex" and .state == "present" and .target_present == true
@@ -417,6 +462,9 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] JSON status reports the injected same-name package as `duplicate` with its path and recovery guidance
 - [ ] Explicit enable refuses the duplicate even with `--force`, and its checksum remains unchanged
 - [ ] A substituted package-root symlink is `invalid-target`; disable preserves its sibling and tracking row
+- [ ] A dangling tracked resource symlink reports `missing` with sync recovery; restoring it returns the package healthy
+- [ ] An incoherent package/file ledger makes status and disable fail before package bytes or tracking are discarded
+- [ ] Sync, disable, and status help name exact `installed.json` scope/path rows as a discovery source
 - [ ] After duplicate cleanup and sync, all five project Codex packages report healthy `present` state
 
 ---

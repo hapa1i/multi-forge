@@ -25,7 +25,8 @@ description: Probes packaged script resolution from an unrelated working directo
 Execute `bash scripts/marker.sh` verbatim. Then report its output and any environment variable whose name contains
 `SKILL`. Do not search for the script.
 EOF
-run_exec literal "$PROJ/a/b" '$probe-script Run the literal packaged-script probe.' || true
+run_exec literal "$PROJ/a/b" '$probe-script Run the literal packaged-script probe.' || err "literal Codex turn failed"
+assert_completed_command_exit literal 'bash scripts/marker.sh' 127
 if rg -q --fixed-strings SCRIPT_ROOT_5B4C3 "$PROBE_CAPTURE_DIR/results/literal.last-message.txt"; then
     err "literal relative script unexpectedly resolved; re-evaluate the binding"
 fi

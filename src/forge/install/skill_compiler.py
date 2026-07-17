@@ -29,12 +29,13 @@ rejects any remaining Claude-only body or resource token.
 
 from __future__ import annotations
 
+import os
 import re
 import stat
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, TypeVar
+from typing import AbstractSet, Any, Mapping, TypeVar
 
 import yaml
 
@@ -258,7 +259,7 @@ CLAUDE_SKILL_ADAPTER = SkillAdapter(
         SkillCapability.TASK_ARGUMENTS: CapabilityBinding("$ARGUMENTS"),
         SkillCapability.RESOURCE_LOADING: CapabilityBinding(relative_path_template="${CLAUDE_SKILL_DIR}/{path}"),
         SkillCapability.PACKAGED_SCRIPT: CapabilityBinding(
-            relative_path_template='FORGE_SKILL_RUNTIME=claude_code bash "${CLAUDE_SKILL_DIR}/{path}"'
+            relative_path_template='FORGE_SKILL_RUNTIME=claude_code "${CLAUDE_SKILL_DIR}/{path}"'
         ),
         SkillCapability.MODEL_FAMILY: CapabilityBinding(
             "Model family: !`forge session show --field model_family 2>/dev/null || true` Main model:\n"
@@ -345,9 +346,13 @@ _TYPED_CLAUDE_FRONTMATTER_FIELDS = {
     "compatibility": "compatibility",
     "metadata": "metadata",
     "allowed_tools": "allowed-tools",
-    "allow_implicit_invocation": "disable-model-invocation",
 }
-_SKILL_SOURCE_EXCLUDED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+_SKILL_SOURCE_EXCLUDED_DIRS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+}
 _SKILL_SOURCE_EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 _EnumT = TypeVar("_EnumT", bound=Enum)
 
@@ -362,7 +367,11 @@ def adapter_for_runtime(runtime: SkillRuntime) -> SkillAdapter:
     raise ValueError(f"Unsupported skill runtime: {runtime}")
 
 
-def load_claude_skill_source(package_root: Path) -> SkillSource:
+def load_claude_skill_source(
+    package_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> SkillSource:
     """Read an existing Claude package into the typed compatibility bridge.
 
     This is the only filesystem-reading part of the compiler module. Compilation
@@ -372,14 +381,14 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
     copy-install bytes and executable modes.
     """
 
+    _require_real_source_directory(package_root, label="Claude skill package root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     skill_document_path = package_root / "SKILL.md"
-    if not package_root.is_dir():
-        raise ValueError(f"Claude skill package must contain {skill_document_path}")
-    _validate_compiler_owned_source_symlinks(package_root)
+    _validate_compiler_owned_source_symlinks(package_root, eligible_paths)
     if not skill_document_path.is_file():
         raise ValueError(f"Claude skill package must contain {skill_document_path}")
 
-    document = skill_document_path.read_bytes()
+    document, skill_mode = _read_contained_source_file(package_root, skill_document_path, eligible_paths)
     frontmatter, body = _parse_skill_document(document, str(skill_document_path))
     raw_name = frontmatter.get("name")
     description = frontmatter.get("description")
@@ -391,6 +400,8 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
     name = package_root.name
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
+        if not _is_eligible_source_path(source_file, eligible_paths):
+            continue
         if source_file.is_symlink():
             _validate_contained_source_file(package_root, source_file)
         if source_file == skill_document_path:
@@ -400,7 +411,7 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
             continue
         if source_file.is_dir() and not source_file.is_symlink():
             continue
-        content, mode = _read_contained_source_file(package_root, source_file)
+        content, mode = _read_contained_source_file(package_root, source_file, eligible_paths)
         auxiliary_files.append(
             SkillSourceFile(
                 path=relative_path,
@@ -417,27 +428,37 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
         ),
         body=body,
         files=tuple(auxiliary_files),
-        skill_mode=stat.S_IMODE(skill_document_path.stat().st_mode),
+        skill_mode=skill_mode,
         source_format=SkillSourceFormat.CLAUDE_BRIDGE,
         source_path=str(package_root),
         claude_document=document,
     )
 
 
-def load_claude_skill_sources(skills_root: Path) -> tuple[SkillSource, ...]:
+def load_claude_skill_sources(
+    skills_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> tuple[SkillSource, ...]:
     """Load existing skill package directories in deterministic name order."""
 
-    if not skills_root.is_dir():
-        raise ValueError(f"Skill source root is not a directory: {skills_root}")
-    package_roots = sorted(
-        path
-        for path in skills_root.iterdir()
-        if path.is_dir() and ((path / "SKILL.md").is_file() or (path / "SKILL.md").is_symlink())
+    _require_real_source_directory(skills_root, label="Skill source root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
+    package_roots = _discover_skill_package_roots(
+        skills_root,
+        eligible_paths,
+        include_neutral=False,
     )
-    return tuple(load_claude_skill_source(package_root) for package_root in package_roots)
+    return tuple(
+        load_claude_skill_source(package_root, eligible_source_paths=eligible_paths) for package_root in package_roots
+    )
 
 
-def load_neutral_skill_source(package_root: Path) -> SkillSource:
+def load_neutral_skill_source(
+    package_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> SkillSource:
     """Load one ``forge-skill.yaml`` + ``content.md`` neutral source package.
 
     Every other installable file in the package is an auxiliary source file,
@@ -446,18 +467,19 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     capability placeholder grammar used by ``content.md``.
     """
 
+    _require_real_source_directory(package_root, label="Neutral skill package root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
     content_path = package_root / NEUTRAL_SKILL_CONTENT
-    if not package_root.is_dir():
-        raise ValueError(f"Neutral skill package must contain {manifest_path}")
-    _validate_compiler_owned_source_symlinks(package_root)
+    _validate_compiler_owned_source_symlinks(package_root, eligible_paths)
     if not manifest_path.is_file():
         raise ValueError(f"Neutral skill package must contain {manifest_path}")
     if not content_path.is_file():
         raise ValueError(f"Neutral skill package must contain {content_path}")
 
     try:
-        raw_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        manifest_content, _manifest_mode = _read_contained_source_file(package_root, manifest_path, eligible_paths)
+        raw_manifest = yaml.safe_load(manifest_content.decode("utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise ValueError(f"{manifest_path}: cannot read neutral skill manifest: {exc}") from exc
     if not isinstance(raw_manifest, dict) or any(not isinstance(key, str) for key in raw_manifest):
@@ -488,6 +510,11 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
         raise ValueError(f"{manifest_path}: claude_frontmatter must be a string-keyed mapping")
     if {"name", "description"} & set(claude_frontmatter):
         raise ValueError(f"{manifest_path}: claude_frontmatter may not override name or description")
+    if "disable-model-invocation" in claude_frontmatter:
+        raise ValueError(
+            f"{manifest_path}: claude_frontmatter.disable-model-invocation is adapter-owned; "
+            "declare the invocation_policy capability and allow_implicit_invocation instead"
+        )
 
     codex_interface_value = raw_manifest.get("codex_interface")
     codex_interface: CodexSkillInterface | None = None
@@ -576,7 +603,11 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
         if path_problem is not None:
             raise ValueError(f"{label} path {path_value!r} {path_problem}")
         token_allowances.append(
-            TokenAllowance(runtime=allowance_runtime, path=PurePosixPath(path_value), rule=rule_value)
+            TokenAllowance(
+                runtime=allowance_runtime,
+                path=PurePosixPath(path_value),
+                rule=rule_value,
+            )
         )
 
     optional_strings: dict[str, str | None] = {}
@@ -592,6 +623,8 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
 
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
+        if not _is_eligible_source_path(source_file, eligible_paths):
+            continue
         if source_file.is_symlink():
             _validate_contained_source_file(package_root, source_file)
         relative_path = PurePosixPath(source_file.relative_to(package_root).as_posix())
@@ -599,7 +632,7 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
             continue
         if source_file.is_dir() and not source_file.is_symlink():
             continue
-        content, mode = _read_contained_source_file(package_root, source_file)
+        content, mode = _read_contained_source_file(package_root, source_file, eligible_paths)
         auxiliary_files.append(
             SkillSourceFile(
                 path=relative_path,
@@ -640,6 +673,7 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
             f"documentary Markdown: {behavioral_runtime_exclusions}"
         )
 
+    body, skill_mode = _read_contained_source_file(package_root, content_path, eligible_paths)
     return SkillSource(
         manifest=SkillManifest(
             name=name,
@@ -656,40 +690,49 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
             token_allowances=tuple(token_allowances),
             runtime_excluded_files=runtime_excluded_files,
         ),
-        body=content_path.read_bytes(),
+        body=body,
         files=tuple(auxiliary_files),
-        skill_mode=stat.S_IMODE(content_path.stat().st_mode),
+        skill_mode=skill_mode,
         source_format=SkillSourceFormat.NEUTRAL,
         source_path=str(package_root),
     )
 
 
-def load_skill_source(package_root: Path) -> SkillSource:
+def load_skill_source(
+    package_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> SkillSource:
     """Load a neutral package when declared, otherwise use the Claude bridge."""
 
+    _require_real_source_directory(package_root, label="Skill package root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
-    if manifest_path.exists() or manifest_path.is_symlink():
-        return load_neutral_skill_source(package_root)
-    return load_claude_skill_source(package_root)
+    if (manifest_path.exists() or manifest_path.is_symlink()) and _is_eligible_source_path(
+        manifest_path, eligible_paths
+    ):
+        return load_neutral_skill_source(package_root, eligible_source_paths=eligible_paths)
+    return load_claude_skill_source(package_root, eligible_source_paths=eligible_paths)
 
 
-def load_skill_sources(skills_root: Path) -> tuple[SkillSource, ...]:
-    """Load a deterministic mixed set of neutral and legacy skill packages."""
+def load_skill_sources(
+    skills_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> tuple[SkillSource, ...]:
+    """Load a deterministic mixed set of neutral and legacy skill packages.
 
-    if not skills_root.is_dir():
-        raise ValueError(f"Skill source root is not a directory: {skills_root}")
-    package_roots = sorted(
-        path
-        for path in skills_root.iterdir()
-        if path.is_dir()
-        and (
-            (path / NEUTRAL_SKILL_MANIFEST).exists()
-            or (path / NEUTRAL_SKILL_MANIFEST).is_symlink()
-            or (path / "SKILL.md").is_file()
-            or (path / "SKILL.md").is_symlink()
-        )
+    When ``eligible_source_paths`` is provided, only listed package sentinels and
+    source files are considered. A listed leaf symlink is eligible only when its
+    contained resolved target is listed too.
+    """
+
+    _require_real_source_directory(skills_root, label="Skill source root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
+    package_roots = _discover_skill_package_roots(skills_root, eligible_paths, include_neutral=True)
+    return tuple(
+        load_skill_source(package_root, eligible_source_paths=eligible_paths) for package_root in package_roots
     )
-    return tuple(load_skill_source(package_root) for package_root in package_roots)
 
 
 def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPackage:
@@ -825,6 +868,21 @@ def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDi
                 rule="source.invocation-policy-value",
                 message="the invocation_policy capability has no allow_implicit_invocation value",
                 recovery="Set allow_implicit_invocation explicitly so both runtime adapters can preserve the policy.",
+                capability=SkillCapability.INVOCATION_POLICY,
+            )
+        )
+    if source.source_format == SkillSourceFormat.NEUTRAL and "disable-model-invocation" in manifest.claude_frontmatter:
+        diagnostics.append(
+            SkillDiagnostic(
+                skill=manifest.name,
+                runtime=runtime,
+                path=PurePosixPath("SKILL.md"),
+                rule="source.invocation-policy-authority",
+                message="claude_frontmatter.disable-model-invocation bypasses the portable invocation policy",
+                recovery=(
+                    "Remove the Claude-specific field, declare the invocation_policy capability, and set "
+                    "allow_implicit_invocation."
+                ),
                 capability=SkillCapability.INVOCATION_POLICY,
             )
         )
@@ -1361,11 +1419,8 @@ def _reject_conflicting_claude_frontmatter(
         if manifest_field not in manifest or claude_field not in claude_frontmatter:
             continue
         manifest_value = manifest[manifest_field]
-        expected_claude_value = manifest_value
-        if manifest_field == "allow_implicit_invocation" and manifest_value is not None:
-            expected_claude_value = not manifest_value
         claude_value = claude_frontmatter[claude_field]
-        if type(claude_value) is type(expected_claude_value) and claude_value == expected_claude_value:
+        if type(claude_value) is type(manifest_value) and claude_value == manifest_value:
             continue
         raise ValueError(
             f"{manifest_path}: conflicting declarations for {manifest_field} and claude_frontmatter.{claude_field}"
@@ -1412,10 +1467,85 @@ def _is_skill_source_file(path: PurePosixPath) -> bool:
     return path.suffix not in _SKILL_SOURCE_EXCLUDED_SUFFIXES
 
 
-def _validate_compiler_owned_source_symlinks(package_root: Path) -> None:
+def _lexical_absolute_path(path: Path) -> Path:
+    """Return an absolute normalized path without resolving symlink entries."""
+
+    return Path(os.path.abspath(path))
+
+
+def _normalized_eligible_source_paths(
+    eligible_source_paths: AbstractSet[Path] | None,
+) -> frozenset[Path] | None:
+    if eligible_source_paths is None:
+        return None
+    return frozenset(_lexical_absolute_path(path) for path in eligible_source_paths)
+
+
+def _require_real_source_directory(path: Path, *, label: str) -> None:
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} is not a directory: {path}") from exc
+    if stat.S_ISLNK(mode):
+        raise ValueError(f"{label} must not be a symlink: {path}")
+    if not stat.S_ISDIR(mode):
+        raise ValueError(f"{label} is not a directory: {path}")
+
+
+def _discover_skill_package_roots(
+    skills_root: Path,
+    eligible_source_paths: frozenset[Path] | None,
+    *,
+    include_neutral: bool,
+) -> tuple[Path, ...]:
+    package_roots: list[Path] = []
+    for package_root in sorted(skills_root.iterdir()):
+        try:
+            mode = package_root.lstat().st_mode
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(mode):
+            raise ValueError(f"Skill package root must not be a symlink: {package_root}")
+        if not stat.S_ISDIR(mode):
+            continue
+
+        manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
+        skill_document_path = package_root / "SKILL.md"
+        if (
+            include_neutral
+            and (manifest_path.exists() or manifest_path.is_symlink())
+            and _is_eligible_source_path(manifest_path, eligible_source_paths)
+        ):
+            package_roots.append(package_root)
+            continue
+        if (skill_document_path.is_file() or skill_document_path.is_symlink()) and _is_eligible_source_path(
+            skill_document_path, eligible_source_paths
+        ):
+            package_roots.append(package_root)
+    return tuple(package_roots)
+
+
+def _is_eligible_source_path(source_file: Path, eligible_source_paths: frozenset[Path] | None) -> bool:
+    if eligible_source_paths is None:
+        return True
+    if _lexical_absolute_path(source_file) not in eligible_source_paths:
+        return False
+    if not source_file.is_symlink():
+        return True
+    try:
+        resolved = source_file.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"{source_file}: eligible skill source symlink cannot be resolved: {exc}") from exc
+    return _lexical_absolute_path(resolved) in eligible_source_paths
+
+
+def _validate_compiler_owned_source_symlinks(
+    package_root: Path,
+    eligible_source_paths: frozenset[Path] | None,
+) -> None:
     for relative_path in sorted(_COMPILER_OWNED_SOURCE_PATHS, key=PurePosixPath.as_posix):
         source_file = package_root / relative_path
-        if source_file.is_symlink():
+        if source_file.is_symlink() and _is_eligible_source_path(source_file, eligible_source_paths):
             _validate_contained_source_file(package_root, source_file)
 
 
@@ -1431,7 +1561,13 @@ def _validate_contained_source_file(package_root: Path, source_file: Path) -> No
         raise ValueError(f"{source_file}: skill source entries must be regular files")
 
 
-def _read_contained_source_file(package_root: Path, source_file: Path) -> tuple[bytes, int]:
+def _read_contained_source_file(
+    package_root: Path,
+    source_file: Path,
+    eligible_source_paths: frozenset[Path] | None,
+) -> tuple[bytes, int]:
+    if not _is_eligible_source_path(source_file, eligible_source_paths):
+        raise ValueError(f"{source_file}: skill source file is not eligible for installation")
     _validate_contained_source_file(package_root, source_file)
     return source_file.read_bytes(), stat.S_IMODE(source_file.stat().st_mode)
 

@@ -35,3 +35,7 @@ Decision: a stable Forge-managed compiled-package cache is a valid symlink sourc
 
 Raw captures were intentionally not committed. Reproduce with `./reproduce.sh` and inspect the external capture
 directory. All seven stages passed in the recorded run.
+
+Evidence update (2026-07-17): after the harness added an implicit-enabled control, fail-closed turn checks, and a
+machine assertion for the literal shell payload and exit 127, stages 40 and 50 were rerun against codex-cli 0.144.5.
+Both passed; raw captures remained external and uncommitted.

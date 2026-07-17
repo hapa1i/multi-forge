@@ -700,7 +700,10 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
             installer.uninstall()
             console.print("  [green]✓ Done[/green]")
 
-        except ForgeInstallError as e:
+        except Exception as e:
+            # ``--all`` is a batch boundary: one filesystem, settings, or
+            # tracking failure must not prevent later installations from being
+            # attempted. KeyboardInterrupt/SystemExit remain uncaught.
             console.print(f"  [red]✗ Failed: {e}[/red]")
             errors.append((scope, project_path, str(e)))
 
@@ -709,6 +712,7 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
         console.print(f"[yellow]Completed with {len(errors)} error(s).[/yellow]")
         for scope, path, err in errors:
             console.print(f"  [red]- {scope} ({display_path(path) if path else 'global'}): {err}[/red]")
+        raise click.exceptions.Exit(1)
     else:
         console.print(f"[green]All {len(installations)} installation(s) disabled.[/green]")
 
@@ -986,8 +990,9 @@ def sync_cmd(scope: str | None, force: bool) -> None:
 
     \b
     Scope Detection (when no --scope specified):
-        Walks up from current directory looking for existing Forge extensions
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge extensions,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - Fails if no extensions found
 
@@ -1160,8 +1165,9 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
 
     \b
     Scope Detection (when no --scope/--all specified):
-        Walks up from current directory looking for existing Forge extensions
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge extensions,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - Fails if no extensions found
 
@@ -1313,8 +1319,9 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
 
     \b
     Scope Detection (when no --scope/--all specified):
-        Walks up from current directory looking for existing Forge installations
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge installations,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - If no installation found, shows all scopes for informational purposes
 

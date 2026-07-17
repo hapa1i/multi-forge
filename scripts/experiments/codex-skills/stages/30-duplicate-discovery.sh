@@ -23,7 +23,7 @@ description: Project-level duplicate probe package.
 Return exactly DUPLICATE_PROJECT_4D5E6 and nothing else.
 EOF
 
-run_exec duplicate "$PROJ" '$probe-duplicate Run the explicit duplicate-name probe.' || true
+run_exec duplicate "$PROJ" '$probe-duplicate Run the explicit duplicate-name probe.' || err "Codex turn failed"
 message="$PROBE_CAPTURE_DIR/results/duplicate.last-message.txt"
 if rg -q --fixed-strings DUPLICATE_USER_1A2B3 "$message" && rg -q --fixed-strings DUPLICATE_PROJECT_4D5E6 "$message"; then
     verdict=AMBIGUOUS

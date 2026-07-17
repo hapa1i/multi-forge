@@ -509,14 +509,21 @@ Portable sources have three layers:
 Neutral Markdown uses `{{forge:<capability>}}`; resource and executable paths use
 `{{forge:<capability>:<package-relative-path>}}`. The vocabulary covers task arguments, resource loading,
 packaged-script execution, model-family selection, exploration, subagents, invocation policy, user interaction, and the
-Forge CLI. Packaged scripts are first-class rather than a resource-loading special case: the adapter must turn a
-package-relative executable into a runtime-safe invocation from an arbitrary working directory.
+Forge CLI. Packaged scripts are first-class rather than a resource-loading special case: packaged executables must be
+owner-readable/executable and compile to direct package-absolute execution from any working directory. Text scripts use
+their shebang; native executables use their OS entry point. Adapters must not assume every executable is Bash.
+
+Portable invocation policy has one typed authority: declaring the `invocation_policy` capability requires
+`allow_implicit_invocation`, from which adapters derive Claude's `disable-model-invocation` and Codex policy metadata. A
+neutral source cannot set the Claude field directly.
 
 The compiler chooses a neutral source whenever `forge-skill.yaml` exists and otherwise uses the checked-in `SKILL.md` as
-a Claude-only compatibility bridge. Adapters compose the output; they do not strip Claude tokens after the fact.
-Unknown, undeclared, unbound, malformed, or leftover capability placeholders fail. The runtime validator then checks the
-whole emitted tree, including nested resources, references, scripts, and Codex `agents/openai.yaml`, before the
-installer can plan any file.
+a Claude-only compatibility bridge. Source and top-level package roots must be real directories. For a repository
+checkout, the same Git eligibility set used by other extension modules gates package sentinels and every source read;
+planning fails if Git cannot produce it. Contained leaf symlinks require both the link and target to be eligible.
+Adapters compose output rather than stripping Claude tokens after the fact. Unknown, undeclared, unbound, malformed, or
+leftover placeholders fail. The runtime validator checks the whole emitted tree, including nested resources, references,
+scripts, and Codex `agents/openai.yaml`, before installation planning.
 
 Only non-templated Markdown documentary references under `references/` may use an explicit `runtime_excluded_files`
 entry. Exclusions cannot hide scripts, behavioral resources, or an unfinished runtime binding; shared executable and

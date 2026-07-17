@@ -397,12 +397,22 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     )
     tracking = TrackingStore()
     project_installation = _installation(root, entry)
+    project_skill_path = root / ".claude" / "skills" / "challenge" / "SKILL.md"
     project_package = InstalledSkillPackage(
         runtime="claude_code",
         skill="challenge",
-        target_dir=str(root / ".claude" / "skills" / "challenge"),
-        file_paths=[str(root / ".claude" / "skills" / "challenge" / "SKILL.md")],
+        target_dir=str(project_skill_path.parent),
+        file_paths=[str(project_skill_path)],
     )
+    project_installation.files = [
+        InstalledFile(
+            target_path=str(project_skill_path),
+            source_path=str(project_skill_path),
+            checksum="unchanged",
+            mode=InstallMode.COPY.value,
+            installed_at="2026-01-01T00:00:00Z",
+        )
+    ]
     project_installation.skill_packages = [project_package]
     tracking.set_installation(InstallScope.PROJECT.value, project_installation, str(root))
     added_path = save_added_settings(settings, entries_to_added_structure(project_installation.settings_entries))
@@ -554,6 +564,7 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
         merge_type="union",
         stable_id="Read",
     )
+    package_file = tmp_path / ".agents" / "skills" / "challenge" / "SKILL.md"
     user_install = Installation(
         scope=InstallScope.USER.value,
         mode=InstallMode.COPY.value,
@@ -566,14 +577,21 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
                 checksum="unchanged",
                 mode=InstallMode.COPY.value,
                 installed_at="2026-01-01T00:00:00Z",
-            )
+            ),
+            InstalledFile(
+                target_path=str(package_file),
+                source_path=str(package_file),
+                checksum="unchanged",
+                mode=InstallMode.COPY.value,
+                installed_at="2026-01-01T00:00:00Z",
+            ),
         ],
         skill_packages=[
             InstalledSkillPackage(
                 runtime="codex",
                 skill="challenge",
-                target_dir=str(tmp_path / ".agents" / "skills" / "challenge"),
-                file_paths=[str(tmp_path / ".agents" / "skills" / "challenge" / "SKILL.md")],
+                target_dir=str(package_file.parent),
+                file_paths=[str(package_file)],
             )
         ],
         settings_entries=[permission_entry],

@@ -51,6 +51,17 @@ def test_scope_help_is_shared_across_extension_commands() -> None:
         assert expected in output
 
 
+@pytest.mark.parametrize("command", ["sync", "disable", "status"])
+def test_lifecycle_help_describes_sidecar_and_tracking_row_discovery(command: str) -> None:
+    result = CliRunner().invoke(extensions, [command, "--help"])
+
+    output = " ".join(result.output.split())
+    assert result.exit_code == 0, result.output
+    assert ".claude/ ownership sidecars" in output
+    assert "exact scope/path tracking rows" in output
+    assert "~/.forge/installed.json" in output
+
+
 @pytest.mark.parametrize("scope", ["local", "project"])
 def test_project_enable_preserves_recorded_global_launcher_when_run_from_venv(
     scope: str,
@@ -918,6 +929,53 @@ class TestScopeAllConflict:
         result = runner.invoke(disable_cmd, ["--all", "--scope", "local"])
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output.lower()
+
+    def test_disable_all_attempts_every_installation_and_exits_nonzero_on_failure(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, call, patch
+
+        from forge.install.models import Installation
+
+        tracking = MagicMock()
+        tracking.list_installations.return_value = [
+            (
+                "user",
+                None,
+                Installation(scope="user", mode="copy", profile="standard"),
+            ),
+            (
+                "project",
+                str(tmp_path),
+                Installation(
+                    scope="project",
+                    project_path=str(tmp_path),
+                    mode="copy",
+                    profile="standard",
+                ),
+            ),
+        ]
+        failed_installer = MagicMock()
+        failed_installer.uninstall.side_effect = OSError("permission denied")
+        successful_installer = MagicMock()
+
+        with (
+            patch("forge.cli.extensions.TrackingStore", return_value=tracking),
+            patch(
+                "forge.cli.extensions.Installer",
+                side_effect=[failed_installer, successful_installer],
+            ) as installer_class,
+            patch("forge.cli.extensions._enforce_project_compatibility"),
+        ):
+            result = CliRunner().invoke(extensions, ["disable", "--all", "--yes"])
+
+        assert result.exit_code == 1, result.output
+        assert "Completed with 1 error(s)." in result.output
+        assert "permission denied" in result.output
+        assert installer_class.call_args_list == [
+            call(scope=InstallScope.USER, project_root=None),
+            call(scope=InstallScope.PROJECT, project_root=tmp_path),
+        ]
+        failed_installer.uninstall.assert_called_once_with()
+        successful_installer.uninstall.assert_called_once_with()
 
     def test_status_all_with_scope_errors(self) -> None:
         from click.testing import CliRunner

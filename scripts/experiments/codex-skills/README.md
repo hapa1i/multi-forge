@@ -41,7 +41,9 @@ reviewed, secret-free verdict summaries belong under `verdicts/`.
 - Discovery stages: `PASS` only when the hidden marker from the selected skill reaches the last message.
 - Duplicate discovery records `USER`, `PROJECT`, `AMBIGUOUS`, or `INCONCLUSIVE`; it is evidence for Forge's own
   duplicate policy, not permission to delete either package.
-- Invocation policy: both the implicit block and explicit success must hold.
-- Script resolution: the literal relative command must demonstrate CWD anchoring, and the skill-root instruction must
-  execute the installed package's marker. Environment inspection separately records whether a `*SKILL*` variable exists.
+- Invocation policy: the same unnamed prompt must load an implicit-enabled control, stop loading it after the policy is
+  changed to explicit-only, and still load it through explicit invocation. Every model turn must complete successfully.
+- Script resolution: the raw JSONL must contain a completed command event whose selected-shell payload is exactly
+  `bash scripts/marker.sh` and whose exit code is 127. The skill-root instruction must then execute the installed
+  package's marker. Environment inspection separately records whether a `*SKILL*` variable exists.
 - Symlink/reload: a fresh invocation must observe both the original and updated marker through the same symlink.

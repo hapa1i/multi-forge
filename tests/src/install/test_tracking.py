@@ -11,6 +11,7 @@ from forge.install.exceptions import TrackingCorruptedError
 from forge.install.models import (
     TRACKING_VERSION,
     Installation,
+    InstalledFile,
     InstalledManifest,
     InstalledSkillPackage,
 )
@@ -195,6 +196,75 @@ class TestTrackingStore:
         with pytest.raises(TrackingCorruptedError, match="deserialization error"):
             tracking_store.read()
 
+    @pytest.mark.parametrize(
+        ("case", "message"),
+        [
+            ("empty", "file_paths must not be empty"),
+            ("missing-ledger", "not backed by files ledger"),
+            ("missing-skill", "must track"),
+            ("outside-package", "outside target_dir"),
+        ],
+    )
+    def test_read_v2_rejects_incoherent_skill_package_ownership(
+        self,
+        tracking_store: TrackingStore,
+        case: str,
+        message: str,
+    ) -> None:
+        target_dir = Path("/home/user/.agents/skills/challenge")
+        skill_path = str(target_dir / "SKILL.md")
+        note_path = str(target_dir / "references" / "note.md")
+        package_paths = [skill_path, note_path]
+        ledger_paths = list(package_paths)
+        if case == "empty":
+            package_paths = []
+        elif case == "missing-ledger":
+            ledger_paths = [skill_path]
+        elif case == "missing-skill":
+            package_paths = [note_path]
+        elif case == "outside-package":
+            outside_path = "/home/user/.agents/skills/sibling/secret.txt"
+            package_paths.append(outside_path)
+            ledger_paths.append(outside_path)
+
+        tracking_store.path.write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "installations": {
+                        "user": {
+                            "scope": "user",
+                            "mode": "copy",
+                            "profile": "standard",
+                            "modules_enabled": ["skills"],
+                            "files": [
+                                {
+                                    "target_path": path,
+                                    "source_path": f"/cache/{Path(path).name}",
+                                    "checksum": "abc",
+                                    "mode": "copy",
+                                    "installed_at": "2026-07-17T00:00:00Z",
+                                }
+                                for path in ledger_paths
+                            ],
+                            "skill_packages": [
+                                {
+                                    "runtime": "codex",
+                                    "skill": "challenge",
+                                    "target_dir": str(target_dir),
+                                    "file_paths": package_paths,
+                                }
+                            ],
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(TrackingCorruptedError, match=message):
+            tracking_store.read()
+
     def test_read_rejects_manifest_with_removed_patched_files_field(self, tracking_store: TrackingStore) -> None:
         """A manifest carrying the removed patched_files field is rejected, not silently loaded.
 
@@ -274,6 +344,15 @@ class TestTrackingStore:
                     mode="copy",
                     profile="standard",
                     modules_enabled=["skills"],
+                    files=[
+                        InstalledFile(
+                            target_path=package.file_paths[0],
+                            source_path="/cache/challenge/SKILL.md",
+                            checksum="abc",
+                            mode="copy",
+                            installed_at="2026-07-17T00:00:00Z",
+                        )
+                    ],
                     skill_packages=[package],
                 )
             }

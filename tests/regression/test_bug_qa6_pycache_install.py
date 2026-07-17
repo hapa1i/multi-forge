@@ -69,7 +69,7 @@ class TestPlanExcludesPycacheWithoutGit:
 
     def test_pycache_excluded_when_git_unavailable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Simulate Docker environment: source tree has __pycache__ but no .git/."""
-        from forge.install.installer import Installer, get_extensions_root
+        from forge.install.installer import Installer
         from forge.install.models import (
             InstallMode,
             InstallModule,
@@ -77,8 +77,11 @@ class TestPlanExcludesPycacheWithoutGit:
             InstallScope,
         )
 
-        # Create a minimal skill source with __pycache__ contamination
-        source_root = get_extensions_root()
+        # Create a sanitized source layout with no Git metadata, matching the
+        # Docker case without mutating the checkout shared by the test session.
+        forge_source = tmp_path / "forge-source"
+        source_root = forge_source / "src"
+        (source_root / "forge").mkdir(parents=True)
         skill_dir = source_root / "skills" / "test-pycache-regression"
         pycache_dir = skill_dir / "__pycache__"
         pycache_dir.mkdir(parents=True, exist_ok=True)
@@ -93,32 +96,24 @@ description: Temporary package for the pycache exclusion regression.
 """)
         (pycache_dir / "SKILL.cpython-312.pyc").write_bytes(b"\x00\x00\x00\x00")
 
-        try:
-            # Force git to be unavailable (simulates Docker without .git/)
-            monkeypatch.setattr(
-                "forge.install.installer._get_git_tracked_files",
-                lambda _: None,
-            )
+        monkeypatch.setattr("forge.install.installer.get_forge_source_root", lambda: forge_source)
+        monkeypatch.setattr("forge.install.installer.get_extensions_root", lambda: source_root)
+        monkeypatch.setattr("forge.install.installer._get_git_tracked_files", lambda _: None)
 
-            installer = Installer(
-                scope=InstallScope.USER,
-                project_root=None,
-            )
-            plan = installer.plan(
-                profile=InstallProfile.STANDARD,
-                mode=InstallMode.COPY,
-                _modules_override={InstallModule.SKILLS},
-            )
+        installer = Installer(
+            scope=InstallScope.USER,
+            project_root=None,
+        )
+        plan = installer.plan(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            _modules_override={InstallModule.SKILLS},
+        )
 
-            planned_targets = [fp.target_path for fp in plan.files]
-            # The .pyc file must NOT appear in the plan
-            assert not any(".pyc" in t for t in planned_targets), (
-                f"__pycache__/.pyc files leaked into install plan: " f"{[t for t in planned_targets if '.pyc' in t]}"
-            )
-            # The SKILL.md SHOULD appear
-            assert any("test-pycache-regression" in t and "SKILL.md" in t for t in planned_targets)
-        finally:
-            # Clean up test fixture from source tree
-            import shutil
-
-            shutil.rmtree(skill_dir, ignore_errors=True)
+        planned_targets = [fp.target_path for fp in plan.files]
+        # The .pyc file must NOT appear in the plan
+        assert not any(".pyc" in t for t in planned_targets), (
+            f"__pycache__/.pyc files leaked into install plan: " f"{[t for t in planned_targets if '.pyc' in t]}"
+        )
+        # The SKILL.md SHOULD appear
+        assert any("test-pycache-regression" in t and "SKILL.md" in t for t in planned_targets)

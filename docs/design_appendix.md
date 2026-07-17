@@ -1023,10 +1023,10 @@ Profiles:
 - `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
-Scope filtering keeps `hooks`/`codex-hooks` user-only and `status-line` project/local. SKILLS then filters by
-scope/runtime/profile/skill; repeatable `--runtime claude|codex|all` affects only SKILLS. New automatic enable adds
-detected Codex to Claude; existing enable and sync retain managed runtimes; explicit narrowing preserves omitted tracked
-packages. Disable owns removal.
+Scope filtering keeps hooks user-only and status line project/local; `--runtime claude|codex|all` filters only SKILLS.
+Automatic enable adds detected Codex when new and retains managed runtimes when existing; explicit narrowing preserves
+omitted tracked packages. Disable owns removal. Unscoped sync/disable/status use `.claude/` sidecars plus exact
+`installed.json` scope/path rows, including Codex-only projects.
 
 User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
 reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
@@ -1057,18 +1057,16 @@ unknown Forge-looking wrappers are retained and reported.
 
 #### Installed manifest (`~/.forge/installed.json`)
 
-The installer must track what it changed so:
+`installed.json` owns extensions; launcher metadata lives elsewhere. Schema v2 adds
+`{runtime, skill, target_dir, file_paths}` under `skill_packages`, backed by the `files` checksum/removal ledger. Rows
+require a unique runtime/skill, absolute target, nonempty sorted paths including `<target_dir>/SKILL.md`, containment,
+ledger coverage, and exclusive ownership. Violations fail reads/writes before mutation. V1 normalizes in memory, then a
+successful mutation writes v2; malformed/unsupported state fails. `cleanup-project` validates first; doctor exposes
+neither tracking degradation nor skill health.
 
-- `forge extension sync` updates only tracked items
-- `forge extension disable` removes only tracked files and reverts only Forge-added settings entries
-
-`installed.json` tracks extension ownership only. Runtime launcher metadata deliberately lives elsewhere so extension
-tracking's strict schema (`version` + `installations`) does not grow a second responsibility.
-
-Schema v2 adds `{runtime, skill, target_dir, file_paths}` rows under `skill_packages`; `files` remains the checksum and
-removal ledger. Strict v1 reads normalize in memory without writing, and the next successful mutation writes v2;
-unknown, malformed, corrupt, older, or newer state fails. `cleanup-project` validates before mutation. Doctor only uses
-a best-effort user-install boolean for hook recovery advice; it exposes neither tracking degradation nor skill health.
+`disable --all` attempts every row, aggregates failures, and exits 1 if any remain. `scripts/setup.sh --uninstall`
+deletes `$FORGE_HOME` only after success; failure, or a missing Forge command with `installed.json` present, preserves
+tracking and aborts.
 
 For legacy migration, `cleanup-project` reads only the selected canonical project/local row, validates the newest
 `.forge-added` payload, then removes only hook ownership; unrelated fields survive. Stale/v1 rows without recoverable
@@ -1182,12 +1180,15 @@ not a bypass; sidecars need a satisfying image. `forge extension doctor` remains
 
 ### C.5 Multi-scope installation (skill resolution)
 
-Portable sources use `forge-skill.yaml` plus neutral `content.md`; packages without that manifest remain legacy
-Claude-only `SKILL.md`. Declared capabilities bind runtime arguments, resources, scripts, model family, exploration,
-invocation policy, and interaction. Script execution is distinct from resource loading and resolves from the selected
-package, never process CWD. Adapters emit Claude `forge:<skill>` or directory-matching Codex names, then strict
-whole-tree validation rejects invalid metadata, paths, placeholders, or runtime-token leaks. Only non-templated
-documentary Markdown under `references/` may be runtime-excluded. See
+Portable sources use `forge-skill.yaml` + `content.md`; otherwise `SKILL.md` is a legacy Claude bridge. Source/package
+roots must be real. In a checkout, Git eligibility (tracked plus unignored untracked paths) gates package discovery and
+every read; inability to obtain that set blocks planning. Contained leaf symlinks require both link and target
+eligibility. Ignored inputs never reach output/cache.
+
+`allow_implicit_invocation` alone owns neutral invocation policy; adapters derive both forms and reject raw Claude
+`disable-model-invocation`. Packaged executables run directly from the installed package, so their shebang or OS entry
+point—not the adapter—selects execution independent of CWD. Whole-tree validation rejects bad metadata, paths,
+placeholders, or runtime tokens; only documentary Markdown under `references/` may be excluded. See
 [design_workflows.md §3.1](design_workflows.md#31-reflective-architecture).
 
 SKILLS planning is explicit over scope/runtime/profile/skill:
@@ -1197,20 +1198,16 @@ SKILLS planning is explicit over scope/runtime/profile/skill:
 | `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
 | `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-Repeatable `enable --runtime claude|codex|all` filters only SKILLS. New automatic enable adds detected Codex to Claude;
-existing automatic enable retains managed runtimes; explicit narrowing emits preservation rows for omitted tracked
-packages; sync preserves tracked runtimes. Disable owns removal. Explicit unavailable/local Codex requests fail before
-writes. Codex scans are read-only across user/project/admin roots and cross-reference valid tracking rows. Automatic new
-packages skip; explicit or managed packages conflict. Other-scope managed matches name the owner and exact disable
-command; only untracked matches advise remove/rename. User-scope planning and status additionally inspect every valid,
-present tracked project/local package of the same name, regardless of the caller's current directory, because the user
-target would be visible from each project. `--force` never changes a match.
+`--runtime` filters only SKILLS. Automatic enable adds detected Codex when new and retains managed runtimes when
+existing; explicit narrowing preserves omissions; sync preserves; disable removes. Unavailable/local Codex requests fail
+before writes. Duplicate scans are read-only and tracking-aware: automatic new packages skip, explicit/managed packages
+conflict, managed matches name their owner/disable command, and only untracked matches advise removal. User-scope checks
+include visible tracked project/local matches; `--force` never bypasses this.
 
-Blocking plans write nothing. Compiled output uses the stable content-addressed `$FORGE_HOME/cache/compiled-skills/v1`
-cache; tracking commits last. Interrupted first-time Codex output must be removed before retry, while tracked updates
-remain syncable. Status owns package health (`present`, `missing`, `duplicate`, `invalid-target`); doctor does not emit
-`skill_packages`. Package directories must be real: substitutions are `invalid-target` and block mutation; symlink mode
-links only leaf files. Claude scopes may drift; Codex should use one visible scope.
+Blocking plans write nothing; compiled output uses `$FORGE_HOME/cache/compiled-skills/v1`, and tracking commits last.
+Status—not doctor—owns `present`, `missing`, `duplicate`, and `invalid-target`. Package/descendant directory symlinks
+are invalid; install symlinks are leaf-only, and a dangling tracked leaf is `missing`. Claude scopes may drift; Codex
+should use one visible scope.
 
 The portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. The four `claude -p` workflow
 frontends plus `walkthrough`/`qa` remain Claude-only.

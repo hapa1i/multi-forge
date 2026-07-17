@@ -53,7 +53,8 @@ probe_init() {
 
     PROBE_ROOT="$(mktemp -d)" || err "mktemp failed"
     export PROBE_ROOT
-    # shellcheck disable=SC2064 -- expand this stage's path when installing the trap.
+    # Expand this stage's path when installing the trap.
+    # shellcheck disable=SC2064
     trap "rm -rf '$PROBE_ROOT'" EXIT
 
     HOME="$PROBE_ROOT/home"
@@ -122,4 +123,20 @@ assert_last_contains() {
     local label="${1:?label}" marker="${2:?marker}"
     rg -q --fixed-strings "$marker" "$PROBE_CAPTURE_DIR/results/$label.last-message.txt" ||
         err "$label last message did not contain $marker"
+}
+
+assert_completed_command_exit() {
+    local label="${1:?label}" command="${2:?command}" expected_exit="${3:?expected exit}"
+    local stream="$PROBE_CAPTURE_DIR/streams/$label.jsonl"
+    local event_command="${SHELL:-/bin/bash} -lc '$command'"
+
+    # Codex records the selected shell wrapper in JSONL. Require that exact
+    # wrapper and payload, plus the matching exit code. Searching the last
+    # message is insufficient: a failed turn or an unexecuted command can
+    # produce the same marker absence.
+    rg --fixed-strings '"type":"item.completed"' "$stream" |
+        rg --fixed-strings '"type":"command_execution"' |
+        rg --fixed-strings "\"command\":\"$event_command\"" |
+        rg -q --fixed-strings "\"exit_code\":$expected_exit" ||
+        err "$label stream did not record completed command '$command' with exit $expected_exit"
 }

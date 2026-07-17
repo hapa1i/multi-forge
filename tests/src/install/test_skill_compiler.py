@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import stat
+import subprocess
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
@@ -191,6 +193,185 @@ def test_claude_loader_rejects_external_skill_document_symlink(tmp_path: Path) -
         load_claude_skill_source(package_root)
 
 
+def test_mixed_loader_rejects_symlinked_skills_root(tmp_path: Path) -> None:
+    real_root = tmp_path / "real-skills"
+    package_root = real_root / "legacy-skill"
+    package_root.mkdir(parents=True)
+    (package_root / "SKILL.md").write_text(
+        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        encoding="utf-8",
+    )
+    linked_root = tmp_path / "linked-skills"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Skill source root must not be a symlink"):
+        load_skill_sources(linked_root)
+
+
+def test_mixed_loader_rejects_top_level_package_symlink(tmp_path: Path) -> None:
+    skills_root = tmp_path / "skills"
+    skills_root.mkdir()
+    external_package = tmp_path / "external-skill"
+    external_package.mkdir()
+    (external_package / "SKILL.md").write_text(
+        "---\nname: forge:external-skill\ndescription: External test. Use for tests.\n---\n\n# External\n",
+        encoding="utf-8",
+    )
+    (skills_root / "external-skill").symlink_to(external_package, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Skill package root must not be a symlink"):
+        load_skill_sources(skills_root)
+
+
+def test_mixed_loader_applies_source_eligibility_to_packages_and_auxiliary_files(
+    tmp_path: Path,
+) -> None:
+    skills_root = tmp_path / "skills"
+    included = skills_root / "included"
+    included.mkdir(parents=True)
+    (included / "forge-skill.yaml").write_text(
+        "schema_version: 1\n" "name: included\n" "description: Included test. Use for tests.\n" "runtimes: [codex]\n",
+        encoding="utf-8",
+    )
+    (included / "content.md").write_text("# Included\n", encoding="utf-8")
+    (included / "visible.txt").write_text("visible\n", encoding="utf-8")
+    (included / "ignored.txt").write_text("ignored\n", encoding="utf-8")
+    ignored_package = skills_root / "ignored-package"
+    ignored_package.mkdir()
+    (ignored_package / "forge-skill.yaml").write_text(
+        "schema_version: 1\n"
+        "name: ignored-package\n"
+        "description: Ignored test. Use for tests.\n"
+        "runtimes: [codex]\n",
+        encoding="utf-8",
+    )
+    (ignored_package / "content.md").write_text("# Ignored\n", encoding="utf-8")
+    eligible = {
+        included / "forge-skill.yaml",
+        included / "content.md",
+        included / "visible.txt",
+    }
+
+    sources = load_skill_sources(skills_root, eligible_source_paths=eligible)
+
+    assert [source.manifest.name for source in sources] == ["included"]
+    assert [source_file.path for source_file in sources[0].files] == [PurePosixPath("visible.txt")]
+
+
+def test_ineligible_neutral_manifest_does_not_hide_eligible_legacy_package(
+    tmp_path: Path,
+) -> None:
+    package_root = tmp_path / "skills" / "legacy-skill"
+    package_root.mkdir(parents=True)
+    skill_document = package_root / "SKILL.md"
+    skill_document.write_text(
+        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        encoding="utf-8",
+    )
+    (package_root / "forge-skill.yaml").write_text(
+        "schema_version: 1\n"
+        "name: ignored-neutral\n"
+        "description: Ignored neutral manifest.\n"
+        "runtimes: [codex]\n",
+        encoding="utf-8",
+    )
+
+    sources = load_skill_sources(
+        package_root.parent,
+        eligible_source_paths={skill_document},
+    )
+
+    assert len(sources) == 1
+    assert sources[0].manifest.name == "legacy-skill"
+    assert sources[0].source_format == SkillSourceFormat.CLAUDE_BRIDGE
+
+
+def test_neutral_loader_requires_eligible_content_document(tmp_path: Path) -> None:
+    package_root = tmp_path / "neutral-skill"
+    package_root.mkdir()
+    manifest_path = package_root / "forge-skill.yaml"
+    manifest_path.write_text(
+        "schema_version: 1\n"
+        "name: neutral-skill\n"
+        "description: Neutral test. Use for tests.\n"
+        "runtimes: [codex]\n",
+        encoding="utf-8",
+    )
+    (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="content.md: skill source file is not eligible"):
+        load_neutral_skill_source(package_root, eligible_source_paths={manifest_path})
+
+
+def test_neutral_loader_treats_ineligible_declared_template_as_missing(
+    tmp_path: Path,
+) -> None:
+    package_root = tmp_path / "neutral-skill"
+    references = package_root / "references"
+    references.mkdir(parents=True)
+    manifest_path = package_root / "forge-skill.yaml"
+    manifest_path.write_text(
+        "schema_version: 1\n"
+        "name: neutral-skill\n"
+        "description: Neutral test. Use for tests.\n"
+        "runtimes: [codex]\n"
+        "template_files: [references/template.md]\n",
+        encoding="utf-8",
+    )
+    content_path = package_root / "content.md"
+    content_path.write_text("# Neutral\n", encoding="utf-8")
+    (references / "template.md").write_text("{{forge:forge_cli}} status\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="template_files names missing auxiliary files"):
+        load_neutral_skill_source(
+            package_root,
+            eligible_source_paths={manifest_path, content_path},
+        )
+
+
+def test_source_eligibility_requires_leaf_alias_and_resolved_target(
+    tmp_path: Path,
+) -> None:
+    package_root = tmp_path / "neutral-skill"
+    references = package_root / "references"
+    references.mkdir(parents=True)
+    manifest_path = package_root / "forge-skill.yaml"
+    manifest_path.write_text(
+        "schema_version: 1\n"
+        "name: neutral-skill\n"
+        "description: Neutral test. Use for tests.\n"
+        "runtimes: [codex]\n",
+        encoding="utf-8",
+    )
+    content_path = package_root / "content.md"
+    content_path.write_text("# Neutral\n", encoding="utf-8")
+    target_path = references / "canonical.md"
+    target_path.write_text("# Canonical\n", encoding="utf-8")
+    alias_path = references / "alias.md"
+    alias_path.symlink_to("canonical.md")
+
+    complete = load_neutral_skill_source(
+        package_root,
+        eligible_source_paths={manifest_path, content_path, target_path, alias_path},
+    )
+    target_only = load_neutral_skill_source(
+        package_root,
+        eligible_source_paths={manifest_path, content_path, target_path},
+    )
+    alias_only = load_neutral_skill_source(
+        package_root,
+        eligible_source_paths={manifest_path, content_path, alias_path},
+    )
+
+    assert {source_file.path for source_file in complete.files} == {
+        PurePosixPath("references/alias.md"),
+        PurePosixPath("references/canonical.md"),
+    }
+    assert complete.files[0].content == complete.files[1].content == b"# Canonical\n"
+    assert {source_file.path for source_file in target_only.files} == {PurePosixPath("references/canonical.md")}
+    assert alias_only.files == ()
+
+
 def test_mixed_loader_preserves_internal_symlink_alias_content() -> None:
     source = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "review")
     assert source.source_format == SkillSourceFormat.NEUTRAL
@@ -251,7 +432,7 @@ def test_packaged_script_path_uses_runtime_specific_loaded_skill_root_binding() 
     codex = compile_skill_for_runtime(source, SkillRuntime.CODEX)
 
     assert (
-        'FORGE_SKILL_RUNTIME=claude_code bash "${CLAUDE_SKILL_DIR}/scripts/check.sh"'
+        'FORGE_SKILL_RUNTIME=claude_code "${CLAUDE_SKILL_DIR}/scripts/check.sh"'
         in claude.file("SKILL.md").content.decode()
     )
     codex_body = codex.file("SKILL.md").content.decode()
@@ -259,6 +440,42 @@ def test_packaged_script_path_uses_runtime_specific_loaded_skill_root_binding() 
     assert "directory containing this SKILL.md" in codex_body
     assert "execute the resulting absolute path" in codex_body
     assert "`FORGE_SKILL_RUNTIME=codex`" in codex_body
+
+
+def test_claude_packaged_script_binding_honors_executable_shebang(
+    tmp_path: Path,
+) -> None:
+    script_path = PurePosixPath("scripts/check.py")
+    source = _neutral_source(
+        body="{{forge:packaged_script:scripts/check.py}}\n",
+        required=frozenset({SkillCapability.PACKAGED_SCRIPT}),
+        files=(
+            SkillSourceFile(
+                script_path,
+                b"#!/usr/bin/env python3\nimport os\nprint(os.environ['FORGE_SKILL_RUNTIME'])\n",
+                mode=0o755,
+            ),
+        ),
+    )
+
+    package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+    package_root = tmp_path / package.name
+    executable = package_root / script_path
+    executable.parent.mkdir(parents=True)
+    compiled_script = package.file(script_path)
+    executable.write_bytes(compiled_script.content)
+    executable.chmod(compiled_script.mode)
+    command = package.file("SKILL.md").content.decode().splitlines()[-1]
+
+    completed = subprocess.run(
+        ["bash", "-c", command],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "CLAUDE_SKILL_DIR": str(package_root)},
+    )
+
+    assert completed.stdout == "claude_code\n"
 
 
 @pytest.mark.parametrize("mode", [0o644, 0o001, 0o100, 0o400])
@@ -535,9 +752,7 @@ runtimes: [codex]
         ("compatibility", "Requires Forge.", "compatibility", "Requires another tool."),
         ("metadata", {"author": "forge"}, "metadata", {"author": "other"}),
         ("allowed_tools", "Read", "allowed-tools", "Bash"),
-        ("allow_implicit_invocation", True, "disable-model-invocation", True),
         ("license", None, "license", "MIT"),
-        ("allow_implicit_invocation", None, "disable-model-invocation", True),
     ],
 )
 def test_neutral_loader_rejects_conflicting_typed_and_claude_frontmatter(
@@ -567,28 +782,27 @@ def test_neutral_loader_rejects_conflicting_typed_and_claude_frontmatter(
         load_neutral_skill_source(package_root)
 
 
-def test_neutral_loader_accepts_equivalent_invocation_policy_declarations(tmp_path: Path) -> None:
+@pytest.mark.parametrize("raw_value", [False, True])
+def test_neutral_loader_rejects_raw_claude_invocation_policy(tmp_path: Path, *, raw_value: bool) -> None:
     package_root = tmp_path / "neutral-skill"
     package_root.mkdir()
+    manifest = {
+        "schema_version": 1,
+        "name": "neutral-skill",
+        "description": "Neutral test skill. Use when testing loading.",
+        "runtimes": ["claude_code", "codex"],
+        "capabilities": ["invocation_policy"],
+        "allow_implicit_invocation": not raw_value,
+        "claude_frontmatter": {"disable-model-invocation": raw_value},
+    }
     (package_root / "forge-skill.yaml").write_text(
-        """\
-schema_version: 1
-name: neutral-skill
-description: Neutral test skill. Use when testing loading.
-runtimes: [claude_code, codex]
-capabilities: [invocation_policy]
-allow_implicit_invocation: true
-claude_frontmatter:
-  disable-model-invocation: false
-""",
+        yaml.safe_dump(manifest, sort_keys=False),
         encoding="utf-8",
     )
     (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
 
-    source = load_neutral_skill_source(package_root)
-
-    package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
-    assert _frontmatter(package.file("SKILL.md").content)["disable-model-invocation"] is False
+    with pytest.raises(ValueError, match="disable-model-invocation is adapter-owned"):
+        load_neutral_skill_source(package_root)
 
 
 @pytest.mark.parametrize(
@@ -662,6 +876,15 @@ def test_invocation_policy_capability_requires_an_explicit_portable_value() -> N
     assert any(item.rule == "source.invocation-policy-value" for item in exc_info.value.diagnostics)
 
 
+def test_neutral_source_rejects_raw_claude_invocation_policy() -> None:
+    source = _neutral_source(claude_frontmatter={"disable-model-invocation": True})
+
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+
+    assert any(item.rule == "source.invocation-policy-authority" for item in exc_info.value.diagnostics)
+
+
 def test_codex_bridge_rejects_raw_claude_tokens_after_explicit_opt_in() -> None:
     bridge = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "panel")
     assert bridge.source_format == SkillSourceFormat.CLAUDE_BRIDGE
@@ -727,7 +950,6 @@ def test_claude_emission_uses_typed_manifest_fields_as_authority() -> None:
             "compatibility": "Requires another tool.",
             "metadata": {"author": "other"},
             "allowed-tools": "Bash",
-            "disable-model-invocation": True,
         },
     )
 
@@ -760,4 +982,8 @@ def test_model_family_resources_remain_shared_across_runtime_outputs() -> None:
             for package_file in package.files
             if package_file.path.parent == PurePosixPath("resources")
         }
-        assert emitted_resource_stems == {"code-anthropic", "code-gemini", "code-openai"}
+        assert emitted_resource_stems == {
+            "code-anthropic",
+            "code-gemini",
+            "code-openai",
+        }

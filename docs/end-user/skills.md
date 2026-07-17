@@ -65,6 +65,10 @@ uses the tracked runtime set. Use `forge extension disable` when you intend to r
 Codex skills never use `$CODEX_HOME`. Codex has no private local-only skill directory, so Forge refuses an explicit
 Codex local request instead of writing personal state into the shared project `.agents/skills` directory.
 
+From inside a project, unscoped `forge extension sync`, `disable`, and `status` use both `.claude/` ownership sidecars
+and exact scope/path rows in `~/.forge/installed.json`. A tracked Codex-only project therefore remains detectable even
+when it has no `.claude/` directory.
+
 ---
 
 ## `/forge:review`
@@ -239,8 +243,8 @@ conversation.
 | `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                    |
 | `/forge:qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                   |
 
-The portable smoke test resolves its bundled script from the installed skill directory, so `$smoke-test` and
-`/forge:smoke-test` do not depend on the session CWD.
+The portable smoke test resolves and directly executes its bundled script from the installed skill directory, so its
+entry point selects the interpreter and `$smoke-test`/`/forge:smoke-test` do not depend on the session CWD.
 
 ---
 
@@ -290,9 +294,13 @@ ls "$HOME/.agents/skills/"                  # Codex user packages
 The status states are `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a
 recovery. Run `forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that
 scope and its exact disable command; only an untracked duplicate tells you to remove or rename it. A Claude-only skill
-such as `panel` will not appear in a Codex target. If a package root or one of its directories was replaced by a
-symlink, status reports `invalid-target` and mutation stops. Remove the unexpected link, then rerun sync or disable;
-Forge will not follow it into another package.
+such as `panel` will not appear in a Codex target. A dangling tracked leaf symlink is `missing` and can be repaired with
+sync. If a package root or descendant directory is a symlink, status reports `invalid-target` and mutation stops. Remove
+the unexpected link, then rerun sync or disable; Forge will not follow it into another package.
+
+If `installed.json` claims an empty, out-of-package, or non-ledger-backed skill package, lifecycle commands report
+corrupt state before touching packages or tracking. Restore or repair the named tracking file, or follow the CLI's full
+reset guidance; do not hand-delete a package while ownership is unresolved.
 
 ### Wrong model instructions selected
 
