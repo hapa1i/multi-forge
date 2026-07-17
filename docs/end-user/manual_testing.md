@@ -116,7 +116,8 @@ recorded runtime set even when a runtime binary is temporarily absent. An explic
 runtimes but preserves omitted tracked packages; disable owns removal. Cross-scope Forge-managed duplicates report the
 owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance. User-scope checks
 include valid, present tracked project/local packages outside the current directory chain because a user package would
-be visible from those projects.
+be visible from those projects. A package root or descendant directory replaced by a symlink must report
+`invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row.
 
 ---
 

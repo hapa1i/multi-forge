@@ -40,14 +40,16 @@ without weakening the one-visible-Codex-scope contract or moving the card out of
   blocks on tracked project/local packages outside the current directory chain.
 - Status is safe outside projects, policy conflicts no longer advertise ineffective `--force`, cache failures map to
   retryable installer errors, and typed/Claude frontmatter conflicts fail at manifest load.
+- Runtime package roots and descendant directories must remain real entries. Status rejects symlink substitution, and
+  enable, sync, apply, rollback, and disable revalidate before mutation instead of following links into sibling content.
 - Added Claude-worker, smoke-script, HOME-isolation, genuine v1, and lifecycle regressions; replaced mutable checkout
   packaging simulation with an offline-built, target-installed wheel covering both runtime outputs; synchronized QA and
   operator docs.
 
-**Verification**: final affected suite (`302 passed`); `make test-unit` (`8131 passed, 1 skipped, 117 deselected`);
-targeted Docker lifecycle (`2 passed`); `uv build`; `make pre-commit`; `make pre-commit-md`; QA v1.0.28 / 584
-assertions; walkthrough-state (`93 passed`); `git diff --check`. The card remains in `doing/`, and no proposed lesson
-was promoted to `impl_notes.md`.
+**Verification**: review suite (`302 passed`), symlink-boundary suite (`216 passed`), full regression (`515 passed`),
+and `make test-unit` (`8134 passed, 1 skipped, 117 deselected`); targeted Docker lifecycle (`2 passed`); `uv build`;
+`make pre-commit`; `make pre-commit-md`; QA v1.0.28 / 585 assertions; walkthrough-state (`93 passed`);
+`git diff --check`. The card remains in `doing/`, and no proposed lesson was promoted to `impl_notes.md`.
 
 ## 2026-07-16
 

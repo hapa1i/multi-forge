@@ -1314,7 +1314,9 @@ new user package would be visible inside all of those projects. Registration alo
 after the user's one-time interactive trust ceremony (§3.9). `forge runtime preflight codex --verify-enrollment`
 confirms enrollment by effect with one cheap managed turn. `~/.forge/installed.json` v2 tracks runtime skill packages
 alongside the canonical file ledger for clean sync, status, and disable. A successful project/local enable then
-establishes the Forge project described in §3.
+establishes the Forge project described in §3. Package roots and descendant directory entries must remain real
+directories: status marks a substituted symlink `invalid-target`, and every write, rollback, or removal revalidates the
+directory chain before mutation. Tracked leaf-file symlinks remain valid for symlink install mode.
 
 For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
 or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it

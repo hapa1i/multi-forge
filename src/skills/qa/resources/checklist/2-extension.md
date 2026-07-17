@@ -381,6 +381,25 @@ test "$DUPLICATE_BEFORE" = "$DUPLICATE_AFTER"
 
 rm -rf "$HOME/.agents/skills/challenge"
 forge extension sync --scope project
+
+# Replacing a tracked package root with a symlink must invalidate it, not redirect disable into the sibling.
+mv .agents/skills/review .agents/skills/review-sibling
+ln -s review-sibling .agents/skills/review
+forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  | jq -e '.[0].skill_packages[] | select(.skill == "review")
+    | .state == "invalid-target" and .target_present == false
+      and (.recovery | contains("unexpected package entry"))'
+if forge extension disable --scope project --yes >/tmp/forge-codex-package-symlink.txt 2>&1; then
+  echo "ERROR: disable followed a substituted Codex package directory" >&2
+  exit 1
+fi
+rg -q 'security violation' /tmp/forge-codex-package-symlink.txt
+test -f .agents/skills/review-sibling/SKILL.md
+jq -e --arg root "$(pwd -P)" '.installations["project:" + $root] != null' "$FORGE_HOME/installed.json"
+rm .agents/skills/review
+mv .agents/skills/review-sibling .agents/skills/review
+forge extension sync --scope project
+
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | jq -e '.[0].skill_packages | length == 5 and all(.[];
       .runtime == "codex" and .state == "present" and .target_present == true
@@ -397,6 +416,7 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] Project sync preserves the recorded Codex runtime set when Codex is temporarily absent from `PATH`
 - [ ] JSON status reports the injected same-name package as `duplicate` with its path and recovery guidance
 - [ ] Explicit enable refuses the duplicate even with `--force`, and its checksum remains unchanged
+- [ ] A substituted package-root symlink is `invalid-target`; disable preserves its sibling and tracking row
 - [ ] After duplicate cleanup and sync, all five project Codex packages report healthy `present` state
 
 ---

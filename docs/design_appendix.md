@@ -1209,7 +1209,8 @@ target would be visible from each project. `--force` never changes a match.
 Blocking plans write nothing. Compiled output uses the stable content-addressed `$FORGE_HOME/cache/compiled-skills/v1`
 cache; tracking commits last. Interrupted first-time Codex output must be removed before retry, while tracked updates
 remain syncable. Status owns package health (`present`, `missing`, `duplicate`, `invalid-target`); doctor does not emit
-`skill_packages`. Claude scopes may drift; Codex should use one visible scope.
+`skill_packages`. Package directories must be real: substitutions are `invalid-target` and block mutation; symlink mode
+links only leaf files. Claude scopes may drift; Codex should use one visible scope.
 
 The portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. The four `claude -p` workflow
 frontends plus `walkthrough`/`qa` remain Claude-only.

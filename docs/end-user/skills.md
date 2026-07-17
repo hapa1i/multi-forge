@@ -290,7 +290,9 @@ ls "$HOME/.agents/skills/"                  # Codex user packages
 The status states are `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a
 recovery. Run `forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that
 scope and its exact disable command; only an untracked duplicate tells you to remove or rename it. A Claude-only skill
-such as `panel` will not appear in a Codex target.
+such as `panel` will not appear in a Codex target. If a package root or one of its directories was replaced by a
+symlink, status reports `invalid-target` and mutation stops. Remove the unexpected link, then rerun sync or disable;
+Forge will not follow it into another package.
 
 ### Wrong model instructions selected
 

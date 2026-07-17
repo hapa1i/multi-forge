@@ -239,6 +239,7 @@ card in the active lane for post-implementation review.
 | Invocation policy          | explicit-only skill with `allow_implicit_invocation: false`         | implicit prompt does not select it; explicit `$skill` remains usable                           | `scripts/experiments/codex-skills/stages/40-invocation-policy.sh`                                             |
 | Packaged script resolution | user and project `smoke-test` installs invoked from unrelated CWDs  | exact installed script runs without checkout/CWD coupling and probes runtime-correct homes     | `scripts/experiments/codex-skills/stages/50-script-resolution.sh`                                             |
 | Runtime-aware lifecycle    | Claude + Codex packages tracked for one scope                       | enable/sync/status/disable are idempotent and remove only tracked files                        | `tests/src/install/test_cross_runtime_skills.py`                                                              |
+| Package-root substitution  | tracked package directory replaced by a symlink to a sibling        | status is invalid; sync/disable preserve sibling bytes and tracking                            | `tests/regression/test_bug_runtime_skill_package_symlink_escape.py`                                           |
 | Partial conflict           | user-owned target conflicts in one runtime                          | plan/apply follows the reviewed atomicity rule and records no half-install as complete         | `tests/src/install/test_cross_runtime_skills.py`                                                              |
 | Copy and symlink modes     | compiled package installed in both modes                            | targets are stable and no symlink points into temporary build output                           | `tests/src/install/test_cross_runtime_skills.py`                                                              |
 | Wheel clean install        | isolated wheel/sdist tool install                                   | packaged sources/adapters compile and install both runtime packages without checkout paths     | `tests/integration/docker/test_installer.py` + release smoke                                                  |
@@ -251,13 +252,15 @@ card in the active lane for post-implementation review.
 - [x] Classify cross-scope Codex duplicates from validated tracking provenance, normalize symlinked path components
   consistently, reject malformed ownership claims, and wire safe recovery through human and JSON status. For a
   user-scope target, inspect every present tracked project/local package even outside the current directory chain.
+- [x] Treat package roots and descendant directories as real-directory ownership boundaries. Reject substituted symlinks
+  during fresh enable, status, sync, apply, rollback, and disable while retaining leaf-file symlink mode.
 - [x] Make `extension status --all` safe outside a project and distinguish policy conflicts that `--force` cannot
   override. Give Codex-only users a complete skills-only recovery command when Claude is absent.
 - [x] Reject conflicting typed/Claude frontmatter declarations at manifest load, map cache materialization failures to a
   retryable installer error, canonicalize manual smoke-script invocation, and pin the Claude-worker limitation in tests.
 - [x] Consolidate repeated installer test patches, isolate `HOME` automatically, remove host-dependent runtime probes,
   and replace the session-container asset mutation helper with a real-wheel, temp-only lifecycle harness.
-- [x] Update lifecycle/operator docs and QA §2.13; regenerate the QA index to v1.0.28 / 584 assertions. Recheck the
+- [x] Update lifecycle/operator docs and QA §2.13; regenerate the QA index to v1.0.28 / 585 assertions. Recheck the
   walkthrough install/status/sync/teardown path and retain its project-only Codex coverage because user-scope `.agents`
   mutation remains Docker-QA-only.
 - [x] Run the targeted real-wheel Docker lifecycle for both Claude and Codex packages.

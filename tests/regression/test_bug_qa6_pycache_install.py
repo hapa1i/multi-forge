@@ -79,11 +79,18 @@ class TestPlanExcludesPycacheWithoutGit:
 
         # Create a minimal skill source with __pycache__ contamination
         source_root = get_extensions_root()
-        skill_dir = source_root / "skills" / "_test_pycache_regression"
+        skill_dir = source_root / "skills" / "test-pycache-regression"
         pycache_dir = skill_dir / "__pycache__"
         pycache_dir.mkdir(parents=True, exist_ok=True)
 
-        (skill_dir / "SKILL.md").write_text("# Test skill\n")
+        (skill_dir / "SKILL.md").write_text("""\
+---
+name: forge:test-pycache-regression
+description: Temporary package for the pycache exclusion regression.
+---
+
+# Test skill
+""")
         (pycache_dir / "SKILL.cpython-312.pyc").write_bytes(b"\x00\x00\x00\x00")
 
         try:
@@ -109,7 +116,7 @@ class TestPlanExcludesPycacheWithoutGit:
                 f"__pycache__/.pyc files leaked into install plan: " f"{[t for t in planned_targets if '.pyc' in t]}"
             )
             # The SKILL.md SHOULD appear
-            assert any("_test_pycache_regression" in t and "SKILL.md" in t for t in planned_targets)
+            assert any("test-pycache-regression" in t and "SKILL.md" in t for t in planned_targets)
         finally:
             # Clean up test fixture from source tree
             import shutil

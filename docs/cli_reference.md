@@ -74,7 +74,9 @@ For each tracked runtime skill package, status JSON includes `runtime`, `skill`,
 `target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is `present`, `missing`,
 `duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A Forge-managed
 cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports remove-or-rename
-guidance. Runtime-package health belongs to `extension status`; `extension doctor` does not emit `skill_packages`.
+guidance. A package root or descendant directory replaced by a symlink is `invalid-target`; enable, sync, and disable
+refuse to traverse it. Symlink install mode remains supported because only the tracked leaf files are links. Runtime-
+package health belongs to `extension status`; `extension doctor` does not emit `skill_packages`.
 
 Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
 best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings

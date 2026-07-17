@@ -242,11 +242,14 @@ review.
   from untracked duplicates, prevented a user package from shadowing tracked project/local packages outside the current
   directory chain, made status recovery executable from any CWD, and rejected conflicting manifest authority. The wheel
   integration now installs the built artifact without mutating the session container's checkout.
+- PR review remediation treats package roots and descendant directories as non-symlink ownership boundaries. Status
+  reports substitutions as invalid, and enable, sync, apply, rollback, and disable fail before following them.
 
 ### Verification
 
-- Initial focused adversarial acceptance: `142 passed`; final review-remediation affected suite: `302 passed`. Full unit
-  suite: `8131 passed, 1 skipped, 117 deselected`.
+- Initial focused adversarial acceptance: `142 passed`; review-remediation affected suite: `302 passed`; PR symlink-
+  boundary suite: `216 passed`. Full unit suite: `8134 passed, 1 skipped, 117 deselected`; full regression suite:
+  `515 passed`.
 - Initial Docker installer lifecycle: `20 passed`; review-remediation lifecycle: `2 passed`, including an offline-built,
   target-installed wheel that exercised both Claude and Codex enable -> sync -> status -> disable ownership.
 - The seven-stage Codex probe and actual compiled user/project `$smoke-test` invocations passed on `codex-cli 0.144.5`;
@@ -255,8 +258,8 @@ review.
   from isolated installs. Claude smoke reported `11/11`, Codex smoke `8/8`, and no bytecode, symlink,
   checkout-reference, compiler-source, or post-disable ownership leak remained.
 - `uv build`, final `make pre-commit`, `make pre-commit-md`, and `git diff --check` passed after the hooks corrected
-  formatting and exposed one test `TypedDict` annotation. QA index parsing reports v1.0.28 / 584 assertions;
-  walkthrough-state tests report `93 passed`; `docs/design_appendix.md` remains below its limit at 29,966 tokens.
+  formatting and exposed one test `TypedDict` annotation. QA index parsing reports v1.0.28 / 585 assertions;
+  walkthrough-state tests report `93 passed`; `docs/design_appendix.md` remains below its limit at 29,990 tokens.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 
@@ -271,6 +274,8 @@ review.
 - Commit tracking last. A post-write failure must restore newly created files plus settings ownership state, while an
   unchanged-file refresh preserves the original installation timestamp.
 - Codex duplicate discovery is an ownership boundary: `--force` never adopts or deletes an untracked same-name package.
+- Runtime package directories are ownership boundaries: validate each directory entry with `lstat` near every mutation;
+  permit symlink mode only at tracked leaf files.
 - The content-addressed compiled-skill cache currently has no eviction. Symlink-mode installs reference digest
   directories directly, so any future cleanup must prove a digest is not the target of a tracked install before removing
   it.

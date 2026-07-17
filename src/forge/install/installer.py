@@ -107,6 +107,9 @@ logger = logging.getLogger(__name__)
 
 
 _EXTENSION_MODULE_NAMES = ("skills", "agents", "commands")
+_INVALID_SKILL_PACKAGE_RECOVERY = (
+    "Remove the unexpected package entry or repair the invalid tracking row before sync or disable."
+)
 
 
 def get_forge_source_root() -> Path:
@@ -387,6 +390,7 @@ def _tracked_codex_package_locations(
                 )
                 _validate_tracked_skill_package_files(
                     package,
+                    target,
                     expected_target,
                     "classify managed Codex package",
                 )
@@ -441,20 +445,61 @@ def _tracked_skill_package_target(
     expected_target = runtime_root / package.skill
     validate_path_within_boundary(expected_target, runtime_root, operation)
     target = Path(package.target_dir)
+    if not target.is_absolute():
+        raise PathBoundaryViolationError(str(target), str(expected_target), operation)
     expected_location = expected_target.parent.resolve() / expected_target.name
     target_location = target.parent.resolve() / target.name
     if target_location != expected_location:
         raise PathBoundaryViolationError(str(target), str(expected_target), operation)
+    _validate_real_skill_package_directory(target, expected_target, operation)
     return target, expected_target
+
+
+def _validate_real_skill_package_directory(path: Path, expected_target: Path, operation: str) -> None:
+    """Require an existing package directory entry to be real, never a symlink."""
+
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        raise PathBoundaryViolationError(str(path), str(expected_target), operation) from e
+    if not stat.S_ISDIR(mode):
+        raise PathBoundaryViolationError(str(path), f"{expected_target} (real directory)", operation)
+
+
+def _validate_skill_package_file_path(
+    tracked_file: Path,
+    package_dir: Path,
+    expected_target: Path,
+    operation: str,
+) -> None:
+    """Validate one package file path without traversing substituted directories."""
+
+    if not tracked_file.is_absolute():
+        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation)
+    validate_path_within_boundary(tracked_file, expected_target, operation)
+    try:
+        relative = tracked_file.relative_to(package_dir)
+    except ValueError as e:
+        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation) from e
+    if not relative.parts or ".." in relative.parts:
+        raise PathBoundaryViolationError(str(tracked_file), str(expected_target), operation)
+
+    current = package_dir
+    for component in relative.parts[:-1]:
+        current /= component
+        _validate_real_skill_package_directory(current, expected_target, operation)
 
 
 def _validate_tracked_skill_package_files(
     package: InstalledSkillPackage,
+    package_dir: Path,
     expected_target: Path,
     operation: str,
 ) -> None:
     for tracked_file in package.file_paths:
-        validate_path_within_boundary(Path(tracked_file), expected_target, operation)
+        _validate_skill_package_file_path(Path(tracked_file), package_dir, expected_target, operation)
 
 
 def _assert_tracked_skill_packages_syncable(
@@ -467,13 +512,13 @@ def _assert_tracked_skill_packages_syncable(
     invalid: list[str] = []
     for package in installation.skill_packages:
         try:
-            _target, expected_target = _tracked_skill_package_target(
+            target, expected_target = _tracked_skill_package_target(
                 package,
                 scope,
                 project_root,
                 "sync skill package",
             )
-            _validate_tracked_skill_package_files(package, expected_target, "sync skill package")
+            _validate_tracked_skill_package_files(package, target, expected_target, "sync skill package")
         except (KeyError, PathBoundaryViolationError, ValueError):
             invalid.append(f"{package.runtime}/{package.skill}")
     if invalid:
@@ -522,14 +567,14 @@ def inspect_skill_package_status(
                     state="invalid-target",
                     target_present=False,
                     file_paths=tuple(package.file_paths),
-                    recovery="Repair or remove the invalid tracking row before sync or disable.",
+                    recovery=_INVALID_SKILL_PACKAGE_RECOVERY,
                 )
             )
             continue
 
         target_present = target.is_dir() and (target / "SKILL.md").is_file()
         try:
-            _validate_tracked_skill_package_files(package, expected_target, "inspect skill package")
+            _validate_tracked_skill_package_files(package, target, expected_target, "inspect skill package")
         except PathBoundaryViolationError:
             statuses.append(
                 SkillPackageStatus(
@@ -539,7 +584,7 @@ def inspect_skill_package_status(
                     state="invalid-target",
                     target_present=target_present,
                     file_paths=tuple(package.file_paths),
-                    recovery="Repair or remove the invalid tracking row before sync or disable.",
+                    recovery=_INVALID_SKILL_PACKAGE_RECOVERY,
                 )
             )
             continue
@@ -558,7 +603,10 @@ def inspect_skill_package_status(
             duplicate_scan = scan_codex_skill_duplicates(
                 package.skill,
                 scan_roots=_codex_package_scan_roots(scope, project_root, tracked_locations),
-                managed_package_dirs=(target, *(location.target for location in tracked_locations)),
+                managed_package_dirs=(
+                    target,
+                    *(location.target for location in tracked_locations),
+                ),
                 current_package_dirs=(target,),
             )
             duplicate_paths = tuple(
@@ -1105,6 +1153,16 @@ class Installer:
                     )
                 continue
 
+            if decision.target_dir is None:
+                raise ForgeInstallError(
+                    f"Skill planner omitted target for eligible package {decision.runtime}/{decision.skill}"
+                )
+            _validate_real_skill_package_directory(
+                decision.target_dir,
+                decision.target_dir,
+                "write skill package",
+            )
+
             source = source_by_name[decision.skill]
             try:
                 compiled = compile_skill_for_runtime(source, SkillRuntime(decision.runtime))
@@ -1112,10 +1170,6 @@ class Installer:
                 raise ForgeInstallError(
                     f"Failed to compile skill '{decision.skill}' for runtime '{decision.runtime}': {e}"
                 ) from e
-            if decision.target_dir is None:
-                raise ForgeInstallError(
-                    f"Skill planner omitted target for eligible package {decision.runtime}/{decision.skill}"
-                )
 
             cache_dir = compiled_skill_cache_dir(compiled)
             runtime_root = _runtime_skill_root(decision.runtime, self._scope, self._project_root)
@@ -1124,6 +1178,12 @@ class Installer:
                 source_file = cache_dir.joinpath(*package_file.path.parts)
                 target_file = decision.target_dir.joinpath(*package_file.path.parts)
                 validate_path_within_boundary(target_file, runtime_root, "write skill package")
+                _validate_skill_package_file_path(
+                    target_file,
+                    decision.target_dir,
+                    decision.target_dir,
+                    "write skill package",
+                )
                 file_plan = self._plan_compiled_file(
                     package_file,
                     source_file,
@@ -1631,9 +1691,27 @@ class Installer:
         installed_files: list[InstalledFile] = []
         newly_created_files: list[InstalledFile] = []
         existing_files_by_target = {record.target_path: record for record in existing.files} if existing else {}
+        skill_package_dirs_by_file = {
+            file_path: Path(package.target_dir)
+            for package in plan.skill_packages
+            if package.target_dir is not None
+            for file_path in package.file_paths
+        }
         for file_plan in plan.files:
+            target = Path(file_plan.target_path)
+            package_dir = skill_package_dirs_by_file.get(file_plan.target_path)
+            if package_dir is not None:
+                try:
+                    _validate_real_skill_package_directory(package_dir, package_dir, "write skill package")
+                    _validate_skill_package_file_path(target, package_dir, package_dir, "write skill package")
+                except PathBoundaryViolationError as e:
+                    self._raise_post_file_failure(
+                        f"Refusing unsafe skill package write '{file_plan.target_path}'; tracking was not updated",
+                        e,
+                        newly_created_files,
+                        plan,
+                    )
             if file_plan.action in ("install", "update"):
-                target = Path(file_plan.target_path)
                 target_existed = target.exists() or target.is_symlink()
                 try:
                     installed_file = self._execute_file(file_plan, mode)
@@ -1980,18 +2058,33 @@ class Installer:
         that write failed. Existing targets are never passed through this path.
         """
 
-        package_boundaries = {
-            file_path: Path(package.target_dir).parent
+        package_directories = {
+            file_path: Path(package.target_dir)
             for package in plan.skill_packages
             if package.target_dir is not None
             for file_path in package.file_paths
         }
+        package_boundaries = {file_path: package_dir.parent for file_path, package_dir in package_directories.items()}
         failures: list[str] = []
         dirs_to_clean: set[tuple[Path, Path]] = set()
         for target in reversed(unrecorded_targets):
             boundary = package_boundaries.get(str(target), get_target_root(self._scope, self._project_root))
             try:
-                validate_path_within_boundary(target, boundary, "roll back partial extension file")
+                package_dir = package_directories.get(str(target))
+                if package_dir is not None:
+                    _validate_real_skill_package_directory(
+                        package_dir,
+                        package_dir,
+                        "roll back partial extension file",
+                    )
+                    _validate_skill_package_file_path(
+                        target,
+                        package_dir,
+                        package_dir,
+                        "roll back partial extension file",
+                    )
+                else:
+                    validate_path_within_boundary(target, boundary, "roll back partial extension file")
                 target.unlink(missing_ok=True)
             except (OSError, PathBoundaryViolationError):
                 if target.exists() or target.is_symlink():
@@ -2006,7 +2099,17 @@ class Installer:
             target = Path(record.target_path)
             boundary = package_boundaries.get(record.target_path, get_target_root(self._scope, self._project_root))
             try:
-                validate_path_within_boundary(target, boundary, "roll back extension file")
+                package_dir = package_directories.get(record.target_path)
+                if package_dir is not None:
+                    _validate_real_skill_package_directory(package_dir, package_dir, "roll back extension file")
+                    _validate_skill_package_file_path(
+                        target,
+                        package_dir,
+                        package_dir,
+                        "roll back extension file",
+                    )
+                else:
+                    validate_path_within_boundary(target, boundary, "roll back extension file")
                 if self._is_forge_owned(target, record):
                     target.unlink(missing_ok=True)
                 elif target.exists() or target.is_symlink():
@@ -2088,15 +2191,18 @@ class Installer:
             raise PathBoundaryViolationError(
                 target_key, f"known {self._scope.value} runtime skill root", operation
             ) from e
-        expected_package_dir = runtime_root / package.skill
-        validate_path_within_boundary(expected_package_dir, runtime_root, operation)
-
-        tracked_package_dir = Path(package.target_dir)
-        expected_location = expected_package_dir.parent.resolve() / expected_package_dir.name
-        tracked_location = tracked_package_dir.parent.resolve() / tracked_package_dir.name
-        if tracked_location != expected_location:
-            raise PathBoundaryViolationError(target_key, str(expected_package_dir), operation)
-        validate_path_within_boundary(target, expected_package_dir, operation)
+        try:
+            tracked_package_dir, expected_package_dir = _tracked_skill_package_target(
+                package,
+                self._scope,
+                self._project_root,
+                operation,
+            )
+        except (KeyError, ValueError) as e:
+            raise PathBoundaryViolationError(
+                target_key, f"known {self._scope.value} runtime skill root", operation
+            ) from e
+        _validate_skill_package_file_path(target, tracked_package_dir, expected_package_dir, operation)
         return runtime_root
 
     @staticmethod
@@ -2215,6 +2321,7 @@ class Installer:
 
         dirs_to_clean: set[tuple[Path, Path]] = set()
         for _file_record, target, boundary in removals:
+            self._tracked_file_boundary(existing, target, "delete file")
             if target.exists() or target.is_symlink():
                 target.unlink()
             parent = target.parent

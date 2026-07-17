@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from itertools import product
 from pathlib import Path
 from typing import TypedDict
@@ -609,6 +610,127 @@ def test_runtime_packages_copy_sync_stale_cleanup_and_disable(
     assert tracking.get_installation("user", None) is None
 
 
+def test_fresh_enable_rejects_substituted_skill_package_symlink(
+    tmp_path: Path,
+) -> None:
+    _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    package_dir = Path.home() / ".agents" / "skills" / "portable"
+    sibling_dir = package_dir.parent / "sibling"
+    sibling_dir.mkdir(parents=True)
+    sentinel = sibling_dir / "owner.txt"
+    sentinel.write_text("not Forge-owned\n", encoding="utf-8")
+    package_dir.symlink_to(sibling_dir, target_is_directory=True)
+
+    with (
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=_runtime_specs(CODEX_RUNTIME),
+        ),
+        pytest.raises(ForgeInstallError, match="security violation"),
+    ):
+        installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    assert package_dir.is_symlink()
+    assert sentinel.read_text(encoding="utf-8") == "not Forge-owned\n"
+    assert not (sibling_dir / "SKILL.md").exists()
+    assert tracking.get_installation("user", None) is None
+
+
+def test_apply_recheck_does_not_rollback_through_substituted_package_root(
+    tmp_path: Path,
+) -> None:
+    _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    package_dir = Path.home() / ".agents" / "skills" / "portable"
+    sibling_dir = package_dir.parent / "sibling"
+    real_execute = installer._execute_file
+    written_relative: list[Path] = []
+
+    def substitute_after_first_write(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+        record = real_execute(file_plan, mode)
+        if not written_relative:
+            written_relative.append(Path(record.target_path).relative_to(package_dir))
+            package_dir.rename(sibling_dir)
+            package_dir.symlink_to(sibling_dir, target_is_directory=True)
+        return record
+
+    with (
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=_runtime_specs(CODEX_RUNTIME),
+        ),
+        patch.object(installer, "_execute_file", side_effect=substitute_after_first_write),
+        pytest.raises(ForgeInstallError, match="Refusing unsafe skill package write") as exc_info,
+    ):
+        installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    assert "Could not roll back" in str(exc_info.value)
+    assert package_dir.is_symlink()
+    assert written_relative and (sibling_dir / written_relative[0]).is_file()
+    assert tracking.get_installation("user", None) is None
+
+
+def test_status_sync_and_disable_reject_substituted_nested_package_directory(
+    tmp_path: Path,
+) -> None:
+    _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    installation = tracking.get_installation("user", None)
+    assert installation is not None
+    package = installation.skill_packages[0]
+    package_dir = Path(package.target_dir)
+    nested_dir = package_dir / "references"
+    sibling_dir = package_dir / "sibling"
+    shutil.copytree(nested_dir, sibling_dir)
+    sibling_files = tuple(sibling_dir.iterdir())
+    shutil.rmtree(nested_dir)
+    nested_dir.symlink_to(sibling_dir, target_is_directory=True)
+
+    status = inspect_skill_package_status(
+        installation,
+        InstallScope.USER,
+        None,
+        tracked_installations=tracking.list_installations(),
+    )
+
+    assert status[0].state == "invalid-target"
+    assert status[0].target_present is True
+    assert status[0].recovery is not None and "unexpected package entry" in status[0].recovery
+    with pytest.raises(ForgeInstallError, match="Cannot change extensions"):
+        installer.update()
+    with pytest.raises(ForgeInstallError, match="security violation"):
+        installer.uninstall()
+    assert nested_dir.is_symlink()
+    assert all(path.is_file() for path in sibling_files)
+    assert tracking.get_installation("user", None) is not None
+
+
 def test_enable_rerun_refreshes_absent_managed_runtime_and_explicit_filter_preserves_it(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1118,7 +1240,11 @@ def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
             "forge.install.installer.installed_runtimes",
             return_value=_runtime_specs(CODEX_RUNTIME),
         ),
-        patch.object(installer, "_installed_file_record", side_effect=fail_second_ownership_record),
+        patch.object(
+            installer,
+            "_installed_file_record",
+            side_effect=fail_second_ownership_record,
+        ),
         pytest.raises(ForgeInstallError, match="tracking was not updated") as exc_info,
     ):
         installer.init(**kwargs)
