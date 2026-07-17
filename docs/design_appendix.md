@@ -1191,6 +1191,9 @@ point—not the adapter—selects execution independent of CWD. Whole-tree valid
 placeholders, or runtime tokens; only documentary Markdown under `references/` may be excluded. See
 [design_workflows.md §3.1](design_workflows.md#31-reflective-architecture).
 
+The host adapter owns model-family context: Codex emits `openai`, leaves the exact model unspecified, and ignores
+tracked Claude sessions.
+
 SKILLS planning is explicit over scope/runtime/profile/skill:
 
 | Runtime       | User target                    | Project target                  | Local target                      |

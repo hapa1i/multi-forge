@@ -328,6 +328,8 @@ jq -e '(.installations.user.skill_packages | length == 11)
 # Project target: portable Codex skills live in the repository, never under CODEX_HOME.
 PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
   --profile minimal --with skills --without commands --runtime codex
+rg -q '^Model family: openai$' .agents/skills/review-docs/SKILL.md
+! rg -q 'forge session show --field model_family' .agents/skills/review-docs/SKILL.md
 find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
   | diff -u /tmp/forge-portable-skills.expected -
 test ! -d "${CODEX_HOME:-$HOME/.codex}/skills"
@@ -456,6 +458,7 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] Explicit Claude re-enable reports runtime preservation and does not remove tracked Codex packages
 - [ ] Disabling the user install removes its Codex packages; the restored user install tracks Claude packages only
 - [ ] Project Codex target contains exactly the five portable skills under `.agents/skills`, not `CODEX_HOME`
+- [ ] Codex review workflows pin the host family to `openai` without consulting a different tracked Forge session
 - [ ] Explicit Codex local scope fails with `scope_unsupported` and leaves the local Claude package set unchanged
 - [ ] User-scope Codex enable refuses tracked project packages outside its CWD and creates no global package
 - [ ] Project sync preserves the recorded Codex runtime set when Codex is temporarily absent from `PATH`

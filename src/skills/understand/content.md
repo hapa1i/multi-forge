@@ -56,8 +56,8 @@ Do not ask the user -- just apply the rules.
 
 {{forge:model_family}}
 
-Let Forge resolve session context from its session environment or the local project. Do not force a runtime-specific
-session identifier: unmanaged direct sessions may not be in Forge's session index but can still expose model metadata.
+Use the runtime binding above as the model-family context. Do not force a runtime-specific session identifier: unmanaged
+direct sessions may not be in Forge's session index, and a different tracked session must not override the host runtime.
 
 Pick **one** instruction file (first match wins, read only one):
 

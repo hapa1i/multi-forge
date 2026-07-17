@@ -170,6 +170,19 @@ def test_all_portable_skills_use_neutral_mixed_source_contract(
         assert not (SKILLS_ROOT / name / "SKILL.md").exists()
 
 
+@pytest.mark.parametrize("name", ["review", "review-docs", "understand"])
+def test_codex_model_family_binding_is_host_runtime_authoritative(
+    compiled_packages: dict[tuple[str, SkillRuntime], CompiledSkillPackage],
+    name: str,
+) -> None:
+    content = compiled_packages[(name, SkillRuntime.CODEX)].file("SKILL.md").content.decode()
+
+    assert "Model family: openai" in content
+    assert "Main model: runtime default (exact model not exposed to Forge)" in content
+    assert "forge session show" not in content
+    assert "a different tracked session must not override the host runtime" in content
+
+
 def test_compiled_packages_preserve_paths_and_modes(
     compiled_packages: dict[tuple[str, SkillRuntime], CompiledSkillPackage],
 ) -> None:

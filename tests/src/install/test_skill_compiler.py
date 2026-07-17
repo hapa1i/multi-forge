@@ -541,8 +541,9 @@ def test_model_family_binding_preserves_claude_pre_step_and_is_codex_native() ->
     assert "!`forge session show --field model_family 2>/dev/null || true`" in claude_body
     assert "!`forge session show --field main_model 2>/dev/null || true`" in claude_body
     codex_body = codex.file("SKILL.md").content.decode()
-    assert "`forge session show --field model_family`" in codex_body
-    assert "`forge session show --field main_model`" in codex_body
+    assert "Model family: openai" in codex_body
+    assert "Main model: runtime default (exact model not exposed to Forge)" in codex_body
+    assert "forge session show" not in codex_body
     assert "!`" not in codex_body
 
 

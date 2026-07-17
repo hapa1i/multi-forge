@@ -517,6 +517,10 @@ Portable invocation policy has one typed authority: declaring the `invocation_po
 `allow_implicit_invocation`, from which adapters derive Claude's `disable-model-invocation` and Codex policy metadata. A
 neutral source cannot set the Claude field directly.
 
+Model-family selection is also host-runtime-owned. Claude may resolve its active Forge session dynamically; Codex binds
+the family to `openai` and leaves the exact model unspecified. It must not query an unrelated tracked Forge session,
+whose Claude default could incorrectly select the Anthropic resource.
+
 The compiler chooses a neutral source whenever `forge-skill.yaml` exists and otherwise uses the checked-in `SKILL.md` as
 a Claude-only compatibility bridge. Source and top-level package roots must be real directories. For a repository
 checkout, the same Git eligibility set used by other extension modules gates package sentinels and every source read;

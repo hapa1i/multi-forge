@@ -233,10 +233,11 @@ remediation now:
   file loading, so ignored packages or bytes cannot enter the stable compiled cache;
 - strictly cross-validates package rows against the canonical installation file ledger and reports dangling tracked leaf
   symlinks as missing;
-- keeps invocation policy under typed neutral authority, honors executable entry points, hardens negative Codex probes
-  against false passes, and documents exact tracking-row discovery in lifecycle help.
+- keeps invocation policy under typed neutral authority, honors executable entry points, makes Codex's `openai` host
+  family authoritative, hardens negative Codex probes against false passes, and documents exact tracking-row discovery
+  in lifecycle help.
 
-The final affected compiler/cache/lifecycle/CLI/setup/regression suite passed `378` tests. QA parses as v1.0.29 / 588
+The final affected compiler/cache/lifecycle/CLI/setup/regression suite passed `381` tests. QA parses as v1.0.30 / 589
 assertions, and strengthened real-Codex policy/script stages passed on codex-cli 0.144.5. Broad verification passed; the
 card stays in `doing/` for review.
 
@@ -277,10 +278,10 @@ review.
 - Clean wheel project/Codex and sdist user/all-runtime enable -> status -> doctor -> sync -> disable lifecycles passed
   from isolated installs. Claude smoke reported `11/11`, Codex smoke `8/8`, and no bytecode, symlink,
   checkout-reference, compiler-source, or post-disable ownership leak remained.
-- The second-review gates passed: `8,153` unit tests with one skip, `521` regression tests, `2` targeted Docker
+- The second-review gates passed: `8,158` unit tests with one skip, `521` regression tests, `2` targeted Docker
   lifecycle tests, `uv build`, `make pre-commit`, `make pre-commit-md`, and `git diff --check`. The current QA parser
-  reports v1.0.29 / 588 assertions; walkthrough-state reports `93 passed`, and `docs/design_appendix.md` remains below
-  its limit at 29,959 tokens.
+  reports v1.0.30 / 589 assertions; walkthrough-state reports `93 passed`, and `docs/design_appendix.md` remains below
+  its limit at 29,987 tokens.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 

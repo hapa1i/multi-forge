@@ -40,10 +40,11 @@ moving the card out of its review hold.
   Tracking strictly cross-validates package ownership against the canonical file ledger, and status treats dangling
   tracked leaf symlinks as missing.
 - Neutral invocation policy is typed-only, packaged executables honor their entry point, negative Codex probes require
-  successful turns plus exact command/exit evidence, and lifecycle help names exact tracking-row discovery.
+  successful turns plus exact command/exit evidence, Codex model-family selection is host-authoritative, and lifecycle
+  help names exact tracking-row discovery.
 
-**Verification**: affected suite (`378 passed`); unit (`8,153 passed`, one skipped); regression (`521 passed`); targeted
-Docker lifecycle (`2 passed`); `uv build`, pre-commit, Markdown, and diff checks passed; QA parser v1.0.29 / 588
+**Verification**: affected suite (`381 passed`); unit (`8,158 passed`, one skipped); regression (`521 passed`); targeted
+Docker lifecycle (`2 passed`); `uv build`, pre-commit, Markdown, and diff checks passed; QA parser v1.0.30 / 589
 assertions; strengthened real-Codex stages 40 and 50 passed on codex-cli 0.144.5.
 
 ### Cross-runtime skill review remediation

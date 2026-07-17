@@ -281,8 +281,8 @@ card in the active lane for post-implementation review.
   command is unavailable.
 - [x] Reject symlinked skill source/package roots and apply the checkout's Git eligibility set to package discovery and
   every required, auxiliary, and symlink-target read before cache materialization.
-- [x] Make invocation policy typed-only for neutral sources and invoke packaged scripts as executable files so their
-  shebang, rather than a hard-coded Bash interpreter, defines the runtime.
+- [x] Make invocation policy typed-only for neutral sources and invoke packaged executables directly so their entry
+  point, rather than a hard-coded Bash interpreter, defines execution.
 - [x] Validate `skill_packages` against the canonical installation file ledger: each unique package has a nonempty,
   sorted in-root file set containing `SKILL.md`, and no package file is unbacked or multiply claimed.
 - [x] Treat dangling tracked leaf symlinks as missing package content while preserving valid live leaf symlinks and the
@@ -291,8 +291,10 @@ card in the active lane for post-implementation review.
   that could pass on authentication, turn, or command failures.
 - [x] Name exact `installed.json` scope/path rows alongside `.claude` ownership sidecars in sync, disable, and status
   help.
-- [x] Extend QA §2.13 with dangling-leaf, corrupt-ledger, and discovery-help checks; regenerate the index to v1.0.29 /
-  588 assertions.
+- [x] Make Codex's host runtime authoritative for model-family selection (`openai`) instead of inheriting the Claude
+  default from an unrelated tracked Forge session.
+- [x] Extend QA §2.13 with model-family, dangling-leaf, corrupt-ledger, and discovery-help checks; regenerate the index
+  to v1.0.30 / 589 assertions.
 - [x] Rerun the strengthened real-Codex invocation-policy and script-resolution stages and record a fresh verdict; the
   historical 0.144.5 capture does not satisfy the stricter evidence gates retroactively.
 - [x] Complete the final unit, regression, targeted Docker, package-build, pre-commit, Markdown, and diff-integrity

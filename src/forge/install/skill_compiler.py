@@ -289,8 +289,7 @@ CODEX_SKILL_ADAPTER = SkillAdapter(
             )
         ),
         SkillCapability.MODEL_FAMILY: CapabilityBinding(
-            "Run `forge session show --field model_family` and "
-            "`forge session show --field main_model`, then use their outputs as the model-family context"
+            "Model family: openai\nMain model: runtime default (exact model not exposed to Forge)"
         ),
         SkillCapability.EXPLORATION: CapabilityBinding(
             "runtime-native repository search and file reads, using parallel workers when independent searches "
