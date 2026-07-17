@@ -6,6 +6,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+import pytest
+
 from forge.install.skill_compiler import (
     SkillRuntime,
     compile_skill_for_runtime,
@@ -136,6 +138,21 @@ class TestModelDocDrift:
 
         assert "`none`" in parallel_section
         assert "`minimal`" not in parallel_section
+
+
+@pytest.mark.parametrize("skill_name", ("panel", "analyze", "debate", "consensus"))
+def test_workflow_frontend_names_claude_worker_prerequisite_without_codex_native_claim(
+    skill_name: str,
+) -> None:
+    """Axis-1 workflow frontends must describe their still-Claude worker boundary."""
+    source = load_skill_source(SKILLS_DIR / skill_name)
+    content = (SKILLS_DIR / skill_name / "SKILL.md").read_text()
+
+    assert source.manifest.runtime_eligibility == frozenset({SkillRuntime.CLAUDE_CODE})
+    assert "workflow workers run through local `claude -p`" in content
+    assert "`claude` must be on PATH" in content
+    assert "codex-native" not in content.lower()
+    assert "codex native" not in content.lower()
 
 
 class TestReviewDocsSkill:

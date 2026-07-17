@@ -87,8 +87,9 @@ assertions. Auto-annotated sections run silently; human-annotated sections pause
 the container for resume via `--from X.Y`. `--to X.Y` always means "stop before X.Y" rather than "run through X.Y".
 
 The Docker QA is the only manual flow that exercises the Codex user target (`$HOME/.agents/skills`), because its home is
-container-isolated. It also verifies project targets, persisted runtime selection during sync, duplicate safety,
-local-scope rejection, package health in human/JSON status, and disable/uninstall cleanup.
+container-isolated. It also verifies project targets, managed-runtime retention during automatic re-enable, explicit
+runtime narrowing, persisted runtime selection during sync, duplicate safety and recovery output, local-scope rejection,
+package health in human/JSON status, and disable/uninstall cleanup.
 
 ## Runtime-aware extension checks
 
@@ -110,8 +111,12 @@ packages remain under `.claude/skills` or `$CLAUDE_HOME/skills`. Codex has no lo
 
 `forge extension status` reports each tracked runtime package and its health (`present`, `missing`, `duplicate`, or
 `invalid-target`). Use `--json` to assert `runtime`, `skill`, `target_dir`, `state`, `missing_file_paths`,
-`duplicate_dirs`, and `recovery`. `forge extension sync` preserves the installation's recorded runtime set even when a
-runtime binary is temporarily absent.
+`duplicate_dirs`, and `recovery`. Automatic enable on an existing installation and `forge extension sync` preserve its
+recorded runtime set even when a runtime binary is temporarily absent. An explicit `--runtime` refreshes the selected
+runtimes but preserves omitted tracked packages; disable owns removal. Cross-scope Forge-managed duplicates report the
+owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance. User-scope checks
+include valid, present tracked project/local packages outside the current directory chain because a user package would
+be visible from those projects.
 
 ---
 

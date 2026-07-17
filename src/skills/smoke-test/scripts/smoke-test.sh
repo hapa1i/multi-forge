@@ -20,15 +20,7 @@ fi
 
 RUNTIME="${FORGE_SKILL_RUNTIME:-claude_code}"
 FORGE_STATE_HOME="${FORGE_HOME:-$HOME/.forge}"
-case "$0" in
-    /*)
-        SCRIPT_PATH="$0"
-        ;;
-    *)
-        SCRIPT_PATH="$PWD/$0"
-        ;;
-esac
-SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 PACKAGE_DIR=$(dirname "$SCRIPT_DIR")
 SKILLS_DIR=$(dirname "$PACKAGE_DIR")
 RUNTIME_ROOT=$(dirname "$SKILLS_DIR")

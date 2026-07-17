@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-17
+
+### Cross-runtime skill review remediation
+
+**Goal**: Close the review-found ownership, duplicate-classification, status, compiler-boundary, and clean-package gaps
+without weakening the one-visible-Codex-scope contract or moving the card out of review hold.
+
+**Key changes**:
+
+- Automatic re-enable now refreshes the union of detected and managed runtimes; explicit narrowing emits preservation
+  rows and retains omitted package files/tracking. Cross-scope duplicates use validated Forge provenance, consistent
+  path normalization, and executable scope-aware recovery instead of untracked-file advice. User-scope planning also
+  blocks on tracked project/local packages outside the current directory chain.
+- Status is safe outside projects, policy conflicts no longer advertise ineffective `--force`, cache failures map to
+  retryable installer errors, and typed/Claude frontmatter conflicts fail at manifest load.
+- Added Claude-worker, smoke-script, HOME-isolation, genuine v1, and lifecycle regressions; replaced mutable checkout
+  packaging simulation with an offline-built, target-installed wheel covering both runtime outputs; synchronized QA and
+  operator docs.
+
+**Verification**: final affected suite (`302 passed`); `make test-unit` (`8131 passed, 1 skipped, 117 deselected`);
+targeted Docker lifecycle (`2 passed`); `uv build`; `make pre-commit`; `make pre-commit-md`; QA v1.0.28 / 584
+assertions; walkthrough-state (`93 passed`); `git diff --check`. The card remains in `doing/`, and no proposed lesson
+was promoted to `impl_notes.md`.
+
 ## 2026-07-16
 
 ### Cross-runtime skill packages (implementation complete; review hold)

@@ -61,6 +61,20 @@ __all__ = [
 
 
 @pytest.fixture(autouse=True)
+def isolate_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Force tests to use an isolated process home directory.
+
+    The runtime-specific homes below protect their own configuration trees, but
+    installer targets such as ``Path.home() / ".agents"`` bypass those variables.
+    Individual tests may still override HOME when they need a named layout.
+    """
+    isolated_home = tmp_path / "isolated_user_home"
+    isolated_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(isolated_home))
+    return isolated_home
+
+
+@pytest.fixture(autouse=True)
 def isolate_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Force tests to use an isolated FORGE_HOME and clear session/run-tree env vars.
 

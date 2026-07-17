@@ -30,9 +30,11 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 
 `forge extension enable --runtime claude|codex|all` is repeatable. This option selects only outputs of the SKILLS
 module; it does not filter commands, agents, permissions, settings, status line, or hooks selected by the profile. With
-no option, enable targets Claude skills and adds Codex when `codex` is detected. An explicit unavailable runtime fails
-preflight. `forge extension sync` uses the installation's tracked runtime set, so temporary binary absence does not
-remove a managed package.
+no option, a new enable targets Claude skills and adds Codex when `codex` is detected. Re-enabling an existing
+installation also retains every runtime it already manages, so temporary binary absence cannot make those packages
+stale. An explicit unavailable runtime fails preflight. On an existing installation, an explicit `--runtime` refreshes
+the selected runtimes and preserves tracked packages for omitted runtimes. `forge extension sync` likewise uses the
+installation's tracked runtime set. Use `forge extension disable` to remove managed packages.
 
 Skill targets are `$CLAUDE_HOME/skills` (Claude user), `<root>/.claude/skills` (Claude project/local),
 `$HOME/.agents/skills` (Codex user), and `<root>/.agents/skills` (Codex project). Codex local is unsupported and never
@@ -40,11 +42,14 @@ aliases the shared project target; Codex skills never use `$CODEX_HOME`. A proje
 module with `--runtime codex` can succeed without `.claude/` or the Claude version gate. A standard-profile
 `--runtime codex` is not Codex-only because the other profile modules still plan their normal Claude surfaces.
 
-Codex package planning scans the user/project/admin skill chain for untracked same-name directories containing
-`SKILL.md`. Automatic selection skips an affected new Codex package. Explicit selection, or an automatically selected
-package that Forge already manages, makes the duplicate a whole-plan conflict; the latter prevents sync from silently
-dropping tracked ownership. Forge never overwrites or deletes the untracked package, and `--force` does not bypass this
-rule.
+Codex package planning scans the user/project/admin skill chain for same-name directories containing `SKILL.md` and
+cross-references valid Forge tracking rows. Automatic selection skips an affected new Codex package. Explicit selection,
+or a duplicate beside a package that Forge already manages, makes the duplicate a whole-plan conflict. A package managed
+by another Forge scope remains a deliberate conflict. Because a user package is globally visible, user-scope planning
+and status also check valid, present tracked project/local packages outside the current directory chain. Status names
+the owning scope and the exact `forge extension disable --scope ...` command needed to release it. Only genuinely
+untracked duplicates receive remove-or-rename guidance. Forge never overwrites or deletes a duplicate package, and
+`--force` does not bypass this rule.
 
 `forge extension cleanup-project [--root <dir>] [--yes]` targets one Forge root. The default invocation is a read-only
 preview that lists settings/config removals, backups, tracking reconciliation, user runtime registration, and final
@@ -67,8 +72,9 @@ those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registr
 `double_fire_risk`. `forge extension status` remains the installation/tracking view and does not report migration state.
 For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`, `file_paths`, `state`,
 `target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is `present`, `missing`,
-`duplicate`, or `invalid-target`; human output mirrors the state and recovery. Runtime-package health belongs to
-`extension status`; `extension doctor` does not emit `skill_packages`.
+`duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A Forge-managed
+cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports remove-or-rename
+guidance. Runtime-package health belongs to `extension status`; `extension doctor` does not emit `skill_packages`.
 
 Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
 best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings

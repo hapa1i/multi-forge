@@ -1024,8 +1024,9 @@ Profiles:
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
 Scope filtering keeps `hooks`/`codex-hooks` user-only and `status-line` project/local. SKILLS then filters by
-scope/runtime/profile/skill; repeatable `--runtime claude|codex|all` affects only SKILLS. Automatic enable adds detected
-Codex to Claude, while sync reuses the tracked runtime set.
+scope/runtime/profile/skill; repeatable `--runtime claude|codex|all` affects only SKILLS. New automatic enable adds
+detected Codex to Claude; existing enable and sync retain managed runtimes; explicit narrowing preserves omitted tracked
+packages. Disable owns removal.
 
 User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
 reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
@@ -1196,10 +1197,14 @@ SKILLS planning is explicit over scope/runtime/profile/skill:
 | `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
 | `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-Repeatable `enable --runtime claude|codex|all` filters only SKILLS; automatic enable adds detected Codex to Claude, and
-sync preserves tracked runtimes. Explicit unavailable/local Codex requests fail before writes. Codex duplicate scans are
-read-only across user/project/admin roots: automatic new packages skip, while explicit or already-managed packages
-conflict; Forge never changes the untracked match, even with `--force`.
+Repeatable `enable --runtime claude|codex|all` filters only SKILLS. New automatic enable adds detected Codex to Claude;
+existing automatic enable retains managed runtimes; explicit narrowing emits preservation rows for omitted tracked
+packages; sync preserves tracked runtimes. Disable owns removal. Explicit unavailable/local Codex requests fail before
+writes. Codex scans are read-only across user/project/admin roots and cross-reference valid tracking rows. Automatic new
+packages skip; explicit or managed packages conflict. Other-scope managed matches name the owner and exact disable
+command; only untracked matches advise remove/rename. User-scope planning and status additionally inspect every valid,
+present tracked project/local package of the same name, regardless of the caller's current directory, because the user
+target would be visible from each project. `--force` never changes a match.
 
 Blocking plans write nothing. Compiled output uses the stable content-addressed `$FORGE_HOME/cache/compiled-skills/v1`
 cache; tracking commits last. Interrupted first-time Codex output must be removed before retry, while tracked updates

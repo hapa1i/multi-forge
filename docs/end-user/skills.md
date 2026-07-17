@@ -52,8 +52,10 @@ forge extension enable --scope project --profile minimal \
 
 `--runtime claude|codex|all` is repeatable and controls only the SKILLS module. It does not filter commands, agents,
 permissions, settings, status line, or hooks selected by the profile. Therefore a standard-profile `--runtime codex`
-still changes its normal Claude surfaces. `forge extension sync` preserves the runtime set already tracked for that
-installation, even if a runtime temporarily disappears from PATH.
+still changes its normal Claude surfaces. On a new installation, automatic selection adds Codex only when detected. On
+an existing installation, automatic enable retains all managed runtimes even if a binary temporarily disappears from
+`PATH`; an explicit `--runtime` refreshes the selected runtimes while preserving omitted tracked packages. Sync also
+uses the tracked runtime set. Use `forge extension disable` when you intend to remove managed packages.
 
 | Runtime     | User scope                                          | Project scope           | Local scope             |
 | ----------- | --------------------------------------------------- | ----------------------- | ----------------------- |
@@ -286,8 +288,9 @@ ls "$HOME/.agents/skills/"                  # Codex user packages
 ```
 
 The status states are `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a
-recovery. Run `forge extension sync` for missing tracked files. A Claude-only skill such as `panel` will not appear in a
-Codex target.
+recovery. Run `forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that
+scope and its exact disable command; only an untracked duplicate tells you to remove or rename it. A Claude-only skill
+such as `panel` will not appear in a Codex target.
 
 ### Wrong model instructions selected
 
@@ -320,8 +323,12 @@ ls .agents/skills/                              # Codex project
 Forge does not deduplicate Claude packages across scopes. For Codex, Forge reports a same-name package elsewhere in the
 applicable user/project/admin scan chain and never overwrites or deletes it, even with `--force`. Automatic enable skips
 a new affected package; an explicit request or a duplicate discovered beside an already managed package fails the whole
-plan. Remove or rename the duplicate yourself. Use sync when the package is already tracked; if automatic enable skipped
-the new package, rerun enable after cleanup because sync preserves the tracked runtime set rather than expanding it.
+plan. A user-scope install also checks Forge-tracked project/local packages outside the current directory: the user copy
+would become visible and ambiguous whenever you entered any such project. Check `forge extension status --json` before
+recovery. If the duplicate is managed by another Forge scope, use the reported command (for example,
+`forge extension disable --scope user`) to release that scope; do not hand-delete its directory. Remove or rename only a
+duplicate reported as untracked. If automatic enable skipped an untracked new package, rerun enable after cleanup
+because sync preserves the tracked runtime set rather than expanding it.
 
 Prefer one skill scope per runtime/project. If you keep project-level skills, reinstall only the user-scope runtime
 hooks:

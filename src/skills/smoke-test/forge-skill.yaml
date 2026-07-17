@@ -5,5 +5,4 @@ runtimes: [claude_code, codex]
 capabilities: [invocation_policy, packaged_script]
 allow_implicit_invocation: false
 claude_frontmatter:
-  disable-model-invocation: true
   allowed-tools: Bash

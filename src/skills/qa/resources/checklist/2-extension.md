@@ -289,6 +289,34 @@ jq -e '([.installations.user.skill_packages[] | select(.runtime == "claude_code"
   and ([.installations.user.skill_packages[] | select(.runtime == "codex")] | length == 5)' \
   "$FORGE_HOME/installed.json"
 
+# Automatic re-enable retains tracked Codex packages when Codex is temporarily absent.
+USER_SKILLS_BEFORE=$(jq -c \
+  '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
+QA_CLAUDE_ONLY_BIN=/tmp/forge-qa-claude-only-bin
+mkdir -p "$QA_CLAUDE_ONLY_BIN"
+printf '#!/bin/sh\nprintf "%%s\\n" "2.1.78 (Claude Code)"\n' > "$QA_CLAUDE_ONLY_BIN/claude"
+chmod +x "$QA_CLAUDE_ONLY_BIN/claude"
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v claude >/dev/null
+! PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" command -v codex >/dev/null 2>&1
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+  --scope user --symlink --profile full --force
+USER_SKILLS_AFTER_AUTO=$(jq -c \
+  '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
+test "$USER_SKILLS_AFTER_AUTO" = "$USER_SKILLS_BEFORE"
+find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-portable-skills.expected -
+
+# Explicit runtime narrowing reports preservation and also leaves omitted tracked packages owned.
+PATH="$QA_CLAUDE_ONLY_BIN:/usr/bin:/bin" "$HOME/.local/bin/forge" extension enable \
+  --scope user --symlink --profile full --runtime claude --force \
+  | tee /tmp/forge-explicit-runtime-preservation.txt
+rg -q 'managed_runtime_preservation' /tmp/forge-explicit-runtime-preservation.txt
+USER_SKILLS_AFTER_EXPLICIT=$(jq -c \
+  '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
+test "$USER_SKILLS_AFTER_EXPLICIT" = "$USER_SKILLS_BEFORE"
+find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+  | diff -u /tmp/forge-portable-skills.expected -
+
 # Remove the user Codex target and restore the Claude user installation used by later sections.
 forge extension disable --scope user --yes
 ! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
@@ -317,6 +345,16 @@ rg -q 'scope_unsupported' /tmp/forge-codex-local.txt
 LOCAL_AFTER=$(jq -c --arg key "$LOCAL_KEY" \
   '[.installations[$key].skill_packages[].runtime] | unique' "$FORGE_HOME/installed.json")
 test "$LOCAL_BEFORE" = '["claude_code"]' && test "$LOCAL_AFTER" = "$LOCAL_BEFORE"
+
+# A user package would be visible inside every project. Refuse it even when the tracked project package is outside CWD.
+if (cd "$HOME" && PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope user \
+  --profile minimal --with skills --without commands --runtime codex \
+  >/tmp/forge-codex-cross-scope.txt 2>&1); then
+  echo "ERROR: user Codex package unexpectedly bypassed tracked project package" >&2
+  exit 1
+fi
+rg -q 'forge_managed_scope_duplicate' /tmp/forge-codex-cross-scope.txt
+! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
 
 # Runtime selection is persisted: sync still owns Codex with a PATH that cannot find the fake binary.
 PATH="/usr/bin:/bin" "$HOME/.local/bin/forge" extension sync --scope project
@@ -350,9 +388,12 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 ```
 
 - [ ] Full-profile user `all` tracks eleven Claude packages and exactly the five portable Codex packages
+- [ ] Automatic re-enable retains all managed runtime packages when Codex is temporarily absent from `PATH`
+- [ ] Explicit Claude re-enable reports runtime preservation and does not remove tracked Codex packages
 - [ ] Disabling the user install removes its Codex packages; the restored user install tracks Claude packages only
 - [ ] Project Codex target contains exactly the five portable skills under `.agents/skills`, not `CODEX_HOME`
 - [ ] Explicit Codex local scope fails with `scope_unsupported` and leaves the local Claude package set unchanged
+- [ ] User-scope Codex enable refuses tracked project packages outside its CWD and creates no global package
 - [ ] Project sync preserves the recorded Codex runtime set when Codex is temporarily absent from `PATH`
 - [ ] JSON status reports the injected same-name package as `duplicate` with its path and recovery guidance
 - [ ] Explicit enable refuses the duplicate even with `--force`, and its checksum remains unchanged

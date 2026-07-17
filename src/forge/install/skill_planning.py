@@ -2,12 +2,14 @@
 
 The compiler owns package bytes; the installer owns writes. This module sits at
 their boundary and answers which ``(scope, runtime, profile, skill)`` packages
-are eligible and where each package belongs. Every omission is represented as a
-decision with a reason so callers never silently drop a runtime package.
+are eligible and where each package belongs. Every selected-runtime omission is
+represented as a decision, while explicit narrowing separately names preserved
+runtimes so the installer can emit package-level preservation rows.
 
 Runtime selection has three distinct origins:
 
-* automatic enable keeps Claude and adds Codex only when its binary is present;
+* automatic enable keeps Claude, adds Codex when its binary is present, and
+  retains runtimes already managed by an existing installation;
 * explicit selection retains unavailable runtimes so the plan can fail clearly;
 * managed update/sync uses the persisted runtime set and never consults current
   binary presence.
@@ -54,12 +56,14 @@ class SkillPlanReason(str, Enum):
 
     ELIGIBLE = "eligible"
     MANAGED_PROFILE_PRESERVATION = "managed_profile_preservation"
+    MANAGED_RUNTIME_PRESERVATION = "managed_runtime_preservation"
     SKILLS_MODULE_EXCLUDED = "skills_module_excluded"
     RUNTIME_EXCLUDED = "runtime_excluded"
     PROFILE_EXCLUDED = "profile_excluded"
     SCOPE_UNSUPPORTED = "scope_unsupported"
     RUNTIME_UNAVAILABLE = "runtime_unavailable"
     DUPLICATE_SCAN_CHAIN = "duplicate_scan_chain"
+    FORGE_MANAGED_SCOPE_DUPLICATE = "forge_managed_scope_duplicate"
 
 
 class UnsupportedRuntimeSkillScope(ValueError):
@@ -73,6 +77,7 @@ class RuntimeSelection:
     runtime_ids: tuple[str, ...]
     origin: RuntimeSelectionOrigin
     unavailable_runtime_ids: tuple[str, ...] = ()
+    preserved_runtime_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,7 @@ class CodexDuplicateScan:
 
     skill: str
     package_dirs: tuple[Path, ...]
+    forge_managed_duplicate_dirs: tuple[Path, ...]
     untracked_package_dirs: tuple[Path, ...]
 
 
@@ -153,18 +159,23 @@ def select_skill_runtimes(
     installed_runtime_ids: Collection[str],
     explicit_runtime_ids: Collection[str] | None = None,
     managed_runtime_ids: Collection[str] | None = None,
+    existing_runtime_ids: Collection[str] = (),
 ) -> RuntimeSelection:
     """Select runtime candidates without conflating enable and sync semantics.
 
     ``managed_runtime_ids`` is authoritative even when empty. It is mutually
     exclusive with an explicit request because update/sync must not silently
-    expand or shrink persisted ownership.
+    expand or shrink persisted ownership. ``existing_runtime_ids`` is the
+    persisted set observed by enable: automatic selection refreshes its union
+    with currently detected runtimes, while explicit selection preserves but
+    does not update omitted runtimes.
     """
 
     if explicit_runtime_ids is not None and managed_runtime_ids is not None:
         raise ValueError("explicit and managed runtime selections are mutually exclusive")
 
     installed = set(_canonical_runtime_ids(installed_runtime_ids, ignore_unknown=True))
+    existing = set(_canonical_runtime_ids(existing_runtime_ids))
     if managed_runtime_ids is not None:
         return RuntimeSelection(
             runtime_ids=_canonical_runtime_ids(managed_runtime_ids),
@@ -180,12 +191,16 @@ def select_skill_runtimes(
             runtime_ids=runtime_ids,
             origin=RuntimeSelectionOrigin.EXPLICIT,
             unavailable_runtime_ids=unavailable,
+            preserved_runtime_ids=_canonical_runtime_ids(existing - set(runtime_ids)),
         )
 
-    automatic = [CLAUDE_CODE_RUNTIME]
+    automatic = {CLAUDE_CODE_RUNTIME, *existing}
     if CODEX_RUNTIME in installed:
-        automatic.append(CODEX_RUNTIME)
-    return RuntimeSelection(runtime_ids=tuple(automatic), origin=RuntimeSelectionOrigin.AUTO)
+        automatic.add(CODEX_RUNTIME)
+    return RuntimeSelection(
+        runtime_ids=_canonical_runtime_ids(automatic),
+        origin=RuntimeSelectionOrigin.AUTO,
+    )
 
 
 def runtime_skill_root(
@@ -228,15 +243,21 @@ def scan_codex_skill_duplicates(
     *,
     scan_roots: Iterable[Path],
     managed_package_dirs: Collection[Path] = (),
+    current_package_dirs: Collection[Path] | None = None,
 ) -> CodexDuplicateScan:
     """Read Codex scan roots and report same-name packages without mutation.
 
     A candidate counts only when it is a directory containing ``SKILL.md``.
-    ``managed_package_dirs`` identifies already tracked Forge packages; all
-    other matches are returned separately as user-owned/untracked conflicts.
+    ``managed_package_dirs`` identifies packages from all valid Forge tracking
+    rows. ``current_package_dirs`` identifies the target(s) belonging to the
+    installation being planned or inspected: those are self matches, while a
+    managed match from another scope remains an ambiguous duplicate with safe
+    disable provenance. When omitted, current dirs default to all managed dirs
+    for compatibility with callers that inspect a single installation.
     """
 
     managed = {_absolute_path(path) for path in managed_package_dirs}
+    current = managed if current_package_dirs is None else {_absolute_path(path) for path in current_package_dirs}
     package_dirs: list[Path] = []
     for scan_root in scan_roots:
         candidate = _absolute_path(scan_root / skill)
@@ -246,14 +267,16 @@ def scan_codex_skill_duplicates(
     return CodexDuplicateScan(
         skill=skill,
         package_dirs=unique,
-        untracked_package_dirs=tuple(path for path in unique if path not in managed),
+        forge_managed_duplicate_dirs=tuple(path for path in unique if path in managed and path not in current),
+        untracked_package_dirs=tuple(path for path in unique if path not in managed and path not in current),
     )
 
 
 def _absolute_path(path: Path) -> Path:
-    """Normalize lexically without resolving symlinks or requiring existence."""
+    """Canonicalize parent components while preserving the final entry itself."""
 
-    return Path(os.path.abspath(path.expanduser()))
+    absolute = Path(os.path.abspath(path.expanduser()))
+    return absolute.parent.resolve() / absolute.name
 
 
 def plan_runtime_skills(
@@ -268,6 +291,7 @@ def plan_runtime_skills(
     project_root: Path | None,
     managed_packages: Collection[tuple[str, str]] = (),
     untracked_codex_packages: Mapping[str, Collection[Path]] | None = None,
+    managed_codex_duplicates: Mapping[str, Collection[Path]] | None = None,
 ) -> RuntimeSkillPlan:
     """Plan every selected runtime/skill pair with an explicit policy result."""
 
@@ -284,6 +308,7 @@ def plan_runtime_skills(
 
     managed = set(managed_packages)
     untracked = untracked_codex_packages or {}
+    managed_duplicates = managed_codex_duplicates or {}
     decisions: list[RuntimeSkillDecision] = []
     for runtime in selection.runtime_ids:
         spec = get_runtime(runtime)
@@ -359,9 +384,9 @@ def plan_runtime_skills(
                 )
                 continue
 
-            duplicate_dirs = tuple(
-                sorted({_absolute_path(path) for path in untracked.get(candidate.name, ())}, key=str)
-            )
+            untracked_duplicate_dirs = {_absolute_path(path) for path in untracked.get(candidate.name, ())}
+            forge_managed_duplicate_dirs = {_absolute_path(path) for path in managed_duplicates.get(candidate.name, ())}
+            duplicate_dirs = tuple(sorted(untracked_duplicate_dirs | forge_managed_duplicate_dirs, key=str))
             if runtime == CODEX_RUNTIME and duplicate_dirs:
                 action = (
                     SkillPlanAction.SKIP
@@ -372,7 +397,11 @@ def plan_runtime_skills(
                     RuntimeSkillDecision(
                         **base,
                         action=action,
-                        reason=SkillPlanReason.DUPLICATE_SCAN_CHAIN,
+                        reason=(
+                            SkillPlanReason.FORGE_MANAGED_SCOPE_DUPLICATE
+                            if forge_managed_duplicate_dirs and not untracked_duplicate_dirs
+                            else SkillPlanReason.DUPLICATE_SCAN_CHAIN
+                        ),
                         target_dir=target_dir,
                         duplicate_dirs=duplicate_dirs,
                     )

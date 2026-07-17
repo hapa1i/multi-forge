@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import shlex
 import shutil
 import stat
 import subprocess
+from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.resources import files
@@ -49,6 +51,7 @@ from .models import (
     FilePlan,
     Installation,
     InstalledFile,
+    InstalledManifest,
     InstalledSkillPackage,
     InstallMode,
     InstallModule,
@@ -58,6 +61,7 @@ from .models import (
     SettingsPlan,
     SkillPackagePlan,
     SkillPackageStatus,
+    make_installation_key,
 )
 from .settings_merge import (
     backup_settings,
@@ -91,6 +95,7 @@ from .skill_planning import (
     CODEX_RUNTIME,
     SkillCandidate,
     SkillPlanAction,
+    SkillPlanReason,
     plan_runtime_skills,
     runtime_skill_root,
     scan_codex_skill_duplicates,
@@ -336,6 +341,94 @@ def _codex_scan_roots(project_root: Path | None, *, include_cwd: bool = True) ->
     return tuple(dict.fromkeys(roots))
 
 
+@dataclass(frozen=True)
+class _TrackedCodexPackageLocation:
+    target: Path
+    scope: InstallScope
+    project_root: Path | None
+
+
+def _tracked_codex_package_locations(
+    installations: Iterable[tuple[str, str | None, Installation]],
+    skill: str,
+) -> tuple[_TrackedCodexPackageLocation, ...]:
+    """Return key-validated Codex package locations owned by tracked scopes."""
+
+    managed: set[_TrackedCodexPackageLocation] = set()
+    for scope_value, project_path, installation in installations:
+        if installation.scope != scope_value or installation.project_path != project_path:
+            continue
+        try:
+            scope = InstallScope(scope_value)
+        except ValueError:
+            continue
+        project_root = Path(project_path) if project_path is not None else None
+        if scope != InstallScope.USER and (project_root is None or not project_root.is_absolute()):
+            continue
+        if InstallModule.SKILLS.value not in installation.modules_enabled:
+            continue
+        tracked_file_paths = {tracked.target_path for tracked in installation.files}
+        for package in installation.skill_packages:
+            if package.runtime != CODEX_RUNTIME or package.skill != skill:
+                continue
+            if (
+                not Path(package.target_dir).is_absolute()
+                or not package.file_paths
+                or any(not Path(file_path).is_absolute() for file_path in package.file_paths)
+                or not set(package.file_paths).issubset(tracked_file_paths)
+            ):
+                continue
+            try:
+                target, expected_target = _tracked_skill_package_target(
+                    package,
+                    scope,
+                    project_root,
+                    "classify managed Codex package",
+                )
+                _validate_tracked_skill_package_files(
+                    package,
+                    expected_target,
+                    "classify managed Codex package",
+                )
+            except (KeyError, PathBoundaryViolationError, ValueError):
+                continue
+            skill_document = expected_target / "SKILL.md"
+            skill_document_location = skill_document.parent.resolve() / skill_document.name
+            if not any(
+                Path(file_path).parent.resolve() / Path(file_path).name == skill_document_location
+                for file_path in package.file_paths
+            ):
+                continue
+            managed.add(
+                _TrackedCodexPackageLocation(
+                    target=target.parent.resolve() / target.name,
+                    scope=scope,
+                    project_root=project_root,
+                )
+            )
+    return tuple(sorted(managed, key=lambda item: (str(item.target), item.scope.value)))
+
+
+def _codex_package_scan_roots(
+    scope: InstallScope,
+    project_root: Path | None,
+    tracked_locations: Iterable[_TrackedCodexPackageLocation],
+) -> tuple[Path, ...]:
+    """Return visible roots plus tracked projects a user package would shadow.
+
+    A user-scope Codex package is visible from every project.  Therefore a
+    valid tracked project/local package must block creation of the same user
+    package even when that project is outside the caller's current directory
+    chain.  Project/local packages only need the normal Codex roots visible
+    from their own project.
+    """
+
+    roots = list(_codex_scan_roots(project_root, include_cwd=project_root is None))
+    if scope == InstallScope.USER:
+        roots.extend(location.target.parent for location in tracked_locations if location.scope != InstallScope.USER)
+    return tuple(dict.fromkeys(roots))
+
+
 def _tracked_skill_package_target(
     package: InstalledSkillPackage,
     scope: InstallScope,
@@ -391,15 +484,27 @@ def _assert_tracked_skill_packages_syncable(
         )
 
 
+def _extension_scope_command(verb: str, scope: InstallScope, project_root: Path | None) -> str:
+    """Return an executable lifecycle command for one tracked installation."""
+
+    command = f"forge extension {verb} --scope {scope.value}"
+    if project_root is not None:
+        command = f"cd {shlex.quote(str(project_root))} && {command}"
+    return command
+
+
 def inspect_skill_package_status(
     installation: Installation,
     scope: InstallScope,
     project_root: Path | None,
+    *,
+    tracked_installations: Iterable[tuple[str, str | None, Installation]] = (),
 ) -> tuple[SkillPackageStatus, ...]:
     """Read tracked package health and Codex duplicate discovery without mutation."""
 
     statuses: list[SkillPackageStatus] = []
-    codex_scan_roots = _codex_scan_roots(project_root, include_cwd=project_root is None)
+    tracked_rows = tuple(tracked_installations)
+    sync_command = _extension_scope_command("sync", scope, project_root)
     for package in sorted(installation.skill_packages, key=lambda item: (item.runtime, item.skill)):
         try:
             target, expected_target = _tracked_skill_package_target(
@@ -446,26 +551,50 @@ def inspect_skill_package_status(
             )
         )
         duplicate_dirs: tuple[str, ...] = ()
+        managed_owners: tuple[_TrackedCodexPackageLocation, ...] = ()
+        has_untracked_duplicates = False
         if package.runtime == CODEX_RUNTIME:
+            tracked_locations = _tracked_codex_package_locations(tracked_rows, package.skill)
             duplicate_scan = scan_codex_skill_duplicates(
                 package.skill,
-                scan_roots=codex_scan_roots,
-                managed_package_dirs=(target,),
+                scan_roots=_codex_package_scan_roots(scope, project_root, tracked_locations),
+                managed_package_dirs=(target, *(location.target for location in tracked_locations)),
+                current_package_dirs=(target,),
             )
-            duplicate_dirs = tuple(str(path) for path in duplicate_scan.untracked_package_dirs)
+            duplicate_paths = tuple(
+                sorted(
+                    {
+                        *duplicate_scan.forge_managed_duplicate_dirs,
+                        *duplicate_scan.untracked_package_dirs,
+                    },
+                    key=str,
+                )
+            )
+            duplicate_dirs = tuple(str(path) for path in duplicate_paths)
+            managed_owners = tuple(
+                location
+                for location in tracked_locations
+                if location.target in duplicate_scan.forge_managed_duplicate_dirs
+            )
+            has_untracked_duplicates = bool(duplicate_scan.untracked_package_dirs)
         if duplicate_dirs:
             state = "duplicate"
-            recovery = (
-                "Remove or rename untracked duplicates, then run 'forge extension sync' to restore missing files."
-                if not target_present or missing_file_paths
-                else "Remove or rename untracked duplicates, then run 'forge extension sync'."
-            )
+            recovery_steps: list[str] = []
+            for owner in managed_owners:
+                command = _extension_scope_command("disable", owner.scope, owner.project_root)
+                step = f"Disable the other Forge-managed package with `{command}`"
+                if step not in recovery_steps:
+                    recovery_steps.append(step)
+            if has_untracked_duplicates:
+                recovery_steps.append("Remove or rename untracked duplicates")
+            suffix = " to restore missing files" if not target_present or missing_file_paths else ""
+            recovery = f"{'; '.join(recovery_steps)}, then run `{sync_command}`{suffix}."
         elif target_present and not missing_file_paths:
             state = "present"
             recovery = None
         else:
             state = "missing"
-            recovery = "Run 'forge extension sync' to restore the tracked package."
+            recovery = f"Run `{sync_command}` to restore the tracked package."
         statuses.append(
             SkillPackageStatus(
                 runtime=package.runtime,
@@ -591,6 +720,14 @@ def find_forge_installation(
     if tracking is None:
         tracking = TrackingStore()
 
+    manifest: InstalledManifest | None = None
+
+    def is_tracked(scope: InstallScope, project_path: str | None) -> bool:
+        nonlocal manifest
+        if manifest is None:
+            manifest = tracking.read()
+        return make_installation_key(scope.value, project_path) in manifest.installations
+
     current = start.resolve()
     home = Path.home().resolve()
 
@@ -613,9 +750,9 @@ def find_forge_installation(
 
         if current != home:
             current_key = str(current)
-            if tracking.get_installation(InstallScope.LOCAL.value, current_key):
+            if is_tracked(InstallScope.LOCAL, current_key):
                 return (InstallScope.LOCAL, current)
-            if tracking.get_installation(InstallScope.PROJECT.value, current_key):
+            if is_tracked(InstallScope.PROJECT, current_key):
                 return (InstallScope.PROJECT, current)
 
         if current == home:
@@ -625,7 +762,7 @@ def find_forge_installation(
             if user_backups or user_added:
                 return (InstallScope.USER, None)
             # Fallback to tracking store for USER (no project_path for user scope)
-            if tracking.get_installation(InstallScope.USER.value, None):
+            if is_tracked(InstallScope.USER, None):
                 return (InstallScope.USER, None)
             break
 
@@ -764,7 +901,15 @@ class Installer:
 
         source_root = get_extensions_root()
         target_root = get_target_root(self._scope, self._project_root)
-        existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
+        tracked_installations = self._tracking.list_installations()
+        existing = next(
+            (
+                installation
+                for scope, project_path, installation in tracked_installations
+                if scope == self._scope.value and project_path == self._project_path_str
+            ),
+            None,
+        )
         if existing is not None:
             _assert_tracked_skill_packages_syncable(existing, self._scope, self._project_root)
 
@@ -793,6 +938,7 @@ class Installer:
                 force=force,
                 explicit_runtime_ids=skill_runtimes,
                 managed_runtime_ids=_managed_runtime_ids,
+                tracked_installations=tracked_installations,
             )
 
         for module in sorted(modules, key=lambda m: m.value):
@@ -860,6 +1006,7 @@ class Installer:
         force: bool,
         explicit_runtime_ids: tuple[str, ...] | None,
         managed_runtime_ids: tuple[str, ...] | None,
+        tracked_installations: list[tuple[str, str | None, Installation]],
     ) -> None:
         try:
             sources = load_skill_sources(source_root / InstallModule.SKILLS.value)
@@ -879,11 +1026,17 @@ class Installer:
             (package.runtime, package.skill) for package in (existing.skill_packages if existing is not None else [])
         }
         managed_packages |= _legacy_claude_skill_packages(existing, self._scope, self._project_root)
+        existing_runtime_ids = tuple(
+            runtime
+            for runtime in (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
+            if any(package_runtime == runtime for package_runtime, _skill in managed_packages)
+        )
         try:
             selection = select_skill_runtimes(
                 installed_runtime_ids=tuple(runtime.id for runtime in installed_runtimes()),
                 explicit_runtime_ids=explicit_runtime_ids,
                 managed_runtime_ids=managed_runtime_ids,
+                existing_runtime_ids=existing_runtime_ids,
             )
         except ValueError as e:
             raise ForgeInstallError(f"Invalid skill runtime selection: {e}") from e
@@ -894,24 +1047,25 @@ class Installer:
             )
 
         untracked_codex: dict[str, tuple[Path, ...]] = {}
+        managed_codex_duplicates: dict[str, tuple[Path, ...]] = {}
         if CODEX_RUNTIME in selection.runtime_ids:
-            scan_roots = _codex_scan_roots(
-                self._project_root,
-                include_cwd=self._project_root is None,
-            )
             for candidate in candidates:
-                managed_dirs = tuple(
+                current_dirs = tuple(
                     Path(package.target_dir)
                     for package in (existing.skill_packages if existing is not None else [])
                     if package.runtime == CODEX_RUNTIME and package.skill == candidate.name
                 )
+                tracked_locations = _tracked_codex_package_locations(tracked_installations, candidate.name)
                 scan = scan_codex_skill_duplicates(
                     candidate.name,
-                    scan_roots=scan_roots,
-                    managed_package_dirs=managed_dirs,
+                    scan_roots=_codex_package_scan_roots(self._scope, self._project_root, tracked_locations),
+                    managed_package_dirs=tuple(location.target for location in tracked_locations),
+                    current_package_dirs=current_dirs,
                 )
                 if scan.untracked_package_dirs:
                     untracked_codex[candidate.name] = scan.untracked_package_dirs
+                if scan.forge_managed_duplicate_dirs:
+                    managed_codex_duplicates[candidate.name] = scan.forge_managed_duplicate_dirs
 
         try:
             runtime_plan = plan_runtime_skills(
@@ -925,6 +1079,7 @@ class Installer:
                 project_root=self._project_root,
                 managed_packages=managed_packages,
                 untracked_codex_packages=untracked_codex,
+                managed_codex_duplicates=managed_codex_duplicates,
             )
         except ValueError as e:
             raise ForgeInstallError(f"Invalid runtime skill plan: {e}") from e
@@ -1008,6 +1163,36 @@ class Installer:
                 "update",
             }:
                 plan.requires_claude_version = True
+
+        if existing is not None:
+            existing_packages = {(package.runtime, package.skill): package for package in existing.skill_packages}
+            for runtime, skill in sorted(managed_packages):
+                if runtime not in selection.preserved_runtime_ids:
+                    continue
+                installed_package = existing_packages.get((runtime, skill))
+                if installed_package is not None:
+                    target_dir = installed_package.target_dir
+                    file_paths = sorted(installed_package.file_paths)
+                else:
+                    target = _runtime_skill_root(runtime, self._scope, self._project_root) / skill
+                    target_dir = str(target)
+                    file_paths = sorted(
+                        tracked_file.target_path
+                        for tracked_file in existing.files
+                        if Path(tracked_file.target_path).is_relative_to(target)
+                    )
+                plan.skill_packages.append(
+                    SkillPackagePlan(
+                        runtime=runtime,
+                        skill=skill,
+                        action=SkillPlanAction.SKIP.value,
+                        target_dir=target_dir,
+                        file_paths=file_paths,
+                        reason=SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value,
+                    )
+                )
+
+        plan.skill_packages.sort(key=lambda package: (package.runtime, package.skill))
 
     def _plan_compiled_file(
         self,
@@ -1428,12 +1613,19 @@ class Installer:
         # Materialize only after all conflicts have cleared.  Dry-run calls
         # plan() directly and therefore cannot create or repair cache entries.
         for compiled in self._compiled_skill_packages.values():
-            materialize_compiled_skill(compiled)
+            try:
+                materialize_compiled_skill(compiled)
+            except (OSError, StateError) as e:
+                raise ForgeInstallError(
+                    f"Failed to materialize compiled skill cache for "
+                    f"'{compiled.runtime.value}/{compiled.name}'; extension targets were not changed "
+                    f"and tracking was not updated: {e}"
+                ) from e
 
         # Historical extension installs rendered the dispatcher even when
         # scope policy filtered hook modules. Preserve that lifecycle contract,
         # while a skills-only Codex install stays free of unrelated writes.
-        if InstallModule.HOOKS in modules or modules - {InstallModule.SKILLS}:
+        if modules - {InstallModule.SKILLS}:
             _ensure_hook_dispatcher()
 
         installed_files: list[InstalledFile] = []
@@ -1567,8 +1759,15 @@ class Installer:
         # Merge newly installed files with existing tracked files (for idempotent re-runs)
         now = now_iso()
 
-        # All targets the current source scan knows about (installed, skipped, or conflicted)
+        # All targets the current source scan knows about, plus packages intentionally
+        # preserved when an explicit runtime filter narrows an existing installation.
         planned_targets = {f.target_path for f in plan.files}
+        planned_targets.update(
+            target
+            for package in plan.skill_packages
+            if package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value
+            for target in package.file_paths
+        )
 
         # Remove stale tracked files whose source no longer exists (e.g., after renames).
         # A file is stale if it was tracked in the previous installation but isn't in the
@@ -1647,8 +1846,8 @@ class Installer:
                 file_paths=list(package.file_paths),
             )
             for package in plan.skill_packages
-            if package.cache_dir is not None
-            and package.target_dir is not None
+            if package.target_dir is not None
+            and (package.cache_dir is not None or package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value)
             and package.action in {"install", "update", "skip"}
         ]
 

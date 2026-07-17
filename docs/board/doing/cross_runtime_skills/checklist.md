@@ -183,8 +183,9 @@ card in the active lane for post-implementation review.
   - _Assertion:_ exercise the scope × runtime × profile matrix with portable, full-profile-only, and runtime-exclusive
     skills. Existing-package preservation is runtime-specific and cannot make a package for another runtime eligible;
     every omission has an explicit policy reason rather than a silent skip.
-  - _Assertion:_ persist the requested/managed runtime-package set; temporary runtime-binary absence during sync cannot
-    make a tracked package stale or delete it.
+  - _Assertion:_ persist the requested/managed runtime-package set; temporary runtime-binary absence during automatic
+    re-enable or sync cannot make a tracked package stale or delete it, and explicit narrowing preserves omitted tracked
+    packages with visible plan rows.
 - [x] Install Codex user skills only under `$HOME/.agents/skills` and project skills under the selected Forge root's
   `.agents/skills`. Enforce the reviewed local-scope decision before any write.
 - [x] Define selection UX explicitly: automatic installed-runtime detection, explicit `--runtime`, or a separate module.
@@ -197,8 +198,10 @@ card in the active lane for post-implementation review.
   must not report an untracked half-install as complete.
 - [x] Make `enable`, `sync`, `disable`, status, dry-run, force, and stale-file cleanup idempotent per runtime package.
 - [x] Preserve copy and symlink semantics without symlinking to transient compiler output.
-- [x] Detect existing same-name skills in Codex's scan chain and apply the reviewed duplicate policy without deleting
-  user-owned files.
+- [x] Detect existing same-name skills in Codex's scan chain, classify valid packages across all Forge tracking rows
+  with consistent path normalization, and apply the reviewed duplicate policy without deleting user-owned files.
+  Other-scope managed packages remain conflicts with scope-aware disable recovery; only untracked matches get
+  remove-or-rename guidance.
 - [x] Package neutral sources, adapters, validation data, scripts, and resources into wheel/sdist runtime data. Verify
   all reads through `importlib.resources` where required.
 - [x] Extend `forge extension status` and, if approved, `extension doctor --json` with truthful runtime-skill state,
@@ -240,6 +243,25 @@ card in the active lane for post-implementation review.
 | Copy and symlink modes     | compiled package installed in both modes                            | targets are stable and no symlink points into temporary build output                           | `tests/src/install/test_cross_runtime_skills.py`                                                              |
 | Wheel clean install        | isolated wheel/sdist tool install                                   | packaged sources/adapters compile and install both runtime packages without checkout paths     | `tests/integration/docker/test_installer.py` + release smoke                                                  |
 | Claude-worker limitation   | Codex-hosted workflow frontend before Axis 2                        | UI/docs name the `claude` worker prerequisite; no Codex-native claim is made                   | `tests/src/review/test_skill_content.py`                                                                      |
+
+## Post-implementation review remediation (2026-07-17)
+
+- [x] Preserve and refresh every managed runtime during plain automatic `enable`; make explicit runtime narrowing emit
+  package-level preservation rows and retain exact file/package ownership, including a genuine v1 tracking upgrade.
+- [x] Classify cross-scope Codex duplicates from validated tracking provenance, normalize symlinked path components
+  consistently, reject malformed ownership claims, and wire safe recovery through human and JSON status. For a
+  user-scope target, inspect every present tracked project/local package even outside the current directory chain.
+- [x] Make `extension status --all` safe outside a project and distinguish policy conflicts that `--force` cannot
+  override. Give Codex-only users a complete skills-only recovery command when Claude is absent.
+- [x] Reject conflicting typed/Claude frontmatter declarations at manifest load, map cache materialization failures to a
+  retryable installer error, canonicalize manual smoke-script invocation, and pin the Claude-worker limitation in tests.
+- [x] Consolidate repeated installer test patches, isolate `HOME` automatically, remove host-dependent runtime probes,
+  and replace the session-container asset mutation helper with a real-wheel, temp-only lifecycle harness.
+- [x] Update lifecycle/operator docs and QA §2.13; regenerate the QA index to v1.0.28 / 584 assertions. Recheck the
+  walkthrough install/status/sync/teardown path and retain its project-only Codex coverage because user-scope `.agents`
+  mutation remains Docker-QA-only.
+- [x] Run the targeted real-wheel Docker lifecycle for both Claude and Codex packages.
+- [x] Run the final unit, build, pre-commit, Markdown, and diff-integrity gates and record the results below.
 
 ## Documentation and operator verification
 

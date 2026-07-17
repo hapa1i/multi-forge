@@ -1,7 +1,7 @@
 # Codex skills probe verdict -- codex-cli 0.144.5 -- 2026-07-16
 
-Environment: macOS host, isolated temporary `HOME`, real authenticated `CODEX_HOME`, unrelated temporary repository CWD,
-read-only sandbox, ephemeral `codex exec`.
+Environment: macOS host, isolated temporary `HOME`, disposable authenticated `CODEX_HOME` populated from a mode-0600
+copy of the real auth file, unrelated temporary repository CWD, read-only sandbox, ephemeral `codex exec`.
 
 ## Discovery, duplicates, and invocation
 
@@ -14,7 +14,7 @@ read-only sandbox, ephemeral `codex exec`.
 
 ## Packaged script/root resolution
 
-- Codex discovered `$HOME/.agents/skills/probe-skill` and loaded its `SKILL.md` by absolute path.
+- Codex discovered `$HOME/.agents/skills/probe-script` and loaded its `SKILL.md` by absolute path.
 - A literal `bash scripts/marker.sh` ran from the repository CWD and failed with exit 127 because that relative path did
   not exist there.
 - No environment variable with `SKILL` in its name was present.

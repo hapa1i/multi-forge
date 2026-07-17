@@ -258,6 +258,8 @@ def _run_smoke_script(
     *,
     runtime: str | None,
     tracking_exists: bool = True,
+    relative_invocation: bool = False,
+    trace: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     home = tmp_path / "home"
     forge_home = tmp_path / "forge-state"
@@ -300,9 +302,13 @@ def _run_smoke_script(
         env["FORGE_SKILL_RUNTIME"] = runtime
     else:
         env.pop("FORGE_SKILL_RUNTIME", None)
+    command = ["bash"]
+    if trace:
+        command.append("-x")
+    command.append("./scripts/smoke-test.sh" if relative_invocation else str(installed_script))
     return subprocess.run(
-        ["bash", str(installed_script)],
-        cwd=unrelated_cwd,
+        command,
+        cwd=installed_script.parent.parent if relative_invocation else unrelated_cwd,
         env=env,
         text=True,
         capture_output=True,
@@ -338,6 +344,25 @@ def test_smoke_script_recovery_names_selected_runtime(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "Some checks failed for codex" in result.stdout
     assert "--runtime codex" in result.stdout
+
+
+def test_smoke_script_resolves_relative_dot_invocation_from_package_root(tmp_path: Path) -> None:
+    result = _run_smoke_script(
+        tmp_path,
+        runtime="claude_code",
+        relative_invocation=True,
+        trace=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    expected_settings = tmp_path / "installed-runtime" / "settings.json"
+    assert f"snapshot_mtime {expected_settings}" in result.stderr
+
+
+def test_smoke_skill_documents_unsupported_runtime_exit_code() -> None:
+    content = (SKILLS_ROOT / "smoke-test" / "content.md").read_text()
+
+    assert "0 = all pass, 1 = failed checks, 2 = unsupported runtime selection" in content
 
 
 def test_smoke_script_rejects_unknown_runtime(tmp_path: Path) -> None:

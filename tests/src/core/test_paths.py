@@ -7,6 +7,12 @@ from pathlib import Path
 from forge.core.paths import display_path, find_git_root
 
 
+def test_process_home_is_isolated(isolate_home: Path) -> None:
+    """Keep implicit Path.home() targets inside the per-test temporary tree."""
+    assert isolate_home.is_dir()
+    assert Path.home() == isolate_home
+
+
 class TestDisplayPath:
     def test_replaces_home_prefix(self):
         home = str(Path.home())

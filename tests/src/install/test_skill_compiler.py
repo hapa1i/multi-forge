@@ -529,6 +529,69 @@ runtimes: [codex]
 
 
 @pytest.mark.parametrize(
+    ("manifest_field", "manifest_value", "claude_field", "claude_value"),
+    [
+        ("license", "Apache-2.0", "license", "MIT"),
+        ("compatibility", "Requires Forge.", "compatibility", "Requires another tool."),
+        ("metadata", {"author": "forge"}, "metadata", {"author": "other"}),
+        ("allowed_tools", "Read", "allowed-tools", "Bash"),
+        ("allow_implicit_invocation", True, "disable-model-invocation", True),
+        ("license", None, "license", "MIT"),
+        ("allow_implicit_invocation", None, "disable-model-invocation", True),
+    ],
+)
+def test_neutral_loader_rejects_conflicting_typed_and_claude_frontmatter(
+    tmp_path: Path,
+    manifest_field: str,
+    manifest_value: object,
+    claude_field: str,
+    claude_value: object,
+) -> None:
+    package_root = tmp_path / "neutral-skill"
+    package_root.mkdir()
+    manifest = {
+        "schema_version": 1,
+        "name": "neutral-skill",
+        "description": "Neutral test skill. Use when testing loading.",
+        "runtimes": ["claude_code", "codex"],
+        manifest_field: manifest_value,
+        "claude_frontmatter": {claude_field: claude_value},
+    }
+    (package_root / "forge-skill.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False),
+        encoding="utf-8",
+    )
+    (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=f"conflicting declarations for {manifest_field}"):
+        load_neutral_skill_source(package_root)
+
+
+def test_neutral_loader_accepts_equivalent_invocation_policy_declarations(tmp_path: Path) -> None:
+    package_root = tmp_path / "neutral-skill"
+    package_root.mkdir()
+    (package_root / "forge-skill.yaml").write_text(
+        """\
+schema_version: 1
+name: neutral-skill
+description: Neutral test skill. Use when testing loading.
+runtimes: [claude_code, codex]
+capabilities: [invocation_policy]
+allow_implicit_invocation: true
+claude_frontmatter:
+  disable-model-invocation: false
+""",
+        encoding="utf-8",
+    )
+    (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+
+    source = load_neutral_skill_source(package_root)
+
+    package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+    assert _frontmatter(package.file("SKILL.md").content)["disable-model-invocation"] is False
+
+
+@pytest.mark.parametrize(
     ("placeholder", "rule"),
     [
         ("{{forge:packaged_script}}", "template.missing-path-argument"),
@@ -651,6 +714,33 @@ def test_codex_emits_spec_frontmatter_and_typed_openai_metadata() -> None:
     assert package.file("agents/openai.yaml").mode == 0o644
 
 
+def test_claude_emission_uses_typed_manifest_fields_as_authority() -> None:
+    source = _neutral_source(
+        required=frozenset({SkillCapability.INVOCATION_POLICY}),
+        license="Apache-2.0",
+        compatibility="Requires Forge CLI.",
+        metadata={"author": "forge"},
+        allowed_tools="Read",
+        allow_implicit_invocation=True,
+        claude_frontmatter={
+            "license": "MIT",
+            "compatibility": "Requires another tool.",
+            "metadata": {"author": "other"},
+            "allowed-tools": "Bash",
+            "disable-model-invocation": True,
+        },
+    )
+
+    package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+
+    frontmatter = _frontmatter(package.file("SKILL.md").content)
+    assert frontmatter["license"] == "Apache-2.0"
+    assert frontmatter["compatibility"] == "Requires Forge CLI."
+    assert frontmatter["metadata"] == {"author": "forge"}
+    assert frontmatter["allowed-tools"] == "Read"
+    assert frontmatter["disable-model-invocation"] is False
+
+
 def test_model_family_resources_remain_shared_across_runtime_outputs() -> None:
     files = tuple(
         SkillSourceFile(PurePosixPath(f"resources/code-{family}.md"), f"# {family}\n".encode())
@@ -664,4 +754,10 @@ def test_model_family_resources_remain_shared_across_runtime_outputs() -> None:
     for source_file in files:
         assert claude.file(source_file.path).content == source_file.content
         assert codex.file(source_file.path).content == source_file.content
-    assert not any("claude" in item.path.stem or "codex" in item.path.stem for item in files)
+    for package in (claude, codex):
+        emitted_resource_stems = {
+            package_file.path.stem
+            for package_file in package.files
+            if package_file.path.parent == PurePosixPath("resources")
+        }
+        assert emitted_resource_stems == {"code-anthropic", "code-gemini", "code-openai"}

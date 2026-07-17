@@ -1294,21 +1294,27 @@ portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `underst
 Claude-only manual-test frontends.
 
 `forge extension enable --runtime claude|codex|all` is repeatable and selects only SKILLS targets; it does not filter
-commands, agents, settings, or hooks from the chosen profile. With no flag, enable keeps Claude and adds Codex when its
-binary is detected. Sync uses the runtime set recorded for that installation, so a temporarily missing binary does not
-drop a managed package. A pure Codex project skill install can therefore avoid both the Claude version gate and
-`.claude/`, but only when the resolved module set contains no Claude mutation.
+commands, agents, settings, or hooks from the chosen profile. With no flag, a new enable keeps Claude and adds Codex
+when its binary is detected. Re-enabling an existing installation retains its managed runtimes even when a binary is
+temporarily absent. An explicit runtime selection refreshes those runtimes and preserves tracked packages for omitted
+runtimes; sync uses the complete tracked runtime set. Removal belongs to disable. A pure Codex project skill install can
+therefore avoid both the Claude version gate and `.claude/`, but only when the resolved module set contains no Claude
+mutation.
 
 Settings merge remains additive (hooks append + dedupe, permissions union). The `codex-hooks` module is separate from
 Codex skill delivery: it registers `codex-session-start` and `codex-policy-check` as a marker-delimited managed block in
 the user Codex config (`$CODEX_HOME/config.toml`) while project/local installs write no runtime hook blocks. This hook
 module remains best-effort when Codex is absent or its config conflicts; explicit Codex SKILLS conflicts instead fail
 the whole install preflight. An automatically selected package that Forge already manages also blocks if a new same-name
-Codex duplicate appears, preventing sync from silently dropping ownership. Registration alone is inert — Codex hooks
-fire only after the user's one-time interactive trust ceremony (§3.9).
-`forge runtime preflight codex --verify-enrollment` confirms enrollment by effect with one cheap managed turn.
-`~/.forge/installed.json` v2 tracks runtime skill packages alongside the canonical file ledger for clean sync, status,
-and disable. A successful project/local enable then establishes the Forge project described in §3.
+Codex duplicate appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all
+valid tracking rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact
+disable command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks
+every valid, present tracked project/local package of the same name, even outside the current directory chain, because a
+new user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only
+after the user's one-time interactive trust ceremony (§3.9). `forge runtime preflight codex --verify-enrollment`
+confirms enrollment by effect with one cheap managed turn. `~/.forge/installed.json` v2 tracks runtime skill packages
+alongside the canonical file ledger for clean sync, status, and disable. A successful project/local enable then
+establishes the Forge project described in §3.
 
 For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
 or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it

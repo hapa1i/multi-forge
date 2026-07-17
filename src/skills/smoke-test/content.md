@@ -13,6 +13,6 @@ for the script:
 
 {{forge:packaged_script:scripts/smoke-test.sh}}
 
-Check the exit code: 0 = all pass, 1 = failures. Report accordingly.
+Check the exit code: 0 = all pass, 1 = failed checks, 2 = unsupported runtime selection. Report accordingly.
 
 For a more thorough runtime-specific verification, follow the Forge manual-testing guidance for the selected runtime.

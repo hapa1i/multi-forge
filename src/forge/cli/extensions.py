@@ -67,6 +67,12 @@ console = Console()
 _log = logging.getLogger(__name__)
 _INSTALL_SCOPE_HELP = "Installation scope: local (gitignored), project (committed), user (global)"
 _SKILL_RUNTIME_IDS = {"claude": "claude_code", "codex": "codex"}
+_NON_FORCEABLE_SKILL_CONFLICT_REASONS = {
+    "duplicate_scan_chain",
+    "forge_managed_scope_duplicate",
+    "runtime_unavailable",
+    "scope_unsupported",
+}
 
 
 def _detect_git_project_root(start: Path | None = None) -> Path | None:
@@ -123,7 +129,7 @@ def _parse_skill_runtimes(values: tuple[str, ...]) -> tuple[str, ...] | None:
     return tuple(runtime for runtime in _SKILL_RUNTIME_IDS.values() if runtime in selected)
 
 
-def _enforce_claude_version_if_required(plan: InstallPlan) -> None:
+def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | None = None) -> None:
     """Apply the Claude CLI gate only when the plan mutates Claude surfaces."""
 
     if not plan.requires_claude_version:
@@ -133,7 +139,24 @@ def _enforce_claude_version_if_required(plan: InstallPlan) -> None:
     version_check = check_minimum_version()
     if not version_check.ok:
         print_error(f"{version_check.reason}")
-        print_tip("Run 'claude update' to upgrade.", console=console)
+        codex_packages_selected = any(
+            package.runtime == _SKILL_RUNTIME_IDS["codex"] and package.action in {"install", "update"}
+            for package in plan.skill_packages
+        )
+        if version_check.version is None and codex_packages_selected:
+            root_option = f" --root {shlex.quote(str(project_root))}" if project_root is not None else ""
+            command = (
+                f"forge extension enable --scope {plan.scope}{root_option} --profile minimal "
+                "--with skills --without commands --runtime codex"
+            )
+            print_tip(
+                f"Install Claude Code, or install only Codex skills with '{command}'.",
+                console=console,
+            )
+        elif version_check.version is None:
+            print_tip("Install Claude Code, then retry.", console=console)
+        else:
+            print_tip("Run 'claude update' to upgrade.", console=console)
         raise click.exceptions.Exit(1)
 
 
@@ -594,7 +617,26 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         console.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
         for c in plan.conflicts:
             console.print(f"  [red]- {c}[/red]")
-        print_tip("Use --force to override, or resolve conflicts manually.", console=console)
+        has_policy_conflicts = any(
+            package.action == "conflict" and package.reason in _NON_FORCEABLE_SKILL_CONFLICT_REASONS
+            for package in plan.skill_packages
+        )
+        has_forceable_conflicts = any(file.action == "conflict" for file in plan.files) or any(
+            setting.action == "conflict" for setting in plan.settings
+        )
+        if has_policy_conflicts and has_forceable_conflicts:
+            print_tip(
+                "Use --force only for file or settings conflicts; resolve runtime, scope, "
+                "and duplicate-scan conflicts manually.",
+                console=console,
+            )
+        elif has_policy_conflicts:
+            print_tip(
+                "Resolve runtime, scope, or duplicate-scan conflicts manually; --force does not override them.",
+                console=console,
+            )
+        else:
+            print_tip("Use --force to override, or resolve conflicts manually.", console=console)
 
 
 def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
@@ -878,7 +920,7 @@ def enable_cmd(
                 _print_plan(plan)
                 console.print("\n[red]Enable failed due to conflicts.[/red]")
                 sys.exit(1)
-            _enforce_claude_version_if_required(plan)
+            _enforce_claude_version_if_required(plan, project_root)
             if needs_create and project_root is not None and plan.requires_claude_version:
                 _create_claude_dir(project_root)
             plan = installer.init(
@@ -977,7 +1019,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             _print_plan(preview)
             console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
-        _enforce_claude_version_if_required(preview)
+        _enforce_claude_version_if_required(preview, project_root)
         plan = installer.update(force=force)
 
         _print_plan(plan)
@@ -1297,7 +1339,11 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     # A corrupt installed.json raises TrackingCorruptedError (a StateCorruptedError);
     # it propagates to the top-level handler for the uniform reset tip.
     tracking = TrackingStore()
-    tracking.read()
+    tracked_installations = tracking.list_installations()
+    installations_by_target = {
+        (tracked_scope, project_path): installation
+        for tracked_scope, project_path, installation in tracked_installations
+    }
 
     cwd = os.getcwd()
 
@@ -1337,10 +1383,15 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
             project_root = _resolve_status_project_root(s, effective_anchor)
             project_path_str = str(project_root) if project_root else None
 
-            inst = tracking.get_installation(s.value, project_path_str)
+            inst = installations_by_target.get((s.value, project_path_str))
             if inst is None:
                 continue
-            package_statuses = inspect_skill_package_status(inst, s, project_root)
+            package_statuses = inspect_skill_package_status(
+                inst,
+                s,
+                project_root,
+                tracked_installations=tracked_installations,
+            )
             data.append(
                 {
                     "scope": s.value,
@@ -1383,7 +1434,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         project_root = _resolve_status_project_root(s, effective_anchor)
         project_path_str = str(project_root) if project_root else None
 
-        installation = tracking.get_installation(s.value, project_path_str)
+        installation = installations_by_target.get((s.value, project_path_str))
 
         console.print(f"\n[bold]Scope: {s.value}[/bold]")
 
@@ -1409,7 +1460,12 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         console.print(f"  Updated:   {installation.updated_at}")
 
         if installation.skill_packages:
-            package_statuses = inspect_skill_package_status(installation, s, project_root)
+            package_statuses = inspect_skill_package_status(
+                installation,
+                s,
+                project_root,
+                tracked_installations=tracked_installations,
+            )
             table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
             table.add_column("STATE")
             table.add_column("RUNTIME")

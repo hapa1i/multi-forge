@@ -127,9 +127,10 @@ from Codex, until the engine dispatches through the runtime registry. That engin
    Codex skills are **user (`$HOME/.agents/skills`) + project (`.agents/skills`, shared/committed)**; Codex has no
    analog to Forge's personal-per-project `local`, so `local` is **unsupported** for Codex skills (or a named untracked
    convention) -- never mapped onto the shared `.agents/skills`.
-5. **Runtime selection**: `forge extension enable --runtime <claude|codex|all>` selects skill-package targets; the
-   default keeps Claude and adds detected Codex, while sync preserves the tracked managed set instead of deleting a
-   package when a runtime temporarily disappears from `PATH`.
+5. **Runtime selection**: `forge extension enable --runtime <claude|codex|all>` selects skill-package targets. A new
+   automatic enable keeps Claude and adds detected Codex; an existing automatic enable retains managed runtimes, and an
+   explicit selection refreshes the selected runtimes while preserving omitted tracked packages. Sync preserves the
+   complete managed set. Only disable removes the installation's managed packages.
 6. **(Axis 2, separate)** route the fan-out engine's workers through the runtime registry / `CodexHeadlessInvoker` in
    `runtime_neutral_workflow_workers`.
 
@@ -165,9 +166,11 @@ from Codex, until the engine dispatches through the runtime registry. That engin
 6. **Names and invocation.** Claude keeps `forge:<skill>` and `/forge:<skill>`; Codex emits directory-matching `<skill>`
    and uses explicit `$<skill>` task text. `disable-model-invocation` maps only to the matching `agents/openai.yaml`
    implicit-invocation policy.
-7. **Delivery and duplicates.** Forge remains the direct installer. It never overwrites or deletes an untracked
-   same-name Codex skill. A duplicate elsewhere in the Codex scan chain is surfaced explicitly; an automatic target may
-   skip, while an explicitly requested Codex target fails for recovery.
+7. **Delivery and duplicates.** Forge remains the direct installer. It never overwrites or deletes a same-name Codex
+   skill. Duplicate discovery cross-references valid tracking rows with one path-normalization rule: an untracked match
+   gets remove-or-rename guidance, while a match managed by another Forge scope stays a conflict whose recovery names
+   that scope's exact disable command. An automatic new target may skip; an explicitly requested or already-managed
+   target fails for recovery.
 8. **Migration tranches.** Prove `challenge` task arguments and `smoke-test` packaged-script/install-home bindings, then
    migrate `review`, `review-docs`, and `understand`. `walkthrough`, `qa`, and the four Claude-worker workflow frontends
    remain Claude-only in this card.
@@ -235,26 +238,32 @@ review.
   settings, ownership sidecars, and tracking retryability.
 - Architecture, CLI, end-user, manual-testing, QA, walkthrough, and skill-authoring guidance now describe the same
   runtime and operator contracts.
+- Review remediation made re-enable runtime selection ownership-aware, distinguished valid cross-scope Forge provenance
+  from untracked duplicates, prevented a user package from shadowing tracked project/local packages outside the current
+  directory chain, made status recovery executable from any CWD, and rejected conflicting manifest authority. The wheel
+  integration now installs the built artifact without mutating the session container's checkout.
 
 ### Verification
 
-- Focused adversarial acceptance: `142 passed`; full unit suite: `8099 passed, 1 skipped, 117 deselected`; Docker
-  installer lifecycle: `20 passed`.
+- Initial focused adversarial acceptance: `142 passed`; final review-remediation affected suite: `302 passed`. Full unit
+  suite: `8131 passed, 1 skipped, 117 deselected`.
+- Initial Docker installer lifecycle: `20 passed`; review-remediation lifecycle: `2 passed`, including an offline-built,
+  target-installed wheel that exercised both Claude and Codex enable -> sync -> status -> disable ownership.
 - The seven-stage Codex probe and actual compiled user/project `$smoke-test` invocations passed on `codex-cli 0.144.5`;
   each compiled Codex smoke run reported `8/8` from an unrelated or nested CWD.
 - Clean wheel project/Codex and sdist user/all-runtime enable -> status -> doctor -> sync -> disable lifecycles passed
   from isolated installs. Claude smoke reported `11/11`, Codex smoke `8/8`, and no bytecode, symlink,
   checkout-reference, compiler-source, or post-disable ownership leak remained.
-- Final `make pre-commit` and `make pre-commit-md` passed after initial runs exposed and prompted correction of test
-  `TypedDict` annotations, import ordering, and Markdown formatting. `docs/design_appendix.md` remains below its limit
-  at 29,870 tokens.
+- `uv build`, final `make pre-commit`, `make pre-commit-md`, and `git diff --check` passed after the hooks corrected
+  formatting and exposed one test `TypedDict` annotation. QA index parsing reports v1.0.28 / 584 assertions;
+  walkthrough-state tests report `93 passed`; `docs/design_appendix.md` remains below its limit at 29,966 tokens.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 
 ### Proposed durable lessons for review
 
-- Runtime selection and persisted package ownership are separate state: sync preserves the managed runtime set even when
-  a runtime binary is temporarily absent.
+- Runtime selection and persisted package ownership are separate state: automatic re-enable and sync retain the managed
+  runtime set when a binary is temporarily absent, while explicit narrowing preserves omitted package ownership.
 - Packaged script execution is distinct from prose/resource loading: bind it from the selected skill root and require an
   owner-readable, owner-executable packaged file.
 - Validate neutral sources and every emitted package as whole trees; exclusions are documentary-only, and compiler/cache
@@ -262,5 +271,8 @@ review.
 - Commit tracking last. A post-write failure must restore newly created files plus settings ownership state, while an
   unchanged-file refresh preserves the original installation timestamp.
 - Codex duplicate discovery is an ownership boundary: `--force` never adopts or deletes an untracked same-name package.
+- The content-addressed compiled-skill cache currently has no eviction. Symlink-mode installs reference digest
+  directories directly, so any future cleanup must prove a digest is not the target of a tracked install before removing
+  it.
 
 These are proposals only; none has been promoted to `docs/board/impl_notes.md` pending human review.

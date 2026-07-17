@@ -340,6 +340,13 @@ _CODEX_INTERFACE_FIELDS = {
     "brand_color",
     "default_prompt",
 }
+_TYPED_CLAUDE_FRONTMATTER_FIELDS = {
+    "license": "license",
+    "compatibility": "compatibility",
+    "metadata": "metadata",
+    "allowed_tools": "allowed-tools",
+    "allow_implicit_invocation": "disable-model-invocation",
+}
 _SKILL_SOURCE_EXCLUDED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 _SKILL_SOURCE_EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 _EnumT = TypeVar("_EnumT", bound=Enum)
@@ -581,6 +588,7 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     allow_implicit_invocation = raw_manifest.get("allow_implicit_invocation")
     if allow_implicit_invocation is not None and not isinstance(allow_implicit_invocation, bool):
         raise ValueError(f"{manifest_path}: allow_implicit_invocation must be a boolean when present")
+    _reject_conflicting_claude_frontmatter(raw_manifest, claude_frontmatter, manifest_path)
 
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
@@ -1216,19 +1224,21 @@ def _frontmatter_for(manifest: SkillManifest, runtime: SkillRuntime) -> dict[str
             "name": f"forge:{manifest.name}",
             "description": manifest.description,
         }
-        for key, value in manifest.claude_frontmatter.items():
-            if key not in {"name", "description"}:
-                frontmatter[key] = value
-        if manifest.license is not None:
-            frontmatter.setdefault("license", manifest.license)
-        if manifest.compatibility is not None:
-            frontmatter.setdefault("compatibility", manifest.compatibility)
-        if manifest.metadata:
-            frontmatter.setdefault("metadata", dict(manifest.metadata))
-        if manifest.allowed_tools is not None:
-            frontmatter.setdefault("allowed-tools", manifest.allowed_tools)
         if manifest.allow_implicit_invocation is not None:
             frontmatter["disable-model-invocation"] = not manifest.allow_implicit_invocation
+        for key, value in manifest.claude_frontmatter.items():
+            if key not in {"name", "description"} and not (
+                key == "disable-model-invocation" and manifest.allow_implicit_invocation is not None
+            ):
+                frontmatter[key] = value
+        if manifest.license is not None:
+            frontmatter["license"] = manifest.license
+        if manifest.compatibility is not None:
+            frontmatter["compatibility"] = manifest.compatibility
+        if manifest.metadata:
+            frontmatter["metadata"] = dict(manifest.metadata)
+        if manifest.allowed_tools is not None:
+            frontmatter["allowed-tools"] = manifest.allowed_tools
         return frontmatter
 
     frontmatter = {
@@ -1340,6 +1350,26 @@ def _required_manifest_string(manifest: Mapping[str, Any], key: str, manifest_pa
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{manifest_path}: {key} must be a non-empty string")
     return value
+
+
+def _reject_conflicting_claude_frontmatter(
+    manifest: Mapping[str, Any],
+    claude_frontmatter: Mapping[str, Any],
+    manifest_path: Path,
+) -> None:
+    for manifest_field, claude_field in _TYPED_CLAUDE_FRONTMATTER_FIELDS.items():
+        if manifest_field not in manifest or claude_field not in claude_frontmatter:
+            continue
+        manifest_value = manifest[manifest_field]
+        expected_claude_value = manifest_value
+        if manifest_field == "allow_implicit_invocation" and manifest_value is not None:
+            expected_claude_value = not manifest_value
+        claude_value = claude_frontmatter[claude_field]
+        if type(claude_value) is type(expected_claude_value) and claude_value == expected_claude_value:
+            continue
+        raise ValueError(
+            f"{manifest_path}: conflicting declarations for {manifest_field} and claude_frontmatter.{claude_field}"
+        )
 
 
 def _manifest_string_list(manifest: Mapping[str, Any], key: str, manifest_path: Path) -> list[str]:
