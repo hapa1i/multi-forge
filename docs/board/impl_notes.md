@@ -36,6 +36,27 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Runtime skill packages are compiled artifacts with separate ownership (cross_runtime_skills, shipped 2026-07-17)
+
+- **Runtime selection is not persisted ownership.** Automatic enable and sync retain the union of detected and already
+  managed runtimes when a binary is temporarily absent. Explicit runtime narrowing preserves omitted package tracking;
+  dedicated disable owns teardown.
+- **Source eligibility and executable binding are compiler inputs.** Reject symlinked source or package roots, apply the
+  checkout's Git eligibility set before discovery and every read, and validate neutral and emitted packages as whole
+  trees. A permitted leaf symlink requires both its alias and contained target to be eligible. Packaged-script execution
+  is a separate capability from prose/resource loading and binds an owner-readable, owner-executable file from the
+  selected skill root.
+- **Package tracking is a strict projection of the canonical file ledger.** Empty, outside-root, unbacked, duplicate, or
+  multiply claimed package paths are corrupted state and must fail before mutation. Commit tracking last; a post-write
+  failure restores created files and settings ownership, while an unchanged refresh preserves its original installation
+  timestamp.
+- **Runtime package directories are ownership boundaries.** Revalidate directory entries with `lstat` near each
+  mutation, permit install-time symlinks only at tracked leaf files, and never let `--force` adopt or delete an
+  untracked same-name package.
+- **Compiled-cache lifetime is part of symlink-install correctness.** The content-addressed cache has no eviction while
+  tracked installs can point at digest directories. Any future cleanup must prove that no tracked symlink depends on a
+  digest before removing it.
+
 ### Hook runtime ownership and recovery follow the execution environment (global runtime epic, closed 2026-07-13)
 
 - Host Claude and Codex runtime hooks have one owner: user-scope settings containing literal absolute

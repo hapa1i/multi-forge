@@ -1,7 +1,7 @@
 # runtime_neutral_workflow_workers -- dispatch Forge workflow workers through the selected runtime
 
 **Lane**: `proposed/` -- separate Axis 2 follow-up discovered while executing
-[`cross_runtime_skills`](../../doing/cross_runtime_skills/card.md). It is not part of that card's approved Axis 1 scope.
+[`cross_runtime_skills`](../../done/cross_runtime_skills/card.md). It is not part of that card's approved Axis 1 scope.
 
 ## Why
 
@@ -24,8 +24,8 @@ exists elsewhere in Forge.
 - Subscription versus API billing, proxy routing, policy hooks, timeout/cancellation, and provider traces must remain
   truthful for every worker.
 - A Codex-hosted frontend does not imply Codex workers until this card ships.
-- The active cross-runtime-skills card may update neutral authoring metadata for these skills, but must keep their Codex
-  package eligibility disabled.
+- The shipped cross-runtime skill work updated neutral authoring metadata for these skills but kept their Codex package
+  eligibility disabled until Axis 2 ships.
 
 ## Acceptance direction
 

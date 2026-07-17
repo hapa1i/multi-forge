@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-17
 
+### Cross-runtime skill packages closeout
+
+**Goal**: Close the shipped cross-runtime skill package card after PR #107 passed human review and merged to `main`.
+
+**Key changes**:
+
+- Moved the card and preserved checklist from `doing/` to `done/`, repointed inbound board references, and recorded the
+  merge boundary.
+- Promoted the reviewed runtime-selection, compiler-source, package-ledger, symlink-ownership, and cache-lifetime
+  invariants to durable implementation notes.
+
+**Verification**: PR #107 merged as `d2a94bf7`; board-path and unchecked-closeout scans, `make pre-commit-md`, and
+`git diff --check` passed.
+
 ### Cross-runtime skill boundary hardening
 
 **Goal**: Close fail-open source, ownership, teardown, and probe-evidence paths found during the second review without

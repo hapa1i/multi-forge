@@ -1,9 +1,8 @@
 # cross_runtime_skills -- run Forge skills under Codex (and other Agent-Skills runtimes), not just Claude Code
 
-**Lane**: `doing/` -- activated 2026-07-16; the reviewed checklist was approved for execution on 2026-07-16. Keep the
-card in `doing/` after implementation and verification until the user reviews the result.
+**Lane**: `done/` -- shipped through PR #107 on 2026-07-17 after implementation, verification, and human review.
 
-**Branch**: `cross-runtime-skills`. Execution plan: [`checklist.md`](checklist.md).
+**Branch**: `cross-runtime-skills`, merged into `main` as `d2a94bf7`. Execution record: [`checklist.md`](checklist.md).
 
 This is a standalone follow-up to the shipped runtime-abstraction lineage (`core/runtime/registry.py`;
 `done/codex_frontend/`, `done/runtime_abstraction/`) and the closed installer/scope redesign in
@@ -238,13 +237,12 @@ remediation now:
   in lifecycle help.
 
 The final affected compiler/cache/lifecycle/CLI/setup/regression suite passed `381` tests. QA parses as v1.0.30 / 589
-assertions, and strengthened real-Codex policy/script stages passed on codex-cli 0.144.5. Broad verification passed; the
-card stays in `doing/` for review.
+assertions, and strengthened real-Codex policy/script stages passed on codex-cli 0.144.5. Broad verification passed, and
+PR #107 merged to `main` on 2026-07-17.
 
 ## Closeout
 
-Implementation is complete on `cross-runtime-skills` and intentionally remains in `doing/` for the requested human
-review.
+Implementation was accepted after human review and shipped through PR #107. This card moved to `done/` on 2026-07-17.
 
 ### Implemented outcome
 
@@ -285,7 +283,7 @@ review.
 - Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
   isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
 
-### Proposed durable lessons for review
+### Durable lessons promoted at closeout
 
 - Runtime selection and persisted package ownership are separate state: automatic re-enable and sync retain the managed
   runtime set when a binary is temporarily absent, while explicit narrowing preserves omitted package ownership.
@@ -306,4 +304,4 @@ review.
   directories directly, so any future cleanup must prove a digest is not the target of a tracked install before removing
   it.
 
-These are proposals only; none has been promoted to `docs/board/impl_notes.md` pending human review.
+These reviewed invariants were promoted in compact form to the board's [implementation notes](../../impl_notes.md).

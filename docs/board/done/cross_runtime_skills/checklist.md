@@ -2,16 +2,17 @@
 
 **Branch**: `cross-runtime-skills` · **Card**: [`card.md`](card.md) · **Activated**: 2026-07-16
 
-> **Execution approved 2026-07-16.** Implement and verify the ratified shape below, but keep this card in `doing/` after
-> completion until the user reviews the result.
+**Shipped**: 2026-07-17 through PR #107
 
-## Current focus
+> **Execution approved 2026-07-16; closeout approved 2026-07-17.** The implementation passed review and shipped through
+> PR #107. This checklist is retained as the execution record.
 
-Execute the approved Axis 1 contract: a typed neutral compiler, runtime-specific skill targets and tracking, and the
-portable skill tranche. Keep Axis 2 worker dispatch and all other explicit scope boundaries separate, and retain the
-card in the active lane for post-implementation review.
+## Outcome
 
-## Scope boundary for review
+The approved Axis 1 contract shipped: a typed neutral compiler, runtime-specific skill targets and tracking, and the
+portable skill tranche. Axis 2 worker dispatch and the other explicit scope boundaries remain separate.
+
+## Scope boundary
 
 **In scope for Axis 1:**
 
@@ -70,8 +71,8 @@ card in the active lane for post-implementation review.
 - [x] **Card shape:** decide whether Axis 1 remains one card or becomes `epic_cross_runtime_skills` with independently
   shippable member cards. If split, define member boundaries and sequencing, create the member cards, and update every
   link before production edits.
-  - _Recommendation for review:_ coordinate neutral-authoring/compiler, installer/runtime/tracking, and skill-migration
-    slices separately. They have distinct rollback and verification boundaries.
+  - _Decision:_ keep Axis 1 in one card while coordinating neutral-authoring/compiler, installer/runtime/tracking, and
+    skill-migration slices separately because they have distinct rollback and verification boundaries.
 - [x] **Axis 2:** confirm fan-out worker-runtime dispatch is a separate proposed card. Record the boundary here and in
   that card; do not let Axis 1 imply that a Codex-hosted `panel` has Codex workers.
 - [x] **Authoring source:** choose the single editable source shape, such as neutral `content.md` plus runtime adapter
@@ -298,7 +299,8 @@ card in the active lane for post-implementation review.
 - [x] Rerun the strengthened real-Codex invocation-policy and script-resolution stages and record a fresh verdict; the
   historical 0.144.5 capture does not satisfy the stricter evidence gates retroactively.
 - [x] Complete the final unit, regression, targeted Docker, package-build, pre-commit, Markdown, and diff-integrity
-  gates for this remediation, then update the verification record without moving the card from `doing/`.
+  gates for this remediation, then update the verification record while retaining the then-required `doing/` review
+  hold.
 
 ## Documentation and operator verification
 
@@ -332,8 +334,7 @@ card in the active lane for post-implementation review.
 
 - [x] Confirm every accepted Phase 0 decision is reflected in code, tests, design docs, end-user docs, and the card.
 - [x] Add a compact newest-first entry to `docs/board/change_log.md` with verification evidence.
-- [x] Propose durable implementation lessons for human review; promote only approved invariants to
-  `docs/board/impl_notes.md`.
+- [x] Promote the reviewed durable implementation invariants to `docs/board/impl_notes.md`.
 - [x] Verify clean wheel/sdist behavior and the user-facing Day 1 path.
-- [ ] After user review, move this card to its correct terminal lane, preserve the checklist, and repoint all inbound
-  board links. Intentionally held in `doing/` at the requested review boundary.
+- [x] After user review and the PR #107 merge, move this card to `done/`, preserve the checklist, and repoint all
+  inbound board links.
