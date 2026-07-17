@@ -77,6 +77,28 @@ esac
 exit 93
 """
 
+FAKE_RG = r"""#!/usr/bin/env bash
+set -euo pipefail
+
+options=()
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -q) options+=("-q") ;;
+        -i) options+=("-i") ;;
+        -qi | -iq) options+=("-q" "-i") ;;
+        --fixed-strings) options+=("-F") ;;
+        --) shift; break ;;
+        -*) echo "unsupported fake rg option: $1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+    shift
+done
+[ "$#" -gt 0 ] || exit 2
+pattern="$1"
+shift
+exec grep "${options[@]}" -- "$pattern" "$@"
+"""
+
 
 def _probe_environment(tmp_path: Path, **overrides: str) -> dict[str, str]:
     fake_bin = tmp_path / "bin"
@@ -84,6 +106,9 @@ def _probe_environment(tmp_path: Path, **overrides: str) -> dict[str, str]:
     codex = fake_bin / "codex"
     codex.write_text(FAKE_CODEX, encoding="utf-8")
     codex.chmod(0o755)
+    rg = fake_bin / "rg"
+    rg.write_text(FAKE_RG, encoding="utf-8")
+    rg.chmod(0o755)
 
     real_codex_home = tmp_path / "real-codex-home"
     real_codex_home.mkdir()
@@ -103,9 +128,7 @@ def _probe_environment(tmp_path: Path, **overrides: str) -> dict[str, str]:
     return env
 
 
-def _run_stage(
-    tmp_path: Path, stage: str, **overrides: str
-) -> subprocess.CompletedProcess[str]:
+def _run_stage(tmp_path: Path, stage: str, **overrides: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", str(STAGES / stage)],
         capture_output=True,
@@ -122,17 +145,13 @@ def test_invocation_policy_requires_enabled_control_and_successful_blocked_turn(
     assert success.returncode == 0, success.stderr
     assert "implicit control loaded" in success.stdout
 
-    failed_turn = _run_stage(
-        tmp_path / "failed", "40-invocation-policy.sh", FAKE_CODEX_FAIL_BLOCKED="1"
-    )
+    failed_turn = _run_stage(tmp_path / "failed", "40-invocation-policy.sh", FAKE_CODEX_FAIL_BLOCKED="1")
     assert failed_turn.returncode != 0
     assert "implicit-blocked Codex turn failed" in failed_turn.stderr
 
 
 def test_script_resolution_requires_successful_negative_turn(tmp_path: Path) -> None:
-    failed_turn = _run_stage(
-        tmp_path, "50-script-resolution.sh", FAKE_CODEX_FAIL_LITERAL="1"
-    )
+    failed_turn = _run_stage(tmp_path, "50-script-resolution.sh", FAKE_CODEX_FAIL_LITERAL="1")
     assert failed_turn.returncode != 0
     assert "literal Codex turn failed" in failed_turn.stderr
 
@@ -151,10 +170,7 @@ def test_script_resolution_requires_exact_command_and_exit(
 ) -> None:
     result = _run_stage(tmp_path, "50-script-resolution.sh", **{override: value})
     assert result.returncode != 0
-    assert (
-        "did not record completed command 'bash scripts/marker.sh' with exit 127"
-        in result.stderr
-    )
+    assert "did not record completed command 'bash scripts/marker.sh' with exit 127" in result.stderr
 
 
 def test_script_resolution_accepts_complete_jsonl_evidence(tmp_path: Path) -> None:
