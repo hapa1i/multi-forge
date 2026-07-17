@@ -250,7 +250,14 @@ entry point selects the interpreter and `$smoke-test`/`/forge:smoke-test` do not
 
 ## Model-aware resource selection
 
-`review`, `review-docs`, and `understand` automatically detect the model family from the session's proxy template:
+`review`, `review-docs`, and `understand` select their model-family resource through the host runtime's adapter:
+
+| Host runtime | Family selection                                                                 | Resource selection                  |
+| ------------ | -------------------------------------------------------------------------------- | ----------------------------------- |
+| Claude       | Dynamic lookup through `forge session show`; proxy/direct metadata determines it | `openai`, `gemini`, or default      |
+| Codex        | Host-authoritative `openai`; no Forge session lookup                             | Always the `-openai.md` instruction |
+
+For Claude, the dynamic detection path is:
 
 ```
 Session -> proxy template -> tier model name -> vendor prefix -> family
@@ -262,16 +269,17 @@ Session -> proxy template -> tier model name -> vendor prefix -> family
 | `gemini`    | `openrouter-gemini`         | `-gemini.md`    |
 | `anthropic` | `litellm-anthropic`, direct | (default)       |
 
-The detection chain uses `forge session show --field model_family`, which resolves managed sessions from the
+The Claude detection chain uses `forge session show --field model_family`, which resolves managed sessions from the
 Forge-managed session's launch environment and otherwise falls back to local environment metadata such as
-`ACTIVE_TEMPLATE`, `ANTHROPIC_BASE_URL`, and direct-model env vars. If detection fails, skills fall back to the
+`ACTIVE_TEMPLATE`, `ANTHROPIC_BASE_URL`, and direct-model env vars. If detection fails, Claude skills fall back to the
 Opus-optimized default resource.
 
-These skills also print the resolved model when Forge can identify it. In unmanaged direct runtime sessions, the host
-may not expose the exact selected model to Forge; in that case the preflight says the exact model is not available
-instead of reporting `none`.
+Claude skills also print the resolved model when Forge can identify it. Codex skills report `openai` and leave the exact
+model unspecified because the Codex host does not expose that selection to Forge. An unrelated tracked Claude session
+must not change Codex's resource selection.
 
-**No extra skill configuration is needed.** Forge selects the resource from the detected model family.
+**No extra skill configuration is needed.** Claude selects from detected session metadata; Codex uses its
+host-authoritative OpenAI binding.
 
 For per-role guidance on when to use Opus 4.8 or Opus 4.6, when to mix families for `/forge:panel`, and when to
 cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
@@ -304,7 +312,7 @@ reset guidance; do not hand-delete a package while ownership is unresolved.
 
 ### Wrong model instructions selected
 
-Check the detected family:
+For a Claude-hosted skill, check the dynamically detected family:
 
 ```bash
 forge session show --field model_family
@@ -313,6 +321,10 @@ forge session show --field main_model
 
 If the family is wrong, the proxy template's tier models may not have the expected vendor prefix. Check with
 `forge session show --json` to see the full proxy and model mapping.
+
+For a Codex-hosted skill, do not repair proxy metadata: the compiled package must declare `Model family: openai` and
+must not invoke `forge session show`. A different family means Codex loaded a stale or duplicate package. Use
+`forge extension status --json` to find the active target and recovery, then run `forge extension sync` for its scope.
 
 ### Skills installed in both user and project scope
 
