@@ -39,6 +39,7 @@ class TestClaudeSpec:
         assert s.usage_source == "transcript_proxy"
         assert s.native_resume is True
         assert s.install_scopes == ("user", "project", "local")
+        assert s.skill_scopes == ("user", "project", "local")
         assert s.curated_transfer_in and s.curated_transfer_out
 
     def test_detect_reuses_installer_version_probe(self, monkeypatch) -> None:
@@ -70,6 +71,9 @@ class TestCodexSpec:
         # Phase 6: the installer registers Codex hooks in the config the Forge
         # install scope maps to (user -> $CODEX_HOME, project/local -> .codex/).
         assert s.install_scopes == ("user", "project", "local")
+        # Local extension participation does not imply a safe Codex skill target:
+        # .agents/skills is committed project state, not personal local state.
+        assert s.skill_scopes == ("user", "project")
         # Note records the default-on reality + the trust-enrollment finding.
         assert s.note is not None and "default-on" in s.note and "trust-enrolled" in s.note
 

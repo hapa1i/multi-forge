@@ -53,3 +53,15 @@ def test_file_lock_releases_after_process_exit(tmp_path: Path) -> None:
     # Should be acquirable now.
     with file_lock(lock_path=lock_path, timeout_s=1.0, poll_s=0.01):
         pass
+
+
+def test_file_lock_does_not_follow_symlink(tmp_path: Path) -> None:
+    lock_path = tmp_path / "state.lock"
+    external = tmp_path / "external"
+    lock_path.symlink_to(external)
+
+    with pytest.raises(OSError):
+        with file_lock(lock_path=lock_path, timeout_s=1.0, poll_s=0.01):
+            pass
+
+    assert not external.exists()

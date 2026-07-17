@@ -70,7 +70,7 @@ Forge has four scoping levels. They must be explicitly defined to avoid path con
 ```text
 project_root    (logical repo -- git identity, shared across worktrees)
   +-- checkout_root    (this worktree -- git rev-parse --show-toplevel)
-       +-- forge_root      (enabled .claude/ + .forge/ project inside the checkout)
+       +-- forge_root      (enabled project/local extension root with .forge/ state)
             +-- working_dir    (launch CWD -- for managed sessions, equals forge_root)
 ```
 
@@ -78,7 +78,7 @@ project_root    (logical repo -- git identity, shared across worktrees)
 | ----------------- | ------------------------------------------------ | --------------- | ----------------------------------------------------- |
 | **Logical Repo**  | `get_main_repo_root()` (git)                     | `project_root`  | Cross-project ops, `session list` default scope       |
 | **Checkout**      | `git rev-parse --show-toplevel`                  | `checkout_root` | Worktree targeting for `--into`, relative_path anchor |
-| **Forge Project** | Directory with `.claude/` + `.forge/`            | `forge_root`    | Session root, artifact root, state scoping anchor     |
+| **Forge Project** | Successful project/local extension enable        | `forge_root`    | Session root, artifact root, state scoping anchor     |
 | **Working Dir**   | Launch CWD (= `forge_root` for managed sessions) | implicit        | Managed sessions always launch from `forge_root`      |
 
 **Four foundational rules (normative):**
@@ -87,9 +87,10 @@ project_root    (logical repo -- git identity, shared across worktrees)
 2. The session root is exactly that install root (the **Forge project root**, `forge_root`).
 3. Session state is scoped to `forge_root` -- manifests, artifacts, search index, `prev_sessions/` all live under that
    `.forge/`.
-4. Project/local `forge extension enable` requires `.claude/` at the target directory. If missing, it is created
-   silently (it is a directory, not a config file -- no ambiguity, no interactive prompt needed). User-level install
-   (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
+4. Project/local `forge extension enable` creates `.claude/` only when the resolved plan mutates a Claude extension or
+   settings surface. A skills-only project install explicitly targeting Codex can establish `.forge/` plus
+   `.agents/skills/` without creating `.claude/`. User scope has no project anchor; each runtime uses its own user skill
+   target.
 
 `.forge/project.toml` is an optional compatibility guardrail, not part of project identity. Missing means unconstrained
 and is silent. Compatibility follows the **target-state owner**: an explicit command checks the `forge_root` whose state
@@ -100,9 +101,14 @@ derived global session/active indexes are exempt because they are not owned by a
 
 **Definitions:**
 
-- **Forge project** = directory containing both `.claude/` and `.forge/`, established by `forge extension enable`.
+- **Forge project** = project/local extension root established by a successful `forge extension enable`; `.forge/` is
+  its state anchor, while `.claude/` and `.agents/` exist only when the selected modules/runtime packages require them.
 - **`forge_root`** = the Forge project root (where `.forge/` lives). Field in `SessionIndexEntry`.
 - **`relative_path`** = `forge_root` relative to `checkout_root`. Preserved on `fork --into`.
+
+Extension lifecycle auto-detection walks ancestors and accepts either managed Claude settings evidence or an exact
+project/local row in `installed.json`. This keeps Codex-only skill roots discoverable by status, sync, and disable even
+when no `.claude/` directory exists.
 
 **Fork `--into` rules (normative):**
 
@@ -1274,23 +1280,43 @@ launcher is globally reachable — install kind (`global` / `editable` / `venv` 
 PATH reachability, dispatcher state, and the current process's dev-override state. This tool install is the prerequisite
 to installing the extensions described below.
 
-Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
-scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles
-(`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,
-codex-hooks) are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union). The
-`codex-hooks` module registers Forge's Codex hooks (`codex-session-start`, `codex-policy-check`) as a marker-delimited
-managed block in the user Codex config (`$CODEX_HOME/config.toml`); atomic managed-block rewrites preserve an existing
-config's filesystem mode. Project/local installs do not write runtime hook blocks for either Claude or Codex. Ordinary
-enable/sync keeps Codex installation best-effort: it is skipped with a notice when `codex` is not on PATH, and its
-conflicts never block the Claude install. Registration alone is inert — Codex hooks fire only after the user's one-time
-interactive trust ceremony (§3.9), which `forge extension enable` names in its next steps but cannot perform or verify.
-Enrollment is unverifiable from a config read (the `trusted_hash` is not computable), so
-`forge runtime preflight codex --verify-enrollment` confirms it empirically instead — it runs one trivial managed
-`codex exec` turn and reports the user-scope hook as enrolled iff the `codex-session-start` hook fired (the observation
-receipt appeared). `~/.forge/installed.json` tracks what was installed for clean update/uninstall. Project/local
-enablement requires a `.claude/` anchor at the target directory (created if missing); user-level install
-(`--scope user`) goes to `~/.claude/` and does not require a project anchor. This establishes the Forge project per the
-identity model (§3).
+Forge extensions live in this repo and are installed via `forge extension enable`. Forge keeps the user/project/local
+scope model and modular profiles (`minimal` / `standard` / `full`). Seven modules (commands, agents, skills, hooks,
+status-line, permissions, codex-hooks) are combined into profiles. Commands, agents, and Claude settings remain Claude
+surfaces. The SKILLS module instead compiles one logical skill into each selected runtime package: Claude user and
+project/local packages go to `$CLAUDE_HOME/skills` and `<root>/.claude/skills`; Codex user and project packages go to
+`$HOME/.agents/skills` and `<root>/.agents/skills`. Codex has no local skill scope and skills never use `$CODEX_HOME`.
+
+Portable skills use `forge-skill.yaml` plus `content.md`; typed Claude/Codex adapters bind runtime capabilities and emit
+a complete validated package. A legacy `SKILL.md` package remains a Claude-only compatibility source. The current
+portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. `panel`, `analyze`, `debate`, and
+`consensus` remain Claude-only until their `claude -p` worker engine is runtime-neutral; `walkthrough` and `qa` remain
+Claude-only manual-test frontends.
+
+`forge extension enable --runtime claude|codex|all` is repeatable and selects only SKILLS targets; it does not filter
+commands, agents, settings, or hooks from the chosen profile. With no flag, a new enable keeps Claude and adds Codex
+when its binary is detected. Re-enabling an existing installation retains its managed runtimes even when a binary is
+temporarily absent. An explicit runtime selection refreshes those runtimes and preserves tracked packages for omitted
+runtimes; sync uses the complete tracked runtime set. Removal belongs to disable. A pure Codex project skill install can
+therefore avoid both the Claude version gate and `.claude/`, but only when the resolved module set contains no Claude
+mutation.
+
+Settings merge remains additive (hooks append + dedupe, permissions union). The `codex-hooks` module is separate from
+Codex skill delivery: it registers `codex-session-start` and `codex-policy-check` as a marker-delimited managed block in
+the user Codex config (`$CODEX_HOME/config.toml`) while project/local installs write no runtime hook blocks. This hook
+module remains best-effort when Codex is absent or its config conflicts; explicit Codex SKILLS conflicts instead fail
+the whole install preflight. An automatically selected package that Forge already manages also blocks if a new same-name
+Codex duplicate appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all
+valid tracking rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact
+disable command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks
+every valid, present tracked project/local package of the same name, even outside the current directory chain, because a
+new user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only
+after the user's one-time interactive trust ceremony (§3.9). `forge runtime preflight codex --verify-enrollment`
+confirms enrollment by effect with one cheap managed turn. `~/.forge/installed.json` v2 tracks runtime skill packages
+alongside the canonical file ledger for clean sync, status, and disable. A successful project/local enable then
+establishes the Forge project described in §3. Package roots and descendant directory entries must remain real
+directories: status marks a substituted symlink `invalid-target`, and every write, rollback, or removal revalidates the
+directory chain before mutation. Tracked leaf-file symlinks remain valid for symlink install mode.
 
 For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
 or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it
@@ -1300,7 +1326,7 @@ again because its config location and command bytes changed.
 
 > Scope model, module inventory, merge rules, and tracking file details in
 > [design_appendix.md §C](design_appendix.md#c-install-model-reference). Multi-scope installation behavior (dual user +
-> project) is documented in [§C.5](design_appendix.md#c5-multi-scope-installation-55----skill-resolution).
+> project) is documented in [§C.5](design_appendix.md#c5-multi-scope-installation-skill-resolution).
 
 ### 5.2 Policy, skills, workflows, and memory
 
@@ -1334,10 +1360,11 @@ make test-integration  # Runs: docker build + docker run pytest
 
 ### 5.4 Interactive manual testing
 
-Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. Three
-skills provide escalating isolation (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`); the detailed pattern,
-annotation types, and wrappers live in [design_appendix.md §D](design_appendix.md#d-interactive-manual-testing). The
-end-user guide is [manual_testing.md](end-user/manual_testing.md).
+Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. The
+portable smoke test runs as `/forge:smoke-test` or `$smoke-test`; the Claude-only `/forge:walkthrough` and `/forge:qa`
+provide the higher isolation tiers. The detailed pattern, annotation types, and wrappers live in
+[design_appendix.md §D](design_appendix.md#d-interactive-manual-testing). The end-user guide is
+[manual_testing.md](end-user/manual_testing.md).
 
 ## 6. Directory structure (monorepo)
 
@@ -1362,7 +1389,7 @@ multi-forge/
 │   │
 │   ├── commands/        # Slash commands (installed to ~/.claude/commands)
 │   ├── agents/          # Agents (installed to ~/.claude/agents)
-│   └── skills/          # Skills (installed to ~/.claude/skills) — scripting layer (design_workflows.md §3)
+│   └── skills/          # Neutral/legacy sources compiled to runtime skill targets (design_workflows.md §3)
 │
 ├── docs/
 └── pyproject.toml

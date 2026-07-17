@@ -13,6 +13,7 @@ from forge.install.models import (
     InstalledFile,
     InstalledManifest,
     InstalledSettingsEntry,
+    InstalledSkillPackage,
     InstallMode,
     InstallModule,
     InstallPlan,
@@ -163,8 +164,25 @@ class TestInstallation:
     def test_installation_defaults(self) -> None:
         inst = Installation(scope="user", mode="copy", profile="standard")
         assert inst.settings_backup_path is None
+        assert inst.skill_packages == []
         assert inst.installed_at == ""
         assert inst.updated_at == ""
+
+    def test_runtime_skill_package_tracks_group_without_duplicating_file_metadata(self) -> None:
+        package = InstalledSkillPackage(
+            runtime="codex",
+            skill="challenge",
+            target_dir="/home/user/.agents/skills/challenge",
+            file_paths=[
+                "/home/user/.agents/skills/challenge/SKILL.md",
+                "/home/user/.agents/skills/challenge/agents/openai.yaml",
+            ],
+        )
+
+        inst = Installation(scope="user", mode="copy", profile="standard", skill_packages=[package])
+
+        assert inst.skill_packages == [package]
+        assert inst.files == []
 
 
 class TestInstalledManifest:

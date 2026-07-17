@@ -30,42 +30,29 @@ You explain WHY, not just WHAT.
 
 This skill requires:
 
-- **Explore subagent**: The `Agent` tool with `subagent_type: "Explore"` must be available
-- **File reading**: Read tool access to analyze target files
-- **Local analysis only**: Use only the tools allowed by this skill. Do not call external MCP analysis tools from this
-  skill.
+- **Repository exploration**: Search and file-reading access for the target and its dependencies
+- **Local analysis only**: Use only local runtime capabilities made available to this skill; do not call external
+  analysis services
 
 ---
 
 ## Phase 1: Exploration
 
-Gather context before analysis. Use the Explore agent to build understanding efficiently.
+Use {{forge:exploration}} to analyze the specified code:
 
-```
-Tool: Agent
-Parameters:
-  subagent_type: "Explore"
-  description: "Analyze code structure and behavior"
-  prompt: |
-    Analyze the specified code:
-    1. If file path: Read and analyze the file
-    2. If directory: Find main source files (exclude node_modules, .git, etc.)
-    3. If question: Find related code via Grep/Glob
+1. For a file, read and analyze it.
+2. For a directory, find the main source files while excluding generated and dependency directories.
+3. For a question, search for the related code.
 
-    Return structured analysis:
-    - What does this code do? (high-level purpose)
-    - Architecture and flow (how components interact)
-    - Key abstractions (main classes, functions, patterns)
-    - Dependencies (what this code depends on)
-```
+Return the code's high-level purpose, architecture and flow, key abstractions, and dependencies.
 
 ---
 
 ## Phase 2: Context-Aware Synthesis
 
-After receiving agent analysis:
+After exploration:
 
-1. Review agent's findings
+1. Review the exploration findings
 2. Enrich with conversation context (relate to ongoing discussion, connect to previous work)
 3. Take follow-up actions if appropriate (read related files, check dependencies)
 4. Present synthesized results

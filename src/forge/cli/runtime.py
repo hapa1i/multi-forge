@@ -68,6 +68,7 @@ def _spec_dict(spec: RuntimeSpec) -> dict[str, object]:
         "usage_source": spec.usage_source,
         "native_resume": spec.native_resume,
         "install_scopes": list(spec.install_scopes),
+        "skill_scopes": list(spec.skill_scopes),
         "curated_transfer_in": spec.curated_transfer_in,
         "curated_transfer_out": spec.curated_transfer_out,
         "note": spec.note,
@@ -97,6 +98,7 @@ def list_cmd(as_json: bool) -> None:
     table.add_column("USAGE")
     table.add_column("RESUME")
     table.add_column("SCOPES")
+    table.add_column("SKILL SCOPES")
 
     for s in specs:
         table.add_row(
@@ -109,6 +111,7 @@ def list_cmd(as_json: bool) -> None:
             s.usage_source,
             "yes" if s.native_resume else "no",
             ", ".join(s.install_scopes) or "-",
+            ", ".join(s.skill_scopes) or "-",
         )
 
     console.print(table)

@@ -51,6 +51,17 @@ def test_scope_help_is_shared_across_extension_commands() -> None:
         assert expected in output
 
 
+@pytest.mark.parametrize("command", ["sync", "disable", "status"])
+def test_lifecycle_help_describes_sidecar_and_tracking_row_discovery(command: str) -> None:
+    result = CliRunner().invoke(extensions, [command, "--help"])
+
+    output = " ".join(result.output.split())
+    assert result.exit_code == 0, result.output
+    assert ".claude/ ownership sidecars" in output
+    assert "exact scope/path tracking rows" in output
+    assert "~/.forge/installed.json" in output
+
+
 @pytest.mark.parametrize("scope", ["local", "project"])
 def test_project_enable_preserves_recorded_global_launcher_when_run_from_venv(
     scope: str,
@@ -301,6 +312,7 @@ class TestEnableFailureCleanup:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
             runner = CliRunner()
@@ -308,6 +320,65 @@ class TestEnableFailureCleanup:
 
         assert result.exit_code != 0
         assert not (repo / ".forge").is_dir()
+
+
+@pytest.mark.parametrize(
+    "runtime_args",
+    [(), ("--runtime", "codex")],
+    ids=["automatic", "explicit-codex"],
+)
+def test_missing_claude_names_full_codex_only_skill_recovery(
+    runtime_args: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bare ``--runtime codex`` still gates while the skills-only recipe does not."""
+    from unittest.mock import patch
+
+    from forge.core.runtime import get_runtime
+
+    home = tmp_path / "home"
+    outside = tmp_path / "outside"
+    home.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.chdir(outside)
+    missing = type(
+        "VersionCheck",
+        (),
+        {
+            "ok": False,
+            "version": None,
+            "reason": "Claude Code not found. Install it first.",
+        },
+    )()
+    recovery = "forge extension enable --scope user --profile minimal --with skills --without commands --runtime codex"
+
+    with (
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=[get_runtime("codex")],
+        ),
+        patch(
+            "forge.install.version.check_minimum_version",
+            return_value=missing,
+        ) as version_check,
+    ):
+        blocked = CliRunner().invoke(
+            extensions,
+            ["enable", "--scope", "user", *runtime_args],
+        )
+        installed = CliRunner().invoke(extensions, recovery.split()[2:])
+
+    assert blocked.exit_code == 1, blocked.output
+    assert recovery in " ".join(blocked.output.split())
+    assert installed.exit_code == 0, installed.output
+    assert version_check.call_count == 1
+    assert not (tmp_path / "claude-home").exists()
+    assert (home / ".agents" / "skills" / "smoke-test" / "SKILL.md").is_file()
 
 
 class TestEnableProjectRegistry:
@@ -340,7 +411,9 @@ class TestEnableProjectRegistry:
             patch("forge.cli.extensions.Installer") as MockInstaller,
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
-            MockInstaller.return_value.init.return_value = self._successful_plan()
+            plan = self._successful_plan()
+            MockInstaller.return_value.plan.return_value = plan
+            MockInstaller.return_value.init.return_value = plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, ["--scope", "local", "--root", str(repo)])
 
@@ -357,7 +430,9 @@ class TestEnableProjectRegistry:
             patch("forge.cli.extensions.Installer") as MockInstaller,
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
-            MockInstaller.return_value.init.return_value = self._successful_plan()
+            plan = self._successful_plan()
+            MockInstaller.return_value.plan.return_value = plan
+            MockInstaller.return_value.init.return_value = plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, ["--scope", "user"])
 
@@ -634,6 +709,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
 
@@ -674,6 +750,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
 
@@ -711,6 +788,7 @@ class TestEnableWithPath:
             patch("forge.install.version.check_minimum_version") as mock_ver,
         ):
             mock_instance = MockInstaller.return_value
+            mock_instance.plan.return_value = mock_plan
             mock_instance.init.return_value = mock_plan
             mock_ver.return_value = MagicMock(ok=True)
             result = CliRunner().invoke(enable_cmd, [])
@@ -852,6 +930,53 @@ class TestScopeAllConflict:
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output.lower()
 
+    def test_disable_all_attempts_every_installation_and_exits_nonzero_on_failure(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock, call, patch
+
+        from forge.install.models import Installation
+
+        tracking = MagicMock()
+        tracking.list_installations.return_value = [
+            (
+                "user",
+                None,
+                Installation(scope="user", mode="copy", profile="standard"),
+            ),
+            (
+                "project",
+                str(tmp_path),
+                Installation(
+                    scope="project",
+                    project_path=str(tmp_path),
+                    mode="copy",
+                    profile="standard",
+                ),
+            ),
+        ]
+        failed_installer = MagicMock()
+        failed_installer.uninstall.side_effect = OSError("permission denied")
+        successful_installer = MagicMock()
+
+        with (
+            patch("forge.cli.extensions.TrackingStore", return_value=tracking),
+            patch(
+                "forge.cli.extensions.Installer",
+                side_effect=[failed_installer, successful_installer],
+            ) as installer_class,
+            patch("forge.cli.extensions._enforce_project_compatibility"),
+        ):
+            result = CliRunner().invoke(extensions, ["disable", "--all", "--yes"])
+
+        assert result.exit_code == 1, result.output
+        assert "Completed with 1 error(s)." in result.output
+        assert "permission denied" in result.output
+        assert installer_class.call_args_list == [
+            call(scope=InstallScope.USER, project_root=None),
+            call(scope=InstallScope.PROJECT, project_root=tmp_path),
+        ]
+        failed_installer.uninstall.assert_called_once_with()
+        successful_installer.uninstall.assert_called_once_with()
+
     def test_status_all_with_scope_errors(self) -> None:
         from click.testing import CliRunner
 
@@ -881,6 +1006,72 @@ class TestScopeAllConflict:
         result = runner.invoke(status_cmd, ["--scope", "user", "--root", str(tmp_path)])
         assert result.exit_code != 0
         assert "not applicable" in result.output.lower()
+
+
+@pytest.mark.parametrize("as_json", [False, True], ids=["human", "json"])
+def test_status_all_outside_project_skips_unresolved_non_user_scopes(
+    as_json: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    home = tmp_path / "home"
+    outside = tmp_path / "outside"
+    home.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+    monkeypatch.chdir(outside)
+    args = ["status", "--all"]
+    if as_json:
+        args.append("--json")
+
+    result = CliRunner().invoke(extensions, args)
+
+    assert result.exit_code == 0, result.output
+    if as_json:
+        assert json.loads(result.output) == []
+    else:
+        assert "Scope: user" in result.output
+        assert "Scope: project" in result.output
+        assert "Scope: local" in result.output
+        assert result.output.count("Not enabled") == 3
+
+
+def test_unavailable_runtime_conflict_says_force_cannot_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    outside = tmp_path / "outside"
+    home.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+    monkeypatch.chdir(outside)
+    monkeypatch.setattr("forge.install.installer.installed_runtimes", lambda: [])
+
+    result = CliRunner().invoke(
+        extensions,
+        [
+            "enable",
+            "--scope",
+            "user",
+            "--runtime",
+            "codex",
+            "--force",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    output = " ".join(result.output.split())
+    assert "runtime_unavailable" in output
+    assert "--force does not override" in output
+    assert "Use --force to override" not in output
 
 
 class TestDisableNoInstallMessage:
@@ -1136,7 +1327,20 @@ class TestCleanupProject:
         selected_settings = selected / ".claude" / "settings.json"
         selected_settings.write_text(
             json.dumps(
-                {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "forge hook session-start"}]}]}}
+                {
+                    "hooks": {
+                        "SessionStart": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "forge hook session-start",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
             ),
             encoding="utf-8",
         )
@@ -1392,8 +1596,14 @@ class TestCleanupProject:
             enrollment_created=False,
             user_codex_action="update",
         )
-        monkeypatch.setattr("forge.cli.extensions.plan_project_hook_migration", lambda _root: preview_plan)
-        monkeypatch.setattr("forge.cli.extensions.apply_project_hook_migration", lambda _root: applied_result)
+        monkeypatch.setattr(
+            "forge.cli.extensions.plan_project_hook_migration",
+            lambda _root: preview_plan,
+        )
+        monkeypatch.setattr(
+            "forge.cli.extensions.apply_project_hook_migration",
+            lambda _root: applied_result,
+        )
 
         result = CliRunner().invoke(
             extensions,

@@ -528,8 +528,6 @@ uninstall_forge() {
         fatal "FORGE_HOME ('$FORGE_HOME') doesn't look like a Forge installation. Set FORGE_HOME correctly or remove it manually."
     fi
 
-    local had_errors=false
-
     # Show what will be removed (if forge is available)
     local forge_cmd=""
     if [[ -x "$FORGE_BIN/forge" ]]; then
@@ -545,13 +543,14 @@ uninstall_forge() {
         echo ""
     fi
 
-    # 1. Remove Claude Code extensions (if forge is available)
+    # 1. Remove tracked Forge extensions (if forge is available)
     if [[ -n "$forge_cmd" ]]; then
         # Remove ALL tracked extensions (user + all local/project)
-        info "Removing Claude Code extensions (all scopes)..."
-        "$forge_cmd" extension disable --all --force 2>/dev/null || {
-            warn "Could not run 'forge extension disable --all' (may need manual cleanup)"
-        }
+        info "Removing Forge extensions (all scopes)..."
+        "$forge_cmd" extension disable --all --yes ||
+            fatal "Could not disable every tracked Forge extension. Resolve the reported errors, then retry uninstall."
+    elif [[ -e "$FORGE_HOME/installed.json" ]]; then
+        fatal "Forge command not found while $FORGE_HOME/installed.json still tracks extensions. Restore the command and retry uninstall."
     else
         warn "Forge command not found, skipping extension removal"
     fi
@@ -699,7 +698,7 @@ uninstall_forge() {
     echo ""
     echo "  Removed:"
     echo "    ✓ ~/.forge/ directory (sessions, proxies, config)"
-    echo "    ✓ Claude Code extensions (all tracked scopes)"
+    echo "    ✓ Forge extensions (all tracked scopes)"
     echo "    ✓ Python packages (pip + uv tool)"
     echo "    ✓ Docker images (multi-forge-*, claude-forge-*)"
     echo "    ✓ Shell PATH entries"

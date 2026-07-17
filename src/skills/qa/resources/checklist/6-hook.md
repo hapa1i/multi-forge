@@ -27,9 +27,18 @@ cat $CLAUDE_HOME/settings.json | jq '.hooks'
 ```bash
 # Install runtime hooks only (no commands/skills)
 forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+jq -e '.installations.user.modules_enabled == ["codex-hooks", "hooks"]
+  and .installations.user.skill_packages == []' "$FORGE_HOME/installed.json"
+
+# Restore the full Claude package set required by the later live-skill checks.
+forge extension enable --scope user --symlink --profile full --runtime claude
+jq -e '(.installations.user.skill_packages | length == 11)
+  and all(.installations.user.skill_packages[]; .runtime == "claude_code")' \
+  "$FORGE_HOME/installed.json"
 ```
 
-- [ ] Hooks-only install works (writes tracked hooks to user settings.json)
+- [ ] Hooks-only install writes only tracked hook modules and records no runtime skill packages
+- [ ] Full-profile restore records eleven Claude packages for the later live-skill checks
 
 ### 6.3 Test Hook Manually
 

@@ -29,7 +29,7 @@ from forge.install.tracking import TrackingStore
 
 
 @pytest.fixture
-def skill_installer(tmp_path: Path) -> tuple[Installer, Path, Path, Path]:
+def skill_installer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Installer, Path, Path, Path]:
     """Set up installer with skills in the source tree.
 
     Creates:
@@ -43,6 +43,7 @@ def skill_installer(tmp_path: Path) -> tuple[Installer, Path, Path, Path]:
 
     claude_home = tmp_path / ".claude"
     claude_home.mkdir()
+    monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
 
     src = tmp_path / "src"
     (src / "forge").mkdir(parents=True)  # _is_repo_checkout requires src/forge
@@ -55,12 +56,14 @@ def skill_installer(tmp_path: Path) -> tuple[Installer, Path, Path, Path]:
     # Skills: walkthrough (no profile requirement)
     wt = src / "skills" / "walkthrough"
     wt.mkdir(parents=True)
-    (wt / "SKILL.md").write_text("# Walkthrough\n")
+    (wt / "SKILL.md").write_text(
+        "---\nname: forge:walkthrough\ndescription: Test walkthrough skill\n---\n# Walkthrough\n"
+    )
 
     # Skills: qa (requires full profile)
     qa = src / "skills" / "qa"
     qa.mkdir(parents=True)
-    (qa / "SKILL.md").write_text("# QA\n")
+    (qa / "SKILL.md").write_text("---\nname: forge:qa\ndescription: Test QA skill\n---\n# QA\n")
     qa_scripts = qa / "scripts"
     qa_scripts.mkdir()
     (qa_scripts / "start-container.sh").write_text("#!/bin/bash\n")

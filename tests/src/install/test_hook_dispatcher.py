@@ -27,6 +27,7 @@ from forge.install.hook_dispatcher import (
     select_forge_binary_for_recording,
     write_runtime_metadata,
 )
+from forge.install.models import Installation
 from forge.install.project_registry import ProjectRegistryStore
 
 
@@ -867,6 +868,31 @@ def test_doctor_advises_sync_when_custom_launcher_is_discoverable_but_not_record
     assert str(custom_forge) in diagnosis.advice
 
 
+def test_doctor_keeps_best_effort_sync_advice_when_tracking_is_corrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tracking is supplementary to doctor and must never make diagnosis raise."""
+    from forge.install.tracking import TrackingStore
+
+    custom_forge, _record = _make_fake_forge(tmp_path / "custom")
+    _install_dispatcher(tmp_path, monkeypatch, tmp_path / "missing-recorded")
+    tracking = TrackingStore()
+    tracking.path.parent.mkdir(parents=True, exist_ok=True)
+    tracking.path.write_text('{"version": 999}', encoding="utf-8")
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: str(custom_forge),
+    )
+
+    assert diagnosis.status == "current"
+    assert diagnosis.advice is not None
+    assert "extension sync --scope user" in diagnosis.advice
+
+
 def test_doctor_advises_enable_when_never_enabled_and_launcher_unrecorded(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -903,6 +929,36 @@ def test_doctor_missing_dispatcher_never_enabled_advises_enable(
         argv0="forge",
         which=lambda *_args, **_kwargs: None,
         has_user_installation=False,
+    )
+
+    assert diagnosis.status == "missing"
+    assert diagnosis.advice is not None
+    assert "extension enable --scope user" in diagnosis.advice
+    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "extension sync" not in diagnosis.advice
+
+
+def test_doctor_skills_only_user_install_does_not_advise_ineffective_sync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.tracking import TrackingStore
+
+    TrackingStore().set_installation(
+        "user",
+        Installation(
+            scope="user",
+            mode="copy",
+            profile="minimal",
+            modules_enabled=["skills"],
+        ),
+    )
+    env = _env(tmp_path, _forge_home())
+
+    diagnosis = diagnose_hook_dispatcher(
+        environ=env,
+        argv0="forge",
+        which=lambda *_args, **_kwargs: None,
     )
 
     assert diagnosis.status == "missing"

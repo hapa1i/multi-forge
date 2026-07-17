@@ -173,7 +173,8 @@ M3 can proceed after M2 in parallel with M1 because it adapts Forge-owned review
 
 ## References
 
-- Forge review skill: `src/skills/review/SKILL.md`, `src/skills/review/resources/code.md`.
+- Forge review skill: `src/skills/review/content.md`, `src/skills/review/forge-skill.yaml`,
+  `src/skills/review/resources/code.md`.
 - Policy engine and composition: `docs/design_workflows.md` sections 1-2.
 - Registered hook inventory: `src/forge/install/preset.py`; contract golden
   `tests/src/install/test_registered_commands_contract.py`.

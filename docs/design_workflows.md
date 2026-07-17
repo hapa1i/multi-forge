@@ -478,22 +478,60 @@ user rather than working around the check.
 
 ## 3. Skills Architecture
 
-Skills are Forge's **scripting layer**: they teach Claude to compose Forge capabilities into workflows. Game engines
-have Lua; editors have VimScript; Forge has skills. The `forge` CLI is the engine (proxy routing, session management,
-`core.llm`). Skills are the instructions; the agent orchestrates.
+Skills are Forge's **scripting layer**: they teach supported agent runtimes to compose Forge capabilities into
+workflows. Game engines have Lua; editors have VimScript; Forge has skills. The `forge` CLI is the engine (proxy
+routing, session management, `core.llm`). Skills are the instructions; the agent orchestrates.
 
-Skills don't add tools—Claude already has Read/Write/Bash. Skills add the playbook for composing them with Forge
-(multi-proxy routing, session forking, policy checks).
+Skills do not add tools; each runtime already has repository and shell capabilities. Skills add the playbook for
+composing those capabilities with Forge (multi-proxy routing, session forking, policy checks).
 
 ### 3.1 Reflective architecture
 
-Forge installs skills about itself: `forge extension enable` deploys CLI commands (capabilities) and skills (how to use
-them). The system teaches the agent about itself.
+Forge installs skills about itself: `forge extension enable` deploys command extensions (capabilities) and
+runtime-specific skill packages (how to use them). The system teaches the agent about itself.
 
-- Coherent upgrades: `forge extension sync` updates CLI + skills atomically
-- No version drift between "what the tool can do" and "what the agent thinks the tool can do"
-- Agents can modify skills (markdown files on disk)
-- Matches hooks/status-line pattern: `forge` is the engine; extensions are instructions
+- `forge extension sync` refreshes tracked extension outputs from the currently installed Forge package.
+- Contributors edit the neutral or legacy sources under `src/skills/`, then run enable or sync; the installer compiles
+  them into generated, Forge-managed runtime packages rather than authoring targets.
+- Independently synced scopes can drift, so operators should prefer one skill scope per runtime/project.
+- The pattern matches hooks and status line: `forge` is the engine; extensions are instructions.
+
+#### Compile model and capability vocabulary
+
+Portable sources have three layers:
+
+| Layer           | Ownership                                                         | Representation                                    |
+| --------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
+| Neutral content | Runtime-free behavior and shared templated/model-family resources | `forge-skill.yaml`, `content.md`, auxiliary files |
+| Runtime adapter | Names, frontmatter, invocation policy, and capability bindings    | Typed Claude/Codex adapter data                   |
+| Build/install   | Complete validated runtime package and target ownership           | Compiled `SKILL.md` tree + `installed.json` v2    |
+
+Neutral Markdown uses `{{forge:<capability>}}`; resource and executable paths use
+`{{forge:<capability>:<package-relative-path>}}`. The vocabulary covers task arguments, resource loading,
+packaged-script execution, model-family selection, exploration, subagents, invocation policy, user interaction, and the
+Forge CLI. Packaged scripts are first-class rather than a resource-loading special case: packaged executables must be
+owner-readable/executable and compile to direct package-absolute execution from any working directory. Text scripts use
+their shebang; native executables use their OS entry point. Adapters must not assume every executable is Bash.
+
+Portable invocation policy has one typed authority: declaring the `invocation_policy` capability requires
+`allow_implicit_invocation`, from which adapters derive Claude's `disable-model-invocation` and Codex policy metadata. A
+neutral source cannot set the Claude field directly.
+
+Model-family selection is also host-runtime-owned. Claude may resolve its active Forge session dynamically; Codex binds
+the family to `openai` and leaves the exact model unspecified. It must not query an unrelated tracked Forge session,
+whose Claude default could incorrectly select the Anthropic resource.
+
+The compiler chooses a neutral source whenever `forge-skill.yaml` exists and otherwise uses the checked-in `SKILL.md` as
+a Claude-only compatibility bridge. Source and top-level package roots must be real directories. For a repository
+checkout, the same Git eligibility set used by other extension modules gates package sentinels and every source read;
+planning fails if Git cannot produce it. Contained leaf symlinks require both the link and target to be eligible.
+Adapters compose output rather than stripping Claude tokens after the fact. Unknown, undeclared, unbound, malformed, or
+leftover placeholders fail. The runtime validator checks the whole emitted tree, including nested resources, references,
+scripts, and Codex `agents/openai.yaml`, before installation planning.
+
+Only non-templated Markdown documentary references under `references/` may use an explicit `runtime_excluded_files`
+entry. Exclusions cannot hide scripts, behavioral resources, or an unfinished runtime binding; shared executable and
+templated content must remain neutral.
 
 ### 3.2 Why skills over MCP
 
@@ -505,12 +543,13 @@ databases, OAuth), but aren't the right abstraction for workflow orchestration.
 | Token cost        | Typically ~100 tokens metadata at startup | Often 3K-10K+ for tool definitions    |
 | Context pollution | Full instructions load only when invoked  | Tool schemas persist in context       |
 | Architecture      | Reflective — skills reference own install | External — separate server process    |
-| Context passing   | Fork session (full context preserved)     | Summarize and send (information loss) |
+| Context passing   | Runtime/session mechanisms when supported | Summarize and send (information loss) |
 | Determinism       | Agent interprets instructions each time   | Structured JSON-RPC interface         |
 
-**Fork advantage:** Skills can fork the current session (`claude -p --resume <uuid>` on another proxy), giving reviewers
-the **full conversation context** (files, decisions, rationale). MCP tools only see what the agent summarizes into tool
-parameters.
+**Claude fork advantage:** A Claude-hosted skill can fork the current session (`claude -p --resume <uuid>` on another
+proxy), giving reviewers the **full conversation context** (files, decisions, rationale). MCP tools only see what the
+agent summarizes into tool parameters. This is a Claude workflow capability, not a claim that every portable skill or
+runtime has identical subprocess behavior.
 
 ### 3.3 Execution modes
 
@@ -549,10 +588,11 @@ available. They are full Claude Code agents (Read/Grep/Bash/Write) but cannot in
 (`FORGE_DEPTH` prevents recursion at depth >= 2 as defense-in-depth). Pure text (.md) is a markdown prompt run in that
 environment.
 
-Skills can declare `effort: high|medium|low` in their SKILL.md frontmatter (Claude Code 2.1.80+). This overrides the
-model effort level when the skill is invoked -- useful for deep-analysis skills (`analyze`, `debate`) that benefit from
-maximum reasoning. This is orthogonal to proxy-level `reasoning_effort` hyperparameters, which control the routed
-model's behavior.
+Claude skill packages can declare `effort: high|medium|low` in emitted `SKILL.md` frontmatter (Claude Code 2.1.80+).
+Portable sources place this Claude-only field under the manifest's adapter data; it is not emitted into Codex
+frontmatter. The value overrides Claude's model effort when the skill is invoked -- useful for deep-analysis skills
+(`analyze`, `debate`) that benefit from maximum reasoning. This is orthogonal to proxy-level `reasoning_effort`
+hyperparameters, which control the routed model's behavior.
 
 Forge injects `claude --effort` per-caller on its automated `claude -p` subprocesses (never the user's interactive
 session). Each consumer carries its own optional effort field and, where a CLI exists, an `--effort` flag: the Claude
@@ -576,11 +616,11 @@ runners**: reusable Python functions in `core/reactive/` that each implement one
 
 **Three-layer architecture:**
 
-| Layer | What                 | Lives in                  | Examples                                         |
-| ----- | -------------------- | ------------------------- | ------------------------------------------------ |
-| 1     | Abstract runners     | `core/reactive/`          | Fan-out, adversarial, linear, actor/critic       |
-| 2     | Skill resources      | `src/skills/*/resources/` | Review resource .md, analyze prompt, tagger      |
-| 3     | Concrete invocations | `src/skills/*/SKILL.md`   | `/forge:panel`, `/forge:debate`, `/forge:review` |
+| Layer | What                 | Lives in                            | Examples                                         |
+| ----- | -------------------- | ----------------------------------- | ------------------------------------------------ |
+| 1     | Abstract runners     | `core/reactive/`                    | Fan-out, adversarial, linear, actor/critic       |
+| 2     | Skill resources      | `src/skills/*/resources/`           | Review resource .md, analyze prompt, tagger      |
+| 3     | Concrete invocations | Neutral source or legacy `SKILL.md` | `/forge:panel`, `/forge:debate`, `/forge:review` |
 
 Layer 3 entry points wire a runner (Layer 1) to specific resources (Layer 2). The same runner/resource can be combined
 differently by different entry points.
@@ -615,15 +655,24 @@ outputs), and evidence-weighted synthesis.
 
 **Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
 half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/credential_registry.py`'s
-`Credential`/`CREDENTIALS` pattern) answers seven capability questions without hard-coding Claude Code assumptions:
-installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
-source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
-`Literal`, not a `bool` — a field-reading consumer never mistakes a Codex limit for Claude parity. Codex's load-bearing
-declarations (`enrollment_gated` hooks, `partial` pretool policy, `default` interactive) are enumerated with their probe
-evidence in [design_appendix.md §I.2](design_appendix.md#i2-codex-runtimespec-declarations).
+`Credential`/`CREDENTIALS` pattern) answers capability questions without hard-coding Claude Code assumptions: installed
+(`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage source,
+native resume, general install scopes, dedicated skill scopes, and curated-transfer in/out. `skill_scopes` stays
+independent of `install_scopes`: Claude declares user/project/local, while Codex declares user/project and must not map
+Forge local scope onto shared project `.agents/skills`. Limited or planned support is a multi-state `Literal`, not a
+`bool` — a field-reading consumer never mistakes a Codex limit for Claude parity. Codex's load-bearing declarations
+(`enrollment_gated` hooks, `partial` pretool policy, `default` interactive) are enumerated with their probe evidence in
+[design_appendix.md §I.2](design_appendix.md#i2-codex-runtimespec-declarations).
 
-`forge runtime list [--json]` renders the matrix. `CodexHeadlessInvoker` and the auth/runtime preflight read it (e.g.
-`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
+`forge runtime list [--json]` renders both scope fields in the matrix. `CodexHeadlessInvoker` and the auth/runtime
+preflight read the same registry (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight
+checks the version gate).
+
+**Portable frontend boundary (Axis 1 vs Axis 2).** `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`
+compile for Claude and Codex. `walkthrough` and `qa` remain Claude-only because they drive Claude-specific manual-test
+flows. `panel`, `analyze`, `debate`, and `consensus` also remain Claude-only: although the fan-out lifecycle has a
+`CodexHeadlessInvoker`, their workflow engine still selects `claude -p` workers. Runtime-neutral worker dispatch is a
+separate Axis 2 change; none of these four frontends is described or installed as Codex-native before that ships.
 
 ### 3.6 Relationship to policies (workflow unification)
 
@@ -811,8 +860,10 @@ never parse human-readable CLI text -- it drifts. JSON schemas are the API contr
 (Ctrl+C), children must be terminated via process group signal (`os.killpg`). All child processes must have timeouts
 (the `timeout_seconds` parameter in `run_claude_session()`).
 
-**Skill script dependency tiers:** Skills are installed by file copy (`forge extension enable`), not as Python packages.
-Scripts in `skills/*/scripts/` have no access to `forge.*` imports or third-party deps. Three tiers handle this:
+**Skill script dependency tiers:** Skills are compiled into self-contained packages and installed by copy or by links to
+the stable compiled cache; they are not Python packages. A packaged-script capability resolves the executable from the
+selected skill root before running it, so execution never depends on the repository CWD. Scripts in `skills/*/scripts/`
+have no access to `forge.*` imports or third-party deps. Three tiers handle this:
 
 | Tier               | When                                                | How                                                    | Example                                |
 | ------------------ | --------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |

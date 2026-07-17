@@ -49,7 +49,10 @@ def mock_repo(tmp_path: Path) -> Path:
     # Skills
     skills = src / "skills" / "search"
     skills.mkdir(parents=True)
-    (skills / "SKILL.md").write_text("# Search Skill\nSearch capabilities.\n")
+    (skills / "SKILL.md").write_text(
+        "---\nname: forge:search\ndescription: Search fixture. Use when testing the installer.\n---\n"
+        "# Search Skill\nSearch capabilities.\n"
+    )
     scripts = skills / "scripts"
     scripts.mkdir()
     (scripts / "search.py").write_text("#!/usr/bin/env python3\nprint('search')\n")
@@ -124,6 +127,10 @@ def installer(mock_repo: Path, mock_claude_home: Path, mock_forge_home: Path):
             ),
             patch(
                 "forge.install.installer.get_target_root",
+                return_value=claude_home,
+            ),
+            patch(
+                "forge.install.installer.get_claude_home",
                 return_value=claude_home,
             ),
             patch(

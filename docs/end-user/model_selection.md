@@ -161,10 +161,10 @@ supervisor to follow a Forge proxy mapping.
 
 ### Skill Model-Family Detection Follows The Proxy
 
-`/forge:review` and `/forge:understand` auto-detect the model family from the proxy template's `opus` tier via
-`forge session show --field model_family`. Today, specialized resources exist for OpenAI and Gemini; Anthropic and
-currently-unmapped families use the Anthropic-tuned default unless additional `code-{family}.md` resources and family
-mappings are added.
+`review`, `review-docs`, and `understand` auto-detect the model family from the proxy template's `opus` tier via
+`forge session show --field model_family`. The Claude selectors are `/forge:<name>` and the Codex selectors are
+`$<name>`. Today, specialized code/document resources exist for OpenAI and Gemini; Anthropic and currently unmapped
+families use the Anthropic-tuned default unless additional family resources and mappings are added.
 
 ---
 
@@ -241,14 +241,14 @@ strengths matter.
 
 ## Reference
 
-| Role            | CLI entry point                                    | Implementation                                               |
-| --------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| Executor        | `forge session start [--proxy <id>] [--model <m>]` | `src/forge/session/manager.py`, `src/forge/cli/session.py`   |
-| Supervisor      | `forge policy supervisor set <target>`             | `src/forge/policy/semantic/supervisor.py`                    |
-| `/forge:review` | `src/skills/review/SKILL.md` (Claude Code skill)   | `src/forge/core/ops/session_context.py` for family detection |
-| `/forge:panel`  | `forge workflow panel ...`                         | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
-| `/forge:debate` | `forge workflow debate ...`                        | `src/forge/review/engine.py` (adversarial runner)            |
-| Memory writer   | Stop enqueues; a later CLI drain launches it       | `src/forge/session/memory_writer.py`                         |
+| Role                        | CLI entry point                                     | Implementation                                               |
+| --------------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| Executor                    | `forge session start [--proxy <id>] [--model <m>]`  | `src/forge/session/manager.py`, `src/forge/cli/session.py`   |
+| Supervisor                  | `forge policy supervisor set <target>`              | `src/forge/policy/semantic/supervisor.py`                    |
+| `/forge:review` / `$review` | `src/skills/review/content.md` + `forge-skill.yaml` | `src/forge/core/ops/session_context.py` for family detection |
+| `/forge:panel`              | `forge workflow panel ...`                          | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
+| `/forge:debate`             | `forge workflow debate ...`                         | `src/forge/review/engine.py` (adversarial runner)            |
+| Memory writer               | Stop enqueues; a later CLI drain launches it        | `src/forge/session/memory_writer.py`                         |
 
 Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
 need runtime readiness for panel/debate workflow runners.

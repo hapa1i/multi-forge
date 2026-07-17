@@ -23,7 +23,7 @@ below are the final coordinator record.
     preserved.
   - Member back-links: 9 repointed (8 proposed -> `../../doing/...`; T1 sibling -> `../`).
   - Inbound refs repointed in `done/forge_hook_legacy_writer` (T9), `done/forge_hook_matcher_consolidation` (prep), and
-    `proposed/cross_runtime_skills`.
+    `doing/cross_runtime_skills`.
   - Verified: link-resolver sweep reports **0** move-related broken relative links. (7 unrelated pre-existing broken
     board links were left untouched -- candidate for a separate board-hygiene pass, not this branch.)
 - [x] T1 checklist reviewed; execution complete on branch `global-forge-install` (Phases 0--3 shipped + verified;

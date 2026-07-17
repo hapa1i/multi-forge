@@ -9,7 +9,9 @@ Each runtime is a frozen :class:`RuntimeSpec` (mirrors the ``Credential`` /
 :data:`RUNTIMES` table plus lookup helpers. The data is the capability matrix from
 the runtime-abstraction card; the registry answers the seven questions that card
 poses -- installed? interactive? headless? hooks? usage? native resume? which
-install scopes?
+install scopes? Cross-runtime skill delivery adds a deliberately separate
+``skill_scopes`` capability: extension participation does not imply that a
+runtime has a private, unambiguous skill target for every Forge scope.
 
 Honest capability encoding: where a runtime's support is *limited* (Codex hooks are
 ``enrollment_gated`` -- they fire only after a one-time interactive trust enrollment)
@@ -118,6 +120,10 @@ class RuntimeSpec:
     native_resume: bool
     # Forge extension/session participation scopes, not per-feature runtime-hook targets.
     install_scopes: tuple[str, ...]  # empty = not Forge-managed
+    # Forge scopes with an explicit runtime skill target. Keep this independent
+    # from install_scopes: a runtime may participate in project/local extension
+    # setup without having a safe skill directory for both scopes.
+    skill_scopes: tuple[str, ...]
     curated_transfer_in: bool  # can accept a context doc at session start
     curated_transfer_out: bool  # can generate a curation of its own transcript
     # Hook registration/enablement floor (None when ungated): a preflight checks these
@@ -157,6 +163,7 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         native_resume=True,
         # Mirrors install.models.InstallScope (USER/PROJECT/LOCAL).
         install_scopes=("user", "project", "local"),
+        skill_scopes=("user", "project", "local"),
         curated_transfer_in=True,  # --append-system-prompt-file
         curated_transfer_out=True,  # transfer curator
         note="Forge's first-class frontend; the installer enforces a minimum Claude Code version.",
@@ -178,6 +185,11 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         # hook registration is narrower: user scope writes $CODEX_HOME/config.toml;
         # project/local installs write no runtime hook block.
         install_scopes=("user", "project", "local"),
+        # Codex has user ($HOME/.agents/skills) and committed project
+        # (<root>/.agents/skills) targets. Forge local is personal-per-project,
+        # but Codex has no distinct local-only skill directory; mapping it to the
+        # committed project target would leak a personal installation.
+        skill_scopes=("user", "project"),
         curated_transfer_in=True,  # initial user message is the zero-setup default; SessionStart additionalContext delivery is probe-confirmed in enrolled homes (Phase 1 30e PASS; build is codex_frontend Phase 4)
         curated_transfer_out=True,  # via headless invoker
         note=(

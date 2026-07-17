@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ from forge.install.codex_hooks import (
     get_builtin_codex_entries,
     get_codex_config_path,
 )
+from forge.install.exceptions import TrackingCorruptedError
 from forge.install.hook_migration import (
     KNOWN_LEGACY_HOOK_SHAPES,
     HookMigrationError,
@@ -26,6 +28,7 @@ from forge.install.models import (
     InstalledFile,
     InstalledManifest,
     InstalledSettingsEntry,
+    InstalledSkillPackage,
     InstallMode,
     InstallModule,
     InstallProfile,
@@ -159,6 +162,66 @@ def test_stale_candidate_is_report_only(tmp_path: Path) -> None:
     assert candidate.stale is True
     assert candidate.cleanup_command is None
     assert candidate.reason == "tracked root no longer exists"
+
+
+def test_cleanup_preview_rejects_unsupported_tracking_before_settings_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _forge_root(tmp_path)
+    tracking = TrackingStore()
+    tracking.path.parent.mkdir(parents=True, exist_ok=True)
+    original = json.dumps({"version": 999, "installations": {}}, indent=2)
+    tracking.path.write_text(original, encoding="utf-8")
+    settings_reads: list[Path] = []
+
+    def reject_settings_read(path: Path, *_args: object, **_kwargs: object) -> None:
+        settings_reads.append(path)
+        raise AssertionError(f"cleanup read settings after invalid tracking: {path}")
+
+    monkeypatch.setattr("forge.install.hook_migration._plan_settings_cleanup", reject_settings_read)
+
+    with pytest.raises(TrackingCorruptedError, match="incompatible version"):
+        plan_project_hook_migration(root, tracking=tracking)
+
+    assert settings_reads == []
+    assert tracking.path.read_text(encoding="utf-8") == original
+
+
+def test_cleanup_v1_preview_is_read_only_then_apply_writes_current(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _forge_root(tmp_path)
+    entry = _legacy_entry()
+    settings = get_settings_path(InstallScope.PROJECT, root)
+    settings.write_text(json.dumps({"hooks": {"SessionStart": [entry]}}), encoding="utf-8")
+    installation = asdict(_installation(root, entry))
+    installation.pop("skill_packages")
+    legacy = {
+        "version": 1,
+        "installations": {f"project:{root}": installation},
+    }
+    tracking = TrackingStore()
+    tracking.path.parent.mkdir(parents=True, exist_ok=True)
+    original = json.dumps(legacy, indent=2)
+    tracking.path.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(
+        "forge.install.hook_migration.diagnose_hook_dispatcher",
+        lambda: SimpleNamespace(status="current"),
+    )
+
+    plan = plan_project_hook_migration(root, tracking=tracking)
+
+    assert plan.root == root.resolve()
+    assert tracking.path.read_text(encoding="utf-8") == original
+
+    monkeypatch.setattr("forge.install.hook_migration.install_hook_dispatcher", lambda: None)
+    apply_project_hook_migration(root, tracking=tracking)
+
+    persisted = json.loads(tracking.path.read_text(encoding="utf-8"))
+    assert persisted["version"] == 2
+    assert persisted["installations"][f"project:{root}"]["skill_packages"] == []
 
 
 def test_v1_candidate_without_recoverable_path_is_not_guessed(tmp_path: Path) -> None:
@@ -334,6 +397,23 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     )
     tracking = TrackingStore()
     project_installation = _installation(root, entry)
+    project_skill_path = root / ".claude" / "skills" / "challenge" / "SKILL.md"
+    project_package = InstalledSkillPackage(
+        runtime="claude_code",
+        skill="challenge",
+        target_dir=str(project_skill_path.parent),
+        file_paths=[str(project_skill_path)],
+    )
+    project_installation.files = [
+        InstalledFile(
+            target_path=str(project_skill_path),
+            source_path=str(project_skill_path),
+            checksum="unchanged",
+            mode=InstallMode.COPY.value,
+            installed_at="2026-01-01T00:00:00Z",
+        )
+    ]
+    project_installation.skill_packages = [project_package]
     tracking.set_installation(InstallScope.PROJECT.value, project_installation, str(root))
     added_path = save_added_settings(settings, entries_to_added_structure(project_installation.settings_entries))
     monkeypatch.setattr(
@@ -354,6 +434,7 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     project_install = tracking.get_installation(InstallScope.PROJECT.value, str(root))
     assert project_install is not None
     assert InstallModule.HOOKS.value not in project_install.modules_enabled
+    assert project_install.skill_packages == [project_package]
     assert not [entry for entry in project_install.settings_entries if entry.key_path.startswith("hooks.")]
     assert "hooks" not in load_added_settings(settings)
     user_install = tracking.get_installation(InstallScope.USER.value)
@@ -483,6 +564,7 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
         merge_type="union",
         stable_id="Read",
     )
+    package_file = tmp_path / ".agents" / "skills" / "challenge" / "SKILL.md"
     user_install = Installation(
         scope=InstallScope.USER.value,
         mode=InstallMode.COPY.value,
@@ -495,6 +577,21 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
                 checksum="unchanged",
                 mode=InstallMode.COPY.value,
                 installed_at="2026-01-01T00:00:00Z",
+            ),
+            InstalledFile(
+                target_path=str(package_file),
+                source_path=str(package_file),
+                checksum="unchanged",
+                mode=InstallMode.COPY.value,
+                installed_at="2026-01-01T00:00:00Z",
+            ),
+        ],
+        skill_packages=[
+            InstalledSkillPackage(
+                runtime="codex",
+                skill="challenge",
+                target_dir=str(package_file.parent),
+                file_paths=[str(package_file)],
             )
         ],
         settings_entries=[permission_entry],
@@ -519,6 +616,7 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
         InstallModule.HOOKS.value,
     }
     assert updated.files == user_install.files
+    assert updated.skill_packages == user_install.skill_packages
     assert permission_entry in updated.settings_entries
 
 

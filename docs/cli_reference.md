@@ -19,14 +19,41 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 
 ### Installation
 
-| Command                           | Purpose                                                                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `forge extension enable`          | Install Forge extensions; user scope installs runtime hooks, project/local installs project settings and enrolls the root |
-| `forge extension sync`            | Update existing installation to current version                                                                           |
-| `forge extension cleanup-project` | Preview/apply one legacy project-hook migration (`--root`, `--yes`)                                                       |
-| `forge extension disable`         | Remove Forge installation cleanly                                                                                         |
-| `forge extension status`          | Show installation status (`--json`)                                                                                       |
-| `forge extension doctor`          | Report install, dispatcher/dev override, hook migration, registry, and compatibility status (`--json`)                    |
+| Command                           | Purpose                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `forge extension enable`          | Install Forge extensions and selected runtime skill packages; project/local success enrolls the root   |
+| `forge extension sync`            | Update existing installation to current version                                                        |
+| `forge extension cleanup-project` | Preview/apply one legacy project-hook migration (`--root`, `--yes`)                                    |
+| `forge extension disable`         | Remove Forge installation cleanly                                                                      |
+| `forge extension status`          | Show installation status (`--json`)                                                                    |
+| `forge extension doctor`          | Report install, dispatcher/dev override, hook migration, registry, and compatibility status (`--json`) |
+
+`forge extension enable --runtime claude|codex|all` is repeatable. This option selects only outputs of the SKILLS
+module; it does not filter commands, agents, permissions, settings, status line, or hooks selected by the profile. With
+no option, a new enable targets Claude skills and adds Codex when `codex` is detected. Re-enabling an existing
+installation also retains every runtime it already manages, so temporary binary absence cannot make those packages
+stale. An explicit unavailable runtime fails preflight. On an existing installation, an explicit `--runtime` refreshes
+the selected runtimes and preserves tracked packages for omitted runtimes. `forge extension sync` likewise uses the
+installation's tracked runtime set. Use `forge extension disable` to remove managed packages.
+
+Skill targets are `$CLAUDE_HOME/skills` (Claude user), `<root>/.claude/skills` (Claude project/local),
+`$HOME/.agents/skills` (Codex user), and `<root>/.agents/skills` (Codex project). Codex local is unsupported and never
+aliases the shared project target; Codex skills never use `$CODEX_HOME`. A project install containing only the SKILLS
+module with `--runtime codex` can succeed without `.claude/` or the Claude version gate. A standard-profile
+`--runtime codex` is not Codex-only because the other profile modules still plan their normal Claude surfaces.
+
+Without an explicit scope, `sync`, `disable`, and `status` walk upward from the current directory. They combine
+`.claude/` ownership sidecars with exact scope/path rows in `~/.forge/installed.json`, so a tracked Codex-only project
+remains discoverable even when it has no `.claude/` directory.
+
+Codex package planning scans the user/project/admin skill chain for same-name directories containing `SKILL.md` and
+cross-references valid Forge tracking rows. Automatic selection skips an affected new Codex package. Explicit selection,
+or a duplicate beside a package that Forge already manages, makes the duplicate a whole-plan conflict. A package managed
+by another Forge scope remains a deliberate conflict. Because a user package is globally visible, user-scope planning
+and status also check valid, present tracked project/local packages outside the current directory chain. Status names
+the owning scope and the exact `forge extension disable --scope ...` command needed to release it. Only genuinely
+untracked duplicates receive remove-or-rename guidance. Forge never overwrites or deletes a duplicate package, and
+`--force` does not bypass this rule.
 
 `forge extension cleanup-project [--root <dir>] [--yes]` targets one Forge root. The default invocation is a read-only
 preview that lists settings/config removals, backups, tracking reconciliation, user runtime registration, and final
@@ -34,6 +61,11 @@ registry activation. `--yes` recomputes the plan and applies it; ambiguous regis
 state exit non-zero without a preflight write. If cleanup has begun and user registration or final enrollment fails, the
 command retains backups and prints the exact retry command for the temporary hooks-off state. There is no `--json` mode;
 `forge extension doctor --json` is the scriptable diagnostic surface.
+
+`forge extension disable --all --yes` attempts every tracked scope and reports all failures. Any failure makes the
+command exit non-zero even when other scopes were removed. The setup-script uninstaller treats that exit as terminal and
+preserves `$FORGE_HOME`, including `installed.json`, for repair and retry; it also refuses to remove that state when the
+Forge command is unavailable.
 
 Doctor reports `FORGE_DEV` under `hook_dispatcher.dev_override` as
 `{present: bool, value: string|null, target: string|null, valid: bool, effective: bool, advice: string|null}`. `valid`
@@ -47,6 +79,23 @@ otherwise it resolves `forge` from `runtime.json` and then known user-tool direc
 User-scope `enable`/`sync` may report one cleanup command per tracked legacy root, but never opens, edits, or enrolls
 those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registrations` independently from
 `double_fire_risk`. `forge extension status` remains the installation/tracking view and does not report migration state.
+For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`, `file_paths`, `state`,
+`target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is `present`, `missing`,
+`duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A Forge-managed
+cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports remove-or-rename
+guidance. A package root or descendant directory replaced by a symlink is `invalid-target`; enable, sync, and disable
+refuse to traverse it. Symlink install mode remains supported because only tracked leaves are links; a dangling leaf is
+`missing`, not `present`. Runtime-package health belongs to `extension status`; `extension doctor` does not emit
+`skill_packages`. V2 tracking also requires every package path to stay under its package, include `SKILL.md`, and appear
+in the canonical file ledger. Incoherent tracking is reported as corrupt state before status or mutation proceeds.
+
+Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
+best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings
+have been written. If an environmental write fails partway through, the previous tracking row remains authoritative and
+files created earlier in that attempt may be untracked. Repair the underlying error, inspect the named targets, and
+rerun the same command. A first-time partial Codex package must be removed before retrying because `--force` cannot
+adopt a directory that now looks user-owned; an interrupted update of an already tracked package can be repaired by
+sync.
 
 ### Session management
 
@@ -227,10 +276,11 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 | `forge runtime list`            | List detected agent runtimes and their static capability matrix (`--json`)                      |
 | `forge runtime preflight codex` | Check native headless Codex auth, hook seam, and Responses readiness (`--json`, `--proxy <id>`) |
 
-`list` reports installed versions plus interactive, headless, hook, pre-tool policy, usage, resume, and install-scope
-capabilities for Claude Code and Codex. Its JSON form also carries curated-transfer support and the full static runtime
-record. It is an inventory surface, not a dynamic auth-readiness check. Install scopes describe where Forge's
-extension/session assets can participate; Codex runtime hook registration itself remains user-scope-only.
+`list` reports installed versions plus interactive, headless, hook, pre-tool policy, usage, resume, general
+`install_scopes`, and dedicated `skill_scopes` capabilities for Claude Code and Codex. Human output shows `SCOPES` and
+`SKILL SCOPES` separately; JSON includes both fields plus curated-transfer support and the full static runtime record.
+It is an inventory surface, not a dynamic auth-readiness check. Codex skill scopes are user/project; Codex runtime hook
+registration itself remains user-scope-only.
 
 `preflight codex` is the dynamic readiness surface. It resolves native Codex auth, reads `codex doctor`, reports the
 hook seam, and exits non-zero when Codex is not ready. A direct preflight refreshes the cached readiness used by Codex

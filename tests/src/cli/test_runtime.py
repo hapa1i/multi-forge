@@ -53,10 +53,12 @@ def test_list_json_carries_capability_fields() -> None:
     assert codex["hook_feature_flag"] is None  # no required hook flag; codex_hooks remains a deprecated alias
     assert codex["installed"] is False  # nothing on PATH (stubbed)
     assert codex["version"] is None
+    assert codex["skill_scopes"] == ["user", "project"]
     assert "detect" not in codex  # the callable is dropped from JSON
 
     claude = next(d for d in data if d["id"] == "claude_code")
     assert claude["install_scopes"] == ["user", "project", "local"]
+    assert claude["skill_scopes"] == ["user", "project", "local"]
 
 
 # ── forge runtime preflight (Phase 5a) ────────────────────────────

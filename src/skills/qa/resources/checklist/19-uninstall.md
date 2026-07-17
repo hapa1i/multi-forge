@@ -1,4 +1,4 @@
-<!-- prereq: 0.3, 2.4, 18 -->
+<!-- prereq: 0.3, 2.13, 18.4 -->
 
 ## 19. Complete Uninstallation (setup.sh --uninstall)
 
@@ -11,21 +11,23 @@ This tests the curl-installable uninstall that removes EVERYTHING.
 <!-- destructive -->
 
 ```bash
-# Verify we have both installations
+# Verify user, local, and project installations
 cat ~/.forge/installed.json | jq '.installations | keys'
-# Should show: ["user", "local:$FORGE_TEST_REPO"]
+# Should include: user, local:$FORGE_TEST_REPO, project:$FORGE_TEST_REPO
 
 # Verify artifacts exist
 ls ~/.forge/             # Should exist
 ls ~/.forge/bin/forge    # Should exist
 ls ~/.claude/commands/   # Should have Forge commands
 ls .claude/commands/     # Should have Forge commands (local)
+ls .agents/skills/       # Should have five portable Codex project skills
 ```
 
-- [ ] Both user and local installations tracked
+- [ ] User, local, and project installations tracked
 - [ ] `~/.forge/` exists
 - [ ] User scope has Forge files
 - [ ] Local scope has Forge files
+- [ ] Project scope has five portable Codex packages under `.agents/skills`
 
 ### 19.2 Run Complete Uninstall
 
@@ -40,12 +42,12 @@ ls .claude/commands/     # Should have Forge commands (local)
 
 The script attempts to remove extensions via Forge CLI:
 
-- `forge extension disable --all --force` (remove tracked extensions)
+- `forge extension disable --all --yes` (remove tracked extensions)
 
 Then it removes `~/.forge/` and other artifacts.
 
 - [ ] Script runs without errors
-- [ ] ALL scopes uninstalled (via `forge extension disable --all --force` or equivalent)
+- [ ] ALL scopes uninstalled (via `forge extension disable --all --yes` or equivalent)
 - [ ] Shows "Found N Forge installation(s)" summary (if forge available)
 - [ ] `~/.forge/` removed
 - [ ] `~/.forge/sessions/` removed (Forge session data)
@@ -74,11 +76,14 @@ cat ~/.claude/settings.json | jq '.hooks'
 ls ~/.claude/commands/ 2>/dev/null | grep -v "^$" || echo "User commands removed"
 ls ~/.claude/agents/ 2>/dev/null | grep -v "^$" || echo "User agents removed"
 ls ~/.claude/skills/ 2>/dev/null | grep -v "^$" || echo "User skills removed"
+! find "$HOME/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
+! find "$FORGE_TEST_REPO/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | grep -q .
 ```
 
 - [ ] `~/.forge/` directory removed
 - [ ] Forge hooks removed from `~/.claude/settings.json`
 - [ ] User commands/agents/skills removed
+- [ ] No tracked Codex package remains under user or project `.agents/skills`
 
 ### 19.4 Verify Local Project Settings Preserved
 

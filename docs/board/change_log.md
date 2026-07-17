@@ -25,7 +25,74 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-17
+
+### Cross-runtime skill boundary hardening
+
+**Goal**: Close fail-open source, ownership, teardown, and probe-evidence paths found during the second review without
+moving the card out of its review hold.
+
+**Key changes**:
+
+- Batch disable now exits nonzero after any failed row, and complete uninstall preserves tracking and `$FORGE_HOME` when
+  tracked teardown cannot complete.
+- Skill loading rejects symlinked roots and applies checkout Git eligibility before discovery, reads, or caching.
+  Tracking strictly cross-validates package ownership against the canonical file ledger, and status treats dangling
+  tracked leaf symlinks as missing.
+- Neutral invocation policy is typed-only, packaged executables honor their entry point, negative Codex probes require
+  successful turns plus exact command/exit evidence, Codex model-family selection is host-authoritative, and lifecycle
+  help names exact tracking-row discovery.
+
+**Verification**: affected suite (`381 passed`); unit (`8,158 passed`, one skipped); regression (`521 passed`); targeted
+Docker lifecycle (`2 passed`); `uv build`, pre-commit, Markdown, and diff checks passed; QA parser v1.0.30 / 589
+assertions; strengthened real-Codex stages 40 and 50 passed on codex-cli 0.144.5.
+
+### Cross-runtime skill review remediation
+
+**Goal**: Close the review-found ownership, duplicate-classification, status, compiler-boundary, and clean-package gaps
+without weakening the one-visible-Codex-scope contract or moving the card out of review hold.
+
+**Key changes**:
+
+- Automatic re-enable now refreshes the union of detected and managed runtimes; explicit narrowing emits preservation
+  rows and retains omitted package files/tracking. Cross-scope duplicates use validated Forge provenance, consistent
+  path normalization, and executable scope-aware recovery instead of untracked-file advice. User-scope planning also
+  blocks on tracked project/local packages outside the current directory chain.
+- Status is safe outside projects, policy conflicts no longer advertise ineffective `--force`, cache failures map to
+  retryable installer errors, and typed/Claude frontmatter conflicts fail at manifest load.
+- Runtime package roots and descendant directories must remain real entries. Status rejects symlink substitution, and
+  enable, sync, apply, rollback, and disable revalidate before mutation instead of following links into sibling content.
+- Added Claude-worker, smoke-script, HOME-isolation, genuine v1, and lifecycle regressions; replaced mutable checkout
+  packaging simulation with an offline-built, target-installed wheel covering both runtime outputs; synchronized QA and
+  operator docs.
+
+**Verification**: review suite (`302 passed`), symlink-boundary suite (`216 passed`), full regression (`515 passed`),
+and `make test-unit` (`8134 passed, 1 skipped, 117 deselected`); targeted Docker lifecycle (`2 passed`); `uv build`;
+`make pre-commit`; `make pre-commit-md`; QA v1.0.28 / 585 assertions; walkthrough-state (`93 passed`);
+`git diff --check`. The card remains in `doing/`, and no proposed lesson was promoted to `impl_notes.md`.
+
 ## 2026-07-16
+
+### Cross-runtime skill packages (implementation complete; review hold)
+
+**Goal**: Compile, install, and operate Forge skills natively under Claude Code and Codex without duplicating the
+authoring source or weakening runtime ownership boundaries.
+
+**Key changes**:
+
+- Added a typed neutral skill manifest/compiler, Claude and Codex adapters, whole-tree validation, and content-addressed
+  package caching. Five portable skills now ship for both runtimes; six remain explicitly Claude-only.
+- Added runtime skill-scope capabilities, scope × runtime × profile planning, Codex user/project targets, duplicate
+  safety, and schema-v2 package tracking across enable, status, sync, disable, copy, and symlink lifecycles.
+- Made apply failures retryable by restoring newly created files, Claude settings, ownership sidecars, and tracking
+  state; hardened source/cache/reference/script boundaries found by adversarial review.
+- Synchronized architecture, CLI, end-user, manual-testing, QA, walkthrough, authoring, and downstream board guidance.
+
+**Verification**: adversarial acceptance (`142 passed`); `make test-unit` (`8099 passed, 1 skipped, 117 deselected`);
+Docker installer integration (`20 passed`); seven-stage real Codex probe plus compiled user/project smoke (`8/8` each);
+clean wheel project/Codex and sdist user/all-runtime lifecycles, including Claude (`11/11`) and Codex (`8/8`) smoke;
+`make pre-commit`; package and token-limit inspection. The card remains in `doing/` for the requested review, and no
+proposed lesson was promoted to `impl_notes.md`.
 
 ### GPT-5.6 catalog and Sol proxy defaults
 

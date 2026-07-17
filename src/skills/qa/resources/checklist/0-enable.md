@@ -25,6 +25,7 @@ git --version       # Need git
 # Ensure no previous Forge installation
 ls -la ~/.forge/           # Should not exist
 which forge                # Should not be on PATH (or points to dev venv)
+test ! -d "$HOME/.agents/skills" || test -z "$(find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -print -quit)"
 
 # Check Claude settings have no Forge hooks
 cat ~/.claude/settings.json | jq '.hooks' 2>/dev/null || true
@@ -32,6 +33,7 @@ cat ~/.claude/settings.local.json | jq '.hooks' 2>/dev/null || true
 ```
 
 - [ ] `~/.forge/` does not exist
+- [ ] `$HOME/.agents/skills` has no pre-existing Codex skill packages
 - [ ] No Forge hooks in `~/.claude/settings.json`
 - [ ] No Forge hooks in `~/.claude/settings.local.json`
 
@@ -50,9 +52,11 @@ cd /forge && /forge/scripts/setup.sh --local
 - [ ] `forge` binary available (at `~/.local/bin/forge` for `--local` mode)
 - [ ] Success message displayed
 
-> Note: `setup.sh` installs Forge but does not automatically install Claude extensions. After install, run:
+> Note: `setup.sh` installs Forge but does not automatically install runtime extensions. After install, run:
 >
-> - `forge extension enable --scope user` (installs commands/agents/skills/hooks)
+> - `forge extension enable --scope user --runtime claude` for the Claude-only QA baseline.
+> - `forge extension enable --scope user --runtime all` when verifying Claude and portable Codex packages together; the
+>   Codex user target is exercised only inside this Docker QA home.
 
 ### 0.4 Verify Installation
 
@@ -65,6 +69,7 @@ source ~/.zshrc  # or ~/.bash_profile
 # Verify forge is on PATH
 which forge
 forge --version
+forge extension enable --help | rg -- '--runtime'
 
 # Check installation artifacts
 ls -la ~/.forge/
@@ -72,6 +77,7 @@ ls -la ~/.forge/repo/
 ```
 
 - [ ] `forge` command available on PATH
+- [ ] Extension help documents repeatable `--runtime` selection (`claude`, `codex`, or `all`)
 - [ ] `~/.forge/` directory created
 - [ ] `~/.forge/repo/` contains repo (symlink or clone)
 

@@ -39,7 +39,12 @@ from forge.install.hook_migration import (
     plan_project_hook_migration,
 )
 from forge.install.hooks import diagnose_forge_hook_runtime
-from forge.install.installer import Installer, find_claude_root, find_forge_installation
+from forge.install.installer import (
+    Installer,
+    find_claude_root,
+    find_forge_installation,
+    inspect_skill_package_status,
+)
 from forge.install.models import (
     FILE_MODULES,
     PROFILE_RANK,
@@ -61,6 +66,13 @@ from forge.install.tracking import TrackingStore
 console = Console()
 _log = logging.getLogger(__name__)
 _INSTALL_SCOPE_HELP = "Installation scope: local (gitignored), project (committed), user (global)"
+_SKILL_RUNTIME_IDS = {"claude": "claude_code", "codex": "codex"}
+_NON_FORCEABLE_SKILL_CONFLICT_REASONS = {
+    "duplicate_scan_chain",
+    "forge_managed_scope_duplicate",
+    "runtime_unavailable",
+    "scope_unsupported",
+}
 
 
 def _detect_git_project_root(start: Path | None = None) -> Path | None:
@@ -101,6 +113,51 @@ def _parse_modules(modules_str: str | None) -> set[InstallModule] | None:
     if not modules_str:
         return None
     return {InstallModule(m.strip()) for m in modules_str.split(",")}
+
+
+def _parse_skill_runtimes(values: tuple[str, ...]) -> tuple[str, ...] | None:
+    """Map repeatable CLI runtime names to stable runtime registry ids."""
+
+    if not values:
+        return None
+    selected: set[str] = set()
+    for value in values:
+        if value == "all":
+            selected.update(_SKILL_RUNTIME_IDS.values())
+        else:
+            selected.add(_SKILL_RUNTIME_IDS[value])
+    return tuple(runtime for runtime in _SKILL_RUNTIME_IDS.values() if runtime in selected)
+
+
+def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | None = None) -> None:
+    """Apply the Claude CLI gate only when the plan mutates Claude surfaces."""
+
+    if not plan.requires_claude_version:
+        return
+    from forge.install.version import check_minimum_version
+
+    version_check = check_minimum_version()
+    if not version_check.ok:
+        print_error(f"{version_check.reason}")
+        codex_packages_selected = any(
+            package.runtime == _SKILL_RUNTIME_IDS["codex"] and package.action in {"install", "update"}
+            for package in plan.skill_packages
+        )
+        if version_check.version is None and codex_packages_selected:
+            root_option = f" --root {shlex.quote(str(project_root))}" if project_root is not None else ""
+            command = (
+                f"forge extension enable --scope {plan.scope}{root_option} --profile minimal "
+                "--with skills --without commands --runtime codex"
+            )
+            print_tip(
+                f"Install Claude Code, or install only Codex skills with '{command}'.",
+                console=console,
+            )
+        elif version_check.version is None:
+            print_tip("Install Claude Code, then retry.", console=console)
+        else:
+            print_tip("Run 'claude update' to upgrade.", console=console)
+        raise click.exceptions.Exit(1)
 
 
 def _count_actions(plan: InstallPlan) -> tuple[int, int, int]:
@@ -218,11 +275,12 @@ def _print_completion_message(
             parts.append("Codex hooks")
         console.print(f"\n[green]Extensions enabled.[/green] ({', '.join(parts)} updated)")
 
-    print_tip(
-        "Run 'forge claude preset edit' to customize permissions and env vars.",
-        blank_before=False,
-        console=console,
-    )
+    if InstallModule.PERMISSIONS.value in plan.modules:
+        print_tip(
+            "Run 'forge claude preset edit' to customize permissions and env vars.",
+            blank_before=False,
+            console=console,
+        )
 
     if InstallModule.SKILLS.value in plan.modules:
         print_tip(
@@ -355,7 +413,10 @@ def _print_hook_migration_plan(plan: ProjectHookMigrationPlan) -> None:
         for settings_plan in (plan.user.settings, plan.user.legacy_settings):
             if settings_plan.changed:
                 console.print(f"  - {display_path(settings_plan.path)}: update user runtime hooks; backup first")
-        if plan.user.codex is not None and plan.user.codex.action in {"install", "update"}:
+        if plan.user.codex is not None and plan.user.codex.action in {
+            "install",
+            "update",
+        }:
             console.print(f"  - {display_path(plan.user.codex.config_path)}: install/update user Codex hooks")
         if plan.user.settings.added_path is not None:
             console.print(
@@ -472,6 +533,35 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
     console.print(f"  Profile: {plan.profile}")
     console.print(f"  Modules: {', '.join(plan.modules)}")
 
+    if plan.skill_packages:
+        console.print(f"\n{prefix}[bold]Skill packages:[/bold]")
+        table = Table(show_header=True, header_style="bold", box=None)
+        table.add_column("ACTION", style="dim")
+        table.add_column("RUNTIME")
+        table.add_column("SKILL")
+        table.add_column("TARGET")
+        table.add_column("REASON", style="dim")
+        for package in plan.skill_packages:
+            style = {
+                "install": "green",
+                "update": "yellow",
+                "skip": "dim",
+                "conflict": "red",
+            }.get(package.action, "")
+            reason = package.reason or ""
+            if package.duplicate_dirs:
+                duplicates = ", ".join(display_path(path) for path in package.duplicate_dirs)
+                reason = f"{reason}; duplicates: {duplicates}" if reason else f"duplicates: {duplicates}"
+            table.add_row(
+                package.action,
+                package.runtime,
+                package.skill,
+                display_path(package.target_dir) if package.target_dir else "",
+                reason,
+                style=style,
+            )
+        console.print(table)
+
     if plan.files:
         console.print(f"\n{prefix}[bold]Files:[/bold]")
         table = Table(show_header=True, header_style="bold", box=None)
@@ -527,7 +617,26 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         console.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
         for c in plan.conflicts:
             console.print(f"  [red]- {c}[/red]")
-        print_tip("Use --force to override, or resolve conflicts manually.", console=console)
+        has_policy_conflicts = any(
+            package.action == "conflict" and package.reason in _NON_FORCEABLE_SKILL_CONFLICT_REASONS
+            for package in plan.skill_packages
+        )
+        has_forceable_conflicts = any(file.action == "conflict" for file in plan.files) or any(
+            setting.action == "conflict" for setting in plan.settings
+        )
+        if has_policy_conflicts and has_forceable_conflicts:
+            print_tip(
+                "Use --force only for file or settings conflicts; resolve runtime, scope, "
+                "and duplicate-scan conflicts manually.",
+                console=console,
+            )
+        elif has_policy_conflicts:
+            print_tip(
+                "Resolve runtime, scope, or duplicate-scan conflicts manually; --force does not override them.",
+                console=console,
+            )
+        else:
+            print_tip("Use --force to override, or resolve conflicts manually.", console=console)
 
 
 def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
@@ -550,6 +659,7 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
     table.add_column("PROJECT PATH")
     table.add_column("PROFILE")
     table.add_column("FILES")
+    table.add_column("SKILL PACKAGES")
 
     for scope, project_path, installation in installations:
         scope_display = scope
@@ -561,6 +671,7 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
             path_display,
             installation.profile,
             str(len(installation.files)),
+            str(len(installation.skill_packages)),
         )
 
     console.print(table)
@@ -589,7 +700,10 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
             installer.uninstall()
             console.print("  [green]✓ Done[/green]")
 
-        except ForgeInstallError as e:
+        except Exception as e:
+            # ``--all`` is a batch boundary: one filesystem, settings, or
+            # tracking failure must not prevent later installations from being
+            # attempted. KeyboardInterrupt/SystemExit remain uncaught.
             console.print(f"  [red]✗ Failed: {e}[/red]")
             errors.append((scope, project_path, str(e)))
 
@@ -598,6 +712,7 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
         console.print(f"[yellow]Completed with {len(errors)} error(s).[/yellow]")
         for scope, path, err in errors:
             console.print(f"  [red]- {scope} ({display_path(path) if path else 'global'}): {err}[/red]")
+        raise click.exceptions.Exit(1)
     else:
         console.print(f"[green]All {len(installations)} installation(s) disabled.[/green]")
 
@@ -609,6 +724,19 @@ def _can_resolve_project_root(scope: InstallScope, *, anchor: Path | None = None
         return True
     except NoClaudeDirectoryError:
         return False
+
+
+def _resolve_status_project_root(scope: InstallScope, anchor: Path | None) -> Path | None:
+    """Resolve a status lookup root, including tracked installs without ``.claude``."""
+
+    try:
+        return _resolve_project_root(scope, anchor=anchor)
+    except NoClaudeDirectoryError:
+        try:
+            detected_scope, detected_root = find_forge_installation(start=anchor)
+        except NoForgeInstallationError:
+            return None
+        return detected_root if detected_scope == scope else None
 
 
 # --- Commands ---
@@ -676,6 +804,13 @@ def extensions() -> None:
     "without_modules",
     help="Remove modules (comma-separated)",
 )
+@click.option(
+    "--runtime",
+    "runtimes",
+    type=click.Choice(["claude", "codex", "all"]),
+    multiple=True,
+    help="Skill runtime target; repeat for multiple targets (default: Claude plus detected Codex)",
+)
 @click.option("--force", "-f", is_flag=True, help="Override conflicts")
 @click.option("--dry-run", "-n", is_flag=True, help="Show plan without executing")
 def enable_cmd(
@@ -685,6 +820,7 @@ def enable_cmd(
     mode: str,
     with_modules: str | None,
     without_modules: str | None,
+    runtimes: tuple[str, ...],
     force: bool,
     dry_run: bool,
 ) -> None:
@@ -706,18 +842,11 @@ def enable_cmd(
         forge extension enable --root /repo/api               # Same (defaults to local)
         forge extension enable --scope user                   # Global ~/.claude
         forge extension enable --profile minimal              # Commands only
+        forge extension enable --runtime codex                # Target skill packages at Codex
+        forge extension enable --runtime claude --runtime codex
         forge extension enable --dry-run                      # Preview changes
     """
     try:
-        # Check Claude Code minimum version (hard-block: reject over warn)
-        from forge.install.version import check_minimum_version
-
-        version_check = check_minimum_version()
-        if not version_check.ok:
-            print_error(f"{version_check.reason}")
-            print_tip("Run 'claude update' to upgrade.", console=console)
-            sys.exit(1)
-
         anchor = Path(path) if path else None
 
         # Validate: --scope user + --root is contradictory
@@ -762,13 +891,6 @@ def enable_cmd(
 
         _enforce_project_compatibility(project_root)
 
-        # Create .claude/ only when not dry-run
-        if needs_create and project_root is not None:
-            if dry_run:
-                console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
-            else:
-                _create_claude_dir(project_root)
-
         # Rule 1 anchor: .forge/ is required for session start.
         # Preview in dry-run; actual creation deferred until installer succeeds.
         needs_forge = project_root is not None and not (project_root / ".forge").is_dir()
@@ -777,29 +899,41 @@ def enable_cmd(
 
         install_profile = InstallProfile(profile)
         install_mode = InstallMode(mode)
+        selected_runtimes = _parse_skill_runtimes(runtimes)
 
         installer = Installer(scope=install_scope, project_root=project_root)
+        plan = installer.plan(
+            profile=install_profile,
+            mode=install_mode,
+            with_modules=_parse_modules(with_modules),
+            without_modules=_parse_modules(without_modules),
+            force=force,
+            skill_runtimes=selected_runtimes,
+        )
 
         if dry_run:
-            plan = installer.plan(
-                profile=install_profile,
-                mode=install_mode,
-                with_modules=_parse_modules(with_modules),
-                without_modules=_parse_modules(without_modules),
-                force=force,
-            )
+            if needs_create and project_root is not None and plan.requires_claude_version:
+                console.print(f"[dim]Would create {display_path(project_root / '.claude')}[/dim]")
             _print_plan(plan, dry_run=True)
             if plan.has_conflicts:
                 sys.exit(1)
             if install_scope == InstallScope.USER:
                 _print_hook_migration_candidates()
         else:
+            if plan.has_conflicts:
+                _print_plan(plan)
+                console.print("\n[red]Enable failed due to conflicts.[/red]")
+                sys.exit(1)
+            _enforce_claude_version_if_required(plan, project_root)
+            if needs_create and project_root is not None and plan.requires_claude_version:
+                _create_claude_dir(project_root)
             plan = installer.init(
                 profile=install_profile,
                 mode=install_mode,
                 with_modules=_parse_modules(with_modules),
                 without_modules=_parse_modules(without_modules),
                 force=force,
+                skill_runtimes=selected_runtimes,
             )
             _print_plan(plan)
             if plan.has_conflicts:
@@ -856,8 +990,9 @@ def sync_cmd(scope: str | None, force: bool) -> None:
 
     \b
     Scope Detection (when no --scope specified):
-        Walks up from current directory looking for existing Forge extensions
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge extensions,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - Fails if no extensions found
 
@@ -868,26 +1003,28 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         forge extension sync --force            # Force re-sync
     """
     try:
-        # Check Claude Code minimum version (same gate as enable)
-        from forge.install.version import check_minimum_version
-
-        version_check = check_minimum_version()
-        if not version_check.ok:
-            print_error(f"{version_check.reason}")
-            print_tip("Run 'claude update' to upgrade.", console=console)
-            sys.exit(1)
-
         if scope is None:
             install_scope, project_root = find_forge_installation()
             console.print(f"[dim]Auto-detected scope: {install_scope.value}[/dim]")
         else:
             install_scope = InstallScope(scope)
-            # Use canonical project root (finds .claude/ and resolves symlinks)
-            project_root = _resolve_project_root(install_scope)
+            try:
+                project_root = _resolve_project_root(install_scope)
+            except NoClaudeDirectoryError:
+                detected_scope, detected_root = find_forge_installation()
+                if detected_scope != install_scope:
+                    raise NotInstalledError(install_scope.value) from None
+                project_root = detected_root
 
         _enforce_project_compatibility(project_root)
 
         installer = Installer(scope=install_scope, project_root=project_root)
+        preview = installer.plan_update(force=force)
+        if preview.has_conflicts:
+            _print_plan(preview)
+            console.print("\n[red]Sync failed due to conflicts.[/red]")
+            sys.exit(1)
+        _enforce_claude_version_if_required(preview, project_root)
         plan = installer.update(force=force)
 
         _print_plan(plan)
@@ -1028,8 +1165,9 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
 
     \b
     Scope Detection (when no --scope/--all specified):
-        Walks up from current directory looking for existing Forge extensions
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge extensions,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - Fails if no extensions found
 
@@ -1058,8 +1196,13 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             console.print(f"[dim]Auto-detected scope: {install_scope.value}[/dim]")
         else:
             install_scope = InstallScope(scope)
-            # Use canonical project root (finds .claude/ and resolves symlinks)
-            project_root = _resolve_project_root(install_scope)
+            try:
+                project_root = _resolve_project_root(install_scope)
+            except NoClaudeDirectoryError:
+                detected_scope, detected_root = find_forge_installation()
+                if detected_scope != install_scope:
+                    raise NoForgeInstallationError(str(Path.cwd())) from None
+                project_root = detected_root
 
         _enforce_project_compatibility(project_root)
 
@@ -1074,6 +1217,23 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
         console.print(f"  Profile:  {existing.profile}")
         console.print(f"  Mode:     {existing.mode}")
         console.print()
+
+        if existing.skill_packages:
+            table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
+            table.add_column("ACTION", style="red")
+            table.add_column("RUNTIME")
+            table.add_column("SKILL")
+            table.add_column("TARGET")
+            for package in existing.skill_packages:
+                table.add_row(
+                    "remove",
+                    package.runtime,
+                    package.skill,
+                    display_path(package.target_dir),
+                )
+            console.print("[bold]Skill packages:[/bold]")
+            console.print(table)
+            console.print()
 
         if existing.files:
             table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
@@ -1159,8 +1319,9 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
 
     \b
     Scope Detection (when no --scope/--all specified):
-        Walks up from current directory looking for existing Forge installations
-        (detected by .settings.*.json.forge.* files in .claude/).
+        Walks up from current directory looking for existing Forge installations,
+        using .claude/ ownership sidecars and exact scope/path tracking rows in
+        ~/.forge/installed.json.
         - Checks LOCAL first, then PROJECT, then USER
         - If no installation found, shows all scopes for informational purposes
 
@@ -1185,7 +1346,11 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     # A corrupt installed.json raises TrackingCorruptedError (a StateCorruptedError);
     # it propagates to the top-level handler for the uniform reset tip.
     tracking = TrackingStore()
-    tracking.read()
+    tracked_installations = tracking.list_installations()
+    installations_by_target = {
+        (tracked_scope, project_path): installation
+        for tracked_scope, project_path, installation in tracked_installations
+    }
 
     cwd = os.getcwd()
 
@@ -1222,15 +1387,18 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
 
         data = []
         for s in scopes:
-            try:
-                project_root = _resolve_project_root(s, anchor=effective_anchor)
-                project_path_str = str(project_root) if project_root else None
-            except NoClaudeDirectoryError:
-                project_path_str = None
+            project_root = _resolve_status_project_root(s, effective_anchor)
+            project_path_str = str(project_root) if project_root else None
 
-            inst = tracking.get_installation(s.value, project_path_str)
+            inst = installations_by_target.get((s.value, project_path_str))
             if inst is None:
                 continue
+            package_statuses = inspect_skill_package_status(
+                inst,
+                s,
+                project_root,
+                tracked_installations=tracked_installations,
+            )
             data.append(
                 {
                     "scope": s.value,
@@ -1238,6 +1406,20 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                     "mode": inst.mode,
                     "modules": list(inst.modules_enabled),
                     "files_count": len(inst.files),
+                    "skill_packages": [
+                        {
+                            "runtime": package_status.runtime,
+                            "skill": package_status.skill,
+                            "target_dir": package_status.target_dir,
+                            "file_paths": list(package_status.file_paths),
+                            "state": package_status.state,
+                            "target_present": package_status.target_present,
+                            "missing_file_paths": list(package_status.missing_file_paths),
+                            "duplicate_dirs": list(package_status.duplicate_dirs),
+                            "recovery": package_status.recovery,
+                        }
+                        for package_status in package_statuses
+                    ],
                     "settings_count": len(inst.settings_entries),
                     "codex_config_path": inst.codex_config_path,
                     "codex_commands": list(inst.codex_commands),
@@ -1256,13 +1438,10 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         console.print("[dim]Showing all scopes for this location:[/dim]")
 
     for s in scopes:
-        try:
-            project_root = _resolve_project_root(s, anchor=effective_anchor)
-            project_path_str = str(project_root) if project_root else None
-        except NoClaudeDirectoryError:
-            project_path_str = None
+        project_root = _resolve_status_project_root(s, effective_anchor)
+        project_path_str = str(project_root) if project_root else None
 
-        installation = tracking.get_installation(s.value, project_path_str)
+        installation = installations_by_target.get((s.value, project_path_str))
 
         console.print(f"\n[bold]Scope: {s.value}[/bold]")
 
@@ -1280,11 +1459,57 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         console.print(f"  Mode:      {installation.mode}")
         console.print(f"  Modules:   {', '.join(installation.modules_enabled)}")
         console.print(f"  Files:     {len(installation.files)}")
+        console.print(f"  Skills:    {len(installation.skill_packages)} runtime package(s)")
         console.print(f"  Settings:  {len(installation.settings_entries)} entries")
         if installation.codex_config_path:
             console.print(f"  Codex:     hooks registered in {display_path(installation.codex_config_path)}")
         console.print(f"  Installed: {installation.installed_at}")
         console.print(f"  Updated:   {installation.updated_at}")
+
+        if installation.skill_packages:
+            package_statuses = inspect_skill_package_status(
+                installation,
+                s,
+                project_root,
+                tracked_installations=tracked_installations,
+            )
+            table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
+            table.add_column("STATE")
+            table.add_column("RUNTIME")
+            table.add_column("SKILL")
+            table.add_column("TARGET")
+            for package_status in package_statuses:
+                style = {
+                    "present": "green",
+                    "missing": "yellow",
+                    "duplicate": "red",
+                    "invalid-target": "red",
+                }.get(package_status.state, "")
+                table.add_row(
+                    package_status.state,
+                    package_status.runtime,
+                    package_status.skill,
+                    display_path(package_status.target_dir),
+                    style=style,
+                )
+            console.print("\n  [dim]Skill packages:[/dim]")
+            console.print(table)
+            for package_status in package_statuses:
+                if package_status.duplicate_dirs:
+                    console.print(
+                        f"  [red]{package_status.runtime}/{package_status.skill} duplicates:[/red] "
+                        + ", ".join(display_path(path) for path in package_status.duplicate_dirs)
+                    )
+                if package_status.missing_file_paths:
+                    console.print(
+                        f"  [yellow]{package_status.runtime}/{package_status.skill} missing files:[/yellow] "
+                        + ", ".join(display_path(path) for path in package_status.missing_file_paths)
+                    )
+                if package_status.recovery:
+                    console.print(
+                        f"  [yellow]{package_status.runtime}/{package_status.skill}:[/yellow] "
+                        f"{package_status.recovery}"
+                    )
 
         try:
             inst_profile = InstallProfile(installation.profile)

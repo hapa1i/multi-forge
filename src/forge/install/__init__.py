@@ -21,6 +21,7 @@ from .models import (
     Installation,
     InstalledFile,
     InstalledManifest,
+    InstalledSkillPackage,
     InstalledSettingsEntry,
     InstallMode,
     InstallModule,
@@ -28,6 +29,8 @@ from .models import (
     InstallProfile,
     InstallScope,
     SettingsPlan,
+    SkillPackagePlan,
+    SkillPackageStatus,
 )
 
 __all__ = [
@@ -38,12 +41,15 @@ __all__ = [
     "InstallModule",
     # Tracking dataclasses
     "InstalledFile",
+    "InstalledSkillPackage",
     "InstalledSettingsEntry",
     "Installation",
     "InstalledManifest",
     # Plan dataclasses
     "FilePlan",
     "SettingsPlan",
+    "SkillPackagePlan",
+    "SkillPackageStatus",
     "InstallPlan",
     # Exceptions
     "ForgeInstallError",

@@ -2,11 +2,11 @@
 
 Three skills verify that Forge is installed and working correctly, with escalating isolation:
 
-| Mode        | Command              | What it does                                              | Install profile |
-| ----------- | -------------------- | --------------------------------------------------------- | --------------- |
-| Smoke test  | `/forge:smoke-test`  | Read-only health check (no writes)                        | `standard`      |
-| Walkthrough | `/forge:walkthrough` | Install + assert in sandbox, verify real system untouched | `standard`      |
-| Full QA     | `/forge:qa`          | Full checklist in Docker                                  | `full`          |
+| Mode        | Invocation                                        | What it does                                              | Runtime          | Install requirement |
+| ----------- | ------------------------------------------------- | --------------------------------------------------------- | ---------------- | ------------------- |
+| Smoke test  | Claude: `/forge:smoke-test`; Codex: `$smoke-test` | Read-only health check (no writes)                        | Claude and Codex | SKILLS module       |
+| Walkthrough | `/forge:walkthrough`                              | Install + assert in sandbox, verify real system untouched | Claude Code only | SKILLS module       |
+| Full QA     | `/forge:qa`                                       | Full checklist in Docker                                  | Claude Code only | `full` profile      |
 
 - Canonical architecture: [`docs/design_appendix.md` section D](../design_appendix.md#d-interactive-manual-testing)
 - Testing guidelines: [`testing_guidelines.md`](../developer/testing_guidelines.md)
@@ -22,13 +22,24 @@ Inside a Claude Code session:
 /forge:walkthrough                     # Default: interactive walkthrough
 ```
 
+Inside Codex, explicitly invoke the portable smoke skill:
+
+```
+$smoke-test
+```
+
+`walkthrough` and `qa` remain Claude-only because they orchestrate Claude Code interaction. The portable skills are
+`challenge`, `smoke-test`, `review`, `review-docs`, and `understand`; `analyze`, `consensus`, `debate`, `panel`, `qa`,
+and `walkthrough` remain Claude-only.
+
 ---
 
 ## Smoke test
 
 Runs a fixed set of read-only probes: `forge --version`, installation status, file existence checks. Prints a pass/fail
 table. No intentional writes; sensitive paths are snapshotted before and after and asserted unchanged. No test repo
-needed.
+needed. Its compiled invocation identifies the selected runtime and directly executes the installed script, whose entry
+point selects the interpreter independently of the session CWD.
 
 ## Walkthrough
 
@@ -38,6 +49,11 @@ The default mode creates a hermetic test environment, installs Forge extensions 
 2. Your real system was not modified (mtime assertions)
 3. Isolation invariants are correct (`FORGE_HOME`, `CLAUDE_HOME`, and `CODEX_HOME` redirected; `HOME` unchanged for
    existing authentication)
+
+Codex verification in the walkthrough is deliberately project-scoped under the hermetic repo at
+`$FORGE_TEST_REPO/.agents/skills`. It never installs Codex user skills under the real `$HOME/.agents/skills`. Codex
+planning/status subprocesses temporarily point `HOME` at a directory inside the test repo so duplicate discovery cannot
+depend on or inspect real user skill packages; the interactive environment keeps the real `HOME` for auth.
 
 The agent walks through each step interactively, explaining what it's checking and why. Risky operations (install,
 uninstall) go through `run-in-repo.sh`; read-only checks are done directly.
@@ -71,6 +87,51 @@ The agent reads the checklist section by section, runs commands inside the conta
 assertions. Auto-annotated sections run silently; human-annotated sections pause for your input. State is stored inside
 the container for resume via `--from X.Y`. `--to X.Y` always means "stop before X.Y" rather than "run through X.Y".
 
+The Docker QA is the only manual flow that exercises the Codex user target (`$HOME/.agents/skills`), because its home is
+container-isolated. It also verifies project targets, managed-runtime retention during automatic re-enable, explicit
+runtime narrowing, persisted runtime selection during sync, duplicate safety and recovery output, local-scope rejection,
+package health (including dangling leaves) in human/JSON status, strict tracking ownership, and disable/uninstall
+cleanup.
+
+## Runtime-aware extension checks
+
+Use an explicit runtime when validating one skill surface:
+
+```bash
+# Project-scoped Codex skills (safe inside a disposable test repository)
+forge extension enable --scope project --runtime codex --profile minimal --with skills --without commands
+forge extension status --scope project --json
+forge extension sync --scope project
+
+# Claude skills
+forge extension enable --scope user --profile minimal --with skills --without commands --runtime claude
+```
+
+Codex project packages install under `.agents/skills`; Codex user packages install under `$HOME/.agents/skills`. Claude
+packages remain under `.claude/skills` or `$CLAUDE_HOME/skills`. Codex has no local/private skill target, so an explicit
+`--scope local --runtime codex` request must fail rather than write into the shared project directory.
+
+`forge extension status` reports each tracked runtime package and its health (`present`, `missing`, `duplicate`, or
+`invalid-target`). Use `--json` to assert `runtime`, `skill`, `target_dir`, `state`, `missing_file_paths`,
+`duplicate_dirs`, and `recovery`. Automatic enable on an existing installation and `forge extension sync` preserve its
+recorded runtime set even when a runtime binary is temporarily absent. An explicit `--runtime` refreshes the selected
+runtimes but preserves omitted tracked packages; disable owns removal. Cross-scope Forge-managed duplicates report the
+owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance. User-scope checks
+include valid, present tracked project/local packages outside the current directory chain because a user package would
+be visible from those projects. A package root or descendant directory replaced by a symlink must report
+`invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row. A dangling
+tracked leaf symlink must instead report `missing`, and sync must recreate it.
+
+Run the following failure-path checks only in a disposable Forge home:
+
+- From a subdirectory of a tracked Codex-only project, unscoped sync/disable/status must resolve the exact project row
+  even without `.claude/`.
+- A v2 `skill_packages` row with empty, out-of-package, or non-ledger-backed `file_paths` must make status/sync/disable
+  fail before package or tracking mutation.
+- If one target makes `forge extension disable --all --yes` fail, the command must still attempt the remaining rows and
+  exit non-zero. `scripts/setup.sh --uninstall` must then preserve `$FORGE_HOME/installed.json`; it must also preserve
+  that state when the Forge command is unavailable.
+
 ---
 
 ## Other flags
@@ -102,19 +163,21 @@ test-repo/
 +-- .forge-home/         # Redirected Forge global state
 +-- .claude-user/        # Redirected user-scope Claude extensions
 +-- .codex-user/         # Redirected user-scope Codex config
-+-- .forge/walkthrough/  # State file, env.sh, reports
++-- .agents/skills/      # Project-scoped portable Codex packages
++-- .forge/walkthrough/  # State, reports, fake Codex, and duplicate-scan HOME
 +-- src/                 # Fixture source files
 +-- tests/               # Fixture test files
 +-- CLAUDE.md            # Fixture project file
 ```
 
-Every risky operation passes through `run-in-repo.sh`, which sources `env.sh` and enforces 4 safety gates before running
-any command. Your real home directory is never touched.
+Every risky operation passes through `run-in-repo.sh`, which applies a dangerous-path denylist, sources `env.sh`, and
+enforces six numbered isolation/structure gates before running any command. Your real home directory is never touched.
 
 ---
 
 ## When to run
 
-- **After installing Forge** -- run `/forge:smoke-test` then `/forge:walkthrough`
+- **After installing Forge** -- run `/forge:smoke-test` in Claude or `$smoke-test` in Codex; add the Claude-only
+  `/forge:walkthrough` for the interactive tour
 - **After upgrading Forge** -- catch regressions with the walkthrough
 - **Before a release** -- run `/forge:qa` for the full checklist

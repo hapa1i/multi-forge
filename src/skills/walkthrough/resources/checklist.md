@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.3 -->
+<!-- version: 1.0.4 -->
 
-<!-- test-count: 98 assertions -->
+<!-- test-count: 108 assertions -->
 
-<!-- last-updated: 2026-07-15 -->
+<!-- last-updated: 2026-07-17 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -22,18 +22,25 @@ isolation. `human:guided` items ask the user to act in their Terminal or Session
 ```bash
 python3 -c "
 import json, os, pathlib
-paths = ['settings.json', 'settings.local.json', 'commands', 'agents', 'skills']
-home = pathlib.Path.home() / '.claude'
-snap = {}
-for p in paths:
-    fp = home / p
-    snap[p] = os.path.getmtime(str(fp)) if fp.exists() else None
+home = pathlib.Path.home()
+paths = {
+    'claude/settings.json': home / '.claude/settings.json',
+    'claude/settings.local.json': home / '.claude/settings.local.json',
+    'claude/commands': home / '.claude/commands',
+    'claude/agents': home / '.claude/agents',
+    'claude/skills': home / '.claude/skills',
+    'codex/skills': home / '.agents/skills',
+}
+snap = {
+    name: os.path.getmtime(str(path)) if path.exists() else None
+    for name, path in paths.items()
+}
 print(json.dumps(snap, indent=2))
 "
 ```
 
 - [ ] Snapshot JSON captured successfully
-- [ ] All 5 paths recorded (settings.json, settings.local.json, commands, agents, skills)
+- [ ] All six real extension paths are recorded, including `$HOME/.agents/skills`
 
 ### 0.2 Create Test Repo
 
@@ -86,14 +93,43 @@ terminal to try Forge commands hands-on in later sections.
 
 <!-- auto -->
 
+The walkthrough and QA orchestration skills remain Claude Code-only. The smoke test is portable and its Codex package is
+verified here without launching Codex or touching the real `$HOME/.agents` tree.
+
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope user
-bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope local
+bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope user --runtime claude
+bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope local --runtime claude
+
+# Make Codex selectable without relying on a real binary. The HOME override is applied
+# after run-in-repo.sh's safety gates and isolates Codex's duplicate-scan chain.
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  mkdir -p .forge/walkthrough/bin .forge/walkthrough/home
+  printf '\''#!/bin/sh\nexit 0\n'\'' > .forge/walkthrough/bin/codex
+  chmod +x .forge/walkthrough/bin/codex
+'
+bash "$SCRIPTS/run-in-repo.sh" env \
+  HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
+  PATH="$FORGE_TEST_REPO/.forge/walkthrough/bin:$PATH" \
+  forge extension enable --scope project --root "$FORGE_TEST_REPO" \
+    --profile minimal --with skills --without commands --runtime codex
+
+# Codex has no local/private skill target. An explicit request must fail visibly.
+if bash "$SCRIPTS/run-in-repo.sh" env \
+  HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
+  PATH="$FORGE_TEST_REPO/.forge/walkthrough/bin:$PATH" \
+  forge extension enable --scope local --runtime codex \
+  > "$FORGE_TEST_REPO/.forge/walkthrough/codex-local.txt" 2>&1; then
+  echo "ERROR: Codex local scope unexpectedly succeeded" >&2
+  exit 1
+fi
+rg -q 'scope_unsupported' "$FORGE_TEST_REPO/.forge/walkthrough/codex-local.txt"
 ```
 
-- [ ] Both commands exit 0
+- [ ] User/local Claude installs and the project Codex install exit 0
 - [ ] User output installs runtime hooks; local output installs project assets/status line without a hook block
-- [ ] No real Claude/Codex settings path is changed because both settings homes point at the walkthrough sandbox
+- [ ] Explicit Codex local scope fails with `scope_unsupported`
+- [ ] Codex skill packages write only to project `.agents/skills` while both settings homes remain sandboxed
+- [ ] The real `$HOME/.agents/skills` path is never used as an install target
 
 ---
 
@@ -111,11 +147,29 @@ Use the Glob tool to verify installed files exist. Set `path` to the directory a
 
 - Glob path: `$FORGE_TEST_REPO/.claude/agents/` pattern: `*.md`
 
+- Glob path: `$FORGE_TEST_REPO/.agents/skills/` pattern: `**/SKILL.md`
+
+Verify the compiled project package set exactly:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  printf '\''%s\n'\'' challenge review review-docs smoke-test understand \
+    > .forge/walkthrough/portable-skills.expected
+  find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
+    | diff -u .forge/walkthrough/portable-skills.expected -
+  test ! -e .codex-user/skills/challenge/SKILL.md
+'
+```
+
 - [ ] commands/ has .md files
 
 - [ ] skills/ has subdirectories with SKILL.md files
 
 - [ ] agents/ has .md files
+
+- [ ] `.agents/skills` contains exactly challenge, review, review-docs, smoke-test, and understand
+
+- [ ] No Codex skill package is written under the sandboxed `CODEX_HOME`
 
 ### 3.2 Check Settings Configuration
 
@@ -135,11 +189,26 @@ Use the Read tool to inspect `$FORGE_TEST_REPO/.claude-user/settings.json` and
 
 <!-- auto -->
 
-Use the Read tool to read `$FORGE_TEST_REPO/.forge-home/installed.json` and verify:
+Read and validate `$FORGE_TEST_REPO/.forge-home/installed.json`:
+
+```bash
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  root=$(pwd -P)
+  jq -e --arg root "$root" '\''
+    (.installations.user.skill_packages | length == 10)
+    and all(.installations.user.skill_packages[]; .runtime == "claude_code")
+    and (.installations["local:" + $root].skill_packages | length == 10)
+    and all(.installations["local:" + $root].skill_packages[]; .runtime == "claude_code")
+    and (.installations["project:" + $root].skill_packages | length == 5)
+    and all(.installations["project:" + $root].skill_packages[]; .runtime == "codex")
+  '\'' .forge-home/installed.json
+'
+```
 
 - [ ] Manifest file exists
-- [ ] Tracks a local-scope installation
-- [ ] Files list is populated
+- [ ] Manifest separately tracks user, local, and project installations
+- [ ] Standard-profile user/local installs each track ten Claude skill packages
+- [ ] Minimal project install tracks exactly five Codex skill packages
 
 ### 3.4 Preview and Apply a Legacy Hook Migration
 
@@ -178,12 +247,19 @@ bash "$SCRIPTS/run-in-repo.sh" forge extension doctor --json
 ```bash
 python3 -c "
 import json, os, pathlib
-paths = ['settings.json', 'settings.local.json', 'commands', 'agents', 'skills']
-home = pathlib.Path.home() / '.claude'
-snap = {}
-for p in paths:
-    fp = home / p
-    snap[p] = os.path.getmtime(str(fp)) if fp.exists() else None
+home = pathlib.Path.home()
+paths = {
+    'claude/settings.json': home / '.claude/settings.json',
+    'claude/settings.local.json': home / '.claude/settings.local.json',
+    'claude/commands': home / '.claude/commands',
+    'claude/agents': home / '.claude/agents',
+    'claude/skills': home / '.claude/skills',
+    'codex/skills': home / '.agents/skills',
+}
+snap = {
+    name: os.path.getmtime(str(path)) if path.exists() else None
+    for name, path in paths.items()
+}
 print(json.dumps(snap, indent=2))
 "
 ```
@@ -191,7 +267,7 @@ print(json.dumps(snap, indent=2))
 Compare every value against the Section 0 snapshot. They must all match exactly.
 
 - [ ] All timestamps match the baseline from Section 0
-- [ ] No new files appeared in real ~/.claude/
+- [ ] No new files appeared in the real `~/.claude` or `~/.agents/skills` paths
 
 ---
 
@@ -224,6 +300,55 @@ forge session -h              # Session subcommand help
 Try at least 2-3 commands. They all run in the sandbox — your real system is not affected.
 
 - [ ] User confirms commands ran successfully in Terminal
+
+### 5.3 Verify Runtime Package Status and Persisted Sync
+
+<!-- auto -->
+
+```bash
+# Inspect project package health with the same isolated HOME used during planning.
+bash "$SCRIPTS/run-in-repo.sh" env \
+  HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
+  forge extension status --scope project --root "$FORGE_TEST_REPO" \
+  > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt"
+rg -q 'Skill packages:' "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt"
+test "$(rg -c 'present[[:space:]]+codex[[:space:]]+' \
+  "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt")" -eq 5
+
+bash "$SCRIPTS/run-in-repo.sh" env \
+  HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
+  forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
+  > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.json"
+jq -e 'length == 1 and .[0].scope == "project"
+  and (.[0].skill_packages | length == 5)
+  and all(.[0].skill_packages[];
+    . as $package
+    | $package.runtime == "codex" and ($package.skill | length > 0)
+    and ($package.target_dir | endswith("/.agents/skills/" + $package.skill))
+    and ($package.file_paths | length > 0)
+    and all($package.file_paths[]; startswith($package.target_dir + "/"))
+    and $package.state == "present" and $package.target_present == true
+    and $package.missing_file_paths == [] and $package.duplicate_dirs == [] and $package.recovery == null)' \
+  "$FORGE_TEST_REPO/.forge/walkthrough/project-status.json"
+
+# Remove the fake Codex directory from PATH. Sync must retain the persisted runtime set.
+FORGE_BIN=$(command -v forge)
+bash "$SCRIPTS/run-in-repo.sh" env \
+  HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
+  PATH="/usr/bin:/bin" \
+  "$FORGE_BIN" extension sync --scope project
+bash "$SCRIPTS/run-in-repo.sh" bash -lc '
+  root=$(pwd -P)
+  jq -e --arg root "$root" '\''
+    (.installations["project:" + $root].skill_packages | length == 5)
+    and all(.installations["project:" + $root].skill_packages[]; .runtime == "codex")
+  '\'' .forge-home/installed.json
+'
+```
+
+- [ ] Human status shows a runtime package table with project Codex packages in `present` state
+- [ ] JSON status reports five healthy Codex packages with no missing files, duplicates, or recovery action
+- [ ] Sync succeeds without Codex on `PATH` and preserves the recorded five-package runtime set
 
 ---
 
@@ -840,11 +965,14 @@ rm -rf "$FORGE_TEST_REPO/.forge/memory"
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope local --force
+bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope project --yes
+bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope local --yes
+bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope user --yes
 ```
 
-- [ ] Uninstall completed (exit code 0)
-- [ ] Output confirms extensions removed
+- [ ] Project, local, and user disable commands all exit 0
+- [ ] Project output confirms the five Codex packages were removed
+- [ ] Local and user output confirms Claude extensions were removed
 
 ### 13.4 Final Verification
 
@@ -858,6 +986,14 @@ ls "$FORGE_TEST_REPO/.claude/commands/" 2>/dev/null | wc -l
 
 ```bash
 ls "$FORGE_TEST_REPO/.claude/skills/" 2>/dev/null | wc -l
+```
+
+```bash
+find "$FORGE_TEST_REPO/.agents/skills" -name SKILL.md -print -quit 2>/dev/null | wc -l
+```
+
+```bash
+find "$FORGE_TEST_REPO/.claude-user/skills" -name SKILL.md -print -quit 2>/dev/null | wc -l
 ```
 
 And verify walkthrough-derived search state was cleaned:
@@ -875,17 +1011,25 @@ And verify real system is still untouched (one final mtime check):
 ```bash
 python3 -c "
 import json, os, pathlib
-paths = ['settings.json', 'settings.local.json', 'commands', 'agents', 'skills']
-home = pathlib.Path.home() / '.claude'
-snap = {}
-for p in paths:
-    fp = home / p
-    snap[p] = os.path.getmtime(str(fp)) if fp.exists() else None
+home = pathlib.Path.home()
+paths = {
+    'claude/settings.json': home / '.claude/settings.json',
+    'claude/settings.local.json': home / '.claude/settings.local.json',
+    'claude/commands': home / '.claude/commands',
+    'claude/agents': home / '.claude/agents',
+    'claude/skills': home / '.claude/skills',
+    'codex/skills': home / '.agents/skills',
+}
+snap = {
+    name: os.path.getmtime(str(path)) if path.exists() else None
+    for name, path in paths.items()
+}
 print(json.dumps(snap, indent=2))
 "
 ```
 
-- [ ] Forge commands/skills directories empty or gone in sandbox
+- [ ] Claude commands/skills directories are empty or gone in both sandbox scopes
+- [ ] Project `.agents/skills` contains no Forge package
 - [ ] Walkthrough transcript artifacts removed
 - [ ] Walkthrough search index removed
-- [ ] All real ~/.claude/ timestamps still match baseline from Section 0
+- [ ] All six real Claude/Codex extension timestamps still match the baseline from Section 0
