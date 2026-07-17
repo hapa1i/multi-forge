@@ -70,10 +70,14 @@ def _cache_is_current(
     expected_digest: str,
 ) -> bool:
     try:
+        if marker.is_symlink():
+            return False
         if marker.read_text(encoding="utf-8").strip() != expected_digest:
             return False
         for package_file in package.files:
             cached = package_root.joinpath(*package_file.path.parts)
+            if cached.is_symlink() or not cached.is_file():
+                return False
             if cached.read_bytes() != package_file.content:
                 return False
             if stat.S_IMODE(cached.stat().st_mode) != package_file.mode:

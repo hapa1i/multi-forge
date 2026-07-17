@@ -59,3 +59,19 @@ def test_materialize_repairs_tampered_content(tmp_path: Path) -> None:
 
     assert repeated == root
     assert (root / "SKILL.md").read_bytes() == b"body\n"
+
+
+def test_materialize_replaces_matching_external_symlink(tmp_path: Path) -> None:
+    package = _package()
+    root = materialize_compiled_skill(package, forge_home=tmp_path)
+    external = tmp_path / "external-skill.md"
+    external.write_bytes(b"body\n")
+    cached = root / "SKILL.md"
+    cached.unlink()
+    cached.symlink_to(external)
+
+    repeated = materialize_compiled_skill(package, forge_home=tmp_path)
+
+    assert repeated == root
+    assert not cached.is_symlink()
+    assert cached.read_bytes() == b"body\n"

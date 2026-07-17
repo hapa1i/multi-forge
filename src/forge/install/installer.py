@@ -14,11 +14,11 @@ import subprocess
 from copy import deepcopy
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from forge.core.paths import find_git_root
 from forge.core.runtime import installed_runtimes
-from forge.core.state import now_iso
+from forge.core.state import StateError, now_iso
 
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
@@ -884,7 +884,10 @@ class Installer:
 
         untracked_codex: dict[str, tuple[Path, ...]] = {}
         if CODEX_RUNTIME in selection.runtime_ids:
-            scan_roots = _codex_scan_roots(self._project_root)
+            scan_roots = _codex_scan_roots(
+                self._project_root,
+                include_cwd=self._project_root is None,
+            )
             for candidate in candidates:
                 managed_dirs = tuple(
                     Path(package.target_dir)
@@ -1017,6 +1020,13 @@ class Installer:
         if is_managed:
             if mode == InstallMode.SYMLINK:
                 if target.is_symlink() and target.resolve(strict=False) == source.resolve(strict=False):
+                    if not source.is_file() or source.is_symlink():
+                        return FilePlan(
+                            action="update",
+                            target_path=str(target),
+                            source_path=str(source),
+                            reason="compiled cache missing or invalid",
+                        )
                     return FilePlan(
                         action="skip",
                         target_path=str(target),
@@ -1434,12 +1444,22 @@ class Installer:
                 installed_files.append(installed_file)
                 if not target_existed:
                     newly_created_files.append(installed_file)
+            elif file_plan.action == "skip" and file_plan.source_path is not None:
+                installed_files.append(self._installed_file_record(file_plan, mode))
 
         backup_path: Path | None = None
         if modules & _CLAUDE_SETTINGS_MODULES:
             settings_path = get_settings_path(self._scope, self._project_root)
-            backup_path = backup_settings(settings_path)
-            settings = read_settings(settings_path)
+            try:
+                backup_path = backup_settings(settings_path)
+                settings = read_settings(settings_path)
+            except OSError as e:
+                self._raise_post_file_failure(
+                    "Failed to prepare Claude settings",
+                    e,
+                    newly_created_files,
+                    plan,
+                )
             removed_entry_ids: set[tuple[str, str]] = set()
             if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
                 old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
@@ -1465,7 +1485,15 @@ class Installer:
                 include_permissions=include_permissions,
                 include_env=include_permissions,
             )
-            write_settings(settings_path, settings)
+            try:
+                write_settings(settings_path, settings)
+            except OSError as e:
+                self._raise_post_file_failure(
+                    f"Failed to write Claude settings '{settings_path}'",
+                    e,
+                    newly_created_files,
+                    plan,
+                )
 
             entry_ids = {(entry.key_path, entry.stable_id) for entry in entries}
             final_entries = list(entries)
@@ -1482,12 +1510,28 @@ class Installer:
             # potentially long stale-file cleanup walk. This includes legacy entries
             # preserved for cleanup after scope filtering.
             added_structure = entries_to_added_structure(final_entries)
-            save_added_settings(settings_path, added_structure)
+            try:
+                save_added_settings(settings_path, added_structure)
+            except OSError as e:
+                self._raise_post_file_failure(
+                    f"Failed to save Claude settings ownership '{settings_path}'",
+                    e,
+                    newly_created_files,
+                    plan,
+                )
         else:
             final_entries = list(existing.settings_entries) if existing else []
             if final_entries:
                 settings_path = get_settings_path(self._scope, self._project_root)
-                save_added_settings(settings_path, entries_to_added_structure(final_entries))
+                try:
+                    save_added_settings(settings_path, entries_to_added_structure(final_entries))
+                except OSError as e:
+                    self._raise_post_file_failure(
+                        f"Failed to preserve Claude settings ownership '{settings_path}'",
+                        e,
+                        newly_created_files,
+                        plan,
+                    )
 
         # Merge newly installed files with existing tracked files (for idempotent re-runs)
         now = now_iso()
@@ -1520,10 +1564,12 @@ class Installer:
                         target.unlink(missing_ok=True)
                         logger.debug("Removed stale tracked file: %s", target)
                     except OSError as e:
-                        raise ForgeInstallError(
-                            f"Failed to remove stale tracked extension file '{target}': {e}. "
-                            "Tracking was not updated; restore write access and rerun 'forge extension sync'."
-                        ) from e
+                        self._raise_post_file_failure(
+                            f"Failed to remove stale tracked extension file '{target}'",
+                            e,
+                            newly_created_files,
+                            plan,
+                        )
                     # Collect parent dirs for empty-directory cleanup
                     parent = target.parent
                     while parent != boundary and parent.is_relative_to(boundary):
@@ -1592,16 +1638,30 @@ class Installer:
         )
         try:
             self._tracking.set_installation(self._scope.value, installation, self._project_path_str)
-        except OSError as e:
-            rollback_failures = self._rollback_newly_created_files(newly_created_files, plan)
-            rollback_note = (
-                f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
-                if rollback_failures
-                else " Newly created extension files were rolled back; rerun the same command after repairing state storage."
+        except (OSError, StateError) as e:
+            self._raise_post_file_failure(
+                "Failed to commit extension tracking",
+                e,
+                newly_created_files,
+                plan,
             )
-            raise ForgeInstallError(f"Failed to commit extension tracking: {e}.{rollback_note}") from e
 
         return plan
+
+    def _raise_post_file_failure(
+        self,
+        message: str,
+        cause: Exception,
+        newly_created_files: list[InstalledFile],
+        plan: InstallPlan,
+    ) -> NoReturn:
+        rollback_failures = self._rollback_newly_created_files(newly_created_files, plan)
+        rollback_note = (
+            f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
+            if rollback_failures
+            else " Newly created extension files were rolled back; rerun the same command after repairing the failure."
+        )
+        raise ForgeInstallError(f"{message}: {cause}.{rollback_note}") from cause
 
     def _rollback_newly_created_files(
         self,
@@ -1666,6 +1726,14 @@ class Installer:
         else:
             shutil.copy2(source, target)
 
+        return self._installed_file_record(file_plan, mode)
+
+    @staticmethod
+    def _installed_file_record(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+        """Build current ownership metadata for an installed or unchanged file."""
+
+        source = Path(file_plan.source_path)  # type: ignore[arg-type]
+        target = Path(file_plan.target_path)
         return InstalledFile(
             target_path=str(target),
             source_path=str(source),
