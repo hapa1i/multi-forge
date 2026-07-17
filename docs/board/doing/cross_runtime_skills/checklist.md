@@ -130,52 +130,53 @@ card in the active lane for post-implementation review.
 
 ## Phase 1 -- characterize existing contracts before refactoring
 
-- [ ] Add a complete Claude package golden or structural manifest for all in-scope skills, including frontmatter,
+- [x] Add a complete Claude package golden or structural manifest for all in-scope skills, including frontmatter,
   resources, references, scripts, executable modes, and profile gates.
   - _Assertion:_ the Claude compiler/adapter can be compared against today's installed package without omitting nested
     files or modes.
-- [ ] Characterize Claude `extension enable`, `sync`, `disable`, conflict, force, copy, symlink, project, local, user,
+- [x] Characterize Claude `extension enable`, `sync`, `disable`, conflict, force, copy, symlink, project, local, user,
   and wheel-installed paths before changing the `SKILLS` module.
-- [ ] Build a machine-readable whole-tree coupling inventory with an explicit allowlist per runtime package.
+- [x] Build a machine-readable whole-tree coupling inventory with an explicit allowlist per runtime package.
   - _Assertion:_ a prohibited runtime-specific token in any nested runtime-neutral or Codex file fails validation with
     its path and rule; a deliberate Claude adapter token remains allowed only in Claude output.
-- [ ] Define separate emitted-package validation contracts at Forge's build boundary. Preserve and validate the current
+- [x] Define separate emitted-package validation contracts at Forge's build boundary. Preserve and validate the current
   Claude-specific package shape; for Codex/spec output, enforce parent-directory/name equality, name and description
   limits, the closed Agent Skills top-level field set, metadata value shape, `allowed-tools` format, and required files.
   Validate reference containment/resolution, runtime-token isolation, and `agents/openai.yaml` separately as Forge
   portability policies.
-- [ ] Decide whether Forge calls `skills-ref` or owns a dependency-free validator. If external validation remains part
+- [x] Decide whether Forge calls `skills-ref` or owns a dependency-free validator. If external validation remains part
   of release verification, pin how it is installed and keep unit tests hermetic.
-- [ ] Characterize `installed.json` as a shared strict state contract before one logical module can produce files in
+- [x] Characterize `installed.json` as a shared strict state contract before one logical module can produce files in
   multiple runtime targets. Inventory enable/update, sync, status, disable, strict `cleanup-project` row validation,
-  `doctor`'s best-effort tracking-dependent recovery diagnostics, and both hook-migration rewrite paths. Pin legacy,
-  current, unsupported-newer, unknown-field, corrupt/unreadable, upgrade, uninstall, partial-conflict, and stale-file
-  semantics before changing the schema.
+  `doctor`'s best-effort tracking-dependent choice of hook recovery command, and both hook-migration rewrite paths. Pin
+  legacy, current, unsupported-newer, unknown-field, corrupt/unreadable, upgrade, uninstall, partial-conflict, and
+  stale-file semantics before changing the schema.
   - _Assertion:_ `cleanup-project` preview remains side-effect-free and fails before mutation on unreadable state;
-    `doctor` remains exit-zero and reports tracking as degraded/unavailable instead of treating it as absent.
+    `doctor` remains exit-zero and falls back to user-sync advice when tracking cannot be read. Runtime-package health
+    remains on `extension status`; doctor does not claim to expose tracking degradation or `skill_packages`.
 
 ## Phase 2 -- neutral compiler and runtime adapters
 
-- [ ] Implement a dependency-light typed skill source/manifest and deterministic compiler with no installer I/O.
+- [x] Implement a dependency-light typed skill source/manifest and deterministic compiler with no installer I/O.
   - _Assertion:_ identical source + adapter inputs produce byte-identical paths, bytes, and modes in stable order.
-- [ ] Implement the Claude adapter first and prove fidelity against the Phase 1 contract.
+- [x] Implement the Claude adapter first and prove fidelity against the Phase 1 contract.
   - _Assertion:_ every unchanged Claude skill remains behaviorally equivalent; required `/forge:<skill>` names,
     frontmatter, model-family selection, resources, and `Agent`/`Explore` behavior are preserved.
-- [ ] Implement the Codex/spec adapter with directory-matching names, spec-only top-level frontmatter, relative resource
+- [x] Implement the Codex/spec adapter with directory-matching names, spec-only top-level frontmatter, relative resource
   paths, and optional `agents/openai.yaml` policy/UI metadata.
-- [ ] Encode capability bindings through typed adapter data rather than string-replacement denylist passes.
+- [x] Encode capability bindings through typed adapter data rather than string-replacement denylist passes.
   - _Assertion:_ unknown or unbound required capability fails compilation; it never leaks a Claude token into Codex
     output or silently deletes behavior.
-- [ ] Keep OpenAI/Gemini/Anthropic content variants runtime-neutral and shared across runtime builds.
-- [ ] Validate the entire emitted package after composition with its runtime-specific validator, including nested
+- [x] Keep OpenAI/Gemini/Anthropic content variants runtime-neutral and shared across runtime builds.
+- [x] Validate the entire emitted package after composition with its runtime-specific validator, including nested
   resources/references/scripts and `agents/openai.yaml`; reject a partial or invalid package before installer planning.
-- [ ] Produce actionable diagnostics naming skill, runtime, source path, capability, and recovery path.
+- [x] Produce actionable diagnostics naming skill, runtime, source path, capability, and recovery path.
 
 ## Phase 3 -- runtime capability, installer, and tracking lifecycle
 
-- [ ] Add the reviewed per-runtime skill-scope capability to `RuntimeSpec`, runtime-list JSON, and tests without
+- [x] Add the reviewed per-runtime skill-scope capability to `RuntimeSpec`, runtime-list JSON, and tests without
   conflating it with hooks or general extension participation.
-- [ ] Extend installer planning so one logical `SKILLS` request computes package eligibility explicitly over
+- [x] Extend installer planning so one logical `SKILLS` request computes package eligibility explicitly over
   `(scope, runtime, profile, skill)` after module selection and produces only the reviewed runtime packages.
   - _Assertion:_ the plan shows runtime, scope, and exact target for each package; status never claims an unwritten
     runtime package.
@@ -184,41 +185,41 @@ card in the active lane for post-implementation review.
     every omission has an explicit policy reason rather than a silent skip.
   - _Assertion:_ persist the requested/managed runtime-package set; temporary runtime-binary absence during sync cannot
     make a tracked package stale or delete it.
-- [ ] Install Codex user skills only under `$HOME/.agents/skills` and project skills under the selected Forge root's
+- [x] Install Codex user skills only under `$HOME/.agents/skills` and project skills under the selected Forge root's
   `.agents/skills`. Enforce the reviewed local-scope decision before any write.
-- [ ] Define selection UX explicitly: automatic installed-runtime detection, explicit `--runtime`, or a separate module.
+- [x] Define selection UX explicitly: automatic installed-runtime detection, explicit `--runtime`, or a separate module.
   Missing Codex must not make an otherwise valid Claude install fail unless the user explicitly requested Codex.
-- [ ] Make tracking runtime-aware with an explicit legacy-read/current-write migration, preserving new runtime-package
+- [x] Make tracking runtime-aware with an explicit legacy-read/current-write migration, preserving new runtime-package
   fields through installer and both hook-migration rewrite paths. Decide and test the schema bump and older-reader
   behavior; do not add fields under the current version by accident.
-- [ ] Preserve the no-write-on-known-conflict preflight contract across runtime targets, and define rollback/recovery
+- [x] Preserve the no-write-on-known-conflict preflight contract across runtime targets, and define rollback/recovery
   plus the tracking commit point for mid-apply failures. A conflict in one target must have a defined outcome; Forge
   must not report an untracked half-install as complete.
-- [ ] Make `enable`, `sync`, `disable`, status, dry-run, force, and stale-file cleanup idempotent per runtime package.
-- [ ] Preserve copy and symlink semantics without symlinking to transient compiler output.
-- [ ] Detect existing same-name skills in Codex's scan chain and apply the reviewed duplicate policy without deleting
+- [x] Make `enable`, `sync`, `disable`, status, dry-run, force, and stale-file cleanup idempotent per runtime package.
+- [x] Preserve copy and symlink semantics without symlinking to transient compiler output.
+- [x] Detect existing same-name skills in Codex's scan chain and apply the reviewed duplicate policy without deleting
   user-owned files.
-- [ ] Package neutral sources, adapters, validation data, scripts, and resources into wheel/sdist runtime data. Verify
+- [x] Package neutral sources, adapters, validation data, scripts, and resources into wheel/sdist runtime data. Verify
   all reads through `importlib.resources` where required.
-- [ ] Extend `forge extension status` and, if approved, `extension doctor --json` with truthful runtime-skill state,
+- [x] Extend `forge extension status` and, if approved, `extension doctor --json` with truthful runtime-skill state,
   discovery conflicts, and recovery guidance.
-- [ ] Apply project-compatibility enforcement to project-owned `.agents/skills` mutations while keeping user-global
+- [x] Apply project-compatibility enforcement to project-owned `.agents/skills` mutations while keeping user-global
   skill state outside an unrelated project's pin.
 
 ## Phase 4 -- migrate the approved skill tranches
 
-- [ ] Migrate the approved shallow tranche through the neutral source and both adapters; do not infer that `challenge`
+- [x] Migrate the approved shallow tranche through the neutral source and both adapters; do not infer that `challenge`
   or `smoke-test` is eligible until its actual argument/path/script couplings have explicit bindings.
-- [ ] Prove each migrated skill under Claude before enabling its Codex package.
-- [ ] Prove each Codex package through explicit invocation; test implicit invocation only where policy permits it.
-- [ ] Migrate `review`, `review-docs`, and `understand` only after the exploration, model-family, argument, and resource
+- [x] Prove each migrated skill under Claude before enabling its Codex package.
+- [x] Prove each Codex package through explicit invocation; test implicit invocation only where policy permits it.
+- [x] Migrate `review`, `review-docs`, and `understand` only after the exploration, model-family, argument, and resource
   capabilities are implemented and tested across every family variant.
-- [ ] Decide whether workflow-front-end skills install under Codex while clearly declaring their Claude worker
+- [x] Decide whether workflow-front-end skills install under Codex while clearly declaring their Claude worker
   prerequisite, or remain Claude-only until Axis 2 ships. Do not label them Codex-native while they require `claude -p`
   workers.
-- [ ] Keep `walkthrough` and `qa` Claude-only unless a later card designs a different runtime-neutral human-interaction
+- [x] Keep `walkthrough` and `qa` Claude-only unless a later card designs a different runtime-neutral human-interaction
   contract.
-- [ ] Add per-skill compile/discovery/invocation coverage and a full-package prohibited-token scan.
+- [x] Add per-skill compile/discovery/invocation coverage and a full-package prohibited-token scan.
 
 ## Acceptance tests
 
@@ -242,38 +243,38 @@ card in the active lane for post-implementation review.
 
 ## Documentation and operator verification
 
-- [ ] Update `docs/design.md` when runtime/installer ownership changes.
-- [ ] Update `docs/design_appendix.md` §C scope/module/tracking contracts and the runtime reference.
-- [ ] Update `docs/design_workflows.md` §3 skills architecture, capability vocabulary, compile model, and Axis 2
+- [x] Update `docs/design.md` when runtime/installer ownership changes.
+- [x] Update `docs/design_appendix.md` §C scope/module/tracking contracts and the runtime reference.
+- [x] Update `docs/design_workflows.md` §3 skills architecture, capability vocabulary, compile model, and Axis 2
   limitation.
-- [ ] Update `docs/cli_reference.md` for any runtime/scope selection, status, doctor, or error surfaces.
-- [ ] Update `docs/end-user/skills.md`, installation/Day-1 guidance, and relevant Codex runtime guidance for
+- [x] Update `docs/cli_reference.md` for any runtime/scope selection, status, doctor, or error surfaces.
+- [x] Update `docs/end-user/skills.md`, installation/Day-1 guidance, and relevant Codex runtime guidance for
   wheel-installed users.
-- [ ] Update `docs/end-user/manual_testing.md` for the runtime-specific skill install surfaces, the Claude-only
+- [x] Update `docs/end-user/manual_testing.md` for the runtime-specific skill install surfaces, the Claude-only
   `walkthrough`/`qa` boundary, and the safe division between host walkthrough and Docker QA coverage.
-- [ ] Update the QA checklist index and relevant sections -- at minimum §§0, 2, 15, 17, 18, and 19 -- for runtime-aware
+- [x] Update the QA checklist index and relevant sections -- at minimum §§0, 2, 15, 17, 18, and 19 -- for runtime-aware
   enable/install/status/sync/doctor/cleanup/disable/uninstall and Codex invocation. Recalculate the index assertion
   count and last-updated metadata as required by `docs/developer/testing_guidelines.md`.
-- [ ] Review and update walkthrough checklist §§0, 2, 3, 4, 5, and 13 plus its assertion count/date for project-scope
+- [x] Review and update walkthrough checklist §§0, 2, 3, 4, 5, and 13 plus its assertion count/date for project-scope
   Codex install verification. Do not exercise Codex user scope against the real `$HOME/.agents/skills`: keep it in
   Docker QA unless the walkthrough first gains full `HOME`/`.agents` isolation and matching safety gates.
-- [ ] Update `src/skills/review/references/skills-writing-guide.md` so contributors author neutral content and know
+- [x] Update `src/skills/review/references/skills-writing-guide.md` so contributors author neutral content and know
   which fields/capabilities belong to each runtime adapter.
-- [ ] Run focused unit suites for compiler, validation, runtime registry, installer planning/tracking, CLI streams, and
+- [x] Run focused unit suites for compiler, validation, runtime registry, installer planning/tracking, CLI streams, and
   skill content.
-- [ ] Run the required targeted installer integration through `./scripts/test-integration.sh`, including packaged Codex
+- [x] Run the required targeted installer integration through `./scripts/test-integration.sh`, including packaged Codex
   user/project skill targets.
-- [ ] Run `uv build`, then verify wheel and sdist in separate clean tool homes with `forge extension enable`,
+- [x] Run `uv build`, then verify wheel and sdist in separate clean tool homes with `forge extension enable`,
   `extension status --json`, `extension doctor --json`, sync, and disable.
-- [ ] Run real `codex` discovery and explicit invocation for user and project scopes on the validated CLI version.
-- [ ] Run `make test-unit` and `make pre-commit`; record all failures, skips, and environment limits.
+- [x] Run real `codex` discovery and explicit invocation for user and project scopes on the validated CLI version.
+- [x] Run `make test-unit` and `make pre-commit`; record all failures, skips, and environment limits.
 
 ## Closeout
 
-- [ ] Confirm every accepted Phase 0 decision is reflected in code, tests, design docs, end-user docs, and the card.
-- [ ] Add a compact newest-first entry to `docs/board/change_log.md` with verification evidence.
-- [ ] Propose durable implementation lessons for human review; promote only approved invariants to
+- [x] Confirm every accepted Phase 0 decision is reflected in code, tests, design docs, end-user docs, and the card.
+- [x] Add a compact newest-first entry to `docs/board/change_log.md` with verification evidence.
+- [x] Propose durable implementation lessons for human review; promote only approved invariants to
   `docs/board/impl_notes.md`.
-- [ ] Verify clean wheel/sdist behavior and the user-facing Day 1 path.
-- [ ] Move this card or every live member card to its correct terminal lane, preserve checklists, and repoint all
-  inbound board links.
+- [x] Verify clean wheel/sdist behavior and the user-facing Day 1 path.
+- [ ] After user review, move this card to its correct terminal lane, preserve the checklist, and repoint all inbound
+  board links. Intentionally held in `doing/` at the requested review boundary.

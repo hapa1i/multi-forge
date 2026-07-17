@@ -39,15 +39,16 @@ from a per-file strip pass to the compile model below.
   `policy.allow_implicit_invocation: false` -- the real control for "user-only" skills.
 
 **Forge already documents the coupling.** `src/skills/review/references/skills-writing-guide.md` lists "Extended
-frontmatter fields (Claude Code)" beyond the open standard (`:311-324`), warns the packager validator "may reject" them
-(`:772-777`), and calls `$ARGUMENTS` / `${CLAUDE_SKILL_DIR}` / `context: fork` / dynamic injection "Claude Code-only"
-(`:1250-1252`). This card acts on what the guide already knows.
+frontmatter fields (Claude Code)" beyond the open standard (`:361-374`), warns the packager validator "may reject" them
+(`:823-826`), and calls `$ARGUMENTS` / `${CLAUDE_SKILL_DIR}` / `context: fork` / dynamic injection "Claude Code-only"
+(`:1300-1314`). This card acts on what the guide already knows.
 
 ---
 
 ## Why
 
-Forge's 11 skills are authored in the open Agent-Skills format, yet nothing Forge ships reaches a non-Claude runtime:
+At proposal time, Forge's 11 skills were authored in the open Agent-Skills format, yet nothing Forge shipped reached a
+non-Claude runtime:
 
 - **Install target is Claude-only.** `install/installer.py` writes every skill to `~/.claude/skills/` /
   `<project>/.claude/skills/` via `get_target_root()` + the `SKILLS` module (`install/models.py:58`). No
@@ -90,8 +91,8 @@ leak `subagent_type: Explore`, so that extraction is the concrete first task.
 | `name: forge:<x>`                                                                                                      | **non-conformant** (colon; `!=` dir) -- rejected/mis-matched                                                                              | layer 2 emits the runtime's `name`: Claude keeps `forge:<x>`; spec/Codex gets dir-matching `<x>`                                                                                 |
 | Claude-only keys: `disable-model-invocation`, `argument-hint`, `context`, `effort`, `agent`, `hooks`, `user-invocable` | **not in the spec allowlist** (packager may reject)                                                                                       | layer 2 **omits** them from the spec/Codex build (non-policy extras -> `metadata`); `disable-model-invocation` -> `agents/openai.yaml` `policy.allow_implicit_invocation: false` |
 | `allowed-tools: Read, Grep, Glob, Bash, Agent`                                                                         | **spec field**, but Forge's value is comma-style Claude tool names; the spec wants space-separated, and it's experimental (Codex ignores) | layer 2 rewrites to space-separated + reconciles values, **or** omits it (experimental)                                                                                          |
-| read-only `${CLAUDE_SKILL_DIR}/resources/...` references                                                               | **no variable**, but Codex is told the selected `SKILL.md` path                                                                            | layer 1 names a package-relative resource; layer 2 tells the runtime to resolve it from the selected skill root                                                                  |
-| executable `${CLAUDE_SKILL_DIR}/scripts/...` references                                                                | **no variable and shell CWD remains the repository**                                                                                       | distinct packaged-script capability; the Codex binding resolves against the loaded `SKILL.md` parent before execution                                                           |
+| read-only `${CLAUDE_SKILL_DIR}/resources/...` references                                                               | **no variable**, but Codex is told the selected `SKILL.md` path                                                                           | layer 1 names a package-relative resource; layer 2 tells the runtime to resolve it from the selected skill root                                                                  |
+| executable `${CLAUDE_SKILL_DIR}/scripts/...` references                                                                | **no variable and shell CWD remains the repository**                                                                                      | distinct packaged-script capability; the Codex binding resolves against the loaded `SKILL.md` parent before execution                                                            |
 | `$ARGUMENTS`                                                                                                           | **no substitution**                                                                                                                       | layer-1 "read the task"/capability; layer 2 binds the arg source                                                                                                                 |
 | inline `` !`forge ...` `` pre-step                                                                                     | **inert text**                                                                                                                            | layer-1 capability ("resolve model family"), pinned + **all three family branches tested**; not "just run it"                                                                    |
 | `subagent_type: "Explore"` / `Agent` in rubrics                                                                        | absent                                                                                                                                    | layer-1 "explore" capability; layer-2 binds (Claude `Agent`/`Explore` vs Codex-native)                                                                                           |
@@ -162,8 +163,8 @@ from Codex, until the engine dispatches through the runtime registry. That engin
    user/project/local; Codex supports user/project only. Codex local is an explicit unsupported package result, never a
    write to shared `.agents/skills`.
 6. **Names and invocation.** Claude keeps `forge:<skill>` and `/forge:<skill>`; Codex emits directory-matching `<skill>`
-   and uses explicit `$<skill>` task text. `disable-model-invocation` maps only to the matching
-   `agents/openai.yaml` implicit-invocation policy.
+   and uses explicit `$<skill>` task text. `disable-model-invocation` maps only to the matching `agents/openai.yaml`
+   implicit-invocation policy.
 7. **Delivery and duplicates.** Forge remains the direct installer. It never overwrites or deletes an untracked
    same-name Codex skill. A duplicate elsewhere in the Codex scan chain is surfaced explicitly; an automatic target may
    skip, while an explicitly requested Codex target fails for recovery.
@@ -192,22 +193,23 @@ from Codex, until the engine dispatches through the runtime registry. That engin
 
 After layers 1--3 for the approved portable tranche, `forge extension enable` on a Codex machine makes `challenge`,
 `smoke-test`, `review`, `review-docs`, and `understand` discoverable and explicitly invocable as Codex-native skills --
-no `claude -p`. **The gate validates the whole built package** (`SKILL.md` + `resources/` + `references/` +
-`scripts/` + `agents/openai.yaml`): falsifiers -- a Codex package leaks `${CLAUDE_SKILL_DIR}`, `$ARGUMENTS`,
+no `claude -p`. **The gate validates the whole built package** (`SKILL.md` + `resources/` + `references/` + `scripts/` +
+`agents/openai.yaml`): falsifiers -- a Codex package leaks `${CLAUDE_SKILL_DIR}`, `$ARGUMENTS`,
 `subagent_type: "Explore"`, or a Claude-only top-level frontmatter key; `name` fails spec validation; a packaged script
 depends on process CWD; or the skill is absent from Codex discovery. The four fan-out frontends remain Claude-only until
 Axis 2; that is an explicit boundary rather than a Codex-native claim.
 
 ## References
 
-- Skills: `src/skills/*/SKILL.md` (11); rubric coupling `src/skills/understand/resources/docs-openai.md:55-57`,
-  `src/skills/review/resources/code-openai.md:55-58`; model-family pre-step `src/skills/review/SKILL.md:45-57`;
-  authoring guide `src/skills/review/references/skills-writing-guide.md:305-324,772-777,1250-1284` (extended fields,
-  packager reject, `metadata` extras).
-- Install: `src/forge/install/installer.py` (skill target `:492-514`), `src/forge/install/models.py:58` (`SKILLS`),
-  `src/forge/install/codex_hooks.py` (Codex settings pattern; installs no skills).
-- Engine (Axis 2): `src/forge/review/engine.py:64-67,283`; `src/forge/core/invoker/__init__.py`.
-- Registry: `src/forge/core/runtime/registry.py:105-139`.
+- Skills: neutral `src/skills/{challenge,smoke-test,review,review-docs,understand}/{forge-skill.yaml,content.md}` plus
+  six legacy Claude-only `SKILL.md` packages; rubric coupling `src/skills/understand/resources/docs-openai.md:51-58`,
+  `src/skills/review/resources/code-openai.md:52-59`; model-family binding `src/skills/review/content.md:36-48`;
+  authoring guide `src/skills/review/references/skills-writing-guide.md:15-61,361-374,823-826,1300-1314` (Forge
+  authoring contract, extended fields, packager reject, Claude variables).
+- Install: `src/forge/install/installer.py` (`_plan_runtime_skill_packages`), `src/forge/install/models.py`
+  (`InstallModule.SKILLS`), `src/forge/install/codex_hooks.py` (Codex settings pattern; installs no skills).
+- Engine (Axis 2): `src/forge/review/engine.py` (`run_claude_session`); `src/forge/core/invoker/__init__.py`.
+- Registry: `src/forge/core/runtime/registry.py` (`RuntimeSpec.skill_scopes`).
 - Design: `docs/design_workflows.md` §3, §4.5; `docs/design_appendix.md` §C, §C.5, §C.6.
 - External (verified 2026-07-06): `agentskills.io/specification` -- closed frontmatter allowlist (`name`==dir;
   `description`; `license`; `compatibility`; `metadata`; `allowed-tools` space-separated + experimental; **no**
@@ -217,4 +219,48 @@ Axis 2; that is an explicit boundary rather than a Codex-native claim.
 
 ## Closeout
 
-(pending)
+Implementation is complete on `cross-runtime-skills` and intentionally remains in `doing/` for the requested human
+review.
+
+### Implemented outcome
+
+- Forge now compiles one typed neutral source into deterministic Claude and Codex packages. `challenge`, `smoke-test`,
+  `review`, `review-docs`, and `understand` ship for both runtimes; the other six bundled skills remain explicitly
+  Claude-only at the approved Axis 1 boundary.
+- Runtime capabilities, scope/profile planning, duplicate discovery, schema-v2 tracking, status, enable/sync/disable,
+  copy/symlink modes, clean-package data, and project compatibility now operate per runtime package. Codex supports user
+  and project scopes; local scope remains an explicit refusal.
+- Whole-package validation fails closed on runtime-token leaks, unsafe references, source/cache symlinks, unusable
+  script modes, malformed runtime metadata, and undeclared capability bindings. Installer failures restore new files,
+  settings, ownership sidecars, and tracking retryability.
+- Architecture, CLI, end-user, manual-testing, QA, walkthrough, and skill-authoring guidance now describe the same
+  runtime and operator contracts.
+
+### Verification
+
+- Focused adversarial acceptance: `142 passed`; full unit suite: `8099 passed, 1 skipped, 117 deselected`; Docker
+  installer lifecycle: `20 passed`.
+- The seven-stage Codex probe and actual compiled user/project `$smoke-test` invocations passed on `codex-cli 0.144.5`;
+  each compiled Codex smoke run reported `8/8` from an unrelated or nested CWD.
+- Clean wheel project/Codex and sdist user/all-runtime enable -> status -> doctor -> sync -> disable lifecycles passed
+  from isolated installs. Claude smoke reported `11/11`, Codex smoke `8/8`, and no bytecode, symlink,
+  checkout-reference, compiler-source, or post-disable ownership leak remained.
+- Final `make pre-commit` and `make pre-commit-md` passed after initial runs exposed and prompted correction of test
+  `TypedDict` annotations, import ordering, and Markdown formatting. `docs/design_appendix.md` remains below its limit
+  at 29,870 tokens.
+- Environment notes: one unit test remained skipped; clean build needed approved access to the shared uv cache, while an
+  isolated uv cache hit the known macOS `dynamic_store` panic. Codex also printed its non-blocking PATH-alias warning.
+
+### Proposed durable lessons for review
+
+- Runtime selection and persisted package ownership are separate state: sync preserves the managed runtime set even when
+  a runtime binary is temporarily absent.
+- Packaged script execution is distinct from prose/resource loading: bind it from the selected skill root and require an
+  owner-readable, owner-executable packaged file.
+- Validate neutral sources and every emitted package as whole trees; exclusions are documentary-only, and compiler/cache
+  ownership must never follow untrusted symlink parents or lock files.
+- Commit tracking last. A post-write failure must restore newly created files plus settings ownership state, while an
+  unchanged-file refresh preserves the original installation timestamp.
+- Codex duplicate discovery is an ownership boundary: `--force` never adopts or deletes an untracked same-name package.
+
+These are proposals only; none has been promoted to `docs/board/impl_notes.md` pending human review.

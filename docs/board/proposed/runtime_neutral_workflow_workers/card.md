@@ -5,10 +5,10 @@
 
 ## Why
 
-`panel`, `analyze`, `debate`, and `consensus` are skill frontends for `forge workflow`, but the workflow engine currently
-launches every worker through `claude -p` and hard-requires the Claude binary. Installing those frontends for Codex would
-therefore mislabel a Claude-worker workflow as Codex-native even though `CodexHeadlessInvoker` already exists elsewhere
-in Forge.
+`panel`, `analyze`, `debate`, and `consensus` are skill frontends for `forge workflow`, but the workflow engine
+currently launches every worker through `claude -p` and hard-requires the Claude binary. Installing those frontends for
+Codex would therefore mislabel a Claude-worker workflow as Codex-native even though `CodexHeadlessInvoker` already
+exists elsewhere in Forge.
 
 ## Proposed outcome
 

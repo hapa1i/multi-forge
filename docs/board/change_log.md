@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-16
 
+### Cross-runtime skill packages (implementation complete; review hold)
+
+**Goal**: Compile, install, and operate Forge skills natively under Claude Code and Codex without duplicating the
+authoring source or weakening runtime ownership boundaries.
+
+**Key changes**:
+
+- Added a typed neutral skill manifest/compiler, Claude and Codex adapters, whole-tree validation, and content-addressed
+  package caching. Five portable skills now ship for both runtimes; six remain explicitly Claude-only.
+- Added runtime skill-scope capabilities, scope × runtime × profile planning, Codex user/project targets, duplicate
+  safety, and schema-v2 package tracking across enable, status, sync, disable, copy, and symlink lifecycles.
+- Made apply failures retryable by restoring newly created files, Claude settings, ownership sidecars, and tracking
+  state; hardened source/cache/reference/script boundaries found by adversarial review.
+- Synchronized architecture, CLI, end-user, manual-testing, QA, walkthrough, authoring, and downstream board guidance.
+
+**Verification**: adversarial acceptance (`142 passed`); `make test-unit` (`8099 passed, 1 skipped, 117 deselected`);
+Docker installer integration (`20 passed`); seven-stage real Codex probe plus compiled user/project smoke (`8/8` each);
+clean wheel project/Codex and sdist user/all-runtime lifecycles, including Claude (`11/11`) and Codex (`8/8`) smoke;
+`make pre-commit`; package and token-limit inspection. The card remains in `doing/` for the requested review, and no
+proposed lesson was promoted to `impl_notes.md`.
+
 ### GPT-5.6 catalog and Sol proxy defaults
 
 **Goal**: Add GPT-5.6 Sol, Terra, and Luna and promote Sol across Forge's bundled OpenAI defaults.
