@@ -75,3 +75,55 @@ def test_materialize_replaces_matching_external_symlink(tmp_path: Path) -> None:
     assert repeated == root
     assert not cached.is_symlink()
     assert cached.read_bytes() == b"body\n"
+
+
+def test_materialize_replaces_symlinked_package_root_without_writing_external_files(
+    tmp_path: Path,
+) -> None:
+    package = _package()
+    root = compiled_skill_cache_dir(package, forge_home=tmp_path)
+    external = tmp_path / "external-package"
+    external.mkdir()
+    root.parent.mkdir(parents=True)
+    root.symlink_to(external, target_is_directory=True)
+
+    repeated = materialize_compiled_skill(package, forge_home=tmp_path)
+
+    assert repeated == root
+    assert not root.is_symlink()
+    assert (root / "SKILL.md").read_bytes() == b"body\n"
+    assert list(external.iterdir()) == []
+
+
+def test_materialize_replaces_symlinked_nested_parent_without_writing_external_files(
+    tmp_path: Path,
+) -> None:
+    package = _package()
+    root = compiled_skill_cache_dir(package, forge_home=tmp_path)
+    external = tmp_path / "external-scripts"
+    external.mkdir()
+    root.mkdir(parents=True)
+    (root / "scripts").symlink_to(external, target_is_directory=True)
+
+    repeated = materialize_compiled_skill(package, forge_home=tmp_path)
+
+    assert repeated == root
+    assert not (root / "scripts").is_symlink()
+    assert (root / "scripts" / "run.sh").read_bytes() == b"#!/bin/sh\n"
+    assert list(external.iterdir()) == []
+
+
+def test_materialize_replaces_symlinked_lock_without_creating_external_file(tmp_path: Path) -> None:
+    package = _package()
+    root = compiled_skill_cache_dir(package, forge_home=tmp_path)
+    external = tmp_path / "external-lock"
+    root.mkdir(parents=True)
+    lock = root / ".complete.lock"
+    lock.symlink_to(external)
+
+    repeated = materialize_compiled_skill(package, forge_home=tmp_path)
+
+    assert repeated == root
+    assert lock.is_file()
+    assert not lock.is_symlink()
+    assert not external.exists()

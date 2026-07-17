@@ -17,6 +17,7 @@ Design notes:
 
 from __future__ import annotations
 
+import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -66,8 +67,12 @@ def file_lock(*, lock_path: Path, timeout_s: float, poll_s: float = 0.05) -> Ite
 
     deadline = time.monotonic() + timeout_s
 
-    # Keep the fd open for the duration of the lock.
-    with lock_path.open("a+", encoding="utf-8") as f:
+    # Keep the fd open for the duration of the lock. O_NOFOLLOW makes a
+    # last-moment symlink substitution fail closed instead of opening an
+    # arbitrary external path.
+    flags = os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW
+    fd = os.open(lock_path, flags, 0o600)
+    with os.fdopen(fd, "a+", encoding="utf-8") as f:
         while True:
             try:
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

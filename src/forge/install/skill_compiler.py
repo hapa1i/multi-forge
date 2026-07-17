@@ -1110,15 +1110,15 @@ def _validate_placeholders(
                     )
                 )
                 continue
-            if capability == SkillCapability.PACKAGED_SCRIPT and (referenced_file.mode & 0o111) == 0:
+            if capability == SkillCapability.PACKAGED_SCRIPT and (referenced_file.mode & 0o500) != 0o500:
                 diagnostics.append(
                     SkillDiagnostic(
                         skill=source.manifest.name,
                         runtime=adapter.runtime,
                         path=argument_path,
                         rule="template.non-executable-package-path",
-                        message=f"packaged script '{argument_value}' does not have an executable mode",
-                        recovery="Mark the bundled script executable (normally mode 0o755).",
+                        message=f"packaged script '{argument_value}' is not owner-readable and owner-executable",
+                        recovery="Give the bundled script owner read and execute permissions (normally mode 0o755).",
                         capability=capability,
                     )
                 )

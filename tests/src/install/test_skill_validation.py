@@ -57,11 +57,23 @@ def test_whole_tree_token_scan_reports_nested_path_runtime_rule_and_recovery() -
     assert "packaged_script" in diagnostic.recovery
 
 
-@pytest.mark.parametrize("skill_dir", ["${CLAUDE_SKILL_DIR}", "$CLAUDE_SKILL_DIR"])
+@pytest.mark.parametrize(
+    "skill_dir",
+    [
+        "${CLAUDE_SKILL_DIR}",
+        "$CLAUDE_SKILL_DIR",
+        "${CLAUDE_SKILL_DIR:-/tmp/fallback}",
+        "${CLAUDE_SKILL_DIR#*/}",
+    ],
+)
 def test_codex_token_scan_rejects_both_claude_skill_dir_forms(skill_dir: str) -> None:
     package = _package(
         CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document(), 0o644),
-        CompiledSkillFile(PurePosixPath("scripts/check.sh"), f'echo "{skill_dir}/data"\n'.encode(), 0o755),
+        CompiledSkillFile(
+            PurePosixPath("scripts/check.sh"),
+            f'echo "{skill_dir}/data"\n'.encode(),
+            0o755,
+        ),
     )
 
     diagnostics = validate_compiled_skill(package)
@@ -77,8 +89,14 @@ def test_codex_token_scan_rejects_both_claude_skill_dir_forms(skill_dir: str) ->
         ("Tool: Agent\n", "token.claude-agent-tool"),
         ("Call `Read` with one argument.\n", "token.claude-read-tool"),
         ("A PreToolUse hook strips parameters.\n", "token.claude-hook-contract"),
-        ("Strip the Claude Code file reference syntax.\n", "token.claude-file-reference"),
-        ("Use Claude Code default when the model is missing.\n", "token.claude-default-model"),
+        (
+            "Strip the Claude Code file reference syntax.\n",
+            "token.claude-file-reference",
+        ),
+        (
+            "Use Claude Code default when the model is missing.\n",
+            "token.claude-default-model",
+        ),
     ],
 )
 def test_whole_tree_scan_covers_operational_claude_couplings(text: str, rule: str) -> None:
@@ -294,10 +312,25 @@ def test_references_must_resolve_without_escaping_package() -> None:
     assert "reference.missing" in rules
 
 
+def test_dynamic_reference_suffix_cannot_hide_static_absolute_or_escape_prefix() -> None:
+    document = _skill_document() + (
+        b"[relative](references/$DOCUMENT.md)\n" b"[escape](../$HOME/secret.md)\n" b"[absolute](/tmp/$USER/secret.md)\n"
+    )
+    package = _package(CompiledSkillFile(PurePosixPath("SKILL.md"), document, 0o644))
+
+    diagnostics = [item for item in validate_compiled_skill(package) if item.rule.startswith("reference.")]
+
+    assert {item.rule for item in diagnostics} == {"reference.absolute", "reference.escape"}
+    assert any("../$HOME/secret.md" in item.message for item in diagnostics)
+    assert any("/tmp/$USER/secret.md" in item.message for item in diagnostics)
+
+
 def test_reference_definitions_and_nested_labels_are_contained() -> None:
     document = _skill_document() + (
         b"[nested [label]](../inline-secret.md)\n"
         b"[escape]: ../definition-secret.md\n"
+        b"[multiline-escape]:\n"
+        b"  ../multiline-secret.md\n"
         b"[missing]: <references/missing.md> 'optional title'\n"
     )
     package = _package(CompiledSkillFile(PurePosixPath("SKILL.md"), document, 0o644))
@@ -307,12 +340,14 @@ def test_reference_definitions_and_nested_labels_are_contained() -> None:
     escape_messages = [item.message for item in diagnostics if item.rule == "reference.escape"]
     assert any("inline-secret.md" in message for message in escape_messages)
     assert any("definition-secret.md" in message for message in escape_messages)
+    assert any("multiline-secret.md" in message for message in escape_messages)
     assert any(item.rule == "reference.missing" and "references/missing.md" in item.message for item in diagnostics)
 
 
 def test_file_uri_is_rejected_but_external_and_anchor_references_are_allowed() -> None:
     document = _skill_document() + (
         b"[local](file:///private/tmp/secret.md)\n"
+        b"[drive](C:/Users/example/secret.md)\n"
         b"[web](https://example.com/docs)\n"
         b"[web2](http://example.com/docs)\n"
         b"[mail](mailto:owner@example.com)\n"
@@ -322,9 +357,11 @@ def test_file_uri_is_rejected_but_external_and_anchor_references_are_allowed() -
 
     diagnostics = [item for item in validate_compiled_skill(package) if item.rule.startswith("reference.")]
 
-    assert len(diagnostics) == 1
-    assert diagnostics[0].rule == "reference.absolute"
-    assert "file:///private/tmp/secret.md" in diagnostics[0].message
+    assert len(diagnostics) == 2
+    assert {item.rule for item in diagnostics} == {"reference.absolute"}
+    messages = {item.message for item in diagnostics}
+    assert any("file:///private/tmp/secret.md" in message for message in messages)
+    assert any("C:/Users/example/secret.md" in message for message in messages)
 
 
 def test_nested_relative_reference_resolves_from_containing_file() -> None:

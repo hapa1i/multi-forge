@@ -261,12 +261,13 @@ def test_packaged_script_path_uses_runtime_specific_loaded_skill_root_binding() 
     assert "`FORGE_SKILL_RUNTIME=codex`" in codex_body
 
 
-def test_packaged_script_path_requires_executable_mode() -> None:
+@pytest.mark.parametrize("mode", [0o644, 0o001, 0o100, 0o400])
+def test_packaged_script_path_requires_owner_read_and_execute(mode: int) -> None:
     script_path = PurePosixPath("scripts/check.sh")
     source = _neutral_source(
         body="{{forge:packaged_script:scripts/check.sh}}\n",
         required=frozenset({SkillCapability.PACKAGED_SCRIPT}),
-        files=(SkillSourceFile(script_path, b"#!/bin/sh\n", mode=0o644),),
+        files=(SkillSourceFile(script_path, b"#!/bin/sh\n", mode=mode),),
     )
 
     with pytest.raises(SkillCompilationError) as exc_info:
@@ -372,6 +373,23 @@ def test_runtime_specific_document_is_preserved_in_claude_and_absent_from_codex(
     assert claude.file(reference_path).content == reference.content
     with pytest.raises(KeyError):
         codex.file(reference_path)
+
+
+def test_document_cannot_be_excluded_from_every_eligible_runtime() -> None:
+    reference_path = PurePosixPath("references/runtime-note.md")
+    source = _neutral_source(
+        files=(SkillSourceFile(reference_path, b"# Runtime note\n"),),
+        runtime_excluded_files={
+            SkillRuntime.CLAUDE_CODE: frozenset({reference_path}),
+            SkillRuntime.CODEX: frozenset({reference_path}),
+        },
+    )
+
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CODEX)
+
+    diagnostic = next(item for item in exc_info.value.diagnostics if item.rule == "source.runtime-exclusion-all")
+    assert diagnostic.path == reference_path
 
 
 @pytest.mark.parametrize(("template", "mode"), [(True, 0o644), (False, 0o755)])

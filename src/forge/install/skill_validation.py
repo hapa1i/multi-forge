@@ -107,7 +107,7 @@ _CODEX_TOKEN_RULES = (
     ),
     _TokenRule(
         id="token.claude-skill-dir",
-        pattern=re.compile(r"\$(?:\{CLAUDE_SKILL_DIR\}|CLAUDE_SKILL_DIR\b)"),
+        pattern=re.compile(r"\$(?:\{CLAUDE_SKILL_DIR(?=[^A-Za-z0-9_]|$)|CLAUDE_SKILL_DIR\b)"),
         message="Claude's skill-directory variable leaked into a Codex package",
         recovery="Use resource_loading or packaged_script explicitly; packaged scripts need their own proven binding.",
     ),
@@ -655,7 +655,10 @@ def _validate_token_isolation(
                 )
             continue
         for rule in rules:
-            if (path, rule.id) in allowances and rule.id not in _NON_SUPPRESSIBLE_TOKEN_RULES:
+            if (
+                path,
+                rule.id,
+            ) in allowances and rule.id not in _NON_SUPPRESSIBLE_TOKEN_RULES:
                 continue
             if rule.pattern.search(text):
                 diagnostics.append(_diagnostic(package, rule.id, rule.message, rule.recovery, path))
@@ -675,7 +678,18 @@ def _validate_references(
         except UnicodeDecodeError:
             continue
         for raw_target in _iter_markdown_reference_targets(text):
-            if not raw_target or _is_dynamic_reference(raw_target):
+            if not raw_target:
+                continue
+            if re.match(r"^[A-Za-z]:", raw_target):
+                diagnostics.append(
+                    _diagnostic(
+                        package,
+                        "reference.absolute",
+                        f"reference '{raw_target}' uses an absolute drive path",
+                        "Reference bundled files with a package-relative path.",
+                        source_path,
+                    )
+                )
                 continue
             split = urlsplit(raw_target)
             if split.scheme.lower() == "file":
@@ -714,6 +728,8 @@ def _validate_references(
                         source_path,
                     )
                 )
+                continue
+            if _is_dynamic_reference(raw_target):
                 continue
             target_path = PurePosixPath(normalized)
             if target_path not in file_map:
@@ -765,7 +781,8 @@ def _iter_inline_markdown_targets(text: str) -> tuple[str, ...]:
 
 def _iter_markdown_definition_targets(text: str) -> tuple[str, ...]:
     targets: list[str] = []
-    for line in text.splitlines():
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
         stripped = line.lstrip(" ")
         if len(line) - len(stripped) > 3 or not stripped.startswith("["):
             continue
@@ -773,6 +790,11 @@ def _iter_markdown_definition_targets(text: str) -> tuple[str, ...]:
         if label_end is None or stripped[label_end + 1 : label_end + 2] != ":":
             continue
         target = _markdown_destination(stripped, label_end + 2, require_closing_parenthesis=False)
+        if target is None and not stripped[label_end + 2 :].strip() and index + 1 < len(lines):
+            continuation = lines[index + 1]
+            continuation_stripped = continuation.lstrip(" ")
+            if len(continuation) - len(continuation_stripped) <= 3:
+                target = _markdown_destination(continuation_stripped, 0, require_closing_parenthesis=False)
         if target is not None:
             targets.append(target)
     return tuple(targets)

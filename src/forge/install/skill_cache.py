@@ -7,7 +7,7 @@ import stat
 from pathlib import Path
 
 from forge.core.paths import get_forge_home
-from forge.core.state import atomic_write_bytes, atomic_write_text, file_lock_for_target
+from forge.core.state import atomic_write_bytes, atomic_write_text, file_lock_for_target, get_lock_path_for_target
 
 from .skill_compiler import CompiledSkillPackage
 
@@ -50,10 +50,16 @@ def compiled_skill_cache_dir(package: CompiledSkillPackage, *, forge_home: Path 
 def materialize_compiled_skill(package: CompiledSkillPackage, *, forge_home: Path | None = None) -> Path:
     """Atomically materialize package files and return their stable cache root."""
 
-    package_root = compiled_skill_cache_dir(package, forge_home=forge_home)
+    root = forge_home or get_forge_home()
+    package_root = compiled_skill_cache_dir(package, forge_home=root)
     marker = package_root / ".complete"
     expected_digest = compiled_skill_digest(package)
+    _prepare_cache_directories(package, package_root=package_root, forge_home=root)
+    _prepare_cache_lock(get_lock_path_for_target(marker))
     with file_lock_for_target(target_path=marker, timeout_s=5.0):
+        # Recheck after acquiring the lock so a stale cache-directory symlink cannot
+        # redirect validation or package writes outside Forge's cache.
+        _prepare_cache_directories(package, package_root=package_root, forge_home=root)
         if _cache_is_current(package, package_root, marker, expected_digest):
             return package_root
         for package_file in sorted(package.files, key=lambda item: item.path.as_posix()):
@@ -61,6 +67,75 @@ def materialize_compiled_skill(package: CompiledSkillPackage, *, forge_home: Pat
             atomic_write_bytes(target, package_file.content, mode=package_file.mode)
         atomic_write_text(marker, expected_digest + "\n", mode=0o644)
     return package_root
+
+
+def _prepare_cache_directories(
+    package: CompiledSkillPackage,
+    *,
+    package_root: Path,
+    forge_home: Path,
+) -> None:
+    """Create cache parents without retaining symlinked or non-directory components."""
+
+    forge_home.mkdir(parents=True, exist_ok=True)
+    current = forge_home
+    for part in package_root.relative_to(forge_home).parts:
+        current /= part
+        _repair_cache_directory(current)
+
+    package_parents = {
+        parent
+        for package_file in package.files
+        for parent in _package_file_parents(package_root, package_file.path.parts[:-1])
+    }
+    for parent in sorted(package_parents, key=lambda path: (len(path.parts), str(path))):
+        _repair_cache_directory(parent)
+
+
+def _package_file_parents(package_root: Path, parts: tuple[str, ...]) -> tuple[Path, ...]:
+    parents: list[Path] = []
+    current = package_root
+    for part in parts:
+        current /= part
+        parents.append(current)
+    return tuple(parents)
+
+
+def _repair_cache_directory(path: Path) -> None:
+    while True:
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError:
+            try:
+                path.mkdir()
+            except FileExistsError:
+                continue
+            return
+        if stat.S_ISDIR(mode):
+            return
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+
+
+def _prepare_cache_lock(path: Path) -> None:
+    """Remove a stale symlink instead of letting the lock open follow it."""
+
+    while True:
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError:
+            return
+        if stat.S_ISREG(mode):
+            return
+        if not stat.S_ISLNK(mode):
+            raise OSError(f"compiled skill cache lock is not a regular file: {path}")
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        return
 
 
 def _cache_is_current(
