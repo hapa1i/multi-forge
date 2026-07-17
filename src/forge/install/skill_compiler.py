@@ -366,7 +366,10 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
     """
 
     skill_document_path = package_root / "SKILL.md"
-    if not package_root.is_dir() or not skill_document_path.is_file():
+    if not package_root.is_dir():
+        raise ValueError(f"Claude skill package must contain {skill_document_path}")
+    _validate_compiler_owned_source_symlinks(package_root)
+    if not skill_document_path.is_file():
         raise ValueError(f"Claude skill package must contain {skill_document_path}")
 
     document = skill_document_path.read_bytes()
@@ -381,25 +384,21 @@ def load_claude_skill_source(package_root: Path) -> SkillSource:
     name = package_root.name
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
-        if source_file == skill_document_path or source_file.is_dir():
+        if source_file.is_symlink():
+            _validate_contained_source_file(package_root, source_file)
+        if source_file == skill_document_path:
             continue
         relative_path = PurePosixPath(source_file.relative_to(package_root).as_posix())
         if not _is_skill_source_file(relative_path):
             continue
-        if source_file.is_symlink():
-            try:
-                resolved = source_file.resolve(strict=True)
-            except (OSError, RuntimeError) as exc:
-                raise ValueError(f"{source_file}: skill source symlink cannot be resolved: {exc}") from exc
-            if not resolved.is_relative_to(package_root.resolve()) or not resolved.is_file():
-                raise ValueError(f"{source_file}: skill source symlink must target a file inside its package")
-        if not source_file.is_file():
+        if source_file.is_dir() and not source_file.is_symlink():
             continue
+        content, mode = _read_contained_source_file(package_root, source_file)
         auxiliary_files.append(
             SkillSourceFile(
                 path=relative_path,
-                content=source_file.read_bytes(),
-                mode=stat.S_IMODE(source_file.stat().st_mode),
+                content=content,
+                mode=mode,
             )
         )
 
@@ -423,7 +422,11 @@ def load_claude_skill_sources(skills_root: Path) -> tuple[SkillSource, ...]:
 
     if not skills_root.is_dir():
         raise ValueError(f"Skill source root is not a directory: {skills_root}")
-    package_roots = sorted(path for path in skills_root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file())
+    package_roots = sorted(
+        path
+        for path in skills_root.iterdir()
+        if path.is_dir() and ((path / "SKILL.md").is_file() or (path / "SKILL.md").is_symlink())
+    )
     return tuple(load_claude_skill_source(package_root) for package_root in package_roots)
 
 
@@ -438,7 +441,10 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
 
     manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
     content_path = package_root / NEUTRAL_SKILL_CONTENT
-    if not package_root.is_dir() or not manifest_path.is_file():
+    if not package_root.is_dir():
+        raise ValueError(f"Neutral skill package must contain {manifest_path}")
+    _validate_compiler_owned_source_symlinks(package_root)
+    if not manifest_path.is_file():
         raise ValueError(f"Neutral skill package must contain {manifest_path}")
     if not content_path.is_file():
         raise ValueError(f"Neutral skill package must contain {content_path}")
@@ -578,10 +584,12 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
 
     auxiliary_files: list[SkillSourceFile] = []
     for source_file in sorted(package_root.rglob("*")):
-        if source_file.is_dir():
-            continue
+        if source_file.is_symlink():
+            _validate_contained_source_file(package_root, source_file)
         relative_path = PurePosixPath(source_file.relative_to(package_root).as_posix())
         if relative_path in _COMPILER_OWNED_SOURCE_PATHS or not _is_skill_source_file(relative_path):
+            continue
+        if source_file.is_dir() and not source_file.is_symlink():
             continue
         content, mode = _read_contained_source_file(package_root, source_file)
         auxiliary_files.append(
@@ -604,6 +612,24 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
     if missing_runtime_exclusions:
         raise ValueError(
             f"{manifest_path}: runtime_excluded_files names missing auxiliary files: {missing_runtime_exclusions}"
+        )
+    auxiliary_by_path = {source_file.path: source_file for source_file in auxiliary_files}
+    behavioral_runtime_exclusions: dict[str, list[PurePosixPath]] = {}
+    for runtime, paths in runtime_excluded_files.items():
+        behavioral_paths = sorted(
+            (
+                path
+                for path in paths
+                if path in auxiliary_by_path and _is_behavioral_source_file(auxiliary_by_path[path])
+            ),
+            key=PurePosixPath.as_posix,
+        )
+        if behavioral_paths:
+            behavioral_runtime_exclusions[runtime.value] = behavioral_paths
+    if behavioral_runtime_exclusions:
+        raise ValueError(
+            f"{manifest_path}: runtime_excluded_files must name only non-templated, non-executable "
+            f"documentary Markdown: {behavioral_runtime_exclusions}"
         )
 
     return SkillSource(
@@ -633,7 +659,8 @@ def load_neutral_skill_source(package_root: Path) -> SkillSource:
 def load_skill_source(package_root: Path) -> SkillSource:
     """Load a neutral package when declared, otherwise use the Claude bridge."""
 
-    if (package_root / NEUTRAL_SKILL_MANIFEST).exists():
+    manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
+    if manifest_path.exists() or manifest_path.is_symlink():
         return load_neutral_skill_source(package_root)
     return load_claude_skill_source(package_root)
 
@@ -646,7 +673,13 @@ def load_skill_sources(skills_root: Path) -> tuple[SkillSource, ...]:
     package_roots = sorted(
         path
         for path in skills_root.iterdir()
-        if path.is_dir() and ((path / NEUTRAL_SKILL_MANIFEST).exists() or (path / "SKILL.md").is_file())
+        if path.is_dir()
+        and (
+            (path / NEUTRAL_SKILL_MANIFEST).exists()
+            or (path / NEUTRAL_SKILL_MANIFEST).is_symlink()
+            or (path / "SKILL.md").is_file()
+            or (path / "SKILL.md").is_symlink()
+        )
     )
     return tuple(load_skill_source(package_root) for package_root in package_roots)
 
@@ -867,6 +900,9 @@ def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDi
             )
 
     available_paths = seen - {PurePosixPath("SKILL.md")}
+    source_files_by_path: dict[PurePosixPath, list[SkillSourceFile]] = {}
+    for source_file in source.files:
+        source_files_by_path.setdefault(source_file.path, []).append(source_file)
     for excluded_runtime in sorted(manifest.runtime_excluded_files, key=lambda item: item.value):
         excluded_paths = manifest.runtime_excluded_files[excluded_runtime]
         if source.source_format != SkillSourceFormat.NEUTRAL:
@@ -913,6 +949,20 @@ def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDi
                         rule="source.runtime-exclusion-missing",
                         message="runtime-specific exclusion names no auxiliary source file",
                         recovery="Add the documentary auxiliary or remove the stale exclusion.",
+                    )
+                )
+            elif any(_is_behavioral_source_file(source_file) for source_file in source_files_by_path[excluded_path]):
+                diagnostics.append(
+                    SkillDiagnostic(
+                        skill=manifest.name,
+                        runtime=runtime,
+                        path=excluded_path,
+                        rule="source.runtime-exclusion-behavioral",
+                        message="runtime-specific exclusion names a templated or executable auxiliary file",
+                        recovery=(
+                            "Keep runtime exclusions limited to non-templated, non-executable documentary Markdown "
+                            "under references/."
+                        ),
                     )
                 )
     for source_path in sorted(available_paths, key=PurePosixPath.as_posix):
@@ -981,7 +1031,7 @@ def _validate_placeholders(
         ]
 
     diagnostics: list[SkillDiagnostic] = []
-    available_paths = {source_file.path for source_file in source.files_for_runtime(adapter.runtime)}
+    available_files = {source_file.path: source_file for source_file in source.files_for_runtime(adapter.runtime)}
     for match in _PLACEHOLDER_CANDIDATE_RE.finditer(text):
         payload = match.group(1)
         capability_id, separator, argument = payload.partition(":")
@@ -1046,7 +1096,8 @@ def _validate_placeholders(
                 )
                 continue
             argument_path = PurePosixPath(argument_value)
-            if argument_path not in available_paths:
+            referenced_file = available_files.get(argument_path)
+            if referenced_file is None:
                 diagnostics.append(
                     SkillDiagnostic(
                         skill=source.manifest.name,
@@ -1055,6 +1106,19 @@ def _validate_placeholders(
                         rule="template.missing-package-path",
                         message=f"path argument '{argument_value}' does not name an emitted source file",
                         recovery="Add the bundled file to SkillSource.files or correct the placeholder path.",
+                        capability=capability,
+                    )
+                )
+                continue
+            if capability == SkillCapability.PACKAGED_SCRIPT and (referenced_file.mode & 0o111) == 0:
+                diagnostics.append(
+                    SkillDiagnostic(
+                        skill=source.manifest.name,
+                        runtime=adapter.runtime,
+                        path=argument_path,
+                        rule="template.non-executable-package-path",
+                        message=f"packaged script '{argument_value}' does not have an executable mode",
+                        recovery="Mark the bundled script executable (normally mode 0o755).",
                         capability=capability,
                     )
                 )
@@ -1318,7 +1382,14 @@ def _is_skill_source_file(path: PurePosixPath) -> bool:
     return path.suffix not in _SKILL_SOURCE_EXCLUDED_SUFFIXES
 
 
-def _read_contained_source_file(package_root: Path, source_file: Path) -> tuple[bytes, int]:
+def _validate_compiler_owned_source_symlinks(package_root: Path) -> None:
+    for relative_path in sorted(_COMPILER_OWNED_SOURCE_PATHS, key=PurePosixPath.as_posix):
+        source_file = package_root / relative_path
+        if source_file.is_symlink():
+            _validate_contained_source_file(package_root, source_file)
+
+
+def _validate_contained_source_file(package_root: Path, source_file: Path) -> None:
     if source_file.is_symlink():
         try:
             resolved = source_file.resolve(strict=True)
@@ -1328,6 +1399,10 @@ def _read_contained_source_file(package_root: Path, source_file: Path) -> tuple[
             raise ValueError(f"{source_file}: skill source symlink must target a file inside its package")
     if not source_file.is_file():
         raise ValueError(f"{source_file}: skill source entries must be regular files")
+
+
+def _read_contained_source_file(package_root: Path, source_file: Path) -> tuple[bytes, int]:
+    _validate_contained_source_file(package_root, source_file)
     return source_file.read_bytes(), stat.S_IMODE(source_file.stat().st_mode)
 
 
@@ -1354,6 +1429,10 @@ def _runtime_exclusion_path_problem(raw: str) -> str | None:
     if not path.parts or path.parts[0] != "references" or path.suffix.lower() not in {".md", ".markdown"}:
         return "is not a Markdown documentary auxiliary under references/"
     return None
+
+
+def _is_behavioral_source_file(source_file: SkillSourceFile) -> bool:
+    return source_file.template or (source_file.mode & 0o111) != 0
 
 
 def _source_path_problem(path: PurePosixPath) -> str | None:

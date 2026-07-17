@@ -130,6 +130,67 @@ def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -
     ]
 
 
+@pytest.mark.parametrize(
+    ("owned_path", "target_content"),
+    [
+        (
+            "forge-skill.yaml",
+            """\
+schema_version: 1
+name: neutral-skill
+description: Neutral test. Use for tests.
+runtimes: [codex]
+""",
+        ),
+        ("content.md", "# Neutral\n"),
+        ("SKILL.md", "generated migration artifact\n"),
+    ],
+)
+@pytest.mark.parametrize("broken", [False, True])
+def test_neutral_loader_rejects_unsafe_compiler_owned_symlinks(
+    tmp_path: Path,
+    owned_path: str,
+    target_content: str,
+    *,
+    broken: bool,
+) -> None:
+    package_root = tmp_path / "neutral-skill"
+    package_root.mkdir()
+    (package_root / "forge-skill.yaml").write_text(
+        """\
+schema_version: 1
+name: neutral-skill
+description: Neutral test. Use for tests.
+runtimes: [codex]
+""",
+        encoding="utf-8",
+    )
+    (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+    (package_root / "SKILL.md").write_text("generated migration artifact\n", encoding="utf-8")
+    external_target = tmp_path / f"external-{owned_path}"
+    if not broken:
+        external_target.write_text(target_content, encoding="utf-8")
+    (package_root / owned_path).unlink()
+    (package_root / owned_path).symlink_to(external_target)
+
+    with pytest.raises(ValueError, match="skill source symlink"):
+        load_neutral_skill_source(package_root)
+
+
+def test_claude_loader_rejects_external_skill_document_symlink(tmp_path: Path) -> None:
+    package_root = tmp_path / "legacy-skill"
+    package_root.mkdir()
+    external_document = tmp_path / "external-SKILL.md"
+    external_document.write_text(
+        "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+        encoding="utf-8",
+    )
+    (package_root / "SKILL.md").symlink_to(external_document)
+
+    with pytest.raises(ValueError, match="must target a file inside its package"):
+        load_claude_skill_source(package_root)
+
+
 def test_mixed_loader_preserves_internal_symlink_alias_content() -> None:
     source = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "review")
     assert source.source_format == SkillSourceFormat.NEUTRAL
@@ -198,6 +259,25 @@ def test_packaged_script_path_uses_runtime_specific_loaded_skill_root_binding() 
     assert "directory containing this SKILL.md" in codex_body
     assert "execute the resulting absolute path" in codex_body
     assert "`FORGE_SKILL_RUNTIME=codex`" in codex_body
+
+
+def test_packaged_script_path_requires_executable_mode() -> None:
+    script_path = PurePosixPath("scripts/check.sh")
+    source = _neutral_source(
+        body="{{forge:packaged_script:scripts/check.sh}}\n",
+        required=frozenset({SkillCapability.PACKAGED_SCRIPT}),
+        files=(SkillSourceFile(script_path, b"#!/bin/sh\n", mode=0o644),),
+    )
+
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CODEX)
+
+    diagnostic = next(
+        item for item in exc_info.value.diagnostics if item.rule == "template.non-executable-package-path"
+    )
+    assert diagnostic.path == script_path
+    assert diagnostic.capability == SkillCapability.PACKAGED_SCRIPT
+    assert "0o755" in diagnostic.recovery
 
 
 def test_resource_path_uses_claude_absolute_and_codex_package_relative_binding() -> None:
@@ -292,6 +372,52 @@ def test_runtime_specific_document_is_preserved_in_claude_and_absent_from_codex(
     assert claude.file(reference_path).content == reference.content
     with pytest.raises(KeyError):
         codex.file(reference_path)
+
+
+@pytest.mark.parametrize(("template", "mode"), [(True, 0o644), (False, 0o755)])
+def test_runtime_exclusions_reject_behavioral_source_files(template: bool, mode: int) -> None:
+    reference_path = PurePosixPath("references/runtime-note.md")
+    source = _neutral_source(
+        files=(SkillSourceFile(reference_path, b"# Runtime note\n", mode=mode, template=template),),
+        runtime_excluded_files={SkillRuntime.CODEX: frozenset({reference_path})},
+    )
+
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
+
+    diagnostic = next(item for item in exc_info.value.diagnostics if item.rule == "source.runtime-exclusion-behavioral")
+    assert diagnostic.path == reference_path
+    assert "non-templated, non-executable" in diagnostic.recovery
+
+
+@pytest.mark.parametrize(("template", "mode"), [(True, 0o644), (False, 0o755)])
+def test_neutral_loader_rejects_behavioral_runtime_exclusions(
+    tmp_path: Path,
+    *,
+    template: bool,
+    mode: int,
+) -> None:
+    package_root = tmp_path / "neutral-skill"
+    references = package_root / "references"
+    references.mkdir(parents=True)
+    template_line = "template_files: [references/runtime-note.md]\n" if template else ""
+    (package_root / "forge-skill.yaml").write_text(
+        "schema_version: 1\n"
+        "name: neutral-skill\n"
+        "description: Neutral test. Use for tests.\n"
+        "runtimes: [claude_code, codex]\n"
+        f"{template_line}"
+        "runtime_excluded_files:\n"
+        "  codex: [references/runtime-note.md]\n",
+        encoding="utf-8",
+    )
+    (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+    runtime_note = references / "runtime-note.md"
+    runtime_note.write_text("# Runtime note\n", encoding="utf-8")
+    runtime_note.chmod(mode)
+
+    with pytest.raises(ValueError, match="non-templated, non-executable"):
+        load_neutral_skill_source(package_root)
 
 
 def test_mixed_loader_discovers_neutral_and_legacy_sources(tmp_path: Path) -> None:
