@@ -51,7 +51,13 @@ Editable installs can hide packaging and clean-environment bugs. For changes tha
 loaded with `importlib.resources`, build a wheel/sdist and verify the behavior from a clean install path when practical.
 For Day 1 install or extension lifecycle changes, verify the global-tool path with `forge extension doctor` (use
 `--json` when checking install kind, PATH reachability, hook dispatcher, project registry, and compatibility fields),
-then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup.
+then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup. For
+runtime-skill/compiler changes, verify `forge runtime list --json`, `forge extension enable --runtime claude|codex|all`,
+and `forge extension status --json`; also exercise `forge extension sync` and `forge extension disable` when package
+ownership changes. `--runtime` filters only the SKILLS module, sync preserves the installation's tracked runtime set,
+and runtime-package health belongs to `extension status`, not `extension doctor`. Codex skills support user and project
+scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local scope onto the shared project
+target.
 
 For auth, proxy, and workflow changes, test the no-`.env` path explicitly: credentials should resolve from environment
 variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
@@ -87,9 +93,11 @@ For Codex-runtime session changes, start with `forge runtime preflight codex`, t
 `forge session start <name> --runtime codex --resume-from <parent> --task "..."`,
 `forge session resume <name> --task "..."`, or the interactive TUI path that omits `--task`. `--context-delivery hook`
 and Codex policy enforcement require Codex hook registration/trust for `$FORGE_HOME/bin/forge-hook codex-session-start`
-and `$FORGE_HOME/bin/forge-hook codex-policy-check`; the default transfer delivery is `initial-message`. Runtime hooks
-are user-scoped via the `forge-hook <name>` dispatcher, while project/local extension installs own status line and
-project assets. For consumer-lane or subscription-billing changes, verify
+and `$FORGE_HOME/bin/forge-hook codex-policy-check`; use `forge codex status` for static registration and
+`forge runtime preflight codex --verify-enrollment` for empirical user-scope trust verification (it runs one cheap Codex
+turn). The default transfer delivery is `initial-message`. Runtime hooks are user-scoped via the `forge-hook <name>`
+dispatcher, while project/local extension installs own status line and project assets. For consumer-lane or
+subscription-billing changes, verify
 `forge session lane set|show|clear --consumer <supervisor|memory_writer|shadow_curation|team_supervisor>`,
 `forge policy supervisor status`, and `forge telemetry activity [session]`; `--backend claude-max` should label only
 keyless direct runs as `subscription_quota`, while resolvable keys remain `api` and proxied runs remain `unknown`.
