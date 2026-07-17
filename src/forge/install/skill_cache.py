@@ -7,7 +7,12 @@ import stat
 from pathlib import Path
 
 from forge.core.paths import get_forge_home
-from forge.core.state import atomic_write_bytes, atomic_write_text, file_lock_for_target, get_lock_path_for_target
+from forge.core.state import (
+    atomic_write_bytes,
+    atomic_write_text,
+    file_lock_for_target,
+    get_lock_path_for_target,
+)
 
 from .skill_compiler import CompiledSkillPackage
 

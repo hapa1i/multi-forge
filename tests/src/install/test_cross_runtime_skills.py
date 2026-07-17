@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from itertools import product
 from pathlib import Path
+from typing import TypedDict
 from unittest.mock import patch
 
 import pytest
@@ -59,6 +60,19 @@ _CLAUDE_ONLY = SkillCandidate(
 )
 
 
+class _PlanningPaths(TypedDict):
+    user_home: Path
+    claude_home: Path
+    project_root: Path
+
+
+class _InstallerSkillKwargs(TypedDict):
+    profile: InstallProfile
+    mode: InstallMode
+    skill_runtimes: tuple[str, ...]
+    _modules_override: set[InstallModule]
+
+
 def test_cli_runtime_selection_is_repeatable_and_all_is_canonical() -> None:
     assert _parse_skill_runtimes(()) is None
     assert _parse_skill_runtimes(("codex", "claude")) == (
@@ -96,7 +110,7 @@ def test_status_degrades_unknown_tracked_runtime_to_invalid_target(
     assert status[0].recovery is not None
 
 
-def _paths(tmp_path: Path) -> dict[str, Path]:
+def _paths(tmp_path: Path) -> _PlanningPaths:
     return {
         "user_home": tmp_path / "home",
         "claude_home": tmp_path / "claude-home",
@@ -581,7 +595,7 @@ def test_dry_run_does_not_materialize_cache_and_symlinks_use_stable_cache(
     monkeypatch.setenv("HOME", str(home))
     extensions_root, _source_package = _write_portable_source(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=_tracking(tmp_path))
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.SYMLINK,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -618,7 +632,7 @@ def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -674,7 +688,7 @@ def test_skip_record_refresh_failure_rolls_back_earlier_new_file_for_retry(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -731,7 +745,7 @@ def test_unchanged_sync_preserves_file_install_timestamps(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -808,7 +822,7 @@ def test_invalid_tracked_runtime_blocks_sync_without_dropping_ownership(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -850,7 +864,7 @@ def test_stale_unlink_failure_preserves_tracking_for_retry(
     extensions_root, source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -897,7 +911,7 @@ def test_tracking_commit_failure_rolls_back_new_package_files_for_retry(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -941,7 +955,7 @@ def test_settings_failure_rolls_back_new_codex_package_for_retry(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -991,7 +1005,7 @@ def test_settings_ownership_save_failure_restores_settings_sidecars_and_files(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -1061,7 +1075,7 @@ def test_tracking_commit_failure_restores_settings_sidecars_and_files(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -1120,7 +1134,7 @@ def test_stale_failure_with_new_file_rolls_back_addition_and_remains_retryable(
     extensions_root, source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -1180,7 +1194,7 @@ def test_failed_update_commit_refreshes_checksum_on_retry(
     extensions_root, source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
         "skill_runtimes": (CODEX_RUNTIME,),
@@ -1275,7 +1289,7 @@ def test_missing_symlink_cache_is_planned_as_update_and_repaired(
     extensions_root, _source_package = _write_portable_source(tmp_path)
     tracking = _tracking(tmp_path)
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
-    kwargs = {
+    kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.SYMLINK,
         "skill_runtimes": (CODEX_RUNTIME,),
