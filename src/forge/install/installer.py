@@ -86,6 +86,7 @@ from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
 from .skill_compiler import (
     CompiledSkillFile,
     CompiledSkillPackage,
+    FORGE_PACKAGE_SENTINEL,
     SkillRuntime,
     compile_skill_for_runtime,
     load_skill_sources,
@@ -1193,6 +1194,11 @@ class Installer:
             for package_file in compiled.files:
                 source_file = cache_dir.joinpath(*package_file.path.parts)
                 target_file = decision.target_dir.joinpath(*package_file.path.parts)
+                effective_mode = (
+                    InstallMode.COPY
+                    if package_file.path.as_posix() == FORGE_PACKAGE_SENTINEL
+                    else mode
+                )
                 validate_path_within_boundary(target_file, runtime_root, "write skill package")
                 _validate_skill_package_file_path(
                     target_file,
@@ -1204,7 +1210,7 @@ class Installer:
                     package_file,
                     source_file,
                     target_file,
-                    mode,
+                    effective_mode,
                     existing,
                     force,
                 )
@@ -1282,7 +1288,12 @@ class Installer:
         """Plan compiled bytes against a future cache path without materializing it."""
 
         if not target.exists() and not target.is_symlink():
-            return FilePlan(action="install", target_path=str(target), source_path=str(source))
+            return FilePlan(
+                action="install",
+                target_path=str(target),
+                effective_mode=mode,
+                source_path=str(source),
+            )
 
         target_location = target.parent.resolve() / target.name
         is_managed = existing is not None and any(
@@ -1296,12 +1307,14 @@ class Installer:
                         return FilePlan(
                             action="update",
                             target_path=str(target),
+                            effective_mode=mode,
                             source_path=str(source),
                             reason="compiled cache missing or invalid",
                         )
                     return FilePlan(
                         action="skip",
                         target_path=str(target),
+                        effective_mode=mode,
                         source_path=str(source),
                         reason="symlink already correct",
                     )
@@ -1313,21 +1326,29 @@ class Installer:
                     return FilePlan(
                         action="skip",
                         target_path=str(target),
+                        effective_mode=mode,
                         source_path=str(source),
                         reason="file unchanged",
                     )
-            return FilePlan(action="update", target_path=str(target), source_path=str(source))
+            return FilePlan(
+                action="update",
+                target_path=str(target),
+                effective_mode=mode,
+                source_path=str(source),
+            )
 
         if force:
             return FilePlan(
                 action="install",
                 target_path=str(target),
+                effective_mode=mode,
                 source_path=str(source),
                 reason="force overwrite",
             )
         return FilePlan(
             action="conflict",
             target_path=str(target),
+            effective_mode=mode,
             source_path=str(source),
             reason="file exists and is not Forge-managed",
         )
@@ -1417,6 +1438,7 @@ class Installer:
             return FilePlan(
                 action="install",
                 target_path=str(target),
+                effective_mode=mode,
                 source_path=str(source),
             )
 
@@ -1430,6 +1452,7 @@ class Installer:
                     return FilePlan(
                         action="skip",
                         target_path=str(target),
+                        effective_mode=mode,
                         source_path=str(source),
                         reason="symlink already correct",
                     )
@@ -1441,6 +1464,7 @@ class Installer:
                         return FilePlan(
                             action="skip",
                             target_path=str(target),
+                            effective_mode=mode,
                             source_path=str(source),
                             reason="file unchanged",
                         )
@@ -1448,6 +1472,7 @@ class Installer:
             return FilePlan(
                 action="update",
                 target_path=str(target),
+                effective_mode=mode,
                 source_path=str(source),
             )
 
@@ -1455,6 +1480,7 @@ class Installer:
             return FilePlan(
                 action="install",
                 target_path=str(target),
+                effective_mode=mode,
                 source_path=str(source),
                 reason="force overwrite",
             )
@@ -1462,6 +1488,7 @@ class Installer:
         return FilePlan(
             action="conflict",
             target_path=str(target),
+            effective_mode=mode,
             source_path=str(source),
             reason="file exists and is not Forge-managed",
         )
@@ -1730,7 +1757,7 @@ class Installer:
             if file_plan.action in ("install", "update"):
                 target_existed = target.exists() or target.is_symlink()
                 try:
-                    installed_file = self._execute_file(file_plan, mode)
+                    installed_file = self._execute_file(file_plan)
                 except OSError as e:
                     self._raise_post_file_failure(
                         f"Failed to write extension file '{file_plan.target_path}'; tracking was not updated",
@@ -1744,7 +1771,7 @@ class Installer:
                     newly_created_files.append(installed_file)
             elif file_plan.action == "skip" and file_plan.source_path is not None:
                 try:
-                    installed_file = self._installed_file_record(file_plan, mode)
+                    installed_file = self._installed_file_record(file_plan)
                 except OSError as e:
                     self._raise_post_file_failure(
                         f"Failed to refresh extension file ownership '{file_plan.target_path}'",
@@ -2146,13 +2173,11 @@ class Installer:
                 pass
         return failures
 
-    def _execute_file(self, file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+    def _execute_file(self, file_plan: FilePlan) -> InstalledFile:
         """Execute a file operation.
 
         Args:
             file_plan: Plan for the file.
-            mode: Installation mode.
-
         Returns:
             InstalledFile record.
         """
@@ -2164,15 +2189,15 @@ class Installer:
         if target.exists() or target.is_symlink():
             target.unlink()
 
-        if mode == InstallMode.SYMLINK:
+        if file_plan.effective_mode == InstallMode.SYMLINK:
             target.symlink_to(source)
         else:
             shutil.copy2(source, target)
 
-        return self._installed_file_record(file_plan, mode)
+        return self._installed_file_record(file_plan)
 
     @staticmethod
-    def _installed_file_record(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+    def _installed_file_record(file_plan: FilePlan) -> InstalledFile:
         """Build current ownership metadata for an installed or unchanged file."""
 
         source = Path(file_plan.source_path)  # type: ignore[arg-type]
@@ -2181,7 +2206,7 @@ class Installer:
             target_path=str(target),
             source_path=str(source),
             checksum=compute_checksum(source),
-            mode=mode.value,
+            mode=file_plan.effective_mode.value,
             installed_at=now_iso(),
         )
 

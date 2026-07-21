@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import stat
 import subprocess
@@ -12,6 +14,9 @@ import yaml
 
 from forge.install.skill_compiler import (
     CodexSkillInterface,
+    FORGE_PACKAGE_PRODUCER,
+    FORGE_PACKAGE_SCHEMA_VERSION,
+    FORGE_PACKAGE_SENTINEL,
     SkillCapability,
     SkillCompilationError,
     SkillManifest,
@@ -101,8 +106,12 @@ def test_mixed_sources_preserve_legacy_claude_bridge_byte_and_mode_fidelity() ->
             ),
             key=PurePosixPath.as_posix,
         )
+        expected_paths.insert(0, PurePosixPath(FORGE_PACKAGE_SENTINEL))
         assert [package_file.path for package_file in package.files] == expected_paths
         for package_file in package.files:
+            if package_file.path == PurePosixPath(FORGE_PACKAGE_SENTINEL):
+                assert package_file.mode == 0o644
+                continue
             source_file = package_root / package_file.path
             assert package_file.content == source_file.read_bytes(), package_file.path
             assert package_file.mode == stat.S_IMODE(source_file.stat().st_mode), package_file.path
@@ -127,6 +136,7 @@ def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -
     package = compile_skill_for_runtime(source, SkillRuntime.CLAUDE_CODE)
 
     assert [package_file.path.as_posix() for package_file in package.files] == [
+        FORGE_PACKAGE_SENTINEL,
         "SKILL.md",
         "resources/guide.md",
     ]
@@ -406,6 +416,52 @@ def test_compilation_is_deterministic_and_runtime_names_are_explicit() -> None:
     assert tuple(item.path for item in codex_first.files) == tuple(
         sorted((item.path for item in codex_first.files), key=PurePosixPath.as_posix)
     )
+
+    for package in (claude_first, codex_first):
+        sentinel = package.file(FORGE_PACKAGE_SENTINEL)
+        payload = json.loads(sentinel.content)
+        payload_files = [item for item in package.files if item.path.as_posix() != FORGE_PACKAGE_SENTINEL]
+        expected_rows = [
+            {
+                "path": item.path.as_posix(),
+                "sha256": hashlib.sha256(item.content).hexdigest(),
+                "mode": item.mode,
+            }
+            for item in payload_files
+        ]
+
+        assert sentinel.mode == 0o644
+        assert payload == {
+            "schema_version": FORGE_PACKAGE_SCHEMA_VERSION,
+            "producer": FORGE_PACKAGE_PRODUCER,
+            "runtime": package.runtime.value,
+            "skill": package.name,
+            "files": expected_rows,
+        }
+        assert sentinel.content == (
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode("utf-8")
+        assert [row["path"] for row in payload["files"]] == sorted(row["path"] for row in payload["files"])
+        assert FORGE_PACKAGE_SENTINEL not in {row["path"] for row in payload["files"]}
+        assert all(
+            path
+            and not PurePosixPath(path).is_absolute()
+            and all(part not in {"", ".", ".."} for part in PurePosixPath(path).parts)
+            for path in (row["path"] for row in payload["files"])
+        )
+
+
+def test_compiler_rejects_auxiliary_package_sentinel() -> None:
+    source = _neutral_source(
+        files=(SkillSourceFile(PurePosixPath(FORGE_PACKAGE_SENTINEL), b"operator marker\n"),),
+    )
+
+    with pytest.raises(SkillCompilationError) as exc_info:
+        compile_skill_for_runtime(source, SkillRuntime.CODEX)
+
+    diagnostic = next(item for item in exc_info.value.diagnostics if item.rule == "package.path")
+    assert diagnostic.path == PurePosixPath(FORGE_PACKAGE_SENTINEL)
+    assert "compiler-owned" in diagnostic.message
 
 
 def test_claude_capability_placeholder_is_typed_and_rendered() -> None:

@@ -206,15 +206,18 @@ class TestFilePlan:
         plan = FilePlan(
             action="install",
             target_path="/target",
+            effective_mode=InstallMode.COPY,
             source_path="/source",
         )
         assert plan.action == "install"
+        assert plan.effective_mode == InstallMode.COPY
         assert plan.reason is None
 
     def test_file_plan_with_reason(self) -> None:
         plan = FilePlan(
             action="conflict",
             target_path="/target",
+            effective_mode=InstallMode.SYMLINK,
             reason="file exists",
         )
         assert plan.reason == "file exists"

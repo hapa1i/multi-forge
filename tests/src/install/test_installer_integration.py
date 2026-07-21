@@ -256,7 +256,7 @@ class TestInstallerIntegration:
         installation = tracking.get_installation("user")
         assert installation is not None
         # Only file-based modules are tracked (commands, agents, skills)
-        assert len(installation.files) == 5  # 2 commands + 1 agent + 2 skill files
+        assert len(installation.files) == 6  # 2 commands + 1 agent + 2 skill files + provenance sentinel
         assert installation.profile == "full"
 
     def test_init_idempotent(

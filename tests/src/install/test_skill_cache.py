@@ -11,6 +11,7 @@ from forge.install.skill_cache import (
 from forge.install.skill_compiler import (
     CompiledSkillFile,
     CompiledSkillPackage,
+    FORGE_PACKAGE_SENTINEL,
     SkillRuntime,
 )
 
@@ -37,6 +38,24 @@ def test_cache_path_is_deterministic_and_content_addressed(tmp_path: Path) -> No
     assert first != changed
     assert first.name == compiled_skill_digest(package)
     assert not first.exists()
+
+
+def test_package_sentinel_changes_cache_digest_once() -> None:
+    legacy = _package()
+    sentinel = CompiledSkillFile(PurePosixPath(FORGE_PACKAGE_SENTINEL), b'{"schema_version":1}\n', 0o644)
+    marked = CompiledSkillPackage(
+        runtime=legacy.runtime,
+        name=legacy.name,
+        files=tuple(sorted((*legacy.files, sentinel), key=lambda item: item.path.as_posix())),
+    )
+    repeated = CompiledSkillPackage(
+        runtime=legacy.runtime,
+        name=legacy.name,
+        files=marked.files,
+    )
+
+    assert compiled_skill_digest(marked) != compiled_skill_digest(legacy)
+    assert compiled_skill_digest(repeated) == compiled_skill_digest(marked)
 
 
 def test_materialize_writes_bytes_modes_and_completion_marker(tmp_path: Path) -> None:

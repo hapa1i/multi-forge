@@ -21,17 +21,17 @@ sync, CLI cleanup coverage, and precisely bounded drift cases). First implementa
 
 Foundation for every later phase; ships the compiled-cache digest clean break (card §Provenance sentinel).
 
-- [ ] 1.1 Sentinel emitter in `src/forge/install/skill_compiler.py` writes `<package>/.forge-package.json`: canonical
+- [x] 1.1 Sentinel emitter in `src/forge/install/skill_compiler.py` writes `<package>/.forge-package.json`: canonical
   UTF-8 JSON, `schema_version: 1`, `producer: multi-forge`, `runtime`, `skill`, `files[]` sorted by relative POSIX path
   with `sha256` (lowercase hex) + `mode`; no timestamps, absolute paths, cache locations, or Forge version.
   - Assertion: two compiles of identical source produce byte-identical sentinels; the sentinel is excluded from its own
     `files[]`; path rules enforced (normalized, relative, unique, nonempty, no `.`/`..` components).
-- [ ] 1.2 Sentinel is a first-class emitted file: participates in the compiled-cache digest (`skill_cache.py`), install
+- [x] 1.2 Sentinel is a first-class emitted file: participates in the compiled-cache digest (`skill_cache.py`), install
   file ledger, tracking checksum, sync, and disable.
   - Assertion: cache digest changes exactly once for unchanged source (the intentional clean break); sync and disable
     round-trip the sentinel; covered in `tests/src/install/test_skill_cache.py`, `test_tracking.py`, and
     `test_cross_runtime_skills.py`.
-- [ ] 1.3 Per-file effective install mode, end to end. Today the planner and executor carry only the installation-wide
+- [x] 1.3 Per-file effective install mode, end to end. Today the planner and executor carry only the installation-wide
   `InstallMode` (`_plan_compiled_file(..., mode)`, `_execute_file(file_plan, mode)`), and `_installed_file_record`
   stamps that one mode onto every `InstalledFile` row — there is no seam for one copied file inside a symlink install.
   Introduce a per-file effective mode from planning through execution to the ledger row, with the sentinel pinned to
@@ -43,10 +43,10 @@ Foundation for every later phase; ships the compiled-cache digest clean break (c
     removes newly created files of both kinds; it does not promise restoration of overwritten tracked files.
   - Assertion (idempotence): a second symlink-mode sync with unchanged source plans `skip` for every file including the
     sentinel, and tracking still records the sentinel as copied.
-- [ ] 1.4 Claude and Codex whole-tree validators (`skill_validation.py`) accept the hidden sentinel file in emitted
+- [x] 1.4 Claude and Codex whole-tree validators (`skill_validation.py`) accept the hidden sentinel file in emitted
   packages.
   - Assertion: validation passes with the sentinel present for both runtimes; `test_skill_validation.py`.
-- [ ] 1.5 Doc sync (board contract: design docs update with the phase): `docs/design.md` §5.1 and
+- [x] 1.5 Doc sync (board contract: design docs update with the phase): `docs/design.md` §5.1 and
   `docs/design_appendix.md` §C describe the sentinel as an emitted, always-copied ledger file and record the one-time
   cache-digest change.
 

@@ -291,12 +291,14 @@ class FilePlan:
     Attributes:
         action: "install", "update", "remove", or "skip".
         target_path: Where the file will be installed.
+        effective_mode: Per-file copy or symlink behavior selected by planning.
         source_path: Where the file comes from (None for remove).
         reason: Explanation for skip/conflict actions.
     """
 
     action: str
     target_path: str
+    effective_mode: InstallMode
     source_path: str | None = None
     reason: str | None = None
 

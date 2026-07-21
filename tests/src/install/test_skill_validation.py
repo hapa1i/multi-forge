@@ -8,6 +8,7 @@ import yaml
 from forge.install.skill_compiler import (
     CompiledSkillFile,
     CompiledSkillPackage,
+    FORGE_PACKAGE_SENTINEL,
     SkillRuntime,
     TokenAllowance,
 )
@@ -36,6 +37,22 @@ def _package(
         files=package_files,
         token_allowances=allowances,
     )
+
+
+@pytest.mark.parametrize("runtime", [SkillRuntime.CLAUDE_CODE, SkillRuntime.CODEX])
+def test_whole_tree_validator_accepts_package_sentinel(runtime: SkillRuntime) -> None:
+    frontmatter_name = "forge:demo-skill" if runtime == SkillRuntime.CLAUDE_CODE else "demo-skill"
+    package = _package(
+        CompiledSkillFile(
+            PurePosixPath(FORGE_PACKAGE_SENTINEL),
+            b'{"files":[],"producer":"multi-forge","runtime":"codex","schema_version":1,"skill":"demo-skill"}\n',
+            0o644,
+        ),
+        CompiledSkillFile(PurePosixPath("SKILL.md"), _skill_document(frontmatter_name), 0o644),
+        runtime=runtime,
+    )
+
+    assert validate_compiled_skill(package) == ()
 
 
 def test_whole_tree_token_scan_reports_nested_path_runtime_rule_and_recovery() -> None:

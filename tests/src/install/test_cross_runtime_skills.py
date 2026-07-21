@@ -33,6 +33,7 @@ from forge.install.models import (
     InstallScope,
 )
 from forge.install.settings_merge import find_added_files
+from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
 from forge.install.skill_planning import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
@@ -796,8 +797,8 @@ def test_apply_recheck_does_not_rollback_through_substituted_package_root(
     real_execute = installer._execute_file
     written_relative: list[Path] = []
 
-    def substitute_after_first_write(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
-        record = real_execute(file_plan, mode)
+    def substitute_after_first_write(file_plan: FilePlan) -> InstalledFile:
+        record = real_execute(file_plan)
         if not written_relative:
             written_relative.append(Path(record.target_path).relative_to(package_dir))
             package_dir.rename(sibling_dir)
@@ -1302,12 +1303,13 @@ def test_project_package_with_symlinked_parent_is_not_its_own_duplicate(
     assert package.duplicate_dirs == []
 
 
-def test_dry_run_does_not_materialize_cache_and_symlinks_use_stable_cache(
+def test_symlink_install_copies_sentinel_and_is_idempotent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_portable_source(tmp_path)
-    installer = Installer(scope=InstallScope.USER, tracking_store=_tracking(tmp_path))
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.SYMLINK,
@@ -1329,9 +1331,42 @@ def test_dry_run_does_not_materialize_cache_and_symlinks_use_stable_cache(
 
     package = next(package for package in applied.skill_packages if package.cache_dir)
     target = Path(package.target_dir) / "SKILL.md"  # type: ignore[arg-type]
+    sentinel = Path(package.target_dir) / FORGE_PACKAGE_SENTINEL  # type: ignore[arg-type]
     assert target.is_symlink()
     assert target.resolve().is_relative_to(Path(package.cache_dir).resolve())  # type: ignore[arg-type]
     assert "/cache/compiled-skills/v1/codex/portable/" in str(target.resolve())
+    assert sentinel.is_file()
+    assert not sentinel.is_symlink()
+
+    marker_plan = next(file for file in applied.files if file.target_path == str(sentinel))
+    payload_plan = next(file for file in applied.files if file.target_path == str(target))
+    assert marker_plan.effective_mode == InstallMode.COPY
+    assert payload_plan.effective_mode == InstallMode.SYMLINK
+
+    installed = tracking.get_installation("user", None)
+    assert installed is not None
+    installed_by_target = {file.target_path: file for file in installed.files}
+    assert installed_by_target[str(sentinel)].mode == "copy"
+    assert installed_by_target[str(target)].mode == "symlink"
+    assert str(sentinel) in next(item for item in installed.skill_packages if item.skill == "portable").file_paths
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        preview = installer.plan_update()
+        synced = installer.update()
+
+    package_paths = set(next(item for item in synced.skill_packages if item.skill == "portable").file_paths)
+    assert {file.action for file in preview.files if file.target_path in package_paths} == {"skip"}
+    marker_preview = next(file for file in preview.files if file.target_path == str(sentinel))
+    assert marker_preview.effective_mode == InstallMode.COPY
+    refreshed = tracking.get_installation("user", None)
+    assert refreshed is not None
+    assert next(file for file in refreshed.files if file.target_path == str(sentinel)).mode == "copy"
+
+    installer.uninstall()
+    assert not Path(package.target_dir).exists()  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -1385,17 +1420,17 @@ def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
-        "mode": InstallMode.COPY,
+        "mode": InstallMode.SYMLINK,
         "skill_runtimes": (CODEX_RUNTIME,),
         "_modules_override": {InstallModule.SKILLS},
     }
     original_record = installer._installed_file_record
     recorded_targets: list[Path] = []
 
-    def fail_second_ownership_record(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+    def fail_second_ownership_record(file_plan: FilePlan) -> InstalledFile:
         if recorded_targets:
             raise OSError("injected post-write checksum failure")
-        installed = original_record(file_plan, mode)
+        installed = original_record(file_plan)
         recorded_targets.append(Path(file_plan.target_path))
         return installed
 
@@ -1416,7 +1451,7 @@ def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
     assert "Newly created extension files were rolled back" in str(exc_info.value)
     assert tracking.get_installation("user", None) is None
     package_dir = home / ".agents" / "skills" / "portable"
-    assert recorded_targets == [package_dir / "SKILL.md"]
+    assert recorded_targets == [package_dir / FORGE_PACKAGE_SENTINEL]
     assert not package_dir.exists()
 
     with (
@@ -1458,10 +1493,10 @@ def test_skip_record_refresh_failure_rolls_back_earlier_new_file_for_retry(
     tracking_before = tracking.path.read_bytes()
     original_record = installer._installed_file_record
 
-    def fail_skip_record(file_plan: FilePlan, mode: InstallMode) -> InstalledFile:
+    def fail_skip_record(file_plan: FilePlan) -> InstalledFile:
         if file_plan.action == "skip":
             raise OSError("injected checksum refresh failure")
-        return original_record(file_plan, mode)
+        return original_record(file_plan)
 
     with (
         patch("forge.install.installer.installed_runtimes", return_value=[]),
