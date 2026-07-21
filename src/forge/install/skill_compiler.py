@@ -387,6 +387,7 @@ def load_claude_skill_source(
     """
 
     _require_real_source_directory(package_root, label="Claude skill package root")
+    _reject_stale_package_sentinel(package_root)
     eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     skill_document_path = package_root / "SKILL.md"
     _validate_compiler_owned_source_symlinks(package_root, eligible_paths)
@@ -473,6 +474,7 @@ def load_neutral_skill_source(
     """
 
     _require_real_source_directory(package_root, label="Neutral skill package root")
+    _reject_stale_package_sentinel(package_root)
     eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
     content_path = package_root / NEUTRAL_SKILL_CONTENT
@@ -853,6 +855,17 @@ def _render_forge_package_sentinel(
         "files": rows,
     }
     return (json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _reject_stale_package_sentinel(package_root: Path) -> None:
+    if (package_root / FORGE_PACKAGE_SENTINEL).exists() or (package_root / FORGE_PACKAGE_SENTINEL).is_symlink():
+        raise ValueError(f"{package_root}: source package must not contain generated {FORGE_PACKAGE_SENTINEL}")
+
+
+def is_compiler_owned_file(path: PurePosixPath) -> bool:
+    """Return whether the compiler owns this emitted package path."""
+
+    return path in {PurePosixPath(FORGE_PACKAGE_SENTINEL)}
 
 
 def _compiled_path_problem(path: PurePosixPath) -> str | None:
@@ -1710,6 +1723,7 @@ __all__ = [
     "FORGE_PACKAGE_PRODUCER",
     "FORGE_PACKAGE_SCHEMA_VERSION",
     "FORGE_PACKAGE_SENTINEL",
+    "is_compiler_owned_file",
     "SkillAdapter",
     "SkillCapability",
     "SkillCompilationError",

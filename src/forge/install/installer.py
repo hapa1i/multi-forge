@@ -86,7 +86,7 @@ from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
 from .skill_compiler import (
     CompiledSkillFile,
     CompiledSkillPackage,
-    FORGE_PACKAGE_SENTINEL,
+    is_compiler_owned_file,
     SkillRuntime,
     compile_skill_for_runtime,
     load_skill_sources,
@@ -1194,11 +1194,8 @@ class Installer:
             for package_file in compiled.files:
                 source_file = cache_dir.joinpath(*package_file.path.parts)
                 target_file = decision.target_dir.joinpath(*package_file.path.parts)
-                effective_mode = (
-                    InstallMode.COPY
-                    if package_file.path.as_posix() == FORGE_PACKAGE_SENTINEL
-                    else mode
-                )
+                # Keep provenance metadata readable after a compiled-cache reset.
+                effective_mode = InstallMode.COPY if is_compiler_owned_file(package_file.path) else mode
                 validate_path_within_boundary(target_file, runtime_root, "write skill package")
                 _validate_skill_package_file_path(
                     target_file,
@@ -2177,9 +2174,10 @@ class Installer:
         """Execute a file operation.
 
         Args:
-            file_plan: Plan for the file.
+            file_plan: Plan for the file to execute.
+
         Returns:
-            InstalledFile record.
+            The resulting installed-file ledger record.
         """
         source = Path(file_plan.source_path)  # type: ignore[arg-type]  # source_path is always non-None in execute context
         target = Path(file_plan.target_path)

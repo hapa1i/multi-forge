@@ -7,7 +7,8 @@
 ## Current Focus
 
 Checklist accepted after two review rounds (history baseline pin, per-file install mode, recovery type, per-phase doc
-sync, CLI cleanup coverage, and precisely bounded drift cases). First implementation phase: Phase 1.
+sync, CLI cleanup coverage, and precisely bounded drift cases). Phases 0–1 are implemented and verified; next work is
+Phase 2 (skill-name universe).
 
 ## Phase 0: Acceptance
 
@@ -16,6 +17,9 @@ sync, CLI cleanup coverage, and precisely bounded drift cases). First implementa
   (verified by repo-wide grep at acceptance)
 - [x] Checklist written; revised across two review rounds
 - [x] Checklist reviewed by user; acceptance committed on the execution branch
+
+  - Verification recorded: acceptance review completed; execution branch and checklist links were checked against the
+    board contract.
 
 ## Phase 1: Provenance sentinel (compiler / cache / ledger / install mode)
 
@@ -49,6 +53,8 @@ Foundation for every later phase; ships the compiled-cache digest clean break (c
 - [x] 1.5 Doc sync (board contract: design docs update with the phase): `docs/design.md` §5.1 and
   `docs/design_appendix.md` §C describe the sentinel as an emitted, always-copied ledger file and record the one-time
   cache-digest change.
+  - Verification recorded: 660 install unit tests, 20 Docker tests, and mypy completed successfully after the Phase 1
+    changes.
 
 ## Phase 2: Skill-name universe
 
@@ -104,9 +110,15 @@ One UI-agnostic operation shared by installer planning, status, and GC (card §D
 - [ ] 4.3 Contract-test migration in this phase: existing status `--json` assertions that index the bare array (e.g.
   `test_cross_runtime_skills.py` `payload[0][...]`) move to the object shape deliberately; migration edits touch
   assertions only, no behavior.
+- [ ] 4.3a QA assertion migration: update the `/forge:qa` extension checklist's jq probes (including
+  `src/skills/qa/resources/checklist/2-extension.md`) from bare-array indexing to the versioned object shape, and add
+  assertions for `schema_version`, `installations`, and `unmanaged_skill_packages`.
 - [ ] 4.4 `forge extension doctor` untouched: no `skill_packages`, no unmanaged data (existing invariant test stays
   green unchanged).
 - [ ] 4.5 Doc sync: `docs/cli_reference.md` documents the new status JSON object as a research-preview clean break.
+- [ ] 4.6 QA-checklist sync and manual coverage: update the tracked QA checklist and its index/`last-updated` metadata
+  for the status JSON v2 object, add the sentinel emission/always-copy and cache-reset checks to the manual extension
+  steps, and run the checklist parser to verify every jq assertion against the shipped CLI.
 
 ## Phase 5: Installer recovery (enable/sync)
 

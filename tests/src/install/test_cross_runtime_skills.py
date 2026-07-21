@@ -1410,9 +1410,15 @@ def test_cache_materialization_failure_maps_to_clean_retryable_error(
     assert not (home / ".agents" / "skills" / "portable").exists()
 
 
+@pytest.mark.parametrize(
+    "mode",
+    [InstallMode.SYMLINK, InstallMode.COPY],
+    ids=["symlink", "copy"],
+)
 def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    mode: InstallMode,
 ) -> None:
     home = Path.home()
     _write_portable_source(tmp_path)
@@ -1420,7 +1426,7 @@ def test_mid_apply_failure_rolls_back_new_files_and_remains_retryable(
     installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
-        "mode": InstallMode.SYMLINK,
+        "mode": mode,
         "skill_runtimes": (CODEX_RUNTIME,),
         "_modules_override": {InstallModule.SKILLS},
     }
@@ -1488,7 +1494,10 @@ def test_skip_record_refresh_failure_rolls_back_earlier_new_file_for_retry(
     ):
         installer.init(**kwargs)
 
-    target = home / ".agents" / "skills" / "portable" / "SKILL.md"
+    # Remove the first-sorted sentinel so the update creates it before the
+    # remaining file's skip-record refresh fails. This exercises rollback of
+    # an earlier-created file rather than failing before any write occurs.
+    target = home / ".agents" / "skills" / "portable" / FORGE_PACKAGE_SENTINEL
     target.unlink()
     tracking_before = tracking.path.read_bytes()
     original_record = installer._installed_file_record
