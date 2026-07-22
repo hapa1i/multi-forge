@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from forge.core.reactive.routing import ModelRoute, RoutingResult
+from forge.core.runtime.codex_preflight import CodexPreflight
 
 
 @runtime_checkable
@@ -34,6 +35,8 @@ class RoutableSpec(Protocol):
     def provider_refs(self) -> tuple[tuple[str, str], ...]: ...
     @property
     def preferred_proxy(self) -> str | None: ...
+    @property
+    def runtime(self) -> str: ...
 
 
 _log = logging.getLogger(__name__)
@@ -66,12 +69,15 @@ class WorkerRoutingPlan:
     """Pre-resolved routing for all workers in a workflow invocation.
 
     Created once at invocation start. Frozen and passed to each worker.
-    ``routes`` is indexed by worker position (same order as spec list).
+    ``routes`` is indexed by worker position (same order as spec list). A
+    runtime-native entry intentionally has ``source="runtime_native"`` and
+    ``route=None``; every other workflow-plan entry requires a concrete route.
     """
 
     routes: tuple[RoutingResult, ...]
     resolved_at: str
     via_override: str | None
+    codex_preflight: CodexPreflight | None = None
 
 
 def resolve_model_flag(route: ModelRoute) -> str | None:
@@ -254,30 +260,41 @@ def resolve_invocation_routing(
 ) -> WorkerRoutingPlan:
     """Resolve routing for all workers at invocation start.
 
-    Called once by the workflow CLI command. Fail-closed: raises if
-    any worker has no route.
+    Called once by the workflow CLI command. Fail-closed: raises if any
+    non-runtime-native worker has no concrete route. Runtime-native workers
+    carry their frozen readiness snapshot on the returned plan.
     """
     from forge.core.reactive.routing import resolve_subprocess_routing
     from forge.core.state import now_iso
 
     results: list[RoutingResult] = []
+    codex_preflight = None
+    if any(spec.runtime == "codex" for spec in specs):
+        from forge.core.runtime.codex_preflight_cache import read_fresh_codex_preflight
+
+        codex_preflight = read_fresh_codex_preflight()
 
     for spec in specs:
-        routes = derive_model_routes(spec)
-
-        direct_only = bool(routes) and all(r.provider == "direct" for r in routes)
-        if direct_only:
-            result = _resolve_direct_spec(spec, routes, via)
+        routes: tuple[ModelRoute, ...]
+        if spec.runtime == "codex":
+            routes = ()
+            result = _resolve_runtime_native_spec(spec, via)
         else:
-            result = resolve_subprocess_routing(
-                explicit_proxy=via,
-                preferred_proxy=spec.preferred_proxy,
-                routes=routes,
-                require_route=True,
-                advisory_check=True,
-            )
+            routes = derive_model_routes(spec)
 
-        if result.route is None:
+            direct_only = bool(routes) and all(r.provider == "direct" for r in routes)
+            if direct_only:
+                result = _resolve_direct_spec(spec, routes, via)
+            else:
+                result = resolve_subprocess_routing(
+                    explicit_proxy=via,
+                    preferred_proxy=spec.preferred_proxy,
+                    routes=routes,
+                    require_route=True,
+                    advisory_check=True,
+                )
+
+        if result.source != "runtime_native" and result.route is None:
             _raise_no_route_error(spec, routes)
 
         _log_routing_decision(spec, result)
@@ -287,6 +304,7 @@ def resolve_invocation_routing(
         routes=tuple(results),
         resolved_at=now_iso(),
         via_override=via,
+        codex_preflight=codex_preflight,
     )
 
 
@@ -327,6 +345,23 @@ def _resolve_direct_spec(
         source="direct",
         route=direct_route,
         credential=_DIRECT_CREDENTIAL,
+        warning=warning,
+    )
+
+
+def _resolve_runtime_native_spec(spec: RoutableSpec, via: str | None) -> RoutingResult:
+    """Build the route-null success used by a runtime-owned Codex worker."""
+    warning = None
+    if via:
+        warning = f"Worker '{spec.name}' uses direct routing; --proxy ignored."
+
+    return RoutingResult(
+        base_url=None,
+        proxy_id=None,
+        template=None,
+        source="runtime_native",
+        route=None,
+        credential=None,
         warning=warning,
     )
 

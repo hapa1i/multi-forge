@@ -1,0 +1,11 @@
+schema_version: 1
+name: debate
+description: Adversarial multi-model evaluation. Models argue for, against, and neutrally about a subject.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, forge_cli, invocation_policy]
+allow_implicit_invocation: false
+claude_frontmatter:
+  argument-hint: '[subject: path or proposal or instruction] [--output path] [--code] [--models m1,m2] [--worker model:stance]'
+  context: fork
+  effort: high
+  allowed-tools: Bash, Read

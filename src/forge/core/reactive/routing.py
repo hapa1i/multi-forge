@@ -36,6 +36,7 @@ RoutingSource = Literal[
     "route_scan",
     "session_proxy",
     "direct",
+    "runtime_native",
     "unresolved",
 ]
 
@@ -61,8 +62,11 @@ class ModelRoute:
 class RoutingResult:
     """Outcome of the subprocess routing resolution chain.
 
-    ``route=None`` means unresolved fallback -- NOT valid direct execution.
-    Direct-capable models get a real ``ModelRoute(provider="direct")``.
+    ``route=None`` may represent unresolved fallback, opaque base-URL/session
+    routing, or intentional runtime-owned execution. ``source`` and
+    ``base_url`` disambiguate those cases. Runtime-native execution uses
+    ``source="runtime_native"`` with no route by design; direct-capable Claude
+    models still get a real ``ModelRoute(provider="direct")``.
     """
 
     base_url: str | None

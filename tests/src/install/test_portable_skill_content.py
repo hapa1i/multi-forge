@@ -18,11 +18,28 @@ from forge.install.skill_compiler import (
 )
 
 SKILLS_ROOT = Path(__file__).parents[3] / "src" / "skills"
-PORTABLE_SKILLS = ("challenge", "smoke-test", "review", "review-docs", "understand")
+PORTABLE_SKILLS = (
+    "analyze",
+    "challenge",
+    "consensus",
+    "debate",
+    "panel",
+    "review",
+    "review-docs",
+    "smoke-test",
+    "understand",
+)
 ALL_RUNTIMES = frozenset({SkillRuntime.CLAUDE_CODE, SkillRuntime.CODEX})
 SMOKE_SCRIPT = SKILLS_ROOT / "smoke-test" / "scripts" / "smoke-test.sh"
 
 EXPECTED_CLAUDE_EXTRAS: dict[str, dict[str, object]] = {
+    "analyze": {
+        "disable-model-invocation": False,
+        "argument-hint": "[topic: path or question or instruction] [--output path] [--models model]",
+        "context": "fork",
+        "effort": "high",
+        "allowed-tools": "Bash, Read",
+    },
     "challenge": {
         "argument-hint": "[claim or objection]",
         "effort": "high",
@@ -31,6 +48,35 @@ EXPECTED_CLAUDE_EXTRAS: dict[str, dict[str, object]] = {
     "smoke-test": {
         "disable-model-invocation": True,
         "allowed-tools": "Bash",
+    },
+    "consensus": {
+        "disable-model-invocation": True,
+        "argument-hint": (
+            "[subject: path or proposal or instruction] [--output path] [--code] "
+            "[--models m1,m2] [--worker model:role]"
+        ),
+        "context": "fork",
+        "effort": "high",
+        "allowed-tools": "Bash, Read",
+    },
+    "debate": {
+        "disable-model-invocation": True,
+        "argument-hint": (
+            "[subject: path or proposal or instruction] [--output path] [--code] "
+            "[--models m1,m2] [--worker model:stance]"
+        ),
+        "context": "fork",
+        "effort": "high",
+        "allowed-tools": "Bash, Read",
+    },
+    "panel": {
+        "disable-model-invocation": True,
+        "argument-hint": (
+            "[target: path or instruction] [--output path] [--code] [--models m1,m2] "
+            "[--roles r1,r2] [--review-type type] [--severity level]"
+        ),
+        "context": "fork",
+        "allowed-tools": "Bash, Read",
     },
     "review": {
         "disable-model-invocation": False,
@@ -53,6 +99,11 @@ EXPECTED_CLAUDE_EXTRAS: dict[str, dict[str, object]] = {
 }
 
 EXPECTED_PACKAGE_PATHS: dict[tuple[str, SkillRuntime], set[PurePosixPath]] = {
+    ("analyze", SkillRuntime.CLAUDE_CODE): {PurePosixPath("SKILL.md")},
+    ("analyze", SkillRuntime.CODEX): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("agents/openai.yaml"),
+    },
     ("challenge", SkillRuntime.CLAUDE_CODE): {PurePosixPath("SKILL.md")},
     ("challenge", SkillRuntime.CODEX): {PurePosixPath("SKILL.md")},
     ("smoke-test", SkillRuntime.CLAUDE_CODE): {
@@ -63,6 +114,29 @@ EXPECTED_PACKAGE_PATHS: dict[tuple[str, SkillRuntime], set[PurePosixPath]] = {
         PurePosixPath("SKILL.md"),
         PurePosixPath("agents/openai.yaml"),
         PurePosixPath("scripts/smoke-test.sh"),
+    },
+    ("consensus", SkillRuntime.CLAUDE_CODE): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("resources/synthesis.md"),
+    },
+    ("consensus", SkillRuntime.CODEX): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("agents/openai.yaml"),
+        PurePosixPath("resources/synthesis.md"),
+    },
+    ("debate", SkillRuntime.CLAUDE_CODE): {PurePosixPath("SKILL.md")},
+    ("debate", SkillRuntime.CODEX): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("agents/openai.yaml"),
+    },
+    ("panel", SkillRuntime.CLAUDE_CODE): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("resources/synthesis.md"),
+    },
+    ("panel", SkillRuntime.CODEX): {
+        PurePosixPath("SKILL.md"),
+        PurePosixPath("agents/openai.yaml"),
+        PurePosixPath("resources/synthesis.md"),
     },
     ("review", SkillRuntime.CLAUDE_CODE): {
         PurePosixPath("SKILL.md"),
@@ -233,6 +307,10 @@ def test_codex_frontmatter_policy_and_whole_tree_are_native(
     challenge_paths = {package_file.path for package_file in compiled_packages[("challenge", SkillRuntime.CODEX)].files}
     assert PurePosixPath("agents/openai.yaml") not in challenge_paths
     expected_policy = {
+        "analyze": True,
+        "consensus": False,
+        "debate": False,
+        "panel": False,
         "smoke-test": False,
         "review": True,
         "review-docs": True,

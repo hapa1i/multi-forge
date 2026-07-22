@@ -164,11 +164,12 @@ printf '%s\n' analyze challenge consensus debate panel qa review review-docs smo
 find "$CLAUDE_HOME/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
   | diff -u /tmp/forge-claude-skills.expected -
 
-printf '%s\n' challenge review review-docs smoke-test understand > /tmp/forge-portable-skills.expected
+printf '%s\n' analyze challenge consensus debate panel review review-docs smoke-test understand \
+  > /tmp/forge-portable-skills.expected
 find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
   | diff -u /tmp/forge-portable-skills.expected -
 
-printf '%s\n' analyze consensus debate panel qa walkthrough > /tmp/forge-claude-only-skills.expected
+printf '%s\n' qa walkthrough > /tmp/forge-claude-only-skills.expected
 comm -23 /tmp/forge-claude-skills.expected /tmp/forge-portable-skills.expected \
   | diff -u /tmp/forge-claude-only-skills.expected -
 
@@ -177,13 +178,16 @@ while read -r skill; do
 done < /tmp/forge-portable-skills.expected
 
 ! rg -n '\$\{CLAUDE_SKILL_DIR\}|\$ARGUMENTS|subagent_type:[[:space:]]*["]?Explore' .agents/skills
+for skill in analyze consensus debate panel; do
+  rg -q 'forge workflow' ".agents/skills/$skill/SKILL.md"
+done
 ```
 
 - [ ] Claude user target contains exactly eleven compiled skill packages
-- [ ] Codex project target contains exactly the five portable skills: challenge, smoke-test, review, review-docs, and
-  understand
-- [ ] The exact Claude-only set is analyze, consensus, debate, panel, qa, and walkthrough
-- [ ] Every Codex `SKILL.md` name matches its package directory and the full Codex tree has no prohibited Claude tokens
+- [ ] Codex project target contains exactly nine portable skills, including analyze, consensus, debate, and panel
+- [ ] The exact Claude-only set is qa and walkthrough
+- [ ] Every Codex `SKILL.md` name matches its package directory, the full tree has no prohibited Claude tokens, and each
+  workflow frontend invokes `forge workflow`
 
 ### 15.8 `/forge:smoke-test` Explicit Invocation
 

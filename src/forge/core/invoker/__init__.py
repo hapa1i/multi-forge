@@ -8,6 +8,7 @@ ordered fan-out, timeouts) and per-job usage emission. Phase 5 adds a
 
 from .claude import ClaudeHeadlessInvoker
 from .codex import CodexHeadlessInvoker, prepare_codex_request
+from ._lifecycle import run_grouped_parallel
 from .types import (
     Attribution,
     HeadlessInvoker,
@@ -23,4 +24,5 @@ __all__ = [
     "HeadlessRequest",
     "HeadlessResult",
     "prepare_codex_request",
+    "run_grouped_parallel",
 ]

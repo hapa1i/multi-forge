@@ -14,7 +14,7 @@ from forge.review.consensus import (
     run_consensus,
     validate_resource,
 )
-from forge.review.models import ModelSpec, ReviewResult, RoleSpec
+from forge.review.models import ModelSpec, MultiReviewOutput, ReviewResult, RoleSpec
 from forge.review.routing import WorkerRoutingPlan
 
 
@@ -176,6 +176,39 @@ class TestBuildReconciliationBrief:
 
 
 class TestRunConsensus:
+    @patch("forge.review.consensus.run_multi_review")
+    @patch("forge.review.routing.resolve_invocation_routing")
+    def test_codex_runtime_and_plan_snapshot_survive_both_rounds(self, mock_routing, mock_run, tmp_path):
+        resource = tmp_path / "eval.md"
+        resource.write_text(f"Evaluate: {ROLE_MARKER}")
+        codex = ModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            description="Native Codex",
+            runtime="codex",
+        )
+        plan = _auto_plan([codex])
+        mock_routing.return_value = plan
+        mock_run.side_effect = [
+            MultiReviewOutput(prompt="", results=[]),
+            MultiReviewOutput(prompt="", results=[]),
+        ]
+
+        run_consensus(
+            str(resource),
+            [RoleSpec(role="architecture", role_prompt="Focus on architecture", model=codex)],
+        )
+
+        mock_routing.assert_called_once()
+        assert mock_run.call_count == 2
+        round1, round2 = mock_run.call_args_list
+        assert [spec.runtime for spec in round1.kwargs["models"]] == ["codex"]
+        assert [spec.runtime for spec in round2.kwargs["models"]] == ["codex"]
+        assert round1.kwargs["routing_plan"] is plan
+        assert round2.kwargs["routing_plan"] is plan
+
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_replaces_role_marker(self, mock_popen_cls, mock_routing, tmp_path):

@@ -98,12 +98,12 @@ PATH="/tmp/forge-qa-runtime-bin:$PATH" forge extension enable --scope project --
   --profile minimal --with skills --without commands --runtime codex
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | jq -e '.schema_version == 2 and .unmanaged_skill_packages == []
-      and (.installations[0].skill_packages | length == 5)
+      and (.installations[0].skill_packages | length == 9)
       and all(.installations[0].skill_packages[]; .runtime == "codex" and .state == "present")'
 ```
 
 - [ ] Project disable removes all tracked `.agents/skills` packages and its tracking row
 - [ ] Disabling project Codex packages leaves the Claude user installation intact
-- [ ] Re-enable restores exactly five healthy project Codex packages for complete-uninstall coverage
+- [ ] Re-enable restores exactly nine healthy project Codex packages for complete-uninstall coverage
 
 ---

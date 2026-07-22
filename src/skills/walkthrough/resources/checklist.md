@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.5 -->
+<!-- version: 1.0.6 -->
 
 <!-- test-count: 108 assertions -->
 
-<!-- last-updated: 2026-07-22 -->
+<!-- last-updated: 2026-07-23 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -153,7 +153,7 @@ Verify the compiled project package set exactly:
 
 ```bash
 bash "$SCRIPTS/run-in-repo.sh" bash -lc '
-  printf '\''%s\n'\'' challenge review review-docs smoke-test understand \
+  printf '\''%s\n'\'' analyze challenge consensus debate panel review review-docs smoke-test understand \
     > .forge/walkthrough/portable-skills.expected
   find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
     | diff -u .forge/walkthrough/portable-skills.expected -
@@ -167,7 +167,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
 
 - [ ] agents/ has .md files
 
-- [ ] `.agents/skills` contains exactly challenge, review, review-docs, smoke-test, and understand
+- [ ] `.agents/skills` contains exactly the nine portable skills, including all four workflow frontends
 
 - [ ] No Codex skill package is written under the sandboxed `CODEX_HOME`
 
@@ -199,7 +199,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
     and all(.installations.user.skill_packages[]; .runtime == "claude_code")
     and (.installations["local:" + $root].skill_packages | length == 10)
     and all(.installations["local:" + $root].skill_packages[]; .runtime == "claude_code")
-    and (.installations["project:" + $root].skill_packages | length == 5)
+    and (.installations["project:" + $root].skill_packages | length == 9)
     and all(.installations["project:" + $root].skill_packages[]; .runtime == "codex")
   '\'' .forge-home/installed.json
 '
@@ -208,7 +208,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
 - [ ] Manifest file exists
 - [ ] Manifest separately tracks user, local, and project installations
 - [ ] Standard-profile user/local installs each track ten Claude skill packages
-- [ ] Minimal project install tracks exactly five Codex skill packages
+- [ ] Minimal project install tracks exactly nine Codex skill packages
 
 ### 3.4 Preview and Apply a Legacy Hook Migration
 
@@ -313,7 +313,7 @@ bash "$SCRIPTS/run-in-repo.sh" env \
   > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt"
 rg -q 'Skill packages:' "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt"
 test "$(rg -c 'present[[:space:]]+codex[[:space:]]+' \
-  "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt")" -eq 5
+  "$FORGE_TEST_REPO/.forge/walkthrough/project-status.txt")" -eq 9
 
 bash "$SCRIPTS/run-in-repo.sh" env \
   HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
@@ -321,7 +321,7 @@ bash "$SCRIPTS/run-in-repo.sh" env \
   > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.json"
 jq -e '.schema_version == 2 and (.installations | length == 1)
   and .unmanaged_skill_packages == [] and .installations[0].scope == "project"
-  and (.installations[0].skill_packages | length == 5)
+  and (.installations[0].skill_packages | length == 9)
   and all(.installations[0].skill_packages[];
     . as $package
     | $package.runtime == "codex" and ($package.skill | length > 0)
@@ -341,15 +341,15 @@ bash "$SCRIPTS/run-in-repo.sh" env \
 bash "$SCRIPTS/run-in-repo.sh" bash -lc '
   root=$(pwd -P)
   jq -e --arg root "$root" '\''
-    (.installations["project:" + $root].skill_packages | length == 5)
+    (.installations["project:" + $root].skill_packages | length == 9)
     and all(.installations["project:" + $root].skill_packages[]; .runtime == "codex")
   '\'' .forge-home/installed.json
 '
 ```
 
 - [ ] Human status shows a runtime package table with project Codex packages in `present` state
-- [ ] JSON status reports five healthy Codex packages with no missing files, duplicates, or recovery action
-- [ ] Sync succeeds without Codex on `PATH` and preserves the recorded five-package runtime set
+- [ ] JSON status reports nine healthy Codex packages with no missing files, duplicates, or recovery action
+- [ ] Sync succeeds without Codex on `PATH` and preserves the recorded nine-package runtime set
 
 ---
 
@@ -972,7 +972,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope user --yes
 ```
 
 - [ ] Project, local, and user disable commands all exit 0
-- [ ] Project output confirms the five Codex packages were removed
+- [ ] Project output confirms the nine Codex packages were removed
 - [ ] Local and user output confirms Claude extensions were removed
 
 ### 13.4 Final Verification

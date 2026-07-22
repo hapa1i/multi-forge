@@ -1,0 +1,11 @@
+schema_version: 1
+name: analyze
+description: Deep single-model analysis of a topic, question, or architectural decision.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, forge_cli, invocation_policy]
+allow_implicit_invocation: true
+claude_frontmatter:
+  argument-hint: '[topic: path or question or instruction] [--output path] [--models model]'
+  context: fork
+  effort: high
+  allowed-tools: Bash, Read

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -10,6 +11,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.reactive.routing import ModelRoute, RoutingResult
+from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.proxy.proxies import ProxyNotFoundError
 from forge.review.models import (
     ModelAvailability,
@@ -42,6 +44,41 @@ def _auto_routing_plan(specs, **_kw):
         for _ in specs
     )
     return WorkerRoutingPlan(routes=results, resolved_at="2026-05-14T12:00:00Z", via_override=None)
+
+
+def _runtime_native_plan(specs, **kwargs):
+    via = kwargs.get("via")
+    results = tuple(
+        RoutingResult(
+            base_url=None,
+            proxy_id=None,
+            template=None,
+            source="runtime_native",
+            route=None,
+            credential=None,
+            warning=(f"Worker '{spec.name}' uses direct routing; --proxy ignored." if via else None),
+        )
+        for spec in specs
+    )
+    preflight = CodexPreflight(
+        installed=True,
+        version="0.145.0",
+        version_ok=True,
+        auth_method="chatgpt_tokens",
+        auth_source="codex_store",
+        billing_mode="subscription_quota",
+        ready=True,
+        blocking_reason=None,
+        hook_seam="enrollment_gated",
+        proxy_responses="native_direct",
+        doctor_status="ok",
+    )
+    return WorkerRoutingPlan(
+        routes=results,
+        resolved_at="2026-07-22T12:00:00Z",
+        via_override=None,
+        codex_preflight=preflight,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -94,6 +131,16 @@ class TestRunHelp:
         assert consensus.exit_code == 0
         assert "Output as JSON" in consensus_output
         assert "Gate on positions: exit 0 if all supporting, exit 1 otherwise" in consensus_output
+
+    def test_worker_selection_and_effort_help_are_runtime_explicit(self):
+        runner = CliRunner()
+
+        for verb in ("panel", "analyze", "debate", "consensus"):
+            result = runner.invoke(main, ["workflow", verb, "--help"])
+            output = " ".join(result.output.split())
+            assert result.exit_code == 0
+            assert "worker names across Claude/Codex runtimes" in output
+            assert "Claude workers only: reasoning effort" in output
 
     def test_unknown_workflow_exits_error(self):
         runner = CliRunner()
@@ -155,7 +202,27 @@ class TestListModels:
         assert data[0]["status"] == "ready"
         assert "model_id" in data[0]
         assert "family" in data[0]
+        assert data[0]["runtime"] == "claude_code"
         assert "preferred_proxy" in data[0]
+
+    @patch("forge.review.models.check_model_availability")
+    def test_codex_table_uses_runtime_preflight_group(self, mock_avail):
+        codex = ModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            description="Native Codex",
+            runtime="codex",
+        )
+        mock_avail.return_value = [ModelAvailability(spec=codex, status="ready", reason="")]
+
+        result = CliRunner().invoke(main, ["workflow", "list-models"])
+
+        assert result.exit_code == 0
+        assert "runtime-native" in result.output
+        assert "runtime preflight" in result.output
+        assert "not configured" not in result.output
 
     @patch("forge.review.models.check_model_availability")
     def test_json_mixed_status(self, mock_avail):
@@ -232,7 +299,7 @@ class TestListModels:
         output = " ".join(result.output.split())
 
         assert result.exit_code == 0
-        assert "credentials configured and routing usable" in output
+        assert "runtime prerequisites and routing usable" in output
 
     @patch("forge.review.models.check_model_availability")
     def test_grouped_display_shows_credential(self, mock_avail):
@@ -287,6 +354,65 @@ class TestRunPanel:
         assert data["resolved_models"]["claude-opus"]["requested_model"] == "claude-opus"
         assert data["resolved_models"]["claude-opus"]["resolved_model"] == "openai/gpt-5.5"
         assert data["resolved_models"]["claude-opus"]["proxy"] == "openrouter-openai"
+        assert data["resolved_models"]["claude-opus"]["runtime"] == "claude_code"
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.review.engine.run_multi_review")
+    def test_codex_json_reports_runtime_default_truthfully(self, mock_run, _mock_routing):
+        mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
+
+        result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review", "--models", "codex", "--json"])
+
+        assert result.exit_code == 0
+        routed = json.loads(result.output)["resolved_models"]["codex"]
+        assert routed == {
+            "requested_model": "codex",
+            "model_id": "codex-default",
+            "resolved_model": None,
+            "provider": "openai",
+            "runtime": "codex",
+            "source": "runtime_native",
+            "proxy": None,
+            "template": None,
+            "model_selection": "runtime_default",
+        }
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.review.engine.run_multi_review")
+    def test_codex_text_reports_runtime_default_truthfully(self, mock_run, _mock_routing):
+        mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
+
+        result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review", "--models", "codex"])
+
+        assert result.exit_code == 0
+        assert "resolved=(runtime default)" in result.output
+        assert "provider=openai" in result.output
+        assert "runtime=codex" in result.output
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.review.engine.run_multi_review")
+    def test_codex_proxy_override_warns_and_is_ignored(self, mock_run, _mock_routing):
+        mock_run.return_value = _mock_output([ReviewResult("codex", "ok", "", True, 1.0)])
+
+        result = CliRunner().invoke(
+            main,
+            [
+                "workflow",
+                "panel",
+                "-p",
+                "Review",
+                "--models",
+                "codex",
+                "--proxy",
+                "openrouter-openai",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "--proxy ignored" in data["routing_warnings"][0]
+        assert data["resolved_models"]["codex"]["proxy"] is None
 
     @patch("forge.review.engine.run_multi_review")
     def test_target_loads_docreview_framework(self, mock_run):
@@ -1065,6 +1191,22 @@ class TestRunDebate:
         assert result.exit_code == 2
         assert "No subject" in result.output
 
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.review.adversarial.run_multi_review")
+    def test_debate_codex_selection_preserves_runtime(self, mock_run, _mock_routing):
+        mock_run.return_value = _mock_output([ReviewResult("codex-for", "analysis", "", True, 1.0)])
+
+        result = CliRunner().invoke(
+            main,
+            ["workflow", "debate", "Proposal", "--models", "codex", "--json"],
+        )
+
+        assert result.exit_code == 0
+        assert [spec.runtime for spec in mock_run.call_args.kwargs["models"]] == ["codex"]
+        routed = json.loads(result.output)["resolved_models"]["codex-for"]
+        assert routed["runtime"] == "codex"
+        assert routed["model_selection"] == "runtime_default"
+
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
     @patch("forge.review.adversarial.run_multi_review")
     def test_debate_invokes_adversarial(self, mock_run, _mock_routing):
@@ -1593,8 +1735,63 @@ class TestRunAnalyze:
 
 
 class TestUsageEmission:
-    """Phase 4c: a workflow fan-out emits ONE verb-level usage event, attributed
-    to the ambient run (not per-worker -- ReviewResult carries no per-worker cost)."""
+    """Workflow fan-out keeps the proxy aggregate separate from worker evidence."""
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_codex_tokens_stay_on_worker_and_downstream_not_verb_aggregate(
+        self,
+        mock_popen,
+        _mock_routing,
+        monkeypatch,
+    ):
+        from unittest.mock import MagicMock
+
+        from forge.core.telemetry.downstream import read_downstream_records
+        from forge.core.usage.ledger import read_usage_events
+
+        stream = (Path(__file__).resolve().parents[2] / "fixtures/codex/exec_json_success.jsonl").read_text()
+        proc = MagicMock()
+        proc.communicate.return_value = (stream, "")
+        proc.returncode = 0
+        proc.poll.return_value = 0
+        proc.pid = 4242
+        proc.wait.return_value = 0
+        mock_popen.return_value = proc
+        monkeypatch.setenv("FORGE_RUN_ID", "run_panel")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel")
+        monkeypatch.setenv("FORGE_SESSION", "planner")
+
+        result = CliRunner().invoke(
+            main,
+            ["workflow", "panel", "-p", "Review this", "--models", "codex", "--json"],
+        )
+
+        assert result.exit_code == 0, result.output
+        events = read_usage_events(command="panel")
+        assert len(events) == 2
+        worker = next(event for event in events if event.attribution_granularity == "worker")
+        verb = next(event for event in events if event.attribution_granularity == "verb")
+        assert (worker.runtime, worker.route, worker.billing_mode) == (
+            "codex",
+            "codex_exec",
+            "subscription_quota",
+        )
+        assert (worker.input_tokens, worker.output_tokens, worker.cached_tokens) == (14936, 22, 10624)
+        assert worker.cost_micro_usd is None
+        assert (verb.input_tokens, verb.output_tokens, verb.cached_tokens, verb.cost_micro_usd) == (
+            None,
+            None,
+            None,
+            None,
+        )
+        attempts = read_downstream_records(kind="attempt", forge_run_id=worker.run_id)
+        assert len(attempts) == 1
+        assert (attempts[0].input_tokens, attempts[0].output_tokens, attempts[0].cached_tokens) == (
+            14936,
+            22,
+            10624,
+        )
 
     @patch("forge.review.engine.run_multi_review")
     def test_panel_emits_one_verb_event(self, mock_run, monkeypatch):

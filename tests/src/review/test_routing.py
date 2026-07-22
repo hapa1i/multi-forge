@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from unittest.mock import patch
+from unittest.mock import patch, sentinel
 
 import pytest
 
@@ -140,6 +140,7 @@ class _StubModelSpec:
     prompt: str | None = None
     prompt_mode: str = "override"
     worker_id: str | None = None
+    runtime: str = "claude_code"
 
 
 _OPENROUTER_OPENAI_META = _TemplateMeta(
@@ -428,6 +429,91 @@ class TestResolveInvocationRouting:
         assert plan.routes[0].route is not None
         assert plan.routes[0].route.provider == "direct"
         assert plan.routes[0].credential == "anthropic-api"
+        assert plan.codex_preflight is None
+
+    def test_runtime_native_spec_bypasses_route_and_proxy_resolution(self):
+        spec = _StubModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            runtime="codex",
+        )
+
+        with (
+            patch("forge.review.routing.derive_model_routes") as mock_derive,
+            self._patch_resolver(None) as mock_resolver,
+            patch(
+                "forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight",
+                return_value=sentinel.preflight,
+            ) as mock_preflight,
+        ):
+            plan = resolve_invocation_routing([spec])
+
+        mock_derive.assert_not_called()
+        mock_resolver.assert_not_called()
+        mock_preflight.assert_called_once_with()
+        assert plan.codex_preflight is sentinel.preflight
+        assert plan.routes == (
+            RoutingResult(
+                base_url=None,
+                proxy_id=None,
+                template=None,
+                source="runtime_native",
+                route=None,
+                credential=None,
+            ),
+        )
+
+    def test_runtime_native_with_via_warns_and_ignores_proxy(self):
+        spec = _StubModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            runtime="codex",
+        )
+
+        with patch(
+            "forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight",
+            return_value=sentinel.preflight,
+        ):
+            plan = resolve_invocation_routing([spec], via="openrouter-openai")
+
+        assert plan.routes[0].source == "runtime_native"
+        assert plan.routes[0].route is None
+        assert plan.routes[0].warning is not None
+        assert "uses direct routing; --proxy ignored" in plan.routes[0].warning
+
+    def test_mixed_plan_preserves_positional_alignment_and_one_preflight_read(self):
+        native_spec = _StubModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            runtime="codex",
+        )
+        direct_spec = _StubModelSpec(
+            name="claude-opus",
+            model_id="claude-opus",
+            family="anthropic",
+            provider_refs=(("direct", "claude-opus-4-6"),),
+        )
+
+        with (
+            self._patch_metas(),
+            patch(
+                "forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight",
+                return_value=sentinel.preflight,
+            ) as mock_preflight,
+        ):
+            plan = resolve_invocation_routing([direct_spec, native_spec, native_spec])
+
+        assert [result.source for result in plan.routes] == ["direct", "runtime_native", "runtime_native"]
+        assert plan.routes[0].route is not None
+        assert plan.routes[1].route is None
+        assert plan.routes[2].route is None
+        mock_preflight.assert_called_once_with()
 
     def test_direct_only_with_via_emits_warning(self):
         spec = _StubModelSpec(

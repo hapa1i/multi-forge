@@ -87,11 +87,12 @@ def _run_preflight(
     *,
     as_json: bool = False,
     routing_plan: Any | None = None,
+    resume_id: str | None = None,
 ) -> None:
     """Check resolved routing/auth before spawning workers. Exit 1 on failure."""
     from forge.review.engine import preflight_check
 
-    errors = preflight_check(specs, routing_plan=routing_plan)
+    errors = preflight_check(specs, routing_plan=routing_plan, resume_id=resume_id)
     warnings = _routing_plan_warnings(specs, routing_plan)
     if not errors:
         if not as_json:
@@ -107,12 +108,17 @@ def _run_preflight(
         print_error("Workflow preflight failed:")
         for err in errors:
             console.print(f"  - {err}")
+        runtime_tips: list[str] = []
+        if any(spec.runtime == "claude_code" for spec in specs):
+            runtime_tips.append("Run 'command -v claude' to check the Claude worker runtime.")
+        if any(spec.runtime == "codex" for spec in specs):
+            runtime_tips.append("Run 'forge runtime preflight codex' to refresh Codex readiness.")
         print_tip(
             "Run 'forge workflow list-models' to check model availability.",
             "Run 'forge proxy list' to check proxy status.",
             "Run 'forge auth status' to check auth status.",
             "Run 'forge proxy create <template>' to create a proxy.",
-            "Run 'command -v claude' to check worker runtime.",
+            *runtime_tips,
             console=console,
         )
     sys.exit(1)
@@ -151,16 +157,20 @@ def _resolved_models_summary(
     summary: dict[str, dict[str, Any]] = {}
     for idx, (spec, result) in enumerate(zip(specs, routing_plan.routes)):
         route = result.route
+        runtime_native = result.source == "runtime_native"
         worker_id = worker_ids[idx] if worker_ids and idx < len(worker_ids) else spec.effective_worker_id
         entry: dict[str, Any] = {
             "requested_model": spec.name,
             "model_id": spec.model_id,
             "resolved_model": route.model_ref if route else None,
-            "provider": route.provider if route else None,
+            "provider": "openai" if runtime_native else (route.provider if route else None),
+            "runtime": spec.runtime,
             "source": result.source,
             "proxy": result.proxy_id,
             "template": result.template or (route.template_id if route else None),
         }
+        if runtime_native:
+            entry["model_selection"] = "runtime_default"
         if roles and worker_id in roles:
             entry[role_field] = roles[worker_id]
         if result.warning:
@@ -176,8 +186,13 @@ def _format_resolved_models(summary: dict[str, dict[str, Any]]) -> str:
 
     lines = ["Resolved models:"]
     for worker_id, item in summary.items():
-        resolved = item.get("resolved_model") or "(unresolved)"
+        resolved = (
+            "(runtime default)"
+            if item.get("model_selection") == "runtime_default"
+            else item.get("resolved_model") or "(unresolved)"
+        )
         provider = item.get("provider") or "unknown"
+        runtime = item.get("runtime") or "unknown"
         proxy = item.get("proxy") or "(direct)"
         template = item.get("template") or "(direct)"
         requested = item.get("requested_model") or worker_id
@@ -185,7 +200,7 @@ def _format_resolved_models(summary: dict[str, dict[str, Any]]) -> str:
         stance = f", stance={item['stance']}" if item.get("stance") else ""
         lines.append(
             f"- {worker_id}: requested={requested}, resolved={resolved}, "
-            f"provider={provider}, proxy={proxy}, template={template}{role}{stance}"
+            f"provider={provider}, runtime={runtime}, proxy={proxy}, template={template}{role}{stance}"
         )
     return "\n".join(lines) + "\n\n"
 
@@ -238,10 +253,10 @@ def workflow_cmd() -> None:
     "--available",
     "available_only",
     is_flag=True,
-    help="Show only ready models (credentials configured and routing usable)",
+    help="Show only ready workers (runtime prerequisites and routing usable)",
 )
 def list_models(as_json: bool, available_only: bool) -> None:
-    """Show workflow model readiness."""
+    """Show workflow worker readiness."""
     from forge.review.models import available_model_specs, check_model_availability
 
     availabilities = check_model_availability(available_model_specs())
@@ -255,6 +270,7 @@ def list_models(as_json: bool, available_only: bool) -> None:
                 "name": a.spec.name,
                 "model_id": a.spec.model_id,
                 "family": a.spec.family,
+                "runtime": a.spec.runtime,
                 "provider_refs": list(a.spec.provider_refs),
                 "preferred_proxy": a.spec.preferred_proxy,
                 "description": a.spec.description,
@@ -284,6 +300,9 @@ def _primary_credential(spec: ModelSpec) -> str:
     Uses derive_model_routes() to get the first route's credential,
     which is stable and deterministic (no registry read).
     """
+    if spec.runtime == "codex":
+        return "runtime-native"
+
     from forge.review.routing import derive_model_routes
 
     routes = derive_model_routes(spec)
@@ -328,11 +347,14 @@ def _print_grouped_models(availabilities: list) -> None:
     console.print("\n[bold]Available Models[/bold]\n")
 
     for cred_name, items in groups.items():
-        env_var = _credential_env_var(cred_name)
-        configured = _credential_configured(cred_name)
-        config_tag = "[green]configured[/green]" if configured else "[yellow]not configured[/yellow]"
-        env_display = f" ({env_var})" if env_var else ""
-        console.print(f"  [bold]{cred_name}[/bold]{env_display}  [{config_tag}]")
+        if cred_name == "runtime-native":
+            console.print("  [bold]runtime-native[/bold]  [[green]runtime preflight[/green]]")
+        else:
+            env_var = _credential_env_var(cred_name)
+            configured = _credential_configured(cred_name)
+            config_tag = "[green]configured[/green]" if configured else "[yellow]not configured[/yellow]"
+            env_display = f" ({env_var})" if env_var else ""
+            console.print(f"  [bold]{cred_name}[/bold]{env_display}  [{config_tag}]")
 
         for a in items:
             style = _STATUS_STYLES.get(a.status, "")
@@ -364,7 +386,7 @@ def _print_grouped_models(availabilities: list) -> None:
     "-m",
     type=str,
     default=None,
-    help="Comma-separated model names (default: all)",
+    help="Comma-separated worker names across Claude/Codex runtimes (default: workflow quorum)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -405,7 +427,7 @@ def _print_grouped_models(availabilities: list) -> None:
     "effort",
     type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
     default=None,
-    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+    help="Claude workers only: reasoning effort (low/medium/high/xhigh/max)",
 )
 @click.pass_context
 def panel(
@@ -510,7 +532,7 @@ def panel(
         _handle_routing_error(e, as_json=as_json)
         return
 
-    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan)
+    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan, resume_id=resume_id)
 
     from forge.core.invoker import Attribution
 
@@ -831,7 +853,7 @@ def _handle_review_output(
     "-m",
     type=str,
     default="claude-opus",
-    help="Comma-separated model names (default: claude-opus)",
+    help="Comma-separated worker names across Claude/Codex runtimes (default: claude-opus)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -854,7 +876,7 @@ def _handle_review_output(
     "effort",
     type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
     default=None,
-    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+    help="Claude workers only: reasoning effort (low/medium/high/xhigh/max)",
 )
 @click.pass_context
 def analyze(
@@ -1036,7 +1058,7 @@ def _resolve_debate_prompt(
     "-m",
     type=str,
     default=None,
-    help="Comma-separated model names (default: all)",
+    help="Comma-separated worker names across Claude/Codex runtimes (default: workflow quorum)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -1066,7 +1088,7 @@ def _resolve_debate_prompt(
     "effort",
     type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
     default=None,
-    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+    help="Claude workers only: reasoning effort (low/medium/high/xhigh/max)",
 )
 @click.pass_context
 def debate(
@@ -1567,7 +1589,7 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     "-m",
     type=str,
     default=None,
-    help="Comma-separated model names (default: all)",
+    help="Comma-separated worker names across Claude/Codex runtimes (default: workflow quorum)",
 )
 @click.option(
     "--timeout",
@@ -1603,7 +1625,7 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     "effort",
     type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
     default=None,
-    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+    help="Claude workers only: reasoning effort (low/medium/high/xhigh/max)",
 )
 @click.pass_context
 def consensus(

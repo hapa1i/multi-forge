@@ -191,9 +191,11 @@ Test suite has ~3,900 tests with Docker-based isolation. Key capabilities: multi
 with resume/transfer, policy engine (TDD + semantic supervisor), search, workflow runners (fan-out, adversarial), skills
 architecture, and interactive manual testing (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`).
 
-Five skills compile for Claude and Codex: `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. Codex
-invokes them as `$<name>`; Claude keeps `/forge:<name>`. `walkthrough`, `qa`, and the four `claude -p` workflow
-frontends remain Claude-only. The `standard` profile includes most skills; `full` adds `/forge:qa` (Docker-based QA).
+Nine skills compile for Claude and Codex: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `panel`,
+`analyze`, `debate`, and `consensus`. Codex invokes them as `$<name>`; Claude keeps `/forge:<name>`. A workflow
+frontend's host runtime is independent of its selected worker runtimes: defaults remain Claude-backed, while `codex` is
+an explicit worker choice. Only `walkthrough` and `qa` remain Claude-only. The `standard` profile includes most skills;
+`full` adds `/forge:qa` (Docker-based QA).
 
 See [design.md](docs/design.md) for architecture details.
 

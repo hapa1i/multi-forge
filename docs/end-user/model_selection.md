@@ -246,12 +246,12 @@ strengths matter.
 | Executor                    | `forge session start [--proxy <id>] [--model <m>]`  | `src/forge/session/manager.py`, `src/forge/cli/session.py`   |
 | Supervisor                  | `forge policy supervisor set <target>`              | `src/forge/policy/semantic/supervisor.py`                    |
 | `/forge:review` / `$review` | `src/skills/review/content.md` + `forge-skill.yaml` | `src/forge/core/ops/session_context.py` for family detection |
-| `/forge:panel`              | `forge workflow panel ...`                          | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
-| `/forge:debate`             | `forge workflow debate ...`                         | `src/forge/review/engine.py` (adversarial runner)            |
+| `/forge:panel` / `$panel`   | `forge workflow panel ...`                          | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
+| `/forge:debate` / `$debate` | `forge workflow debate ...`                         | `src/forge/review/engine.py` (adversarial runner)            |
 | Memory writer               | Stop enqueues; a later CLI drain launches it        | `src/forge/session/memory_writer.py`                         |
 
 Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
-need runtime readiness for panel/debate workflow runners.
+need runtime readiness for workflow workers, including the cached preflight state of the opt-in `codex` worker.
 
 For the panel and debate model specs, see `src/forge/review/models.py`. To add a new model alternative or change the
 default tier mapping, edit the proxy template under `src/forge/config/defaults/templates/` and reset proxies that use it

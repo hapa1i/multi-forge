@@ -997,7 +997,7 @@ def test_neutral_source_rejects_raw_claude_invocation_policy() -> None:
 
 
 def test_codex_bridge_rejects_raw_claude_tokens_after_explicit_opt_in() -> None:
-    bridge = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "panel")
+    bridge = next(source for source in load_skill_sources(SKILLS_ROOT) if source.manifest.name == "qa")
     assert bridge.source_format == SkillSourceFormat.CLAUDE_BRIDGE
     bridge = replace(
         bridge,

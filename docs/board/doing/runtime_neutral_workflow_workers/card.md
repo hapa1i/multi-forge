@@ -1,7 +1,8 @@
 # runtime_neutral_workflow_workers -- dispatch Forge workflow workers through the selected runtime
 
-**Lane**: `proposed/` -- separate Axis 2 follow-up discovered while executing
-[`cross_runtime_skills`](../../done/cross_runtime_skills/card.md). It is not part of that card's approved Axis 1 scope.
+**Lane**: `doing/` -- accepted 2026-07-22; execution branch `runtime-neutral-workflow-workers`. Separate Axis 2
+follow-up discovered while executing [`cross_runtime_skills`](../../done/cross_runtime_skills/card.md); it is not part
+of that card's approved Axis 1 scope.
 
 ## Why
 
@@ -13,9 +14,12 @@ exists elsewhere in Forge.
 ## Proposed outcome
 
 - Define a runtime-neutral worker request/response contract for review workflows.
-- Select workers through the runtime/backend registry instead of a hard-coded Claude subprocess.
+- Select workers through the runtime registry instead of a hard-coded Claude subprocess; runtime-native auth and billing
+  posture are resolved by runtime preflight without asserting a static backend identity.
 - Reuse `CodexHeadlessInvoker` where its lifecycle, auth, and transcript contracts match; document any adapter gap.
-- Preserve current Claude behavior and model-role semantics.
+- Preserve current Claude request construction, dispatch, and model-role semantics, except for deliberately folding
+  reliable runtime-error envelopes. Exit-zero failures cannot reach synthesis as successes; on non-zero exits, runtime
+  stream text takes precedence while an otherwise empty result retains `Exit code N`.
 - Only after worker parity is verified, make the four workflow frontend skills eligible for non-Claude packages.
 
 ## Boundaries and risks
@@ -31,4 +35,4 @@ exists elsewhere in Forge.
 
 Use the same workflow fixtures with Claude and Codex worker adapters; assert equivalent synthesis inputs, explicit
 runtime attribution, cancellation/error behavior, and telemetry/provider-trace ownership. Add targeted integration for
-real headless runtime execution before accepting the card into `todo/`.
+real headless runtime execution before moving the card to `done/`.

@@ -16,6 +16,13 @@ from collections.abc import Callable, Generator
 import pytest
 
 from tests.fixtures.docker import ContainerLike
+from tests.integration.session.conftest import (  # noqa: F401
+    codex_git_forge_root,
+    codex_ready_cached,
+    real_codex_home,
+)
+
+__all__ = ["codex_git_forge_root", "codex_ready_cached", "real_codex_home"]
 
 
 @pytest.fixture

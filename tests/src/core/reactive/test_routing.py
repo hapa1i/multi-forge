@@ -146,10 +146,11 @@ class TestRoutingResult:
 
     def test_all_source_values_covered(self):
         valid_sources = get_args(RoutingSource)
-        assert len(valid_sources) == 7
+        assert len(valid_sources) == 8
         assert "explicit" in valid_sources
         assert "unresolved" in valid_sources
         assert "direct" in valid_sources
+        assert "runtime_native" in valid_sources
 
 
 # ── resolve_subprocess_routing ───────────────────────────────────

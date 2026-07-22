@@ -6,9 +6,8 @@ lifecycle (process groups, ``SIGTERM``->``SIGKILL`` cleanup, ``ThreadPoolExecuto
 ordering, per-job timeout) and usage emission.
 
 Routing and prompt derivation stay in the caller (review domain); a request
-arrives already routed (``argv`` + ``env`` resolved). This is the seam Phase 5
-swaps to add a Codex runtime without touching the review/supervisor/memory-writer
-callers: the lifecycle is shared, only the request-shaping differs per runtime.
+arrives already routed (``argv`` + ``env`` resolved). Claude and Codex share
+the lifecycle while their callers keep runtime-specific request shaping.
 """
 
 from __future__ import annotations
@@ -93,8 +92,8 @@ class HeadlessResult:
     root_run_id: str | None = None
     # Phase 5: runtime-self-reported cost/usage from --output-format json (nullable;
     # cost None when the route reported none). ``envelope_parsed`` is independent of
-    # cost presence. ``runtime_is_error`` (already is-error-reliable-gated) steers the
-    # usage status only; ``success`` stays returncode-based (no consumer regression).
+    # cost presence. ``runtime_is_error`` (already is-error-reliable-gated) steers
+    # usage status and lets callers fail result mapping even when exit status is zero.
     cost_micro_usd: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None

@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.reactive.routing import ModelRoute, RoutingResult
+from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.review.models import ConsensusOutput, ReviewResult
 from forge.review.routing import WorkerRoutingPlan
 
@@ -36,6 +37,38 @@ def _auto_routing_plan(specs, **_kw):
         for _ in specs
     )
     return WorkerRoutingPlan(routes=results, resolved_at="2026-05-14T12:00:00Z", via_override=None)
+
+
+def _runtime_native_plan(specs, **_kw):
+    preflight = CodexPreflight(
+        installed=True,
+        version="0.145.0",
+        version_ok=True,
+        auth_method="chatgpt_tokens",
+        auth_source="codex_store",
+        billing_mode="subscription_quota",
+        ready=True,
+        blocking_reason=None,
+        hook_seam="enrollment_gated",
+        proxy_responses="native_direct",
+        doctor_status="ok",
+    )
+    return WorkerRoutingPlan(
+        routes=tuple(
+            RoutingResult(
+                base_url=None,
+                proxy_id=None,
+                template=None,
+                source="runtime_native",
+                route=None,
+                credential=None,
+            )
+            for _ in specs
+        ),
+        resolved_at="2026-07-22T12:00:00Z",
+        via_override=None,
+        codex_preflight=preflight,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -162,6 +195,28 @@ class TestConsensusSubject:
 
 
 class TestConsensusJson:
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_runtime_native_plan)
+    @patch("forge.review.consensus.run_multi_review")
+    def test_codex_selection_preserves_runtime_across_both_rounds(self, mock_run, _mock_routing):
+        from forge.review.models import MultiReviewOutput
+
+        mock_run.return_value = MultiReviewOutput(
+            prompt="",
+            results=[ReviewResult("codex-architecture", "position", "", True, 1.0)],
+        )
+
+        result = CliRunner().invoke(
+            main,
+            ["workflow", "consensus", "test", "--json", "--models", "codex"],
+        )
+
+        assert result.exit_code == 0
+        assert mock_run.call_count == 2
+        assert [call.kwargs["models"][0].runtime for call in mock_run.call_args_list] == ["codex", "codex"]
+        routed = json.loads(result.output)["resolved_models"]["codex-architecture"]
+        assert routed["runtime"] == "codex"
+        assert routed["model_selection"] == "runtime_default"
+
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
     @patch("forge.review.consensus.run_multi_review")
     def test_json_output_has_round1_and_round2(self, mock_run, _mock_routing):

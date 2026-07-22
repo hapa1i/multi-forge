@@ -1,18 +1,18 @@
 # Forge Workflows -- Multi-Model Review & Analysis
 
-Run structured analysis across multiple models. `forge workflow` provides four workflow runners that fan out prompts to
-parallel `claude -p` subprocesses and collect results for synthesis.
+Run structured analysis across multiple workers. `forge workflow` provides four runners that fan out prompts through
+Claude and Codex headless runtimes and collect results for synthesis.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
 - Proxies (model routing): [`proxy.md`](proxy.md)
 - Policies (automatic gating): [`policy.md`](policy.md)
 
-All workflow runners require the local Claude Code CLI (`claude`) on `PATH`, because Forge uses `claude -p` as the
-worker runtime even when the selected model is routed through an OpenRouter or LiteLLM proxy. Verify this from the same
-shell or Claude Code Bash environment that runs `forge workflow`:
+Runtime prerequisites follow the selected workers. Claude-backed workers require `claude` on `PATH`; the opt-in `codex`
+worker requires a fresh successful cached preflight. Check them from the same environment that runs the workflow:
 
 ```bash
 command -v claude
+forge runtime preflight codex
 ```
 
 ---
@@ -48,6 +48,9 @@ Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
 - `claude-opus` -- direct Anthropic, pinned to Claude Opus 4.8
 
+This default set is unchanged and entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex
+worker. Codex selects its own model; Forge does not pass a model pin.
+
 Routing is **capability-based**: models declare what they are (family, provider refs), and Forge derives routes at
 runtime from proxy templates and credentials. The preferred proxy is a catalog hint, not a hard requirement -- any
 compatible proxy found in the registry will work.
@@ -62,11 +65,18 @@ forge workflow panel src/ --code -m gpt-5.6-sol,deepseek-v4-pro --proxy openrout
 
 # Explicit direct Claude workers
 forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.8
+
+# Runtime-native Codex worker (read-only sandbox)
+forge workflow panel src/ --code -m codex
+
+# Mixed runtime quorum
+forge workflow panel src/ --code -m claude-opus,codex
 ```
 
-Check which models are locally routable with `forge workflow list-models`. Models are grouped by primary credential and
-show `[configured]` / `[not configured]` status. Models whose proxy isn't running or whose API key isn't configured show
-as **unavailable**. Use `--available` to see only ready models, or `--json` for structured output.
+Check which workers are locally ready with `forge workflow list-models`. Proxy/direct workers are grouped by primary
+credential; runtime-native workers are grouped by runtime preflight. A Codex worker is ready only while its cached
+preflight is fresh and successful. Use `--available` to see only ready workers, or `--json` for structured output that
+includes each worker's `runtime`.
 
 Use `forge model catalog` for Forge's static model capability catalog; `forge workflow list-models` is the runtime
 readiness view for workflow runners.
@@ -163,14 +173,18 @@ forge workflow consensus --worker gpt-5.6-sol:architect --worker claude-opus:sec
 
 All `forge workflow` subcommands support:
 
-| Flag      | Description                                                                                           |
-| --------- | ----------------------------------------------------------------------------------------------------- |
-| `--json`  | Structured JSON output, including worker responses, resolved model refs, routing, durations, status   |
-| `--check` | Gate mode: exit 0 if passed, exit 1 if failed (fail-closed)                                           |
-| `-m`      | Comma-separated model names (e.g., `claude-opus,gemini-3.1-pro-preview`)                              |
-| `--proxy` | Route proxy-backed workers through this proxy; direct workers (e.g., `claude-opus`) stay on Anthropic |
-| `-t`      | Per-model timeout in seconds (default: 600)                                                           |
-| `--cwd`   | Working directory for subprocesses                                                                    |
+| Flag       | Description                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| `--json`   | Structured output including worker responses, runtime, resolved model state, routing, durations, and status |
+| `--check`  | Gate mode: exit 0 if passed, exit 1 if failed (fail-closed)                                                 |
+| `-m`       | Comma-separated worker names (e.g., `claude-opus,codex`)                                                    |
+| `--proxy`  | Override proxy-backed workers; direct Claude and Codex workers warn and ignore it                           |
+| `--effort` | Claude-worker reasoning effort only: `low`, `medium`, `high`, `xhigh`, or `max`                             |
+| `-t`       | Per-worker timeout in seconds (default: 600)                                                                |
+| `--cwd`    | Working directory for subprocesses                                                                          |
+
+Single-runtime invocations use that runtime's ordinary parallel dispatcher. Mixed invocations share one global
+five-child limit and one cancellation domain; output remains in requested-worker order.
 
 ---
 
@@ -202,7 +216,8 @@ forge workflow panel src/critical.py --code --check && echo "Passed" || echo "Fa
 | `--context blind`         | Fresh subprocess, prompt + filesystem | Isolated reviews, cheap, default      |
 | `--context resume:<uuid>` | Fork of session with full context     | Architecture reviews, complex changes |
 
-Other subcommands (`analyze`, `debate`) always run blinded -- no session context is passed.
+`resume:<uuid>` is Claude-conversation context. Combining it with any Codex worker fails closed; use `--context blind`
+for Codex or mixed runs. Other subcommands (`analyze`, `debate`, `consensus`) always run blinded.
 
 ---
 
@@ -256,8 +271,10 @@ forge workflow list-models --available --json
 Unknown model names are rejected before execution. Models without a compatible running proxy are flagged by the
 preflight check with an actionable suggestion (which proxy to create or start).
 
-For auditability, workflow JSON includes `resolved_models` for every worker. Each entry shows the requested model,
-actual routed model ref, provider, proxy, template, routing source, and role/stance when applicable.
+For auditability, workflow JSON includes `resolved_models` for every worker. Each entry shows runtime, requested model,
+actual routed model ref, provider, proxy, template, routing source, model-selection state, and role/stance when
+applicable. The runtime-native Codex entry uses `resolved_model: null` and `model_selection: "runtime_default"`; human
+output renders this as `resolved=(runtime default)`.
 
 ### "--check failed but output looks fine"
 
@@ -281,6 +298,18 @@ Claude Code >= 2.1.81. Upgrade Claude Code to resolve this.
 
 The workflow resolved model routing, but the local worker runtime is missing. Install Claude Code or expose `claude` on
 `PATH` in the same environment that runs `forge workflow`. Proxy-backed models still need the local `claude -p` binary.
+
+### "Codex worker is unavailable"
+
+Refresh the cached readiness snapshot, then retry:
+
+```bash
+forge runtime preflight codex
+forge workflow list-models --available
+```
+
+Forge intentionally does not run the slower Codex doctor inline for every workflow verb. A cold, stale, or failed cache
+entry fails closed instead of silently substituting a Claude worker.
 
 ### "debate rejects my proposal"
 

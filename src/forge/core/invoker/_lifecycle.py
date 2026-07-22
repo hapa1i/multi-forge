@@ -273,198 +273,208 @@ class _HeadlessLifecycleBase:
         return result
 
     def run_parallel(self, requests: list[HeadlessRequest]) -> list[HeadlessResult]:
-        """Run jobs concurrently; return results in input order.
+        """Run one runtime's jobs through the shared grouped dispatcher."""
+        return run_grouped_parallel([(self, request) for request in requests])
 
-        Per-job process groups, SIGTERM->SIGKILL cleanup, a 5-wide thread pool, and
-        ``result_map[idx]`` ordering. Cancellation (KeyboardInterrupt mid-fan-out)
-        SIGTERMs children before the executor join.
-        """
-        if not requests:
-            return []
 
-        # Thread-safe child tracking. cleanup_started closes cancellation races where
-        # a worker is about to spawn, or has spawned but not yet registered, a child.
-        children: list[subprocess.Popen[str]] = []
-        children_lock = threading.Lock()
-        cleanup_started = False
+def run_grouped_parallel(
+    jobs: list[tuple[_HeadlessLifecycleBase, HeadlessRequest]],
+) -> list[HeadlessResult]:
+    """Run invoker/request pairs in one ordered, five-wide cancellation domain.
 
-        def _cleanup() -> None:
-            """Mark cancellation, then terminate every child registered so far."""
-            nonlocal cleanup_started
+    Each request uses its paired invoker's argv, parsing, retry, emission, and
+    missing-binary hooks. Process tracking and cleanup are global to the batch,
+    so mixed-runtime fan-out never exceeds five live children and an interrupt
+    reaps every runtime before joining worker threads.
+    """
+    if not jobs:
+        return []
+
+    # Thread-safe child tracking. cleanup_started closes cancellation races where
+    # a worker is about to spawn, or has spawned but not yet registered, a child.
+    children: list[subprocess.Popen[str]] = []
+    children_lock = threading.Lock()
+    cleanup_started = False
+
+    def _cleanup() -> None:
+        """Mark cancellation, then terminate every child registered so far."""
+        nonlocal cleanup_started
+        with children_lock:
+            cleanup_started = True
+            snapshot = list(children)
+        _terminate_and_reap(snapshot)
+
+    def _run_one(invoker: _HeadlessLifecycleBase, request: HeadlessRequest) -> HeadlessResult:
+        start = time.monotonic()
+        ident = _identity(request.env)
+        run_argv, hints = invoker._prepare_argv(request)
+        proc: subprocess.Popen[str] | None = None
+        try:
             with children_lock:
-                cleanup_started = True
-                snapshot = list(children)
-            _terminate_and_reap(snapshot)
-
-        def _run_one(request: HeadlessRequest) -> HeadlessResult:
-            start = time.monotonic()
-            ident = _identity(request.env)
-            run_argv, hints = self._prepare_argv(request)
-            proc: subprocess.Popen[str] | None = None
-            try:
-                with children_lock:
-                    if cleanup_started:
-                        return HeadlessResult(
-                            label=request.label,
-                            stdout="",
-                            stderr="",
-                            returncode=-1,
-                            duration_seconds=time.monotonic() - start,
-                            error="cancelled",
-                            cancelled=True,
-                            **ident,
-                        )
-
-                proc = subprocess.Popen(
-                    run_argv,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    cwd=request.cwd,
-                    env=request.env,
-                    start_new_session=True,
-                )
-                with children_lock:
-                    children.append(proc)
-                    should_cancel = cleanup_started
-
-                if should_cancel:
-                    # Cleanup may have started after Popen returned but before the child
-                    # was registered in `children`. In that race, the worker owns reaping
-                    # its just-spawned process so shutdown(wait=True) cannot hang on it.
-                    _terminate_and_reap([proc])
-                    result = HeadlessResult(
+                if cleanup_started:
+                    return HeadlessResult(
                         label=request.label,
                         stdout="",
                         stderr="",
-                        returncode=proc.returncode if proc.returncode is not None else -1,
+                        returncode=-1,
                         duration_seconds=time.monotonic() - start,
                         error="cancelled",
                         cancelled=True,
                         **ident,
                     )
-                else:
+
+            proc = subprocess.Popen(
+                run_argv,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=request.cwd,
+                env=request.env,
+                start_new_session=True,
+            )
+            with children_lock:
+                children.append(proc)
+                should_cancel = cleanup_started
+
+            if should_cancel:
+                # Cleanup may have started after Popen returned but before the child
+                # was registered in `children`. In that race, the worker owns reaping
+                # its just-spawned process so shutdown(wait=True) cannot hang on it.
+                _terminate_and_reap([proc])
+                result = HeadlessResult(
+                    label=request.label,
+                    stdout="",
+                    stderr="",
+                    returncode=proc.returncode if proc.returncode is not None else -1,
+                    duration_seconds=time.monotonic() - start,
+                    error="cancelled",
+                    cancelled=True,
+                    **ident,
+                )
+            else:
+                stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
+                returncode = proc.returncode if proc.returncode is not None else -1
+                # Retry-once backstop: format flag rejected despite the capability latch. The
+                # original process already exited; spawn the unflagged retry as a TRACKED child
+                # (own process group + registered in `children`, with `proc` reassigned to it)
+                # so the SIGTERM->SIGKILL cleanup and timeout handler below cover it too -- a
+                # plain subprocess.run here would be unterminable on cancellation and could hang
+                # shutdown for up to timeout_seconds.
+                if invoker._is_recoverable_format_rejection(returncode, stderr, hints):
+                    retry_argv, hints = invoker._on_format_rejection(request)
+                    proc = subprocess.Popen(
+                        retry_argv,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        cwd=request.cwd,
+                        env=request.env,
+                        start_new_session=True,
+                    )
+                    with children_lock:
+                        children.append(proc)
+                        retry_should_cancel = cleanup_started
+                    if retry_should_cancel:
+                        # Same race as the primary spawn (above): _cleanup() takes a
+                        # one-shot snapshot of `children`, so if it ran between this
+                        # retry Popen returning and the append above, the retry child
+                        # is not in that snapshot. The worker reaps it here -- otherwise
+                        # shutdown(wait=True) blocks on its communicate() for up to
+                        # timeout_seconds, the exact hang the tracked-child design prevents.
+                        _terminate_and_reap([proc])
+                        return HeadlessResult(
+                            label=request.label,
+                            stdout="",
+                            stderr="",
+                            returncode=proc.returncode if proc.returncode is not None else -1,
+                            duration_seconds=time.monotonic() - start,
+                            error="cancelled",
+                            cancelled=True,
+                            **ident,
+                        )
                     stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                     returncode = proc.returncode if proc.returncode is not None else -1
-                    # Retry-once backstop: format flag rejected despite the capability latch. The
-                    # original process already exited; spawn the unflagged retry as a TRACKED child
-                    # (own process group + registered in `children`, with `proc` reassigned to it)
-                    # so the SIGTERM->SIGKILL cleanup and timeout handler below cover it too -- a
-                    # plain subprocess.run here would be unterminable on cancellation and could hang
-                    # shutdown for up to timeout_seconds.
-                    if self._is_recoverable_format_rejection(returncode, stderr, hints):
-                        retry_argv, hints = self._on_format_rejection(request)
-                        proc = subprocess.Popen(
-                            retry_argv,
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            cwd=request.cwd,
-                            env=request.env,
-                            start_new_session=True,
-                        )
-                        with children_lock:
-                            children.append(proc)
-                            retry_should_cancel = cleanup_started
-                        if retry_should_cancel:
-                            # Same race as the primary spawn (above): _cleanup() takes a
-                            # one-shot snapshot of `children`, so if it ran between this
-                            # retry Popen returning and the append above, the retry child
-                            # is not in that snapshot. The worker reaps it here -- otherwise
-                            # shutdown(wait=True) blocks on its communicate() for up to
-                            # timeout_seconds, the exact hang the tracked-child design prevents.
-                            _terminate_and_reap([proc])
-                            return HeadlessResult(
-                                label=request.label,
-                                stdout="",
-                                stderr="",
-                                returncode=proc.returncode if proc.returncode is not None else -1,
-                                duration_seconds=time.monotonic() - start,
-                                error="cancelled",
-                                cancelled=True,
-                                **ident,
-                            )
-                        stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
-                        returncode = proc.returncode if proc.returncode is not None else -1
-                    result = self._build_result(
-                        request,
-                        stdout=stdout,
-                        stderr=stderr,
-                        returncode=returncode,
-                        duration_seconds=time.monotonic() - start,
-                        ident=ident,
-                        hints=hints,
-                    )
-            except subprocess.TimeoutExpired:
-                try:
-                    if proc is not None:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                        proc.wait(timeout=5)
-                except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                    pass
-                result = HeadlessResult(
-                    label=request.label,
-                    stdout="",
-                    stderr="",
-                    returncode=-1,
+                result = invoker._build_result(
+                    request,
+                    stdout=stdout,
+                    stderr=stderr,
+                    returncode=returncode,
                     duration_seconds=time.monotonic() - start,
-                    timed_out=True,
-                    **ident,
+                    ident=ident,
+                    hints=hints,
                 )
-            except FileNotFoundError:
-                result = HeadlessResult(
-                    label=request.label,
-                    stdout="",
-                    stderr="",
-                    returncode=-1,
-                    duration_seconds=time.monotonic() - start,
-                    error=self._missing_binary_error(),
-                    **ident,
-                )
-            except (OSError, subprocess.SubprocessError) as e:
-                result = HeadlessResult(
-                    label=request.label,
-                    stdout="",
-                    stderr="",
-                    returncode=-1,
-                    duration_seconds=time.monotonic() - start,
-                    error=str(e),
-                    **ident,
-                )
-            self._emit(request, result)
-            return result
-
-        result_map: dict[int, HeadlessResult] = {}
-        max_workers = min(len(requests), 5)
-        # Manage the executor manually (no `with`) so cleanup runs in the right order on
-        # cancellation. `with ThreadPoolExecutor(...)` calls shutdown(wait=True) on __exit__
-        # -- BEFORE an outer finally -- which blocks until every worker drains its blocking
-        # communicate() (up to timeout_seconds). On a KeyboardInterrupt or main-thread error
-        # mid-loop we must instead SIGTERM the children FIRST (so communicate() returns
-        # promptly), then join. Normal path: every child already exited, so _cleanup() is a
-        # no-op and shutdown joins instantly.
-        executor = ThreadPoolExecutor(max_workers=max_workers)
-        try:
-            future_to_idx = {executor.submit(_run_one, req): idx for idx, req in enumerate(requests)}
-            for future in as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                try:
-                    result_map[idx] = future.result()
-                except Exception as e:
-                    result_map[idx] = HeadlessResult(
-                        label=requests[idx].label,
-                        stdout="",
-                        stderr="",
-                        returncode=-1,
-                        duration_seconds=0.0,
-                        error=f"Thread error: {e}",
-                    )
-        finally:
+        except subprocess.TimeoutExpired:
             try:
-                _cleanup()  # kill running children first (prompt cancellation)
-            finally:
-                executor.shutdown(wait=True, cancel_futures=True)  # always join workers (never leak threads)
+                if proc is not None:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    proc.wait(timeout=5)
+            except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+                pass
+            result = HeadlessResult(
+                label=request.label,
+                stdout="",
+                stderr="",
+                returncode=-1,
+                duration_seconds=time.monotonic() - start,
+                timed_out=True,
+                **ident,
+            )
+        except FileNotFoundError:
+            result = HeadlessResult(
+                label=request.label,
+                stdout="",
+                stderr="",
+                returncode=-1,
+                duration_seconds=time.monotonic() - start,
+                error=invoker._missing_binary_error(),
+                **ident,
+            )
+        except (OSError, subprocess.SubprocessError) as e:
+            result = HeadlessResult(
+                label=request.label,
+                stdout="",
+                stderr="",
+                returncode=-1,
+                duration_seconds=time.monotonic() - start,
+                error=str(e),
+                **ident,
+            )
+        invoker._emit(request, result)
+        return result
 
-        return [result_map[idx] for idx in range(len(requests)) if idx in result_map]
+    result_map: dict[int, HeadlessResult] = {}
+    max_workers = min(len(jobs), 5)
+    # Manage the executor manually (no `with`) so cleanup runs in the right order on
+    # cancellation. `with ThreadPoolExecutor(...)` calls shutdown(wait=True) on __exit__
+    # -- BEFORE an outer finally -- which blocks until every worker drains its blocking
+    # communicate() (up to timeout_seconds). On a KeyboardInterrupt or main-thread error
+    # mid-loop we must instead SIGTERM the children FIRST (so communicate() returns
+    # promptly), then join. Normal path: every child already exited, so _cleanup() is a
+    # no-op and shutdown joins instantly.
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    try:
+        future_to_idx = {
+            executor.submit(_run_one, invoker, request): idx for idx, (invoker, request) in enumerate(jobs)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                result_map[idx] = future.result()
+            except Exception as e:
+                result_map[idx] = HeadlessResult(
+                    label=jobs[idx][1].label,
+                    stdout="",
+                    stderr="",
+                    returncode=-1,
+                    duration_seconds=0.0,
+                    error=f"Thread error: {e}",
+                )
+    finally:
+        try:
+            _cleanup()  # kill running children first (prompt cancellation)
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)  # always join workers (never leak threads)
+
+    return [result_map[idx] for idx in range(len(jobs)) if idx in result_map]
