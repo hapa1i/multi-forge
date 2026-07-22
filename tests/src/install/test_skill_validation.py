@@ -6,9 +6,9 @@ import pytest
 import yaml
 
 from forge.install.skill_compiler import (
+    FORGE_PACKAGE_SENTINEL,
     CompiledSkillFile,
     CompiledSkillPackage,
-    FORGE_PACKAGE_SENTINEL,
     SkillRuntime,
     TokenAllowance,
 )

@@ -8,8 +8,8 @@ import pytest
 import yaml
 
 from forge.install.skill_compiler import (
-    CompiledSkillPackage,
     FORGE_PACKAGE_SENTINEL,
+    CompiledSkillPackage,
     SkillRuntime,
     SkillSource,
     SkillSourceFormat,
@@ -189,7 +189,9 @@ def test_compiled_packages_preserve_paths_and_modes(
 ) -> None:
     for key, expected_paths in EXPECTED_PACKAGE_PATHS.items():
         package = compiled_packages[key]
-        assert {package_file.path for package_file in package.files} == expected_paths | {PurePosixPath(FORGE_PACKAGE_SENTINEL)}, key
+        assert {package_file.path for package_file in package.files} == expected_paths | {
+            PurePosixPath(FORGE_PACKAGE_SENTINEL)
+        }, key
         for package_file in package.files:
             expected_mode = 0o755 if package_file.path == PurePosixPath("scripts/smoke-test.sh") else 0o644
             assert package_file.mode == expected_mode, (key, package_file.path)

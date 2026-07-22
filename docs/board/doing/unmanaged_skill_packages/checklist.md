@@ -13,9 +13,12 @@ Phase 2 (skill-name universe).
 ## Phase 0: Acceptance
 
 - [x] Execution branch `unmanaged-skill-packages` created from `main`
+
 - [x] Card moved `proposed/` -> `doing/` via `git mv`; `**Lane**` header updated; no inbound links existed to repoint
   (verified by repo-wide grep at acceptance)
+
 - [x] Checklist written; revised across two review rounds
+
 - [x] Checklist reviewed by user; acceptance committed on the execution branch
 
   - Verification recorded: acceptance review completed; execution branch and checklist links were checked against the

@@ -9,9 +9,9 @@ from forge.install.skill_cache import (
     materialize_compiled_skill,
 )
 from forge.install.skill_compiler import (
+    FORGE_PACKAGE_SENTINEL,
     CompiledSkillFile,
     CompiledSkillPackage,
-    FORGE_PACKAGE_SENTINEL,
     SkillRuntime,
 )
 

@@ -1319,9 +1319,10 @@ directories: status marks a substituted symlink `invalid-target`, and every writ
 directory chain before mutation. Tracked leaf-file symlinks remain valid for symlink install mode.
 
 Every compiled runtime package also emits a deterministic `.forge-package.json` provenance sentinel. It records schema
-version 1, producer, runtime, skill name, and sorted payload file digests/modes; it contains no timestamps, absolute paths,
-cache locations, or Forge version and is excluded from its own file list. The sentinel is always installed as a regular copy,
-participates in cache digests, tracking, sync, and disable, and introduces one intentional cache-digest change on upgrade.
+version 1, producer, runtime, skill name, and sorted payload file digests/modes; it contains no timestamps, absolute
+paths, cache locations, or Forge version and is excluded from its own file list. The sentinel is always installed as a
+regular copy, participates in cache digests, tracking, sync, and disable, and introduces one intentional cache-digest
+change on upgrade.
 
 For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
 or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it

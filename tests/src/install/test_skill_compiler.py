@@ -13,10 +13,10 @@ import pytest
 import yaml
 
 from forge.install.skill_compiler import (
-    CodexSkillInterface,
     FORGE_PACKAGE_PRODUCER,
     FORGE_PACKAGE_SCHEMA_VERSION,
     FORGE_PACKAGE_SENTINEL,
+    CodexSkillInterface,
     SkillCapability,
     SkillCompilationError,
     SkillManifest,

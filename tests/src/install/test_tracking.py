@@ -361,7 +361,7 @@ class TestTrackingStore:
                             checksum="abc",
                             mode="symlink",
                             installed_at="2026-07-17T00:00:00Z",
-                        )
+                        ),
                     ],
                     skill_packages=[package],
                 )
