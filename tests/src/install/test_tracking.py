@@ -335,7 +335,10 @@ class TestTrackingStore:
             runtime="codex",
             skill="challenge",
             target_dir="/home/user/.agents/skills/challenge",
-            file_paths=["/home/user/.agents/skills/challenge/SKILL.md"],
+            file_paths=[
+                "/home/user/.agents/skills/challenge/.forge-package.json",
+                "/home/user/.agents/skills/challenge/SKILL.md",
+            ],
         )
         manifest = InstalledManifest(
             installations={
@@ -347,11 +350,18 @@ class TestTrackingStore:
                     files=[
                         InstalledFile(
                             target_path=package.file_paths[0],
-                            source_path="/cache/challenge/SKILL.md",
-                            checksum="abc",
+                            source_path="/cache/challenge/.forge-package.json",
+                            checksum="sentinel-checksum",
                             mode="copy",
                             installed_at="2026-07-17T00:00:00Z",
-                        )
+                        ),
+                        InstalledFile(
+                            target_path=package.file_paths[1],
+                            source_path="/cache/challenge/SKILL.md",
+                            checksum="abc",
+                            mode="symlink",
+                            installed_at="2026-07-17T00:00:00Z",
+                        ),
                     ],
                     skill_packages=[package],
                 )
@@ -362,6 +372,7 @@ class TestTrackingStore:
         loaded = tracking_store.read()
 
         assert loaded.installations["user"].skill_packages == [package]
+        assert [file.mode for file in loaded.installations["user"].files] == ["copy", "symlink"]
 
     def test_write_always_emits_current_version(self, tracking_store: TrackingStore) -> None:
         tracking_store.write(InstalledManifest(version=1))

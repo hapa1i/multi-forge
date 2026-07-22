@@ -973,7 +973,9 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
 ## C. Install Model Reference
 
-Reference details for [design.md §5.1](design.md#51-extensions-install-model).
+[design.md §5.1](design.md#51-extensions-install-model).
+
+`.forge-package.json` is copied and ledgered; emission changes cache digest.
 
 **Forge tool distribution.** Forge ships on PyPI; the recommended install is a global tool
 (`uv tool install multi-forge` / `pipx install multi-forge`), which puts the `forge` launcher on `PATH` (typically

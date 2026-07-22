@@ -1,6 +1,6 @@
 # Unmanaged Skill Packages: Detection and Cleanup
 
-**Lane**: `proposed/`
+**Lane**: `doing/`
 
 **Origin**: 2026-07-19 stale-Codex-skill incident. A pre-merge test run on the cross-runtime-skills branch leaked five
 pre-fix compiled packages into the real `$HOME/.agents/skills` (the HOME-isolation gap later closed by
@@ -75,9 +75,9 @@ filesystem-wide search.
 
 The skill-name universe is the union of current shipped/locally compilable skill names and an append-only
 `FORGE_SKILL_NAME_HISTORY`. The history is initialized with all names shipped before this feature and retains renamed or
-retired names. A test requires every current candidate name to be represented by that union. A valid sentinel is
-reported regardless of whether its name remains in the registry; an unknown unmarked name is treated as user content and
-ignored.
+retired names. A test pins the immutable pre-feature baseline as a required subset of history, while a separate test
+requires every current candidate name to be represented by the union. A valid sentinel is reported regardless of whether
+its name remains in the registry; an unknown unmarked name is treated as user content and ignored.
 
 ## Provenance sentinel
 
@@ -151,7 +151,7 @@ collision_dirs
 cleanup_eligible
 cleanup_reason
 cleanup_scope            # project | all | null
-recovery
+recovery                 # string | null
 ```
 
 `target_scopes` is an array because Claude project and local installs share one physical target; the scanner must not
@@ -159,8 +159,9 @@ invent which scope produced an untracked path. `complete` means a real package d
 `partial` means the expected package entry is incomplete (including a reset package whose payload links now dangle), and
 `invalid-target` covers blocking files and unsafe path types. `collision_dirs` is sorted and excludes the record's own
 path. `cleanup_scope` names the narrowest clean scope that can mutate the target (`all` for a user target); it is `null`
-when cleanup is not safe. `recovery` names the exact path and distinguishes a safe `forge clean` candidate from a
-report-only remove-or-rename decision. Human rendering uses the same records.
+when cleanup is not safe. `recovery` is a rendered human string or `null`; it names the exact path and distinguishes a
+safe `forge clean` candidate from a report-only remove-or-rename decision. Machine-readable cleanup state remains in
+`cleanup_eligible`, `cleanup_reason`, and `cleanup_scope`. Human rendering uses the same records.
 
 Tracking failure is a no-scan boundary. A missing manifest means there are no managed rows, but a corrupt, unsupported,
 or unreadable manifest must propagate the existing state error; it must never be treated as empty tracking. This matches
@@ -169,8 +170,8 @@ GC's existing fail-closed behavior when durable references cannot be built.
 ### Enable and sync recovery
 
 Installer planning consumes the same unmanaged records before reducing a runtime package to a conflict or automatic
-skip. Every selected package blocked or skipped by an untracked same-name entry carries structured recovery through the
-`SkillPackagePlan` and human conflict renderer:
+skip. Every selected package blocked or skipped by an untracked same-name entry carries a per-package recovery string
+through the `SkillPackagePlan` and human conflict renderer:
 
 - For a marked orphan with `cleanup_eligible: true`, name the exact path, preview command, apply command, and retry:
   user targets use `forge clean --scope all --verbose`; project targets use
@@ -238,10 +239,12 @@ explicitly, so existing project compatibility checks can refuse project-owned de
 independent. Matching current GC behavior, a compatibility refusal remains in the preview category/count, is also
 rendered through `skipped_project_compatibility`, and is excluded from apply.
 
-`run_clean` must rescan rather than trust the preview report, then revalidate each candidate immediately before removal.
-It removes only the exact validated package directory. Any ownership, marker, contents, path type, containment, or
-compatibility drift records a failure, leaves the entry untouched, and produces a nonzero apply result through the
-existing `CleanResult` contract. Directory traversal never follows symlinked roots or subdirectories.
+`run_clean` must perform a fresh scan rather than trust the preliminary CLI report. A candidate that becomes managed
+before that scan is omitted from apply and left untouched without an apply failure. Each candidate returned by the fresh
+scan is revalidated immediately before removal. Any ownership, marker, contents, path type, containment, or
+compatibility drift after the scan records a failure, leaves the entry untouched, and produces a nonzero apply result
+through the existing `CleanResult` contract. It removes only the exact validated package directory; directory traversal
+never follows symlinked roots or subdirectories.
 
 ### Tracking-reset recovery
 
@@ -299,7 +302,8 @@ roots require an explicit visit; `--scope all` does not imply a filesystem crawl
 | Full `$FORGE_HOME` reset                                                                       | Fixed user and current project roots are visible; erased project references are not | User/current marked output can be listed; other projects require a visit   |
 | Marked user orphan                                                                             | Shown under user/`--all` as cleanup eligible                                        | Excluded from `project`/`workspace`; listed and removable under `all`      |
 | Project marked orphan fails project compatibility                                              | Unmanaged with recovery                                                             | Compatibility skip; never deleted                                          |
-| Candidate changes between preview and apply                                                    | Updated status on next read                                                         | Apply revalidation fails, preserves path, exits nonzero                    |
+| Candidate becomes managed before `run_clean`'s fresh scan                                      | Updated status on next read                                                         | Omitted from apply; path preserved without a package failure               |
+| Candidate changes after fresh scan but before deletion                                         | Updated status on next read                                                         | Pre-delete revalidation fails, preserves path, exits nonzero               |
 | `/etc/codex/skills` or non-owned ancestor collision                                            | Visibility-only collision evidence                                                  | Never listed or deleted                                                    |
 
 Installer recovery has its own acceptance contract:

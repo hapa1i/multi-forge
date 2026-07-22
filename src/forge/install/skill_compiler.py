@@ -29,6 +29,8 @@ rejects any remaining Claude-only body or resource token.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import stat
@@ -308,11 +310,15 @@ _PORTABLE_RELATIVE_PATH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 NEUTRAL_SKILL_MANIFEST = "forge-skill.yaml"
 NEUTRAL_SKILL_CONTENT = "content.md"
 NEUTRAL_SKILL_SCHEMA_VERSION = 1
+FORGE_PACKAGE_SENTINEL = ".forge-package.json"
+FORGE_PACKAGE_SCHEMA_VERSION = 1
+FORGE_PACKAGE_PRODUCER = "multi-forge"
 _COMPILER_OWNED_SOURCE_PATHS = frozenset(
     {
         PurePosixPath(NEUTRAL_SKILL_MANIFEST),
         PurePosixPath(NEUTRAL_SKILL_CONTENT),
         PurePosixPath("SKILL.md"),
+        PurePosixPath(FORGE_PACKAGE_SENTINEL),
     }
 )
 _NEUTRAL_MANIFEST_FIELDS = {
@@ -381,6 +387,7 @@ def load_claude_skill_source(
     """
 
     _require_real_source_directory(package_root, label="Claude skill package root")
+    _reject_stale_package_sentinel(package_root)
     eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     skill_document_path = package_root / "SKILL.md"
     _validate_compiler_owned_source_symlinks(package_root, eligible_paths)
@@ -467,6 +474,7 @@ def load_neutral_skill_source(
     """
 
     _require_real_source_directory(package_root, label="Neutral skill package root")
+    _reject_stale_package_sentinel(package_root)
     eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
     manifest_path = package_root / NEUTRAL_SKILL_MANIFEST
     content_path = package_root / NEUTRAL_SKILL_CONTENT
@@ -776,6 +784,17 @@ def compile_skill(source: SkillSource, adapter: SkillAdapter) -> CompiledSkillPa
             content = _render_template(content, source, adapter, source_file.path)
         compiled_files.append(CompiledSkillFile(path=source_file.path, content=content, mode=source_file.mode))
 
+    sentinel = CompiledSkillFile(
+        path=PurePosixPath(FORGE_PACKAGE_SENTINEL),
+        content=_render_forge_package_sentinel(
+            runtime=adapter.runtime,
+            skill=source.manifest.name,
+            files=compiled_files,
+        ),
+        mode=0o644,
+    )
+    compiled_files.append(sentinel)
+
     package = CompiledSkillPackage(
         runtime=adapter.runtime,
         name=source.manifest.name,
@@ -798,6 +817,68 @@ def compile_skill_for_runtime(source: SkillSource, runtime: SkillRuntime) -> Com
     """Compile with Forge's default adapter for ``runtime``."""
 
     return compile_skill(source, adapter_for_runtime(runtime))
+
+
+def _render_forge_package_sentinel(
+    *,
+    runtime: SkillRuntime,
+    skill: str,
+    files: list[CompiledSkillFile],
+) -> bytes:
+    """Render deterministic package provenance without self-referencing the sentinel."""
+
+    sentinel_path = PurePosixPath(FORGE_PACKAGE_SENTINEL)
+    seen: set[PurePosixPath] = set()
+    rows: list[dict[str, str | int]] = []
+    for package_file in sorted(files, key=lambda item: item.path.as_posix()):
+        problem = _compiled_path_problem(package_file.path)
+        if problem is not None:
+            raise ValueError(f"Compiled skill file path {package_file.path.as_posix()!r} {problem}")
+        if package_file.path == sentinel_path:
+            raise ValueError(f"Compiled skill file path {FORGE_PACKAGE_SENTINEL!r} is compiler-owned")
+        if package_file.path in seen:
+            raise ValueError(f"Compiled skill file path {package_file.path.as_posix()!r} is duplicated")
+        seen.add(package_file.path)
+        rows.append(
+            {
+                "path": package_file.path.as_posix(),
+                "sha256": hashlib.sha256(package_file.content).hexdigest(),
+                "mode": package_file.mode,
+            }
+        )
+
+    payload = {
+        "schema_version": FORGE_PACKAGE_SCHEMA_VERSION,
+        "producer": FORGE_PACKAGE_PRODUCER,
+        "runtime": runtime.value,
+        "skill": skill,
+        "files": rows,
+    }
+    return (json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _reject_stale_package_sentinel(package_root: Path) -> None:
+    if (package_root / FORGE_PACKAGE_SENTINEL).exists() or (package_root / FORGE_PACKAGE_SENTINEL).is_symlink():
+        raise ValueError(f"{package_root}: source package must not contain generated {FORGE_PACKAGE_SENTINEL}")
+
+
+def is_compiler_owned_file(path: PurePosixPath) -> bool:
+    """Return whether the compiler owns this emitted package path."""
+
+    return path in {PurePosixPath(FORGE_PACKAGE_SENTINEL)}
+
+
+def _compiled_path_problem(path: PurePosixPath) -> str | None:
+    raw = path.as_posix()
+    if not raw or raw == ".":
+        return "is empty"
+    if path.is_absolute() or raw.startswith("/"):
+        return "is absolute"
+    if "\\" in raw:
+        return "contains a non-POSIX separator"
+    if any(part in {"", ".", ".."} for part in path.parts):
+        return "is not normalized or escapes the package root"
+    return None
 
 
 def _validate_source(source: SkillSource, adapter: SkillAdapter) -> list[SkillDiagnostic]:
@@ -1610,8 +1691,8 @@ def _source_path_problem(path: PurePosixPath) -> str | None:
         return "package path contains a non-POSIX separator"
     if any(part in {"", ".", ".."} for part in path.parts):
         return "package path is not normalized or escapes the package root"
-    if path == PurePosixPath("SKILL.md"):
-        return "auxiliary files may not replace compiler-owned SKILL.md"
+    if path in {PurePosixPath("SKILL.md"), PurePosixPath(FORGE_PACKAGE_SENTINEL)}:
+        return f"auxiliary files may not replace compiler-owned {path.as_posix()}"
     return None
 
 
@@ -1639,6 +1720,10 @@ __all__ = [
     "CodexSkillInterface",
     "CompiledSkillFile",
     "CompiledSkillPackage",
+    "FORGE_PACKAGE_PRODUCER",
+    "FORGE_PACKAGE_SCHEMA_VERSION",
+    "FORGE_PACKAGE_SENTINEL",
+    "is_compiler_owned_file",
     "SkillAdapter",
     "SkillCapability",
     "SkillCompilationError",
