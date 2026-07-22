@@ -108,7 +108,7 @@ install-home probes. The approved sequence proves those bindings first, then mig
 (`review/engine.py:283`, hard binary requirement `:64-67`). A `CodexHeadlessInvoker` exists (`core/invoker/__init__.py`)
 but `review/engine.py` does **not** use it -- so these skills need `claude` on PATH for their workers even when driven
 from Codex, until the engine dispatches through the runtime registry. That engine change is tracked separately in
-[`runtime_neutral_workflow_workers`](../../proposed/runtime_neutral_workflow_workers/card.md).
+[`runtime_neutral_workflow_workers`](../../doing/runtime_neutral_workflow_workers/card.md).
 
 ## Target shape
 
