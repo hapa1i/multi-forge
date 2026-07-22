@@ -163,6 +163,17 @@ when cleanup is not safe. `recovery` is a rendered human string or `null`; it na
 safe `forge clean` candidate from a report-only remove-or-rename decision. Machine-readable cleanup state remains in
 `cleanup_eligible`, `cleanup_reason`, and `cleanup_scope`. Human rendering uses the same records.
 
+A selected target root that is a symlink, another non-directory type, or unreadable cannot produce a truthful
+per-package record because the scanner must not traverse it and the fixed record requires a skill name. The immutable
+scan result therefore carries a separate root issue. Human status prints a `Root not scanned` diagnostic with the path,
+runtime, and reason and does not claim that no packages were found; status JSON remains the schema-v2 object above with
+no synthetic package row. Missing roots remain silently skipped. `forge clean` never lists or traverses an unsafe root.
+
+Current skill names are discovered from candidate source package entries without parsing source contents. If even that
+names-only discovery is unavailable, status and clean fall back to the append-only historical names rather than block
+unrelated status or cleanup categories; marker-bearing packages remain observable regardless of name. Installer planning
+still performs full source validation and Git-eligibility gating before writes.
+
 Tracking failure is a no-scan boundary. A missing manifest means there are no managed rows, but a corrupt, unsupported,
 or unreadable manifest must propagate the existing state error; it must never be treated as empty tracking. This matches
 GC's existing fail-closed behavior when durable references cannot be built.
@@ -291,7 +302,8 @@ roots require an explicit visit; `--scope all` does not imply a filesystem crawl
 | Marked package has an edited or extra file                                                     | Unmanaged, modified, mismatch reason                                                | Never listed or deleted                                                    |
 | Marker is malformed or from a newer schema                                                     | Unmanaged, invalid/unsupported marker                                               | Never listed or deleted                                                    |
 | Unmarked or invalid-marker known-name directory is partial or lacks `SKILL.md`                 | Unmanaged, partial                                                                  | Never listed or deleted                                                    |
-| Package root, target root, or descendant directory is a symlink                                | Unmanaged, invalid target                                                           | Never listed or traversed                                                  |
+| Package root or descendant directory is a symlink                                              | Unmanaged, invalid target                                                           | Never listed or traversed                                                  |
+| Selected target root is a symlink, another non-directory type, or unreadable                   | Human root-not-scanned diagnostic; no synthetic JSON package row                    | Never listed or traversed                                                  |
 | Payload link is external or dangling links do not reconstruct one cache package                | Unmanaged, invalid target                                                           | Never listed or followed                                                   |
 | Exact target is claimed by coherent tracking                                                   | Existing tracked package status only                                                | Not an unmanaged candidate                                                 |
 | Unmanaged target also collides with another visible package                                    | Ownership unmanaged plus collision dirs                                             | Eligibility depends only on marker/scope proof, not collision state        |

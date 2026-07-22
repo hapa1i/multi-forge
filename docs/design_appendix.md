@@ -1182,19 +1182,10 @@ not a bypass; sidecars need a satisfying image. `forge extension doctor` remains
 
 ### C.5 Multi-scope installation (skill resolution)
 
-Portable sources use `forge-skill.yaml` + `content.md`; otherwise `SKILL.md` is a legacy Claude bridge. Source/package
-roots must be real. In a checkout, Git eligibility (tracked plus unignored untracked paths) gates package discovery and
-every read; inability to obtain that set blocks planning. Contained leaf symlinks require both link and target
-eligibility. Ignored inputs never reach output/cache.
-
-`allow_implicit_invocation` alone owns neutral invocation policy; adapters derive both forms and reject raw Claude
-`disable-model-invocation`. Packaged executables run directly from the installed package, so their shebang or OS entry
-point—not the adapter—selects execution independent of CWD. Whole-tree validation rejects bad metadata, paths,
-placeholders, or runtime tokens; only documentary Markdown under `references/` may be excluded. See
-[design_workflows.md §3.1](design_workflows.md#31-reflective-architecture).
-
-The host adapter owns model-family context: Codex emits `openai`, leaves the exact model unspecified, and ignores
-tracked Claude sessions.
+Sources are neutral (`forge-skill.yaml` + `content.md`) or legacy (`SKILL.md`). Real checkout roots admit only
+Git-tracked/unignored paths; links need eligible targets, and unavailable Git state blocks planning.
+`allow_implicit_invocation` owns invocation; executables use their entry point. Validation rejects unsafe inputs. Codex
+emits family `openai`, no exact model, and ignores Claude sessions.
 
 SKILLS planning is explicit over scope/runtime/profile/skill:
 
@@ -1203,19 +1194,25 @@ SKILLS planning is explicit over scope/runtime/profile/skill:
 | `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
 | `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-`--runtime` filters only SKILLS. Automatic enable adds detected Codex when new and retains managed runtimes when
-existing; explicit narrowing preserves omissions; sync preserves; disable removes. Unavailable/local Codex requests fail
-before writes. Duplicate scans are read-only and tracking-aware: automatic new packages skip, explicit/managed packages
-conflict, managed matches name their owner/disable command, and only untracked matches advise removal. User-scope checks
-include visible tracked project/local matches; `--force` never bypasses this.
+`--runtime` filters only SKILLS. Automatic enable adds Codex/retains managed runtimes; narrowing and sync preserve,
+disable removes, and unsupported requests fail before writes. Duplicate scans skip automatic new packages but conflict
+for explicit/managed ones; matches name owner/disable or manual/clean recovery, and `--force` never bypasses either.
+User scope includes visible tracked project/local matches. Blocking plans write nothing; cache output precedes tracking.
 
-Blocking plans write nothing; compiled output uses `$FORGE_HOME/cache/compiled-skills/v1`, and tracking commits last.
-Status—not doctor—owns `present`, `missing`, `duplicate`, and `invalid-target`. Package/descendant directory symlinks
-are invalid; install symlinks are leaf-only, and a dangling tracked leaf is `missing`. Claude scopes may drift; Codex
-should use one visible scope.
+Status—not doctor—owns `present`, `missing`, `duplicate`, and `invalid-target`. Directory links are invalid; install
+links are leaf-only and dangling leaves are `missing`. Claude may drift; Codex should have one visible scope.
 
-The portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. The four `claude -p` workflow
-frontends plus `walkthrough`/`qa` remain Claude-only.
+Unmanaged discovery unions names-only current discovery with append-only history, scans direct children with `lstat`,
+and compares one tracking snapshot. Name failure falls back to history; full validation is installer-only. Status
+reports provenance/shape/collisions, ignores unknown names, and treats ancestor/admin roots as visibility-only. Unsafe
+roots are not traversed: human status emits a root issue, JSON invents no package, and clean omits them.
+
+Cleanup requires a strict marker/exact tree: files match digest/mode; live links stay inside cache; dangling reset links
+reconstruct one cache package. Clean rescans, fingerprints, anchors, and revalidates before deleting the child. User
+targets require `all`; project/local use their owner. Repair lost/corrupt tracking, then rescan.
+
+Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`. The four workflow frontends, `walkthrough`,
+and `qa` are Claude-only.
 
 ### C.6 Codex hook registration (codex-hooks module)
 

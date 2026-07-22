@@ -7,6 +7,7 @@ Detects and removes orphaned Forge state:
 - Stale work-queue markers (session gone or worktree gone)
 - Stale proxy entries (dead PIDs, orphaned "starting" state)
 - Orphaned search documents (transcript files deleted)
+- Untracked runtime skill packages with fully verified Forge provenance
 - Corrupt Forge state files (unparseable manifests scoped by roots; corrupt
   global registries at any scope)
 
@@ -18,8 +19,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
-from collections.abc import Callable
+import stat
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -28,6 +31,15 @@ from forge.install.project_compat import (
     ProjectCompatibilityError,
     ProjectCompatibilitySkip,
     enforce_project_compatibility,
+)
+from forge.install.unmanaged import (
+    SkillScanRoot,
+    UnmanagedSkillPackage,
+    canonical_package_path,
+    cleanup_proof_fingerprint,
+    revalidate_cleanup_candidate,
+    runtime_skill_scan_roots,
+    scan_unmanaged_skill_packages,
 )
 
 from .context import ExecutionContext
@@ -60,6 +72,10 @@ class CleanReport:
     scope: str
     skipped_project_compatibility: list[ProjectCompatibilitySkip] = field(default_factory=list)
     _search_doc_owners: tuple[tuple[str, str], ...] = field(default=(), repr=False, compare=False)
+    _unmanaged_records: tuple[UnmanagedSkillPackage, ...] = field(default=(), repr=False, compare=False)
+    _unmanaged_roots: tuple[SkillScanRoot, ...] = field(default=(), repr=False, compare=False)
+    _unmanaged_skill_names: tuple[str, ...] = field(default=(), repr=False, compare=False)
+    _unmanaged_proof_tokens: tuple[tuple[str, str], ...] = field(default=(), repr=False, compare=False)
 
     @property
     def total_count(self) -> int:
@@ -178,6 +194,62 @@ def _belongs_to_project(candidate: Path, project_root: Path, known_roots: set[Pa
         pass
     # Already discovered via index (which filters by project_root)
     return resolved in known_roots
+
+
+def _scan_unmanaged_skill_packages_for_clean(
+    *,
+    scope: str,
+    scope_roots: set[Path],
+) -> tuple[
+    tuple[SkillScanRoot, ...],
+    tuple[str, ...],
+    tuple[UnmanagedSkillPackage, ...],
+    tuple[tuple[str, str], ...],
+]:
+    """Scan only runtime roots that the selected clean scope may mutate."""
+
+    from forge.install.installer import get_extensions_root
+    from forge.install.models import InstallModule, InstallScope
+    from forge.install.skill_compiler import discover_skill_source_names
+    from forge.session.claude.paths import get_claude_home
+
+    try:
+        current_names = discover_skill_source_names(get_extensions_root() / InstallModule.SKILLS.value)
+    except (OSError, ValueError) as exc:
+        _log.warning("forge clean: current skill names unavailable; using historical names only: %s", exc)
+        current_names = ()
+
+    selected: list[tuple[InstallScope, Path | None]] = []
+    for forge_root in sorted(scope_roots, key=str):
+        selected.extend(
+            (
+                (InstallScope.PROJECT, forge_root),
+                (InstallScope.LOCAL, forge_root),
+            )
+        )
+    if scope == "all":
+        selected.append((InstallScope.USER, None))
+
+    roots = runtime_skill_scan_roots(
+        selected,
+        user_home=Path.home(),
+        claude_home=get_claude_home(),
+    )
+    records = scan_unmanaged_skill_packages(
+        roots,
+        current_skill_names=current_names,
+    )
+    eligible_records: list[UnmanagedSkillPackage] = []
+    proof_tokens: list[tuple[str, str]] = []
+    for record in records:
+        if not record.cleanup_eligible:
+            continue
+        token = cleanup_proof_fingerprint(Path(record.target_dir))
+        if token is None:
+            continue
+        eligible_records.append(record)
+        proof_tokens.append((record.target_dir, token))
+    return roots, current_names, tuple(eligible_records), tuple(proof_tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -801,6 +873,8 @@ def _project_owner(
     category: str,
     item: str,
     scope_roots: set[Path],
+    *,
+    unmanaged_project_owners: Mapping[str, Path | None] | None = None,
 ) -> Path | None:
     """Return the Forge root owning a project-scoped cleanup item.
 
@@ -822,6 +896,12 @@ def _project_owner(
         global_paths = {path.resolve() for path, _reader in _global_registry_probes()}
         if Path(item).resolve() in global_paths:
             return None
+    if category == "unmanaged_skill_packages":
+        if unmanaged_project_owners is not None:
+            return unmanaged_project_owners.get(str(canonical_package_path(Path(item))))
+        # Compatibility fallback for synthetic reports that predate the
+        # scanner-owned root metadata.
+        return _owning_scope_root(Path(item), scope_roots)
     if category in _PROJECT_OWNED_CATEGORIES:
         return _owning_scope_root(Path(item), scope_roots)
     return None
@@ -848,6 +928,7 @@ def _project_compatibility_skips(
     scope_roots: set[Path],
     *,
     search_doc_owners: tuple[tuple[str, str], ...] | None = None,
+    unmanaged_project_owners: Mapping[str, Path | None] | None = None,
 ) -> list[ProjectCompatibilitySkip]:
     """Return every project-owned report item that apply would refuse."""
 
@@ -866,7 +947,12 @@ def _project_compatibility_skips(
                     search_owners = _search_doc_owners_by_path(scope_roots)
                 owners = search_owners.get(item, [])
             else:
-                owner = _project_owner(category.category, item, scope_roots)
+                owner = _project_owner(
+                    category.category,
+                    item,
+                    scope_roots,
+                    unmanaged_project_owners=unmanaged_project_owners,
+                )
                 owners = [] if owner is None else [owner]
             for owner in owners:
                 if owner not in errors:
@@ -895,8 +981,23 @@ def _build_clean_report(
     scope: str,
     scope_roots: set[Path],
     search_doc_owners: tuple[tuple[str, str], ...] = (),
+    unmanaged_records: tuple[UnmanagedSkillPackage, ...] = (),
+    unmanaged_roots: tuple[SkillScanRoot, ...] = (),
+    unmanaged_skill_names: tuple[str, ...] = (),
+    unmanaged_proof_tokens: tuple[tuple[str, str], ...] = (),
 ) -> CleanReport:
     """Build a report with compatibility refusals for preview and apply."""
+
+    roots_by_package_parent = {(root.runtime, canonical_package_path(root.path)): root for root in unmanaged_roots}
+    unmanaged_project_owners: dict[str, Path | None] = {}
+    for record in unmanaged_records:
+        target = canonical_package_path(Path(record.target_dir))
+        root = roots_by_package_parent.get((record.runtime, target.parent))
+        unmanaged_project_owners[str(target)] = (
+            root.project_root.resolve()
+            if root is not None and root.cleanup_scope == "project" and root.project_root is not None
+            else None
+        )
 
     return CleanReport(
         categories=categories,
@@ -905,8 +1006,13 @@ def _build_clean_report(
             categories,
             scope_roots,
             search_doc_owners=search_doc_owners,
+            unmanaged_project_owners=unmanaged_project_owners,
         ),
         _search_doc_owners=search_doc_owners,
+        _unmanaged_records=unmanaged_records,
+        _unmanaged_roots=unmanaged_roots,
+        _unmanaged_skill_names=unmanaged_skill_names,
+        _unmanaged_proof_tokens=unmanaged_proof_tokens,
     )
 
 
@@ -930,6 +1036,15 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         scope_roots = _resolve_tracked_roots(ctx, scope)
         ref_set = _build_reference_set(ctx, scope, scope_roots)
         worktree_ref_set = _build_worktree_reference_set(ctx, scope, scope_roots)
+        (
+            unmanaged_roots,
+            unmanaged_skill_names,
+            unmanaged_records,
+            unmanaged_proof_tokens,
+        ) = _scan_unmanaged_skill_packages_for_clean(
+            scope=scope,
+            scope_roots=scope_roots,
+        )
     except StateCorruptedError:
         # A corrupt index/registry blocks reference building. Report ONLY corrupt
         # state so forge clean can remove the bad file; the orphan detectors are
@@ -953,6 +1068,12 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         _detect_orphan_search_docs(scope_roots, owners=search_doc_owners),
         _detect_dead_installations(),
         _detect_corrupt_state(scope_roots),
+        OrphanCategory(
+            category="unmanaged_skill_packages",
+            description="Untracked Forge runtime skill packages with verified provenance",
+            count=len(unmanaged_records),
+            items=sorted(record.target_dir for record in unmanaged_records),
+        ),
     ]
 
     return _build_clean_report(
@@ -960,6 +1081,10 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         scope=scope,
         scope_roots=scope_roots,
         search_doc_owners=tuple(search_doc_owners),
+        unmanaged_records=unmanaged_records,
+        unmanaged_roots=unmanaged_roots,
+        unmanaged_skill_names=unmanaged_skill_names,
+        unmanaged_proof_tokens=unmanaged_proof_tokens,
     )
 
 
@@ -1020,11 +1145,101 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
             # A removed manifest self-heals its index entry; a removed registry
             # recreates empty on next use.
             cleaned = _clean_files(category.items, result)
+        elif category.category == "unmanaged_skill_packages":
+            cleaned = _clean_unmanaged_skill_packages(category.items, eligible_report, result)
 
         if cleaned > 0:
             result.categories_cleaned[category.category] = cleaned
 
     return result
+
+
+def _clean_unmanaged_skill_packages(
+    items: list[str],
+    report: CleanReport,
+    result: CleanResult,
+) -> int:
+    """Revalidate and remove exact package directories without following links."""
+
+    records = {canonical_package_path(Path(record.target_dir)): record for record in report._unmanaged_records}
+    roots = {(root.runtime, canonical_package_path(root.path)): root for root in report._unmanaged_roots}
+    proof_tokens = {canonical_package_path(Path(path)): token for path, token in report._unmanaged_proof_tokens}
+    cleaned = 0
+    for path_str in items:
+        path = canonical_package_path(Path(path_str))
+        record = records.get(path)
+        root = roots.get((record.runtime, path.parent)) if record is not None else None
+        proof_token = proof_tokens.get(path)
+        if record is None or root is None or proof_token is None:
+            result.failed.append((path_str, "cleanup candidate metadata is unavailable"))
+            continue
+
+        owner = root.project_root.resolve() if root.project_root is not None else None
+        if owner is not None:
+            try:
+                enforce_project_compatibility(owner)
+            except ProjectCompatibilityError as exc:
+                result.failed.append((path_str, f"project compatibility changed before deletion: {exc}"))
+                continue
+
+        try:
+            root_fd = os.open(root.path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError as exc:
+            result.failed.append((path_str, f"runtime skill root could not be anchored safely: {exc}"))
+            continue
+        try:
+            if not _open_directory_matches_path(root_fd, root.path):
+                result.failed.append((path_str, "runtime skill root changed before deletion"))
+                continue
+            try:
+                revalidated = revalidate_cleanup_candidate(
+                    record,
+                    root,
+                    current_skill_names=report._unmanaged_skill_names,
+                )
+            except (StateCorruptedError, StateUnreadableError, OSError, ValueError) as exc:
+                result.failed.append((path_str, f"cleanup proof could not be rebuilt: {exc}"))
+                continue
+            if revalidated is None:
+                result.failed.append(
+                    (
+                        path_str,
+                        "ownership, provenance, contents, or path shape changed before deletion",
+                    )
+                )
+                continue
+            current_token = cleanup_proof_fingerprint(path)
+            if current_token is None or current_token != proof_token:
+                result.failed.append((path_str, "marker, contents, or path identity changed before deletion"))
+                continue
+            if not _open_directory_matches_path(root_fd, root.path):
+                result.failed.append((path_str, "runtime skill root changed before deletion"))
+                continue
+
+            try:
+                shutil.rmtree(path.name, dir_fd=root_fd)
+            except OSError as exc:
+                result.failed.append((path_str, str(exc)))
+            else:
+                cleaned += 1
+        finally:
+            os.close(root_fd)
+    return cleaned
+
+
+def _open_directory_matches_path(directory_fd: int, path: Path) -> bool:
+    """Return whether an open real directory is still the directory at *path*."""
+
+    try:
+        opened = os.fstat(directory_fd)
+        current = path.lstat()
+    except OSError:
+        return False
+    return (
+        stat.S_ISDIR(opened.st_mode)
+        and stat.S_ISDIR(current.st_mode)
+        and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
+    )
 
 
 def _clean_session_dirs(items: list[str], result: CleanResult) -> int:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -26,6 +28,15 @@ from forge.core.ops.gc import (
     collect_clean_report,
     run_clean,
 )
+from forge.install.models import (
+    Installation,
+    InstalledFile,
+    InstalledManifest,
+    InstalledSkillPackage,
+    make_installation_key,
+)
+from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
+from forge.install.tracking import TrackingStore, compute_checksum
 from forge.session import IndexStore
 from forge.session.models import create_session_state
 from forge.session.store import SessionStore
@@ -70,6 +81,73 @@ def _make_ctx(tmp_path: Path, forge_root: Path | None = None) -> ExecutionContex
         worktree_root=tmp_path,
         project_root=tmp_path,
         forge_root=forge_root,
+    )
+
+
+def _write_marked_skill_package(
+    skill_root: Path,
+    *,
+    runtime: str = "codex",
+    skill: str = "understand",
+    content: bytes = b"---\nname: understand\n---\n",
+) -> Path:
+    package = skill_root / skill
+    package.mkdir(parents=True)
+    payload = package / "SKILL.md"
+    payload.write_bytes(content)
+    payload.chmod(0o644)
+    marker = {
+        "schema_version": 1,
+        "producer": "multi-forge",
+        "runtime": runtime,
+        "skill": skill,
+        "files": [
+            {
+                "path": "SKILL.md",
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "mode": 0o644,
+            }
+        ],
+    }
+    (package / FORGE_PACKAGE_SENTINEL).write_text(
+        json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    return package
+
+
+def _claim_project_package(project: Path, package: Path, *, runtime: str = "codex") -> None:
+    file_paths = sorted(str(path) for path in (package / "SKILL.md", package / FORGE_PACKAGE_SENTINEL))
+    installed_files = [
+        InstalledFile(
+            target_path=path,
+            source_path=path,
+            checksum=compute_checksum(Path(path)),
+            mode="copy",
+            installed_at="2026-07-22T00:00:00+00:00",
+        )
+        for path in file_paths
+    ]
+    installation = Installation(
+        scope="project",
+        project_path=str(project),
+        mode="copy",
+        profile="standard",
+        modules_enabled=["skills"],
+        files=installed_files,
+        skill_packages=[
+            InstalledSkillPackage(
+                runtime=runtime,
+                skill=package.name,
+                target_dir=str(package),
+                file_paths=file_paths,
+            )
+        ],
+    )
+    TrackingStore().write(
+        InstalledManifest(
+            installations={make_installation_key("project", str(project)): installation},
+        )
     )
 
 
@@ -557,6 +635,22 @@ class TestCollectCleanReport:
         session_cat = next(c for c in report.categories if c.category == "session_dirs")
         assert session_cat.count == 1
 
+    def test_broken_skill_name_discovery_does_not_block_other_cleanup_categories(self, tmp_path: Path) -> None:
+        fr = _seed_session(tmp_path, "alpha")
+        orphan = fr / ".forge" / "sessions" / "ghost"
+        orphan.mkdir(parents=True)
+        (orphan / "forge.session.json").write_text("{}", encoding="utf-8")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        with patch(
+            "forge.install.skill_compiler.discover_skill_source_names",
+            side_effect=OSError("broken source tree"),
+        ):
+            report = collect_clean_report(ctx=ctx, scope="workspace")
+
+        session_cat = next(category for category in report.categories if category.category == "session_dirs")
+        assert session_cat.items == [str(orphan)]
+
 
 # ---------------------------------------------------------------------------
 # run_clean
@@ -625,6 +719,298 @@ class TestRunClean:
         result = run_clean(ctx=ctx, scope="workspace")
         assert result.deleted_count == 0
         assert not result.failed
+
+    @staticmethod
+    def _category(report: CleanReport) -> OrphanCategory:
+        return next(category for category in report.categories if category.category == "unmanaged_skill_packages")
+
+    def test_scope_mapping_deduplicates_project_targets_and_adds_user_only_for_all(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        project_codex = _write_marked_skill_package(project / ".agents" / "skills")
+        project_claude = _write_marked_skill_package(
+            project / ".claude" / "skills",
+            runtime="claude_code",
+        )
+        user_codex = _write_marked_skill_package(Path.home() / ".agents" / "skills")
+        user_claude = _write_marked_skill_package(
+            Path(os.environ["CLAUDE_HOME"]) / "skills",
+            runtime="claude_code",
+        )
+        ctx = _make_ctx(tmp_path, forge_root=project)
+
+        project_report = collect_clean_report(ctx=ctx, scope="project")
+        workspace_report = collect_clean_report(ctx=ctx, scope="workspace")
+        all_report = collect_clean_report(ctx=ctx, scope="all")
+
+        project_items = self._category(project_report).items
+        assert project_items == sorted([str(project_claude), str(project_codex)])
+        assert self._category(workspace_report).items == project_items
+        assert self._category(all_report).items == sorted(
+            [str(project_claude), str(project_codex), str(user_claude), str(user_codex)]
+        )
+
+        result = run_clean(ctx=ctx, scope="all")
+
+        assert result.categories_cleaned["unmanaged_skill_packages"] == 4
+        assert not any(path.exists() for path in (project_claude, project_codex, user_claude, user_codex))
+
+    def test_all_scope_does_not_discover_project_root_after_every_reference_is_lost(self, tmp_path: Path) -> None:
+        current_project = tmp_path / "current"
+        lost_project = tmp_path / "lost"
+        (current_project / ".forge").mkdir(parents=True)
+        (lost_project / ".forge").mkdir(parents=True)
+        current_package = _write_marked_skill_package(current_project / ".agents" / "skills")
+        lost_package = _write_marked_skill_package(lost_project / ".agents" / "skills")
+        ctx = _make_ctx(current_project, forge_root=current_project)
+
+        report = collect_clean_report(ctx=ctx, scope="all")
+
+        assert self._category(report).items == [str(current_package)]
+
+        result = run_clean(ctx=ctx, scope="all")
+
+        assert result.categories_cleaned["unmanaged_skill_packages"] == 1
+        assert not current_package.exists()
+        assert lost_package.is_dir()
+
+    def test_unmarked_package_is_status_only_and_never_in_clean_report(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        package = project / ".agents" / "skills" / "understand"
+        package.mkdir(parents=True)
+        (package / "SKILL.md").write_text("pre-marker output\n", encoding="utf-8")
+        (project / ".forge").mkdir()
+        ctx = _make_ctx(tmp_path, forge_root=project)
+
+        report = collect_clean_report(ctx=ctx, scope="project")
+        result = run_clean(ctx=ctx, scope="project")
+
+        assert self._category(report).items == []
+        assert "unmanaged_skill_packages" not in result.categories_cleaned
+        assert package.is_dir()
+
+    def test_cache_reset_dangling_package_is_listed_and_removed_without_following_links(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        payload = package / "SKILL.md"
+        payload.unlink()
+        missing_cache_payload = (
+            _forge_home() / "cache" / "compiled-skills" / "v1" / "codex" / package.name / ("a" * 64) / "SKILL.md"
+        )
+        payload.symlink_to(missing_cache_payload)
+        ctx = _make_ctx(tmp_path, forge_root=project)
+
+        preview = collect_clean_report(ctx=ctx, scope="project")
+
+        assert self._category(preview).items == [str(package)]
+        assert len(preview._unmanaged_records) == 1
+        assert preview._unmanaged_records[0].shape == "partial"
+        assert payload.is_symlink() and not payload.exists()
+
+        result = run_clean(ctx=ctx, scope="project")
+
+        assert result.categories_cleaned["unmanaged_skill_packages"] == 1
+        assert not package.exists()
+        assert not missing_cache_payload.exists()
+
+    def test_incompatible_project_stays_counted_and_global_user_package_cleans(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        (project / ".forge" / "project.toml").write_text(
+            'schema_version = 1\nrequired_forge = ">=9999"\n',
+            encoding="utf-8",
+        )
+        project_package = _write_marked_skill_package(project / ".agents" / "skills")
+        user_package = _write_marked_skill_package(Path.home() / ".agents" / "skills")
+        ctx = _make_ctx(tmp_path, forge_root=project)
+
+        preview = collect_clean_report(ctx=ctx, scope="all")
+
+        assert self._category(preview).count == 2
+        assert [skip.target for skip in preview.skipped_project_compatibility] == [str(project_package)]
+
+        result = run_clean(ctx=ctx, scope="all")
+
+        assert project_package.is_dir()
+        assert not user_package.exists()
+        assert result.categories_cleaned["unmanaged_skill_packages"] == 1
+        assert [skip.target for skip in result.skipped_project_compatibility] == [str(project_package)]
+        assert result.should_exit_nonzero is True
+
+    def test_pre_scan_ownership_change_is_omitted_without_failure(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        ctx = _make_ctx(tmp_path, forge_root=project)
+        preview = collect_clean_report(ctx=ctx, scope="project")
+        assert self._category(preview).items == [str(package)]
+        _claim_project_package(project, package)
+
+        result = run_clean(ctx=ctx, scope="project")
+
+        assert package.is_dir()
+        assert "unmanaged_skill_packages" not in result.categories_cleaned
+        assert result.failed == []
+
+    def test_post_scan_ownership_drift_fails_and_preserves_package(self, tmp_path: Path) -> None:
+        from forge.core.ops import gc as gc_module
+
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        ctx = _make_ctx(tmp_path, forge_root=project)
+        original = gc_module.revalidate_cleanup_candidate
+
+        def claim_then_revalidate(*args: Any, **kwargs: Any):
+            _claim_project_package(project, package)
+            return original(*args, **kwargs)
+
+        with patch(
+            "forge.core.ops.gc.revalidate_cleanup_candidate",
+            side_effect=claim_then_revalidate,
+        ):
+            result = run_clean(ctx=ctx, scope="project")
+
+        assert package.is_dir()
+        assert result.categories_cleaned.get("unmanaged_skill_packages", 0) == 0
+        assert result.failed and result.failed[0][0] == str(package)
+        assert result.should_exit_nonzero is True
+
+    @pytest.mark.parametrize("drift", ["contents", "coherent-replacement", "path-type", "parent-path-type"])
+    def test_post_scan_filesystem_drift_fails_and_preserves_replacement(
+        self,
+        tmp_path: Path,
+        drift: str,
+    ) -> None:
+        from forge.core.ops import gc as gc_module
+
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        ctx = _make_ctx(tmp_path, forge_root=project)
+        original = gc_module.revalidate_cleanup_candidate
+        external = tmp_path / "operator-owned"
+
+        def drift_then_revalidate(*args: Any, **kwargs: Any):
+            if drift == "contents":
+                (package / "operator.txt").write_text("keep\n", encoding="utf-8")
+            elif drift == "coherent-replacement":
+                shutil.rmtree(package)
+                replacement = _write_marked_skill_package(package.parent, content=b"replacement\n")
+                assert replacement == package
+            elif drift == "path-type":
+                shutil.rmtree(package)
+                external.mkdir()
+                (external / "keep.txt").write_text("keep\n", encoding="utf-8")
+                package.symlink_to(external, target_is_directory=True)
+            else:
+                skill_root = package.parent
+                shutil.rmtree(skill_root)
+                replacement = _write_marked_skill_package(external)
+                skill_root.symlink_to(external, target_is_directory=True)
+                assert replacement == external / package.name
+            return original(*args, **kwargs)
+
+        with patch(
+            "forge.core.ops.gc.revalidate_cleanup_candidate",
+            side_effect=drift_then_revalidate,
+        ):
+            result = run_clean(ctx=ctx, scope="project")
+
+        assert package.exists()
+        if drift == "contents":
+            assert (package / "operator.txt").is_file()
+        elif drift == "coherent-replacement":
+            assert (package / "SKILL.md").read_text(encoding="utf-8") == "replacement\n"
+        elif drift == "path-type":
+            assert package.is_symlink()
+            assert (external / "keep.txt").is_file()
+        else:
+            assert package.parent.is_symlink()
+            assert (external / package.name / "SKILL.md").is_file()
+        assert result.failed and result.failed[0][0] == str(package)
+        assert result.should_exit_nonzero is True
+
+    def test_compatibility_drift_after_scan_fails_before_revalidation(self, tmp_path: Path) -> None:
+        from forge.core.ops import gc as gc_module
+        from forge.install.project_compat import ProjectCompatibilityError
+
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        ctx = _make_ctx(tmp_path, forge_root=project)
+        original = gc_module.enforce_project_compatibility
+        calls = 0
+
+        def become_incompatible(root: Path) -> object:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                original(root)
+                return None
+            raise ProjectCompatibilityError(str(root), "compatibility changed", state="incompatible")
+
+        with patch(
+            "forge.core.ops.gc.enforce_project_compatibility",
+            side_effect=become_incompatible,
+        ):
+            result = run_clean(ctx=ctx, scope="project")
+
+        assert package.is_dir()
+        assert result.failed and "compatibility changed" in result.failed[0][1]
+        assert result.should_exit_nonzero is True
+
+    def test_runtime_root_swap_after_package_revalidation_preserves_replacement(self, tmp_path: Path) -> None:
+        from forge.core.ops import gc as gc_module
+
+        project = tmp_path / "project"
+        (project / ".forge").mkdir(parents=True)
+        package = _write_marked_skill_package(project / ".agents" / "skills")
+        skill_root = package.parent
+        external_root = tmp_path / "operator-skills"
+        ctx = _make_ctx(tmp_path, forge_root=project)
+        original = gc_module.cleanup_proof_fingerprint
+        calls = 0
+
+        def swap_root_after_fingerprint(path: Path) -> str | None:
+            nonlocal calls
+            token = original(path)
+            calls += 1
+            if calls == 2:
+                shutil.rmtree(skill_root)
+                _write_marked_skill_package(external_root)
+                skill_root.symlink_to(external_root, target_is_directory=True)
+            return token
+
+        with patch("forge.core.ops.gc.cleanup_proof_fingerprint", side_effect=swap_root_after_fingerprint):
+            result = run_clean(ctx=ctx, scope="project")
+
+        assert calls == 2
+        assert skill_root.is_symlink()
+        assert (external_root / package.name / "SKILL.md").is_file()
+        assert result.failed and "runtime skill root changed" in result.failed[0][1]
+        assert result.should_exit_nonzero is True
+
+    def test_corrupt_tracking_requires_a_second_pass_before_packages_are_visible(self, tmp_path: Path) -> None:
+        package = _write_marked_skill_package(Path.home() / ".agents" / "skills")
+        tracking_path = TrackingStore().path
+        tracking_path.parent.mkdir(parents=True, exist_ok=True)
+        tracking_path.write_text("{corrupt", encoding="utf-8")
+        ctx = _make_ctx(tmp_path)
+
+        first = collect_clean_report(ctx=ctx, scope="all")
+
+        assert [category.category for category in first.categories] == ["corrupt_state"]
+        assert str(tracking_path) in first.categories[0].items
+        assert package.is_dir()
+
+        first_apply = run_clean(ctx=ctx, scope="all")
+        assert first_apply.categories_cleaned["corrupt_state"] == 1
+        assert package.is_dir()
+
+        second = collect_clean_report(ctx=ctx, scope="all")
+        assert self._category(second).items == [str(package)]
 
     @pytest.mark.parametrize(
         ("project_toml", "expected_state"),
@@ -869,6 +1255,26 @@ class TestRunClean:
         assert skips[0].forge_root == str(forge_root.resolve())
         assert skips[0].state == "unreadable"
         assert "read error" in skips[0].reason
+
+    def test_unmanaged_user_owner_metadata_overrides_path_containment(self, tmp_path: Path) -> None:
+        project = tmp_path / "project"
+        package = project / "nested-home" / ".agents" / "skills" / "understand"
+        category = OrphanCategory(
+            "unmanaged_skill_packages",
+            "verified packages",
+            1,
+            [str(package)],
+        )
+
+        with patch("forge.core.ops.gc.enforce_project_compatibility") as enforce:
+            skips = _project_compatibility_skips(
+                [category],
+                {project},
+                unmanaged_project_owners={str(package): None},
+            )
+
+        assert skips == []
+        enforce.assert_not_called()
 
     def test_pending_work_marker_is_gated_by_payload_forge_root(self, tmp_path: Path) -> None:
         forge_root = _seed_session(tmp_path, "live")

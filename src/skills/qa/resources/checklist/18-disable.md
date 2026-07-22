@@ -97,7 +97,9 @@ test -f "$CLAUDE_HOME/skills/review/SKILL.md"
 PATH="/tmp/forge-qa-runtime-bin:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
   --profile minimal --with skills --without commands --runtime codex
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.[0].skill_packages | length == 5 and all(.[]; .runtime == "codex" and .state == "present")'
+  | jq -e '.schema_version == 2 and .unmanaged_skill_packages == []
+      and (.installations[0].skill_packages | length == 5)
+      and all(.installations[0].skill_packages[]; .runtime == "codex" and .state == "present")'
 ```
 
 - [ ] Project disable removes all tracked `.agents/skills` packages and its tracking row

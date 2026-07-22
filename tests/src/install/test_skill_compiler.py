@@ -26,6 +26,7 @@ from forge.install.skill_compiler import (
     SkillSourceFormat,
     TokenAllowance,
     compile_skill_for_runtime,
+    discover_skill_source_names,
     load_claude_skill_source,
     load_neutral_skill_source,
     load_skill_sources,
@@ -115,6 +116,17 @@ def test_mixed_sources_preserve_legacy_claude_bridge_byte_and_mode_fidelity() ->
             source_file = package_root / package_file.path
             assert package_file.content == source_file.read_bytes(), package_file.path
             assert package_file.mode == stat.S_IMODE(source_file.stat().st_mode), package_file.path
+
+
+def test_discover_skill_source_names_does_not_parse_broken_source_contents(tmp_path: Path) -> None:
+    package_root = tmp_path / "future-skill"
+    package_root.mkdir()
+    (package_root / "forge-skill.yaml").write_text("schema_version: [broken\n", encoding="utf-8")
+    (tmp_path / "not-a-skill").mkdir()
+
+    assert discover_skill_source_names(tmp_path) == ("future-skill",)
+    with pytest.raises(ValueError):
+        load_skill_sources(tmp_path)
 
 
 def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -> None:

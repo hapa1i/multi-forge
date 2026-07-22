@@ -37,11 +37,13 @@ from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
 from forge.install.skill_planning import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
+    FORGE_SKILL_NAME_HISTORY,
     RuntimeSelectionOrigin,
     SkillCandidate,
     SkillPlanAction,
     SkillPlanReason,
     UnsupportedRuntimeSkillScope,
+    forge_skill_name_universe,
     plan_runtime_skills,
     runtime_skill_root,
     scan_codex_skill_duplicates,
@@ -62,6 +64,20 @@ _CLAUDE_ONLY = SkillCandidate(
     name="claude-only",
     supported_runtimes=(CLAUDE_CODE_RUNTIME,),
 )
+
+_PRE_UNMANAGED_DETECTION_SKILL_NAMES = {
+    "analyze",
+    "challenge",
+    "consensus",
+    "debate",
+    "panel",
+    "qa",
+    "review",
+    "review-docs",
+    "smoke-test",
+    "understand",
+    "walkthrough",
+}
 
 
 class _PlanningPaths(TypedDict):
@@ -93,6 +109,25 @@ def test_cli_runtime_selection_is_repeatable_and_all_is_canonical() -> None:
         CLAUDE_CODE_RUNTIME,
         CODEX_RUNTIME,
     )
+
+
+def test_forge_skill_name_history_preserves_pre_feature_baseline() -> None:
+    assert _PRE_UNMANAGED_DETECTION_SKILL_NAMES <= FORGE_SKILL_NAME_HISTORY
+
+
+def test_forge_skill_name_universe_includes_current_candidates_and_history() -> None:
+    current = {"challenge", "future-portable"}
+
+    universe = forge_skill_name_universe(current)
+
+    assert current <= universe
+    assert FORGE_SKILL_NAME_HISTORY <= universe
+
+
+@pytest.mark.parametrize("bad_name", ["", None, 1])
+def test_forge_skill_name_universe_rejects_invalid_current_names(bad_name: object) -> None:
+    with pytest.raises(ValueError, match="non-empty strings"):
+        forge_skill_name_universe([bad_name])  # type: ignore[list-item]
 
 
 def test_status_degrades_unknown_tracked_runtime_to_invalid_target(
@@ -1141,7 +1176,9 @@ def test_cross_scope_codex_duplicate_keeps_managed_provenance_and_safe_recovery(
         ["status", "--scope", "project", "--root", str(project), "--json"],
     )
     assert json_status.exit_code == 0, json_status.output
-    json_package = json.loads(json_status.output)[0]["skill_packages"][0]
+    status_payload = json.loads(json_status.output)
+    assert status_payload["schema_version"] == 2
+    json_package = status_payload["installations"][0]["skill_packages"][0]
     assert json_package["state"] == "duplicate"
     assert "forge extension disable --scope user" in json_package["recovery"]
     human_status = CliRunner().invoke(
@@ -2082,6 +2119,15 @@ def test_explicit_duplicate_blocks_all_targets_even_with_force_but_auto_skips_co
 
     assert blocked.has_conflicts
     assert any("duplicate_scan_chain" in conflict for conflict in blocked.conflicts)
+    explicit_conflict = next(
+        package
+        for package in blocked.skill_packages
+        if package.runtime == CODEX_RUNTIME and package.reason == "duplicate_scan_chain"
+    )
+    assert explicit_conflict.recovery is not None
+    assert f"Remove or rename {duplicate.parent}" in explicit_conflict.recovery
+    assert "forge clean" not in explicit_conflict.recovery
+    assert "original `forge extension enable`" in explicit_conflict.recovery
     assert duplicate.read_text(encoding="utf-8") == "user-owned\n"
     assert all(not Path(package.cache_dir).exists() for package in blocked.skill_packages if package.cache_dir)
     assert tracking.get_installation("user", None) is None
@@ -2103,10 +2149,178 @@ def test_explicit_duplicate_blocks_all_targets_even_with_force_but_auto_skips_co
         package.runtime == CODEX_RUNTIME and package.action == "skip" and package.reason == "duplicate_scan_chain"
         for package in automatic.skill_packages
     )
+    automatic_skip = next(
+        package
+        for package in automatic.skill_packages
+        if package.runtime == CODEX_RUNTIME and package.reason == "duplicate_scan_chain"
+    )
+    assert automatic_skip.recovery is not None
+    assert f"Remove or rename {duplicate.parent}" in automatic_skip.recovery
     assert duplicate.read_text(encoding="utf-8") == "user-owned\n"
     installed = tracking.get_installation("user", None)
     assert installed is not None
     assert {package.runtime for package in installed.skill_packages} == {CLAUDE_CODE_RUNTIME}
+
+
+def test_marked_orphan_enable_recovery_names_clean_preview_apply_and_retry(tmp_path: Path) -> None:
+    home = Path.home()
+    _write_portable_source(tmp_path)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs: _InstallerSkillKwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        installed = installer.init(**kwargs)
+    assert not installed.has_conflicts
+    package = home / ".agents" / "skills" / "portable"
+    original_skill = (package / "SKILL.md").read_bytes()
+    tracking.remove_installation("user", None)
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        blocked = installer.init(**kwargs)
+
+    assert blocked.has_conflicts
+    conflict = next(
+        item for item in blocked.skill_packages if item.runtime == CODEX_RUNTIME and item.skill == "portable"
+    )
+    assert conflict.recovery is not None
+    assert str(package) in conflict.recovery
+    assert "`forge clean --scope all --verbose`" in conflict.recovery
+    assert "`forge clean --scope all --verbose --yes`" in conflict.recovery
+    assert "original `forge extension enable`" in conflict.recovery
+    assert (package / "SKILL.md").read_bytes() == original_skill
+    assert tracking.get_installation("user", None) is None
+
+
+def test_mixed_unmanaged_packages_keep_safe_and_manual_recovery_independent(tmp_path: Path) -> None:
+    home = Path.home()
+    _write_portable_source(tmp_path)
+    _write_portable_source(tmp_path, name="second")
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs: _InstallerSkillKwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        installed = installer.init(**kwargs)
+    assert not installed.has_conflicts
+    assert tracking.remove_installation("user", None)
+
+    safe_package = home / ".agents" / "skills" / "portable"
+    manual_package = home / ".agents" / "skills" / "second"
+    (manual_package / FORGE_PACKAGE_SENTINEL).unlink()
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        blocked = installer.init(**kwargs)
+
+    safe = next(package for package in blocked.skill_packages if package.skill == "portable")
+    manual = next(package for package in blocked.skill_packages if package.skill == "second")
+    assert blocked.has_conflicts
+    assert safe.recovery is not None
+    assert str(safe_package) in safe.recovery
+    assert "forge clean --scope all --verbose" in safe.recovery
+    assert str(manual_package) not in safe.recovery
+    assert manual.recovery is not None
+    assert f"Remove or rename {manual_package}" in manual.recovery
+    assert "forge clean" not in manual.recovery
+    assert str(safe_package) not in manual.recovery
+    assert safe_package.is_dir()
+    assert manual_package.is_dir()
+
+
+def test_unsafe_marker_in_real_package_keeps_exact_manual_recovery(tmp_path: Path) -> None:
+    home = Path.home()
+    _write_portable_source(tmp_path)
+    package = home / ".agents" / "skills" / "portable"
+    package.mkdir(parents=True)
+    (package / "SKILL.md").write_text("operator-owned\n", encoding="utf-8")
+    external_marker = tmp_path / "operator-marker.json"
+    external_marker.write_text("{}\n", encoding="utf-8")
+    (package / FORGE_PACKAGE_SENTINEL).symlink_to(external_marker)
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        blocked = installer.init(
+            profile=InstallProfile.STANDARD,
+            mode=InstallMode.COPY,
+            skill_runtimes=(CODEX_RUNTIME,),
+            _modules_override={InstallModule.SKILLS},
+        )
+
+    conflict = next(item for item in blocked.skill_packages if item.skill == "portable")
+    assert blocked.has_conflicts
+    assert conflict.recovery is not None
+    assert f"Remove or rename {package}" in conflict.recovery
+    assert "forge clean" not in conflict.recovery
+    assert (package / FORGE_PACKAGE_SENTINEL).is_symlink()
+    assert (package / "SKILL.md").read_text(encoding="utf-8") == "operator-owned\n"
+    assert tracking.get_installation("user", None) is None
+
+
+def test_marked_orphan_sync_recovery_names_sync_as_retry_operation(tmp_path: Path) -> None:
+    home = Path.home()
+    _write_portable_source(tmp_path)
+    _write_portable_source(tmp_path, name="second")
+    tracking = _tracking(tmp_path)
+    installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+    kwargs: _InstallerSkillKwargs = {
+        "profile": InstallProfile.STANDARD,
+        "mode": InstallMode.COPY,
+        "skill_runtimes": (CODEX_RUNTIME,),
+        "_modules_override": {InstallModule.SKILLS},
+    }
+
+    with patch(
+        "forge.install.installer.installed_runtimes",
+        return_value=_runtime_specs(CODEX_RUNTIME),
+    ):
+        installed = installer.init(**kwargs)
+    assert not installed.has_conflicts
+
+    installation = tracking.get_installation("user", None)
+    assert installation is not None
+    portable = next(package for package in installation.skill_packages if package.skill == "portable")
+    portable_files = set(portable.file_paths)
+    installation.skill_packages = [portable]
+    installation.files = [record for record in installation.files if record.target_path in portable_files]
+    tracking.set_installation("user", installation)
+
+    blocked = installer.plan_update()
+
+    conflict = next(package for package in blocked.skill_packages if package.skill == "second")
+    orphan = home / ".agents" / "skills" / "second"
+    assert blocked.has_conflicts
+    assert conflict.recovery is not None
+    assert str(orphan) in conflict.recovery
+    assert "forge clean --scope all --verbose" in conflict.recovery
+    assert "original `forge extension sync`" in conflict.recovery
+    assert "extension enable" not in conflict.recovery
+    assert orphan.is_dir()
 
 
 def test_codex_only_project_install_is_detectable_in_status_and_disable_without_claude_dir(
@@ -2160,20 +2374,23 @@ def test_codex_only_project_install_is_detectable_in_status_and_disable_without_
     status = CliRunner().invoke(extensions, ["status", "--json"])
     assert status.exit_code == 0, status.output
     payload = json.loads(status.output)
-    assert payload[0]["skill_packages"][0]["runtime"] == CODEX_RUNTIME
-    assert payload[0]["skill_packages"][0]["target_dir"] == str(target.parent)
-    assert payload[0]["skill_packages"][0]["state"] == "present"
-    assert payload[0]["skill_packages"][0]["target_present"] is True
-    assert payload[0]["skill_packages"][0]["missing_file_paths"] == []
-    assert payload[0]["skill_packages"][0]["duplicate_dirs"] == []
-    assert payload[0]["skill_packages"][0]["recovery"] is None
+    assert payload["schema_version"] == 2
+    assert payload["unmanaged_skill_packages"] == []
+    installed_package = payload["installations"][0]["skill_packages"][0]
+    assert installed_package["runtime"] == CODEX_RUNTIME
+    assert installed_package["target_dir"] == str(target.parent)
+    assert installed_package["state"] == "present"
+    assert installed_package["target_present"] is True
+    assert installed_package["missing_file_paths"] == []
+    assert installed_package["duplicate_dirs"] == []
+    assert installed_package["recovery"] is None
 
     duplicate = home / ".agents" / "skills" / "portable" / "SKILL.md"
     duplicate.parent.mkdir(parents=True)
     duplicate.write_text("user-owned\n", encoding="utf-8")
     duplicate_status = CliRunner().invoke(extensions, ["status", "--json"])
     duplicate_payload = json.loads(duplicate_status.output)
-    observed = duplicate_payload[0]["skill_packages"][0]
+    observed = duplicate_payload["installations"][0]["skill_packages"][0]
     assert observed["state"] == "duplicate"
     assert observed["target_present"] is True
     assert observed["duplicate_dirs"] == [str(duplicate.parent)]
@@ -2188,7 +2405,7 @@ def test_codex_only_project_install_is_detectable_in_status_and_disable_without_
     missing_resource.unlink()
     missing_status = CliRunner().invoke(extensions, ["status", "--json"])
     missing_payload = json.loads(missing_status.output)
-    observed = missing_payload[0]["skill_packages"][0]
+    observed = missing_payload["installations"][0]["skill_packages"][0]
     assert observed["state"] == "missing"
     assert observed["target_present"] is True
     assert observed["missing_file_paths"] == [str(missing_resource)]
@@ -2200,7 +2417,7 @@ def test_codex_only_project_install_is_detectable_in_status_and_disable_without_
     missing_resource.symlink_to(missing_resource.with_name("gone.md"))
     dangling_status = CliRunner().invoke(extensions, ["status", "--json"])
     dangling_payload = json.loads(dangling_status.output)
-    observed = dangling_payload[0]["skill_packages"][0]
+    observed = dangling_payload["installations"][0]["skill_packages"][0]
     assert observed["state"] == "missing"
     assert observed["missing_file_paths"] == [str(missing_resource)]
 

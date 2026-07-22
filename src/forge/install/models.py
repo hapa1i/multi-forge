@@ -356,6 +356,7 @@ class SkillPackagePlan:
     file_paths: list[str] = field(default_factory=list)
     reason: str | None = None
     duplicate_dirs: list[str] = field(default_factory=list)
+    recovery: str | None = None
 
 
 @dataclass(frozen=True)

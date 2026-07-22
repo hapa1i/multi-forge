@@ -208,5 +208,6 @@ def _category_label(category: str) -> str:
         "search_docs": "Orphan search docs:",
         "dead_installations": "Dead installations:",
         "corrupt_state": "Corrupt state files:",
+        "unmanaged_skill_packages": "Unmanaged skill packages:",
     }
     return labels.get(category, f"{category}:")

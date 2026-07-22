@@ -62,6 +62,7 @@ from .models import (
     SkillPackagePlan,
     SkillPackageStatus,
     make_installation_key,
+    parse_installation_key,
 )
 from .settings_merge import (
     backup_settings,
@@ -103,6 +104,13 @@ from .skill_planning import (
     select_skill_runtimes,
 )
 from .tracking import TrackingStore, compute_checksum
+from .unmanaged import (
+    UnmanagedSkillPackage,
+    canonical_package_path,
+    render_unmanaged_conflict_recovery,
+    runtime_skill_scan_roots,
+    scan_unmanaged_skill_packages,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -739,6 +747,8 @@ def find_claude_root(
 def find_forge_installation(
     start: Path | None = None,
     tracking: "TrackingStore | None" = None,
+    *,
+    tracking_snapshot: InstalledManifest | None = None,
 ) -> tuple[InstallScope, Path | None]:
     """Find the nearest Forge installation walking up from start.
 
@@ -753,6 +763,8 @@ def find_forge_installation(
     Args:
         start: Starting directory. Defaults to cwd.
         tracking: TrackingStore instance. Created if not provided.
+        tracking_snapshot: Optional already-validated manifest for one coherent
+            caller-owned read.
 
     Returns:
         Tuple of (scope, project_root). For USER scope, project_root is None.
@@ -765,7 +777,7 @@ def find_forge_installation(
     if tracking is None:
         tracking = TrackingStore()
 
-    manifest: InstalledManifest | None = None
+    manifest: InstalledManifest | None = tracking_snapshot
 
     def is_tracked(scope: InstallScope, project_path: str | None) -> bool:
         nonlocal manifest
@@ -946,7 +958,10 @@ class Installer:
 
         source_root = get_extensions_root()
         target_root = get_target_root(self._scope, self._project_root)
-        tracked_installations = self._tracking.list_installations()
+        manifest = self._tracking.read()
+        tracked_installations = [
+            (*parse_installation_key(key), installation) for key, installation in manifest.installations.items()
+        ]
         existing = next(
             (
                 installation
@@ -999,6 +1014,7 @@ class Installer:
                 explicit_runtime_ids=skill_runtimes,
                 managed_runtime_ids=_managed_runtime_ids,
                 tracked_installations=tracked_installations,
+                tracking=manifest,
                 eligible_source_paths=git_eligible,
             )
 
@@ -1068,6 +1084,7 @@ class Installer:
         explicit_runtime_ids: tuple[str, ...] | None,
         managed_runtime_ids: tuple[str, ...] | None,
         tracked_installations: list[tuple[str, str | None, Installation]],
+        tracking: InstalledManifest,
         eligible_source_paths: set[Path] | None,
     ) -> None:
         try:
@@ -1087,6 +1104,37 @@ class Installer:
             )
             for source in sources
         )
+        tracked_codex_roots = {
+            location.target.parent
+            for candidate in candidates
+            for location in _tracked_codex_package_locations(tracked_installations, candidate.name)
+        }
+        unmanaged_records = scan_unmanaged_skill_packages(
+            runtime_skill_scan_roots(
+                ((self._scope, self._project_root),),
+                user_home=Path.home(),
+                claude_home=get_claude_home(),
+                additional_codex_visibility_roots=tracked_codex_roots,
+                report_visibility_entries=True,
+            ),
+            current_skill_names=(candidate.name for candidate in candidates),
+            tracking=tracking,
+        )
+        unmanaged_by_package: dict[tuple[str, str], list[Path]] = {}
+        unmanaged_by_path: dict[Path, UnmanagedSkillPackage] = {}
+        for record in unmanaged_records:
+            target = canonical_package_path(Path(record.target_dir))
+            # Preserve the existing security-violation boundary for blocking
+            # files and package-root symlinks. A real package directory can
+            # still contain an unsafe marker or descendant; those entries go
+            # through duplicate planning so their manual recovery is visible.
+            try:
+                target_is_real_directory = stat.S_ISDIR(target.lstat().st_mode)
+            except OSError:
+                target_is_real_directory = False
+            if target_is_real_directory:
+                unmanaged_by_package.setdefault((record.runtime, record.skill), []).append(target)
+            unmanaged_by_path[target] = record
         managed_packages = {
             (package.runtime, package.skill) for package in (existing.skill_packages if existing is not None else [])
         }
@@ -1143,6 +1191,7 @@ class Installer:
                 claude_home=get_claude_home(),
                 project_root=self._project_root,
                 managed_packages=managed_packages,
+                unmanaged_runtime_packages=unmanaged_by_package,
                 untracked_codex_packages=untracked_codex,
                 managed_codex_duplicates=managed_codex_duplicates,
             )
@@ -1158,6 +1207,12 @@ class Installer:
                     target_dir=str(decision.target_dir) if decision.target_dir is not None else None,
                     reason=decision.reason.value,
                     duplicate_dirs=[str(path) for path in decision.duplicate_dirs],
+                    recovery=render_unmanaged_conflict_recovery(
+                        decision.duplicate_dirs,
+                        unmanaged_by_path,
+                        operation="sync" if managed_runtime_ids is not None else "enable",
+                        project_root=self._project_root,
+                    ),
                 )
                 plan.skill_packages.append(package_plan)
                 if decision.action == SkillPlanAction.CONFLICT:

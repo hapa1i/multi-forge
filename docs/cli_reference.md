@@ -52,8 +52,11 @@ or a duplicate beside a package that Forge already manages, makes the duplicate 
 by another Forge scope remains a deliberate conflict. Because a user package is globally visible, user-scope planning
 and status also check valid, present tracked project/local packages outside the current directory chain. Status names
 the owning scope and the exact `forge extension disable --scope ...` command needed to release it. Only genuinely
-untracked duplicates receive remove-or-rename guidance. Forge never overwrites or deletes a duplicate package, and
-`--force` does not bypass this rule.
+untracked duplicates receive unmanaged-package recovery. A marked orphan whose sentinel and exact tree prove safe
+cleanup names its exact path, the matching `forge clean` preview/apply commands, and a retry of the original enable/sync
+command. Unmarked, modified, malformed/newer-marker, visibility-only, and unsafe entries retain exact-path
+remove-or-rename guidance. Forge never adopts, overwrites, or automatically deletes a duplicate package, and `--force`
+does not bypass this rule.
 
 `forge extension cleanup-project [--root <dir>] [--yes]` targets one Forge root. The default invocation is a read-only
 preview that lists settings/config removals, backups, tracking reconciliation, user runtime registration, and final
@@ -79,23 +82,44 @@ otherwise it resolves `forge` from `runtime.json` and then known user-tool direc
 User-scope `enable`/`sync` may report one cleanup command per tracked legacy root, but never opens, edits, or enrolls
 those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registrations` independently from
 `double_fire_risk`. `forge extension status` remains the installation/tracking view and does not report migration state.
-For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`, `file_paths`, `state`,
-`target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is `present`, `missing`,
-`duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A Forge-managed
-cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports remove-or-rename
-guidance. A package root or descendant directory replaced by a symlink is `invalid-target`; enable, sync, and disable
-refuse to traverse it. Symlink install mode remains supported because only tracked leaves are links; a dangling leaf is
-`missing`, not `present`. Runtime-package health belongs to `extension status`; `extension doctor` does not emit
+`forge extension status --json` is a schema-v2 object (a research-preview clean break from the former bare array):
+
+```json
+{
+  "schema_version": 2,
+  "installations": [],
+  "unmanaged_skill_packages": []
+}
+```
+
+Both arrays are always present, including when a selected scope has no installation row. `installations` retains the
+existing record shape. For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`,
+`file_paths`, `state`, `target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is
+`present`, `missing`, `duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A
+Forge-managed cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports
+remove-or-rename guidance unless its sentinel/tree proof permits the clean workflow above. `unmanaged_skill_packages` is
+separate and uses the fixed fields `runtime`, `skill`, `target_dir`, `target_scopes`, `root_kind`, `shape`,
+`provenance`, `collision_dirs`, `cleanup_eligible`, `cleanup_reason`, `cleanup_scope`, and `recovery`; absent values are
+JSON `null`. A package root or descendant directory replaced by a symlink is `invalid-target`; enable, sync, and disable
+refuse to traverse it. When a selected runtime root itself is a symlink, another non-directory type, or unreadable,
+human status prints a `Root not scanned` line with its path/runtime/reason instead of claiming that no packages were
+found. The fixed JSON object does not invent a package record for a root with no observable skill name. Missing roots
+remain silently skipped. Symlink install mode remains supported because only tracked leaves are links; a dangling leaf
+is `missing`, not `present`. Runtime-package health belongs to `extension status`; `extension doctor` does not emit
 `skill_packages`. V2 tracking also requires every package path to stay under its package, include `SKILL.md`, and appear
 in the canonical file ledger. Incoherent tracking is reported as corrupt state before status or mutation proceeds.
+
+Status and clean discover current skill names without parsing package contents, then union them with the append-only
+historical name set. If names-only source discovery is unavailable, they retain the historical set and continue;
+installer planning still performs full source validation and checkout Git-eligibility gating before any write.
 
 Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
 best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings
 have been written. If an environmental write fails partway through, the previous tracking row remains authoritative and
-files created earlier in that attempt may be untracked. Repair the underlying error, inspect the named targets, and
-rerun the same command. A first-time partial Codex package must be removed before retrying because `--force` cannot
-adopt a directory that now looks user-owned; an interrupted update of an already tracked package can be repaired by
-sync.
+files created earlier in that attempt may be untracked. Repair the underlying error, inspect `forge extension status`,
+and follow its per-package recovery. Use `forge clean` only when status marks the exact package cleanup-eligible;
+otherwise remove or rename it deliberately. `--force` cannot adopt either case. An interrupted update of an already
+tracked package can be repaired by sync.
 
 ### Session management
 
@@ -373,6 +397,24 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 `forge clean --yes --json` still emits its result object on stdout and exits 1 when either `failed` or
 `skipped_project_compatibility` is non-empty.
+
+The `unmanaged_skill_packages` category contains only untracked runtime package directories whose Forge sentinel, exact
+tree, payload bytes/modes (or bounded cache-reset dangling links), path shape, absent ownership, and cleanup scope were
+verified. Report-only observations remain exclusive to `forge extension status`. Scope mapping is:
+
+| Clean scope | Runtime skill roots included                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `project`   | Claude project/local and Codex project targets at the current Forge root; never user targets |
+| `workspace` | The same targets for GC-known roots in the current logical workspace; never user targets     |
+| `all`       | Project/local targets for every GC-known root plus both fixed user targets                   |
+
+Project/local package items remain counted in preview when project compatibility refuses them and are excluded from
+apply; fixed user items are global and independent. Apply rebuilds the report, snapshots each candidate's filesystem
+identity, anchors its real runtime root, then revalidates ownership, provenance, contents, path shape, identity, and
+compatibility immediately before each exact-directory removal. A candidate that becomes tracked before the fresh scan
+disappears without failure; drift after that scan is preserved and reported as a failed item. If clean first removes a
+corrupt `installed.json`, run clean again: package detection stays disabled until valid or absent tracking can prove
+ownership.
 
 ### Internal (hidden from `forge --help`)
 

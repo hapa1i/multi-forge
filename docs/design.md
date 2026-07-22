@@ -1324,6 +1324,29 @@ paths, cache locations, or Forge version and is excluded from its own file list.
 regular copy, participates in cache digests, tracking, sync, and disable, and introduces one intentional cache-digest
 change on upgrade.
 
+Runtime targets are also scanned independently of tracked-package health. The scanner reads one validated tracking
+snapshot, treats only exact canonical package targets in coherent schema-v2 rows as managed, and observes direct
+children whose name is current/historical Forge output or whose real directory carries the sentinel. Unknown unmarked
+directories remain user content. Unmanaged entries are reported separately from the four tracked states, including
+partial and unsafe blockers, malformed/newer markers, modified trees, and Codex visibility collisions. Corrupt or
+unreadable tracking is a no-scan boundary. Current names come from names-only source discovery, so malformed source
+contents do not block status or unrelated cleanup categories; if source-name discovery itself is unavailable, the scan
+continues with the append-only historical set while installer planning retains full source/Git validation.
+
+The scanner never traverses a selected runtime root that is a symlink, another non-directory type, or unreadable. Such a
+root cannot supply the skill name required by the fixed package record, so the scan carries a separate immutable root
+issue: human status renders its path/runtime/reason, JSON emits no synthetic package row, and clean never lists it.
+Missing roots remain silently skipped.
+
+Cleanup is intentionally narrower than detection. `forge clean` lists an unmanaged package only when a regular strict
+sentinel, exact tree, bytes/modes (or the bounded compiled-cache dangling-link reset case), real writable/package/
+descendant directories, target scope, and absent tracking all prove that the exact directory is Forge output with no
+extra content. Project/workspace scopes inspect known project/local roots; `all` also inspects both fixed user roots.
+Apply performs a fresh scan, retains a private filesystem-identity proof, anchors the real runtime root, and immediately
+rechecks proof/identity/compatibility before removing the direct child. Enable/sync never adopts or overwrites an
+unmanaged package: a proven orphan names the matching clean preview/apply and retry sequence, while every report-only
+entry keeps exact-path remove-or-rename guidance.
+
 For pre-user-ownership installations, user-scope enable/sync prints one cleanup command per tracked root without opening
 or enrolling it. `forge extension cleanup-project` previews one root by default and applies only with `--yes`; it
 removes safe legacy Claude registrations and project Codex marker blocks, preserves unrelated settings/TOML, installs

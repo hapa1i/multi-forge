@@ -352,9 +352,10 @@ chmod +x /tmp/forge-codex-skills-bin/codex
         )
         assert status.returncode == 0, f"Codex status failed: {status.stderr}"
         payload = json.loads(status.stdout)
-        assert len(payload) == 1
-        assert payload[0]["scope"] == "user"
-        observed_packages = payload[0]["skill_packages"]
+        assert payload["schema_version"] == 2
+        assert payload["unmanaged_skill_packages"] == []
+        assert payload["installations"][0]["scope"] == "user"
+        observed_packages = payload["installations"][0]["skill_packages"]
         assert [(package["runtime"], package["skill"]) for package in observed_packages] == [
             ("codex", skill) for skill in _CODEX_PORTABLE_SKILLS
         ]
@@ -483,6 +484,22 @@ PY
             assert package["file_paths"] == sorted(package["file_paths"])
             assert package["file_paths"]
             assert all(path.startswith(f"{expected_dir}/") for path in package["file_paths"])
+            assert f"{expected_dir}/.forge-package.json" in package["file_paths"]
+
+        markers = synced_container.exec(f"""
+/forge/.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+roots = (Path("{claude_root}"), Path("{codex_root}"))
+markers = [package / ".forge-package.json" for root in roots for package in root.iterdir() if package.is_dir()]
+assert markers
+assert all(marker.is_file() and not marker.is_symlink() for marker in markers)
+assert all(json.loads(marker.read_text())["schema_version"] == 1 for marker in markers)
+print(len(markers))
+PY
+""")
+        assert markers.returncode == 0, markers.stderr
 
         sync = synced_container.exec(_packaged_forge_command("extension sync --scope project"))
         assert sync.returncode == 0, f"Wheel sync failed: stdout={sync.stdout!r} stderr={sync.stderr!r}"
@@ -492,9 +509,10 @@ PY
         )
         assert status.returncode == 0, f"Wheel status failed: stdout={status.stdout!r} stderr={status.stderr!r}"
         payload = json.loads(status.stdout)
-        assert len(payload) == 1
-        assert payload[0]["scope"] == "project"
-        status_packages = payload[0]["skill_packages"]
+        assert payload["schema_version"] == 2
+        assert payload["unmanaged_skill_packages"] == []
+        assert payload["installations"][0]["scope"] == "project"
+        status_packages = payload["installations"][0]["skill_packages"]
         assert sorted((package["runtime"], package["skill"]) for package in status_packages) == observed_packages
         for package in status_packages:
             assert package["state"] == "present"
@@ -502,6 +520,64 @@ PY
             assert package["missing_file_paths"] == []
             assert package["duplicate_dirs"] == []
             assert package["recovery"] is None
+
+        # Lost tracking turns the copied project packages into marked orphans.
+        # Project clean must preview the whole category, remove it only on
+        # apply, and permit the original wheel command to recreate ownership.
+        assert synced_container.exec(f"rm -f {tracking_path}").returncode == 0
+        unmanaged_status = synced_container.exec(
+            _packaged_forge_command(f"extension status --scope project --root {_PACKAGED_PROJECT_ROOT} --json")
+        )
+        assert unmanaged_status.returncode == 0, unmanaged_status.stderr
+        unmanaged_payload = json.loads(unmanaged_status.stdout)
+        assert unmanaged_payload["installations"] == []
+        assert len(unmanaged_payload["unmanaged_skill_packages"]) == len(observed_packages)
+        assert all(item["cleanup_eligible"] for item in unmanaged_payload["unmanaged_skill_packages"])
+        assert all(item["cleanup_scope"] == "project" for item in unmanaged_payload["unmanaged_skill_packages"])
+
+        project_preview = synced_container.exec(_packaged_forge_command("clean --scope project --json"))
+        assert project_preview.returncode == 0, project_preview.stderr
+        project_preview_payload = json.loads(project_preview.stdout)
+        project_category = next(
+            category
+            for category in project_preview_payload["categories"]
+            if category["category"] == "unmanaged_skill_packages"
+        )
+        assert project_category["count"] == len(observed_packages)
+
+        project_clean = synced_container.exec(_packaged_forge_command("clean --scope project --yes --json"))
+        assert project_clean.returncode == 0, project_clean.stderr
+        assert json.loads(project_clean.stdout)["categories_cleaned"]["unmanaged_skill_packages"] == len(
+            observed_packages
+        )
+        assert _read_codex_skill_root(synced_container, _PACKAGED_PROJECT_ROOT)["packages"] == []
+        cleared_claude = synced_container.exec(f"""
+/forge/.venv/bin/python - <<'PY'
+from pathlib import Path
+
+root = Path("{claude_root}")
+assert not root.exists() or not any(path.is_dir() for path in root.iterdir())
+PY
+""")
+        assert cleared_claude.returncode == 0, cleared_claude.stderr
+
+        reenable_project = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable "
+                f"--scope project --root {_PACKAGED_PROJECT_ROOT} "
+                "--profile minimal --with skills --without commands --runtime all"
+            )
+        )
+        assert reenable_project.returncode == 0, reenable_project.stderr
+        assert (
+            sorted(
+                (package["runtime"], package["skill"])
+                for package in synced_container.read_json(tracking_path)["installations"][tracking_key][
+                    "skill_packages"
+                ]
+            )
+            == observed_packages
+        )
 
         add_operator_packages = synced_container.exec(f"""
 mkdir -p {claude_root}/operator-owned {codex_root}/operator-owned
@@ -527,6 +603,46 @@ PY
         assert remaining.returncode == 0, remaining.stderr
         assert json.loads(remaining.stdout) == [["operator-owned"], ["operator-owned"]]
         assert tracking_key not in synced_container.read_json(tracking_path)["installations"]
+
+        # Symlink-mode user packages retain copied sentinels after the cache is
+        # reset. With tracking also gone, all payload links are dangling but
+        # remain structurally safe for global cleanup and re-enable.
+        enable_user = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable --scope user --profile minimal --with skills "
+                "--without commands --runtime all --symlink"
+            )
+        )
+        assert enable_user.returncode == 0, enable_user.stderr
+        user_manifest = synced_container.read_json(tracking_path)
+        user_packages = user_manifest["installations"]["user"]["skill_packages"]
+        user_count = len(user_packages)
+        assert user_count == len(_CLAUDE_MINIMAL_SKILLS) + len(_CODEX_PORTABLE_SKILLS)
+
+        reset = synced_container.exec(f"""
+rm -f {tracking_path}
+rm -rf {_PACKAGED_FORGE_HOME}/cache/compiled-skills
+""")
+        assert reset.returncode == 0, reset.stderr
+        reset_status = synced_container.exec(_packaged_forge_command("extension status --scope user --json"))
+        assert reset_status.returncode == 0, reset_status.stderr
+        reset_packages = json.loads(reset_status.stdout)["unmanaged_skill_packages"]
+        assert len(reset_packages) == user_count
+        assert all(item["shape"] == "partial" for item in reset_packages)
+        assert all(item["cleanup_eligible"] and item["cleanup_scope"] == "all" for item in reset_packages)
+
+        user_clean = synced_container.exec(_packaged_forge_command("clean --scope all --yes --json"))
+        assert user_clean.returncode == 0, user_clean.stderr
+        assert json.loads(user_clean.stdout)["categories_cleaned"]["unmanaged_skill_packages"] == user_count
+
+        reenable_user = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable --scope user --profile minimal --with skills "
+                "--without commands --runtime all --symlink"
+            )
+        )
+        assert reenable_user.returncode == 0, reenable_user.stderr
+        assert len(synced_container.read_json(tracking_path)["installations"]["user"]["skill_packages"]) == user_count
 
 
 class TestHookDispatcherRuntime:
