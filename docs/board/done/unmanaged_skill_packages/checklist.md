@@ -6,10 +6,11 @@
 
 ## Current Focus
 
-Phases 0–7 and the Phase 8 audit/verification are complete. Review ratified the fail-closed whole-target-root behavior
-with a human root-level diagnostic: the scanner never traverses an unsafe root and never invents the skill name required
-by the fixed JSON package record. Review remediation also restored the displaced runtime-selection assertion and removed
-status/clean's dependency on fully parsed skill sources. The card remains in `doing/` pending the next review pass.
+Closed. Shipped via PR #109 (`cbb58e16`) on 2026-07-22. Review ratified the fail-closed whole-target-root behavior with
+a human root-level diagnostic: the scanner never traverses an unsafe root and never invents the skill name required by
+the fixed JSON package record. Review remediation also restored the displaced runtime-selection assertion and removed
+status/clean's dependency on fully parsed skill sources. Closeout re-verified merged `main` (focused suites
+`289 passed`; `make test-unit` `8230 passed, 1 skipped`).
 
 ## Phase 0: Acceptance
 
@@ -204,7 +205,8 @@ Doc updates ship with their phases (1.5, 4.5, 5.5, 6.7); this phase is the consi
     `make test-unit` (`8230 passed, 1 skipped, 117 deselected`); `make test-regression` (`522 passed`); wheel-installed
     Docker lifecycle (`1 passed, 19 deselected`); `uv build`; `make pre-commit`; QA parser v1.0.31 / 592 assertions;
     walkthrough parser v1.0.5 / 108 assertions.
-- [ ] Card moved `doing/` -> `done/`; inbound links repointed (none existed at acceptance; re-verify at closeout).
+- [x] Card moved `doing/` -> `done/`; inbound links repointed (none existed at acceptance; re-verified at closeout by
+  repo-wide grep for `doing/unmanaged_skill_packages` -- no inbound links found).
 
 ## Acceptance Tests
 

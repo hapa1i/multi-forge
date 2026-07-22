@@ -36,6 +36,27 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Unmanaged runtime outputs are observable state with deletion-grade provenance (unmanaged_skill_packages, shipped 2026-07-22)
+
+- **Discovery surfaces are independently observable state.** Classify runtime discovery directories directly instead of
+  deriving their health from tracking rows alone, and keep tracked-package health and unowned-entry classification as
+  separate projections so adding recovery cannot weaken existing ownership semantics.
+- **Deletion-authorizing provenance describes an exact reproducible tree.** It must survive loss of rebuildable caches
+  and be rechecked together with ownership immediately before mutation. A marker is same-user recovery evidence, not
+  authentication: any extra file, changed mode or content, unsafe path type, or external link makes the whole package
+  report-only.
+- **A corrupt or unreadable ownership manifest is a no-scan boundary.** Recovery is deliberately two-pass when cleanup
+  first removes corrupt tracking: only a later scan may classify the remaining outputs as unowned.
+- **One physical target with multiple logical scopes: observe widely, mutate narrowly.** Expose every applicable scope
+  in observations but assign mutation to the narrowest clean scope. Fixed user targets remain global; project
+  compatibility must not block unrelated global cleanup.
+- **Unsafe containers get container-level diagnostics, not invented child records.** When an unsafe root cannot yield
+  the identity a fixed per-item record requires, keep the record schema honest and surface a separate root-level
+  diagnostic. Never traverse the container merely to avoid an empty result.
+- **Read-only surfaces depend only on the metadata they need.** Discover candidate names without parsing full install
+  sources, and let unavailable optional metadata shrink report breadth instead of blocking unrelated cleanup categories;
+  mutation paths retain full validation.
+
 ### Runtime skill packages are compiled artifacts with separate ownership (cross_runtime_skills, shipped 2026-07-17)
 
 - **Runtime selection is not persisted ownership.** Automatic enable and sync retain the union of detected and already

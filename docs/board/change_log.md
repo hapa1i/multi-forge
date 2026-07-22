@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-22
 
+### Unmanaged skill packages closeout
+
+**Goal**: Close the shipped unmanaged-skill-package detection and cleanup card after PR #109 passed review remediation
+and merged to `main`.
+
+**Key changes**:
+
+- Moved the card and preserved checklist from `doing/` to `done/`, updated the lane header, and recorded the ratified
+  fail-closed unsafe-root behavior (never traversed; surfaced as a human root-level diagnostic, never a fabricated JSON
+  package row).
+- Promoted the reviewed discovery-surface, deletion-proof, no-scan-boundary, and scope-ownership invariants to durable
+  implementation notes.
+
+**Verification**: PR #109 merged as `cbb58e16`; merged-`main` re-run of the focused suites (`289 passed`) and
+`make test-unit` (`8230 passed, 1 skipped, 117 deselected`); inbound-link and stale-lane grep clean;
+`make pre-commit-md`; `git diff --check`.
+
 ### Phase 8: Unmanaged skill packages (implementation complete; review hold)
 
 **Goal**: Detect runtime skill packages no longer represented by coherent tracking, distinguish safe Forge cleanup from

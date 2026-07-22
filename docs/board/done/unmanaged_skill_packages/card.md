@@ -1,6 +1,6 @@
 # Unmanaged Skill Packages: Detection and Cleanup
 
-**Lane**: `doing/`
+**Lane**: `done/` -- shipped through PR #109 on 2026-07-22 after implementation, review remediation, and human review.
 
 **Origin**: 2026-07-19 stale-Codex-skill incident. A pre-merge test run on the cross-runtime-skills branch leaked five
 pre-fix compiled packages into the real `$HOME/.agents/skills` (the HOME-isolation gap later closed by
