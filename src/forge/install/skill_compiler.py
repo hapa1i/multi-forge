@@ -722,6 +722,27 @@ def load_skill_source(
     return load_claude_skill_source(package_root, eligible_source_paths=eligible_paths)
 
 
+def discover_skill_source_names(
+    skills_root: Path,
+    *,
+    eligible_source_paths: AbstractSet[Path] | None = None,
+) -> tuple[str, ...]:
+    """Return candidate package names without parsing source contents.
+
+    Status and cleanup need names only to widen report-only discovery. A
+    malformed source package must not block those unrelated read paths;
+    installer planning remains responsible for loading and validating every
+    selected source before writes.
+    """
+
+    _require_real_source_directory(skills_root, label="Skill source root")
+    eligible_paths = _normalized_eligible_source_paths(eligible_source_paths)
+    return tuple(
+        package_root.name
+        for package_root in _discover_skill_package_roots(skills_root, eligible_paths, include_neutral=True)
+    )
+
+
 def load_skill_sources(
     skills_root: Path,
     *,

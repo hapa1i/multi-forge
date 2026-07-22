@@ -1,10 +1,10 @@
 # Forge Walkthrough Checklist
 
-<!-- version: 1.0.4 -->
+<!-- version: 1.0.5 -->
 
 <!-- test-count: 108 assertions -->
 
-<!-- last-updated: 2026-07-17 -->
+<!-- last-updated: 2026-07-22 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -319,9 +319,10 @@ bash "$SCRIPTS/run-in-repo.sh" env \
   HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
   forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.json"
-jq -e 'length == 1 and .[0].scope == "project"
-  and (.[0].skill_packages | length == 5)
-  and all(.[0].skill_packages[];
+jq -e '.schema_version == 2 and (.installations | length == 1)
+  and .unmanaged_skill_packages == [] and .installations[0].scope == "project"
+  and (.installations[0].skill_packages | length == 5)
+  and all(.installations[0].skill_packages[];
     . as $package
     | $package.runtime == "codex" and ($package.skill | length > 0)
     and ($package.target_dir | endswith("/.agents/skills/" + $package.skill))

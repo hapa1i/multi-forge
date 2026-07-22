@@ -25,6 +25,31 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-22
+
+### Phase 8: Unmanaged skill packages (implementation complete; review hold)
+
+**Goal**: Detect runtime skill packages no longer represented by coherent tracking, distinguish safe Forge cleanup from
+report-only user content, and provide scope-correct recovery without adopting or overwriting either class.
+
+**Key changes**:
+
+- Added one-snapshot unmanaged-package discovery with append-only historical names, strict provenance-marker and tree
+  validation, collision reporting, and immutable status records. The emitted marker intentionally causes a one-time
+  research-preview compiled-cache digest change.
+- Added per-package enable/sync recovery, status JSON schema v2, and guarded `unmanaged_skill_packages` cleanup across
+  project, workspace, and all scopes. The status `--json` top-level object is the second research-preview clean break.
+- Anchored cleanup to real runtime-root descriptors, revalidated ownership and filesystem proof immediately before
+  removal, covered cache-reset and drift boundaries, and synchronized operator, design, QA, and walkthrough docs.
+- Review remediation restored a displaced runtime-selection assertion, added human diagnostics for unsafe selected roots
+  without inventing JSON package rows, and replaced full source parsing on status/clean with names-only discovery plus a
+  historical fallback.
+
+**Verification**: focused acceptance (`289 passed`); related compiler/cache/tracking/validation (`170 passed`);
+`make test-unit` (`8230 passed, 1 skipped, 117 deselected`); `make test-regression` (`522 passed`); wheel-installed
+Docker lifecycle (`1 passed, 19 deselected`); `uv build`; `make pre-commit`; QA parser v1.0.31 / 592 assertions;
+walkthrough parser v1.0.5 / 108 assertions; `git diff --check`. The card remains in `doing/` for human review.
+
 ## 2026-07-17
 
 ### Cross-runtime skill packages closeout

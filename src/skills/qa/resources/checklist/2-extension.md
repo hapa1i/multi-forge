@@ -289,6 +289,15 @@ jq -e '([.installations.user.skill_packages[] | select(.runtime == "claude_code"
   and ([.installations.user.skill_packages[] | select(.runtime == "codex")] | length == 5)' \
   "$FORGE_HOME/installed.json"
 
+# Symlink installs keep payload links but always copy the provenance sentinel.
+test -L "$CLAUDE_HOME/skills/understand/SKILL.md"
+test -f "$CLAUDE_HOME/skills/understand/.forge-package.json"
+test ! -L "$CLAUDE_HOME/skills/understand/.forge-package.json"
+jq -e '.schema_version == 1 and .producer == "multi-forge"
+  and .runtime == "claude_code" and .skill == "understand"
+  and any(.files[]; .path == "SKILL.md")' \
+  "$CLAUDE_HOME/skills/understand/.forge-package.json"
+
 # Automatic re-enable retains tracked Codex packages when Codex is temporarily absent.
 USER_SKILLS_BEFORE=$(jq -c \
   '[.installations.user.skill_packages[] | [.runtime, .skill]] | sort' "$FORGE_HOME/installed.json")
@@ -334,6 +343,36 @@ find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort 
   | diff -u /tmp/forge-portable-skills.expected -
 test ! -d "${CODEX_HOME:-$HOME/.codex}/skills"
 
+# Exercise cache-reset recovery in a disposable project and Forge home. The
+# copied sentinel makes the now-dangling payload links provable, but cleanup
+# still requires a project preview/apply and a fresh enable.
+RESET_ROOT=/tmp/forge-unmanaged-skill-reset
+RESET_FORGE_HOME=/tmp/forge-unmanaged-skill-reset-home
+rm -rf "$RESET_ROOT" "$RESET_FORGE_HOME"
+mkdir -p "$RESET_ROOT/.forge"
+FORGE_HOME="$RESET_FORGE_HOME" PATH="$QA_RUNTIME_BIN:$PATH" \
+  forge extension enable --scope project --root "$RESET_ROOT" --symlink \
+  --profile minimal --with skills --without commands --runtime codex
+rm "$RESET_FORGE_HOME/installed.json"
+rm -rf "$RESET_FORGE_HOME/cache/compiled-skills"
+FORGE_HOME="$RESET_FORGE_HOME" forge extension status --scope project --root "$RESET_ROOT" --json \
+  | jq -e '.schema_version == 2 and .installations == []
+      and (.unmanaged_skill_packages | length == 5)
+      and all(.unmanaged_skill_packages[];
+        .runtime == "codex" and .shape == "partial" and .provenance == "marked"
+        and .cleanup_eligible == true and .cleanup_scope == "project")'
+(cd "$RESET_ROOT" && FORGE_HOME="$RESET_FORGE_HOME" forge clean --scope project --verbose) \
+  | tee /tmp/forge-unmanaged-skill-reset-preview.txt
+rg -q 'Unmanaged skill packages:[[:space:]]+5' /tmp/forge-unmanaged-skill-reset-preview.txt
+test -d "$RESET_ROOT/.agents/skills/understand"
+(cd "$RESET_ROOT" && FORGE_HOME="$RESET_FORGE_HOME" forge clean --scope project --verbose --yes)
+test ! -e "$RESET_ROOT/.agents/skills/understand"
+FORGE_HOME="$RESET_FORGE_HOME" PATH="$QA_RUNTIME_BIN:$PATH" \
+  forge extension enable --scope project --root "$RESET_ROOT" --symlink \
+  --profile minimal --with skills --without commands --runtime codex
+(cd "$RESET_ROOT" && FORGE_HOME="$RESET_FORGE_HOME" forge extension disable --scope project --yes)
+rm -rf "$RESET_ROOT" "$RESET_FORGE_HOME"
+
 # An explicit Codex local/private request must fail and leave the existing local Claude runtime set unchanged.
 LOCAL_KEY="local:$(pwd -P)"
 LOCAL_BEFORE=$(jq -c --arg key "$LOCAL_KEY" \
@@ -369,8 +408,11 @@ mkdir -p "$HOME/.agents/skills/challenge"
 printf 'user-owned duplicate\n' > "$HOME/.agents/skills/challenge/SKILL.md"
 DUPLICATE_BEFORE=$(shasum -a 256 "$HOME/.agents/skills/challenge/SKILL.md" | cut -d' ' -f1)
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.[0].skill_packages[] | select(.skill == "challenge")
-    | .state == "duplicate" and (.duplicate_dirs | length == 1) and (.recovery | contains("Remove or rename"))'
+  | jq -e '.schema_version == 2 and (.installations | type == "array")
+    and (.unmanaged_skill_packages | type == "array")
+    and any(.installations[0].skill_packages[]; .skill == "challenge"
+      and .state == "duplicate" and (.duplicate_dirs | length == 1)
+      and (.recovery | contains("Remove or rename")))'
 if PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
   --profile minimal --with skills --without commands --runtime codex --force \
   >/tmp/forge-codex-duplicate.txt 2>&1; then
@@ -388,9 +430,10 @@ forge extension sync --scope project
 mv .agents/skills/review .agents/skills/review-sibling
 ln -s review-sibling .agents/skills/review
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.[0].skill_packages[] | select(.skill == "review")
-    | .state == "invalid-target" and .target_present == false
-      and (.recovery | contains("unexpected package entry"))'
+  | jq -e '.schema_version == 2 and (.unmanaged_skill_packages | type == "array")
+    and any(.installations[0].skill_packages[]; .skill == "review"
+      and .state == "invalid-target" and .target_present == false
+      and (.recovery | contains("unexpected package entry")))'
 if forge extension disable --scope project --yes >/tmp/forge-codex-package-symlink.txt 2>&1; then
   echo "ERROR: disable followed a substituted Codex package directory" >&2
   exit 1
@@ -407,9 +450,11 @@ DANGLING_RESOURCE="$(pwd -P)/.agents/skills/understand/resources/docs.md"
 mv "$DANGLING_RESOURCE" /tmp/forge-understand-docs.backup
 ln -s docs-never-exists.md "$DANGLING_RESOURCE"
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e --arg path "$DANGLING_RESOURCE" '.[0].skill_packages[] | select(.skill == "understand")
-    | .state == "missing" and (.missing_file_paths | index($path)) != null
-      and (.recovery | contains("extension sync"))'
+  | jq -e --arg path "$DANGLING_RESOURCE" '.schema_version == 2
+    and (.unmanaged_skill_packages | type == "array")
+    and any(.installations[0].skill_packages[]; .skill == "understand"
+      and .state == "missing" and (.missing_file_paths | index($path)) != null
+      and (.recovery | contains("extension sync")))'
 rm "$DANGLING_RESOURCE"
 mv /tmp/forge-understand-docs.backup "$DANGLING_RESOURCE"
 
@@ -448,12 +493,16 @@ for verb in sync disable status; do
 done
 
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.[0].skill_packages | length == 5 and all(.[];
-      .runtime == "codex" and .state == "present" and .target_present == true
-      and .missing_file_paths == [] and .duplicate_dirs == [] and .recovery == null)'
+  | jq -e '.schema_version == 2 and (.installations | length == 1)
+      and .unmanaged_skill_packages == []
+      and (.installations[0].skill_packages | length == 5)
+      and all(.installations[0].skill_packages[];
+        .runtime == "codex" and .state == "present" and .target_present == true
+        and .missing_file_paths == [] and .duplicate_dirs == [] and .recovery == null)'
 ```
 
 - [ ] Full-profile user `all` tracks eleven Claude packages and exactly the five portable Codex packages
+- [ ] Symlink-mode payloads are links while `.forge-package.json` is a regular copied schema-v1 sentinel
 - [ ] Automatic re-enable retains all managed runtime packages when Codex is temporarily absent from `PATH`
 - [ ] Explicit Claude re-enable reports runtime preservation and does not remove tracked Codex packages
 - [ ] Disabling the user install removes its Codex packages; the restored user install tracks Claude packages only
@@ -462,6 +511,8 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] Explicit Codex local scope fails with `scope_unsupported` and leaves the local Claude package set unchanged
 - [ ] User-scope Codex enable refuses tracked project packages outside its CWD and creates no global package
 - [ ] Project sync preserves the recorded Codex runtime set when Codex is temporarily absent from `PATH`
+- [ ] A disposable cache-reset package reports `partial` + cleanup-eligible, survives preview, cleans on `--yes`, and
+  re-enables from the wheel/runtime sources
 - [ ] JSON status reports the injected same-name package as `duplicate` with its path and recovery guidance
 - [ ] Explicit enable refuses the duplicate even with `--force`, and its checksum remains unchanged
 - [ ] A substituted package-root symlink is `invalid-target`; disable preserves its sibling and tracking row
@@ -469,5 +520,6 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] An incoherent package/file ledger makes status and disable fail before package bytes or tracking are discarded
 - [ ] Sync, disable, and status help name exact `installed.json` scope/path rows as a discovery source
 - [ ] After duplicate cleanup and sync, all five project Codex packages report healthy `present` state
+- [ ] Every extension status JSON probe validates schema v2 and both top-level arrays
 
 ---

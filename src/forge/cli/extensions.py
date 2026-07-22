@@ -43,17 +43,20 @@ from forge.install.installer import (
     Installer,
     find_claude_root,
     find_forge_installation,
+    get_extensions_root,
     inspect_skill_package_status,
 )
 from forge.install.models import (
     FILE_MODULES,
     PROFILE_RANK,
+    InstalledManifest,
     InstallMode,
     InstallModule,
     InstallPlan,
     InstallProfile,
     InstallScope,
     get_gated_skills,
+    parse_installation_key,
 )
 from forge.install.project_compat import (
     ProjectCompatibilityError,
@@ -61,7 +64,13 @@ from forge.install.project_compat import (
     format_project_compatibility_recovery,
 )
 from forge.install.project_registry import EnrollmentSource, ProjectRegistryStore
+from forge.install.skill_compiler import discover_skill_source_names
 from forge.install.tracking import TrackingStore
+from forge.install.unmanaged import (
+    runtime_skill_scan_roots,
+    scan_unmanaged_skill_state,
+)
+from forge.session.claude.paths import get_claude_home
 
 console = Console()
 _log = logging.getLogger(__name__)
@@ -561,6 +570,11 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
                 style=style,
             )
         console.print(table)
+        for package in plan.skill_packages:
+            if package.recovery:
+                console.print(
+                    f"  [yellow]{package.runtime}/{package.skill} recovery:[/yellow] {escape(package.recovery)}"
+                )
 
     if plan.files:
         console.print(f"\n{prefix}[bold]Files:[/bold]")
@@ -726,14 +740,21 @@ def _can_resolve_project_root(scope: InstallScope, *, anchor: Path | None = None
         return False
 
 
-def _resolve_status_project_root(scope: InstallScope, anchor: Path | None) -> Path | None:
+def _resolve_status_project_root(
+    scope: InstallScope,
+    anchor: Path | None,
+    tracking_snapshot: InstalledManifest | None = None,
+) -> Path | None:
     """Resolve a status lookup root, including tracked installs without ``.claude``."""
 
     try:
         return _resolve_project_root(scope, anchor=anchor)
     except NoClaudeDirectoryError:
         try:
-            detected_scope, detected_root = find_forge_installation(start=anchor)
+            detected_scope, detected_root = find_forge_installation(
+                start=anchor,
+                tracking_snapshot=tracking_snapshot,
+            )
         except NoForgeInstallationError:
             return None
         return detected_root if detected_scope == scope else None
@@ -1346,7 +1367,10 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     # A corrupt installed.json raises TrackingCorruptedError (a StateCorruptedError);
     # it propagates to the top-level handler for the uniform reset tip.
     tracking = TrackingStore()
-    tracked_installations = tracking.list_installations()
+    manifest = tracking.read()
+    tracked_installations = [
+        (*parse_installation_key(key), installation) for key, installation in manifest.installations.items()
+    ]
     installations_by_target = {
         (tracked_scope, project_path): installation
         for tracked_scope, project_path, installation in tracked_installations
@@ -1363,7 +1387,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         scopes = [InstallScope.USER, InstallScope.PROJECT, InstallScope.LOCAL]
     elif scope is None and anchor is None:
         try:
-            detected_scope, detected_root = find_forge_installation()
+            detected_scope, detected_root = find_forge_installation(tracking_snapshot=manifest)
             detected_scope_name = detected_scope.value
             scopes = [detected_scope]
         except NoForgeInstallationError:
@@ -1371,7 +1395,10 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     elif scope is None and anchor is not None:
         # --root without --scope: auto-detect scope at that path
         try:
-            detected_scope, detected_root = find_forge_installation(start=anchor)
+            detected_scope, detected_root = find_forge_installation(
+                start=anchor,
+                tracking_snapshot=manifest,
+            )
             detected_scope_name = detected_scope.value
             scopes = [detected_scope]
         except NoForgeInstallationError:
@@ -1382,12 +1409,59 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     # Use the detected root (from walk-up) over the raw anchor for lookups.
     effective_anchor = detected_root if detected_root is not None else anchor
 
+    scope_contexts = [
+        (
+            selected_scope,
+            _resolve_status_project_root(
+                selected_scope,
+                effective_anchor,
+                tracking_snapshot=manifest,
+            ),
+        )
+        for selected_scope in scopes
+    ]
+    non_user_scopes = [selected_scope for selected_scope in scopes if selected_scope != InstallScope.USER]
+    shared_scan_root = next(
+        (
+            project_root
+            for selected_scope, project_root in scope_contexts
+            if selected_scope != InstallScope.USER and project_root
+        ),
+        None,
+    )
+    scanner_scope_roots: list[tuple[InstallScope, Path | None]] = []
+    for selected_scope, project_root in scope_contexts:
+        if selected_scope == InstallScope.USER:
+            scanner_scope_roots.append((selected_scope, None))
+        elif project_root is not None:
+            scanner_scope_roots.append((selected_scope, project_root))
+        elif len(non_user_scopes) > 1 and shared_scan_root is not None:
+            # `--all` scans both logical Claude scopes at the effective root
+            # even when only one scope has a tracking/sidecar signal.
+            scanner_scope_roots.append((selected_scope, shared_scan_root))
+    try:
+        current_skill_names = discover_skill_source_names(get_extensions_root() / InstallModule.SKILLS.value)
+    except (OSError, ValueError) as exc:
+        _log.warning("extension status: current skill names unavailable; using historical names only: %s", exc)
+        current_skill_names = ()
+    scan_roots = runtime_skill_scan_roots(
+        scanner_scope_roots,
+        user_home=Path.home(),
+        claude_home=get_claude_home(),
+    )
+    unmanaged_scan = scan_unmanaged_skill_state(
+        scan_roots,
+        current_skill_names=current_skill_names,
+        tracking=manifest,
+    )
+    unmanaged_packages = unmanaged_scan.packages
+    unmanaged_root_issues = unmanaged_scan.root_issues
+
     if as_json:
         import json
 
-        data = []
-        for s in scopes:
-            project_root = _resolve_status_project_root(s, effective_anchor)
+        installations = []
+        for s, project_root in scope_contexts:
             project_path_str = str(project_root) if project_root else None
 
             inst = installations_by_target.get((s.value, project_path_str))
@@ -1399,7 +1473,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                 project_root,
                 tracked_installations=tracked_installations,
             )
-            data.append(
+            installations.append(
                 {
                     "scope": s.value,
                     "profile": inst.profile,
@@ -1427,7 +1501,17 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                     "updated_at": inst.updated_at,
                 }
             )
-        click.echo(json.dumps(data, indent=2, default=str))
+        click.echo(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "installations": installations,
+                    "unmanaged_skill_packages": [package.to_dict() for package in unmanaged_packages],
+                },
+                indent=2,
+                default=str,
+            )
+        )
         return
 
     if detected_scope_name:
@@ -1437,8 +1521,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         console.print(f"[dim]No extensions detected in {location}[/dim]")
         console.print("[dim]Showing all scopes for this location:[/dim]")
 
-    for s in scopes:
-        project_root = _resolve_status_project_root(s, effective_anchor)
+    for s, project_root in scope_contexts:
         project_path_str = str(project_root) if project_root else None
 
         installation = installations_by_target.get((s.value, project_path_str))
@@ -1526,20 +1609,51 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
             for f in installation.files:
                 console.print(f"    - {display_path(f.target_path)}")
 
+    console.print("\n[bold]Unmanaged runtime skill packages[/bold]")
+    if not unmanaged_packages and not unmanaged_root_issues:
+        console.print("  [dim]None found in the selected runtime roots.[/dim]")
+    elif unmanaged_packages:
+        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
+        table.add_column("RUNTIME")
+        table.add_column("SKILL")
+        table.add_column("SHAPE")
+        table.add_column("PROVENANCE")
+        table.add_column("TARGET")
+        table.add_column("CLEANUP")
+        for package in unmanaged_packages:
+            table.add_row(
+                package.runtime,
+                package.skill,
+                package.shape,
+                package.provenance,
+                display_path(package.target_dir),
+                package.cleanup_scope or "report only",
+                style="yellow" if package.cleanup_eligible else "red",
+            )
+        console.print(table)
+        for package in unmanaged_packages:
+            if package.collision_dirs:
+                console.print(
+                    f"  [red]{package.runtime}/{package.skill} collisions:[/red] "
+                    + ", ".join(display_path(path) for path in package.collision_dirs)
+                )
+            console.print(f"  [dim]{package.runtime}/{package.skill}:[/dim] {package.cleanup_reason}")
+            if package.recovery:
+                console.print(f"  [yellow]{package.runtime}/{package.skill}:[/yellow] {package.recovery}")
+    for issue in unmanaged_root_issues:
+        console.print(
+            f"  [red]Root not scanned:[/red] {display_path(issue.root_dir)} " f"({issue.runtime}): {issue.reason}"
+        )
+
     if scope is None and not show_all and anchor is None:
         local_installed = any(
-            tracking.get_installation(
-                s.value,
-                str(_resolve_project_root(s)) if s != InstallScope.USER else None,
-            )
-            for s in scopes
-            if s == InstallScope.USER or _can_resolve_project_root(s)
+            (selected_scope.value, str(project_root) if project_root is not None else None) in installations_by_target
+            for selected_scope, project_root in scope_contexts
         )
         if not local_installed:
-            all_installations = tracking.list_installations()
-            if all_installations:
+            if tracked_installations:
                 print_tip(
-                    f"{len(all_installations)} installation(s) exist elsewhere. Run 'forge info' to see all.",
+                    f"{len(tracked_installations)} installation(s) exist elsewhere. Run 'forge info' to see all.",
                     console=console,
                 )
             else:

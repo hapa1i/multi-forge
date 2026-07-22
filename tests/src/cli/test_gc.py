@@ -86,6 +86,71 @@ class TestCleanCmdDryRun:
             assert data["dry_run"] is True
             assert data["total"] == 1
 
+    def test_unmanaged_package_category_renders_paths_and_json_count(self) -> None:
+        import json
+
+        package = "/project/.agents/skills/understand"
+        report = CleanReport(
+            categories=[
+                OrphanCategory(
+                    "unmanaged_skill_packages",
+                    "Untracked Forge runtime skill packages with verified provenance",
+                    1,
+                    [package],
+                )
+            ],
+            scope="project",
+        )
+        with (
+            patch("forge.cli.gc.ExecutionContext.from_cwd"),
+            patch("forge.cli.gc.collect_clean_report", return_value=report),
+        ):
+            human = CliRunner().invoke(clean_cmd, ["--scope", "project", "--verbose"])
+            machine = CliRunner().invoke(clean_cmd, ["--scope", "project", "--json"])
+
+        assert human.exit_code == 0
+        assert "Unmanaged skill packages:" in human.output
+        assert package in human.output
+        payload = json.loads(machine.output)
+        assert payload["total"] == 1
+        assert payload["categories"] == [
+            {
+                "category": "unmanaged_skill_packages",
+                "description": "Untracked Forge runtime skill packages with verified provenance",
+                "count": 1,
+                "items": [package],
+            }
+        ]
+
+    def test_direct_clean_inherits_unmanaged_read_only_report(self, capsys) -> None:
+        import json
+
+        from forge.cli.hooks.direct_commands import _handle_cmd_clean
+
+        report = CleanReport(
+            categories=[
+                OrphanCategory(
+                    "unmanaged_skill_packages",
+                    "Untracked Forge runtime skill packages with verified provenance",
+                    2,
+                    ["/project/.agents/skills/review", "/project/.agents/skills/understand"],
+                )
+            ],
+            scope="project",
+        )
+        with (
+            patch("forge.core.ops.context.ExecutionContext.from_cwd"),
+            patch("forge.core.ops.gc.collect_clean_report", return_value=report),
+            patch("forge.core.ops.gc.run_clean") as run_clean,
+        ):
+            _handle_cmd_clean(["--scope", "project"])
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["decision"] == "block"
+        assert "Untracked Forge runtime skill packages with verified provenance: 2" in payload["reason"]
+        assert "forge clean --yes" in payload["reason"]
+        run_clean.assert_not_called()
+
     def test_preview_labels_apply_refusal_without_running_clean(self) -> None:
         report = _make_report(total=1)
         report.skipped_project_compatibility.append(_compatibility_skip())

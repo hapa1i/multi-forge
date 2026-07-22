@@ -299,12 +299,17 @@ ls "${CLAUDE_HOME:-$HOME/.claude}/skills/"  # Claude user packages
 ls "$HOME/.agents/skills/"                  # Codex user packages
 ```
 
-The status states are `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a
-recovery. Run `forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that
-scope and its exact disable command; only an untracked duplicate tells you to remove or rename it. A Claude-only skill
-such as `panel` will not appear in a Codex target. A dangling tracked leaf symlink is `missing` and can be repaired with
-sync. If a package root or descendant directory is a symlink, status reports `invalid-target` and mutation stops. Remove
-the unexpected link, then rerun sync or disable; Forge will not follow it into another package.
+Status JSON is a schema-v2 object with `installations` and `unmanaged_skill_packages` arrays. The tracked status states
+remain `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a recovery. Run
+`forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that scope and its
+exact disable command. An unmanaged package is reported separately with provenance and cleanup fields: a verified marked
+Forge orphan names a clean preview/apply/retry sequence, while unmarked, modified, malformed/newer, or unsafe entries
+tell you to remove or rename the exact path. A Claude-only skill such as `panel` will not appear in a Codex target. A
+dangling tracked leaf symlink is `missing` and can be repaired with sync. If a package root or descendant directory is a
+symlink, status reports `invalid-target` and mutation stops. Remove the unexpected link, then rerun sync or disable;
+Forge will not follow it into another package. If the selected runtime root itself is a symlink, another non-directory
+type, or unreadable, human status prints `Root not scanned` with its path and reason; Forge cannot safely traverse it or
+invent a per-package JSON row. Repair the root before relying on its package inventory.
 
 If `installed.json` claims an empty, out-of-package, or non-ledger-backed skill package, lifecycle commands report
 corrupt state before touching packages or tracking. Restore or repair the named tracking file, or follow the CLI's full
@@ -351,6 +356,29 @@ recovery. If the duplicate is managed by another Forge scope, use the reported c
 `forge extension disable --scope user`) to release that scope; do not hand-delete its directory. Remove or rename only a
 duplicate reported as untracked. If automatic enable skipped an untracked new package, rerun enable after cleanup
 because sync preserves the tracked runtime set rather than expanding it.
+
+### Recover after tracking loss or reset
+
+Do not delete packages while `installed.json` is corrupt or unreadable: Forge cannot prove which targets are still
+owned, so status/cleanup package scanning fails closed. Repair the file first, or use the existing durable-state reset
+guidance. If `forge clean --yes` removes corrupt tracking, invoke clean a second time; only then can otherwise unchanged
+post-marker packages appear as unowned Forge output.
+
+Preview the complete cleanup report before applying it:
+
+```bash
+forge clean --scope all --verbose                 # Fixed user targets and every GC-known project
+cd /path/to/project
+forge clean --scope project --verbose             # This project's Claude/Codex targets only
+```
+
+Repeat the chosen command with `--yes` after reviewing every category. `unmanaged_skill_packages` is one batch—there is
+no per-path selector—so use project scope or manual remove/rename when the full report should not be applied. Then rerun
+`forge extension enable` with the intended scope, profile, mode, and runtimes; lost tracking cannot reconstruct those
+choices. A full Forge-home reset can leave symlink payloads dangling, but the copied sentinel permits cleanup only when
+every link still points lexically into the same compiled-cache package at the same `FORGE_HOME`. Changing `FORGE_HOME`,
+or losing the only references to an arbitrary project root, requires an explicit project visit and may leave the package
+report-only.
 
 Prefer one skill scope per runtime/project. If you keep project-level skills, reinstall only the user-scope runtime
 hooks:

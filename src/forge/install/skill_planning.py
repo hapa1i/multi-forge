@@ -34,6 +34,29 @@ from .models import PROFILE_RANK, InstallProfile, InstallScope
 CLAUDE_CODE_RUNTIME = "claude_code"
 CODEX_RUNTIME = "codex"
 
+# Append-only inventory of package names emitted by Forge before unmanaged
+# package detection existed.  Runtime discovery roots are user-owned surfaces:
+# a retired Forge name can still block or influence a runtime after its
+# tracking row is lost, so removing a historical name would make that output
+# invisible again.  Add renamed/retired package names here; never derive this
+# set from project-local ``.agents/skills`` directories, which may contain
+# unrelated user-authored skills.
+FORGE_SKILL_NAME_HISTORY = frozenset(
+    {
+        "analyze",
+        "challenge",
+        "consensus",
+        "debate",
+        "panel",
+        "qa",
+        "review",
+        "review-docs",
+        "smoke-test",
+        "understand",
+        "walkthrough",
+    }
+)
+
 
 class RuntimeSelectionOrigin(str, Enum):
     """Why a runtime is in a skill plan."""
@@ -142,6 +165,23 @@ class _DecisionBase(TypedDict):
     runtime: str
     profile: InstallProfile
     skill: str
+
+
+def forge_skill_name_universe(current_names: Iterable[str]) -> frozenset[str]:
+    """Return every current or historical Forge-emitted skill package name.
+
+    ``current_names`` comes from the same checked-in or wheel-bundled compiler
+    sources used by installer planning.  Keeping history as an independent
+    input makes its append-only baseline testable instead of allowing a union
+    assertion to pass tautologically when history is accidentally emptied.
+    """
+
+    normalized: set[str] = set(FORGE_SKILL_NAME_HISTORY)
+    for name in current_names:
+        if not isinstance(name, str) or not name:
+            raise ValueError("Forge skill names must be non-empty strings")
+        normalized.add(name)
+    return frozenset(normalized)
 
 
 def _canonical_runtime_ids(runtime_ids: Iterable[str], *, ignore_unknown: bool = False) -> tuple[str, ...]:
@@ -290,6 +330,7 @@ def plan_runtime_skills(
     claude_home: Path,
     project_root: Path | None,
     managed_packages: Collection[tuple[str, str]] = (),
+    unmanaged_runtime_packages: Mapping[tuple[str, str], Collection[Path]] | None = None,
     untracked_codex_packages: Mapping[str, Collection[Path]] | None = None,
     managed_codex_duplicates: Mapping[str, Collection[Path]] | None = None,
 ) -> RuntimeSkillPlan:
@@ -307,6 +348,7 @@ def plan_runtime_skills(
             raise ValueError(f"Skill '{candidate.name}' declares unknown runtime(s): {', '.join(sorted(unknown))}")
 
     managed = set(managed_packages)
+    unmanaged_packages = unmanaged_runtime_packages or {}
     untracked = untracked_codex_packages or {}
     managed_duplicates = managed_codex_duplicates or {}
     decisions: list[RuntimeSkillDecision] = []
@@ -384,13 +426,25 @@ def plan_runtime_skills(
                 )
                 continue
 
-            untracked_duplicate_dirs = {_absolute_path(path) for path in untracked.get(candidate.name, ())}
-            forge_managed_duplicate_dirs = {_absolute_path(path) for path in managed_duplicates.get(candidate.name, ())}
+            untracked_duplicate_dirs = {
+                _absolute_path(path)
+                for path in (
+                    *unmanaged_packages.get((runtime, candidate.name), ()),
+                    *(untracked.get(candidate.name, ()) if runtime == CODEX_RUNTIME else ()),
+                )
+            }
+            forge_managed_duplicate_dirs = (
+                {_absolute_path(path) for path in managed_duplicates.get(candidate.name, ())}
+                if runtime == CODEX_RUNTIME
+                else set()
+            )
             duplicate_dirs = tuple(sorted(untracked_duplicate_dirs | forge_managed_duplicate_dirs, key=str))
-            if runtime == CODEX_RUNTIME and duplicate_dirs:
+            if duplicate_dirs and (runtime == CODEX_RUNTIME or untracked_duplicate_dirs):
                 action = (
                     SkillPlanAction.SKIP
-                    if selection.origin == RuntimeSelectionOrigin.AUTO and not already_managed
+                    if runtime == CODEX_RUNTIME
+                    and selection.origin == RuntimeSelectionOrigin.AUTO
+                    and not already_managed
                     else SkillPlanAction.CONFLICT
                 )
                 decisions.append(

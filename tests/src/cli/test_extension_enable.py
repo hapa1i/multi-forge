@@ -1032,12 +1032,134 @@ def test_status_all_outside_project_skips_unresolved_non_user_scopes(
 
     assert result.exit_code == 0, result.output
     if as_json:
-        assert json.loads(result.output) == []
+        assert json.loads(result.output) == {
+            "schema_version": 2,
+            "installations": [],
+            "unmanaged_skill_packages": [],
+        }
     else:
         assert "Scope: user" in result.output
         assert "Scope: project" in result.output
         assert "Scope: local" in result.output
         assert result.output.count("Not enabled") == 3
+
+
+def test_status_json_reports_unmanaged_package_without_installation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    home = tmp_path / "home"
+    package = home / ".agents" / "skills" / "understand"
+    package.mkdir(parents=True)
+    (package / "SKILL.md").write_text("untracked pre-marker package\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+
+    result = CliRunner().invoke(extensions, ["status", "--scope", "user", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == 2
+    assert payload["installations"] == []
+    assert len(payload["unmanaged_skill_packages"]) == 1
+    unmanaged = payload["unmanaged_skill_packages"][0]
+    assert unmanaged["runtime"] == "codex"
+    assert unmanaged["skill"] == "understand"
+    assert unmanaged["target_dir"] == str(package)
+    assert unmanaged["target_scopes"] == ["user"]
+    assert unmanaged["provenance"] == "unmarked"
+    assert unmanaged["cleanup_eligible"] is False
+    assert unmanaged["cleanup_scope"] is None
+    assert "Remove or rename" in unmanaged["recovery"]
+
+    human = CliRunner().invoke(extensions, ["status", "--scope", "user"])
+    assert human.exit_code == 0, human.output
+    assert "Unmanaged runtime skill packages" in human.output
+    assert "understand" in human.output
+    assert "Remove or rename" in human.output
+
+
+def test_status_human_reports_symlinked_runtime_root_without_traversing_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    home = tmp_path / "home"
+    real_root = tmp_path / "external-skills"
+    hidden_package = real_root / "understand"
+    hidden_package.mkdir(parents=True)
+    (hidden_package / "SKILL.md").write_text("must not be traversed\n", encoding="utf-8")
+    linked_root = home / ".agents" / "skills"
+    linked_root.parent.mkdir(parents=True)
+    linked_root.symlink_to(real_root, target_is_directory=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+
+    human = CliRunner().invoke(extensions, ["status", "--scope", "user"])
+
+    assert human.exit_code == 0, human.output
+    assert "Root not scanned:" in human.output
+    assert ".agents/skills" in human.output
+    assert "is not a real directory" in human.output
+    assert "None found in the selected runtime roots" not in human.output
+    assert str(hidden_package) not in human.output
+
+    machine = CliRunner().invoke(extensions, ["status", "--scope", "user", "--json"])
+
+    assert machine.exit_code == 0, machine.output
+    assert json.loads(machine.stdout) == {
+        "schema_version": 2,
+        "installations": [],
+        "unmanaged_skill_packages": [],
+    }
+
+
+def test_status_uses_one_tracking_snapshot_for_detection_and_rendering(tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    from forge.install.tracking import TrackingStore
+
+    tracking = TrackingStore(tmp_path / "installed.json")
+    with (
+        patch("forge.cli.extensions.TrackingStore", return_value=tracking),
+        patch.object(tracking, "read", wraps=tracking.read) as read_tracking,
+    ):
+        result = CliRunner().invoke(extensions, ["status", "--all", "--json"])
+
+    assert result.exit_code == 0, result.output
+    read_tracking.assert_called_once_with()
+
+
+def test_status_uses_historical_names_when_current_source_discovery_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+    from unittest.mock import patch
+
+    home = tmp_path / "home"
+    package = home / ".agents" / "skills" / "understand"
+    package.mkdir(parents=True)
+    (package / "SKILL.md").write_text("historical name\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "forge-home"))
+    monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude-home"))
+
+    with patch(
+        "forge.cli.extensions.discover_skill_source_names",
+        side_effect=OSError("broken source tree"),
+    ):
+        result = CliRunner().invoke(extensions, ["status", "--scope", "user", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert [record["skill"] for record in payload["unmanaged_skill_packages"]] == ["understand"]
 
 
 def test_unavailable_runtime_conflict_says_force_cannot_override(
@@ -1934,8 +2056,11 @@ class TestEnableCodexHooks:
         result = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data[0]["codex_config_path"] == str(self._codex_config())
-        assert [_normalize_forge_home(command) for command in data[0]["codex_commands"]] == [
+        assert data["schema_version"] == 2
+        assert data["unmanaged_skill_packages"] == []
+        installation = data["installations"][0]
+        assert installation["codex_config_path"] == str(self._codex_config())
+        assert [_normalize_forge_home(command) for command in installation["codex_commands"]] == [
             "$FORGE_HOME/bin/forge-hook codex-policy-check",
             "$FORGE_HOME/bin/forge-hook codex-session-start",
         ]
@@ -2001,4 +2126,4 @@ class TestEnableCodexHooks:
         assert result.exit_code == 0, result.output
         status = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
         data = json.loads(status.output)
-        assert data[0]["codex_config_path"] == str(self._codex_config())
+        assert data["installations"][0]["codex_config_path"] == str(self._codex_config())

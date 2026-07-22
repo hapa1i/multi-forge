@@ -67,6 +67,12 @@ Then set up the project-owned pieces:
 forge extension enable                 # Set up .forge/, status line, and project assets
 ```
 
+If enable reports an unmanaged runtime skill package, Forge leaves it untouched. A verified marked orphan prints the
+exact `forge clean` preview and `--yes` command for that target, followed by a retry of the original enable command.
+Unmarked, modified, malformed, or unsafe entries instead print remove-or-rename guidance; do not use `--force` to try to
+adopt them. `forge extension status --json` exposes the same distinction in `unmanaged_skill_packages` even when no
+installation row exists.
+
 ### B. Launch Claude
 
 The simplest path -- no proxy, no API key setup needed (uses your existing Claude subscription):
