@@ -28,9 +28,8 @@ Inside Codex, explicitly invoke the portable smoke skill:
 $smoke-test
 ```
 
-`walkthrough` and `qa` remain Claude-only because they orchestrate Claude Code interaction. The portable skills are
-`challenge`, `smoke-test`, `review`, `review-docs`, and `understand`; `analyze`, `consensus`, `debate`, `panel`, `qa`,
-and `walkthrough` remain Claude-only.
+`walkthrough` and `qa` remain Claude-only because they orchestrate Claude Code interaction. The nine portable skills are
+`analyze`, `challenge`, `consensus`, `debate`, `panel`, `review`, `review-docs`, `smoke-test`, and `understand`.
 
 ---
 

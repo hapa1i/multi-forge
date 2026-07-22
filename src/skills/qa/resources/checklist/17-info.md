@@ -72,13 +72,13 @@ cd "$FORGE_TEST_REPO"
 
 forge extension status --scope project --root "$FORGE_TEST_REPO" | tee /tmp/forge-project-status.txt
 rg -q 'Skill packages:' /tmp/forge-project-status.txt
-test "$(rg -c 'present[[:space:]]+codex[[:space:]]+' /tmp/forge-project-status.txt)" -eq 5
+test "$(rg -c 'present[[:space:]]+codex[[:space:]]+' /tmp/forge-project-status.txt)" -eq 9
 
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | tee /tmp/forge-project-status.json \
   | jq -e '.schema_version == 2 and (.installations | length == 1)
       and .unmanaged_skill_packages == [] and .installations[0].scope == "project"
-      and (.installations[0].skill_packages | length == 5)
+      and (.installations[0].skill_packages | length == 9)
       and all(.installations[0].skill_packages[];
         . as $package
         | $package.runtime == "codex" and ($package.skill | length > 0)
@@ -89,8 +89,8 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
         and $package.missing_file_paths == [] and $package.duplicate_dirs == [] and $package.recovery == null)'
 ```
 
-- [ ] Human status shows a runtime-package table with the five project Codex packages in `present` state
-- [ ] JSON status reports one project installation and five healthy Codex package records
+- [ ] Human status shows a runtime-package table with the nine project Codex packages in `present` state
+- [ ] JSON status reports one project installation and nine healthy Codex package records
 - [ ] Every JSON package record names its skill/runtime/target/files and has no missing files, duplicates, or recovery
   action
 

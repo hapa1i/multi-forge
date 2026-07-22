@@ -321,6 +321,7 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
   - `make test-unit`: `8277 passed, 1 skipped, 117 deselected`.
   - Real Codex-only + mixed worker integration: `2 passed in 21.71s`.
   - Existing Claude workflow parity integration: `13 passed`.
+  - Checkout + built-wheel cross-runtime skill lifecycle integration: `2 passed, 18 deselected`.
   - `make pre-commit`: all hooks passed; `uv build` produced the 0.9.0 wheel and sdist.
   - Clean wheel install: `forge runtime list --json` found Claude and Codex; project skill installs for
     `--runtime claude`, `codex`, and `all` succeeded; Codex installed exactly nine healthy packages; sync was

@@ -17,7 +17,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
 
 _CODEX_PORTABLE_SKILLS = (
+    "analyze",
     "challenge",
+    "consensus",
+    "debate",
+    "panel",
     "review",
     "review-docs",
     "smoke-test",

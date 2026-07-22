@@ -282,11 +282,12 @@ chmod +x "$QA_RUNTIME_BIN/codex"
 
 # User target: Docker QA is the only manual flow allowed to touch $HOME/.agents.
 PATH="$QA_RUNTIME_BIN:$PATH" forge extension enable --scope user --symlink --profile full --runtime all --force
-printf '%s\n' challenge review review-docs smoke-test understand > /tmp/forge-portable-skills.expected
+printf '%s\n' analyze challenge consensus debate panel review review-docs smoke-test understand \
+  > /tmp/forge-portable-skills.expected
 find "$HOME/.agents/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
   | diff -u /tmp/forge-portable-skills.expected -
 jq -e '([.installations.user.skill_packages[] | select(.runtime == "claude_code")] | length == 11)
-  and ([.installations.user.skill_packages[] | select(.runtime == "codex")] | length == 5)' \
+  and ([.installations.user.skill_packages[] | select(.runtime == "codex")] | length == 9)' \
   "$FORGE_HOME/installed.json"
 
 # Symlink installs keep payload links but always copy the provenance sentinel.
@@ -357,13 +358,13 @@ rm "$RESET_FORGE_HOME/installed.json"
 rm -rf "$RESET_FORGE_HOME/cache/compiled-skills"
 FORGE_HOME="$RESET_FORGE_HOME" forge extension status --scope project --root "$RESET_ROOT" --json \
   | jq -e '.schema_version == 2 and .installations == []
-      and (.unmanaged_skill_packages | length == 5)
+      and (.unmanaged_skill_packages | length == 9)
       and all(.unmanaged_skill_packages[];
         .runtime == "codex" and .shape == "partial" and .provenance == "marked"
         and .cleanup_eligible == true and .cleanup_scope == "project")'
 (cd "$RESET_ROOT" && FORGE_HOME="$RESET_FORGE_HOME" forge clean --scope project --verbose) \
   | tee /tmp/forge-unmanaged-skill-reset-preview.txt
-rg -q 'Unmanaged skill packages:[[:space:]]+5' /tmp/forge-unmanaged-skill-reset-preview.txt
+rg -q 'Unmanaged skill packages:[[:space:]]+9' /tmp/forge-unmanaged-skill-reset-preview.txt
 test -d "$RESET_ROOT/.agents/skills/understand"
 (cd "$RESET_ROOT" && FORGE_HOME="$RESET_FORGE_HOME" forge clean --scope project --verbose --yes)
 test ! -e "$RESET_ROOT/.agents/skills/understand"
@@ -400,7 +401,7 @@ rg -q 'forge_managed_scope_duplicate' /tmp/forge-codex-cross-scope.txt
 # Runtime selection is persisted: sync still owns Codex with a PATH that cannot find the fake binary.
 PATH="/usr/bin:/bin" "$HOME/.local/bin/forge" extension sync --scope project
 jq -e --arg root "$(pwd -P)" \
-  '[.installations["project:" + $root].skill_packages[] | select(.runtime == "codex")] | length == 5' \
+  '[.installations["project:" + $root].skill_packages[] | select(.runtime == "codex")] | length == 9' \
   "$FORGE_HOME/installed.json"
 
 # A same-name user package is never overwritten, even with --force.
@@ -495,7 +496,7 @@ done
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | jq -e '.schema_version == 2 and (.installations | length == 1)
       and .unmanaged_skill_packages == []
-      and (.installations[0].skill_packages | length == 5)
+      and (.installations[0].skill_packages | length == 9)
       and all(.installations[0].skill_packages[];
         .runtime == "codex" and .state == "present" and .target_present == true
         and .missing_file_paths == [] and .duplicate_dirs == [] and .recovery == null)'
@@ -519,7 +520,7 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] A dangling tracked resource symlink reports `missing` with sync recovery; restoring it returns the package healthy
 - [ ] An incoherent package/file ledger makes status and disable fail before package bytes or tracking are discarded
 - [ ] Sync, disable, and status help name exact `installed.json` scope/path rows as a discovery source
-- [ ] After duplicate cleanup and sync, all five project Codex packages report healthy `present` state
+- [ ] After duplicate cleanup and sync, all nine project Codex packages report healthy `present` state
 - [ ] Every extension status JSON probe validates schema v2 and both top-level arrays
 
 ---
