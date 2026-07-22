@@ -1590,10 +1590,14 @@ class TestCleanupProject:
     def test_user_sync_consolidates_safe_legacy_siblings(
         self,
         monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         import json
         import os
 
+        # User-scope sync must not inherit Codex duplicate packages from the
+        # developer checkout that happens to host the test run.
+        monkeypatch.chdir(tmp_path)
         claude_home = Path(os.environ["CLAUDE_HOME"])
         monkeypatch.setattr(
             "forge.install.version.check_minimum_version",

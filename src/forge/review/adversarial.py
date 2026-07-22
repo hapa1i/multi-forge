@@ -89,6 +89,7 @@ def run_adversarial(
                 preferred_proxy=stance.model.preferred_proxy,
                 prompt=filled,
                 worker_id=worker_id,
+                runtime=stance.model.runtime,
             )
         )
 

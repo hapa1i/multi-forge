@@ -13,7 +13,7 @@ from forge.review.adversarial import (
     run_adversarial,
     validate_resource,
 )
-from forge.review.models import ModelSpec, StanceSpec
+from forge.review.models import ModelSpec, MultiReviewOutput, StanceSpec
 from forge.review.routing import WorkerRoutingPlan
 
 
@@ -92,6 +92,31 @@ class TestStanceSpec:
 
 
 class TestRunAdversarial:
+    @patch("forge.review.adversarial.run_multi_review")
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
+    def test_prompt_specialization_preserves_codex_runtime(self, mock_routing, mock_run, tmp_path):
+        resource = tmp_path / "eval.md"
+        resource.write_text(f"Evaluate: {STANCE_MARKER}")
+        codex = ModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            description="Native Codex",
+            runtime="codex",
+        )
+        mock_run.return_value = MultiReviewOutput(prompt="", results=[])
+
+        run_adversarial(
+            str(resource),
+            [StanceSpec(stance="for", stance_prompt="Support", model=codex)],
+        )
+
+        routed_specs = mock_routing.call_args.args[0]
+        dispatched_specs = mock_run.call_args.kwargs["models"]
+        assert [spec.runtime for spec in routed_specs] == ["codex"]
+        assert [spec.runtime for spec in dispatched_specs] == ["codex"]
+
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_replaces_stance_marker(self, mock_popen_cls, mock_routing, tmp_path):

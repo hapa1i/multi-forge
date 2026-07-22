@@ -10,8 +10,8 @@ Validates workflow runners + skill architecture.
 - This section uses `$FORGE_QA_WORKFLOW_MODELS` (set by `start-container.sh` per provider profile). Workflow proxy
   aliases are created in 4.2.
 - Omitting `--models` uses all configured defaults (from `forge workflow list-models`).
-- Workflow workers require `claude` on PATH in the environment running `forge workflow`; proxies choose model routing,
-  but workers still execute through local `claude -p`.
+- Runtime prerequisites follow the selected workers. The configured defaults use local `claude -p`; the opt-in `codex`
+  worker uses cached Codex readiness and runs read-only.
 
 ### 14.1 List Available Workflow Models
 
@@ -24,7 +24,7 @@ forge workflow list-models --available
 
 # Verify structured model metadata used by routing/preflight.
 forge workflow list-models --json \
-  | jq -e 'map(has("name") and has("model_id") and has("family") and has("provider_refs") and has("preferred_proxy") and has("status") and has("reason")) | all'
+  | jq -e 'map(has("name") and has("model_id") and has("family") and has("runtime") and has("provider_refs") and has("preferred_proxy") and has("status") and has("reason")) | all'
 
 # `--available` JSON should include only ready models.
 forge workflow list-models --available --json \
@@ -33,8 +33,8 @@ forge workflow list-models --available --json \
 
 - [ ] Groups models by primary credential and shows `[configured]` / `[not configured]`
 - [ ] Shows model name, description, and status (`ready`/`unavailable`/`error`)
-- [ ] `--json` outputs a structured JSON array with `name`, `model_id`, `family`, `provider_refs`, `preferred_proxy`,
-  `status`, and `reason`
+- [ ] `--json` outputs a structured JSON array with `name`, `model_id`, `family`, `runtime`, `provider_refs`,
+  `preferred_proxy`, `status`, and `reason`
 - [ ] `--available` filters to ready models only
 
 ### 14.2 `forge workflow panel`
@@ -48,7 +48,8 @@ forge workflow panel docs/ --models $FORGE_QA_WORKFLOW_MODELS --json
 ```
 
 - [ ] Returns structured JSON output
-- [ ] JSON includes `resolved_models` with actual model refs and proxy/template routing for each worker
+- [ ] JSON includes `resolved_models` with runtime plus an actual model ref or explicit runtime-default selection for
+  each worker
 - [ ] `--context blind` is the default (no --resume passed to workers)
 
 ### 14.3 `forge workflow panel --check`
@@ -102,7 +103,7 @@ echo "Exit code: $?"
 
 - [ ] Spawns single worker with analysis resource prompt
 - [ ] Returns structured JSON output
-- [ ] JSON includes `resolved_models` with actual model ref and proxy/template routing for the worker
+- [ ] JSON includes `resolved_models` with runtime plus an actual model ref or explicit runtime-default selection
 - [ ] `--check` mode returns exit code 0/1 with verdict
 
 ### 14.6 `forge workflow debate`
@@ -121,7 +122,7 @@ forge workflow debate "Should we adopt microservices?" --models $FORGE_QA_WORKFL
 
 - [ ] Spawns workers with stance injection (for/against/neutral)
 - [ ] Mandatory blinding (workers don't see each other's output)
-- [ ] JSON includes `resolved_models` with actual model refs and proxy/template routing for each worker
+- [ ] JSON includes runtime-aware `resolved_models` with honest resolved or runtime-default model selection
 - [ ] Returns structured output with agreement/disagreement areas
 
 ### 14.7 `forge workflow debate --code`
@@ -162,7 +163,7 @@ echo "Exit code: $?"
 - [ ] Two rounds: independent positions then reconciliation
 - [ ] Mandatory blinding both rounds (no --resume passed to workers)
 - [ ] JSON includes `round1`, `round2`, `roles`, `role_map`, `reconciliation_brief`
-- [ ] JSON includes `resolved_models` with actual model refs and proxy/template routing for each worker
+- [ ] JSON includes runtime-aware `resolved_models` with honest resolved or runtime-default model selection
 - [ ] `--check` mode: requires `position` field (rejects legacy `passed`/`verdict`)
 
 ### 14.9 `forge workflow consensus --code`
@@ -301,5 +302,45 @@ jq -e 'any(.preflight_errors[]; test("ANTHROPIC_API_KEY|anthropic"; "i"))' \
   and model ref
 - [ ] Direct Anthropic workflow workers fail during preflight with an actionable credential error when
   `ANTHROPIC_API_KEY` is absent
+
+### 14.13 Runtime-Native Codex Worker Fail-Closed Boundary
+
+<!-- auto -->
+
+```bash
+tmp_home="$(mktemp -d)"
+
+FORGE_HOME="$tmp_home" forge workflow list-models --json > /tmp/forge-workflow-codex-model.json
+jq -e '.[] | select(.name == "codex")
+  | .runtime == "codex"
+    and .model_id == "codex-default"
+    and .provider_refs == []
+    and .status == "unavailable"
+    and (.reason | test("forge runtime preflight codex"))' \
+  /tmp/forge-workflow-codex-model.json
+
+if FORGE_HOME="$tmp_home" forge workflow analyze -p "This must not spawn." \
+  --models codex --json > /tmp/forge-workflow-codex-cold.json; then
+  echo "ERROR: cold Codex workflow unexpectedly succeeded" >&2
+  exit 1
+fi
+jq -e 'any(.preflight_errors[]; test("forge runtime preflight codex"))' \
+  /tmp/forge-workflow-codex-cold.json
+
+if FORGE_HOME="$tmp_home" forge workflow panel -p "This must not spawn." \
+  --models codex --context resume:uuid-for-qa --json > /tmp/forge-workflow-codex-resume.json; then
+  echo "ERROR: Codex resume-context workflow unexpectedly succeeded" >&2
+  exit 1
+fi
+jq -e 'any(.preflight_errors[]; test("--context blind"))' \
+  /tmp/forge-workflow-codex-resume.json
+
+rm -rf "$tmp_home"
+```
+
+- [ ] The shipped `codex` worker reports runtime `codex`, nominal model `codex-default`, and no provider refs
+- [ ] A cold readiness cache reports the exact `forge runtime preflight codex` recovery
+- [ ] Cold readiness and resume-context failures exit nonzero without spawning a worker
+- [ ] `--context resume:<uuid>` with Codex names `--context blind` as the recovery
 
 ---

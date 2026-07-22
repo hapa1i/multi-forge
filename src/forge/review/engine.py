@@ -1,9 +1,9 @@
-"""Multi-model review engine with parallel fan-out.
+"""Multi-model, multi-runtime review engine with parallel fan-out.
 
-Spawns N ``claude -p`` subprocesses in parallel via ThreadPoolExecutor,
-one per model backend. Each subprocess runs in its own process group
-(``start_new_session=True``) so that cleanup via ``os.killpg`` can
-terminate orphaned children if the parent is interrupted.
+Spawns one headless subprocess per worker through its declared runtime.
+Each subprocess runs in its own process group (``start_new_session=True``)
+so cleanup via ``os.killpg`` can terminate orphaned children if the parent
+is interrupted. Mixed-runtime requests share one lifecycle pool.
 
 Routing is pre-resolved: the engine receives a ``WorkerRoutingPlan``
 and passes each worker its ``RoutingResult``. No per-worker registry
@@ -21,8 +21,11 @@ from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.invoker import (
     Attribution,
     ClaudeHeadlessInvoker,
+    CodexHeadlessInvoker,
     HeadlessRequest,
     HeadlessResult,
+    prepare_codex_request,
+    run_grouped_parallel,
 )
 from forge.core.models.direct_model import direct_model_env
 from forge.core.reactive.env import (
@@ -32,6 +35,7 @@ from forge.core.reactive.env import (
     should_spawn_subprocesses,
 )
 from forge.core.reactive.routing import RoutingResult
+from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.review.routing import (
     WorkerRoutingPlan,
     resolve_invocation_routing,
@@ -51,17 +55,28 @@ _log = logging.getLogger(__name__)
 def preflight_check(
     specs: list[ModelSpec],
     routing_plan: WorkerRoutingPlan | None = None,
+    resume_id: str | None = None,
 ) -> list[str]:
     """Validate routing before spawning workers.
 
-    When a routing_plan is provided, validates each result has a route.
-    Otherwise falls back to check_model_availability().
+    When a routing_plan is provided, validates concrete Claude routes and the
+    frozen runtime-native Codex readiness snapshot. Otherwise falls back to
+    check_model_availability().
 
     Returns a list of error strings (empty means all OK).
     """
     errors: list[str] = []
 
-    if should_spawn_subprocesses() and shutil.which("claude") is None:
+    has_claude = any(spec.runtime == "claude_code" for spec in specs)
+    has_codex = any(spec.runtime == "codex" for spec in specs)
+
+    if resume_id and has_codex:
+        errors.append(
+            "Claude resume context cannot be used with a Codex worker. "
+            "Use '--context blind' or select only Claude-runtime workers."
+        )
+
+    if has_claude and should_spawn_subprocesses() and shutil.which("claude") is None:
         errors.append(
             "claude CLI not found in PATH. `forge workflow` workers run through local `claude -p`, "
             "even for proxy-routed models; install Claude Code or expose `claude` on PATH in the "
@@ -70,6 +85,21 @@ def preflight_check(
 
     if routing_plan is not None:
         for spec, result in zip(specs, routing_plan.routes):
+            if spec.runtime == "codex":
+                if result.source != "runtime_native":
+                    errors.append(f"{spec.name}: expected runtime-native routing")
+                    continue
+                preflight = routing_plan.codex_preflight
+                if preflight is None:
+                    errors.append(
+                        f"{spec.name}: Codex readiness cache is missing or stale. "
+                        "Run 'forge runtime preflight codex'."
+                    )
+                elif not preflight.ready:
+                    reason = preflight.blocking_reason or "Codex runtime is not ready"
+                    errors.append(f"{spec.name}: {reason}. Run 'forge runtime preflight codex'.")
+                continue
+
             if result.route is None:
                 reason = result.warning or "No compatible route found"
                 errors.append(f"{spec.name}: {reason}")
@@ -86,7 +116,9 @@ def preflight_check(
     for avail in availabilities:
         if avail.status == "ready":
             continue
-        if avail.spec.preferred_proxy:
+        if avail.spec.runtime == "codex":
+            hint = ""
+        elif avail.spec.preferred_proxy:
             hint = f" Run 'forge proxy create {avail.spec.preferred_proxy}' to set it up."
         else:
             hint = " Run 'forge auth login -c anthropic-api' or use --models to select only proxy-backed models."
@@ -134,8 +166,8 @@ def run_multi_review(
 
     Routing and per-worker request shaping happen here (review domain); the spawn
     lifecycle (process groups, signal cleanup, ordered fan-out, timeouts) is
-    delegated to ``ClaudeHeadlessInvoker.run_parallel`` so it is shared with future
-    runtimes (Phase 5). When ``attribution`` is set, the invoker emits a per-worker
+    delegated to the runtime's invoker. A mixed fan-out uses one grouped lifecycle
+    pool across runtimes. When ``attribution`` is set, the invoker emits a per-worker
     UsageEvent for each spawned worker.
 
     Args:
@@ -145,11 +177,12 @@ def run_multi_review(
             resolves routing once at the top before fan-out.
         timeout_seconds: Per-model timeout in seconds.
         cwd: Working directory for each subprocess.
-        resume_id: If set, adds ``--resume <id>`` to each subprocess.
+        resume_id: If set, adds ``--resume <id>`` to each Claude subprocess.
+            Combining it with a Codex worker fails the invocation closed.
         attribution: Verb context (command/workflow/session) for per-worker usage
             events. None (default) skips per-worker emission.
-        reasoning_effort: ``claude --effort`` level applied to every worker's
-            ``claude -p`` argv. None (default) omits the flag (tier default).
+        reasoning_effort: ``claude --effort`` level applied to every Claude
+            worker's argv. None (default) omits the flag (tier default).
 
     Returns:
         MultiReviewOutput with per-model results in input order.
@@ -163,6 +196,26 @@ def run_multi_review(
 
     if not specs:
         return MultiReviewOutput(prompt=prompt)
+
+    if resume_id and any(spec.runtime == "codex" for spec in specs):
+        error = (
+            "Claude resume context cannot be used with a Codex worker; "
+            "use '--context blind' or select only Claude-runtime workers"
+        )
+        return MultiReviewOutput(
+            prompt=prompt,
+            results=[
+                ReviewResult(
+                    model_name=spec.effective_worker_id,
+                    stdout="",
+                    stderr="",
+                    success=False,
+                    duration_seconds=0.0,
+                    error=error,
+                )
+                for spec in specs
+            ],
+        )
 
     # Resolve routing once if not provided by caller
     if routing_plan is None:
@@ -198,21 +251,29 @@ def run_multi_review(
             timeout_seconds=timeout_seconds,
             attribution=attribution,
             reasoning_effort=reasoning_effort,
+            codex_preflight=routing_plan.codex_preflight,
         )
         for idx, spec in enumerate(specs)
     ]
 
     results: dict[int, ReviewResult] = {}
-    spawnable: list[tuple[int, HeadlessRequest]] = []
+    claude_invoker = ClaudeHeadlessInvoker()
+    codex_invoker = CodexHeadlessInvoker()
+    spawnable: list[tuple[int, ClaudeHeadlessInvoker | CodexHeadlessInvoker, HeadlessRequest]] = []
     for idx, item in enumerate(prepared):
         if isinstance(item, HeadlessRequest):
-            spawnable.append((idx, item))
+            invoker = codex_invoker if specs[idx].runtime == "codex" else claude_invoker
+            spawnable.append((idx, invoker, item))
         else:
             results[idx] = item
 
     if spawnable:
-        outcomes = ClaudeHeadlessInvoker().run_parallel([req for _, req in spawnable])
-        for (idx, req), outcome in zip(spawnable, outcomes):
+        invokers = {type(invoker) for _, invoker, _ in spawnable}
+        if len(invokers) == 1:
+            outcomes = spawnable[0][1].run_parallel([req for _, _, req in spawnable])
+        else:
+            outcomes = run_grouped_parallel([(invoker, req) for _, invoker, req in spawnable])
+        for (idx, _invoker, req), outcome in zip(spawnable, outcomes):
             results[idx] = _to_review_result(req, outcome)
 
     # Return in deterministic input order
@@ -230,13 +291,13 @@ def _prepare_worker(
     timeout_seconds: int,
     attribution: Attribution | None,
     reasoning_effort: str | None = None,
+    codex_preflight: CodexPreflight | None = None,
 ) -> ReviewResult | HeadlessRequest:
     """Shape one worker into a HeadlessRequest, or a failed ReviewResult.
 
-    Returns a ReviewResult (no spawn) when the route doesn't resolve or the
-    direct-model env can't be built; otherwise a HeadlessRequest carrying the
-    built ``claude -p`` argv + env (with run-tree identity stamped) + the
-    per-worker prompt.
+    Returns a ReviewResult (no spawn) when routing/readiness fails or the
+    direct-model env can't be built; otherwise returns a runtime-specific
+    HeadlessRequest with run-tree identity and the per-worker prompt.
     """
     if spec.prompt is None:
         worker_prompt = prompt
@@ -244,6 +305,55 @@ def _prepare_worker(
         worker_prompt = f"{spec.prompt}\n\n{prompt}" if prompt else spec.prompt
     else:
         worker_prompt = spec.prompt
+
+    if spec.runtime == "codex":
+        if routing_result.source != "runtime_native":
+            return ReviewResult(
+                model_name=spec.effective_worker_id,
+                stdout="",
+                stderr="",
+                success=False,
+                duration_seconds=0.0,
+                error=f"Runtime-native routing was not resolved for '{spec.name}'",
+            )
+        if codex_preflight is None:
+            return ReviewResult(
+                model_name=spec.effective_worker_id,
+                stdout="",
+                stderr="",
+                success=False,
+                duration_seconds=0.0,
+                error="Codex readiness cache is missing or stale; run 'forge runtime preflight codex'",
+            )
+        if not codex_preflight.ready:
+            reason = codex_preflight.blocking_reason or "Codex runtime is not ready"
+            return ReviewResult(
+                model_name=spec.effective_worker_id,
+                stdout="",
+                stderr="",
+                success=False,
+                duration_seconds=0.0,
+                error=f"{reason}; run 'forge runtime preflight codex'",
+            )
+        return prepare_codex_request(
+            prompt=worker_prompt,
+            preflight=codex_preflight,
+            attribution=attribution,
+            cwd=cwd,
+            sandbox="read-only",
+            timeout_seconds=timeout_seconds,
+            label=spec.effective_worker_id,
+        )
+
+    if spec.runtime != "claude_code":
+        return ReviewResult(
+            model_name=spec.effective_worker_id,
+            stdout="",
+            stderr="",
+            success=False,
+            duration_seconds=0.0,
+            error=f"Unsupported workflow runtime '{spec.runtime}'",
+        )
 
     # Review fan-out is per-prompt with no session name in scope, so X-Forge-Session
     # falls back to forge_run_<hash>; only the command role is stamped here.
@@ -316,9 +426,8 @@ def _prepare_worker(
 def _to_review_result(request: HeadlessRequest, outcome: HeadlessResult) -> ReviewResult:
     """Map a HeadlessResult back to a ReviewResult.
 
-    Preserves the engine's original status conventions: strip stdout on success,
-    ``stderr.strip() or "Exit code N"`` on non-zero exit, the ``Timeout after Ns``
-    string with the configured timeout as the recorded duration.
+    Preserves the engine's status conventions while treating an in-band runtime
+    error as failure even when the process exits zero.
     """
     identity = {
         "run_id": outcome.run_id,
@@ -345,6 +454,16 @@ def _to_review_result(request: HeadlessRequest, outcome: HeadlessResult) -> Revi
             success=False,
             duration_seconds=outcome.duration_seconds,
             error=outcome.error,
+            **identity,
+        )
+    if outcome.runtime_is_error:
+        return ReviewResult(
+            model_name=model_name,
+            stdout=outcome.stdout,
+            stderr=outcome.stderr,
+            success=False,
+            duration_seconds=outcome.duration_seconds,
+            error=outcome.stderr.strip() or outcome.stdout.strip() or "Runtime reported error",
             **identity,
         )
     if outcome.returncode != 0:

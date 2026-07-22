@@ -180,6 +180,7 @@ def run_consensus(
                 preferred_proxy=role_spec.model.preferred_proxy,
                 prompt=filled,
                 worker_id=worker_id,
+                runtime=role_spec.model.runtime,
             )
         )
 
@@ -216,10 +217,11 @@ def run_consensus(
                 preferred_proxy=spec_r1.preferred_proxy,
                 prompt=reconciliation_prompt,
                 worker_id=spec_r1.effective_worker_id,
+                runtime=spec_r1.runtime,
             )
         )
 
-    plan_r2 = routing_plan if routing_plan is not None else resolve_invocation_routing(specs_r2, via=via)
+    plan_r2 = plan_r1
 
     # --- Round 2: Reconciliation (blinded) ---
     round2_output = run_multi_review(

@@ -153,7 +153,7 @@ Verify the compiled project package set exactly:
 
 ```bash
 bash "$SCRIPTS/run-in-repo.sh" bash -lc '
-  printf '\''%s\n'\'' challenge review review-docs smoke-test understand \
+  printf '\''%s\n'\'' analyze challenge consensus debate panel review review-docs smoke-test understand \
     > .forge/walkthrough/portable-skills.expected
   find .agents/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort \
     | diff -u .forge/walkthrough/portable-skills.expected -
@@ -167,7 +167,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
 
 - [ ] agents/ has .md files
 
-- [ ] `.agents/skills` contains exactly challenge, review, review-docs, smoke-test, and understand
+- [ ] `.agents/skills` contains exactly the nine portable skills, including all four workflow frontends
 
 - [ ] No Codex skill package is written under the sandboxed `CODEX_HOME`
 
@@ -199,7 +199,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
     and all(.installations.user.skill_packages[]; .runtime == "claude_code")
     and (.installations["local:" + $root].skill_packages | length == 10)
     and all(.installations["local:" + $root].skill_packages[]; .runtime == "claude_code")
-    and (.installations["project:" + $root].skill_packages | length == 5)
+    and (.installations["project:" + $root].skill_packages | length == 9)
     and all(.installations["project:" + $root].skill_packages[]; .runtime == "codex")
   '\'' .forge-home/installed.json
 '
@@ -208,7 +208,7 @@ bash "$SCRIPTS/run-in-repo.sh" bash -lc '
 - [ ] Manifest file exists
 - [ ] Manifest separately tracks user, local, and project installations
 - [ ] Standard-profile user/local installs each track ten Claude skill packages
-- [ ] Minimal project install tracks exactly five Codex skill packages
+- [ ] Minimal project install tracks exactly nine Codex skill packages
 
 ### 3.4 Preview and Apply a Legacy Hook Migration
 

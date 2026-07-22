@@ -366,13 +366,17 @@ runners.
 | `forge workflow consensus [subject]` | Two-round multi-model convergence          |
 | `forge workflow list-models`         | Show available workflow models             |
 
-Workflow model specs support proxy-backed workers and explicit direct Claude workers. The default `claude-opus` worker
-resolves to Claude Opus 4.8; the older `claude-opus-4.6` worker is opt-in, and explicit workers can attach per-worker
-prompt hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
-`--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
-([design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative)). All four execution commands also accept
-`--effort <level>` (`claude --effort`: `low/medium/high/xhigh/max`), applied to every worker's `claude -p` argv. Direct
-workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy`.
+Workflow model specs declare a worker runtime and support proxy-backed Claude workers, explicit direct Claude workers,
+and the opt-in runtime-native `codex` worker. The default set is unchanged and remains Claude-backed. Codex selects its
+own model, runs read-only, and requires a fresh cached `forge runtime preflight codex`; `--context resume:<uuid>` with
+any Codex worker fails closed and names `--context blind` as the recovery.
+
+All four execution commands accept `--proxy <proxy_id>`. It overrides preferred-proxy and route-scan selection for
+proxy-backed workers; direct Claude and Codex workers warn and ignore it. `--effort <level>`
+(`low/medium/high/xhigh/max`) applies only to Claude worker argv. Mixed runs share one five-child concurrency and
+cancellation domain. `forge workflow list-models [--json]` reports readiness and runtime. In execution JSON,
+`resolved_models` includes `runtime`; the unpinned Codex entry reports `resolved_model: null` and
+`model_selection: "runtime_default"`.
 
 ### Search
 

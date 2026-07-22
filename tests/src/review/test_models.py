@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
 from forge.core.models.catalog import get_compact_name, get_default_model
+from forge.core.runtime.registry import RUNTIMES, get_runtime
 from forge.review.models import (
     AVAILABLE_MODELS,
     DEFAULT_MODELS,
@@ -40,6 +43,32 @@ class TestModelSpec:
         assert spec.model_id == "test"
         assert spec.family == "openai"
         assert spec.preferred_proxy == "openrouter-openai"
+        assert spec.runtime == "claude_code"
+
+    def test_unknown_runtime_is_rejected(self):
+        with pytest.raises(ValueError, match="Unknown runtime 'missing'"):
+            ModelSpec(
+                name="test",
+                model_id="test",
+                family="openai",
+                provider_refs=(),
+                description="Test",
+                runtime="missing",
+            )
+
+    def test_registered_non_headless_runtime_is_rejected(self, monkeypatch):
+        runtime = replace(get_runtime("claude_code"), id="interactive-only", headless=False)
+        monkeypatch.setitem(RUNTIMES, runtime.id, runtime)
+
+        with pytest.raises(ValueError, match="does not support headless execution"):
+            ModelSpec(
+                name="test",
+                model_id="test",
+                family="openai",
+                provider_refs=(),
+                description="Test",
+                runtime=runtime.id,
+            )
 
     def test_none_proxy_for_direct(self):
         spec = ModelSpec(
@@ -81,6 +110,19 @@ class TestDefaultModels:
         assert OPENAI_DEFAULT in DEFAULT_MODELS
         assert GEMINI_DEFAULT in DEFAULT_MODELS
         assert "claude-opus" in DEFAULT_MODELS
+
+    def test_existing_catalog_entries_remain_claude_runtime(self):
+        assert {spec.runtime for name, spec in AVAILABLE_MODELS.items() if name != "codex"} == {"claude_code"}
+
+    def test_codex_is_selectable_not_default(self):
+        assert "codex" in AVAILABLE_MODELS
+        assert "codex" not in DEFAULT_MODELS
+
+        spec = AVAILABLE_MODELS["codex"]
+        assert spec.model_id == "codex-default"
+        assert spec.family == "openai"
+        assert spec.provider_refs == ()
+        assert spec.runtime == "codex"
 
     def test_gpt_uses_preferred_proxy(self):
         assert DEFAULT_MODELS[OPENAI_DEFAULT].preferred_proxy == "openrouter-openai"
@@ -186,6 +228,15 @@ class TestResolveModelSpecs:
         specs = resolve_model_specs(f"{OPENAI_DEFAULT},claude-opus")
         assert [s.name for s in specs] == [OPENAI_DEFAULT, "claude-opus"]
 
+    def test_codex_resolves_with_runtime_native_identity(self):
+        specs = resolve_model_specs("codex")
+
+        assert len(specs) == 1
+        assert specs[0] == AVAILABLE_MODELS["codex"]
+
+    def test_default_resolution_excludes_codex(self):
+        assert "codex" not in {spec.name for spec in resolve_model_specs(None)}
+
     def test_specific_direct_claude_versions_have_distinct_specs(self):
         specs = resolve_model_specs("claude-opus-4.6,claude-opus-4.8")
 
@@ -196,8 +247,9 @@ class TestResolveModelSpecs:
         assert specs[1].provider_refs == (("direct", "claude-opus-4-8"),)
 
     def test_unknown_model_raises(self):
-        with pytest.raises(ValueError, match="nonexistent"):
+        with pytest.raises(ValueError, match="nonexistent") as excinfo:
             resolve_model_specs("nonexistent")
+        assert "codex" in str(excinfo.value)
 
     def test_mixed_valid_invalid_raises(self):
         with pytest.raises(ValueError, match="nonexistent"):
@@ -212,6 +264,7 @@ class TestResolveModelSpecs:
         assert "claude-opus-4.8" in names
         assert "deepseek-v4-pro" in names
         assert "minimax-m3" in names
+        assert "codex" in names
 
 
 DEEPSEEK_DEFAULT = get_default_model("deepseek", "opus")
@@ -272,6 +325,38 @@ def _spec(
 
 
 class TestCheckModelAvailability:
+    @patch("forge.review.routing.derive_model_routes")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_ready_uses_cached_preflight(self, mock_read, mock_derive):
+        mock_read.return_value = SimpleNamespace(ready=True, blocking_reason=None)
+
+        result = check_model_availability([AVAILABLE_MODELS["codex"]])
+
+        assert result[0].status == "ready"
+        assert result[0].reason == ""
+        mock_derive.assert_not_called()
+
+    @patch("forge.review.routing.derive_model_routes")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight", return_value=None)
+    def test_codex_unavailable_when_cache_is_missing(self, _mock_read, mock_derive):
+        result = check_model_availability([AVAILABLE_MODELS["codex"]])
+
+        assert result[0].status == "unavailable"
+        assert "forge runtime preflight codex" in result[0].reason
+        mock_derive.assert_not_called()
+
+    @patch("forge.review.routing.derive_model_routes")
+    @patch("forge.core.runtime.codex_preflight_cache.read_fresh_codex_preflight")
+    def test_codex_unavailable_when_cached_preflight_is_unready(self, mock_read, mock_derive):
+        mock_read.return_value = SimpleNamespace(ready=False, blocking_reason="Codex login is required")
+
+        result = check_model_availability([AVAILABLE_MODELS["codex"]])
+
+        assert result[0].status == "unavailable"
+        assert "Codex login is required" in result[0].reason
+        assert "forge runtime preflight codex" in result[0].reason
+        mock_derive.assert_not_called()
+
     @patch(
         "forge.core.reactive.routing.resolve_subprocess_routing",
     )

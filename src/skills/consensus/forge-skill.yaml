@@ -1,0 +1,11 @@
+schema_version: 1
+name: consensus
+description: Multi-model consensus workflow. Role-assigned models converge toward a shared recommendation through two rounds of evaluation and reconciliation.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, forge_cli, resource_loading, invocation_policy]
+allow_implicit_invocation: false
+claude_frontmatter:
+  argument-hint: '[subject: path or proposal or instruction] [--output path] [--code] [--models m1,m2] [--worker model:role]'
+  context: fork
+  effort: high
+  allowed-tools: Bash, Read

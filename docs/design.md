@@ -566,9 +566,10 @@ fallback chains with different semantics.
 | 6    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                  |
 
 `source="direct"` is produced by workflow routing (`review.routing`) for direct-only model specs (e.g., `claude-opus`
-running `claude -p --bare`), not by the shared resolver. `route` is present when model compatibility is known; `None`
-can mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL). `source` and `base_url` distinguish
-them.
+running `claude -p --bare`), not by the shared resolver. Workflow routing also produces `source="runtime_native"` for
+the Codex worker; that source intentionally has no `ModelRoute` because Codex owns model selection and auth. More
+generally, `route=None` can also mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL), so
+`source` and `base_url` distinguish the cases.
 
 **Supervisor model scope:** When supervisor routing resolves to a proxy URL, the supervisor invokes
 `claude -p --model opus` and clears inherited Claude model-pin env vars (`ANTHROPIC_MODEL`,
@@ -589,10 +590,12 @@ Forge proxy. See [design_appendix.md §G](design_appendix.md#g-subprocess-routin
 | Memory writer | Fail open     | Async/best-effort; benefits future sessions, not the current one |
 
 **Per-invocation routing plan:** Workflow commands resolve routing for all workers **once** at invocation start as a
-frozen `WorkerRoutingPlan`. No per-worker resolution at runtime. This prevents registry drift during parallel fan-out
-and ensures preflight checks match runtime behavior. User-facing workflow JSON surfaces this decision as
-`resolved_models`, including requested model, actual model ref, provider, proxy, template, and routing source for each
-worker.
+frozen `WorkerRoutingPlan`. If any Codex worker is selected, the plan also freezes one fresh cached Codex preflight for
+readiness, auth, and billing attribution; no workflow verb runs an inline doctor. This prevents registry or readiness
+drift during parallel fan-out and keeps two-round consensus on one snapshot. User-facing workflow JSON surfaces each
+decision in `resolved_models`, including runtime, requested model, actual model ref, provider, proxy, template, routing
+source, and model-selection state. Runtime-native Codex entries report `resolved_model=null` and
+`model_selection="runtime_default"` because Forge does not pin or observe the exact Codex model.
 
 > **Routing reference details** — data type schemas (`ModelRoute`, `RoutingResult`, `WorkerRoutingPlan`), function
 > signatures, route derivation ranking, and sidecar constraints are in
@@ -1289,9 +1292,9 @@ project/local packages go to `$CLAUDE_HOME/skills` and `<root>/.claude/skills`; 
 
 Portable skills use `forge-skill.yaml` plus `content.md`; typed Claude/Codex adapters bind runtime capabilities and emit
 a complete validated package. A legacy `SKILL.md` package remains a Claude-only compatibility source. The current
-portable set is `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`. `panel`, `analyze`, `debate`, and
-`consensus` remain Claude-only until their `claude -p` worker engine is runtime-neutral; `walkthrough` and `qa` remain
-Claude-only manual-test frontends.
+portable set is `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `panel`, `analyze`, `debate`, and
+`consensus`. The workflow frontends do not imply Codex workers by default: worker runtime is selected independently and
+the default worker set remains Claude-backed. `walkthrough` and `qa` remain Claude-only manual-test frontends.
 
 `forge extension enable --runtime claude|codex|all` is repeatable and selects only SKILLS targets; it does not filter
 commands, agents, settings, or hooks from the chosen profile. With no flag, a new enable keeps Claude and adds Codex

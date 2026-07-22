@@ -1,0 +1,10 @@
+schema_version: 1
+name: panel
+description: Multi-model panel review. Multiple models review independently, then findings are synthesized.
+runtimes: [claude_code, codex]
+capabilities: [task_arguments, forge_cli, resource_loading, invocation_policy]
+allow_implicit_invocation: false
+claude_frontmatter:
+  argument-hint: '[target: path or instruction] [--output path] [--code] [--models m1,m2] [--roles r1,r2] [--review-type type] [--severity level]'
+  context: fork
+  allowed-tools: Bash, Read

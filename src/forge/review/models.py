@@ -32,6 +32,7 @@ class ModelSpec:
         prompt_mode: "override" means prompt replaces the global prompt.
             "prefix" means prompt is prepended to the global prompt as a hint.
         worker_id: Stable key for JSON output. Defaults to ``name`` when None.
+        runtime: Registered headless runtime used to execute this worker.
     """
 
     name: str
@@ -43,6 +44,14 @@ class ModelSpec:
     prompt: str | None = None
     prompt_mode: PromptMode = "override"
     worker_id: str | None = None
+    runtime: str = "claude_code"
+
+    def __post_init__(self) -> None:
+        from forge.core.runtime.registry import get_runtime
+
+        runtime = get_runtime(self.runtime)
+        if not runtime.headless:
+            raise ValueError(f"Runtime '{self.runtime}' does not support headless execution")
 
     @property
     def effective_worker_id(self) -> str:
@@ -212,6 +221,14 @@ def _build_available_models() -> dict[str, ModelSpec]:
             provider_refs=(("direct", "claude-fable-5"),),
             description="Most capable Claude; direct single-shot review and quorum dissent",
         ),
+        "codex": ModelSpec(
+            name="codex",
+            model_id="codex-default",
+            family="openai",
+            provider_refs=(),
+            description="Native Codex review using the runtime-selected model",
+            runtime="codex",
+        ),
     }
 
 
@@ -301,9 +318,42 @@ def check_model_availability(
         specs = list(DEFAULT_MODELS.values())
 
     results: list[ModelAvailability] = []
+    codex_preflight_loaded = False
+    codex_preflight = None
 
     for spec in specs:
         try:
+            if spec.runtime == "codex":
+                if not codex_preflight_loaded:
+                    from forge.core.runtime.codex_preflight_cache import (
+                        read_fresh_codex_preflight,
+                    )
+
+                    codex_preflight = read_fresh_codex_preflight()
+                    codex_preflight_loaded = True
+
+                refresh = "Run 'forge runtime preflight codex' to refresh readiness."
+                if codex_preflight is None:
+                    results.append(
+                        ModelAvailability(
+                            spec=spec,
+                            status="unavailable",
+                            reason=f"Codex readiness cache is missing or stale. {refresh}",
+                        )
+                    )
+                elif codex_preflight.ready:
+                    results.append(ModelAvailability(spec=spec, status="ready", reason=""))
+                else:
+                    reason = codex_preflight.blocking_reason or "Codex runtime is not ready"
+                    results.append(
+                        ModelAvailability(
+                            spec=spec,
+                            status="unavailable",
+                            reason=f"{reason}. {refresh}",
+                        )
+                    )
+                continue
+
             routes = derive_model_routes(spec)
 
             direct_only = bool(routes) and all(r.provider == "direct" for r in routes)

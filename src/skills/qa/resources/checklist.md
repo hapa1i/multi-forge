@@ -2,9 +2,9 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.31 -->
+<!-- version: 1.0.32 -->
 
-<!-- test-count: 592 -->
+<!-- test-count: 596 -->
 
 <!-- last-updated: 2026-07-22 -->
 

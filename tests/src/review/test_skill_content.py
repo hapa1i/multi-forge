@@ -115,21 +115,20 @@ class TestModelDocDrift:
             assert first_line == expected_title
 
     def test_multi_model_skills_reference_current_gpt_proxy_requirement(self):
-        expected = "GPT-5.6 Sol and Gemini require active proxies"
         stale = (
             "GPT-5.4 and Gemini require active proxies",
             "GPT-5.5 and Gemini require active proxies",
         )
 
         for skill_name in ("panel", "debate", "consensus"):
-            content = (SKILLS_DIR / skill_name / "SKILL.md").read_text()
-            assert expected in content
+            content = _compiled_skill(skill_name)
+            assert "credentials or proxies reported by `list-models`" in content
             assert all(value not in content for value in stale)
 
     def test_panel_skill_describes_current_claude_opus_default(self):
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
+        content = _compiled_skill("panel")
 
-        assert "Default Claude Opus 4.8 reasoning" in content
+        assert "retains the existing\nClaude-backed workflow defaults" in content
         assert "Stable Claude Opus 4.6 reasoning" not in content
 
     def test_gpt_55_parallel_tool_note_uses_supported_reasoning_effort(self):
@@ -141,18 +140,21 @@ class TestModelDocDrift:
 
 
 @pytest.mark.parametrize("skill_name", ("panel", "analyze", "debate", "consensus"))
-def test_workflow_frontend_names_claude_worker_prerequisite_without_codex_native_claim(
+def test_workflow_frontend_is_portable_and_names_per_worker_runtime_prerequisites(
     skill_name: str,
 ) -> None:
-    """Axis-1 workflow frontends must describe their still-Claude worker boundary."""
+    """Host frontend runtime and selected worker runtimes remain independent."""
     source = load_skill_source(SKILLS_DIR / skill_name)
-    content = (SKILLS_DIR / skill_name / "SKILL.md").read_text()
+    claude_content = _compiled_skill(skill_name)
+    codex_content = _compiled_skill(skill_name, SkillRuntime.CODEX)
 
-    assert source.manifest.runtime_eligibility == frozenset({SkillRuntime.CLAUDE_CODE})
-    assert "workflow workers run through local `claude -p`" in content
-    assert "`claude` must be on PATH" in content
-    assert "codex-native" not in content.lower()
-    assert "codex native" not in content.lower()
+    assert source.manifest.runtime_eligibility == frozenset(SkillRuntime)
+    for content in (claude_content, codex_content):
+        assert "Claude-backed workers require the local Claude runtime" in content
+        assert "runtime preflight codex" in content
+        assert "Omitting `--models` retains" in content
+    assert "$ARGUMENTS" not in codex_content
+    assert "${CLAUDE_SKILL_DIR}" not in codex_content
 
 
 class TestReviewDocsSkill:
@@ -203,18 +205,21 @@ class TestOldSkillsDeleted:
 
 class TestPanelSkill:
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "panel" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "panel" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "panel" / "content.md").exists()
+        assert _compiled_skill("panel")
+        assert _compiled_skill("panel", SkillRuntime.CODEX)
 
     def test_name_is_panel(self):
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
-        assert "name: forge:panel" in content
+        assert "name: forge:panel" in _compiled_skill("panel")
+        assert "name: panel" in _compiled_skill("panel", SkillRuntime.CODEX)
 
     def test_references_forge_workflow(self):
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
-        assert "forge workflow panel" in content
+        assert "forge workflow panel" in _compiled_skill("panel")
+        assert "forge workflow panel" in _compiled_skill("panel", SkillRuntime.CODEX)
 
     def test_no_resource_flag(self):
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
+        content = _compiled_skill("panel")
         assert "--resource" not in content
 
     def test_synthesis_resource_exists(self):
@@ -223,19 +228,20 @@ class TestPanelSkill:
 
     def test_step1_parses_flags(self):
         """Step 1 must list all CLI flags for the agent to extract."""
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
+        content = _compiled_skill("panel")
+        step1 = content.split("### Step 1", 1)[1].split("### Step 2", 1)[0]
         for flag in ("--code", "--models", "--roles", "--review-type", "--severity"):
-            assert flag in content, f"Panel SKILL.md missing {flag} in Step 1"
+            assert flag in step1, f"Panel SKILL.md missing {flag} in Step 1"
 
-    def test_step2_forwards_flags(self):
-        """Step 2 bash command must forward all parsed flags."""
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
-        step2 = content.split("### Step 2")[1].split("### Step 3")[0]
+    def test_run_step_forwards_flags(self):
+        """The workflow command must forward all parsed flags."""
+        content = _compiled_skill("panel")
+        run_step = content.split("### Step 3", 1)[1].split("### Step 4", 1)[0]
         for flag in ("--roles", "--review-type", "--severity"):
-            assert flag in step2, f"Panel Step 2 doesn't forward {flag}"
+            assert flag in run_step, f"Panel run step doesn't forward {flag}"
 
     def test_argument_hint_includes_new_flags(self):
-        content = (SKILLS_DIR / "panel" / "SKILL.md").read_text()
+        content = _compiled_skill("panel")
         # Frontmatter is between first and second ---
         frontmatter = content.split("---")[1]
         for flag in ("--roles", "--review-type", "--severity"):
@@ -244,15 +250,18 @@ class TestPanelSkill:
 
 class TestAnalyzeSkill:
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "analyze" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "analyze" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "analyze" / "content.md").exists()
+        assert _compiled_skill("analyze")
+        assert _compiled_skill("analyze", SkillRuntime.CODEX)
 
     def test_name_is_analyze(self):
-        content = (SKILLS_DIR / "analyze" / "SKILL.md").read_text()
-        assert "name: forge:analyze" in content
+        assert "name: forge:analyze" in _compiled_skill("analyze")
+        assert "name: analyze" in _compiled_skill("analyze", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_analyze(self):
-        content = (SKILLS_DIR / "analyze" / "SKILL.md").read_text()
-        assert "forge workflow analyze" in content
+        assert "forge workflow analyze" in _compiled_skill("analyze")
+        assert "forge workflow analyze" in _compiled_skill("analyze", SkillRuntime.CODEX)
 
     def test_no_resource(self):
         """Analyze has no local resources (framework loaded by CLI)."""
@@ -260,48 +269,51 @@ class TestAnalyzeSkill:
         assert not resources.exists() or not list(resources.iterdir())
 
     def test_step1_parses_models_flag(self):
-        content = (SKILLS_DIR / "analyze" / "SKILL.md").read_text()
+        content = _compiled_skill("analyze")
         assert "--models" in content.split("### Step 2")[0]
 
-    def test_step2_forwards_models_flag(self):
-        content = (SKILLS_DIR / "analyze" / "SKILL.md").read_text()
-        step2 = content.split("### Step 2")[1].split("### Step 3")[0]
-        assert "--models" in step2
+    def test_run_step_forwards_models_flag(self):
+        content = _compiled_skill("analyze")
+        run_step = content.split("### Step 3", 1)[1].split("### Step 4", 1)[0]
+        assert "--models" in run_step
 
 
 class TestDebateSkill:
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "debate" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "debate" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "debate" / "content.md").exists()
+        assert _compiled_skill("debate")
+        assert _compiled_skill("debate", SkillRuntime.CODEX)
 
     def test_name_is_debate(self):
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
-        assert "name: forge:debate" in content
+        assert "name: forge:debate" in _compiled_skill("debate")
+        assert "name: debate" in _compiled_skill("debate", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_debate(self):
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
-        assert "forge workflow debate" in content
+        assert "forge workflow debate" in _compiled_skill("debate")
+        assert "forge workflow debate" in _compiled_skill("debate", SkillRuntime.CODEX)
 
     def test_no_resource_flag(self):
         """Debate skill no longer uses --resource (CLI handles template)."""
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
+        content = _compiled_skill("debate")
         assert "--resource" not in content
 
     def test_blocks_auto_invocation(self):
         """Debate is expensive (multi-model) -- must not auto-invoke."""
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
+        content = _compiled_skill("debate")
         assert "disable-model-invocation: true" in content
 
     def test_step1_parses_worker_flag(self):
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
+        content = _compiled_skill("debate")
         assert "--worker" in content.split("### Step 2")[0]
 
-    def test_step2_forwards_worker_flag(self):
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
-        step2 = content.split("### Step 2")[1].split("### Step 3")[0]
-        assert "--worker" in step2
+    def test_run_step_forwards_worker_flag(self):
+        content = _compiled_skill("debate")
+        run_step = content.split("### Step 3", 1)[1].split("### Step 4", 1)[0]
+        assert "--worker" in run_step
 
     def test_argument_hint_includes_worker(self):
-        content = (SKILLS_DIR / "debate" / "SKILL.md").read_text()
+        content = _compiled_skill("debate")
         frontmatter = content.split("---")[1]
         assert "--worker" in frontmatter
 
@@ -408,35 +420,38 @@ class TestQaWorkflowChecklist:
 
 class TestConsensusSkill:
     def test_skill_exists(self):
-        assert (SKILLS_DIR / "consensus" / "SKILL.md").exists()
+        assert (SKILLS_DIR / "consensus" / "forge-skill.yaml").exists()
+        assert (SKILLS_DIR / "consensus" / "content.md").exists()
+        assert _compiled_skill("consensus")
+        assert _compiled_skill("consensus", SkillRuntime.CODEX)
 
     def test_name_is_consensus(self):
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
-        assert "name: forge:consensus" in content
+        assert "name: forge:consensus" in _compiled_skill("consensus")
+        assert "name: consensus" in _compiled_skill("consensus", SkillRuntime.CODEX)
 
     def test_references_forge_workflow_consensus(self):
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
-        assert "forge workflow consensus" in content
+        assert "forge workflow consensus" in _compiled_skill("consensus")
+        assert "forge workflow consensus" in _compiled_skill("consensus", SkillRuntime.CODEX)
 
     def test_blocks_auto_invocation(self):
         """Consensus is expensive (multi-model, two rounds) -- must not auto-invoke."""
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
+        content = _compiled_skill("consensus")
         assert "disable-model-invocation: true" in content
 
     def test_synthesis_resource_exists(self):
         assert (SKILLS_DIR / "consensus" / "resources" / "synthesis.md").exists()
 
     def test_step1_parses_worker_flag(self):
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
+        content = _compiled_skill("consensus")
         assert "--worker" in content.split("### Step 2")[0]
 
-    def test_step2_forwards_worker_flag(self):
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
-        step2 = content.split("### Step 2")[1].split("### Step 3")[0]
-        assert "--worker" in step2
+    def test_run_step_forwards_worker_flag(self):
+        content = _compiled_skill("consensus")
+        run_step = content.split("### Step 3", 1)[1].split("### Step 4", 1)[0]
+        assert "--worker" in run_step
 
     def test_argument_hint_includes_worker(self):
-        content = (SKILLS_DIR / "consensus" / "SKILL.md").read_text()
+        content = _compiled_skill("consensus")
         frontmatter = content.split("---")[1]
         assert "--worker" in frontmatter
 

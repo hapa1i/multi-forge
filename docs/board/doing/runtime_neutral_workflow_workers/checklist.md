@@ -6,11 +6,10 @@
 
 ## Current Focus
 
-Phase 0 accepted; current focus is the 0.1 live de-risk probe, then Phase 1. Round 1 found four blocking gaps (codex
-runtime-error folding, mixed-pool cancellation, D2 axis conflation, downstream-record assertion). Round 2 confirmed D9's
-narrowed Claude-preservation scope and found three follow-on gaps (runtime propagation through derived worker specs,
-one-plan consensus preflight, and normative-card alignment). All findings were verified against the code and
-incorporated. D1-D9 were ratified on 2026-07-22; no implementation has started.
+Implementation and pre-merge verification are complete. The runtime-neutral worker contract, grouped dispatcher, Codex
+worker, four portable workflow frontends, durable docs, QA coverage, and wheel-installed package lifecycle have all
+passed their acceptance gates. The card remains in `doing/` only for review and merge; Phase 5.5 is intentionally
+post-merge.
 
 ## Baseline (verified at acceptance; extended in round 1)
 
@@ -152,26 +151,34 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
   unchanged" scope, which otherwise covers request construction + dispatch only (Phase 1.4 output fields are the other
   deliberate, additive change).
 
-- [ ] 0.1 De-risk probe (after ratification, before Phase 2): shape one review-style prompt through
+- [x] 0.1 De-risk probe (after ratification, before Phase 2): shape one review-style prompt through
   `prepare_codex_request` (read-only sandbox) and run it via `CodexHeadlessInvoker.run_parallel` on the host ChatGPT
   login; confirm the reduced final text lands on `HeadlessResult.stdout`, exact tokens on the event, and the read-only
   sandbox permits repo reads.
 
   - Assertion: probe command + observed result recorded under this item. Trap (impl_notes "Codex E2E trap"): restore the
     host `CODEX_HOME` captured at import, clear `CODEX_API_KEY`/`CODEX_ACCESS_TOKEN`.
+  - Observed 2026-07-22: `uv run forge runtime preflight codex --json`, followed by a direct `prepare_codex_request` ->
+    `CodexHeadlessInvoker.run_parallel` probe, shaped `codex exec --json --sandbox read-only`. The prompt read
+    `pyproject.toml` and returned exact final stdout `multi-forge`; `success=True`, `runtime_is_error=False`,
+    input/output/cached tokens were `38118`/`140`/`29184`, and the run id was `run_7420367c329a`. The worker event
+    recorded `runtime=codex`, `route=codex_exec`, `provider=openai`, `billing_mode=subscription_quota`, exact tokens,
+    and null model/proxy/cost. Exactly one downstream direct-provider attempt recorded `provider=openai`, null
+    backend/proxy/request ids, the same tokens, and null cost. The host Codex home was restored and API/access-token
+    overrides were cleared for the child.
 
 ## Phase 1: Worker runtime contract (types + routing)
 
-- [ ] 1.1 `ModelSpec.runtime` field (default `"claude_code"`), validated per D1 (registry membership AND
+- [x] 1.1 `ModelSpec.runtime` field (default `"claude_code"`), validated per D1 (registry membership AND
   `headless=True`).
   - Assertion: unknown runtime raises `ValueError`; a registered non-headless runtime is rejected (synthetic registry
     entry in the test); every existing `AVAILABLE_MODELS` entry carries `claude_code`; `DEFAULT_MODELS` names and
     resolution are unchanged (golden). `tests/src/review/test_models.py`.
-- [ ] 1.2 New codex worker spec (name per D8) in `AVAILABLE_MODELS`, excluded from `DEFAULT_MODELS`.
+- [x] 1.2 New codex worker spec (name per D8) in `AVAILABLE_MODELS`, excluded from `DEFAULT_MODELS`.
   - Assertion: `resolve_model_specs("codex")` returns the exact D8 identity (`model_id="codex-default"`,
     `family="openai"`, `provider_refs=()`, `runtime="codex"`); `resolve_model_specs(None)` excludes it; the
     unknown-model error's available list includes it.
-- [ ] 1.3 Routing per D2: runtime-native resolver branch in `resolve_invocation_routing` (no `ModelRoute`, no proxy
+- [x] 1.3 Routing per D2: runtime-native resolver branch in `resolve_invocation_routing` (no `ModelRoute`, no proxy
   registry read, no template scan); additive `RoutingSource` literal `"runtime_native"`; core docstring documents the
   additive `runtime_native => route=None` semantics, while the plan-level route-nullability matrix is pinned in
   `resolve_invocation_routing` tests (per D2 scope: opaque `explicit`/session-proxy successes keep `route=None` in the
@@ -181,16 +188,16 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
     keeps positional alignment with specs; `derive_model_routes` is not consulted for runtime-native specs;
     `runtime_native + route=None` is accepted while `unresolved + route=None` still fails.
     `tests/src/review/test_routing.py`, `tests/src/review/test_engine.py`.
-- [ ] 1.4 `_resolved_models_summary` + `_format_resolved_models` (`cli/workflow.py:139,172`) carry an explicit `runtime`
+- [x] 1.4 `_resolved_models_summary` + `_format_resolved_models` (`cli/workflow.py:139,172`) carry an explicit `runtime`
   per worker (additive JSON field; human line gains `runtime=`). Runtime-native entries per D8: `resolved_model=null`,
   `model_selection="runtime_default"`, `provider="openai"`, `proxy`/`template` null; human renders
   `resolved=(runtime default)`.
   - Assertion: JSON and text goldens updated deliberately in `tests/src/cli/test_workflow.py`; summary
     `provider`/`runtime` byte-equal the emitted worker event's `provider`/`runtime` (attribution consistency).
-- [ ] 1.5 `forge workflow list-models` availability for the codex worker keys on cached preflight readiness (per D4),
+- [x] 1.5 `forge workflow list-models` availability for the codex worker keys on cached preflight readiness (per D4),
   not on `ANTHROPIC_API_KEY` or proxy scan (`check_model_availability`, `review/models.py:288`).
   - Assertion: ready iff a fresh ready preflight exists; unavailable reason names 'forge runtime preflight codex'.
-- [ ] 1.6 Prompt-specialized worker specs preserve runtime. `run_adversarial` and both `run_consensus` rounds copy
+- [x] 1.6 Prompt-specialized worker specs preserve runtime. `run_adversarial` and both `run_consensus` rounds copy
   `ModelSpec.runtime` when reconstructing stance/role-specific specs; no transform may silently take the field default.
   - Assertion: a codex stance remains `runtime="codex"`; a codex role remains `runtime="codex"` in both consensus rounds
     and resolves/dispatches through the runtime-native path. `tests/src/review/test_adversarial.py`,
@@ -201,12 +208,12 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
 
 ## Phase 2: Engine dispatch and preflight
 
-- [ ] 2.1 Characterization FIRST: golden test pinning the exact `HeadlessRequest` list (argv, env keys, prompt,
+- [x] 2.1 Characterization FIRST: golden test pinning the exact `HeadlessRequest` list (argv, env keys, prompt,
   attribution) an all-Claude default-quorum `run_multi_review` produces today, via a stubbed invoker. Separately
   characterize today's `_to_review_result` mapping for an exit-0 `is_error` envelope (pre-D9 behavior).
   - Assertion: request-construction golden passes before and after every Phase 2 change; the D9 flip updates the
     result-mapping characterization deliberately in the same commit as its regression test.
-- [ ] 2.2 `_prepare_worker` branches on the resolved runtime: the Claude branch is untouched; the codex branch shapes
+- [x] 2.2 `_prepare_worker` branches on the resolved runtime: the Claude branch is untouched; the codex branch shapes
   via `prepare_codex_request` (prompt/label/timeout/cwd passthrough; `Attribution` preserved so
   `operation="workflow.worker"` and the invoker's per-worker upstream row come free; sandbox per D6; preflight from the
   routing plan per D4, failed ReviewResult without one).
@@ -215,32 +222,32 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
     `tests/src/review/test_engine.py`.
   - Note: `prepare_codex_request` expects `cwd` to be a git worktree; a non-git cwd surfaces codex's own refusal as that
     worker's error -- no Forge bypass (documented, not special-cased).
-- [ ] 2.3 Grouped dispatch per D3: lifecycle refactor to (invoker, request) pairs; `run_parallel` delegates as a single
+- [x] 2.3 Grouped dispatch per D3: lifecycle refactor to (invoker, request) pairs; `run_parallel` delegates as a single
   group; engine passes per-request invokers.
   - Assertion: all-Claude -> identical behavior via the single-group delegation (characterization 2.1 plus existing
     `tests/src/core/invoker/test_claude_invoker.py` lifecycle suite green unchanged); all-codex -> codex invoker hooks
     used; mixed -> results merged in input order; at most 5 concurrent children across both runtimes (fake slow Popen
     counting live children).
-- [ ] 2.4 `preflight_check` becomes per-runtime: the `claude`-binary error fires only when >=1 Claude-runtime worker is
+- [x] 2.4 `preflight_check` becomes per-runtime: the `claude`-binary error fires only when >=1 Claude-runtime worker is
   selected; >=1 codex worker validates the plan's frozen preflight per D4; D5 `resume_id` rejection;
   `_credential_preflight_error` stays scoped to direct-Anthropic routes. `_run_preflight`'s tip line
   (`cli/workflow.py:115`) becomes runtime-aware.
   - Assertion: codex-only spec list with no `claude` on PATH produces no claude error; cold/absent preflight fails
     closed with the refresh tip; `resume_id` + codex worker fails closed naming blind.
     `tests/src/cli/test_workflow_preflight.py`, `tests/src/review/test_engine.py`.
-- [ ] 2.5 Consensus owns one routing/preflight snapshot across both rounds. When no `routing_plan` is injected,
+- [x] 2.5 Consensus owns one routing/preflight snapshot across both rounds. When no `routing_plan` is injected,
   `run_consensus` resolves once from the round-1 specs and reuses that plan for the prompt-only round-2 specs; supplied
   plans keep today's reuse behavior.
   - Assertion: direct `run_consensus(..., routing_plan=None)` calls `resolve_invocation_routing` exactly once; both
     `run_multi_review` calls receive the same plan object and frozen `codex_preflight`.
     `tests/src/review/test_consensus.py`.
-- [ ] 2.6 D9 runtime-error folding in `_to_review_result` with regression coverage for both runtimes.
+- [x] 2.6 D9 runtime-error folding in `_to_review_result` with regression coverage for both runtimes.
   - Assertion: codex exit-0 + `runtime_is_error=True` (empty final text, provider message on effective stderr) ->
     `success=False`, stdout stays empty, and error carries the provider message; Claude exit-0 `is_error` envelope with
     empty stderr -> `success=False`, parsed stdout is preserved and also supplies the error text; both streams empty ->
     exact fallback `Runtime reported error`. Synthesis never sees any of them as successes; usage-event status and
     ReviewResult agree.
-- [ ] 2.7 Cancellation and mid-flight-kill semantics under the grouped dispatcher (D3): interrupt mid-fan-out terminates
+- [x] 2.7 Cancellation and mid-flight-kill semantics under the grouped dispatcher (D3): interrupt mid-fan-out terminates
   children of BOTH runtimes from the single registry; never-started jobs are `cancelled=True` (no emission); killed
   in-flight jobs emit error events (unchanged).
   - Assertion: fake-Popen mixed-dispatch test drives cleanup and asserts both partitions' children are reaped and the
@@ -248,12 +255,12 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
 
 ## Phase 3: Verb CLI and telemetry truthfulness
 
-- [ ] 3.1 Four verbs accept codex workers through the existing selection surfaces (`--models`, debate/consensus worker
+- [x] 3.1 Four verbs accept codex workers through the existing selection surfaces (`--models`, debate/consensus worker
   args); D7 flag semantics implemented; help text names the runtime axis and the `--effort` Claude-only rule.
   - Assertion: `--effort high` with a mixed quorum reaches only Claude argv; `--proxy` with a codex worker warns and is
     ignored for that worker; codex selections on debate and both consensus rounds retain `runtime="codex"` through
     prompt specialization and reach Codex argv. `tests/src/cli/test_workflow.py`, `test_workflow_consensus.py`.
-- [ ] 3.2 Telemetry truthfulness (the card's boundary list), matching the shipped emitter contracts:
+- [x] 3.2 Telemetry truthfulness (the card's boundary list), matching the shipped emitter contracts:
   - Per-worker codex usage event: `route=codex_exec`, `runtime=codex`, `billing_mode` preflight-resolved
     (`subscription_quota` on ChatGPT), exact tokens, `cost_micro_usd=None` -- via the invoker's existing
     `emit_codex_usage`; asserted end-to-end from the engine, not just the invoker.
@@ -267,11 +274,11 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
     verb row unchanged.
   - Assertion: ledger + downstream fixture tests in `tests/src/review/test_engine.py` /
     `tests/src/cli/test_workflow.py`.
-- [ ] 3.3 Synthesis-input equivalence: given identical final text, a codex worker's `ReviewResult.stdout` is byte-equal
+- [x] 3.3 Synthesis-input equivalence: given identical final text, a codex worker's `ReviewResult.stdout` is byte-equal
   to a Claude worker's, and `format_synthesis_prompt`, `_evaluate_verdicts`, and `_build_reconciliation_brief` consume
   it unchanged.
   - Assertion: same-fixture comparison test; `tests/src/review/test_synthesis.py` or `test_engine.py`.
-- [ ] 3.4 **PARITY GATE (blocks Phase 4).** Unit suites green plus real-runtime integration:
+- [x] 3.4 **PARITY GATE (blocks Phase 4).** Unit suites green plus real-runtime integration:
   - New real-codex worker smoke: one-codex-worker panel run on the host ChatGPT login asserting success,
     synthesis-usable stdout, and a `runtime=codex` worker event (new
     `tests/integration/cli/test_workflow_codex_smoke.py`, fixtures/traps per `tests/integration/session/conftest.py` and
@@ -283,31 +290,39 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
 
 ## Phase 4: Frontend skill eligibility (gated on 3.4)
 
-- [ ] 4.1 Author neutral sources (`forge-skill.yaml` + `content.md`) for `panel`, `analyze`, `debate`, `consensus`;
+- [x] 4.1 Author neutral sources (`forge-skill.yaml` + `content.md`) for `panel`, `analyze`, `debate`, `consensus`;
   migrate `resources/`; bind capabilities (CLI, task args, resource loading) per the compile vocabulary; typed
   invocation policy.
-- [ ] 4.2 Content is runtime-honest: a Codex-hosted frontend drives `forge workflow ...`, and worker availability
+- [x] 4.2 Content is runtime-honest: a Codex-hosted frontend drives `forge workflow ...`, and worker availability
   depends on worker runtimes (Claude binary for Claude workers, codex readiness for the codex worker) -- the skill never
   implies codex-native workers by default. Model-family selection stays host-runtime-owned (design_workflows.md §3.1
   rules).
-- [ ] 4.3 Install planning: the four packages become codex-eligible; duplicate scans, schema-v2 tracking, whole-tree
+- [x] 4.3 Install planning: the four packages become codex-eligible; duplicate scans, schema-v2 tracking, whole-tree
   validation, and the provenance sentinel all pass for both runtimes.
   - Assertion: `--runtime codex` skills planning includes the four packages; compiled Claude output remains equivalent
     for unchanged behavior. `tests/src/install/test_cross_runtime_skills.py` + compiler/validation suites.
-- [ ] 4.4 Compiled-package smoke: verify the emitted Codex package instructions invoke the verbs correctly (content
+- [x] 4.4 Compiled-package smoke: verify the emitted Codex package instructions invoke the verbs correctly (content
   review; a live codex-host `$panel` smoke if cheap).
 
 ## Phase 5: Docs sync and closeout
 
-- [ ] 5.1 Design docs updated with the shipped contract: `design_workflows.md` §3.5 (replace the "Portable frontend
+- [x] 5.1 Design docs updated with the shipped contract: `design_workflows.md` §3.5 (replace the "Portable frontend
   boundary (Axis 1 vs Axis 2)" paragraph), `design.md` §5.1 portable-set sentence, `design_appendix.md` §C.5 portable
   list and §G (`runtime_native` RoutingSource literal), `cli_reference.md` workflow section (runtime axis, D7 semantics,
   `model_selection` output field), CLAUDE.md skills/portability paragraph. The normative card wording was already
   aligned in Phase 0 (D2b/D9); closeout verifies the durable design docs match it.
-- [ ] 5.2 End-user docs (`docs/end-user/skills.md` and any workflow guide); QA checklist sections +
+- [x] 5.2 End-user docs (`docs/end-user/skills.md` and any workflow guide); QA checklist sections +
   `test-count`/`last-updated` header; walkthrough checklist if it exercises workflow verbs.
-- [ ] 5.3 Verification recorded: focused suites, `make test-unit`, targeted integration from 3.4, `make pre-commit`.
-- [ ] 5.4 `docs/board/change_log.md` entry; durable lessons proposed via `.forge/memory/shadow_impl_notes.md`.
+- [x] 5.3 Verification recorded: focused suites, `make test-unit`, targeted integration from 3.4, `make pre-commit`.
+  - `uv run pytest` focused post-format suite: `729 passed`.
+  - `make test-unit`: `8275 passed, 1 skipped, 117 deselected`.
+  - Real Codex-only + mixed worker integration: `2 passed in 21.71s`.
+  - Existing Claude workflow parity integration: `13 passed`.
+  - `make pre-commit`: all hooks passed; `uv build` produced the 0.9.0 wheel and sdist.
+  - Clean wheel install: `forge runtime list --json` found Claude and Codex; project skill installs for
+    `--runtime claude`, `codex`, and `all` succeeded; Codex installed exactly nine healthy packages; sync was
+    idempotent; disable removed all nine packages and its tracking row.
+- [x] 5.4 `docs/board/change_log.md` entry; durable lessons proposed via `.forge/memory/shadow_impl_notes.md`.
 - [ ] 5.5 After merge to `main`: card `doing/` -> `done/`, inbound links repointed, checklist preserved.
 
 ## Acceptance tests

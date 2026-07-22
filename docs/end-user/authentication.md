@@ -125,6 +125,7 @@ If you see authentication errors in workflow output, run `forge auth login -c an
 | `forge session start` (direct)                  | Claude Code login/subscription is enough                               |
 | `forge workflow analyze` (default)              | `ANTHROPIC_API_KEY`                                                    |
 | `forge workflow panel` (default)                | `ANTHROPIC_API_KEY` + active `openrouter-openai` + `openrouter-gemini` |
+| `forge workflow ... --models codex`             | Fresh `forge runtime preflight codex` (native Codex auth)              |
 | `forge session resume --fresh -s ai-curated`    | `OPENROUTER_API_KEY`                                                   |
 | OpenRouter proxy (`openrouter-*`)               | `OPENROUTER_API_KEY`                                                   |
 | Anthropic passthrough (`anthropic-passthrough`) | `ANTHROPIC_API_KEY`                                                    |

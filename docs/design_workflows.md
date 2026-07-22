@@ -641,17 +641,15 @@ differently by different entry points.
 - Callable from skills (on-demand) and policies (automatic)
 - Conservative set: fundamental patterns only
 
-The **fan-out runner** (`run_multi_review()`) shapes one already-routed `HeadlessRequest` per worker (model/proxy +
-optional per-worker prompt) and delegates the parallel lifecycle -- per-worker process groups, `os.killpg`
-SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to a headless invoker
-(`core/invoker/`). That lifecycle is now runtime-neutral: it lives in `_HeadlessLifecycleBase` (`_lifecycle.py`), and
-two concrete invokers fill template hooks (`_prepare_argv`/`_build_result`/`_emit`/`_is_recoverable_format_rejection`).
-`ClaudeHeadlessInvoker` (the review caller) requests capability-gated `--output-format json`; `CodexHeadlessInvoker`
-runs `codex exec --json` and reduces its JSONL event stream via `parse_codex_jsonl_stream` (Codex's predicate is always
-`False`, so the JSON-retry branch is dead for it). Both emit one per-worker usage event when a request carries
-attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The **adversarial
-runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory blinding (no peer
-outputs), and evidence-weighted synthesis.
+The **fan-out runner** (`run_multi_review()`) resolves each worker's runtime and shapes one routed `HeadlessRequest` per
+worker. Claude workers use `ClaudeHeadlessInvoker`; runtime-native Codex workers use `CodexHeadlessInvoker` with
+`codex exec --json --sandbox read-only` and no model pin. A single-runtime invocation keeps the invoker's ordinary
+`run_parallel()` call. Mixed invocations use `run_grouped_parallel()` over `(invoker, request)` pairs, retaining one
+five-child executor, one process registry, prompt cross-runtime cleanup, and deterministic input-order results. Both
+paths share `_HeadlessLifecycleBase` process-group and JSON-reduction behavior. Runtime-reported error envelopes fail
+the worker even at exit 0, so result synthesis and usage status agree. The **adversarial runner** constrains workers to
+review/eval skills with stance injection (`{stance_prompt}`), mandatory blinding (no peer outputs), and
+evidence-weighted synthesis.
 
 **Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
 half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/credential_registry.py`'s
@@ -668,11 +666,12 @@ Forge local scope onto shared project `.agents/skills`. Limited or planned suppo
 preflight read the same registry (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight
 checks the version gate).
 
-**Portable frontend boundary (Axis 1 vs Axis 2).** `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`
-compile for Claude and Codex. `walkthrough` and `qa` remain Claude-only because they drive Claude-specific manual-test
-flows. `panel`, `analyze`, `debate`, and `consensus` also remain Claude-only: although the fan-out lifecycle has a
-`CodexHeadlessInvoker`, their workflow engine still selects `claude -p` workers. Runtime-neutral worker dispatch is a
-separate Axis 2 change; none of these four frontends is described or installed as Codex-native before that ships.
+**Portable frontend boundary (Axis 1 vs Axis 2).** `challenge`, `smoke-test`, `review`, `review-docs`, `understand`,
+`panel`, `analyze`, `debate`, and `consensus` compile for both Claude and Codex. The host-runtime axis selects how the
+frontend instructions are invoked; it does not select worker runtimes. The workflow-worker axis is declared per
+`ModelSpec`, so either frontend can drive Claude workers, the opt-in `codex` worker, or a mixed quorum through
+`forge workflow`. Omitting `--models` preserves the existing Claude-backed defaults. `walkthrough` and `qa` remain
+Claude-only because they drive Claude-specific manual-test flows.
 
 ### 3.6 Relationship to policies (workflow unification)
 

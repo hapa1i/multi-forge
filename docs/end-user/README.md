@@ -176,7 +176,8 @@ Code and `$<name>` in Codex; model family is auto-detected from session context 
 $review src/forge/session/                 # Codex: same portable review
 /forge:review-docs docs/design.md          # Claude portable document review
 $understand src/forge/core/ops/            # Codex portable explanation
-/forge:panel src/forge/session/ --code     # Claude-only workflow frontend
+/forge:panel src/forge/session/ --code     # Claude workflow frontend with selectable workers
+$panel src/forge/session/ --code           # Codex: same portable workflow frontend
 ```
 
 See [skills.md](skills.md).

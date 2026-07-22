@@ -501,12 +501,12 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
         and .missing_file_paths == [] and .duplicate_dirs == [] and .recovery == null)'
 ```
 
-- [ ] Full-profile user `all` tracks eleven Claude packages and exactly the five portable Codex packages
+- [ ] Full-profile user `all` tracks eleven Claude packages and exactly the nine portable Codex packages
 - [ ] Symlink-mode payloads are links while `.forge-package.json` is a regular copied schema-v1 sentinel
 - [ ] Automatic re-enable retains all managed runtime packages when Codex is temporarily absent from `PATH`
 - [ ] Explicit Claude re-enable reports runtime preservation and does not remove tracked Codex packages
 - [ ] Disabling the user install removes its Codex packages; the restored user install tracks Claude packages only
-- [ ] Project Codex target contains exactly the five portable skills under `.agents/skills`, not `CODEX_HOME`
+- [ ] Project Codex target contains exactly the nine portable skills under `.agents/skills`, not `CODEX_HOME`
 - [ ] Codex review workflows pin the host family to `openai` without consulting a different tracked Forge session
 - [ ] Explicit Codex local scope fails with `scope_unsupported` and leaves the local Claude package set unchanged
 - [ ] User-scope Codex enable refuses tracked project packages outside its CWD and creates no global package

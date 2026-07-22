@@ -1211,8 +1211,8 @@ Cleanup requires a strict marker/exact tree: files match digest/mode; live links
 reconstruct one cache package. Clean rescans, fingerprints, anchors, and revalidates before deleting the child. User
 targets require `all`; project/local use their owner. Repair lost/corrupt tracking, then rescan.
 
-Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`. The four workflow frontends, `walkthrough`,
-and `qa` are Claude-only.
+Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `panel`, `analyze`, `debate`, and
+`consensus`. Only `walkthrough` and `qa` remain Claude-only.
 
 ### C.6 Codex hook registration (codex-hooks module)
 
@@ -1562,50 +1562,53 @@ a drifted default catalog still degrades (route by `None`, `to_lane` null).
 
 ```python
 RoutingSource = Literal[
-    "explicit",          # CLI flag override (--proxy, --supervisor-proxy, config URL)
-    "subprocess_proxy",  # Session ambient (FORGE_SUBPROCESS_PROXY)
-    "preferred_proxy",   # Catalog hint (ModelSpec.preferred_proxy)
-    "route_scan",        # Compatible running proxy found via route matching
-    "session_proxy",     # Inherited ANTHROPIC_BASE_URL
-    "direct",            # Intentional direct execution (direct-only model specs)
-    "unresolved",        # No route found (shared resolver terminal step)
+    "explicit",
+    "subprocess_proxy",
+    "preferred_proxy",
+    "route_scan",
+    "session_proxy",
+    "direct",
+    "runtime_native",
+    "unresolved",
 ]
 
 @dataclass(frozen=True)
 class ModelRoute:
-    provider: str              # "openrouter", "litellm", or "direct"
-    credential: str            # Credential from credential_registry.py (e.g., "openrouter", "anthropic-api")
-    family: str                # Model family (e.g., "openai", "gemini", "anthropic")
-    template_id: str | None    # Proxy template this route can use; None for direct
-    template_family: str | None  # Template's explicit family metadata; None for direct
-    model_ref: str             # Provider-specific model ID (e.g., "openai/gpt-5.5")
+    provider: str
+    credential: str
+    family: str
+    template_id: str | None
+    template_family: str | None
+    model_ref: str
 
 @dataclass(frozen=True)
 class RoutingResult:
-    base_url: str | None       # None = direct Anthropic or unresolved
-    proxy_id: str | None       # Resolved proxy identity (for cost tracking, logging)
-    template: str | None       # Proxy template (for tier override awareness)
-    source: RoutingSource      # Which chain step resolved this route
-    route: ModelRoute | None   # Present when model compatibility is known; None for unresolved or opaque routing
-    credential: str | None     # route.credential, duplicated for ergonomics
-    warning: str | None = None # Non-fatal diagnostic (e.g., "preferred proxy not running")
+    base_url: str | None
+    proxy_id: str | None
+    template: str | None
+    source: RoutingSource
+    route: ModelRoute | None
+    credential: str | None
+    warning: str | None = None
 ```
 
-`direct` and `unresolved` are both "no proxy" but semantically different. `direct` = intentional direct execution
-(produced by `review.routing` for direct-only specs like `claude-opus`). `unresolved` = no route found (produced by the
-shared resolver as its terminal step). `route` is present when model compatibility is known; `None` can mean unresolved
-or opaque/non-model-specific routing (e.g., explicit base URL with no routes supplied). `source` and `base_url`
-distinguish them.
+`direct` has a concrete route. `runtime_native` deliberately has none because the runtime owns selection and auth (the
+`codex` worker). `unresolved` means failure. A route-null shared-resolver result can still be successful opaque base-URL
+passthrough; `source` and `base_url` distinguish it.
 
 ### G.2 Workflow types (from `review.routing`)
 
 ```python
 @dataclass(frozen=True)
 class WorkerRoutingPlan:
-    routes: tuple[RoutingResult, ...]  # Indexed by worker position (same order as spec list)
-    resolved_at: str                   # ISO timestamp for staleness detection
-    via_override: str | None           # --proxy value, if set (for logging)
+    routes: tuple[RoutingResult, ...]
+    resolved_at: str
+    via_override: str | None
+    codex_preflight: CodexPreflight | None = None
 ```
+
+Workflow plans accept `route=None` only for `runtime_native`; every other route-null entry fails closed. This does not
+narrow the shared resolver's opaque `require_route=False` successes.
 
 ### G.3 Key function signatures
 

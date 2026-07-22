@@ -33,7 +33,7 @@ from forge.install.models import (
     InstallScope,
 )
 from forge.install.settings_merge import find_added_files
-from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
+from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL, load_skill_sources
 from forge.install.skill_planning import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
@@ -78,6 +78,8 @@ _PRE_UNMANAGED_DETECTION_SKILL_NAMES = {
     "understand",
     "walkthrough",
 }
+
+SKILLS_ROOT = Path(__file__).parents[3] / "src" / "skills"
 
 
 class _PlanningPaths(TypedDict):
@@ -299,6 +301,35 @@ def test_scope_runtime_profile_skill_matrix_is_explicit(tmp_path: Path) -> None:
             assert claude_only.reason == SkillPlanReason.RUNTIME_EXCLUDED
         else:
             assert claude_only.action == SkillPlanAction.INSTALL
+
+
+def test_codex_planning_includes_runtime_neutral_workflow_frontends(tmp_path: Path) -> None:
+    workflow_names = {"analyze", "consensus", "debate", "panel"}
+    sources = {source.manifest.name: source for source in load_skill_sources(SKILLS_ROOT)}
+    candidates = tuple(
+        SkillCandidate(
+            name=name,
+            supported_runtimes=tuple(sorted(runtime.value for runtime in sources[name].manifest.runtime_eligibility)),
+        )
+        for name in sorted(workflow_names)
+    )
+    selection = select_skill_runtimes(
+        installed_runtime_ids=(CODEX_RUNTIME,),
+        explicit_runtime_ids=(CODEX_RUNTIME,),
+    )
+
+    plan = plan_runtime_skills(
+        scope=InstallScope.USER,
+        profile=InstallProfile.STANDARD,
+        skills_module_selected=True,
+        candidates=candidates,
+        selection=selection,
+        **_paths(tmp_path),
+    )
+
+    assert {decision.skill for decision in plan.installable} == workflow_names
+    assert all(decision.runtime == CODEX_RUNTIME for decision in plan.installable)
+    assert not plan.has_conflicts
 
 
 def test_automatic_local_enable_skips_codex_without_suppressing_claude(

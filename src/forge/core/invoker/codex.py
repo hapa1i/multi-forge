@@ -154,7 +154,7 @@ def prepare_codex_request(
     *,
     prompt: str,
     preflight: CodexPreflight,
-    attribution: Attribution,
+    attribution: Attribution | None,
     model: str | None = None,
     cwd: str | None = None,
     sandbox: CodexSandbox = "workspace-write",
@@ -209,7 +209,11 @@ def prepare_codex_request(
         base_url=None,
         # Stamp the runtime + resolved billing posture onto the attribution so the emitted
         # event's billing_mode always matches the preflight that gated this spawn.
-        attribution=replace(attribution, runtime="codex", billing_mode=preflight.billing_mode),
+        attribution=(
+            replace(attribution, runtime="codex", billing_mode=preflight.billing_mode)
+            if attribution is not None
+            else None
+        ),
     )
 
 

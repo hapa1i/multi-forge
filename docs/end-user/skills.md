@@ -22,19 +22,24 @@ $review src/forge/session/
 $review-docs docs/design.md
 $understand src/forge/core/ops/session_context.py
 
-# Claude-only workflow frontends
+# Portable workflow frontends (Claude selectors shown)
 /forge:panel src/forge/session/ --code
 /forge:analyze "Should we use event sourcing for the audit log?"
 /forge:debate "Should we migrate from skills to MCP?"
+
+# Codex: the same workflow frontends
+$panel src/forge/session/ --code --models codex
+$analyze "Review the transfer boundary" --models claude-opus,codex
 ```
 
-Five skills currently compile for both runtimes: `challenge`, `smoke-test`, `review`, `review-docs`, and `understand`.
-For the argument-taking skills, the same task text follows the runtime-specific selector. `review`, `review-docs`, and
-`understand` keep model-family resource selection orthogonal to runtime; `challenge` consumes only the claim text and
-`smoke-test` runs its fixed read-only checks.
+Nine skills currently compile for both runtimes: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`,
+`panel`, `analyze`, `debate`, and `consensus`. The same task text follows the runtime-specific selector. `review`,
+`review-docs`, and `understand` keep model-family resource selection orthogonal to runtime; `challenge` consumes only
+the claim text and `smoke-test` runs its fixed read-only checks.
 
-Six skills remain Claude-only. `panel`, `analyze`, `debate`, and `consensus` still start `claude -p` workflow workers;
-making those workers runtime-neutral is separate work. `walkthrough` and `qa` drive Claude-specific manual-test flows.
+The workflow frontend's host runtime does not choose its workers. The built-in defaults remain Claude-backed; select the
+opt-in `codex` worker explicitly with `--models codex`, or mix it with Claude worker names. Only `walkthrough` and `qa`
+remain Claude-only because they drive Claude-specific manual-test flows.
 
 ## Installation and runtime targets
 
@@ -88,7 +93,7 @@ Codex:       $review [target]
 based on the session's proxy. Falls back to the Opus-optimized default if no model-specific resource exists.
 
 **Multi-model alternative:** For independent reviews from multiple models in parallel, use `forge workflow panel --code`
-(CLI) or `/forge:panel --code` (skill).
+(CLI), `/forge:panel --code` (Claude), or `$panel --code` (Codex).
 
 ---
 
@@ -107,8 +112,8 @@ Codex:       $review-docs [target]
 
 Same model-aware resource selection as `/forge:review`, but loads `docs.md` / `docs-{family}.md` rubrics.
 
-**Multi-model alternative:** For independent reviews from multiple models, use `forge workflow panel` (CLI) or
-`/forge:panel` (skill).
+**Multi-model alternative:** For independent reviews from multiple models, use `forge workflow panel` (CLI),
+`/forge:panel` (Claude), or `$panel` (Codex).
 
 ---
 
@@ -145,10 +150,12 @@ selection as other skills.
 Multi-model panel review. Multiple models review independently, then findings are synthesized.
 
 ```text
-/forge:panel [target] [--code] [--models model1,model2]
+Claude Code: /forge:panel [target] [--code] [--models worker1,worker2]
+Codex:       $panel [target] [--code] [--models worker1,worker2]
 ```
 
-Claude Code only. The workflow engine still launches Claude workers even when Codex is installed.
+Both frontends call the same workflow engine. Worker runtime is selected independently per worker; omitting `--models`
+keeps the existing Claude-backed defaults.
 
 | Argument   | Required | Description                                                         |
 | ---------- | -------- | ------------------------------------------------------------------- |
@@ -158,6 +165,10 @@ Claude Code only. The workflow engine still launches Claude workers even when Co
 
 The panel runs `forge workflow panel` under the hood. Each model reviews independently, then the main agent synthesizes
 consensus findings, unique insights, and conflicts.
+
+The opt-in `codex` worker runs `codex exec` in a read-only sandbox and uses the model selected by Codex. Before
+selecting it, run `forge runtime preflight codex`; Forge fails closed on a cold or stale cache instead of running doctor
+inline.
 
 **Default models:**
 
@@ -172,7 +183,8 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
 model.
 
-**Requirements:** GPT-5.6 Sol and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
+**Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-5.6 Sol and Gemini require
+active proxies; direct Claude requires its credential; Codex requires the cached runtime preflight. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
@@ -182,10 +194,12 @@ model.
 Adversarial multi-model evaluation. Models argue for, against, and neutrally about a subject.
 
 ```text
-/forge:debate [subject] [--code] [--models model1,model2]
+Claude Code: /forge:debate [subject] [--code] [--models worker1,worker2]
+Codex:       $debate [subject] [--code] [--models worker1,worker2]
 ```
 
-Claude Code only. The workflow engine still launches Claude workers even when Codex is installed.
+Both frontends call the same runtime-neutral workflow engine. Omitting `--models` keeps the existing Claude-backed
+defaults; `codex` remains opt-in.
 
 | Argument   | Required | Description                                                                     |
 | ---------- | -------- | ------------------------------------------------------------------------------- |
@@ -205,8 +219,8 @@ key disagreements, and an evidence-weighted recommendation.
 | `gemini-3.1-pro-preview` | AGAINST | Critic -- risks          | openrouter-gemini       |
 | `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
-**Requirements:** GPT-5.6 Sol and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
-[authentication.md](authentication.md#which-auth-do-i-need) for setup.
+**Requirements:** Each selected worker must be ready in `forge workflow list-models`. Codex readiness comes from
+`forge runtime preflight codex`; proxy and direct-Claude workers keep their existing prerequisites.
 
 ---
 
@@ -235,13 +249,13 @@ conversation.
 
 ## Other skills
 
-| Skill                               | Runtime        | Purpose                                                          |
-| ----------------------------------- | -------------- | ---------------------------------------------------------------- |
-| `/forge:analyze`                    | Claude only    | Deep single-model analysis (default model: claude-opus)          |
-| `/forge:consensus`                  | Claude only    | Two-round multi-model convergence toward a shared recommendation |
-| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | Read-only installation health check                              |
-| `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                    |
-| `/forge:qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                   |
+| Skill                               | Runtime        | Purpose                                                           |
+| ----------------------------------- | -------------- | ----------------------------------------------------------------- |
+| `/forge:analyze` / `$analyze`       | Claude + Codex | Deep single-worker analysis (default worker: claude-opus)         |
+| `/forge:consensus` / `$consensus`   | Claude + Codex | Two-round multi-worker convergence toward a shared recommendation |
+| `/forge:smoke-test` / `$smoke-test` | Claude + Codex | Read-only installation health check                               |
+| `/forge:walkthrough`                | Claude only    | Interactive feature tour (hermetic test repo)                     |
+| `/forge:qa`                         | Claude only    | Full Docker-based QA (requires `full` profile)                    |
 
 The portable smoke test resolves and directly executes its bundled script from the installed skill directory, so its
 entry point selects the interpreter and `$smoke-test`/`/forge:smoke-test` do not depend on the session CWD.

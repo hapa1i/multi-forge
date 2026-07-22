@@ -20,14 +20,14 @@ ls ~/.forge/             # Should exist
 ls ~/.forge/bin/forge    # Should exist
 ls ~/.claude/commands/   # Should have Forge commands
 ls .claude/commands/     # Should have Forge commands (local)
-ls .agents/skills/       # Should have five portable Codex project skills
+ls .agents/skills/       # Should have nine portable Codex project skills
 ```
 
 - [ ] User, local, and project installations tracked
 - [ ] `~/.forge/` exists
 - [ ] User scope has Forge files
 - [ ] Local scope has Forge files
-- [ ] Project scope has five portable Codex packages under `.agents/skills`
+- [ ] Project scope has nine portable Codex packages under `.agents/skills`
 
 ### 19.2 Run Complete Uninstall
 

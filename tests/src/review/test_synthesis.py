@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from forge.core.invoker import HeadlessRequest, HeadlessResult
+from forge.review.engine import _to_review_result
 from forge.review.models import MultiReviewOutput, ReviewResult
 from forge.review.synthesis import format_json_output, format_synthesis_prompt
 
@@ -31,6 +33,38 @@ def _failure(name: str = "model-b", error: str = "Timeout") -> ReviewResult:
 
 
 class TestFormatSynthesisPrompt:
+    def test_identical_claude_and_codex_final_text_produces_identical_synthesis_input(self):
+        text = "Same final review text"
+        claude = _to_review_result(
+            HeadlessRequest(argv=["claude", "-p"], prompt="review", env={}, label="worker"),
+            HeadlessResult(
+                label="worker",
+                stdout=text,
+                stderr="",
+                returncode=0,
+                duration_seconds=1.0,
+            ),
+        )
+        codex = _to_review_result(
+            HeadlessRequest(
+                argv=["codex", "exec", "--json", "--sandbox", "read-only"],
+                prompt="review",
+                env={},
+                label="worker",
+                output_format=None,
+            ),
+            HeadlessResult(
+                label="worker",
+                stdout=text,
+                stderr="",
+                returncode=0,
+                duration_seconds=1.0,
+            ),
+        )
+
+        assert claude.stdout == codex.stdout == text
+        assert format_synthesis_prompt(_output([claude])) == format_synthesis_prompt(_output([codex]))
+
     def test_includes_prompt_preview(self):
         text = format_synthesis_prompt(_output([_success()]))
         assert "Review src/main.py" in text

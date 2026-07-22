@@ -2,15 +2,30 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.core.invoker import HeadlessRequest
+from forge.core.invoker import (
+    Attribution,
+    ClaudeHeadlessInvoker,
+    CodexHeadlessInvoker,
+    HeadlessRequest,
+    HeadlessResult,
+)
 from forge.core.reactive.routing import ModelRoute, RoutingResult, RoutingSource
-from forge.review.engine import _prepare_worker, preflight_check, run_multi_review
-from forge.review.models import ModelAvailability, ModelSpec, PromptMode
+from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.review.engine import (
+    _prepare_worker,
+    _to_review_result,
+    preflight_check,
+    run_multi_review,
+)
+from forge.review.models import DEFAULT_MODELS, ModelAvailability, ModelSpec, PromptMode
 from forge.review.routing import WorkerRoutingPlan
+
+_CODEX_SUCCESS_STREAM = (Path(__file__).resolve().parents[2] / "fixtures/codex/exec_json_success.jsonl").read_text()
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +47,7 @@ def _spec(
     provider_refs: tuple[tuple[str, str], ...] | None = None,
     prompt: str | None = None,
     prompt_mode: PromptMode = "override",
+    runtime: str = "claude_code",
 ) -> ModelSpec:
     if provider_refs is None:
         if preferred_proxy:
@@ -47,6 +63,18 @@ def _spec(
         preferred_proxy=preferred_proxy,
         prompt=prompt,
         prompt_mode=prompt_mode,
+        runtime=runtime,
+    )
+
+
+def _codex_spec() -> ModelSpec:
+    return ModelSpec(
+        name="codex",
+        model_id="codex-default",
+        family="openai",
+        provider_refs=(),
+        description="Native Codex",
+        runtime="codex",
     )
 
 
@@ -84,11 +112,44 @@ def _routing_result(
     )
 
 
-def _plan(*results: RoutingResult) -> WorkerRoutingPlan:
+def _runtime_native_result() -> RoutingResult:
+    return RoutingResult(
+        base_url=None,
+        proxy_id=None,
+        template=None,
+        source="runtime_native",
+        route=None,
+        credential=None,
+    )
+
+
+def _plan(*results: RoutingResult, codex_preflight: CodexPreflight | None = None) -> WorkerRoutingPlan:
     return WorkerRoutingPlan(
         routes=tuple(results),
         resolved_at="2026-05-14T12:00:00Z",
         via_override=None,
+        codex_preflight=codex_preflight,
+    )
+
+
+def _codex_preflight(
+    *,
+    ready: bool = True,
+    blocking_reason: str | None = None,
+    billing_mode: str = "subscription_quota",
+) -> CodexPreflight:
+    return CodexPreflight(
+        installed=True,
+        version="0.145.0",
+        version_ok=True,
+        auth_method="chatgpt_tokens",
+        auth_source="codex_store",
+        billing_mode=billing_mode,  # type: ignore[arg-type]
+        ready=ready,
+        blocking_reason=blocking_reason,
+        hook_seam="enrollment_gated",
+        proxy_responses="native_direct",
+        doctor_status="ok",
     )
 
 
@@ -103,6 +164,267 @@ def _mock_popen(stdout: str = "review output", returncode: int = 0, stderr: str 
 
 
 class TestRunMultiReview:
+    def test_default_claude_quorum_request_shape_golden(self):
+        specs = list(DEFAULT_MODELS.values())
+        routes = [
+            (
+                _route(
+                    provider="openrouter",
+                    model_ref=spec.provider_refs[0][1],
+                    family=spec.family,
+                )
+                if spec.preferred_proxy
+                else _route(
+                    provider="direct",
+                    model_ref=spec.provider_refs[0][1],
+                    family=spec.family,
+                    credential="anthropic-api",
+                )
+            )
+            for spec in specs
+        ]
+        plan = _plan(
+            *[
+                _routing_result(
+                    route=route,
+                    base_url=None if route.provider == "direct" else f"http://proxy-{idx}:8096",
+                    source="direct" if route.provider == "direct" else "preferred_proxy",
+                )
+                for idx, route in enumerate(routes)
+            ]
+        )
+        attribution = Attribution(command="panel", workflow="review", session="golden")
+        captured: list[HeadlessRequest] = []
+
+        def build_env(*, base_url=None, direct=False, extra_vars=None):
+            return {
+                "ENV_KIND": "direct" if direct else str(base_url),
+                **(extra_vars or {}),
+            }
+
+        def run_parallel(_self, requests):
+            captured.extend(requests)
+            return [
+                HeadlessResult(
+                    label=request.label,
+                    stdout="ok",
+                    stderr="",
+                    returncode=0,
+                    duration_seconds=1.0,
+                )
+                for request in requests
+            ]
+
+        with (
+            patch("forge.review.engine.resolve_env_or_credential", return_value=None),
+            patch("forge.review.engine.build_claude_env", side_effect=build_env),
+            patch("forge.review.engine.direct_model_env", return_value={"DIRECT_MODEL": "pinned"}),
+            patch("forge.review.engine.can_use_bare", return_value=False),
+            patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel", new=run_parallel),
+        ):
+            run_multi_review(
+                "review prompt",
+                models=specs,
+                routing_plan=plan,
+                timeout_seconds=321,
+                cwd="/worktree",
+                attribution=attribution,
+                reasoning_effort="high",
+            )
+
+        assert captured == [
+            HeadlessRequest(
+                argv=["claude", "-p", "--model", routes[0].model_ref, "--effort", "high"],
+                prompt="review prompt",
+                env={"ENV_KIND": "http://proxy-0:8096", "FORGE_COMMAND": "review"},
+                cwd="/worktree",
+                timeout_seconds=321,
+                label=specs[0].effective_worker_id,
+                model=routes[0].model_ref,
+                provider=routes[0].provider,
+                proxy_id="test-proxy",
+                attribution=attribution,
+                base_url="http://proxy-0:8096",
+            ),
+            HeadlessRequest(
+                argv=["claude", "-p", "--model", routes[1].model_ref, "--effort", "high"],
+                prompt="review prompt",
+                env={"ENV_KIND": "http://proxy-1:8096", "FORGE_COMMAND": "review"},
+                cwd="/worktree",
+                timeout_seconds=321,
+                label=specs[1].effective_worker_id,
+                model=routes[1].model_ref,
+                provider=routes[1].provider,
+                proxy_id="test-proxy",
+                attribution=attribution,
+                base_url="http://proxy-1:8096",
+            ),
+            HeadlessRequest(
+                argv=["claude", "-p", "--effort", "high"],
+                prompt="review prompt",
+                env={"ENV_KIND": "direct", "FORGE_COMMAND": "review", "DIRECT_MODEL": "pinned"},
+                cwd="/worktree",
+                timeout_seconds=321,
+                label=specs[2].effective_worker_id,
+                model=routes[2].model_ref,
+                provider=routes[2].provider,
+                proxy_id="test-proxy",
+                attribution=attribution,
+                base_url=None,
+            ),
+        ]
+
+    @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
+    @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
+    def test_codex_only_uses_codex_parallel_dispatch(self, mock_codex_parallel, mock_claude_parallel):
+        preflight = _codex_preflight()
+        plan = _plan(_runtime_native_result(), codex_preflight=preflight)
+        mock_codex_parallel.return_value = [
+            HeadlessResult(
+                label="codex",
+                stdout="codex review",
+                stderr="",
+                returncode=0,
+                duration_seconds=1.0,
+            )
+        ]
+
+        output = run_multi_review("review", models=[_codex_spec()], routing_plan=plan)
+
+        assert output.results[0].stdout == "codex review"
+        mock_codex_parallel.assert_called_once()
+        mock_claude_parallel.assert_not_called()
+        request = mock_codex_parallel.call_args.args[0][0]
+        assert request.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+
+    @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
+    @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
+    @patch("forge.review.engine.run_grouped_parallel")
+    def test_mixed_runtime_dispatch_uses_one_grouped_pool(
+        self,
+        mock_grouped,
+        mock_codex_parallel,
+        mock_claude_parallel,
+    ):
+        specs = [_spec("claude-worker"), _codex_spec(), _spec("claude-worker-2")]
+        plan = _plan(
+            _routing_result(),
+            _runtime_native_result(),
+            _routing_result(),
+            codex_preflight=_codex_preflight(),
+        )
+
+        def outcomes(jobs):
+            return [
+                HeadlessResult(
+                    label=request.label,
+                    stdout=f"out-{request.label}",
+                    stderr="",
+                    returncode=0,
+                    duration_seconds=1.0,
+                )
+                for _invoker, request in jobs
+            ]
+
+        mock_grouped.side_effect = outcomes
+
+        output = run_multi_review("review", models=specs, routing_plan=plan, reasoning_effort="high")
+
+        mock_grouped.assert_called_once()
+        mock_codex_parallel.assert_not_called()
+        mock_claude_parallel.assert_not_called()
+        jobs = mock_grouped.call_args.args[0]
+        assert [type(invoker) for invoker, _request in jobs] == [
+            ClaudeHeadlessInvoker,
+            CodexHeadlessInvoker,
+            ClaudeHeadlessInvoker,
+        ]
+        assert [request.label for _invoker, request in jobs] == ["claude-worker", "codex", "claude-worker-2"]
+        assert "--effort" in jobs[0][1].argv
+        assert "--effort" not in jobs[1][1].argv
+        assert [result.model_name for result in output.results] == ["claude-worker", "codex", "claude-worker-2"]
+
+    @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
+    def test_codex_without_frozen_preflight_fails_without_spawn(self, mock_parallel):
+        plan = _plan(_runtime_native_result())
+
+        output = run_multi_review("review", models=[_codex_spec()], routing_plan=plan)
+
+        assert output.failed == 1
+        assert "forge runtime preflight codex" in (output.results[0].error or "")
+        mock_parallel.assert_not_called()
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_codex_worker_emits_runtime_native_usage_and_one_direct_downstream_attempt(self, mock_popen):
+        from forge.cli.workflow import _resolved_models_summary
+        from forge.core.telemetry.downstream import read_downstream_records
+        from forge.core.usage.ledger import read_usage_events
+
+        mock_popen.return_value = _mock_popen(_CODEX_SUCCESS_STREAM)
+        spec = _codex_spec()
+        plan = _plan(_runtime_native_result(), codex_preflight=_codex_preflight())
+        with patch.dict(
+            "os.environ",
+            {"FORGE_RUN_ID": "run_verb", "FORGE_ROOT_RUN_ID": "run_root"},
+        ):
+            output = run_multi_review(
+                "review",
+                models=[spec],
+                routing_plan=plan,
+                attribution=Attribution(command="panel", workflow="panel", session="s1"),
+            )
+
+        result = output.results[0]
+        assert result.success is True
+        assert result.stdout == "OK"
+        assert result.run_id is not None
+
+        events = read_usage_events(run_id=result.run_id)
+        assert len(events) == 1
+        event = events[0]
+        assert (event.route, event.runtime, event.billing_mode) == (
+            "codex_exec",
+            "codex",
+            "subscription_quota",
+        )
+        assert (event.provider, event.model, event.proxy_id) == ("openai", None, None)
+        assert (event.input_tokens, event.output_tokens, event.cached_tokens) == (14936, 22, 10624)
+        assert event.cost_micro_usd is None
+
+        attempts = read_downstream_records(kind="attempt", forge_run_id=result.run_id)
+        assert len(attempts) == 1
+        attempt = attempts[0]
+        assert (attempt.source_kind, attempt.provider, attempt.backend_id) == ("provider", "openai", None)
+        assert (attempt.input_tokens, attempt.output_tokens, attempt.cached_tokens) == (14936, 22, 10624)
+        assert attempt.cost_micros is None
+        assert attempt.proxy_id is None
+        assert attempt.request_id is None
+        assert attempt.provider_request_id is None
+        assert attempt.audit_record_type is None
+
+        summary = _resolved_models_summary([spec], plan)["codex"]
+        assert (summary["provider"], summary["runtime"]) == (event.provider, event.runtime)
+
+    @patch("forge.review.engine.run_grouped_parallel")
+    @patch("forge.review.engine.ClaudeHeadlessInvoker.run_parallel")
+    @patch("forge.review.engine.CodexHeadlessInvoker.run_parallel")
+    def test_resume_with_codex_fails_whole_invocation_without_spawn(
+        self,
+        mock_codex_parallel,
+        mock_claude_parallel,
+        mock_grouped,
+    ):
+        specs = [_spec("claude-worker"), _codex_spec()]
+        plan = _plan(_routing_result(), _runtime_native_result(), codex_preflight=_codex_preflight())
+
+        output = run_multi_review("review", models=specs, routing_plan=plan, resume_id="uuid-123")
+
+        assert output.failed == 2
+        assert all("--context blind" in (result.error or "") for result in output.results)
+        mock_codex_parallel.assert_not_called()
+        mock_claude_parallel.assert_not_called()
+        mock_grouped.assert_not_called()
+
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_single_model_success(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("great review")
@@ -375,6 +697,38 @@ class TestPreflightCheck:
         plan = _plan(*[_routing_result() for _ in range(2)])
         assert preflight_check(specs, routing_plan=plan) == []
 
+    def test_codex_only_does_not_require_claude_binary(self, monkeypatch):
+        monkeypatch.setattr("forge.review.engine.shutil.which", lambda name: None)
+        plan = _plan(_runtime_native_result(), codex_preflight=_codex_preflight())
+
+        assert preflight_check([_codex_spec()], routing_plan=plan) == []
+
+    def test_codex_cache_miss_fails_closed_with_refresh_command(self):
+        errors = preflight_check([_codex_spec()], routing_plan=_plan(_runtime_native_result()))
+
+        assert len(errors) == 1
+        assert "forge runtime preflight codex" in errors[0]
+
+    def test_codex_unready_snapshot_fails_closed_with_reason(self):
+        plan = _plan(
+            _runtime_native_result(),
+            codex_preflight=_codex_preflight(ready=False, blocking_reason="Codex login required"),
+        )
+
+        errors = preflight_check([_codex_spec()], routing_plan=plan)
+
+        assert len(errors) == 1
+        assert "Codex login required" in errors[0]
+        assert "forge runtime preflight codex" in errors[0]
+
+    def test_resume_context_with_codex_names_blind_fix(self):
+        plan = _plan(_runtime_native_result(), codex_preflight=_codex_preflight())
+
+        errors = preflight_check([_codex_spec()], routing_plan=plan, resume_id="uuid-123")
+
+        assert len(errors) == 1
+        assert "--context blind" in errors[0]
+
     def test_unresolved_route_returns_error(self):
         spec = _spec("a")
         unresolved = RoutingResult(
@@ -440,6 +794,53 @@ class TestPreflightCheck:
         spec = _spec("a")
         mock_avail.return_value = [_avail(spec)]
         assert preflight_check([spec]) == []
+
+
+class TestReviewResultMapping:
+    @pytest.mark.parametrize(
+        ("runtime", "argv", "stdout", "stderr", "expected_error"),
+        [
+            ("claude_code", ["claude", "-p"], "runtime failure", "", "runtime failure"),
+            (
+                "codex",
+                ["codex", "exec", "--json", "--sandbox", "read-only"],
+                "",
+                "provider rejected request",
+                "provider rejected request",
+            ),
+            ("codex", ["codex", "exec", "--json"], "", "", "Runtime reported error"),
+        ],
+    )
+    def test_runtime_error_fails_with_preserved_streams(
+        self,
+        runtime,
+        argv,
+        stdout,
+        stderr,
+        expected_error,
+    ):
+        request = HeadlessRequest(
+            argv=argv,
+            prompt="review",
+            env={},
+            label="worker",
+            attribution=Attribution(command="panel", runtime=runtime),
+        )
+        outcome = HeadlessResult(
+            label="worker",
+            stdout=stdout,
+            stderr=stderr,
+            returncode=0,
+            duration_seconds=1.0,
+            runtime_is_error=True,
+        )
+
+        result = _to_review_result(request, outcome)
+
+        assert result.success is False
+        assert result.stdout == stdout
+        assert result.stderr == stderr
+        assert result.error == expected_error
 
 
 class TestCredentialInjection:
@@ -530,3 +931,67 @@ class TestReasoningEffort:
         run_multi_review("review", models=[_spec()], routing_plan=plan)
         cmd = mock_popen_cls.call_args[0][0]
         assert "--effort" not in cmd
+
+
+class TestCodexWorkerShaping:
+    def test_prepare_codex_worker_uses_read_only_sanitized_runtime_request(self, monkeypatch):
+        for name, value in {
+            "ANTHROPIC_API_KEY": "anthropic-secret",
+            "ANTHROPIC_BASE_URL": "http://proxy:8084",
+            "FORGE_SUBPROCESS_PROXY": "proxy-id",
+            "CODEX_API_KEY": "stale-codex-key",
+            "CODEX_ACCESS_TOKEN": "stale-codex-token",
+        }.items():
+            monkeypatch.setenv(name, value)
+        attribution = Attribution(command="panel", workflow="review", session="s1")
+
+        prepared = _prepare_worker(
+            _codex_spec(),
+            _runtime_native_result(),
+            prompt="review this",
+            cwd="/worktree",
+            resume_id=None,
+            timeout_seconds=321,
+            attribution=attribution,
+            reasoning_effort="high",
+            codex_preflight=_codex_preflight(),
+        )
+
+        assert isinstance(prepared, HeadlessRequest)
+        assert prepared.argv == ["codex", "exec", "--json", "--sandbox", "read-only"]
+        assert prepared.prompt == "review this"
+        assert prepared.cwd == "/worktree"
+        assert prepared.timeout_seconds == 321
+        assert prepared.label == "codex"
+        assert prepared.model is None
+        assert prepared.provider == "openai"
+        assert prepared.base_url is None
+        assert prepared.proxy_id is None
+        assert prepared.output_format is None
+        assert prepared.attribution is not None
+        assert prepared.attribution.runtime == "codex"
+        assert prepared.attribution.billing_mode == "subscription_quota"
+        assert prepared.attribution.operation == "workflow.worker"
+        for stripped in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_BASE_URL",
+            "FORGE_SUBPROCESS_PROXY",
+            "CODEX_API_KEY",
+            "CODEX_ACCESS_TOKEN",
+        ):
+            assert stripped not in prepared.env
+
+    def test_prepare_codex_worker_preserves_optional_no_attribution(self):
+        prepared = _prepare_worker(
+            _codex_spec(),
+            _runtime_native_result(),
+            prompt="review this",
+            cwd=None,
+            resume_id=None,
+            timeout_seconds=600,
+            attribution=None,
+            codex_preflight=_codex_preflight(),
+        )
+
+        assert isinstance(prepared, HeadlessRequest)
+        assert prepared.attribution is None
