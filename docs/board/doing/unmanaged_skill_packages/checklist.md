@@ -56,8 +56,8 @@ Foundation for every later phase; ships the compiled-cache digest clean break (c
 - [x] 1.5 Doc sync (board contract: design docs update with the phase): `docs/design.md` §5.1 and
   `docs/design_appendix.md` §C describe the sentinel as an emitted, always-copied ledger file and record the one-time
   cache-digest change.
-  - Verification recorded: 660 install unit tests, 20 Docker tests, and mypy completed successfully after the Phase 1
-    changes.
+  - Verification recorded: 675 install unit tests passed with 1 skipped, 20 Docker installer tests passed, and mypy
+    completed successfully after the Phase 1 changes.
 
 ## Phase 2: Skill-name universe
 

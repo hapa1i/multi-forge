@@ -143,6 +143,48 @@ def test_legacy_claude_bridge_excludes_runtime_build_artifacts(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
+    "source_format",
+    [SkillSourceFormat.NEUTRAL, SkillSourceFormat.CLAUDE_BRIDGE],
+    ids=["neutral", "legacy"],
+)
+@pytest.mark.parametrize("broken", [False, True], ids=["regular", "broken-symlink"])
+def test_skill_loaders_reject_generated_package_sentinel(
+    tmp_path: Path,
+    source_format: SkillSourceFormat,
+    *,
+    broken: bool,
+) -> None:
+    package_name = "neutral-skill" if source_format == SkillSourceFormat.NEUTRAL else "legacy-skill"
+    package_root = tmp_path / package_name
+    package_root.mkdir()
+    if source_format == SkillSourceFormat.NEUTRAL:
+        (package_root / "forge-skill.yaml").write_text(
+            "schema_version: 1\n"
+            "name: neutral-skill\n"
+            "description: Neutral test. Use for tests.\n"
+            "runtimes: [codex]\n",
+            encoding="utf-8",
+        )
+        (package_root / "content.md").write_text("# Neutral\n", encoding="utf-8")
+        loader = load_neutral_skill_source
+    else:
+        (package_root / "SKILL.md").write_text(
+            "---\nname: forge:legacy-skill\ndescription: Legacy test. Use for tests.\n---\n\n# Legacy\n",
+            encoding="utf-8",
+        )
+        loader = load_claude_skill_source
+
+    sentinel = package_root / FORGE_PACKAGE_SENTINEL
+    if broken:
+        sentinel.symlink_to("missing-package-sentinel.json")
+    else:
+        sentinel.write_text('{"schema_version":1}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"source package must not contain generated \.forge-package\.json"):
+        loader(package_root)
+
+
+@pytest.mark.parametrize(
     ("owned_path", "target_content"),
     [
         (
