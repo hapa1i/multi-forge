@@ -39,14 +39,15 @@ existing Claude-backed defaults and truthful routing, telemetry, and failure sem
   or default quorum changed.
 - Added one grouped five-child lifecycle domain for mixed-runtime fan-out, preserving input order and prompt
   cancellation. Single-runtime calls retain the existing `run_parallel` shape; shared result mapping now deliberately
-  rejects reliable runtime-error envelopes on both runtimes.
+  rejects reliable runtime-error envelopes on both runtimes. Runtime stream text takes precedence on non-zero failures,
+  while an empty result retains its numeric exit code.
 - Kept Codex auth, billing, and downstream-provider identity runtime-owned: worker and downstream records reuse the
   existing `codex_exec`/OpenAI emitter contract without fabricating a model route, backend, proxy, or cost.
 - Migrated the four workflow frontends to neutral sources, expanding the portable Codex set from five to nine packages,
   and synchronized design, CLI, end-user, QA, and walkthrough documentation.
 
-**Verification**: focused post-format suites (`729 passed`); `make test-unit`
-(`8275 passed, 1 skipped, 117 deselected`); real Codex-only and mixed-runtime workflow integration (`2 passed`);
+**Verification**: focused post-format suites (`731 passed`); `make test-unit`
+(`8277 passed, 1 skipped, 117 deselected`); real Codex-only and mixed-runtime workflow integration (`2 passed`);
 existing Claude workflow parity integration (`13 passed`); clean wheel installs for `--runtime claude`, `codex`, and
 `all`, including status/sync/disable lifecycle; `uv build`; `make pre-commit`; QA parser v1.0.32 / 596 assertions;
 walkthrough parser v1.0.5 / 108 assertions. The card remains in `doing/` for review and merge.

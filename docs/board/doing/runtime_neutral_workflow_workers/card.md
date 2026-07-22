@@ -17,8 +17,9 @@ exists elsewhere in Forge.
 - Select workers through the runtime registry instead of a hard-coded Claude subprocess; runtime-native auth and billing
   posture are resolved by runtime preflight without asserting a static backend identity.
 - Reuse `CodexHeadlessInvoker` where its lifecycle, auth, and transcript contracts match; document any adapter gap.
-- Preserve current Claude request construction, dispatch, and model-role semantics, except for deliberately correcting
-  exit-zero runtime-error result mapping so failed envelopes cannot reach synthesis as successes.
+- Preserve current Claude request construction, dispatch, and model-role semantics, except for deliberately folding
+  reliable runtime-error envelopes. Exit-zero failures cannot reach synthesis as successes; on non-zero exits, runtime
+  stream text takes precedence while an otherwise empty result retains `Exit code N`.
 - Only after worker parity is verified, make the four workflow frontend skills eligible for non-Claude packages.
 
 ## Boundaries and risks

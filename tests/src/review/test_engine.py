@@ -798,17 +798,20 @@ class TestPreflightCheck:
 
 class TestReviewResultMapping:
     @pytest.mark.parametrize(
-        ("runtime", "argv", "stdout", "stderr", "expected_error"),
+        ("runtime", "argv", "stdout", "stderr", "returncode", "expected_error"),
         [
-            ("claude_code", ["claude", "-p"], "runtime failure", "", "runtime failure"),
+            ("claude_code", ["claude", "-p"], "runtime failure", "", 0, "runtime failure"),
             (
                 "codex",
                 ["codex", "exec", "--json", "--sandbox", "read-only"],
                 "",
                 "provider rejected request",
+                0,
                 "provider rejected request",
             ),
-            ("codex", ["codex", "exec", "--json"], "", "", "Runtime reported error"),
+            ("codex", ["codex", "exec", "--json"], "", "", 0, "Runtime reported error"),
+            ("claude_code", ["claude", "-p"], "provider failure", "", 7, "provider failure"),
+            ("codex", ["codex", "exec", "--json"], "", "", 9, "Exit code 9"),
         ],
     )
     def test_runtime_error_fails_with_preserved_streams(
@@ -817,6 +820,7 @@ class TestReviewResultMapping:
         argv,
         stdout,
         stderr,
+        returncode,
         expected_error,
     ):
         request = HeadlessRequest(
@@ -830,7 +834,7 @@ class TestReviewResultMapping:
             label="worker",
             stdout=stdout,
             stderr=stderr,
-            returncode=0,
+            returncode=returncode,
             duration_seconds=1.0,
             runtime_is_error=True,
         )

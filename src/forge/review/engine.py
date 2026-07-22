@@ -457,13 +457,16 @@ def _to_review_result(request: HeadlessRequest, outcome: HeadlessResult) -> Revi
             **identity,
         )
     if outcome.runtime_is_error:
+        runtime_error = outcome.stderr.strip() or outcome.stdout.strip()
+        if not runtime_error:
+            runtime_error = f"Exit code {outcome.returncode}" if outcome.returncode != 0 else "Runtime reported error"
         return ReviewResult(
             model_name=model_name,
             stdout=outcome.stdout,
             stderr=outcome.stderr,
             success=False,
             duration_seconds=outcome.duration_seconds,
-            error=outcome.stderr.strip() or outcome.stdout.strip() or "Runtime reported error",
+            error=runtime_error,
             **identity,
         )
     if outcome.returncode != 0:

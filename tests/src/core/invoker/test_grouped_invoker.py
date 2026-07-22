@@ -126,10 +126,7 @@ class TestGroupedParallel:
             return proc
 
         mock_popen.side_effect = make_proc
-        jobs = [
-            (claude if idx % 2 == 0 else codex, _request(f"w{idx}"))
-            for idx in range(8)
-        ]
+        jobs = [(claude if idx % 2 == 0 else codex, _request(f"w{idx}")) for idx in range(8)]
 
         results = run_grouped_parallel(jobs)
 
@@ -188,10 +185,7 @@ class TestGroupedParallel:
 
         watcher = threading.Thread(target=watchdog, daemon=True)
         watcher.start()
-        jobs = [
-            (claude if idx % 2 == 0 else codex, _request(f"w{idx}"))
-            for idx in range(6)
-        ]
+        jobs = [(claude if idx % 2 == 0 else codex, _request(f"w{idx}")) for idx in range(6)]
         try:
             with patch("forge.core.invoker._lifecycle.as_completed", fake_as_completed):
                 with pytest.raises(KeyboardInterrupt):
