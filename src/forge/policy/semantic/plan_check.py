@@ -9,7 +9,6 @@ for the frontier supervisor (the engine's registered resolver) to decide.
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -238,7 +237,10 @@ def _head_tail_excerpt(text: str, budget_chars: int, *, preserve_hunk_headers: b
             hunk_headers = "Hunk/file headers preserved from the full diff:\n" + hunk_headers + "\n\n"
 
     marker_template = "\n\n[... omitted {omitted_chars} chars from the middle ...]\n\n"
-    available = max(1, budget_chars - len(hunk_headers) - len(marker_template.format(omitted_chars=0)))
+    available = max(
+        1,
+        budget_chars - len(hunk_headers) - len(marker_template.format(omitted_chars=0)),
+    )
     head_chars = max(1, available // 2)
     tail_chars = max(1, available - head_chars)
     omitted = max(0, original_chars - head_chars - tail_chars)
@@ -314,7 +316,10 @@ def _pack_prompt_sections(
 ) -> tuple[_PackedText, _PackedText]:
     # Treat checker_budget_tokens as the approximate whole-prompt budget, then
     # split the remaining room between the approved plan and action context.
-    total_chars = max(1, _budget_chars(budget_tokens) - _prompt_shell_chars(context) - _PROMPT_OVERHEAD_RESERVE_CHARS)
+    total_chars = max(
+        1,
+        _budget_chars(budget_tokens) - _prompt_shell_chars(context) - _PROMPT_OVERHEAD_RESERVE_CHARS,
+    )
     plan_budget = int(total_chars * _PLAN_BUDGET_FRACTION)
     action_budget = max(1, total_chars - plan_budget)
     if total_chars >= _MIN_ACTION_CHARS * 2 and action_budget < _MIN_ACTION_CHARS:
@@ -363,17 +368,6 @@ def _effective_provider(model: str, provider: ProviderType | None) -> ProviderTy
         return None
 
 
-def _client_base_url(model: str, provider: ProviderType | None) -> str | None:
-    if provider is not None:
-        from forge.core.llm.credentials import resolve_provider_base_url
-
-        return resolve_provider_base_url(provider)
-
-    from forge.core.usage import resolve_client_base_url
-
-    return resolve_client_base_url(model)
-
-
 def run_plan_check(
     context: ActionContext,
     *,
@@ -392,19 +386,12 @@ def run_plan_check(
     Must NOT be called from inside an event loop (SyncAdapter constraint).
     """
     try:
-        from forge.core.llm import (
-            Message,
-            ModelHyperparameters,
-            SyncAdapter,
-            get_client,
-        )
+        from forge.core.llm import Message, ModelHyperparameters
         from forge.core.llm.types import ReasoningEffort
+        from forge.core.reactive.llm_call import complete_llm_call
         from forge.core.usage import (
             emit_direct_llm_usage,
-            mint_request_id,
             resolve_direct_provider_user,
-            target_is_forge_proxy,
-            with_forge_request_id,
             with_openrouter_user,
         )
 
@@ -419,12 +406,6 @@ def run_plan_check(
             action_text=packed_action.text,
         )
 
-        client = get_client(model, provider=provider)
-        adapter = SyncAdapter(client)
-
-        # Same exact-cost join as the tagger: forward an X-Request-ID only when the
-        # client provably targets a Forge proxy (a dangling ref is worse than none).
-        request_id = mint_request_id() if target_is_forge_proxy(_client_base_url(model, provider)) else None
         # OpenRouter `user` grouping: opt-in (global toggle, resolved inside) and
         # OpenRouter-only -- the field is an OpenRouter feature, so gate on the route.
         provider_user = (
@@ -437,14 +418,15 @@ def run_plan_check(
         hp: ModelHyperparameters | None = (
             ModelHyperparameters(reasoning_effort=cast(ReasoningEffort, reasoning_effort)) if reasoning_effort else None
         )
-        if request_id:
-            hp = with_forge_request_id(hp, request_id)
         if provider_user:
             hp = with_openrouter_user(hp, provider_user)
 
-        start = time.monotonic()
-        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
-        latency_ms = (time.monotonic() - start) * 1000
+        response, latency_ms, request_id = complete_llm_call(
+            model=model,
+            provider=provider,
+            messages=[Message(role="user", content=prompt)],
+            hyperparams=hp,
+        )
 
         verdict = parse_plan_check_verdict(response.text)
 
@@ -492,7 +474,12 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
     - cache: ThrottleCache entries for clean allows only
     """
 
-    def __init__(self, config: SupervisorConfig | None = None, *, lane_record: LaneRecord | None = None) -> None:
+    def __init__(
+        self,
+        config: SupervisorConfig | None = None,
+        *,
+        lane_record: LaneRecord | None = None,
+    ) -> None:
         self._config = config
         # The supervisor's consumer-lane binding (epic consumer_lanes, T1b), threaded so a shadow
         # candidate is captured with the lane production would replay on (None => default claude).

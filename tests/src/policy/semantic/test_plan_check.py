@@ -141,7 +141,11 @@ class TestRunPlanCheck:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        verdict = run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="# Plan\nStep 1.")
+        verdict = run_plan_check(
+            _make_context(),
+            model="gemini/gemini-3.5-flash",
+            plan_text="# Plan\nStep 1.",
+        )
 
         assert verdict == PlanCheckVerdict(aligned=True, reason="covered by step 1")
         prompt = _prompt_of(mock_adapter.complete)
@@ -218,7 +222,11 @@ class TestRunPlanCheck:
             origin="claude_code",
             event="PreToolUse.Edit",
             tool_name="Edit",
-            tool_args={"file_path": "src/main.py", "old_string": "old", "new_string": "new"},
+            tool_args={
+                "file_path": "src/main.py",
+                "old_string": "old",
+                "new_string": "new",
+            },
             repo_root="/workspace",
             session_name="test-session",
             target_path="src/main.py",
@@ -244,7 +252,11 @@ class TestRunPlanCheck:
             origin="claude_code",
             event="PreToolUse.Edit",
             tool_name="Edit",
-            tool_args={"file_path": "src/main.py", "old_string": "old_call()", "new_string": "new_call()"},
+            tool_args={
+                "file_path": "src/main.py",
+                "old_string": "old_call()",
+                "new_string": "new_call()",
+            },
             repo_root="/workspace",
             session_name="test-session",
             target_path="src/main.py",
@@ -324,7 +336,11 @@ class TestRunPlanCheck:
         events = read_usage_events()
         assert len(events) == 1
         e = events[0]
-        assert (e.command, e.session, e.provider) == ("plan-check", "test-session", "gemini")
+        assert (e.command, e.session, e.provider) == (
+            "plan-check",
+            "test-session",
+            "gemini",
+        )
         assert e.status == "success"
         assert e.measurement_source == "provider_usage_exact"
         assert (e.input_tokens, e.output_tokens) == (9, 4)
@@ -345,7 +361,11 @@ class TestRunPlanCheck:
         from forge.core.usage.ledger import read_usage_events
 
         e = read_usage_events()[0]
-        assert (e.command, e.status, e.failure_type) == ("plan-check", "error", "parse_error")
+        assert (e.command, e.status, e.failure_type) == (
+            "plan-check",
+            "error",
+            "parse_error",
+        )
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -363,7 +383,11 @@ class TestRunPlanCheck:
         from forge.core.usage.ledger import read_usage_events
 
         e = read_usage_events()[0]
-        assert (e.command, e.status, e.failure_type) == ("plan-check", "error", "exception")
+        assert (e.command, e.status, e.failure_type) == (
+            "plan-check",
+            "error",
+            "exception",
+        )
         assert e.session == "test-session"
 
     @patch("forge.core.llm.get_client")
@@ -374,7 +398,10 @@ class TestRunPlanCheck:
         """When the resolved target IS a Forge proxy, forward X-Request-ID and join."""
         monkeypatch.setenv("FORGE_RUN_ID", "run_pc")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_pc")
-        monkeypatch.setattr("forge.core.usage.resolve_client_base_url", lambda _m: "http://localhost:8084")
+        monkeypatch.setattr(
+            "forge.core.usage.resolve_client_base_url",
+            lambda _m: "http://localhost:8084",
+        )
         monkeypatch.setattr("forge.core.usage.target_is_forge_proxy", lambda _u: True)
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = CompletionResponse(
@@ -397,6 +424,33 @@ class TestRunPlanCheck:
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
+    def test_explicit_provider_drives_client_and_request_id_target(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        resolve_provider = MagicMock(return_value="http://localhost:8084")
+        resolve_model = MagicMock(return_value="http://wrong.example")
+        monkeypatch.setattr("forge.core.llm.credentials.resolve_provider_base_url", resolve_provider)
+        monkeypatch.setattr("forge.core.usage.resolve_client_base_url", resolve_model)
+        monkeypatch.setattr("forge.core.usage.target_is_forge_proxy", lambda _u: True)
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(
+            _make_context(),
+            model="google/gemini-3.5-flash",
+            provider="openrouter",
+            plan_text="plan",
+        )
+
+        mock_get_client.assert_called_once_with("google/gemini-3.5-flash", provider="openrouter")
+        resolve_provider.assert_called_once_with("openrouter")
+        resolve_model.assert_not_called()
+        forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]
+        assert forwarded["X-Request-ID"].startswith("req_")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
     def test_reasoning_effort_forwarded_in_hyperparams(
         self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
     ) -> None:
@@ -405,7 +459,12 @@ class TestRunPlanCheck:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="test/model", plan_text="plan", reasoning_effort="high")
+        run_plan_check(
+            _make_context(),
+            model="test/model",
+            plan_text="plan",
+            reasoning_effort="high",
+        )
 
         hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
         assert hp is not None
@@ -437,7 +496,12 @@ class TestRunPlanCheck:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="plan", reasoning_effort="low")
+        run_plan_check(
+            _make_context(),
+            model="gemini/gemini-3.5-flash",
+            plan_text="plan",
+            reasoning_effort="low",
+        )
 
         hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
         assert hp is not None
@@ -471,7 +535,12 @@ class TestRunPlanCheckProviderUser:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+        run_plan_check(
+            _make_context(),
+            model="google/gemini-3.5-flash",
+            provider="openrouter",
+            plan_text="plan",
+        )
 
         user = self._user_in(mock_adapter)
         assert user is not None and user.startswith("forge_sess_") and user.endswith("_plan_check")
@@ -488,7 +557,12 @@ class TestRunPlanCheckProviderUser:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+        run_plan_check(
+            _make_context(),
+            model="google/gemini-3.5-flash",
+            provider="openrouter",
+            plan_text="plan",
+        )
 
         assert self._user_in(mock_adapter) is None
 
@@ -505,7 +579,12 @@ class TestRunPlanCheckProviderUser:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", provider="litellm_local", plan_text="plan")
+        run_plan_check(
+            _make_context(),
+            model="gemini/gemini-3.5-flash",
+            provider="litellm_local",
+            plan_text="plan",
+        )
 
         assert self._user_in(mock_adapter) is None
 
@@ -522,7 +601,12 @@ class TestRunPlanCheckProviderUser:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+        run_plan_check(
+            _make_context(),
+            model="google/gemini-3.5-flash",
+            provider="openrouter",
+            plan_text="plan",
+        )
 
         user = self._user_in(mock_adapter)
         assert user is not None and "super-secret-session-name" not in user
@@ -542,7 +626,12 @@ class TestRunPlanCheckProviderUser:
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+        run_plan_check(
+            _make_context(),
+            model="google/gemini-3.5-flash",
+            provider="openrouter",
+            plan_text="plan",
+        )
 
         assert self._user_in(mock_adapter) == derive_provider_session_id("mysession", "run_bbbbbbbbbbbb", "plan-check")
 
@@ -657,7 +746,11 @@ class TestPlanCheckEvaluate:
     def test_never_denies_or_warns(self, mock_check: MagicMock, tmp_path: Path) -> None:
         """Across all verdict shapes, tier-1 emits only allow or needs_review."""
         policy = PlanCheckPolicy(config=_config_with_plan(tmp_path))
-        for verdict in (PlanCheckVerdict(True, "x"), PlanCheckVerdict(False, "y"), None):
+        for verdict in (
+            PlanCheckVerdict(True, "x"),
+            PlanCheckVerdict(False, "y"),
+            None,
+        ):
             mock_check.return_value = verdict
             decision = policy.evaluate(_make_context())
             assert decision.decision in ("allow", "needs_review")
@@ -867,6 +960,9 @@ class TestShadowCapture:
         mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
         cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
         policy = PlanCheckPolicy(config=cfg)
-        with patch("forge.policy.semantic.shadow.capture_candidate", side_effect=RuntimeError("boom")):
+        with patch(
+            "forge.policy.semantic.shadow.capture_candidate",
+            side_effect=RuntimeError("boom"),
+        ):
             decision = policy._check(_make_context())
         assert decision.decision == "allow"  # audit failure never blocks the hook

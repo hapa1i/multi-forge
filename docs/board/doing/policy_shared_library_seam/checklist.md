@@ -4,9 +4,8 @@
 
 ## Current focus
 
-Review rounds 1-2 (2026-07-24) incorporated: team-bar authority, telemetry ownership, warn delivery, helper inputs, and
-the full handler-to-runner routing chain are resolved below; D7 was decided by the user. **Ready for Slice 1
-implementation.**
+Slice 1 is complete: the provider-aware transport helper is covered directly, tagger and plan-check delegate without
+changing their telemetry contracts, and 83 focused tests pass. **Current: Slice 2.**
 
 ## Slice 0: Re-verify audit findings -- DONE 2026-07-24, corrected after review rounds 1-2
 
@@ -74,14 +73,14 @@ gate (`target_is_forge_proxy` -> `mint_request_id` -> `with_forge_request_id` ch
 `.complete()`. It returns `(response, latency_ms, request_id)`. Parsing, status determination, usage emission, and
 upstream recording all stay at call sites per the matrix.
 
-- [ ] Characterization tests pin the tagger + plan-check matrix rows (pre-repoint).
-- [ ] Helper module `core/reactive/llm_call.py` (working name); call sites lazy-import inside function bodies
+- [x] Characterization tests pin the tagger + plan-check matrix rows (pre-repoint).
+- [x] Helper module `core/reactive/llm_call.py` (working name); call sites lazy-import inside function bodies
   (impl_notes `core/reactive/__init__` eager-import trap).
-- [ ] `tag_action` delegates; matrix row byte-identical; `[]` fail-open unchanged.
-- [ ] `run_plan_check` delegates; explicit-provider client construction and request-ID target resolution remain
+- [x] `tag_action` delegates; matrix row byte-identical; `[]` fail-open unchanged.
+- [x] `run_plan_check` delegates; explicit-provider client construction and request-ID target resolution remain
   provider-aware; site-composed `reasoning_effort` + `with_openrouter_user` hyperparams are preserved;
   `None`-on-any-error contract unchanged; `PlanCheckPolicy` throttle key (incl. `checker_effort`) untouched.
-- [ ] Design sync (per-phase, board_contract): design_workflows.md §2.1 table gains the transport-core helper row.
+- [x] Design sync (per-phase, board_contract): design_workflows.md §2.1 table gains the transport-core helper row.
 
 ## Slice 2: repoint stages + transfer; fold the block bar onto verdict.py
 

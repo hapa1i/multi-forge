@@ -412,16 +412,17 @@ Reference details for [Policy and Enforcement](#1-policy-and-enforcement).
 
 ### 2.1 Shared library scope (from §1.2)
 
-| Utility            | Extracted from                      | API                                                                                   |
-| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
-| Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                               |
-| Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
-| Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                |
-| Tagger             | new                                 | `tag_action(context, model, prompt) -> tags[]`                                        |
-| Env builder        | both                                | `build_claude_env(base_url?) -> dict`                                                 |
-| Fan-out runner     | `src/forge/review/engine.py`        | `run_multi_review(prompt, models, per_worker_prompts?)`                               |
-| Adversarial runner | `src/forge/review/adversarial.py`   | `run_adversarial(proposal, skill_resource, stances, models)`                          |
+| Utility            | Extracted from                      | API                                                                                                  |
+| ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| LLM transport      | five direct-call consumers          | `complete_llm_call(model, messages, provider?, hyperparams?) -> (response, latency_ms, request_id?)` |
+| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)`                |
+| Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                                              |
+| Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                                |
+| Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                               |
+| Tagger             | new                                 | `tag_action(context, model, prompt) -> tags[]`                                                       |
+| Env builder        | both                                | `build_claude_env(base_url?) -> dict`                                                                |
+| Fan-out runner     | `src/forge/review/engine.py`        | `run_multi_review(prompt, models, per_worker_prompts?)`                                              |
+| Adversarial runner | `src/forge/review/adversarial.py`   | `run_adversarial(proposal, skill_resource, stances, models)`                                         |
 
 ### 2.2 Example: Writing a new policy (from §1.2)
 
