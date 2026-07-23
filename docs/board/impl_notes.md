@@ -36,6 +36,24 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Mixed headless runtime workflows separate execution from routing (runtime_neutral_workflow_workers, shipped 2026-07-23)
+
+- **Execution runtime and model routing are separate axes.** Give runtime-owned transports an explicit routing source
+  and keep route-null success a consumer-scoped invariant. Do not fabricate credentials, backend ids, proxy ids, or
+  model ids merely to fit a route-shaped abstraction.
+- **Runtime readiness is one logical-invocation snapshot.** Freeze expensive or stateful readiness once and carry that
+  object through every worker and derived round so one command cannot observe multiple machine states.
+- **Mixed fan-out has one lifecycle owner.** Use one concurrency pool, one child registry, and one cancellation owner
+  across runtimes. Nested runtime pools multiply the child cap and prevent prompt main-thread cleanup.
+- **Worker specialization preserves runtime.** Stance and role transforms must carry the runtime field; field-by-field
+  reconstruction can silently fall back to the default runtime while selection and reporting still name the original
+  worker.
+- **Reliable runtime-error envelopes are domain failures even at exit zero.** Preserve both output streams for
+  diagnosis, but keep usage status, synthesis eligibility, and the user-visible result aligned on failure.
+- **Portable workflow frontends distinguish host runtime from worker runtimes.** Compile one neutral source into native
+  host packages, state default-worker behavior explicitly, and verify runtime-specific install, status, sync, and
+  disable from a built wheel rather than only the source tree.
+
 ### Unmanaged runtime outputs are observable state with deletion-grade provenance (unmanaged_skill_packages, shipped 2026-07-22)
 
 - **Discovery surfaces are independently observable state.** Classify runtime discovery directories directly instead of

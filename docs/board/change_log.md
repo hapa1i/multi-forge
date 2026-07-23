@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-23
+
+### Runtime-neutral workflow workers closeout
+
+**Goal**: Close the shipped runtime-neutral workflow worker card after PR #110 merged to `main`.
+
+**Key changes**:
+
+- Moved the paired card and checklist from `doing/` to `done/`, recorded merge `26122901`, closed the final checklist
+  item, and repointed the inbound cross-runtime-skills link.
+- Promoted the reviewed execution/routing split, readiness snapshot, mixed lifecycle ownership, specialization,
+  runtime-error, and portable-frontend invariants to durable implementation notes.
+
+**Verification**: PR #110 merged as `26122901`; final merged package lifecycle integration (`2 passed, 18 deselected`);
+QA parser v1.0.33 / 596 assertions; walkthrough parser v1.0.6 / 108 assertions; stale-lane and inbound-link audit;
+`make pre-commit-md`; `git diff --check`.
+
 ## 2026-07-22
 
 ### Runtime-neutral workflow workers (implementation complete; review hold)

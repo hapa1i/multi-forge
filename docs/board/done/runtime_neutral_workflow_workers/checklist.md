@@ -2,14 +2,13 @@
 
 **Card**: [card.md](card.md) -- the normative contract. This checklist sequences it; where they disagree, the card wins.
 
-**Branch**: `runtime-neutral-workflow-workers` (from `main` at `c4950865`)
+**Branch**: `runtime-neutral-workflow-workers` (from `main` at `c4950865`; merged via PR #110 as `26122901`)
 
 ## Current Focus
 
-Implementation and pre-merge verification are complete. The runtime-neutral worker contract, grouped dispatcher, Codex
-worker, four portable workflow frontends, durable docs, QA coverage, and wheel-installed package lifecycle have all
-passed their acceptance gates. The card remains in `doing/` only for review and merge; Phase 5.5 is intentionally
-post-merge.
+Shipped and closed on `main` on 2026-07-23. The runtime-neutral worker contract, grouped dispatcher, Codex worker, four
+portable workflow frontends, durable docs, QA coverage, and wheel-installed package lifecycle passed their acceptance
+gates; PR #110 merged as `26122901`, and Phase 5.5 records the lane move and link closeout.
 
 ## Baseline (verified at acceptance; extended in round 1)
 
@@ -327,7 +326,8 @@ Decisions needing ratification (recommendation stated first; rejected alternativ
     `--runtime claude`, `codex`, and `all` succeeded; Codex installed exactly nine healthy packages; sync was
     idempotent; disable removed all nine packages and its tracking row.
 - [x] 5.4 `docs/board/change_log.md` entry; durable lessons proposed via `.forge/memory/shadow_impl_notes.md`.
-- [ ] 5.5 After merge to `main`: card `doing/` -> `done/`, inbound links repointed, checklist preserved.
+- [x] 5.5 After merge to `main`: card `doing/` -> `done/`, inbound links repointed, checklist preserved. Completed
+  2026-07-23 after PR #110 merged as `26122901`.
 
 ## Acceptance tests
 

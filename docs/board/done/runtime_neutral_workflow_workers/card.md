@@ -1,8 +1,8 @@
 # runtime_neutral_workflow_workers -- dispatch Forge workflow workers through the selected runtime
 
-**Lane**: `doing/` -- accepted 2026-07-22; execution branch `runtime-neutral-workflow-workers`. Separate Axis 2
-follow-up discovered while executing [`cross_runtime_skills`](../../done/cross_runtime_skills/card.md); it is not part
-of that card's approved Axis 1 scope.
+**Lane**: `done/` -- accepted 2026-07-22; shipped via PR #110 as `26122901` on 2026-07-23. Separate Axis 2 follow-up
+discovered while executing [`cross_runtime_skills`](../cross_runtime_skills/card.md); it is not part of that card's
+approved Axis 1 scope.
 
 ## Why
 
