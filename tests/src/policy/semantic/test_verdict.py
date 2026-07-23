@@ -1,7 +1,9 @@
 """Tests for policy/semantic/verdict.py."""
 
+import forge.policy.semantic.verdict as verdict_module
 from forge.policy.semantic.verdict import (
     SupervisorVerdict,
+    meets_block_bar,
     parse_supervisor_verdict,
     verdict_to_decision,
 )
@@ -208,3 +210,12 @@ class TestVerdictToDecision:
         decision = verdict_to_decision(verdict)
         assert decision.decision == "deny"
         assert decision.intent is None
+
+
+def test_meets_block_bar_reads_threshold_at_call_time(monkeypatch) -> None:
+    monkeypatch.setattr(verdict_module, "CONFIDENCE_THRESHOLD", 0.9)
+    assert meets_block_bar(0.85, True) is False
+
+    monkeypatch.setattr(verdict_module, "CONFIDENCE_THRESHOLD", 0.8)
+    assert meets_block_bar(0.85, True) is True
+    assert meets_block_bar(0.85, False) is False

@@ -18,7 +18,9 @@ from forge.session.transfer import (
     MAX_TRANSCRIPT_CHARS,
     ResumeStrategy,
     _build_frontmatter,
+    _call_llm_for_curation_prompt,
     _citation_is_grounded,
+    _emit_curation_usage,
     _format_transcript_for_llm,
     _generate_ai_curated_context,
     _generate_minimal_context,
@@ -932,10 +934,14 @@ class TestAICuratedStrategy:
         dropped = [w for w in warnings if "ungrounded citation" in w]
         assert len(dropped) == 2
 
-    def test_ai_curated_fallback_on_llm_error(self, sample_transcript: Path) -> None:
+    def test_ai_curated_fallback_on_llm_error(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should fall back to structured on LLM error."""
         from unittest.mock import MagicMock, patch
 
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
         mock_adapter = MagicMock()
         mock_adapter.complete.side_effect = Exception("API timeout")
 
@@ -958,6 +964,7 @@ class TestAICuratedStrategy:
         assert any("using structured" in w.lower() for w in warnings)
         # Structured output has Conversation Summary section
         assert "Conversation Summary" in content
+        assert [e for e in read_usage_events() if e.command == "transfer-curate"] == []
 
     def test_ai_curated_no_transcript_uses_minimal(self) -> None:
         """Should use minimal strategy if no transcript."""
@@ -1535,6 +1542,48 @@ class TestCurationUsageEmission:
         self._run_curation(sample_transcript)
 
         assert [e for e in read_usage_events() if e.command == "transfer-curate"] == []
+
+    def test_off_proxy_call_keeps_request_id_inert(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(self._CURATED))
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+            patch("forge.core.llm.credentials.resolve_provider_base_url", return_value="https://openrouter.ai/api/v1"),
+            patch("forge.core.usage.target_is_forge_proxy", return_value=False),
+        ):
+            call = _call_llm_for_curation_prompt("curate this")
+
+        assert call.request_id is None
+        hyperparams = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert "extra_headers" not in hyperparams.extra.get("openai", {})
+
+    def test_proxy_call_threads_request_id_to_usage(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(self._CURATED))
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+            patch("forge.core.llm.credentials.resolve_provider_base_url", return_value="http://localhost:8084"),
+            patch("forge.core.usage.target_is_forge_proxy", return_value=True),
+            patch("forge.core.usage.mint_request_id", return_value="req_curate"),
+        ):
+            call = _call_llm_for_curation_prompt("curate this")
+
+        _emit_curation_usage(call)
+        forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]
+        assert forwarded["X-Request-ID"] == "req_curate"
+        event = [e for e in read_usage_events() if e.command == "transfer-curate"][0]
+        assert event.source_refs is not None
+        assert event.source_refs.cost_request_id == "req_curate"
 
     def test_parse_failure_still_emits_error_event(
         self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch

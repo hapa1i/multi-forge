@@ -4,8 +4,9 @@
 
 ## Current focus
 
-Slice 1 is complete: the provider-aware transport helper is covered directly, tagger and plan-check delegate without
-changing their telemetry contracts, and 83 focused tests pass. **Current: Slice 2.**
+Slices 1-2 are complete. The provider-aware transport helper now serves tagger, plan-check, workflow stages, and
+transfer; site-owned telemetry and failure contracts remain pinned, and the semantic/workflow block bar has one
+call-time predicate. **Current: Slice 3.**
 
 ## Slice 0: Re-verify audit findings -- DONE 2026-07-24, corrected after review rounds 1-2
 
@@ -84,16 +85,16 @@ upstream recording all stay at call sites per the matrix.
 
 ## Slice 2: repoint stages + transfer; fold the block bar onto verdict.py
 
-- [ ] Characterization tests pin the stages + transfer matrix rows (pre-repoint).
-- [ ] `_complete_with_usage` (`stages.py`) delegates transport; emission/parse split and the "verdict mapping outside
+- [x] Characterization tests pin the stages + transfer matrix rows (pre-repoint).
+- [x] `_complete_with_usage` (`stages.py`) delegates transport; emission/parse split and the "verdict mapping outside
   the emit try" no-double-emit contract stay in stages.
-- [ ] `_call_llm_for_curation_prompt` (`transfer.py`) delegates transport; provider-user role + max_tokens/temperature
+- [x] `_call_llm_for_curation_prompt` (`transfer.py`) delegates transport; provider-user role + max_tokens/temperature
   composed at site; the no-request-id behavior stays inert (gate is a no-op off-proxy -- assert it); exception ->
   no-emit fallback unchanged.
-- [ ] Block-bar fold (D2): add `meets_block_bar(confidence, has_citations)` to `verdict.py`, reading
+- [x] Block-bar fold (D2): add `meets_block_bar(confidence, has_citations)` to `verdict.py`, reading
   `CONFIDENCE_THRESHOLD` at **call time** (no import-time value binding by consumers); `verdict_to_decision` and stages'
   `_map_verdict` both call it; stages' local constant deleted; message/violation shaping stays local.
-- [ ] Move-together test: monkeypatch `verdict.CONFIDENCE_THRESHOLD`; assert the semantic decision AND the workflow
+- [x] Move-together test: monkeypatch `verdict.CONFIDENCE_THRESHOLD`; assert the semantic decision AND the workflow
   reviewer flip together.
 
 ## Slice 3: lane delegation + one UUID constant

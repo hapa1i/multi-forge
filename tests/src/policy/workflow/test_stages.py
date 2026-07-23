@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import forge.policy.semantic.verdict as verdict_module
 from forge.core.llm import CompletionResponse
+from forge.policy.semantic.verdict import SupervisorVerdict, verdict_to_decision
 from forge.policy.types import ActionContext
 from forge.policy.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
 from forge.policy.workflow.stages import (
@@ -507,6 +509,26 @@ class TestMapVerdict:
             "wf.test",
         )
         assert result.decision == "deny"
+
+    def test_threshold_change_moves_semantic_and_workflow_together(self, monkeypatch) -> None:
+        data = {
+            "verdict": "divergent",
+            "confidence": 0.85,
+            "violations": [{"evidence": "bad", "citations": ["plan"]}],
+        }
+        semantic = SupervisorVerdict(
+            verdict="divergent",
+            confidence=0.85,
+            violations=[{"evidence": "bad", "citations": ["plan"]}],
+        )
+
+        monkeypatch.setattr(verdict_module, "CONFIDENCE_THRESHOLD", 0.9)
+        assert verdict_to_decision(semantic).decision == "warn"
+        assert _map_verdict(data, "wf.test").decision == "warn"
+
+        monkeypatch.setattr(verdict_module, "CONFIDENCE_THRESHOLD", 0.8)
+        assert verdict_to_decision(semantic).decision == "deny"
+        assert _map_verdict(data, "wf.test").decision == "deny"
 
 
 # --- _normalize_severity ---
