@@ -6,7 +6,7 @@
 
 Slices 1-2 are complete. The provider-aware transport helper now serves tagger, plan-check, workflow stages, and
 transfer; site-owned telemetry and failure contracts remain pinned, and the semantic/workflow block bar has one
-call-time predicate. **Current: Slice 3.**
+call-time predicate. Slice 3 delegates lane resolution and consolidates the policy UUID matcher. **Current: Slice 4.**
 
 ## Slice 0: Re-verify audit findings -- DONE 2026-07-24, corrected after review rounds 1-2
 
@@ -99,9 +99,9 @@ upstream recording all stay at call sites per the matrix.
 
 ## Slice 3: lane delegation + one UUID constant
 
-- [ ] `run_supervisor_check` calls `resolve_supervisor_lane(lane_record)` inside its existing fail-open try
+- [x] `run_supervisor_check` calls `resolve_supervisor_lane(lane_record)` inside its existing fail-open try
   (`supervisor.py:802-804` collapses); `LaneError` posture byte-identical.
-- [ ] D5: promote `queries.py:_UUID_RE` to public `RESUME_ID_UUID_RE`; `supervisor.py` imports it from
+- [x] D5: promote `queries.py:_UUID_RE` to public `RESUME_ID_UUID_RE`; `supervisor.py` imports it from
   `forge.policy.queries`, matching the existing supervisor -> queries dependency (never the reverse). Characterize
   canonical lowercase/uppercase UUIDs as accepted and compact, braced, and non-hex forms as rejected in both consumers;
   repo grep returns one production definition.

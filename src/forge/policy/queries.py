@@ -13,7 +13,7 @@ from forge.session import SessionStore
 from forge.session.effective import compute_effective_intent
 from forge.session.models import SessionState
 
-_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+RESUME_ID_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 def read_scoped_supervisor_target(
@@ -33,7 +33,7 @@ def read_scoped_supervisor_target(
         fr = supervisor_forge_root or fallback_forge_root
 
         # Try name-based lookup first (common case)
-        if not _UUID_RE.fullmatch(resume_id):
+        if not RESUME_ID_UUID_RE.fullmatch(resume_id):
             return mgr.get_session(resume_id, forge_root=fr)
 
         # UUID: reverse lookup through the index

@@ -352,6 +352,41 @@ class TestSupervisorDepthGuard:
 class TestSupervisorResumeTargetResolution:
     """Tests for resolving supervisor resume targets."""
 
+    @pytest.mark.parametrize(
+        "raw_uuid",
+        [
+            "12345678-1234-1234-1234-123456789abc",
+            "ABCDEF12-ABCD-ABCD-ABCD-ABCDEF123456",
+        ],
+    )
+    def test_canonical_uuid_bypasses_session_lookup(self, raw_uuid: str) -> None:
+        from forge.policy.semantic.supervisor import _resolve_resume_target
+
+        with patch("forge.policy.semantic.supervisor.SessionManager") as mock_manager:
+            resolved = _resolve_resume_target(raw_uuid)
+
+        assert resolved.resume_id == raw_uuid
+        assert resolved.warning is None
+        mock_manager.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "resume_id",
+        [
+            "12345678123412341234123456789abc",
+            "{12345678-1234-1234-1234-123456789abc}",
+            "12345678-1234-1234-1234-123456789abz",
+        ],
+    )
+    def test_noncanonical_uuid_uses_session_name_resolution(self, resume_id: str) -> None:
+        from forge.policy.semantic.supervisor import _resolve_resume_target
+
+        with patch("forge.policy.semantic.supervisor.SessionManager") as mock_manager:
+            mock_manager.return_value.get_session.side_effect = LookupError("not found")
+            resolved = _resolve_resume_target(resume_id)
+
+        assert resolved.resume_id == resume_id
+        mock_manager.return_value.get_session.assert_called_once_with(resume_id, forge_root=None)
+
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_resolves_forge_session_name_to_uuid(self, mock_run: MagicMock) -> None:
         """A Forge session name should resolve to its confirmed Claude UUID."""
