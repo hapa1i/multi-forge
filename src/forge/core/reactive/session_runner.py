@@ -1,8 +1,8 @@
 """Claude subprocess management for headless (-p) mode.
 
 Provides a unified interface for running ``claude -p`` as a subprocess
-with structured result handling. Used by the semantic supervisor
-(``claude -p --resume``) and the memory writer (``claude -p``).
+with structured result handling. Used by semantic and team supervisors,
+the memory writer, and shadow curation.
 
 For interactive sessions (stdin/stdout inherited), use
 ``forge.session.claude.invoke.invoke_claude()`` instead.
@@ -31,6 +31,13 @@ from forge.core.reactive.headless_json import (
 from forge.core.reactive.structured_output import parse_headless_envelope
 
 _log = logging.getLogger(__name__)
+
+_CLAUDE_MODEL_PIN_ENV_VARS = (
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+)
 
 
 @dataclass

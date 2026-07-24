@@ -17,7 +17,11 @@ from forge.core.invoker.types import Attribution, HeadlessResult
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
-from forge.core.reactive.session_runner import SessionResult, run_claude_session
+from forge.core.reactive.session_runner import (
+    _CLAUDE_MODEL_PIN_ENV_VARS,
+    SessionResult,
+    run_claude_session,
+)
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.queries import RESUME_ID_UUID_RE
@@ -97,13 +101,6 @@ conflicts between this plan and earlier conversation context, THIS plan takes pr
 {plan_content}
 
 ---"""
-
-_CLAUDE_MODEL_PIN_ENV_VARS = (
-    "ANTHROPIC_MODEL",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-)
 
 # The supervisor as a consumer-lane binding (epic consumer_lanes). It reads repo
 # files (a `tool_agent` capability floor), and `runtime_id` selects the dispatch arm

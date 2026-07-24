@@ -261,7 +261,11 @@ checker → reviewer stages. The tagger is called once per event and its tags ro
 avoiding redundant classification.
 
 **Team extension**: The same library works for team hooks (`TeammateIdle`, `TaskCompleted`) by subscribing to different
-events. See [team_design.md](board/proposed/team_orchestration/card.md) §3.
+events. Its block bar is deliberately narrower than the semantic supervisor's: a parsed divergent verdict blocks only
+when `confidence` meets the shared threshold (default `0.8`), without a citation predicate. Low, missing, or malformed
+confidence allows the event but preserves the supervisor's feedback as diagnostic stderr; only exit-2 feedback is
+guaranteed to reach the teammate on the Claude hook wire. See
+[team_design.md](board/proposed/team_orchestration/card.md) §3.
 
 ### 1.3 Verification Policy (Feedback Loop)
 

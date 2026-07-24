@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from forge.cli.hooks.commands import _safe_cache_key
 from forge.core.llm import CompletionResponse
 from forge.core.reactive.session_runner import SessionResult
@@ -53,6 +55,57 @@ def _task_event(
         "task_subject": task_subject,
         "hook_event_name": "TaskCompleted",
     }
+
+
+@pytest.fixture(autouse=True)
+def _clear_team_routing_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the team-routing matrix independent of the invoking Forge session."""
+    for name in (
+        "ANTHROPIC_BASE_URL",
+        "FORGE_LAUNCH_MODE",
+        "FORGE_SIDECAR",
+        "FORGE_SUBPROCESS_BASE_URL",
+        "FORGE_SUBPROCESS_PROXY",
+        "FORGE_SUBPROCESS_PROXY_ID",
+        "FORGE_SUBPROCESS_TEMPLATE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _invoke_supervisor_with_spies(
+    config: TeamSupervisorConfig,
+    *,
+    result: SessionResult | None = None,
+) -> tuple[tuple[int, str], MagicMock, MagicMock, MagicMock]:
+    """Invoke the supervisor while exposing dispatch, runner, and usage boundaries."""
+    dispatch = MagicMock()
+    with (
+        patch("forge.policy.team.handlers.run_claude_session") as run,
+        patch("forge.core.reactive.cost_tracking.track_verb_cost") as track_cost,
+        patch("forge.core.usage.emit_usage_for_session_result") as emit_usage,
+    ):
+        run.return_value = result or SessionResult(
+            stdout='{"verdict": "aligned", "confidence": 0.9}',
+            stderr="",
+            returncode=0,
+        )
+        outcome = _run_supervisor(
+            config,
+            "alice",
+            "team",
+            "idle",
+            "",
+            on_dispatch=dispatch,
+        )
+    if run.called:
+        base_url = run.call_args.kwargs["base_url"]
+        track_cost.assert_called_once_with("team-supervisor", [base_url] if base_url else [])
+        emit_usage.assert_called_once()
+        assert emit_usage.call_args.kwargs["base_url"] == base_url
+    else:
+        track_cost.assert_not_called()
+        emit_usage.assert_not_called()
+    return outcome, run, emit_usage, dispatch
 
 
 # --- _is_fresh ---
@@ -200,13 +253,44 @@ class TestRunSupervisor:
     @patch("forge.policy.team.handlers.run_claude_session")
     def test_divergent_blocks(self, mock_session):
         mock_session.return_value = SessionResult(
-            stdout='{"verdict": "divergent", "feedback": "Missing tests"}',
+            stdout='{"verdict": "divergent", "confidence": 0.9, "feedback": "Missing tests"}',
             stderr="",
             returncode=0,
         )
         exit_code, feedback = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 2
         assert "Missing tests" in feedback
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            '{"verdict": "divergent", "confidence": 0.3, "feedback": "Check scope"}',
+            '{"verdict": "divergent", "confidence": "invalid", "feedback": "Check scope"}',
+            '{"verdict": "divergent", "feedback": "Check scope"}',
+        ],
+        ids=["low", "malformed", "missing"],
+    )
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_divergent_below_bar_allows_with_feedback(self, mock_session, payload):
+        mock_session.return_value = SessionResult(stdout=payload, stderr="", returncode=0)
+
+        exit_code, feedback = _run_supervisor(_config(), "alice", "team", "idle", "")
+
+        assert exit_code == 0
+        assert feedback == "Check scope"
+
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_confidence_threshold_is_read_at_call_time(self, mock_session, monkeypatch):
+        from forge.policy.semantic import verdict as verdict_module
+
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "divergent", "confidence": 0.9, "feedback": "Check scope"}',
+            stderr="",
+            returncode=0,
+        )
+        monkeypatch.setattr(verdict_module, "CONFIDENCE_THRESHOLD", 0.95)
+
+        assert _run_supervisor(_config(), "alice", "team", "idle", "") == (0, "Check scope")
 
     @patch("forge.policy.team.handlers.run_claude_session")
     def test_subprocess_failure_allows(self, mock_session):
@@ -252,6 +336,175 @@ class TestRunSupervisor:
         mock_session.assert_called_once()
         assert mock_session.call_args.kwargs["base_url"] is None
         assert mock_session.call_args.kwargs["direct"] is True
+        assert mock_session.call_args.kwargs["unset_env_vars"] is None
+
+
+class TestRunSupervisorRoutingMatrix:
+    """Pin the D3 pre-dispatch route, freeze, usage, and pin-scrub contract."""
+
+    def test_direct_skips_resolver_and_preserves_model_pins(self, monkeypatch):
+        monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "ambient-proxy")
+        with patch("forge.policy.team.handlers.resolve_subprocess_routing") as resolve:
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config(direct=True))
+
+        assert outcome == (0, "")
+        resolve.assert_not_called()
+        assert run.call_args.kwargs["base_url"] is None
+        assert run.call_args.kwargs["direct"] is True
+        assert run.call_args.kwargs["unset_env_vars"] is None
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_explicit_base_url_dispatches_proxied_and_scrubs_model_pins(self):
+        outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config(base_url="http://proxy.test:8095"))
+
+        assert outcome == (0, "")
+        assert run.call_args.kwargs["base_url"] == "http://proxy.test:8095"
+        assert run.call_args.kwargs["direct"] is False
+        assert "ANTHROPIC_MODEL" in run.call_args.kwargs["unset_env_vars"]
+        assert "model" not in run.call_args.kwargs
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_explicit_named_proxy_reachable_dispatches_after_strict_preflight(self):
+        entry = MagicMock(
+            proxy_id="team-proxy",
+            template="openrouter-anthropic",
+            base_url="http://proxy.test:8095",
+        )
+        with (
+            patch("forge.core.reactive.routing.lookup_proxy_entry_strict", return_value=entry) as lookup,
+            patch("forge.core.reactive.routing._check_proxy_reachable", return_value=True) as health,
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config(proxy="team-proxy"))
+
+        assert outcome == (0, "")
+        lookup.assert_called_once_with("team-proxy")
+        health.assert_called_once_with(entry)
+        assert run.call_args.kwargs["base_url"] == "http://proxy.test:8095"
+        assert "ANTHROPIC_MODEL" in run.call_args.kwargs["unset_env_vars"]
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_explicit_named_proxy_missing_fails_open_before_commitment(self):
+        with patch(
+            "forge.core.reactive.routing.lookup_proxy_entry_strict",
+            side_effect=RuntimeError("not registered"),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config(proxy="missing-proxy"))
+
+        assert outcome == (0, "")
+        run.assert_not_called()
+        dispatch.assert_not_called()
+        emit_usage.assert_not_called()
+
+    def test_explicit_named_proxy_unreachable_fails_open_before_commitment(self):
+        entry = MagicMock(
+            proxy_id="team-proxy",
+            template="openrouter-anthropic",
+            base_url="http://proxy.test:8095",
+        )
+        with (
+            patch("forge.core.reactive.routing.lookup_proxy_entry_strict", return_value=entry),
+            patch("forge.core.reactive.routing._check_proxy_reachable", return_value=False),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config(proxy="team-proxy"))
+
+        assert outcome == (0, "")
+        run.assert_not_called()
+        dispatch.assert_not_called()
+        emit_usage.assert_not_called()
+
+    def test_ambient_subprocess_proxy_reachable_is_visible_before_dispatch(self, monkeypatch):
+        monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "ambient-proxy")
+        entry = MagicMock(
+            proxy_id="ambient-proxy",
+            template="openrouter-anthropic",
+            base_url="http://ambient.test:8095",
+        )
+        with (
+            patch("forge.core.reactive.routing.lookup_proxy_entry_strict", return_value=entry),
+            patch("forge.core.reactive.routing._check_proxy_reachable", return_value=True),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        assert run.call_args.kwargs["base_url"] == "http://ambient.test:8095"
+        assert "ANTHROPIC_MODEL" in run.call_args.kwargs["unset_env_vars"]
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_ambient_subprocess_proxy_missing_fails_open_before_commitment(self, monkeypatch):
+        monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "missing-proxy")
+        with patch(
+            "forge.core.reactive.routing.lookup_proxy_entry_strict",
+            side_effect=RuntimeError("not registered"),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        run.assert_not_called()
+        dispatch.assert_not_called()
+        emit_usage.assert_not_called()
+
+    def test_ambient_subprocess_proxy_unreachable_fails_open_before_commitment(self, monkeypatch):
+        monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "ambient-proxy")
+        entry = MagicMock(
+            proxy_id="ambient-proxy",
+            template="openrouter-anthropic",
+            base_url="http://ambient.test:8095",
+        )
+        with (
+            patch("forge.core.reactive.routing.lookup_proxy_entry_strict", return_value=entry),
+            patch("forge.core.reactive.routing._check_proxy_reachable", return_value=False),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        run.assert_not_called()
+        dispatch.assert_not_called()
+        emit_usage.assert_not_called()
+
+    def test_inherited_base_url_is_visible_before_dispatch(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://inherited.test:8095")
+        registry = MagicMock()
+        registry.proxies = {}
+        with (
+            patch("forge.proxy.proxies.ProxyRegistryStore.read", return_value=registry),
+            patch("forge.proxy.proxies.lookup_proxy_by_base_url", return_value=None),
+            patch("forge.core.reactive.routing._probe_proxy_metadata", return_value=None),
+        ):
+            outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        assert run.call_args.kwargs["base_url"] == "http://inherited.test:8095"
+        assert "ANTHROPIC_MODEL" in run.call_args.kwargs["unset_env_vars"]
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_sidecar_injected_base_url_is_visible_before_dispatch(self, monkeypatch):
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        monkeypatch.setenv("FORGE_SUBPROCESS_BASE_URL", "http://host.docker.internal:8095")
+        monkeypatch.setenv("FORGE_SUBPROCESS_PROXY_ID", "team-proxy")
+        monkeypatch.setenv("FORGE_SUBPROCESS_TEMPLATE", "openrouter-anthropic")
+
+        outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        assert run.call_args.kwargs["base_url"] == "http://host.docker.internal:8095"
+        assert "ANTHROPIC_MODEL" in run.call_args.kwargs["unset_env_vars"]
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
+
+    def test_unresolved_dispatches_direct_without_scrubbing_model_pins(self):
+        outcome, run, emit_usage, dispatch = _invoke_supervisor_with_spies(_config())
+
+        assert outcome == (0, "")
+        assert run.call_args.kwargs["base_url"] is None
+        assert run.call_args.kwargs["direct"] is False
+        assert run.call_args.kwargs["unset_env_vars"] is None
+        dispatch.assert_called_once_with()
+        emit_usage.assert_called_once()
 
 
 # --- usage attribution (Phase 5: the team supervisor is now instrumented) ---

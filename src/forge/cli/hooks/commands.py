@@ -1862,7 +1862,7 @@ def _team_supervisor_hook(log_label: str, handler: Callable[..., tuple[int, str]
         cache_key,
         lambda cache: handler(data, config, cache, backend_id=backend_id, on_dispatch=_freeze),
     )
-    if exit_code == 2 and feedback:
+    if feedback:
         print(feedback, file=sys.stderr)
     sys.exit(exit_code)
 
@@ -1871,7 +1871,7 @@ def _team_supervisor_hook(log_label: str, handler: Callable[..., tuple[int, str]
 def teammate_idle() -> None:
     """Handle TeammateIdle hook from Claude Code.
 
-    Exit 0: allow teammate to go idle.
+    Exit 0: allow teammate to go idle (stderr may contain diagnostic feedback).
     Exit 2: teammate continues working (stderr = feedback).
     """
     from forge.policy.team.handlers import handle_teammate_idle
@@ -1883,7 +1883,7 @@ def teammate_idle() -> None:
 def task_completed() -> None:
     """Handle TaskCompleted hook from Claude Code.
 
-    Exit 0: task marked as completed.
+    Exit 0: task marked as completed (stderr may contain diagnostic feedback).
     Exit 2: task stays open (stderr = feedback to teammate).
     """
     from forge.policy.team.handlers import handle_task_completed

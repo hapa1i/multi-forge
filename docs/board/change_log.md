@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-24
+
+### Policy shared-library seam
+
+**Goal**: Extract the honest shared policy/reactive seams while preserving caller-specific telemetry and failure
+contracts, then correct the team supervisor's routing, confidence, and model-pin behavior.
+
+**Key changes**:
+
+- Added one provider-aware direct-LLM transport helper for the action tagger, plan checker, workflow stages, transfer
+  curation, and team tagger; parsing, telemetry emission, and fail behavior remain caller-owned and matrix-tested.
+- Consolidated the semantic/workflow confidence-plus-citation predicate, supervisor lane resolution, and canonical
+  resume-ID matcher without changing their decisions.
+- Applied the decided D7 team contract: divergent verdicts block only at the shared confidence threshold; lower or
+  malformed confidence allows with diagnostic stderr feedback. Team routing now resolves before commitment, so strict
+  named-route failures skip before lane freeze/usage, while reachable ambient routes become visible to cost and usage.
+- Fixed executor model-pin leakage for every resolved team-supervisor URL without imposing the semantic supervisor's
+  `opus` pin. Added a deterministic Docker fixture covering both team hooks through the tagger HTTP and `claude -p`
+  wires.
+
+**Verification**: Focused acceptance (`449 passed`); `make test-unit` (`8314 passed, 1 skipped, 117 deselected`);
+`make test-regression` (`529 passed`); targeted policy/supervisor/team-hook Docker integration (`32 passed`); mypy,
+pyright, and `make pre-commit`.
+
 ## 2026-07-23
 
 ### Runtime-neutral workflow workers closeout

@@ -4,9 +4,8 @@
 
 ## Current focus
 
-Slices 1-2 are complete. The provider-aware transport helper now serves tagger, plan-check, workflow stages, and
-transfer; site-owned telemetry and failure contracts remain pinned, and the semantic/workflow block bar has one
-call-time predicate. Slice 3 delegates lane resolution and consolidates the policy UUID matcher. **Current: Slice 4.**
+Complete 2026-07-24. The shared seams, D3 routing changes, D7 team gate, model-pin fix, deterministic team wire fixture,
+design sync, verification, and board closeout are recorded below.
 
 ## Slice 0: Re-verify audit findings -- DONE 2026-07-24, corrected after review rounds 1-2
 
@@ -108,45 +107,45 @@ upstream recording all stay at call sites per the matrix.
 
 ## Slice 4: team handler -- confidence gate (D7), model-pin fix, routing, fifth caller, wire coverage
 
-- [ ] Characterization tests pin the team-tagger matrix row + current `_run_supervisor` contract (pre-change).
-- [ ] **D7a gate (decided)**: parse the verdict; block `(2, feedback)` only when
+- [x] Characterization tests pin the team-tagger matrix row + current `_run_supervisor` contract (pre-change).
+- [x] **D7a gate (decided)**: parse the verdict; block `(2, feedback)` only when
   `confidence >= verdict.CONFIDENCE_THRESHOLD` (call-time read of the shared constant -- the two-arg citation predicate
   is NOT used here; the team bar is confidence-only by decision). Divergent below bar -> `(0, feedback)`.
   Malformed/missing confidence degrades to `0.0` (warn, never block -- mirrors `stages.py:262-268`).
-- [ ] **D7b warn channel (decided)**: `_team_supervisor_hook` (`cli/hooks/commands.py:1865`) also prints feedback on
+- [x] **D7b warn channel (decided)**: `_team_supervisor_hook` (`cli/hooks/commands.py:1865`) also prints feedback on
   exit 0 (log/verbose visibility; teammate delivery is only guaranteed on exit 2 per the hook contract). Update both
   hook command docstrings.
-- [ ] **Defect B fix**: scrub model pins whenever a `base_url` resolved from ANY source (same rule as
+- [x] **Defect B fix**: scrub model pins whenever a `base_url` resolved from ANY source (same rule as
   `supervisor.py:567`); direct/unresolved dispatch keeps env. D4: promote `_CLAUDE_MODEL_PIN_ENV_VARS` to
   `core/reactive/session_runner.py`. Deliberate divergence from the semantic arm: **no** `model="opus"` pin for the team
   supervisor (the team design targets cheap proxies; forcing opus would change cost posture) -- documented in the design
   sync.
-- [ ] **Routing migration (D3 matrix below)**: `_run_supervisor` resolves via
+- [x] **Routing migration (D3 matrix below)**: `_run_supervisor` resolves via
   `resolve_subprocess_routing(explicit_base_url=config.base_url, explicit_proxy=config.proxy, require_route=False)`
   mirroring `supervisor.py:554`. A resolver exception fails open before dispatch; an unresolved result dispatches
   direct. Ambient destinations are unchanged, but their route becomes visible before dispatch for cost tracking,
   model-pin scrubbing, usage attribution, and lane-freeze commitment.
-- [ ] **Fifth caller**: `_classify_event` delegates transport to the Slice-1 helper; matrix row byte-identical.
-- [ ] D6: after removing the team-handler import, correct `core/reactive/proxy.py:4` to name the remaining
+- [x] **Fifth caller**: `_classify_event` delegates transport to the Slice-1 helper; matrix row byte-identical.
+- [x] D6: after removing the team-handler import, correct `core/reactive/proxy.py:4` to name the remaining
   `lookup_proxy_base_url` consumers (`core/reactive/env.py`, `core/reactive/cost_tracking.py`); no module deletion
   (`check_proxy_reachable` co-resides).
-- [ ] Consumer-lane freeze keeps its commitment rule: `on_dispatch` fires only past depth + routing guards
+- [x] Consumer-lane freeze keeps its commitment rule: `on_dispatch` fires only past depth + routing guards
   (`handlers.py:261-264`). Missing/corrupt named proxies already fail before that boundary. D3 intentionally moves
   present-but-unreachable named proxies and invalid ambient routes in front of it, so those paths no longer freeze a
   lane or emit a dispatch usage event; characterize the old paths and assert the new ones.
-- [ ] D7 unit coverage in `tests/src/policy/team/test_handlers.py` and a CLI-hook feedback test: low-confidence and
+- [x] D7 unit coverage in `tests/src/policy/team/test_handlers.py` and a CLI-hook feedback test: low-confidence and
   malformed-confidence divergent -> exit 0 + stderr feedback; high-confidence divergent -> exit 2.
-- [ ] Defect-B regression carries `pytestmark = pytest.mark.regression`:
+- [x] Defect-B regression carries `pytestmark = pytest.mark.regression`:
   `tests/regression/test_bug_team_supervisor_model_pin_leak.py`. Assert scrub for explicit base URL, explicit named
   proxy, ambient `FORGE_SUBPROCESS_PROXY`, inherited `ANTHROPIC_BASE_URL`, and sidecar-injected base URL; direct and
   truly unresolved dispatches keep the pins.
-- [ ] **Team wire integration (new -- none exists today)**: Docker harnessed-claude coverage for
+- [x] **Team wire integration (new -- none exists today)**: Docker harnessed-claude coverage for
   `forge hook teammate-idle` / `task-completed` asserting exit codes + stderr on both the exit-0 warn and exit-2 block
   paths. The fixture installs (1) an OpenAI-compatible `/v1/chat/completions` stub wired through
   `LITELLM_LOCAL_BASE_URL` that deterministically returns `needs-review`, (2) a `claude` harness that returns selectable
   low/high-confidence verdicts, and (3) an enabled team-supervisor manifest with isolated session/cache ids. File:
   `tests/integration/docker/test_team_hooks.py`.
-- [ ] Design sync (per-phase): design_workflows.md §1.2 team-extension note documents the confidence-only team bar +
+- [x] Design sync (per-phase): design_workflows.md §1.2 team-extension note documents the confidence-only team bar +
   exit-0 warn channel as the team contract; design.md §3.6.12 fail-behavior table gains a team-supervisor row
   (fail-open; unresolved -> direct), the D3 early-resolution/strict-validation deltas, and the no-opus-pin divergence.
   Update the linked `docs/board/proposed/team_orchestration/card.md` "current implementation" reference when the code
@@ -218,13 +217,14 @@ upstream recording all stay at call sites per the matrix.
 
 ## Closeout
 
-- [ ] Focused suites; `make test-unit`; `make test-regression`; targeted integration:
+- [x] Focused suites (`449 passed`); `make test-unit` (`8314 passed, 1 skipped, 117 deselected`); `make test-regression`
+  (`529 passed`); targeted integration (`32 passed`):
   `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py tests/integration/docker/test_supervisor_e2e.py tests/integration/docker/test_team_hooks.py`
-- [ ] `make pre-commit` clean
-- [ ] Verify the per-slice design-sync tasks landed (design_workflows.md §1.2 + §2.1; design.md §3.6.12; linked
+- [x] `make pre-commit` clean
+- [x] Verify the per-slice design-sync tasks landed (design_workflows.md §1.2 + §2.1; design.md §3.6.12; linked
   `team_orchestration` current-implementation reference); no end-user doc changes expected (team feature has no end-user
   guide yet)
-- [ ] Compact `docs/board/change_log.md` entry (Goal / Key changes / Verification; name D7 + D3 strict-preflight and
+- [x] Compact `docs/board/change_log.md` entry (Goal / Key changes / Verification; name D7 + D3 strict-preflight and
   early-visibility deltas as the behavior changes)
-- [ ] Durable lessons proposed via `.forge/memory/shadow_impl_notes.md` for human promotion
-- [ ] Card `doing/` -> `done/`; no inbound links to repoint (verified 2026-07-24)
+- [x] Durable lessons proposed via `.forge/memory/shadow_impl_notes.md` for human promotion
+- [x] Card `doing/` -> `done/`; no inbound links to repoint (verified 2026-07-24)

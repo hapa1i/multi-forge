@@ -550,20 +550,21 @@ of a lookup-only `resolve_proxy()`. This makes a template name with no running p
 
 #### 3.6.12 Subprocess routing resolution (normative)
 
-All Forge subprocesses (workflow workers, supervisor, memory writer) resolve proxy routing through a single shared
-function (`resolve_subprocess_routing()`). This replaced four ad-hoc resolution paths that each implemented different
-fallback chains with different semantics.
+Forge subprocesses (workflow workers, semantic and team supervisors, memory writer) share `resolve_subprocess_routing()`
+when they need Forge-owned transport selection. This replaced ad-hoc resolution paths that implemented different
+fallback chains with different semantics. Intentional direct and runtime-native arms bypass the resolver.
 
-**Resolution chain** (same for every subprocess type):
+**Resolution chain** (sources not supplied by a caller are skipped):
 
-| Step | Source             | Behavior                                                                 |
-| ---- | ------------------ | ------------------------------------------------------------------------ |
-| 1    | `explicit`         | CLI flag override (`--proxy`, `--supervisor-proxy`, config URL)          |
-| 2    | `subprocess_proxy` | Session ambient (`FORGE_SUBPROCESS_PROXY`) -- user intent for child jobs |
-| 3    | `preferred_proxy`  | Catalog hint (`ModelSpec.preferred_proxy`); soft -- skip if not running  |
-| 4    | `route_scan`       | Find any running proxy compatible with a derived `ModelRoute`            |
-| 5    | `session_proxy`    | Inherited `ANTHROPIC_BASE_URL`                                           |
-| 6    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                  |
+| Step | Source             | Behavior                                                                                        |
+| ---- | ------------------ | ----------------------------------------------------------------------------------------------- |
+| 1    | `explicit`         | Opaque base-URL override                                                                        |
+| 2    | `explicit`         | Named CLI/config proxy; strict registration, reachability, and route compatibility              |
+| 3    | `subprocess_proxy` | Ambient `FORGE_SUBPROCESS_PROXY`; strict, or host-injected sidecar URL/metadata                 |
+| 4    | `preferred_proxy`  | Catalog hint (`ModelSpec.preferred_proxy`); soft -- skip if not running                         |
+| 5    | `route_scan`       | Find any running proxy compatible with a derived `ModelRoute`                                   |
+| 6    | `session_proxy`    | Inherited `ANTHROPIC_BASE_URL`; opaque URLs are accepted when the caller does not require route |
+| 7    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                                         |
 
 `source="direct"` is produced by workflow routing (`review.routing`) for direct-only model specs (e.g., `claude-opus`
 running `claude -p --bare`), not by the shared resolver. Workflow routing also produces `source="runtime_native"` for
@@ -571,11 +572,23 @@ the Codex worker; that source intentionally has no `ModelRoute` because Codex ow
 generally, `route=None` can also mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL), so
 `source` and `base_url` distinguish the cases.
 
-**Supervisor model scope:** When supervisor routing resolves to a proxy URL, the supervisor invokes
+**Supervisor model scope:** When semantic-supervisor routing resolves to a proxy URL, it invokes
 `claude -p --model opus` and clears inherited Claude model-pin env vars (`ANTHROPIC_MODEL`,
 `ANTHROPIC_DEFAULT_*_MODEL`). This keeps executor/session `--model` pins local to the executor while allowing the
-supervisor to use the selected proxy's `opus` tier. Direct supervisors do not get this proxy-tier reset because there is
-no Forge proxy mapping to resolve.
+semantic supervisor to use the selected proxy's `opus` tier.
+
+The team supervisor also clears inherited model pins whenever any source resolves a base URL, including explicit,
+ambient, inherited, and sidecar-injected URLs. It deliberately does **not** pass `--model opus`: the resumed team
+supervisor keeps its existing model posture instead of acquiring semantic-supervisor tier policy. `direct=True` skips
+resolution, while a truly unresolved route dispatches direct; both retain inherited model pins.
+
+**Team commitment boundary:** The team handler resolves routing before its `on_dispatch` callback. Explicit or ambient
+named proxies are strict: missing, corrupt, or unreachable entries fail open by skipping the check before lane freeze or
+dispatch-usage emission. This includes an ambient `FORGE_SUBPROCESS_PROXY` that is unregistered (previously silently
+fell through to direct) and one that is registered but unreachable (previously failed after dispatch commitment).
+Reachable ambient proxies, inherited `ANTHROPIC_BASE_URL`, and sidecar-injected URLs keep the same destination but are
+now visible early enough for cost tracking and model-pin scrubbing. The team caller supplies no `ModelRoute`, so
+`preferred_proxy` and `route_scan` are no-ops.
 
 This chain applies to the supervisor's default `claude_code` lane. The `codex` lane arm (the supervisor's
 `consumer_lanes` binding, epic consumer_lanes) bypasses it entirely: `codex exec` runs **direct** to OpenAI with no
@@ -583,11 +596,12 @@ Forge proxy. See [design_appendix.md §G](design_appendix.md#g-subprocess-routin
 
 **Fail behavior by subprocess type:**
 
-| Subprocess    | On unresolved | Rationale                                                        |
-| ------------- | ------------- | ---------------------------------------------------------------- |
-| Workflows     | Fail closed   | User asked for this work; partial results worse than an error    |
-| Supervisor    | Fail open     | Blocking the coding session is worse than skipping a check       |
-| Memory writer | Fail open     | Async/best-effort; benefits future sessions, not the current one |
+| Subprocess          | On unresolved   | Rationale                                                        |
+| ------------------- | --------------- | ---------------------------------------------------------------- |
+| Workflows           | Fail closed     | User asked for this work; partial results worse than an error    |
+| Semantic supervisor | Fail open       | Blocking the coding session is worse than skipping a check       |
+| Team supervisor     | Dispatch direct | No configured route is a valid direct resumed-session posture    |
+| Memory writer       | Fail open       | Async/best-effort; benefits future sessions, not the current one |
 
 **Per-invocation routing plan:** Workflow commands resolve routing for all workers **once** at invocation start as a
 frozen `WorkerRoutingPlan`. If any Codex worker is selected, the plan also freezes one fresh cached Codex preflight for
