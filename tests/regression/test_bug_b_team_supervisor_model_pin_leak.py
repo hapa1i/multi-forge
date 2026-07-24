@@ -1,4 +1,4 @@
-"""Regression coverage for executor model pins leaking into proxied team checks."""
+"""Regression B: executor model pins must not leak into proxied team checks."""
 
 from __future__ import annotations
 

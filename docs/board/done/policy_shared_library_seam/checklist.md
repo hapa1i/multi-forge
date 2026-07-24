@@ -29,7 +29,7 @@ Verified against `main` at `0435e561`; review corrections are marked CORRECTED.
   supervisor. That card is `proposed/` (non-normative per board_contract), so no authority exists either way -- the
   prompt requests a `confidence` the handler never reads (`prompts.py:38`, `handlers.py:289-294`). Reclassified as
   policy decision **D7, resolved by the user 2026-07-24** (confidence-only gate + exit-0 warn channel).
-- [x] Defect B (model-pin leak) stands: semantic scrubs `_CLAUDE_MODEL_PIN_ENV_VARS` when a base_url resolves
+- [x] Defect B (model-pin leak) stands: semantic scrubs `CLAUDE_MODEL_PIN_ENV_VARS` when a base_url resolves
   (`supervisor.py:567,593`); team passes no `unset_env_vars` (`handlers.py:266-274`).
 - [x] CORRECTED -- `lookup_proxy_base_url` importers are `policy/team/handlers.py:21`, `core/reactive/env.py:574`, and
   `core/reactive/cost_tracking.py:117` (plus direct tests incl. `check_proxy_reachable` in
@@ -50,7 +50,7 @@ Verified against `main` at `0435e561`; review corrections are marked CORRECTED.
 - [x] Active `card.md` synchronized after review round 2: transport-only seam, ordered slice dependencies, D7 policy
   change, and D3 early-resolution semantics now match this checklist.
 
-## Telemetry contract (normative for this card -- byte-identical before/after)
+## Telemetry contract (normative counts, statuses, and failure posture)
 
 | Caller (command)                                     | Success                                                                             | Parse failure                                   | Transport exception                                                          |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -60,9 +60,14 @@ Verified against `main` at `0435e561`; review corrections are marked CORRECTED.
 | team tagger (`team-tagger`)                          | 1 usage (default success; `$FORGE_SESSION` best-effort)                             | n/a (first-word fallback `routine`)             | 1 usage error/`exception`                                                    |
 | transfer curation (`transfer-curate`)                | 1 usage success + identity-gated upstream                                           | 1 usage error/`unparseable_output`              | **0 usage events** (fallback only; `transfer.py:965-967`)                    |
 
-Failure-type vocabularies (`parse_error` vs `unparseable_output`) are per-site and preserved. "Single emitter" means
-*this matrix exactly*, never "one event on every path". Characterization tests pin each row BEFORE its site is
-repointed.
+Failure-type vocabularies (`parse_error` vs `unparseable_output`) are per-site and preserved. "Single emitter" means the
+event counts and failure paths in this matrix, never "one event on every path". Characterization tests pin each row
+BEFORE its site is repointed.
+
+The transport request-ID gate is an explicitly additive correlation exception: when a configured target is a registered
+Forge proxy, the helper attaches `X-Request-ID` and the call site may persist `cost_request_id`. The default direct
+OpenRouter target remains off-proxy and inert. This changes correlation fields, not event counts, statuses, or failure
+posture.
 
 ## Slice 1: transport-core helper; repoint tagger + plan_check
 
@@ -88,8 +93,8 @@ upstream recording all stay at call sites per the matrix.
 - [x] `_complete_with_usage` (`stages.py`) delegates transport; emission/parse split and the "verdict mapping outside
   the emit try" no-double-emit contract stay in stages.
 - [x] `_call_llm_for_curation_prompt` (`transfer.py`) delegates transport; provider-user role + max_tokens/temperature
-  composed at site; the no-request-id behavior stays inert (gate is a no-op off-proxy -- assert it); exception ->
-  no-emit fallback unchanged.
+  composed at site; the default direct OpenRouter target keeps request-ID behavior inert, while a registered Forge proxy
+  gains the additive correlation described above; exception -> no-emit fallback unchanged.
 - [x] Block-bar fold (D2): add `meets_block_bar(confidence, has_citations)` to `verdict.py`, reading
   `CONFIDENCE_THRESHOLD` at **call time** (no import-time value binding by consumers); `verdict_to_decision` and stages'
   `_map_verdict` both call it; stages' local constant deleted; message/violation shaping stays local.
@@ -111,12 +116,13 @@ upstream recording all stay at call sites per the matrix.
 - [x] **D7a gate (decided)**: parse the verdict; block `(2, feedback)` only when
   `confidence >= verdict.CONFIDENCE_THRESHOLD` (call-time read of the shared constant -- the two-arg citation predicate
   is NOT used here; the team bar is confidence-only by decision). Divergent below bar -> `(0, feedback)`.
-  Malformed/missing confidence degrades to `0.0` (warn, never block -- mirrors `stages.py:262-268`).
+  Malformed/missing confidence degrades to `0.0`, sharing stages' fail-open posture. Team parsing additionally treats
+  booleans, non-finite values, and values outside `0.0-1.0` as malformed.
 - [x] **D7b warn channel (decided)**: `_team_supervisor_hook` (`cli/hooks/commands.py:1865`) also prints feedback on
   exit 0 (log/verbose visibility; teammate delivery is only guaranteed on exit 2 per the hook contract). Update both
   hook command docstrings.
 - [x] **Defect B fix**: scrub model pins whenever a `base_url` resolved from ANY source (same rule as
-  `supervisor.py:567`); direct/unresolved dispatch keeps env. D4: promote `_CLAUDE_MODEL_PIN_ENV_VARS` to
+  `supervisor.py:567`); direct/unresolved dispatch keeps env. D4: promote `CLAUDE_MODEL_PIN_ENV_VARS` to
   `core/reactive/session_runner.py`. Deliberate divergence from the semantic arm: **no** `model="opus"` pin for the team
   supervisor (the team design targets cheap proxies; forcing opus would change cost posture) -- documented in the design
   sync.
@@ -136,7 +142,7 @@ upstream recording all stay at call sites per the matrix.
 - [x] D7 unit coverage in `tests/src/policy/team/test_handlers.py` and a CLI-hook feedback test: low-confidence and
   malformed-confidence divergent -> exit 0 + stderr feedback; high-confidence divergent -> exit 2.
 - [x] Defect-B regression carries `pytestmark = pytest.mark.regression`:
-  `tests/regression/test_bug_team_supervisor_model_pin_leak.py`. Assert scrub for explicit base URL, explicit named
+  `tests/regression/test_bug_b_team_supervisor_model_pin_leak.py`. Assert scrub for explicit base URL, explicit named
   proxy, ambient `FORGE_SUBPROCESS_PROXY`, inherited `ANTHROPIC_BASE_URL`, and sidecar-injected base URL; direct and
   truly unresolved dispatches keep the pins.
 - [x] **Team wire integration (new -- none exists today)**: Docker harnessed-claude coverage for
@@ -182,7 +188,7 @@ upstream recording all stay at call sites per the matrix.
 - **D3 -- early shared routing resolution**: the matrix above distinguishes unchanged subprocess destinations from the
   intentional strict-validation, attribution, model-pin, usage, and freeze-timing deltas. Authority is design.md
   §3.6.12.
-- **D4 -- `_CLAUDE_MODEL_PIN_ENV_VARS`** promoted to `core/reactive/session_runner.py` (home of `unset_env_vars`).
+- **D4 -- `CLAUDE_MODEL_PIN_ENV_VARS`** promoted to `core/reactive/session_runner.py` (home of `unset_env_vars`).
 - **D5 -- UUID regex owner**: `policy/queries.py` promotes `_UUID_RE` to public `RESUME_ID_UUID_RE`;
   `semantic/supervisor.py` imports it in the already-existing supervisor -> queries direction.
 - **D6 -- docstring correction only**; deletion retracted (two production importers remain after team migration, and
@@ -193,20 +199,20 @@ upstream recording all stay at call sites per the matrix.
 
 ## Acceptance tests
 
-| Test                              | Fixture                                                                | Assertion                                                                | Test File                                                                                        |
-| --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Telemetry matrix characterization | mocked `SyncAdapter.complete` + captured emit/upstream                 | all 5 matrix rows byte-identical pre/post repoint                        | `test_tagger.py`, `test_plan_check.py`, `test_stages.py`, `test_transfer.py`, `test_handlers.py` |
-| plan-check contract intact        | existing plan-check fixtures                                           | effort + provider-user composition; `None` on error; throttle key        | `tests/src/policy/semantic/test_plan_check.py`                                                   |
-| Bar moves together                | monkeypatched `verdict.CONFIDENCE_THRESHOLD`                           | `verdict_to_decision` AND workflow reviewer flip together                | `tests/src/policy/semantic/test_verdict.py`, `tests/src/policy/workflow/test_stages.py`          |
-| Team gate: warn path              | divergent, confidence 0.3; divergent, malformed confidence             | `(0, feedback)`; feedback printed on stderr at exit 0                    | `tests/src/policy/team/test_handlers.py`, `tests/src/cli/hooks/test_team_hook_feedback.py`       |
-| Team gate: block path             | divergent, confidence 0.9                                              | `(2, feedback)`                                                          | `tests/src/policy/team/test_handlers.py`                                                         |
-| Model-pin scrub                   | pins + every resolved-source row; direct/unresolved controls           | every resolved proxy source scrubs; direct/unresolved keep pins          | `tests/regression/test_bug_team_supervisor_model_pin_leak.py`                                    |
-| Routing matrix rows               | named proxy, ambient env, sidecar injection, no-route controls         | target + pre-dispatch/freeze/usage effects match D3 matrix               | `tests/src/policy/team/test_handlers.py`                                                         |
-| `_classify_event` migrated        | mocked complete                                                        | team-tagger matrix row byte-identical                                    | `tests/src/policy/team/test_handlers.py`                                                         |
-| Lane delegation                   | drifted `LaneRecord`                                                   | fail-open decision identical pre/post Slice 3                            | `tests/src/policy/semantic/test_supervisor.py`                                                   |
-| UUID matcher consolidation        | canonical lower/uppercase plus compact, braced, and non-hex forms      | both consumers preserve the anchored matcher behavior; one definition    | `tests/src/policy/test_queries.py` (new), `tests/src/policy/semantic/test_supervisor.py`         |
-| Team wire (integration, NEW)      | deterministic tagger HTTP stub + harnessed `claude` + enabled manifest | both hooks reach supervisor; exit 0 + stderr warn; exit 2 + stderr block | `tests/integration/docker/test_team_hooks.py`                                                    |
-| Policy hook path (integration)    | Docker harnessed deterministic `claude -p` (NOT real LLM)              | supervisor + policy-check flows pass post-seam                           | `tests/integration/docker/test_policy_hooks.py`, `test_supervisor_e2e.py`                        |
+| Test                              | Fixture                                                                | Assertion                                                                                   | Test File                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Telemetry matrix characterization | mocked `SyncAdapter.complete` + captured emit/upstream                 | all 5 rows preserve counts/status/failure posture; registered-proxy correlation is additive | `test_tagger.py`, `test_plan_check.py`, `test_stages.py`, `test_transfer.py`, `test_handlers.py` |
+| plan-check contract intact        | existing plan-check fixtures                                           | effort + provider-user composition; `None` on error; throttle key                           | `tests/src/policy/semantic/test_plan_check.py`                                                   |
+| Bar moves together                | monkeypatched `verdict.CONFIDENCE_THRESHOLD`                           | `verdict_to_decision` AND workflow reviewer flip together                                   | `tests/src/policy/semantic/test_verdict.py`, `tests/src/policy/workflow/test_stages.py`          |
+| Team gate: warn path              | divergent, confidence 0.3; divergent, malformed confidence             | `(0, feedback)`; feedback printed on stderr at exit 0                                       | `tests/src/policy/team/test_handlers.py`, `tests/src/cli/hooks/test_team_hook_feedback.py`       |
+| Team gate: block path             | divergent, confidence 0.9                                              | `(2, feedback)`                                                                             | `tests/src/policy/team/test_handlers.py`                                                         |
+| Model-pin scrub                   | pins + every resolved-source row; direct/unresolved controls           | every resolved proxy source scrubs; direct/unresolved keep pins                             | `tests/regression/test_bug_b_team_supervisor_model_pin_leak.py`                                  |
+| Routing matrix rows               | named proxy, ambient env, sidecar injection, no-route controls         | target + pre-dispatch/freeze/usage effects match D3 matrix                                  | `tests/src/policy/team/test_handlers.py`                                                         |
+| `_classify_event` migrated        | mocked complete                                                        | team-tagger matrix row byte-identical                                                       | `tests/src/policy/team/test_handlers.py`                                                         |
+| Lane delegation                   | drifted `LaneRecord`                                                   | fail-open decision identical pre/post Slice 3                                               | `tests/src/policy/semantic/test_supervisor.py`                                                   |
+| UUID matcher consolidation        | canonical lower/uppercase plus compact, braced, and non-hex forms      | both consumers preserve the anchored matcher behavior; one definition                       | `tests/src/policy/test_queries.py` (new), `tests/src/policy/semantic/test_supervisor.py`         |
+| Team wire (integration, NEW)      | deterministic tagger HTTP stub + harnessed `claude` + enabled manifest | both hooks reach supervisor; exit 0 + stderr warn; exit 2 + stderr block                    | `tests/integration/docker/test_team_hooks.py`                                                    |
+| Policy hook path (integration)    | Docker harnessed deterministic `claude -p` (NOT real LLM)              | supervisor + policy-check flows pass post-seam                                              | `tests/integration/docker/test_policy_hooks.py`, `test_supervisor_e2e.py`                        |
 
 ## Blockers / notes
 

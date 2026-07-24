@@ -32,7 +32,7 @@ from forge.core.reactive.structured_output import parse_headless_envelope
 
 _log = logging.getLogger(__name__)
 
-_CLAUDE_MODEL_PIN_ENV_VARS = (
+CLAUDE_MODEL_PIN_ENV_VARS = (
     "ANTHROPIC_MODEL",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",

@@ -1,9 +1,9 @@
 # policy_shared_library_seam -- extract the reactive transport core and consolidate policy seams
 
-**Lane**: `doing/` -- active on branch `policy-shared-library-seam`; the re-verified execution contract is
-[checklist.md](checklist.md). Extract the common direct-LLM **transport core** while preserving five deliberately
-different parsing and telemetry contracts, then consolidate the semantic/workflow block rule, lane resolution, UUID
-validation, and team-supervisor routing.
+**Lane**: `done/` -- completed and verified 2026-07-24 on branch `policy-shared-library-seam`; closeout is bundled with
+the implementation for merge. The re-verified execution contract is [checklist.md](checklist.md). The card extracts the
+common direct-LLM **transport core** while preserving five deliberately different parsing and telemetry contracts, then
+consolidates the semantic/workflow block rule, lane resolution, UUID validation, and team-supervisor routing.
 
 Slices are ordered: Slice 2 and Slice 4 consume the Slice-1 helper. Slices 1-3 are behavior-preserving. Slice 4 contains
 the decided D7 team-policy change, the model-pin defect fix, and intentional D3 pre-dispatch routing/observability

@@ -18,7 +18,7 @@ from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lane
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import (
-    _CLAUDE_MODEL_PIN_ENV_VARS,
+    CLAUDE_MODEL_PIN_ENV_VARS,
     SessionResult,
     run_claude_session,
 )
@@ -557,7 +557,7 @@ def _dispatch_claude_supervisor(
         # With a proxy URL, `--model opus` routes through the proxy's opus tier,
         # so alternatives like claude-opus-4-8 remain opt-in for the executor.
         model = "opus" if base_url else None
-        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
+        unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.usage import emit_usage_for_session_result

@@ -21,7 +21,7 @@ from typing import Any
 from forge.core.lanes import Consumer, Lane
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import (
-    _CLAUDE_MODEL_PIN_ENV_VARS,
+    CLAUDE_MODEL_PIN_ENV_VARS,
     run_claude_session,
 )
 from forge.core.reactive.structured_output import extract_json_from_response
@@ -256,7 +256,7 @@ def _run_supervisor(
         except Exception as e:
             _log.warning("Team supervisor routing failed: %s", e)
             return 0, ""
-        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
+        unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
     prompt = TEAM_SUPERVISOR_PROMPT.format(
         teammate_name=teammate,
