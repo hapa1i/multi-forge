@@ -179,8 +179,8 @@ inline.
 | `claude-opus`            | Default Claude Opus 5 reasoning     | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
-(most capable). The default `claude-opus` worker resolves to Opus 5; use `--models claude-opus-4.6,claude-opus-4.8`
-when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
+(most capable). The default `claude-opus` worker resolves to Opus 5; use `--models claude-opus-4.6,claude-opus-4.8` when
+you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
 model.
 
 **Requirements:** Each selected worker must be ready in `forge workflow list-models`. GPT-5.6 Sol and Gemini require
@@ -295,9 +295,9 @@ must not change Codex's resource selection.
 **No extra skill configuration is needed.** Claude selects from detected session metadata; Codex uses its
 host-authoritative OpenAI binding.
 
-For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/forge:panel`, and when to
-cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
-long-context retrieval and citation fidelity as the checks to validate locally.
+For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/forge:panel`, and
+when to cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there
+treats long-context retrieval and citation fidelity as the checks to validate locally.
 
 ---
 

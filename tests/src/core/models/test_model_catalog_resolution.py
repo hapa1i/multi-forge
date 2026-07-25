@@ -321,7 +321,10 @@ class TestGemini36Flash:
 
     def test_gemini_36_flash_scores_with_35(self):
         """Efficiency release: same measured intelligence bucket as 3.5 Flash."""
-        assert get_model_spec("gemini-3.6-flash").intelligence_score == get_model_spec("gemini-3.5-flash").intelligence_score
+        assert (
+            get_model_spec("gemini-3.6-flash").intelligence_score
+            == get_model_spec("gemini-3.5-flash").intelligence_score
+        )
 
 
 class TestKimiK3:

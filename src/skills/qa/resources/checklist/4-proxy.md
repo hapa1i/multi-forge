@@ -420,18 +420,18 @@ forge proxy template show openrouter-qwen
 - [ ] `forge proxy template list` shows 19 user-facing templates total (8 litellm + 10 openrouter + 1
   anthropic-passthrough)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-5,
-  opus=claude-opus-4.8)
+  opus=claude-opus-5)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
 - [ ] `openrouter-glm` maps tiers to GLM models (haiku=glm-4.7-flash, sonnet/opus=glm-5.2)
-- [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k2.6)
+- [ ] `openrouter-kimi` maps tiers to Gemma/Kimi models (haiku=gemma-4-31b-it, sonnet/opus=kimi-k3)
 - [ ] `openrouter-minimax` maps tiers to Gemma/MiniMax models (haiku=gemma-4-31b-it, sonnet/opus=minimax-m3)
-- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku=qwen3.6-flash, sonnet=qwen3.6-plus, opus=qwen3.6-max-preview)
+- [ ] `openrouter-qwen` maps tiers to Qwen models (haiku=qwen3.6-flash, sonnet=qwen3.7-plus, opus=qwen3.7-max)
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.6-sol, opus=gpt-5.6-sol)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-5.6-sol)
-- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.5-flash, sonnet=gemini-3.1-pro-preview,
+- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.6-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
-- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.5-flash with tier_overrides for reasoning_effort
+- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.6-flash with tier_overrides for reasoning_effort
   (low/medium/high)
 - [ ] Each OpenRouter template has a distinct default_port (8095-8104)
 

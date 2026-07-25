@@ -25,6 +25,35 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-26
+
+### July 2026 model refresh (Opus 5 default, K3, Qwen 3.7, Gemini 3.6 Flash)
+
+**Goal**: Catalog and template support for Claude Opus 5 (new default opus tier), Kimi K3, Qwen3.7 Plus/Max, and Gemini
+3.6 Flash, with the tier-1 cascade checker and dead gemini-2.0-flash tagger defaults migrated to 3.6 Flash.
+
+**Key changes**:
+
+- Fixed a latent proxy bug first: derived reasoning efforts now clamp to each model's catalog effort levels and explicit
+  unsupported values are rejected (`forge.proxy.reasoning`, extracted from `server.py` for the size gate). Existing
+  gemini-flash proxies stop receiving derived `xhigh`.
+- Opus 5 replaces Opus 4.8 across catalog defaults, `opus`/`claude-opus` aliases, the four anthropic templates, and the
+  proxy-context estimator pin; 4.8 stays selectable via `model_alternatives` and untouched explicit fixtures.
+- Kimi K3 (`[low, high]` efforts; native `max` unreachable by design — no `max` in Forge's vocabulary) and Qwen3.7
+  Plus/Max take over their family tiers; displaced 3.6-generation models become alternatives. OSS review workers now
+  lock `provider_refs` to each family's derived default.
+- Gemini 3.6 Flash ships with sampling overrides off (Google deprecates temperature/top_p/top_k), thinking default
+  medium, and probe-backed `prompt_caching: false`; flash/haiku tiers, checker defaults, and all gemini-2.0-flash tagger
+  defaults (model shut down 2026-06-01) move to it — zero 2.0-flash references remain in src/.
+- LiteLLM floor raised 1.85.0 -> 1.88.0 (gate-proven; resolution unchanged). gemini-3.6-flash (2026-07-21) is newer than
+  every stable LiteLLM release, so packaged cost-map pricing first ships in the v1.94 line; production relies on the
+  remote cost-map refresh until then. A live gate proves completion/thinking/cost on 1.88.0 through a freshly
+  materialized bundled route; a version-aware pin flips to a packaged-map assert at v1.94.
+
+**Verification**: Full unit suite green per commit; regression suite incl. new effort-floor test; live LiteLLM gate
+passed with GEMINI_API_KEY (cache probe negative, recorded in catalog); OpenRouter live matrix + `make pre-commit` +
+`uv build` wheel smoke recorded at closeout.
+
 ## 2026-07-24
 
 ### Policy shared-library seam
