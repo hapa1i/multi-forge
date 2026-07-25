@@ -13,7 +13,7 @@ class TestTeamSupervisorConfig:
     def test_defaults(self):
         config = TeamSupervisorConfig()
         assert config.enabled is False
-        assert config.tagger_model == "gemini/gemini-2.0-flash"
+        assert config.tagger_model == "gemini/gemini-3.6-flash"
         assert config.resume_id is None
         assert config.timeout_seconds == 45
         assert config.throttle_seconds == 60

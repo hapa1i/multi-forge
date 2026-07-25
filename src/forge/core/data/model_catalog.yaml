@@ -966,6 +966,40 @@ models:
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
+  # Gemini 3.6 Flash: efficiency release built on 3.5 Flash (same measured
+  # intelligence, fewer output tokens). Google deprecates temperature/top_p/
+  # top_k for this model (values are ignored), so sampling overrides are off.
+  # Thinking levels minimal/low/medium/high with medium the documented
+  # default; derived efforts above high clamp to high at the proxy seam.
+  gemini-3.6-flash:
+    friendly_name: Gemini 3.6 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      # Probed via Forge's LiteLLM path on 1.88.0 (2026-07-26): repeated
+      # ~2.8k-token identical prefix, 4 probes over 30s, cached_tokens
+      # always 0 — no usable cache accounting despite Google/LiteLLM
+      # metadata advertising support. Re-probe before flipping this.
+      supports: false
+    native_thinking_param: thinking_level
+    thinking_levels: [minimal, low, medium, high]
+    default_thinking_level: medium
+    # LiteLLM mapping: reasoning_effort -> thinking_level. none/disable are
+    # 3.5-era aliases, unproven for 3.6 — extend only with LiteLLM test proof.
+    litellm_reasoning_efforts: [minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 84  # Same measured intelligence as 3.5 Flash (efficiency release)
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
   # ---------------------------------------------------------------------------
   # Claude Models (4.8 + 4.7 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
@@ -1786,6 +1820,7 @@ aliases:
   vertex_ai/gemini-2.5-pro: gemini-2.5-pro
   vertex_ai/gemini-2.5-flash: gemini-2.5-flash
   vertex_ai/gemini-3.5-flash: gemini-3.5-flash
+  vertex_ai/gemini-3.6-flash: gemini-3.6-flash
 
   # Google AI Studio provider prefix (LiteLLM style)
   gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1794,6 +1829,7 @@ aliases:
   gemini/gemini-2.5-pro: gemini-2.5-pro
   gemini/gemini-2.5-flash: gemini-2.5-flash
   gemini/gemini-3.5-flash: gemini-3.5-flash
+  gemini/gemini-3.6-flash: gemini-3.6-flash
 
   # Google provider prefix (OpenRouter style)
   google/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1801,6 +1837,7 @@ aliases:
   google/gemini-2.5-pro: gemini-2.5-pro
   google/gemini-2.5-flash: gemini-2.5-flash
   google/gemini-3.5-flash: gemini-3.5-flash
+  google/gemini-3.6-flash: gemini-3.6-flash
 
   # Anthropic provider prefix + friendly aliases
   # Opus 4.6

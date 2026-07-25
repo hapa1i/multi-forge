@@ -22,7 +22,7 @@ class FilterConfig:
 class CheckerConfig:
     """Cheap LLM check config for CheckerStage."""
 
-    model: str = "gemini/gemini-2.0-flash"
+    model: str = "gemini/gemini-3.6-flash"
     prompt_template: str = ""
     system_prompt: str | None = None
 
@@ -31,7 +31,7 @@ class CheckerConfig:
 class ReviewerConfig:
     """Deep LLM review config for ReviewerStage."""
 
-    model: str = "gemini/gemini-2.0-flash"
+    model: str = "gemini/gemini-3.6-flash"
     prompt_template: str = ""
     system_prompt: str | None = None
 
@@ -56,7 +56,7 @@ class WorkflowConfig:
     description: str
     intent: str = ""
     tool_names: list[str] = field(default_factory=lambda: ["Write", "Edit"])
-    tagger_model: str = "gemini/gemini-2.0-flash"
+    tagger_model: str = "gemini/gemini-3.6-flash"
     tagger_prompt: str = ""
     branches: list[BranchConfig] = field(default_factory=list)
     throttle_seconds: int = 30

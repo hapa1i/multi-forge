@@ -621,9 +621,9 @@ class TestProxyInstanceConfigValidation:
                 costs={"on_cap_hit": "explode"},
             )
 
-    @pytest.mark.parametrize("opus_model", ["claude-opus-4-8", "claude-opus-5"])
-    def test_claude_opus_rejects_static_temperature_override(self, opus_model):
-        """Proxy config validation rejects Forge-owned unsupported opus sampling overrides."""
+    @pytest.mark.parametrize("opus_model", ["claude-opus-4-8", "claude-opus-5", "gemini-3.6-flash"])
+    def test_no_override_models_reject_static_temperature(self, opus_model):
+        """Proxy config validation rejects sampling overrides for no-override models."""
         from forge.config.schema import (
             ProxyInstanceConfig,
             TierModels,

@@ -29,9 +29,9 @@ _log = logging.getLogger(__name__)
 
 DEFAULT_PLAN_CHECK_PROVIDER: ProviderType = "openrouter"
 DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER: dict[ProviderType, str] = {
-    "openrouter": "google/gemini-3.5-flash",
-    "litellm_local": "gemini/gemini-3.5-flash",
-    "litellm_remote": "gemini/gemini-3.5-flash",
+    "openrouter": "google/gemini-3.6-flash",
+    "litellm_local": "gemini/gemini-3.6-flash",
+    "litellm_remote": "gemini/gemini-3.6-flash",
 }
 DEFAULT_PLAN_CHECK_MODEL = DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER[DEFAULT_PLAN_CHECK_PROVIDER]
 DEFAULT_PLAN_CHECK_BUDGET_TOKENS = 32_000

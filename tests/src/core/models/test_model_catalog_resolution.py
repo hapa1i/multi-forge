@@ -288,6 +288,42 @@ class TestGemini31ProPreviewIsCanonical:
         assert canonical == "gemini-3.1-pro-preview"
 
 
+class TestGemini36Flash:
+    """Tests for the gemini-3.6-flash catalog entry."""
+
+    def test_gemini_36_flash_is_canonical(self):
+        catalog = load_model_catalog()
+
+        assert "gemini-3.6-flash" in catalog.models
+        assert "gemini-3.6-flash" not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["vertex_ai/gemini-3.6-flash", "gemini/gemini-3.6-flash", "google/gemini-3.6-flash"],
+    )
+    def test_prefixed_aliases_resolve(self, alias):
+        assert resolve_model_id(alias) == "gemini-3.6-flash"
+
+    def test_gemini_36_flash_intrinsic_properties(self):
+        """3.6 is not a 3.5 clone: sampling deprecated, thinking default medium, no none/disable."""
+        spec = get_model_spec("gemini-3.6-flash")
+
+        assert spec.context_window_tokens == 1_048_576
+        assert spec.max_output_tokens == 65_536
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "thinking_level"
+        assert spec.thinking_levels == ("minimal", "low", "medium", "high")
+        assert spec.default_thinking_level == "medium"
+        assert spec.litellm_reasoning_efforts == ("minimal", "low", "medium", "high")
+        assert spec.default_reasoning_effort == "medium"
+        assert spec.system_prompt_addendum == "system_prompt_addendums/gemini.md"
+
+    def test_gemini_36_flash_scores_with_35(self):
+        """Efficiency release: same measured intelligence bucket as 3.5 Flash."""
+        assert get_model_spec("gemini-3.6-flash").intelligence_score == get_model_spec("gemini-3.5-flash").intelligence_score
+
+
 class TestKimiK3:
     """Tests for the kimi-k3 catalog entry and kimi default status."""
 

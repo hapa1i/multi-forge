@@ -375,7 +375,7 @@ def _validate_checker_model(checker_model: str | None) -> None:
     try:
         supervisor_semantic.validate_checker_model(checker_model)
     except ValueError as e:
-        raise SupervisorInputError(str(e), tip="Example: google/gemini-3.5-flash") from e
+        raise SupervisorInputError(str(e), tip="Example: google/gemini-3.6-flash") from e
 
 
 def _resolve_requested_lane(*, runtime: str | None, backend: str | None) -> LaneRecord | None:

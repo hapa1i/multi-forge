@@ -43,7 +43,7 @@ def detect_provider(model: str) -> ProviderType:
         'litellm_remote'
         >>> detect_provider("vertex_ai/gemini-3.1-pro-preview")
         'litellm_remote'
-        >>> detect_provider("gemini/gemini-2.0-flash")
+        >>> detect_provider("gemini/gemini-3.6-flash")
         'litellm_local'
         >>> detect_provider("anthropic/claude-sonnet-4")
         'litellm_remote'

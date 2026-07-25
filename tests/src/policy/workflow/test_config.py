@@ -18,7 +18,7 @@ class TestWorkflowConfig:
     def test_defaults(self):
         config = WorkflowConfig(name="test", description="A test workflow", intent="Test intent")
         assert config.tool_names == ["Write", "Edit"]
-        assert config.tagger_model == "gemini/gemini-2.0-flash"
+        assert config.tagger_model == "gemini/gemini-3.6-flash"
         assert config.tagger_prompt == ""
         assert config.branches == []
         assert config.throttle_seconds == 30
@@ -102,10 +102,10 @@ class TestWorkflowConfig:
 
     def test_checker_config_defaults(self):
         config = CheckerConfig()
-        assert config.model == "gemini/gemini-2.0-flash"
+        assert config.model == "gemini/gemini-3.6-flash"
         assert config.system_prompt is None
 
     def test_reviewer_config_defaults(self):
         config = ReviewerConfig()
-        assert config.model == "gemini/gemini-2.0-flash"
+        assert config.model == "gemini/gemini-3.6-flash"
         assert config.system_prompt is None

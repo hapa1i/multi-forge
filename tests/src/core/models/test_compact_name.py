@@ -30,6 +30,11 @@ class TestGetCompactName:
         assert get_compact_name("gemini-3.5-flash") == "gemini-3.5-flash"
         assert get_compact_name("vertex_ai/gemini-3.5-flash") == "gemini-3.5-flash"
 
+    def test_gemini_3_6_flash_no_short_name(self) -> None:
+        """gemini-3.6-flash has no short_name override -> raw id."""
+        assert get_compact_name("gemini-3.6-flash") == "gemini-3.6-flash"
+        assert get_compact_name("vertex_ai/gemini-3.6-flash") == "gemini-3.6-flash"
+
     def test_catalog_short_name_codex_mini(self) -> None:
         """gpt-5.1-codex-mini uses catalog short_name 'codex-mini'."""
         assert get_compact_name("gpt-5.1-codex-mini") == "codex-mini"
