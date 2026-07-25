@@ -66,8 +66,8 @@ defaults:
     opus: glm-5.2
   kimi:
     haiku: gemma-4-31b-it
-    sonnet: kimi-k2.6
-    opus: kimi-k2.6
+    sonnet: kimi-k3
+    opus: kimi-k3
 
 # =============================================================================
 # MODELS - Canonical IDs are provider-agnostic
@@ -1402,6 +1402,38 @@ models:
     intelligence_score: 89
     tags: [agentic, code-gen, vision]
 
+  # Kimi K3: strongest open-weight model, placed with Opus 4.8 / Sonnet 5.
+  # Fixed sampling (unlike the K2.x range surface). Native reasoning_effort
+  # levels are low/high/max with max the provider-side default; Forge's effort
+  # vocabulary has no "max" (reasoning.py EFFORT_RANK tops out at xhigh), so
+  # the catalog advertises [low, high], the bundled template pins high, and
+  # derived efforts above high clamp to high at the proxy seam.
+  # max_output_tokens is the provider DEFAULT cap (raisable to 1,048,576);
+  # Forge keeps the default as a deliberate conservative cap.
+  # supports_images covers Forge's OpenRouter route (text+image); Moonshot's
+  # direct API additionally accepts video, which Forge's route does not carry.
+  kimi-k3:
+    friendly_name: Kimi K3
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, high]
+    default_reasoning_effort: high
+    intelligence_score: 98  # Strongest open-weight; peer of Opus 4.8 / Sonnet 5
+    tags: [agentic, code-gen, vision]
+
   qwen3.6-plus:
     friendly_name: Qwen3.6 Plus
     context_window_tokens: 1000000
@@ -1800,6 +1832,7 @@ aliases:
   # Kimi / MoonshotAI (via OpenRouter)
   moonshotai/kimi-k2.5: kimi-k2.5
   moonshotai/kimi-k2.6: kimi-k2.6
+  moonshotai/kimi-k3: kimi-k3
   kimi-k2-5: kimi-k2.5
   kimi-k2-6: kimi-k2.6
 

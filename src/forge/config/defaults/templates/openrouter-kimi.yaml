@@ -2,8 +2,8 @@
 # Kimi models via OpenRouter (direct, no LiteLLM)
 #
 # Haiku uses Gemma 4 31B as a shared low-cost multimodal tier. Sonnet/opus use
-# Kimi K2.6 as the higher-capability Kimi tier. K2.5 is available as a
-# sonnet/opus model_alternative for explicit proxy requests.
+# Kimi K3 as the higher-capability Kimi tier. K2.6 and K2.5 are available as
+# sonnet/opus model_alternatives for explicit proxy requests.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 
 proxy:
@@ -15,12 +15,14 @@ proxy:
   openrouter:
     tiers:
       haiku: google/gemma-4-31b-it
-      sonnet: moonshotai/kimi-k2.6
-      opus: moonshotai/kimi-k2.6
+      sonnet: moonshotai/kimi-k3
+      opus: moonshotai/kimi-k3
     model_alternatives:
       sonnet:
+        kimi-k2.6: moonshotai/kimi-k2.6
         kimi-k2.5: moonshotai/kimi-k2.5
       opus:
+        kimi-k2.6: moonshotai/kimi-k2.6
         kimi-k2.5: moonshotai/kimi-k2.5
     tier_overrides:
       sonnet:

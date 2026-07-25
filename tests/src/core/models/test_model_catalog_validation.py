@@ -389,6 +389,7 @@ class TestOpenRouterOpenModelsCatalog:
             "deepseek/deepseek-v4-pro": ("deepseek-v4-pro", 1048576, 384000),
             "moonshotai/kimi-k2.5": ("kimi-k2.5", 262144, 262144),
             "moonshotai/kimi-k2.6": ("kimi-k2.6", 32768, 32768),
+            "moonshotai/kimi-k3": ("kimi-k3", 1048576, 131072),
             "qwen/qwen3.6-flash": ("qwen3.6-flash", 1000000, 65536),
             "qwen/qwen3.6-plus": ("qwen3.6-plus", 1000000, 65536),
             "qwen/qwen3.6-max-preview": ("qwen3.6-max-preview", 262144, 65536),
@@ -414,6 +415,7 @@ class TestOpenRouterOpenModelsCatalog:
         for model_id in (
             "kimi-k2.5",
             "kimi-k2.6",
+            "kimi-k3",
             "qwen3.6-flash",
             "qwen3.6-plus",
             "gemma-4-31b-it",

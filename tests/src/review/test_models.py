@@ -273,26 +273,30 @@ QWEN_DEFAULT = get_default_model("qwen", "opus")
 GLM_DEFAULT = get_default_model("glm", "opus")
 KIMI_DEFAULT = get_default_model("kimi", "opus")
 
+# family -> (preferred proxy, derived worker name, expected OpenRouter slug).
+# The slug entry locks each worker's hardcoded provider_refs to the family's
+# catalog default, so a defaults flip without the matching ref update fails.
 _OSS_FAMILIES = {
-    "deepseek": ("openrouter-deepseek", DEEPSEEK_DEFAULT),
-    "minimax": ("openrouter-minimax", MINIMAX_DEFAULT),
-    "qwen": ("openrouter-qwen", QWEN_DEFAULT),
-    "glm": ("openrouter-glm", GLM_DEFAULT),
-    "kimi": ("openrouter-kimi", KIMI_DEFAULT),
+    "deepseek": ("openrouter-deepseek", DEEPSEEK_DEFAULT, "deepseek/deepseek-v4-pro"),
+    "minimax": ("openrouter-minimax", MINIMAX_DEFAULT, "minimax/minimax-m3"),
+    "qwen": ("openrouter-qwen", QWEN_DEFAULT, "qwen/qwen3.6-max-preview"),
+    "glm": ("openrouter-glm", GLM_DEFAULT, "z-ai/glm-5.2"),
+    "kimi": ("openrouter-kimi", KIMI_DEFAULT, "moonshotai/kimi-k3"),
 }
 
 
 class TestOssWorkflowModels:
     """Open-source models are selectable but not in the default quorum."""
 
-    @pytest.mark.parametrize("family,proxy,model", [(f, p, m) for f, (p, m) in _OSS_FAMILIES.items()])
-    def test_oss_model_is_selectable_not_default(self, family, proxy, model):
+    @pytest.mark.parametrize("family,proxy,model,slug", [(f, p, m, s) for f, (p, m, s) in _OSS_FAMILIES.items()])
+    def test_oss_model_is_selectable_not_default(self, family, proxy, model, slug):
         assert model in AVAILABLE_MODELS, f"{family} opus model '{model}' not in AVAILABLE_MODELS"
         assert model not in DEFAULT_MODELS
 
         spec = AVAILABLE_MODELS[model]
         assert spec.preferred_proxy == proxy
         assert spec.family == family
+        assert spec.provider_refs == (("openrouter", slug),)
 
     def test_resolve_cheap_pair(self):
         specs = resolve_model_specs(f"{DEEPSEEK_DEFAULT},{MINIMAX_DEFAULT}")

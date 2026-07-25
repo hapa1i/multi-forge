@@ -1065,7 +1065,7 @@ class TestTemplateResolution:
                 "deepseek/deepseek-v4-pro",
             ),
             "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.6-plus", "qwen/qwen3.6-max-preview"),
-            "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k2.6", "moonshotai/kimi-k2.6"),
+            "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k3", "moonshotai/kimi-k3"),
             "openrouter-glm": ("z-ai/glm-4.7-flash", "z-ai/glm-5.2", "z-ai/glm-5.2"),
             "openrouter-minimax": ("google/gemma-4-31b-it", "minimax/minimax-m3", "minimax/minimax-m3"),
         }
@@ -1084,8 +1084,8 @@ class TestTemplateResolution:
         }
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {
-            "sonnet": {"kimi-k2.5": "moonshotai/kimi-k2.5"},
-            "opus": {"kimi-k2.5": "moonshotai/kimi-k2.5"},
+            "sonnet": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
+            "opus": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
         }
         minimax = load_config(template="openrouter-minimax")
         assert minimax.proxy.openrouter.model_alternatives == {

@@ -180,7 +180,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=kimi_opus,
             model_id=kimi_opus,
             family="kimi",
-            provider_refs=(("openrouter", "moonshotai/kimi-k2.6"),),
+            provider_refs=(("openrouter", "moonshotai/kimi-k3"),),
             preferred_proxy="openrouter-kimi",
             description="Agentic code generation and analysis",
         ),

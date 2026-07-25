@@ -288,6 +288,43 @@ class TestGemini31ProPreviewIsCanonical:
         assert canonical == "gemini-3.1-pro-preview"
 
 
+class TestKimiK3:
+    """Tests for the kimi-k3 catalog entry and kimi default status."""
+
+    def test_kimi_k3_is_canonical_and_the_kimi_default(self):
+        catalog = load_model_catalog()
+
+        assert "kimi-k3" in catalog.models
+        assert "kimi-k3" not in catalog.aliases
+        assert catalog.defaults["kimi"]["sonnet"] == "kimi-k3"
+        assert catalog.defaults["kimi"]["opus"] == "kimi-k3"
+        assert catalog.defaults["kimi"]["haiku"] == "gemma-4-31b-it"
+
+    def test_kimi_k3_slug_resolves(self):
+        assert resolve_model_id("moonshotai/kimi-k3") == "kimi-k3"
+
+    def test_kimi_k3_intrinsic_properties(self):
+        """K3 drops the K2.x range sampling surface and advertises [low, high] efforts."""
+        spec = get_model_spec("kimi-k3")
+
+        assert spec.context_window_tokens == 1_048_576
+        assert spec.max_output_tokens == 131_072
+        assert spec.supports_images is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "reasoning_effort"
+        assert spec.litellm_reasoning_efforts == ("low", "high")
+        assert spec.default_reasoning_effort == "high"
+
+    def test_kimi_k3_score_ordering(self):
+        """K3 sits with the Claude 98 bucket, above every other open-weight model."""
+        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
+
+        assert score("kimi-k3") == score("claude-opus-4-8") == score("claude-sonnet-5")
+        assert score("kimi-k3") > score("kimi-k2.6")
+        assert score("kimi-k3") > score("glm-5.2")
+
+
 class TestOpenRouterSlugAliases:
     """OpenRouter provider slugs can differ from Forge canonical IDs."""
 
@@ -295,6 +332,7 @@ class TestOpenRouterSlugAliases:
         assert resolve_model_id("anthropic/claude-opus-4.6") == "claude-opus-4-6-1m"
         assert resolve_model_id("anthropic/claude-sonnet-4.6") == "claude-sonnet-4-6-1m"
         assert resolve_model_id("anthropic/claude-opus-4.8") == "claude-opus-4-8"
+        assert resolve_model_id("moonshotai/kimi-k3") == "kimi-k3"
         assert resolve_model_id("qwen/qwen3.6-flash") == "qwen3.6-flash"
         assert resolve_model_id("qwen/qwen3.6-plus") == "qwen3.6-plus"
         assert resolve_model_id("minimax/minimax-m2.5") == "minimax-m2.5"
