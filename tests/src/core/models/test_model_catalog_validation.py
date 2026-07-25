@@ -393,6 +393,8 @@ class TestOpenRouterOpenModelsCatalog:
             "qwen/qwen3.6-flash": ("qwen3.6-flash", 1000000, 65536),
             "qwen/qwen3.6-plus": ("qwen3.6-plus", 1000000, 65536),
             "qwen/qwen3.6-max-preview": ("qwen3.6-max-preview", 262144, 65536),
+            "qwen/qwen3.7-plus": ("qwen3.7-plus", 1000000, 65536),
+            "qwen/qwen3.7-max": ("qwen3.7-max", 1000000, 65536),
             "qwen/qwen3-coder": ("qwen3-coder", 262144, 65536),
             "minimax/minimax-m2.5": ("minimax-m2.5", 196608, 196608),
             "minimax/minimax-m2.7": ("minimax-m2.7", 196608, 131072),
@@ -418,11 +420,13 @@ class TestOpenRouterOpenModelsCatalog:
             "kimi-k3",
             "qwen3.6-flash",
             "qwen3.6-plus",
+            "qwen3.7-plus",
             "gemma-4-31b-it",
         ):
             assert catalog.get(model_id).supports_images is True
 
         assert catalog.get("qwen3.6-max-preview").supports_images is False
+        assert catalog.get("qwen3.7-max").supports_images is False
         assert catalog.get("qwen3-coder").supports_thinking is False
 
     def test_glm_52_reasoning_effort_list_is_high_xhigh_only(self):

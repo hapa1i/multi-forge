@@ -58,8 +58,8 @@ defaults:
     opus: minimax-m3
   qwen:
     haiku: qwen3.6-flash
-    sonnet: qwen3.6-plus
-    opus: qwen3.6-max-preview
+    sonnet: qwen3.7-plus
+    opus: qwen3.7-max
   glm:
     haiku: glm-4.7-flash
     sonnet: glm-5.2
@@ -1500,6 +1500,57 @@ models:
     intelligence_score: 90
     tags: [agentic, code-gen]
 
+  # Qwen3.7: successor generation. Plus is the qwen sonnet default (multimodal,
+  # 1M published context); Max is the GA flagship and the qwen opus default
+  # (text-only, replaces the 3.6 Max Preview default).
+  qwen3.7-plus:
+    friendly_name: Qwen3.7 Plus
+    context_window_tokens: 1000000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024  # Conservative Forge floor; Alibaba's implicit cache may hit below this
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 89  # Above Qwen3.6 Plus (88)
+    tags: [agentic, code-gen, vision]
+
+  qwen3.7-max:
+    friendly_name: Qwen3.7 Max
+    context_window_tokens: 1000000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024  # Conservative Forge floor; Alibaba's implicit cache may hit below this
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 92  # GA flagship; above GLM-5.2 / Qwen3.6 Max Preview (both 90)
+    tags: [agentic, code-gen]
+
   qwen3-coder:
     friendly_name: Qwen3 Coder 480B A35B
     context_window_tokens: 262144
@@ -1840,11 +1891,15 @@ aliases:
   qwen/qwen3.6-flash: qwen3.6-flash
   qwen/qwen3.6-plus: qwen3.6-plus
   qwen/qwen3.6-max-preview: qwen3.6-max-preview
+  qwen/qwen3.7-plus: qwen3.7-plus
+  qwen/qwen3.7-max: qwen3.7-max
   qwen/qwen3-coder: qwen3-coder
   qwen3-6-flash: qwen3.6-flash
   qwen3-6-plus: qwen3.6-plus
   qwen3-6-max-preview: qwen3.6-max-preview
   qwen3-6-max: qwen3.6-max-preview
+  qwen3-7-plus: qwen3.7-plus
+  qwen3-7-max: qwen3.7-max
   qwen-coder: qwen3-coder
 
   # MiniMax / Z.ai / Google / Mistral (via OpenRouter)

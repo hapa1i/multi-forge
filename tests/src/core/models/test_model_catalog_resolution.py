@@ -325,6 +325,53 @@ class TestKimiK3:
         assert score("kimi-k3") > score("glm-5.2")
 
 
+class TestQwen37:
+    """Tests for the qwen3.7 catalog entries and qwen default status."""
+
+    def test_qwen_37_models_are_canonical_and_the_qwen_defaults(self):
+        catalog = load_model_catalog()
+
+        assert "qwen3.7-plus" in catalog.models
+        assert "qwen3.7-max" in catalog.models
+        assert catalog.defaults["qwen"]["haiku"] == "qwen3.6-flash"
+        assert catalog.defaults["qwen"]["sonnet"] == "qwen3.7-plus"
+        assert catalog.defaults["qwen"]["opus"] == "qwen3.7-max"
+
+    @pytest.mark.parametrize(
+        "alias, canonical",
+        [
+            ("qwen/qwen3.7-plus", "qwen3.7-plus"),
+            ("qwen/qwen3.7-max", "qwen3.7-max"),
+            ("qwen3-7-plus", "qwen3.7-plus"),
+            ("qwen3-7-max", "qwen3.7-max"),
+        ],
+    )
+    def test_qwen_37_aliases_resolve(self, alias, canonical):
+        assert resolve_model_id(alias) == canonical
+
+    def test_qwen_37_intrinsic_properties(self):
+        """Both 3.7 models publish 1M context / 64k output; only Plus is multimodal."""
+        plus = get_model_spec("qwen3.7-plus")
+        maxx = get_model_spec("qwen3.7-max")
+
+        for spec in (plus, maxx):
+            assert spec.context_window_tokens == 1_000_000
+            assert spec.max_output_tokens == 65_536
+            assert spec.supports_thinking is True
+            assert spec.litellm_reasoning_efforts is None
+        assert plus.supports_images is True
+        assert maxx.supports_images is False
+
+    def test_qwen_37_score_ordering(self):
+        """Max (GA flagship) tops the qwen family; Plus sits above the 3.6 Plus it replaces."""
+        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
+
+        assert score("qwen3.7-max") > score("qwen3.6-max-preview")
+        assert score("qwen3.7-max") > score("glm-5.2")
+        assert score("qwen3.7-plus") > score("qwen3.6-plus")
+        assert score("qwen3.7-max") > score("qwen3.7-plus")
+
+
 class TestOpenRouterSlugAliases:
     """OpenRouter provider slugs can differ from Forge canonical IDs."""
 

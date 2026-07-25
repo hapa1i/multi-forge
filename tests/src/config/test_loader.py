@@ -1052,6 +1052,7 @@ class TestTemplateResolution:
         assert "openrouter-gemini-flash" in names
         assert "openrouter-deepseek" in names
         assert "openrouter-kimi" in names
+        assert "openrouter-qwen" in names
         assert "openrouter-glm" in names
         assert "openrouter-minimax" in names
         assert "openrouter-qwen" in names
@@ -1064,7 +1065,7 @@ class TestTemplateResolution:
                 "deepseek/deepseek-v4-pro",
                 "deepseek/deepseek-v4-pro",
             ),
-            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.6-plus", "qwen/qwen3.6-max-preview"),
+            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.7-plus", "qwen/qwen3.7-max"),
             "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k3", "moonshotai/kimi-k3"),
             "openrouter-glm": ("z-ai/glm-4.7-flash", "z-ai/glm-5.2", "z-ai/glm-5.2"),
             "openrouter-minimax": ("google/gemma-4-31b-it", "minimax/minimax-m3", "minimax/minimax-m3"),
@@ -1079,8 +1080,8 @@ class TestTemplateResolution:
 
         qwen = load_config(template="openrouter-qwen")
         assert qwen.proxy.openrouter.model_alternatives == {
-            "sonnet": {"qwen3-coder": "qwen/qwen3-coder"},
-            "opus": {"qwen3-coder": "qwen/qwen3-coder"},
+            "sonnet": {"qwen3.6-plus": "qwen/qwen3.6-plus", "qwen3-coder": "qwen/qwen3-coder"},
+            "opus": {"qwen3.6-max-preview": "qwen/qwen3.6-max-preview", "qwen3-coder": "qwen/qwen3-coder"},
         }
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {

@@ -164,7 +164,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=qwen_opus,
             model_id=qwen_opus,
             family="qwen",
-            provider_refs=(("openrouter", "qwen/qwen3.6-max-preview"),),
+            provider_refs=(("openrouter", "qwen/qwen3.7-max"),),
             preferred_proxy="openrouter-qwen",
             description="Large context multilingual analysis",
         ),

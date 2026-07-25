@@ -279,7 +279,7 @@ KIMI_DEFAULT = get_default_model("kimi", "opus")
 _OSS_FAMILIES = {
     "deepseek": ("openrouter-deepseek", DEEPSEEK_DEFAULT, "deepseek/deepseek-v4-pro"),
     "minimax": ("openrouter-minimax", MINIMAX_DEFAULT, "minimax/minimax-m3"),
-    "qwen": ("openrouter-qwen", QWEN_DEFAULT, "qwen/qwen3.6-max-preview"),
+    "qwen": ("openrouter-qwen", QWEN_DEFAULT, "qwen/qwen3.7-max"),
     "glm": ("openrouter-glm", GLM_DEFAULT, "z-ai/glm-5.2"),
     "kimi": ("openrouter-kimi", KIMI_DEFAULT, "moonshotai/kimi-k3"),
 }
