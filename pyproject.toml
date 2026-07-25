@@ -44,7 +44,10 @@ dependencies = [
     "fastapi>=0.115.14",
     "uvicorn>=0.31.1",
     "watchfiles>=0.20",
-    "litellm[proxy]>=1.85.0",
+    # Floor = the gate-proven version for gemini-3.6-flash (see
+    # tests/integration/proxy/test_proxy_local_litellm_e2e.py); packaged
+    # cost-map pricing for that model first ships in the v1.94 line.
+    "litellm[proxy]>=1.88.0",
 ]
 
 [project.scripts]

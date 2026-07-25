@@ -380,6 +380,67 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="module")
+def local_litellm_gemini(module_forge_home: Path) -> Generator[str, None, None]:
+    """Start an isolated local LiteLLM from the current bundled config (Gemini routes).
+
+    Unlike ``local_litellm``, this never reuses a running instance or a stale
+    materialized config: the bundled backends/litellm.yaml is freshly
+    materialized into an isolated FORGE_HOME, so the routes under test are the
+    ones this checkout ships.
+    """
+    if not os.environ.get("GEMINI_API_KEY"):
+        pytest.fail("GEMINI_API_KEY not set (required for local Gemini LiteLLM tests)")
+
+    test_port = allocate_ephemeral_port()
+    base_url = f"http://localhost:{test_port}"
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+
+    create_result = subprocess.run(
+        ["uv", "run", "forge", "model", "backend", "create", "litellm"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if create_result.returncode != 0:
+        pytest.fail(f"Failed to create isolated LiteLLM config: {create_result.stderr[-500:]}")
+
+    start_result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "forge",
+            "model",
+            "backend",
+            "start",
+            "litellm",
+            "--port",
+            str(test_port),
+        ],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if start_result.returncode != 0:
+        pytest.fail(f"Failed to start isolated LiteLLM: {start_result.stderr[-500:]}")
+    if not wait_for_port(test_port, timeout=30):
+        pytest.fail(f"Isolated LiteLLM failed to start on port {test_port}")
+
+    try:
+        yield base_url
+    finally:
+        subprocess.run(
+            ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+
+@pytest.fixture(scope="module")
 def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
     """Serve a hermetic Responses API endpoint and capture its request bodies."""
     port = allocate_ephemeral_port()
