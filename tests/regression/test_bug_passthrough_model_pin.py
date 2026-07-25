@@ -35,6 +35,7 @@ _PROXY_ID = "test-passthrough"
 # stay pinnable on passthrough because the model is forwarded unchanged.
 _DISPLACED_PINS = {
     "claude-fable-5": ("opus", "claude-fable-5"),
+    "claude-opus-4-8": ("opus", "claude-opus-4-8"),
     "claude-opus-4-6": ("opus", "claude-opus-4-6"),
     "claude-sonnet-4-6": ("sonnet", "claude-sonnet-4-6"),
 }
@@ -49,7 +50,7 @@ def _passthrough_cfg() -> ProxyInstanceConfig:
         proxy_endpoint="http://localhost:8096",
         port=8096,
         upstream_base_url="https://api.anthropic.com",
-        tiers=TierModels(haiku="claude-haiku-4-5", sonnet="claude-sonnet-5", opus="claude-opus-4-8"),
+        tiers=TierModels(haiku="claude-haiku-4-5", sonnet="claude-sonnet-5", opus="claude-opus-5"),
         model_alternatives={},
         wire_shape="anthropic_passthrough",
     )

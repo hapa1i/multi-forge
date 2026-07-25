@@ -621,8 +621,9 @@ class TestProxyInstanceConfigValidation:
                 costs={"on_cap_hit": "explode"},
             )
 
-    def test_claude_48_rejects_static_temperature_override(self):
-        """Proxy config validation rejects Forge-owned unsupported 4.8 sampling overrides."""
+    @pytest.mark.parametrize("opus_model", ["claude-opus-4-8", "claude-opus-5"])
+    def test_claude_opus_rejects_static_temperature_override(self, opus_model):
+        """Proxy config validation rejects Forge-owned unsupported opus sampling overrides."""
         from forge.config.schema import (
             ProxyInstanceConfig,
             TierModels,
@@ -639,12 +640,13 @@ class TestProxyInstanceConfigValidation:
                 proxy_endpoint="http://localhost:8084",
                 port=8084,
                 upstream_base_url="https://litellm.test.example.com",
-                tiers=TierModels(haiku="h", sonnet="s", opus="claude-opus-4-8"),
+                tiers=TierModels(haiku="h", sonnet="s", opus=opus_model),
                 tier_overrides=TierOverrides(opus=TierOverride(temperature=0.7)),
             )
 
-    def test_claude_48_rejects_static_thinking_budget_override(self):
-        """Adaptive-only 4.8 rejects static thinking budgets at config validation time."""
+    @pytest.mark.parametrize("opus_model", ["anthropic/claude-opus-4.8", "anthropic/claude-opus-5"])
+    def test_claude_opus_rejects_static_thinking_budget_override(self, opus_model):
+        """Adaptive-only opus models reject static thinking budgets at config validation time."""
         from forge.config.schema import (
             ProxyInstanceConfig,
             TierModels,
@@ -661,7 +663,7 @@ class TestProxyInstanceConfigValidation:
                 proxy_endpoint="http://localhost:8084",
                 port=8084,
                 upstream_base_url="https://litellm.test.example.com",
-                tiers=TierModels(haiku="h", sonnet="s", opus="anthropic/claude-opus-4.8"),
+                tiers=TierModels(haiku="h", sonnet="s", opus=opus_model),
                 tier_overrides=TierOverrides(opus=TierOverride(thinking_budget_tokens=4096)),
             )
 

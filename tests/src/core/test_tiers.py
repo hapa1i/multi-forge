@@ -16,6 +16,8 @@ from forge.core.tiers import detect_tier_word
         ("claude-haiku-4-5", "haiku"),
         ("claude-sonnet-4-6", "sonnet"),
         ("claude-opus-4-8", "opus"),
+        ("claude-opus-5", "opus"),
+        ("anthropic/claude-opus-5", "opus"),
         ("claude-fable-5", "opus"),
         ("anthropic/claude-fable-5", "opus"),
         ("Claude-OPUS-4", "opus"),

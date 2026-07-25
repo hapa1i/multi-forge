@@ -99,12 +99,12 @@ and local validation result whenever you change a proxy default.
 
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
-The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 4.8 and the `sonnet` tier to Sonnet 5, and
-exposes the displaced models (Fable 5, Opus 4.6, Sonnet 4.6) as alternatives for explicit session pins. You do not need
-separate proxies just to compare Claude versions:
+The bundled `openrouter-anthropic` template maps the `opus` tier to Opus 5 and the `sonnet` tier to Sonnet 5, and
+exposes the displaced models (Fable 5, Opus 4.8, Opus 4.6, Sonnet 4.6) as alternatives for explicit session pins. You
+do not need separate proxies just to compare Claude versions:
 
 ```bash
-# Planner/supervisor source on the proxy's default opus tier (Opus 4.8)
+# Planner/supervisor source on the proxy's default opus tier (Opus 5)
 forge session start planner --proxy openrouter-anthropic
 
 # Executor pinned to an alternative exposed by the same proxy (e.g. Fable 5 or Opus 4.6)

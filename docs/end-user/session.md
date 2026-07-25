@@ -728,8 +728,8 @@ Rejected for sidecar or host-proxy launches.
 Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
 `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. `forge session resume --model ...` updates the
 current session's stored pin; `forge session fork --model ...` writes the pin to the child session. This is useful when
-moving a planner between Opus 4.8 execution and Opus 4.6 final review. The `claude-opus`/`opus` aliases point at Claude
-Opus 4.8; pin `claude-opus-4-6` explicitly for Opus 4.6.
+moving a planner between Opus 5 execution and Opus 4.6 final review. The `claude-opus`/`opus` aliases point at Claude
+Opus 5; pin `claude-opus-4-8` or `claude-opus-4-6` explicitly for the displaced versions.
 
 For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
 a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.

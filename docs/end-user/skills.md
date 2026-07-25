@@ -176,10 +176,10 @@ inline.
 | ------------------------ | ----------------------------------- | ----------------------- |
 | `gpt-5.6-sol`            | Logical problems, systematic review | openrouter-openai proxy |
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
-| `claude-opus`            | Default Claude Opus 4.8 reasoning   | Direct Anthropic        |
+| `claude-opus`            | Default Claude Opus 5 reasoning     | Direct Anthropic        |
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
-(most capable). The default `claude-opus` worker resolves to Opus 4.8; use `--models claude-opus-4.6,claude-opus-4.8`
+(most capable). The default `claude-opus` worker resolves to Opus 5; use `--models claude-opus-4.6,claude-opus-4.8`
 when you want both Opus 4.6 and the bounded-review Opus 4.8 worker in the panel, or add `claude-fable` for the top-tier
 model.
 
@@ -295,7 +295,7 @@ must not change Codex's resource selection.
 **No extra skill configuration is needed.** Claude selects from detected session metadata; Codex uses its
 host-authoritative OpenAI binding.
 
-For per-role guidance on when to use Opus 4.8 or Opus 4.6, when to mix families for `/forge:panel`, and when to
+For per-role guidance on when to use Opus 5 or a displaced Opus version, when to mix families for `/forge:panel`, and when to
 cross-route a supervisor to Gemini, see [model_selection.md](model_selection.md). The supervisor guidance there treats
 long-context retrieval and citation fidelity as the checks to validate locally.
 

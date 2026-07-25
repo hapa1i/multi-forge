@@ -228,16 +228,16 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 ## Model alternatives
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
-`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 4.8
-and their sonnet tier to Sonnet 5, with Fable 5, Opus 4.6, and Sonnet 4.6 as alternatives. (`anthropic-passthrough`
-forwards the client's model unchanged, so `--model` selects any Claude model directly with no alternatives map.) Use
-`--model` to select an alternative:
+`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5
+and their sonnet tier to Sonnet 5, with Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
+(`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model directly with no
+alternatives map.) Use `--model` to select an alternative:
 
 ```bash
-# Default: opus tier routes to Opus 4.8, sonnet tier to Sonnet 5
+# Default: opus tier routes to Opus 5, sonnet tier to Sonnet 5
 forge session start my-session --proxy openrouter-anthropic
 
-# Select an alternative instead (e.g. Fable 5, Opus 4.6, or Sonnet 4.6)
+# Select an alternative instead (e.g. Fable 5, Opus 4.8, or Sonnet 4.6)
 forge session start my-session --proxy openrouter-anthropic --model claude-fable-5
 ```
 
@@ -254,12 +254,13 @@ To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 model_alternatives:
   opus:
     claude-fable-5: anthropic/claude-fable-5
+    claude-opus-4-8: anthropic/claude-opus-4.8
     claude-opus-4-6: anthropic/claude-opus-4.6
   sonnet:
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable-5`) vs leave the default Opus 4.8
+For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable-5`) vs leave the default Opus 5
 mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,
 and per-family cost + multi-needle retrieval data — see [model_selection.md](model_selection.md).
 

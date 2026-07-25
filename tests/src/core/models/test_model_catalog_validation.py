@@ -356,11 +356,11 @@ class TestGPT56CatalogMetadata:
 class TestClaude48CatalogProfile:
     """Tests for the explicit Claude Opus 4.8 catalog profile."""
 
-    def test_opus_friendly_aliases_default_to_4_8(self):
+    def test_opus_friendly_aliases_default_to_5(self):
         catalog = load_model_catalog(force_reload=True)
 
-        assert catalog.resolve("opus") == "claude-opus-4-8"
-        assert catalog.resolve("claude-opus") == "claude-opus-4-8"
+        assert catalog.resolve("opus") == "claude-opus-5"
+        assert catalog.resolve("claude-opus") == "claude-opus-5"
 
     def test_opus_48_aliases_and_metadata(self):
         catalog = load_model_catalog(force_reload=True)

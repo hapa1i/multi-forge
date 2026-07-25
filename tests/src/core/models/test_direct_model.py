@@ -103,7 +103,7 @@ def test_proxy_context_model_defaults_only_for_large_context() -> None:
 
     apply_proxy_context_model_defaults(env_vars, 1000000)
     assert env_vars == {
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8[1m]",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
         "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
     }
 

@@ -46,7 +46,7 @@ Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
 - `gpt-5.6-sol` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
-- `claude-opus` -- direct Anthropic, pinned to Claude Opus 4.8
+- `claude-opus` -- direct Anthropic, pinned to Claude Opus 5
 
 This default set is unchanged and entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex
 worker. Codex selects its own model; Forge does not pass a model pin.

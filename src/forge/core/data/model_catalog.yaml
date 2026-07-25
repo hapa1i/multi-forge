@@ -43,11 +43,11 @@ defaults:
   anthropic:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-4-8
+    opus: claude-opus-5
   openrouter:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-4-8
+    opus: claude-opus-5
   deepseek:
     haiku: deepseek-v4-flash
     sonnet: deepseek-v4-pro
@@ -836,7 +836,7 @@ models:
     # minimal/low/none/disable -> low, medium/high -> high
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 99  # Peer of gpt-5.5 / Claude Opus 4.8
+    intelligence_score: 99  # Peer of gpt-5.5 / Claude Opus 5
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -997,7 +997,7 @@ models:
     tags: []
 
   # --- Claude 4.7 Series ---
-  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 4.8.
+  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 5.
   claude-opus-4-7:
     friendly_name: Claude Opus 4.7
     context_window_tokens: 1000000
@@ -1025,10 +1025,42 @@ models:
     tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
-  # Opus 4.8 is the catalog opus default (anthropic + openrouter) and the proxy
-  # opus-tier default. Opus 4.6 and Fable 5 remain selectable via --model.
+  # Opus 4.8 is the displaced standard opus (Opus 5 is the default); still
+  # selectable via --model (opus model_alternatives).
   claude-opus-4-8:
     friendly_name: Claude Opus 4.8
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    token_estimate_multiplier: 1.35
+    intelligence_score: 98  # Displaced by Opus 5; peer of Sonnet 5 / Opus 4.7
+    tags: []
+
+  # --- Claude Opus 5 ---
+  # Opus 5 replaces Opus 4.8 as the standard opus: catalog opus default
+  # (anthropic + openrouter) and the proxy opus-tier default. Same request
+  # surface as Opus 4.8 / Sonnet 5: adaptive-only thinking, sampling overrides
+  # removed, native 1M context (default and max), same pricing as Opus 4.8.
+  # Below Fable 5.
+  claude-opus-5:
+    friendly_name: Claude Opus 5
     context_window_tokens: 1000000
     max_output_tokens: 128000
     max_thinking_tokens: 128000
@@ -1055,9 +1087,9 @@ models:
 
   # --- Claude Fable Series ---
   # Fable 5 is the most capable model (a tier above Opus). Same request surface
-  # as Opus 4.8 -- adaptive thinking only, sampling overrides removed. Not a
-  # catalog or template default: the opus tier defaults to Opus 4.8; Fable 5 and
-  # Opus 4.6 stay selectable via --model (opus model_alternatives).
+  # as Opus 5 -- adaptive thinking only, sampling overrides removed. Not a
+  # catalog or template default: the opus tier defaults to Opus 5; Fable 5 and
+  # Opus 4.8 stay selectable via --model (opus model_alternatives).
   claude-fable-5:
     friendly_name: Claude Fable 5
     context_window_tokens: 1000000
@@ -1111,7 +1143,7 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 98  # Between Opus 4.6 (97) and Opus 4.8 (99); peer of Opus 4.7
+    intelligence_score: 98  # Peer of Opus 4.8 / Opus 4.7 (all 98); below Opus 5 (99)
     tags: []
 
   claude-sonnet-4-6:
@@ -1692,11 +1724,9 @@ aliases:
   anthropic/claude-opus-4-6: claude-opus-4-6
   anthropic/claude-opus-4-6-1m: claude-opus-4-6-1m
   claude-opus-4.6: claude-opus-4-6
-  claude-opus: claude-opus-4-8
   opus-4-6: claude-opus-4-6
   opus-4.6: claude-opus-4-6
   opus-4-6-1m: claude-opus-4-6-1m
-  opus: claude-opus-4-8
 
   # Opus 4.7 (explicit opt-in only)
   anthropic/claude-opus-4-7: claude-opus-4-7
@@ -1705,12 +1735,18 @@ aliases:
   opus-4-7: claude-opus-4-7
   opus-4.7: claude-opus-4-7
 
-  # Opus 4.8 (default opus tier)
+  # Opus 4.8 (displaced default; still selectable)
   anthropic/claude-opus-4-8: claude-opus-4-8
   anthropic/claude-opus-4.8: claude-opus-4-8
   claude-opus-4.8: claude-opus-4-8
   opus-4-8: claude-opus-4-8
   opus-4.8: claude-opus-4-8
+
+  # Opus 5 (default opus tier)
+  anthropic/claude-opus-5: claude-opus-5  # also the OpenRouter slug (no dot)
+  claude-opus: claude-opus-5
+  opus-5: claude-opus-5
+  opus: claude-opus-5
 
   # Fable 5 (most capable; opus --model alternative, direct --model fable)
   anthropic/claude-fable-5: claude-fable-5
