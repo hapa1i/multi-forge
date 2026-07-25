@@ -34,6 +34,11 @@ class SupervisorVerdict:
     violations: list[dict[str, Any]] = field(default_factory=list)
 
 
+def meets_block_bar(confidence: float, has_citations: bool) -> bool:
+    """Return whether a divergent verdict has enough support to block."""
+    return confidence >= CONFIDENCE_THRESHOLD and has_citations
+
+
 def _warn_verdict(evidence: str, suggested_fix: str) -> SupervisorVerdict:
     """Create a divergent verdict with 0.0 confidence (maps to warn, not deny)."""
     return SupervisorVerdict(
@@ -158,7 +163,7 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
         )
 
         # Only block on high-confidence violations with citations
-        if verdict.confidence >= CONFIDENCE_THRESHOLD and citations:
+        if meets_block_bar(verdict.confidence, bool(citations)):
             blocking_violations.append(violation)
         else:
             # Low confidence or no citations → warning only

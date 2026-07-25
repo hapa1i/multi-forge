@@ -19,11 +19,11 @@ Before diving into upstream changes and future directions, here's what Forge has
 
 | Capability                            | Status            | Details                                                                      |
 | ------------------------------------- | ----------------- | ---------------------------------------------------------------------------- |
-| `TeammateIdle` quality gate           | Implemented       | Tagger + optional supervisor, two outcomes                                   |
-| `TaskCompleted` quality gate          | Implemented       | Tagger + supervisor + escape hatch, two outcomes                             |
+| `TeammateIdle` quality gate           | Implemented       | Tagger + optional supervisor, two control outcomes + diagnostic allow        |
+| `TaskCompleted` quality gate          | Implemented       | Tagger + supervisor + escape hatch, two control outcomes + diagnostic allow  |
 | Cross-team supervisor                 | Implemented       | `claude -p --resume`, structured JSON verdict                                |
 | File-backed cache                     | Implemented       | `~/.forge/team-hooks/<session_id>.json`, 0.2s lock                           |
-| Handler contract                      | `tuple[int, str]` | exit 0 = allow, exit 2 + stderr = block                                      |
+| Handler contract                      | `tuple[int, str]` | exit 0 = allow (optional diagnostic stderr), exit 2 + stderr = block         |
 | Teammate termination (JSON response)  | Not implemented   | Upstream supports it (v2.1.69); Forge handlers return `tuple[int, str]` only |
 | Worktree lifecycle hooks              | Not implemented   | `WorktreeCreate`/`WorktreeRemove` exist upstream                             |
 | HTTP hook deployment                  | Not implemented   | Upstream supports HTTP hooks (v2.1.63)                                       |
@@ -81,8 +81,9 @@ hooks needs verification `[VERIFY]`.
 | `Stop` with `last_assistant_message` | v2.1.47 | Simpler verification input — no transcript parsing needed. Not used yet. |
 
 **Concurrency constraint**: All teammates share `FORGE_SESSION`, so concurrent hook firings contend on the session
-manifest file lock. Team hook handlers read the manifest for config but avoid per-event writes to `forge.session.json` —
-they use a separate cache file at `~/.forge/team-hooks/` instead.
+manifest file lock. Team hook event state uses a separate cache file at `~/.forge/team-hooks/`; the first actual
+supervisor dispatch may also persist its consumer-lane freeze in `forge.session.json`, but cache/tagger/routing skips do
+not.
 
 **Corrected from earlier findings**: The 2026-02-06 empirical test misinterpreted `backendType: "in-process"` as a
 shared-process execution model. It's a display mode. Teammates are "separate Claude Code instances" with own context
@@ -99,8 +100,8 @@ Forge does not manage team lifecycle. Native teams handle coordination (messagin
    Opus, haiku → Gemini Flash). All teammates inherit this proxy. Already built — no team-specific code needed.
 
 2. **Quality gate hooks**: `TeammateIdle` and `TaskCompleted` handlers using the shared reactive library (design.md
-   §4.1.2). Per-role checks keyed on `teammate_name`. Two outcomes today (allow / block); upstream supports a third
-   (stop teammate) — see §4.
+   §4.1.2). Per-role checks keyed on `teammate_name`. There are two control outcomes today (allow / block), and an allow
+   may carry diagnostic stderr feedback; upstream supports a third control outcome (stop teammate) — see §4.
 
 3. **Cross-team supervisor**: A `claude -p --resume` session with its own proxy, watching all teammate events for plan
    adherence. The key differentiator — see §3.
@@ -124,7 +125,7 @@ Forge does not manage team lifecycle. Native teams handle coordination (messagin
 The supervisor is a Forge-managed `claude -p --resume` invocation that evaluates teammate work against the approved
 plan. It runs **outside** the native team — its own proxy, its own context.
 
-### Current implementation (two outcomes)
+### Current implementation (two control outcomes)
 
 ```
 TeammateIdle / TaskCompleted hook fires
@@ -138,8 +139,10 @@ TeammateIdle / TaskCompleted hook fires
         |
         +-- "needs-review" --> Supervisor session
         |       |
-        |       +-- aligned   --> allow (exit 0)
-        |       +-- divergent --> block + feedback (exit 2)
+        |       +-- aligned --> allow (exit 0)
+        |       +-- divergent, confidence >= 0.8 --> block + feedback (exit 2)
+        |       +-- divergent, lower/malformed confidence
+        |               --> allow + diagnostic feedback (exit 0 + stderr)
         |
         +-- "routine"      --> allow (exit 0)
         +-- "trivial"      --> allow (exit 0)
@@ -158,10 +161,16 @@ instead of exit codes. This enables a three-way decision:
 **Supervisor session**:
 
 - Invoked via `claude -p --resume <planner_session_id>` (inherits plan context without RAG)
-- Own `ANTHROPIC_BASE_URL` pointing to a cheap high-context proxy (e.g., Gemini via `litellm-gemini-local`)
+- Resolves explicit and ambient subprocess routing before dispatch; strict named-route failures skip the check
+  fail-open, while a truly unresolved route dispatches direct
+- Clears inherited Claude model pins for every resolved base URL but does not force `--model opus`
 - Minimal JSON verdict (`{verdict, confidence, feedback}` — parsed via `extract_json_from_response()`)
+- Divergence blocks only at the shared confidence threshold; citation gating remains semantic-supervisor-specific
 - File-backed cache + throttle window (`~/.forge/team-hooks/<session_id>.json`, timestamp-based freshness)
 - Fail-open on errors (same pattern as existing supervisor)
+
+Exit-0 feedback is a local diagnostic stderr channel. Claude guarantees teammate-facing feedback delivery for exit 2; an
+exit-0 warning is observable to operators but is not a teammate-delivery contract.
 
 **Per-role evaluation**: The prompt includes `teammate_name` from the hook payload:
 
@@ -179,8 +188,8 @@ The tagger makes supervision cost-effective at team scale. Instead of checking e
 only "needs-review" events escalate to the full supervisor session.
 
 **Tag taxonomy note**: The team tagger uses event-level tags (needs-review | routine | trivial). The policy tagger
-(design.md §4.1.2) uses code-change tags (bug-fix | refactor | architectural | new-pattern | test | docs). Same
-`tag_action()` utility, different prompts. Tag taxonomies are per-caller, not shared.
+(design.md §4.1.2) uses code-change tags (bug-fix | refactor | architectural | new-pattern | test | docs). They share
+the direct-LLM transport helper but retain caller-owned prompts and parsers. Tag taxonomies are per-caller, not shared.
 
 ---
 

@@ -8,7 +8,6 @@ to fork the planning session without polluting its conversation.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -18,9 +17,14 @@ from forge.core.invoker.types import Attribution, HeadlessResult
 from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane, valid_lanes
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
-from forge.core.reactive.session_runner import SessionResult, run_claude_session
+from forge.core.reactive.session_runner import (
+    CLAUDE_MODEL_PIN_ENV_VARS,
+    SessionResult,
+    run_claude_session,
+)
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import DeterministicPolicy
+from forge.policy.queries import RESUME_ID_UUID_RE
 from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     parse_supervisor_verdict_with_status,
@@ -37,10 +41,6 @@ from forge.session.models import (
 )
 
 _log = logging.getLogger(__name__)
-
-_UUID_PATTERN = re.compile(
-    r"^[0-9a-fA-F]{8}-" r"[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{12}$"
-)
 
 SUPERVISOR_INTENT = (
     "Ensure implementation stays aligned with the approved plan. The supervisor "
@@ -101,13 +101,6 @@ conflicts between this plan and earlier conversation context, THIS plan takes pr
 {plan_content}
 
 ---"""
-
-_CLAUDE_MODEL_PIN_ENV_VARS = (
-    "ANTHROPIC_MODEL",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-)
 
 # The supervisor as a consumer-lane binding (epic consumer_lanes). It reads repo
 # files (a `tool_agent` capability floor), and `runtime_id` selects the dispatch arm
@@ -381,7 +374,7 @@ def _resolve_resume_target(resume_target: str, forge_root: str | None = None) ->
     if not target:
         return _ResolvedTarget(warning="Supervisor not configured (no resume_id)")
 
-    if _UUID_PATTERN.fullmatch(target):
+    if RESUME_ID_UUID_RE.fullmatch(target):
         return _ResolvedTarget(resume_id=target)
 
     try:
@@ -564,7 +557,7 @@ def _dispatch_claude_supervisor(
         # With a proxy URL, `--model opus` routes through the proxy's opus tier,
         # so alternatives like claude-opus-4-8 remain opt-in for the executor.
         model = "opus" if base_url else None
-        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
+        unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.usage import emit_usage_for_session_result
@@ -800,8 +793,7 @@ def run_supervisor_check(
     # runs the default lane. resolve_lane also rejects any override outside SUPERVISOR_CONSUMER's
     # declared candidates. A misconfigured lane must fail open, never brick the hook (design_workflows 1.2).
     try:
-        override = None if lane_record is None else record_to_lane(lane_record)
-        lane = resolve_lane(SUPERVISOR_CONSUMER, override=override)
+        lane = resolve_supervisor_lane(lane_record)
     except LaneError as e:
         _log.warning("Supervisor lane resolution failed: %s", e)
         return SupervisorRun(
@@ -1225,7 +1217,7 @@ def resolve_supervisor_reload_plan_path(
         target_state = read_scoped_supervisor_target(sup.resume_id, sup.forge_root, current_fr)
         if target_state is not None:
             target_name = sup.resume_id
-            if _UUID_PATTERN.fullmatch(sup.resume_id):
+            if RESUME_ID_UUID_RE.fullmatch(sup.resume_id):
                 try:
                     match = IndexStore().find_session_by_uuid(sup.resume_id)
                     if match:

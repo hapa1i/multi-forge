@@ -2,6 +2,7 @@
 
 Handlers return ``(exit_code, stderr_message)``:
 - ``(0, "")`` = allow (teammate goes idle / task marked completed)
+- ``(0, "feedback")`` = allow with a diagnostic warning
 - ``(2, "feedback")`` = block (teammate continues / task stays open)
 
 All errors fail-open (return 0). Uses file-backed cache at
@@ -11,15 +12,18 @@ All errors fail-open (return 0). Uses file-backed cache at
 from __future__ import annotations
 
 import logging
+import math
 import os
-import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
 from forge.core.lanes import Consumer, Lane
-from forge.core.reactive.proxy import lookup_proxy_base_url
-from forge.core.reactive.session_runner import run_claude_session
+from forge.core.reactive.routing import resolve_subprocess_routing
+from forge.core.reactive.session_runner import (
+    CLAUDE_MODEL_PIN_ENV_VARS,
+    run_claude_session,
+)
 from forge.core.reactive.structured_output import extract_json_from_response
 from forge.core.state import now_iso
 from forge.policy.team.config import TeamSupervisorConfig
@@ -172,13 +176,10 @@ def _classify_event(
     # it, else emit ambient/global (emit_direct_llm_usage no-ops without a run identity).
     session = os.environ.get("FORGE_SESSION") or None
     try:
-        from forge.core.llm import Message, SyncAdapter, get_client
+        from forge.core.llm import Message
+        from forge.core.reactive.llm_call import complete_llm_call
         from forge.core.usage import (
             emit_direct_llm_usage,
-            mint_request_id,
-            resolve_client_base_url,
-            target_is_forge_proxy,
-            with_forge_request_id,
         )
 
         prompt = prompt_template.format(
@@ -186,14 +187,12 @@ def _classify_event(
             team_name=team,
             task_subject=task_subject or "",
         )
-        adapter = SyncAdapter(get_client(model))
         # Exact-cost join only when the client provably targets a Forge proxy (same gate as
         # the action tagger / WorkflowPolicy stages); else no header and no cost_request_id.
-        request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
-        hp = with_forge_request_id(None, request_id) if request_id else None
-        start = time.monotonic()
-        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
-        latency_ms = (time.monotonic() - start) * 1000
+        response, latency_ms, request_id = complete_llm_call(
+            model=model,
+            messages=[Message(role="user", content=prompt)],
+        )
         emit_direct_llm_usage(
             command="team-tagger",
             model=model,
@@ -232,8 +231,10 @@ def _run_supervisor(
 ) -> tuple[int, str]:
     """Run cross-team supervisor. Returns ``(exit_code, feedback)``.
 
-    Fail-open on: subprocess failure, parse failure, missing "verdict",
-    non-dict extraction, verdict != "divergent", or FORGE_DEPTH limit.
+    Fail-open on: routing/subprocess failure, parse failure, missing "verdict",
+    non-dict extraction, verdict != "divergent", confidence below the block
+    threshold, or FORGE_DEPTH limit. Low/malformed confidence preserves
+    diagnostic feedback while allowing the event.
     """
     from forge.core.reactive.env import should_spawn_subprocesses
 
@@ -241,11 +242,22 @@ def _run_supervisor(
         _log.debug("Skipping team supervisor at FORGE_DEPTH limit")
         return 0, ""
 
-    try:
-        base_url = None if config.direct else (config.base_url or lookup_proxy_base_url(config.proxy))
-    except Exception as e:
-        _log.warning("Team supervisor proxy '%s' not found: %s", config.proxy, e)
-        return 0, ""
+    if config.direct:
+        base_url = None
+        unset_env_vars = None
+    else:
+        try:
+            routing_result = resolve_subprocess_routing(
+                explicit_base_url=config.base_url,
+                explicit_proxy=config.proxy,
+                require_route=False,
+            )
+            base_url = routing_result.base_url
+        except Exception as e:
+            _log.warning("Team supervisor routing failed: %s", e)
+            return 0, ""
+        unset_env_vars = CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
+
     prompt = TEAM_SUPERVISOR_PROMPT.format(
         teammate_name=teammate,
         team_name=team,
@@ -271,6 +283,7 @@ def _run_supervisor(
             direct=config.direct,
             timeout_seconds=config.timeout_seconds,
             reasoning_effort=config.effort,
+            unset_env_vars=unset_env_vars,
         )
     # Emit before the success gate so failures/timeouts are attributed too (the emit
     # helper maps status itself and is best-effort -- it never raises).
@@ -290,5 +303,22 @@ def _run_supervisor(
     if not isinstance(verdict, dict) or verdict.get("verdict") != "divergent":
         return 0, ""
 
-    feedback = verdict.get("feedback", "Supervisor flagged work as divergent")
-    return 2, feedback
+    feedback = str(verdict.get("feedback", "Supervisor flagged work as divergent"))
+    raw_confidence = verdict.get("confidence")
+    try:
+        if isinstance(raw_confidence, bool) or not isinstance(raw_confidence, (int, float, str)):
+            raise ValueError("unsupported confidence type")
+        confidence = float(raw_confidence)
+        if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+            raise ValueError("confidence outside 0.0-1.0")
+    except (TypeError, ValueError):
+        _log.warning("Team supervisor returned malformed confidence %r; allowing with feedback", raw_confidence)
+        confidence = 0.0
+
+    # The team contract deliberately shares only the semantic threshold value.
+    # Citation gating remains specific to the semantic/workflow supervisor bar.
+    from forge.policy.semantic.verdict import CONFIDENCE_THRESHOLD
+
+    if confidence >= CONFIDENCE_THRESHOLD:
+        return 2, feedback
+    return 0, feedback

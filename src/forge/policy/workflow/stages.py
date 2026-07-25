@@ -12,17 +12,14 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from typing import Any
 
 from forge.core.reactive.structured_output import extract_json_from_response
+from forge.policy.semantic.verdict import meets_block_bar
 from forge.policy.types import ActionContext, PolicyDecision, Severity, Violation
 from forge.policy.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
 
 _log = logging.getLogger(__name__)
-
-# Confidence threshold for blocking (same as supervisor)
-CONFIDENCE_THRESHOLD = 0.8
 
 _VALID_SEVERITIES: set[str] = {"critical", "high", "medium", "low"}
 
@@ -198,29 +195,18 @@ def _complete_with_usage(
     Emits ``status="error"``/``parse_error`` on an unparseable response (plan-check is the
     reference). Returns the parsed dict, or ``None`` on a parse failure.
     """
-    from forge.core.llm import Message, SyncAdapter, get_client
-    from forge.core.usage import (
-        emit_direct_llm_usage,
-        mint_request_id,
-        resolve_client_base_url,
-        target_is_forge_proxy,
-        with_forge_request_id,
-    )
-
-    client = get_client(model)
-    adapter = SyncAdapter(client)
-    # Exact-cost join only when the client provably targets a Forge proxy (a dangling
-    # X-Request-ID ref is worse than none) -- same gate as the tagger/plan-check.
-    request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
-    hp = with_forge_request_id(None, request_id) if request_id else None
+    from forge.core.llm import Message
+    from forge.core.reactive.llm_call import complete_llm_call
+    from forge.core.usage import emit_direct_llm_usage
 
     messages = [Message(role="user", content=prompt)]
     if system_prompt:
         messages.insert(0, Message(role="system", content=system_prompt))
 
-    start = time.monotonic()
-    response = adapter.complete(messages, hyperparams=hp)
-    latency_ms = (time.monotonic() - start) * 1000
+    response, latency_ms, request_id = complete_llm_call(
+        model=model,
+        messages=messages,
+    )
 
     data = extract_json_from_response(response.text)
     emit_direct_llm_usage(
@@ -273,7 +259,7 @@ def _map_verdict(data: dict[str, Any], policy_id: str) -> PolicyDecision:
 
     has_citations = any(v.get("citations") for v in raw_violations if isinstance(v, dict))
 
-    if confidence >= CONFIDENCE_THRESHOLD and has_citations:
+    if meets_block_bar(confidence, has_citations):
         violations = [
             Violation(
                 rule_id=f"{policy_id}.reviewer",

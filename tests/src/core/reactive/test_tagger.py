@@ -60,7 +60,10 @@ class TestParseTags:
 
     def test_mixed_pipe_and_comma_uses_pipe(self):
         """Pipe takes precedence over comma when both present."""
-        assert _parse_tags("routine | config, trivial") == ["routine", "config, trivial"]
+        assert _parse_tags("routine | config, trivial") == [
+            "routine",
+            "config, trivial",
+        ]
 
     def test_comma_separated_empty_entries(self):
         """Empty entries between commas are filtered."""
@@ -109,7 +112,9 @@ class TestTagAction:
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
-    def test_llm_error_returns_empty_list(self, mock_adapter_cls, mock_get_client):
+    def test_llm_error_returns_empty_list(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        monkeypatch.setenv("FORGE_RUN_ID", "run_tag")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_tag")
         mock_adapter = MagicMock()
         mock_adapter.complete.side_effect = RuntimeError("LLM down")
         mock_adapter_cls.return_value = mock_adapter
@@ -125,6 +130,9 @@ class TestTagAction:
         assert outcomes[0].operation == "action.tag"
         assert outcomes[0].tool_name == "Write"
         assert outcomes[0].target_path == "src/foo.py"
+        from forge.core.usage.ledger import read_usage_events
+
+        assert read_usage_events() == []
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -133,7 +141,11 @@ class TestTagAction:
         mock_adapter.complete.return_value = CompletionResponse(text="[]")
         mock_adapter_cls.return_value = mock_adapter
 
-        result = tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
+        result = tag_action(
+            _make_context(),
+            model="gemini/gemini-2.0-flash",
+            prompt_template="{tool_name}",
+        )
 
         assert result == []
         from forge.core.telemetry.upstream import read_upstream_outcomes
@@ -180,7 +192,11 @@ class TestTagAction:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
+        tag_action(
+            _make_context(),
+            model="gemini/gemini-2.0-flash",
+            prompt_template="{tool_name}",
+        )
 
         from forge.core.usage.ledger import read_usage_events
 
@@ -196,10 +212,14 @@ class TestTagAction:
     @patch("forge.core.llm.SyncAdapter")
     def test_proxy_target_forwards_header_and_joins(self, mock_adapter_cls, mock_get_client, monkeypatch):
         """When the resolved target IS a Forge proxy: forward X-Request-ID AND record
-        the exact source_refs.cost_request_id join (the forwarded id == the recorded id)."""
+        the exact source_refs.cost_request_id join (the forwarded id == the recorded id).
+        """
         monkeypatch.setenv("FORGE_RUN_ID", "run_t")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_t")
-        monkeypatch.setattr("forge.core.usage.resolve_client_base_url", lambda _m: "http://localhost:8084")
+        monkeypatch.setattr(
+            "forge.core.usage.resolve_client_base_url",
+            lambda _m: "http://localhost:8084",
+        )
         monkeypatch.setattr("forge.core.usage.target_is_forge_proxy", lambda _u: True)
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = CompletionResponse(
@@ -207,7 +227,11 @@ class TestTagAction:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
+        tag_action(
+            _make_context(),
+            model="gemini/gemini-2.0-flash",
+            prompt_template="{tool_name}",
+        )
 
         forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"][
             "X-Request-ID"

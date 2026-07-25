@@ -605,6 +605,7 @@ class _CurationCall:
     model_used: str
     usage: dict[str, int] | None
     latency_ms: float
+    request_id: str | None = None
     provider_meta: Any | None = None
 
 
@@ -616,14 +617,12 @@ def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str =
     OpenRouter routing, provider-user grouping, parse-as-JSON, and usage metadata.
     """
     # Lazy import to avoid circular dependencies and startup cost
-    import time
-
-    from forge.core.llm import Message, SyncAdapter, get_client
+    from forge.core.llm import Message
     from forge.core.llm.types import ModelHyperparameters
+    from forge.core.reactive.llm_call import complete_llm_call
     from forge.core.reactive.structured_output import extract_json_from_response
     from forge.core.usage import resolve_direct_provider_user, with_openrouter_user
 
-    client = SyncAdapter(get_client(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER))
     # .complete (not .ask) so the provider's in-band token usage is captured for
     # ledger attribution; .ask returns text only. Same two-message shape .ask builds
     # internally, so model input is unchanged. Mirrors core/reactive/tagger.py.
@@ -641,9 +640,12 @@ def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str =
     provider_user = resolve_direct_provider_user(provider_user_role)
     if provider_user:
         hp = with_openrouter_user(hp, provider_user)
-    start = time.monotonic()
-    response = client.complete(messages, hyperparams=hp)
-    latency_ms = (time.monotonic() - start) * 1000
+    response, latency_ms, request_id = complete_llm_call(
+        model=AI_CURATION_MODEL,
+        provider=AI_CURATION_PROVIDER,
+        messages=messages,
+        hyperparams=hp,
+    )
     # Unparseable output is returned (curated=None), not raised: the .complete() above
     # spent real tokens, and the caller emits BEFORE the parse gate decides the fallback
     # (the team-supervisor precedent: failures are attributed, not lost).
@@ -653,6 +655,7 @@ def _call_llm_for_curation_prompt(user_prompt: str, *, provider_user_role: str =
         model_used=f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}",
         usage=response.usage,
         latency_ms=latency_ms,
+        request_id=request_id,
         provider_meta=getattr(response, "provider_meta", None),
     )
 
@@ -711,6 +714,7 @@ def _emit_curation_usage(
         usage=call.usage,
         status="error" if parse_failed else "success",
         failure_type="unparseable_output" if parse_failed else None,
+        cost_request_id=call.request_id,
         latency_ms=call.latency_ms,
         session=session,
         runtime="forge_cli",
