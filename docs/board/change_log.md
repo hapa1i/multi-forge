@@ -51,8 +51,11 @@ wc -l docs/board/change_log.md
   materialized bundled route; a version-aware pin flips to a packaged-map assert at v1.94.
 
 **Verification**: Full unit suite green per commit; regression suite incl. new effort-floor test; live LiteLLM gate
-passed with GEMINI_API_KEY (cache probe negative, recorded in catalog); OpenRouter live matrix + `make pre-commit` +
-`uv build` wheel smoke recorded at closeout.
+passed with GEMINI_API_KEY (cache probe negative, recorded in catalog). OpenRouter live matrix: Opus 5, Kimi K3, and
+Gemini 3.6 Flash completions passed through their new template defaults; the qwen completions are blocked by this
+account's OpenRouter data-policy settings (404 "no endpoints available" for every qwen slug, including the pre-existing
+3.6-flash — environment limit, remediation at openrouter.ai/settings/privacy), so qwen live coverage here is the boot +
+tier-mapping assertion. `make pre-commit` clean; `uv build` wheel smoke at closeout.
 
 ## 2026-07-24
 
