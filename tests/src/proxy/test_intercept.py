@@ -63,12 +63,12 @@ class TestGuards:
 
 class TestReasoningPin:
     def test_floor_consistent_with_server_thresholds(self):
-        """Each effort floor must round-trip back to the same effort via the server's mapping."""
-        from forge.proxy import server
+        """Each effort floor must round-trip back to the same effort via the proxy's mapping."""
+        from forge.proxy import reasoning
 
         for effort in ("minimal", "low", "medium", "high", "xhigh"):
             floor = intercept.effort_to_budget_floor(effort)
-            assert server._derive_reasoning_effort({"budget_tokens": floor}) == effort
+            assert reasoning.derive_reasoning_effort({"budget_tokens": floor}) == effort
 
     def test_raises_low_budget_to_floor(self):
         thinking, changed, before, after = intercept.pin_reasoning(

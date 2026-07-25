@@ -10,7 +10,7 @@ from forge.core.models.catalog import (
     load_model_catalog,
 )
 from forge.core.models.types import ModelSpec, TemperatureSpec
-from forge.proxy.server import _EFFORT_RANK
+from forge.proxy.reasoning import EFFORT_RANK
 
 
 def _minimal_model_data() -> dict:
@@ -285,14 +285,14 @@ class TestTypeValidation:
 
 
 class TestCatalogEffortRankAlignment:
-    """Ensure every reasoning effort string in the catalog is recognized by the proxy's _EFFORT_RANK.
+    """Ensure every reasoning effort string in the catalog is recognized by the proxy's EFFORT_RANK.
 
     Prevents drift: adding a new effort level to model_catalog.yaml without
-    updating _EFFORT_RANK in server.py would silently misrank comparisons.
+    updating EFFORT_RANK in reasoning.py would silently misrank comparisons.
     """
 
     def test_all_catalog_efforts_exist_in_effort_rank(self):
-        """Every litellm_reasoning_efforts value in the real catalog must be a key in _EFFORT_RANK."""
+        """Every litellm_reasoning_efforts value in the real catalog must be a key in EFFORT_RANK."""
         catalog = load_model_catalog(force_reload=True)
         missing: list[tuple[str, str]] = []
 
@@ -300,40 +300,40 @@ class TestCatalogEffortRankAlignment:
             if spec.litellm_reasoning_efforts is None:
                 continue
             for effort in spec.litellm_reasoning_efforts:
-                if effort not in _EFFORT_RANK:
+                if effort not in EFFORT_RANK:
                     missing.append((model_id, effort))
 
         assert missing == [], (
-            f"Catalog effort strings not in _EFFORT_RANK: "
+            f"Catalog effort strings not in EFFORT_RANK: "
             f"{[f'{m}: {e!r}' for m, e in missing]}. "
-            f"Update _EFFORT_RANK in server.py to include these levels."
+            f"Update EFFORT_RANK in reasoning.py to include these levels."
         )
 
     def test_all_catalog_defaults_exist_in_effort_rank(self):
-        """Every default_reasoning_effort in the real catalog must be a key in _EFFORT_RANK."""
+        """Every default_reasoning_effort in the real catalog must be a key in EFFORT_RANK."""
         catalog = load_model_catalog(force_reload=True)
         missing: list[tuple[str, str]] = []
 
         for model_id, spec in catalog.models.items():
             if spec.default_reasoning_effort is None:
                 continue
-            if spec.default_reasoning_effort not in _EFFORT_RANK:
+            if spec.default_reasoning_effort not in EFFORT_RANK:
                 missing.append((model_id, spec.default_reasoning_effort))
 
         assert missing == [], (
-            f"Catalog default efforts not in _EFFORT_RANK: "
+            f"Catalog default efforts not in EFFORT_RANK: "
             f"{[f'{m}: {e!r}' for m, e in missing]}. "
-            f"Update _EFFORT_RANK in server.py to include these levels."
+            f"Update EFFORT_RANK in reasoning.py to include these levels."
         )
 
     def test_effort_rank_is_strictly_ordered(self):
-        """_EFFORT_RANK values form a strict ordering (no duplicates except aliases)."""
+        """EFFORT_RANK values form a strict ordering (no duplicates except aliases)."""
         known_aliases = {"disable"}  # intentional alias for "none"
-        non_alias = {k: v for k, v in _EFFORT_RANK.items() if k not in known_aliases and k is not None}
+        non_alias = {k: v for k, v in EFFORT_RANK.items() if k not in known_aliases and k is not None}
 
         values = list(non_alias.values())
         assert len(values) == len(set(values)), (
-            f"Duplicate rank values in _EFFORT_RANK (excluding aliases): " f"{non_alias}"
+            f"Duplicate rank values in EFFORT_RANK (excluding aliases): " f"{non_alias}"
         )
 
 

@@ -82,6 +82,7 @@ from forge.proxy.ports import (
     find_available_loopback_port as _find_available_loopback_port,
 )
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.reasoning import resolve_reasoning_effort
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,
     build_intercept_capability_section,
@@ -579,84 +580,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Unified LLM Proxy", lifespan=lifespan)
-
-
-# --- Thinking → reasoning_effort translation ---
-# Claude Code sends Anthropic-specific `thinking` config; litellm uses
-# `reasoning_effort` which it translates per provider (Gemini 3: thinking_level,
-# Gemini 2.5: thinkingBudget). These helpers map between the two.
-
-# Ordered from lowest to highest so we can compare with max().
-_EFFORT_RANK: dict[str | None, int] = {
-    None: -1,
-    "none": 0,
-    "disable": 0,
-    "minimal": 1,
-    "low": 2,
-    "medium": 3,
-    "high": 4,
-    "xhigh": 5,
-}
-
-# Budget thresholds for ceil-to-tier mapping (never downgrade).
-# Checked top-down; first match wins.  LiteLLM internal budgets for
-# reference: low ~ 1,024, medium ~ 8,192, high ~ 24,576.
-_BUDGET_THRESHOLDS: list[tuple[int, str]] = [
-    (25_000, "xhigh"),  # >=25k tokens -> xhigh (above litellm high)
-    (10_000, "high"),  # >=10k tokens -> high
-    (2_000, "medium"),  # >=2k tokens  -> medium
-    (500, "low"),  # >=500 tokens -> low
-    (1, "minimal"),  # >=1 token    -> minimal
-]
-
-# Type-based fallback when budget_tokens is absent.
-_TYPE_TO_EFFORT: dict[str, str] = {
-    "enabled": "high",
-    "adaptive": "medium",
-    "disabled": "none",
-}
-
-
-def _derive_reasoning_effort(thinking: dict[str, object] | object | None) -> str | None:
-    """Derive reasoning_effort from Claude Code's thinking config.
-
-    Priority: budget_tokens (numeric, precise) > type (semantic label).
-    Unknown types default to "medium" (safe — never results in no reasoning).
-    """
-    if not isinstance(thinking, dict):
-        return None
-
-    # 1) Use budget_tokens if present — data-driven, not label-driven.
-    budget = thinking.get("budget_tokens")
-    if isinstance(budget, (int, float)) and budget > 0:
-        for threshold, effort in _BUDGET_THRESHOLDS:
-            if budget >= threshold:
-                return effort
-        return "minimal"  # budget_tokens in (0, 1) — fractional edge case
-
-    # 2) Fall back to type-based mapping.
-    thinking_type = thinking.get("type")
-    if isinstance(thinking_type, str):
-        mapped: str | None = _TYPE_TO_EFFORT.get(thinking_type)
-        if mapped is not None:
-            return mapped
-        # Unknown type — default to medium (safe), log warning.
-        logger.warning(
-            "Unknown thinking type '%s', defaulting to reasoning_effort='medium'",
-            thinking_type,
-        )
-        return "medium"
-
-    return None
-
-
-def _max_effort(a: str | None, b: str | None) -> str | None:
-    """Return the higher of two reasoning_effort levels, treating None as unset."""
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return a if _EFFORT_RANK.get(a, 3) >= _EFFORT_RANK.get(b, 3) else b
 
 
 def _thinking_summary(thinking: object) -> dict[str, object] | None:
@@ -1243,21 +1166,15 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
 
         # Optional reasoning/thinking overrides.
         # Priority: request explicit > thinking-derived > tier_override > model default
-        # tier_override acts as a FLOOR (never go below the user's tier config).
-        # Use getattr() for test stubs that don't include new fields.
-        reasoning_effort = getattr(request_data, "reasoning_effort", None)
-        if reasoning_effort is not None:
-            openai_request_dict["reasoning_effort"] = reasoning_effort
-        else:
-            # Claude Code sends `thinking` (Anthropic-specific) instead of
-            # `reasoning_effort`. Translate to reasoning_effort so litellm can
-            # map it to each provider's native parameter.
-            thinking = getattr(request_data, "thinking", None)
-            derived = _derive_reasoning_effort(thinking)
-
-            # Apply tier_override as a floor: max(derived, tier_override).
-            tier_effort = tier_override.reasoning_effort if tier_override else None
-            openai_request_dict["reasoning_effort"] = _max_effort(derived, tier_effort)
+        # tier_override acts as a FLOOR (never go below the user's tier config);
+        # the result is normalized against the catalog's effort levels for the
+        # mapped model (explicit unsupported values reject, derived ones clamp).
+        openai_request_dict["reasoning_effort"] = resolve_reasoning_effort(
+            request_data,
+            tier_override=tier_override,
+            model_id=actual_model_id,
+            request_id=request_id,
+        )
 
         # Note: the raw `thinking` dict is NOT forwarded — it's Anthropic-specific.
         # Litellm controls thinking via reasoning_effort (mapped above).
