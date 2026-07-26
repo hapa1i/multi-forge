@@ -13,8 +13,8 @@ its first three items are owner decisions rather than implementation work.
 
 ## Current focus
 
-Slice 0. Three questions need answers before any code: two unproven card assumptions (P1, P2) and one the card predates
-(P3). All three are load-bearing; none should be discovered during implementation.
+Slice 0, narrowed. **P1 and P2 are answered** from local evidence (see "Probe results") -- both resolved in adoption's
+favour, and P2 tightened the model-inference scope. Remaining before any code: **P3** plus the three owner decisions.
 
 ## Re-grounding (2026-07-26)
 
@@ -61,22 +61,65 @@ Blocking decisions (card "Open questions"):
 
 New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
 
-- [ ] **P1 -- Stop-rewrite idempotency (v1-blocking).** The whole binding survives the first Forge-managed Stop only if
-  a plain `claude --resume <uuid>` reports the **same** `session_id` in its Stop payload; `cli/hooks/commands.py:179`
-  rewrites `confirmed.claude_session_id` from that payload unconditionally. The card lists this as a risk but schedules
-  no probe, and if the id ever differs the binding drifts after exactly one turn -- silently. Assertion: a real-Claude
-  Docker gate (precedent: `test_native_relocate_contract.py`, `test_rewind_native_contract.py`) creates a conversation,
-  reattaches by UUID, and asserts the Stop-payload `session_id` equals the original. Record the Claude version pinned,
-  matching the `CLAUDE_VERSION_VALIDATED` convention.
-- [ ] **P2 -- transcript model metadata (scope-affecting).** Card Design step 3 says the future-resume model can be
-  inferred "from transcript metadata when present". Forge has **no** transcript-model extraction today:
-  `core/transcript.py` exposes only role/turn primitives, and the sole `model` read in `src/` is the status line's proxy
-  tier map. Assertion: either a named transcript field is confirmed to carry the model (and an extractor is scoped into
-  Slice 2), or inference is dropped from v1 and `--model`-or-warn becomes the only path. Do not carry "infer when
-  present" into implementation unproven.
+- [ ] **P1 -- Stop-rewrite idempotency. DE-RISKED by local evidence; the gate still owes the proof.** The binding
+  survives the first Forge-managed Stop only if a plain `claude --resume <uuid>` reports the **same** `session_id`;
+  `cli/hooks/commands.py:179` rewrites `confirmed.claude_session_id` from that payload unconditionally, so a differing
+  id drifts the binding after one turn, silently. Local evidence (see "Probe results") is consistent on all four axes
+  and found **zero** counterexamples, so this is no longer a design risk -- but wall-clock gap evidence is
+  circumstantial for the reattach leg specifically. Assertion (unchanged, now a version-drift guard rather than a
+  feasibility question): a real-Claude Docker gate -- precedent `test_native_relocate_contract.py`,
+  `test_rewind_native_contract.py` -- creates a conversation, reattaches by UUID, and asserts the Stop-payload
+  `session_id` equals the original. Record the pinned Claude version, matching the `CLAUDE_VERSION_VALIDATED`
+  convention. Deliver with Slice 5.
+- [x] **P2 -- transcript model metadata (scope-affecting). ANSWERED: inference is viable; keep it in v1.** Assistant
+  entries carry `message.model` on **1129/1129** occurrences across a 40-transcript sample, with real canonical ids
+  (`claude-opus-5`, `claude-fable-5`, `claude-opus-4-8`). Scope the extractor into Slice 2 with the three edge cases
+  measured over 120 transcripts (see "Probe results"): filter the `<synthetic>` sentinel, tolerate transcripts with no
+  assistant turn (**the majority of the sample**, so the warn-and-persist fallback is the common path, not an edge), and
+  take the last real model -- **zero** files mixed two real models, so no tie-break rule is needed, only a defensive
+  one.
 - [ ] **P3 -- adopted session on the proxy branch.** Decide what an adopted (direct-mode) session does if a later resume
   supplies `--proxy`, given the new `_apply_direct_model_env_if_supported` branch. Assertion: behavior stated in the
   card; adoption records direct mode honestly and does not silently acquire a proxy model pin.
+
+### Probe results (2026-07-26)
+
+Method: read-only inspection of local evidence -- 1,029 native transcripts under `~/.claude/projects/` plus this
+checkout's Forge session manifests. No LLM calls, no Docker, no spend. Samples are path-ordered slices (not
+time-ordered), and only entry keys, ids, and model strings were read -- never message content.
+
+**P1 -- four independent axes, zero counterexamples:**
+
+| Axis                                   | Sample           | Result                                         |
+| -------------------------------------- | ---------------- | ---------------------------------------------- |
+| Filename stem vs embedded `sessionId`  | 250 transcripts  | 250 match, 0 mismatch, 0 files with >1 id      |
+| Forge `stop` captures vs manifest uuid | 45 captures      | 45 match, 0 mismatch, 0 null                   |
+| One id spanning a long wall-clock gap  | 300 transcripts  | 16 files, gaps up to 18.3h, still exactly 1 id |
+| `pre-compact` nulling the binding      | code + 4 entries | impossible -- separate handler                 |
+
+The fourth axis was an active scare worth recording. `pre-compact` artifact entries carry `session_id: null` (4/4) and
+the Stop rewrite has **no falsy guard**, which would null an adopted binding on the first `/compact`. They are different
+functions: `_capture_transcript_artifact` (`:124`) is reached only from `stop` (`:544`) and `stop-failure` (`:749`),
+while the pre-compact handler (`:814`) writes its own entry and touches only `confirmed_by`. Compaction therefore cannot
+break an adopted binding -- but a future refactor that unifies the two capture paths would reintroduce exactly this bug,
+so Slice 1's provenance test should assert it.
+
+**P2 -- `message.model` coverage:**
+
+| Measure                                       | Result      |
+| --------------------------------------------- | ----------- |
+| assistant entries carrying `message.model`    | 1129 / 1129 |
+| transcripts mixing two real model ids         | 0 of 120    |
+| transcripts with only the `<synthetic>` value | 4 of 120    |
+| transcripts with no assistant turn at all     | 87 of 120   |
+
+The last row resizes card Design step 3: a transcript with no assistant turn cannot yield a model, and that is the
+**majority** of the sample, so warn-and-persist is the ordinary path and inference is the optimization. `<synthetic>` is
+a sentinel, not a model id, and must be filtered before it reaches `direct_model`.
+
+**Incidental finding (not this card's scope).** `pre-compact` artifact entries omit `session_id` while `stop` entries
+include it, so the two capture shapes disagree in `confirmed.artifacts.transcripts[]`. Adoption should follow the `stop`
+shape. Worth a separate card only if artifact readers care.
 
 ## Slice 1 -- Manifest provenance schema
 
@@ -85,6 +128,9 @@ New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
   ad hoc dict key is rejected by the strict reader.
 - [ ] Provenance survives hook confirmation. Assertion: a simulated Stop leaves `confirmed.adoption` intact and
   `confirmed.claude_session_id` unchanged while `confirmed_by` becomes `hook:stop`.
+- [ ] Compaction cannot null the binding. Assertion: a simulated `pre-compact` on an adopted session leaves
+  `confirmed.claude_session_id` intact. Guards the P1 axis-4 hazard -- pre-compact writes a null `session_id` and the
+  Stop rewrite has no falsy guard, so only the separation of the two handlers keeps this safe today.
 - [ ] design.md §3.3/§3.5 sync: `claude_session_id` gains a third origination path (start **pre-seeds**, native fork
   **records**, adopt **binds**); `confirmed.adoption` documented as CLI-written. Assertion: §3.5 ownership text names
   adopt.
