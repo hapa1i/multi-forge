@@ -417,6 +417,14 @@ To avoid writer conflicts:
     turn, so the manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC
     key posture of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes
     every Claude-resume predicate refuse Codex sessions.
+  - `confirmed.adoption` — `source_runtime`, `adopted_at`, `source_path`, `model_basis` — is CLI-owned and written once
+    when a manifest is bound to a **pre-existing** native conversation. No hook writes it. It exists as a separate field
+    rather than a `confirmed_by` value because `confirmed_by` records who touched the manifest **most recently**: at
+    least three writers stamp it (`cli:adopt`, `hook:stop`, `hook:pre-compact`), so origin recorded there would be
+    overwritten within one turn. `model_basis` (`explicit` | `inferred` | `none`) records what produced
+    `intent.launch.direct_model`, since a transcript that justified an inference is user-owned and may be gone before
+    anyone asks why the session resumes on that model. The binding command that populates this field is not shipped yet;
+    the schema and its hook-survival guarantees are.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -427,7 +435,8 @@ To avoid writer conflicts:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
-    points for the final live conversation identity.
+    points for the final live conversation identity. Hooks **never** write `confirmed.adoption`, and their rewrites of
+    `confirmed_by` and `claude_session_id` leave it intact.
   - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): freezes a consumer's chosen lane
     **write-once** (epic consumer_lanes/T1b, T6a) -- but **only when an explicit lane was chosen**. All four mirror one
     guard: resolve the lane once (the read `backend_id` comes from), then under the lock re-check

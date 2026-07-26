@@ -5,18 +5,20 @@
 **Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly; the `todo/` parking step was
 skipped because acceptance and activation happened in the same decision.
 
-**Execution branch**: `feat/native-session-adoption`. No production code is written yet. Slice 0 shipped one test file
-(`tests/integration/docker/test_adopt_binding_contract.py`, the P1 gate) and no `src/` change; Slice 1 is the first
-slice that touches production code.
+**Execution branch**: `feat/native-session-adoption`. Slice 0 shipped one test file
+(`tests/integration/docker/test_adopt_binding_contract.py`, the P1 gate) with no `src/` change. Slice 1 shipped the
+first production change: `AdoptionConfirmed` in `src/forge/session/models.py`. No CLI surface exists yet -- Slice 2 adds
+the op and leaf.
 
 **Slice numbering note**: the card uses "Phase 1 / Phase 2" for the **Claude** and **Codex arms**. This checklist uses
 "Slice" numbering to avoid collision; the arm mapping is called out where it applies.
 
 ## Current focus
 
-**Slice 0 is closed.** The three owner decisions, the card corrections, and all three probes (P1 gated on real Claude
-2.1.220, P2, P3) are settled and recorded in the card. Nothing blocks Slice 1 or Slice 2; the cursor moves to Slice 1
-(manifest provenance schema), which Slice 2 builds on.
+**Slices 0 and 1 are closed.** Slice 0's three owner decisions and all three probes (P1 gated on real Claude 2.1.220,
+P2, P3) are settled and recorded in the card. Slice 1 shipped `confirmed.AdoptionConfirmed` plus its hook-survival tests
+and the design.md §3.5 ownership entry; §3.3's origination sentence is deliberately deferred to Slice 2, since it would
+describe a command that does not exist yet. **Cursor: Slice 2** (the adopt op and CLI leaf) -- nothing blocks it.
 
 ## Re-grounding (2026-07-26)
 
@@ -165,6 +167,11 @@ uses `snapshot_path` where `stop` uses `copied_path`). The earlier "null" readin
 and `stop-failure` (`:749`). Slice 1 still asserts it, because the Stop rewrite has no falsy guard and a future refactor
 that unified the two capture paths could introduce one.
 
+Slice 1 refined this further: pre-compact leaves `claude_session_id` alone but **does** stamp
+`confirmed_by="hook:pre-compact"` (`:891`) -- found by a wrong assertion that expected `cli:adopt` to survive. So
+`confirmed_by` has at least **three** writers. That turns "provenance needs its own field" from an argument into a
+demonstrated fact, and it is now the reason recorded in design.md §3.5.
+
 **P2 -- `message.model` coverage:**
 
 | Measure                                       | Result (full 470) |
@@ -189,22 +196,37 @@ shape. Worth a separate card only if artifact readers care.
 
 ## Slice 1 -- Manifest provenance schema
 
-- [ ] `confirmed.adoption` added as a strict dataclass field (`{source_runtime, adopted_at, source_path, model_basis}`).
-  Assertion: `SessionStore.read` round-trips it; a pre-adoption manifest without the field still reads (optional +
-  defaulted); an ad hoc dict key is rejected by the strict reader.
-- [ ] `model_basis` records which P3 basis produced `intent.launch.direct_model`: `explicit` (`--model`), `inferred`
-  (transcript metadata), or `none` (left unset). Assertion: each of the three values round-trips, and `none` coexists
-  with `direct_model is None` -- so "why is this pinned?" is answerable from the manifest alone, without re-reading a
-  transcript that may no longer exist.
-- [ ] Provenance survives hook confirmation. Assertion: a simulated Stop leaves `confirmed.adoption` intact and
-  `confirmed.claude_session_id` unchanged while `confirmed_by` becomes `hook:stop`.
-- [ ] Compaction cannot disturb the binding. Assertion: a simulated `pre-compact` on an adopted session leaves
-  `confirmed.claude_session_id` intact. Pre-compact never mutates the binding today -- it exits without a `session_id`
-  and omits the key from its artifact entry -- so this is a guard against a future refactor that unified the two capture
-  paths, given the Stop rewrite has no falsy guard.
-- [ ] design.md §3.3/§3.5 sync: `claude_session_id` gains a third origination path (start **pre-seeds**, native fork
-  **records**, adopt **binds**); `confirmed.adoption` documented as CLI-written. Assertion: §3.5 ownership text names
-  adopt.
+- [x] `confirmed.adoption` added as a strict dataclass field (`{source_runtime, adopted_at, source_path, model_basis}`)
+  -- `AdoptionConfirmed`, `session/models.py:555`, wired at `SessionConfirmed.adoption`. Verified in
+  `tests/src/session/test_models.py::TestAdoptionConfirmed`: dacite round-trips it; a manifest without the field still
+  reads (additive, defaults `None`); an ad hoc `adoption_source` key raises `UnexpectedDataError` under the strict read.
+  Plain `str` fields, no `__post_init__` validation -- matching the sibling `*Confirmed` fail-open rule
+  (`LaunchConfirmed`, `:498`), because a confirmed-facts class that refuses to load strands the whole session, not one
+  field. Value constants stay with the writing op (`ROLLOUT_SOURCE_*` precedent, `core/ops/codex_session.py:69`), so
+  they land in Slice 2.
+- [x] `model_basis` records which P3 basis produced `intent.launch.direct_model`: `explicit` (`--model`), `inferred`
+  (transcript metadata), or `none` (left unset). Verified: all three round-trip (parametrized), and `none` coexists with
+  an unset `direct_model` -- a recorded decision, not missing data.
+- [x] Provenance survives hook confirmation. Verified in
+  `tests/src/cli/test_artifact_hooks.py::TestAdoptionProvenanceSurvivesHooks` against the **real** Stop handler through
+  `CliRunner`, not a simulated mutation: `confirmed_by` becomes `hook:stop`, `claude_session_id` stays the adopted uuid
+  (P1's idempotency, now also covered at unit speed), and every `confirmed.adoption` field survives.
+- [x] Compaction cannot disturb the binding. Verified against the real `pre-compact` handler: `claude_session_id` and
+  `confirmed.adoption` are untouched, and the recorded snapshot entry carries **no** `session_id` key. Pre-compact never
+  mutates the binding today, so this is a guard against a future refactor unifying the two capture paths, given the Stop
+  rewrite has no falsy guard. The test also pins the incidental shape difference (compaction entries omit `session_id`)
+  that the P1 Docker gate has to filter around.
+- [x] design.md **§3.5** sync: `confirmed.adoption` documented as CLI-owned and hook-immune, in the CLI-writes list; the
+  Hooks-write list states hooks never write it and their `confirmed_by` / `claude_session_id` rewrites leave it intact.
+  The entry records *why* the field exists rather than restating its shape: `confirmed_by` has **three** writers
+  (`cli:adopt`, `hook:stop`, `hook:pre-compact` -- `commands.py:891`, discovered by a failing assertion in this slice),
+  so origin stored there is overwritten within a turn.
+- [ ] design.md **§3.3** sync **deferred to Slice 2, deliberately**: the third origination path (start **pre-seeds**,
+  native fork **records**, adopt **binds**) describes a command that does not exist yet, and design docs must describe
+  shipped behavior (documentation_guidelines "Design Documents"). Slice 1 shipped the schema, so §3.5 documents the
+  schema; §3.3's origination sentence lands with the op. §3.5 says so explicitly ("the binding command that populates
+  this field is not shipped yet; the schema and its hook-survival guarantees are") so the gap is visible in the design
+  doc, not just here.
 
 ## Slice 2 -- Claude adopt op and CLI (card Phase 1)
 

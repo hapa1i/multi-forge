@@ -8,6 +8,7 @@ from forge.core.state import now_iso
 from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
+    AdoptionConfirmed,
     CodexConfirmed,
     ConsumerLaneBinding,
     ConsumerLaneConfirmed,
@@ -247,6 +248,88 @@ class TestCodexConfirmed:
             config=dacite.Config(strict=True),
         )
         assert restored.codex is None
+
+
+class TestAdoptionConfirmed:
+    """Adoption provenance schema (native_session_adoption Slice 1)."""
+
+    def test_confirmed_adoption_defaults_none(self) -> None:
+        assert SessionConfirmed().adoption is None
+
+    def test_dacite_round_trip(self) -> None:
+        from dataclasses import asdict
+
+        import dacite
+
+        source_path = "/home/u/.claude/projects/-home-u-repo/470b1a1b.jsonl"
+        confirmed = SessionConfirmed(
+            claude_session_id="470b1a1b-202b-4ead-a3ea-d0dca69243f2",
+            adoption=AdoptionConfirmed(
+                source_runtime="claude_code",
+                adopted_at="2026-07-26T12:00:00Z",
+                source_path=source_path,
+                model_basis="inferred",
+            ),
+        )
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored.adoption is not None
+        assert restored.adoption.source_runtime == "claude_code"
+        assert restored.adoption.adopted_at == "2026-07-26T12:00:00Z"
+        assert restored.adoption.source_path == source_path
+        assert restored.adoption.model_basis == "inferred"
+
+    def test_old_manifest_without_adoption_deserializes(self) -> None:
+        """A pre-adoption manifest must still read: the field is additive, not required."""
+        import dacite
+
+        restored = dacite.from_dict(
+            SessionConfirmed,
+            {"claude_session_id": "uuid-1234", "is_sandboxed": False},
+            config=dacite.Config(strict=True),
+        )
+        assert restored.adoption is None
+
+    def test_ad_hoc_key_rejected_by_strict_read(self) -> None:
+        """Provenance must be a model field, not a dict key smuggled past the schema."""
+        import dacite
+
+        with pytest.raises(dacite.UnexpectedDataError):
+            dacite.from_dict(
+                SessionConfirmed,
+                {"claude_session_id": "uuid-1234", "adoption_source": "cli:adopt"},
+                config=dacite.Config(strict=True),
+            )
+
+    @pytest.mark.parametrize("basis", ["explicit", "inferred", "none"])
+    def test_every_model_basis_round_trips(self, basis: str) -> None:
+        """All three P3 outcomes persist, including the deliberate no-basis case."""
+        from dataclasses import asdict
+
+        import dacite
+
+        # "none" pairs with an unset direct_model: adoption found no basis and
+        # declined to invent one, which is a recorded decision, not missing data.
+        confirmed = SessionConfirmed(adoption=AdoptionConfirmed(model_basis=basis))
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored.adoption is not None
+        assert restored.adoption.model_basis == basis
+
+    def test_adoption_is_independent_of_confirmed_by(self) -> None:
+        """The whole reason the field exists: a Stop rewrite must not erase provenance."""
+        from dataclasses import asdict
+
+        import dacite
+
+        confirmed = SessionConfirmed(
+            adoption=AdoptionConfirmed(source_runtime="claude_code", model_basis="explicit"),
+            confirmed_by="cli:adopt",
+        )
+        # Simulate the Stop hook's rewrite (cli/hooks/commands.py:179-180).
+        confirmed.confirmed_by = "hook:stop"
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored.confirmed_by == "hook:stop"
+        assert restored.adoption is not None
+        assert restored.adoption.model_basis == "explicit"
 
 
 class TestSessionState:
