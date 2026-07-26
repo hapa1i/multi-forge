@@ -211,7 +211,8 @@ rejoins the tracks: Seam 5 unblocks `budget-required`, gated on the correlation 
   Forge's own workers in-process through the existing fan-out concurrency domain rather than through this hook-based
   counter.
 - **Seam 6** -- ambient mutation and diagnostics: terminal/direct commands share command-core ops; invalid guard config
-  is consistently visible through doctor and policy status. Owner M0.
+  is consistently visible through doctor and policy status. Owner M0; M1 reads the opt-out spelling because its deny
+  text must name the exact escape command (D3 release gate), so renaming the opt-out surface is a cross-card change.
 
 ## Out of Scope
 

@@ -14,6 +14,14 @@ verification) is unchanged -- scope answers "who turned it on and who may turn i
 Epic decisions D1 (engine integration, not a dedicated handler) and D2 (config home + override precedence) are recorded
 in the epic card and are this card's requirements, not open questions.
 
+**Release-gate coupling (epic posture revision, 2026-07-26).** Revised D3 ships M1 with a `block` default, and that
+default is admissible only if this card's opt-out lands in the same release. The opt-out work below is therefore M1 v1's
+blocking precondition rather than ordinary M0 scope: `policy.disabled_guards`, `policy.ambient_guards_disabled`, the
+`%policy guard disable|enable` and terminal command pair, and the shared command-core op seam. The coupling is also a
+contract, not just a schedule: M1's deny text must name the exact escape command, so the opt-out spelling is rendered by
+a sibling card and is not an M0 implementation detail free to change afterwards. Shipping the block without the hatch is
+the failure mode D3 names.
+
 ## Design
 
 - **Config source**: a typed `policy.guards:` section in `~/.forge/config.yaml`. Missing means built-in defaults; a
