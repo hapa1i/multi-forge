@@ -141,7 +141,8 @@ the consent moment still carries no cost semantics, and direct-runtime spend is 
 no receipt). It does resize three members:
 
 - **M1 -- materially reduced.** v1 ships `block` + `allow` only. Refusing a launch requires no agent counter, so v1
-  needs neither Seam 5 nor the correlation probe. `budget-required` moves to v2.
+  needs neither Seam 5 nor the correlation probe. `warn` and `budget-required` both move to v2; the enum keeps all four
+  modes.
 - **M2 -- Forge core unchanged; native enforcement slice deferred.** Seam 2 (envelope schema) and workflow preflight
   admission ship as planned; Seam 5 (agent-budget state) defers to v2 alongside `budget-required`. Claude's setting
   cannot govern `forge workflow` fan-out, which remains Forge-spawned `claude -p` subprocesses in Forge's own
@@ -182,12 +183,12 @@ M3 is unaffected.
 
 ## Members
 
-| Id  | Card                                                            | Delivers (v1)                                                                    | Depends on | Deferred to v2             |
-| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------- | -------------------------- |
-| M0  | [ambient_policy_scope](../ambient_policy_scope/card.md)         | Engine second activation scope, `policy.guards` config, opt-out UX, new matchers | --         | --                         |
-| M1  | [native_review_guard](../native_review_guard/card.md)           | Native-review guard, `block` default + `allow` opt-out                           | M0         | `budget-required` mode     |
-| M2  | [review_budget_envelope](../review_budget_envelope/card.md)     | Budget envelope schema (Seam 2) + workflow preflight enforcement                 | M0         | Seam 5 agent-counter state |
-| M3  | [adaptive_review_behavior](../adaptive_review_behavior/card.md) | Single-agent narrowing, workflow batch scheduling, and coverage receipts         | M2         | --                         |
+| Id  | Card                                                            | Delivers (v1)                                                                    | Depends on | Deferred to v2                   |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------- | -------------------------------- |
+| M0  | [ambient_policy_scope](../ambient_policy_scope/card.md)         | Engine second activation scope, `policy.guards` config, opt-out UX, new matchers | --         | --                               |
+| M1  | [native_review_guard](../native_review_guard/card.md)           | Native-review guard, `block` default + `allow` opt-out                           | M0         | `warn` + `budget-required` modes |
+| M2  | [review_budget_envelope](../review_budget_envelope/card.md)     | Budget envelope schema (Seam 2) + workflow preflight enforcement                 | M0         | Seam 5 agent-counter state       |
+| M3  | [adaptive_review_behavior](../adaptive_review_behavior/card.md) | Single-agent narrowing, workflow batch scheduling, and coverage receipts         | M2         | --                               |
 
 **Sequencing (revised 2026-07-26)**: M0 first -- activation, opt-out UX, and hook vocabulary before enforcement. **M1 v1
 then ships directly on M0 and no longer depends on M2**, because refusing a launch requires no agent counter; the

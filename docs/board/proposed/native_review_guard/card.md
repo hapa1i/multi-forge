@@ -26,8 +26,9 @@ Semantics:
   shipped v1 default per epic D3.** It is the only cheap mode with a hard guarantee: the deny contract instructs the
   model to explain the conflict and ask how to proceed, so the refusal becomes a user decision point before spend.
 - `warn`: allow, but emit a preflight estimate (agent-count range, diff size, context floor) at the Skill boundary
-  before fan-out. **Not the default, and not guard-grade.** Warn output is model-facing stderr, so it neither stops
-  spend nor reaches the user at the consent moment the incident identified; its residual value is observability.
+  before fan-out. **v2, and never the default.** Warn output is model-facing stderr, so it neither stops spend nor
+  reaches the user at the consent moment the incident identified; that makes it observability-grade rather than
+  guard-grade, so v1 ships without it.
 - `budget-required`: deny unless the session supplies an explicit budget envelope (schema owned by M2). **v2** -- gated
   on Seam 5 agent-counter state and the `SubagentStop` correlation probe. If correlation proves unavailable, `block` is
   a fine terminal state rather than a degraded one.
@@ -83,7 +84,7 @@ Provable now (assistant-initiated path):
 
 - With `mode: block`, an assistant-initiated native review (Skill-tool invocation) is denied before broad reads or
   subagent fan-out; the deny message names `/forge:review` and carries the guard's intent.
-- With `mode: warn`, the review proceeds and a preflight estimate is visibly emitted before fan-out.
+- (**v2**) With `mode: warn`, the review proceeds and a preflight estimate is visibly emitted before fan-out.
 - (**v2**, with Seam 5) With `mode: budget-required`, no envelope means denial before fan-out. With an envelope and
   proven parent-operation correlation, launches beyond its total-agent cap are denied; parallel-agent denial
   additionally requires reliable active-slot release. Without parent-operation correlation, the Skill is denied with an
