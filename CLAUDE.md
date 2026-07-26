@@ -187,7 +187,7 @@ src/forge/
 
 ## Implementation Status
 
-Test suite has ~3,900 tests with Docker-based isolation. Key capabilities: multi-model proxy routing, session management
+Test suite has ~9,400 tests with Docker-based isolation. Key capabilities: multi-model proxy routing, session management
 with resume/transfer, policy engine (TDD + semantic supervisor), search, workflow runners (fan-out, adversarial), skills
 architecture, and interactive manual testing (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`).
 
