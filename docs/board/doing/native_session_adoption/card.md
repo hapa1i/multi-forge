@@ -196,9 +196,22 @@ All ingredients exist; nothing constructs a manifest *from* a rollout today:
 
 ## Open questions
 
-- **Verb**: `adopt` vs `import` (lean: `adopt` -- lifecycle-verb family, no file-format connotation).
-- **Discovery shape**: bare `adopt` lists (preview-default precedent: `session clean`) vs an explicit `--list` flag.
-- **Recent-mtime threshold** for the double-attach warning, and warn-vs-block.
+**Resolved 2026-07-26** (Slice 0 owner decisions; execution detail in [checklist.md](checklist.md)):
+
+- **Verb**: **`adopt`**. Joins the session lifecycle-verb family (`start`/`resume`/`fork`/`clean`); `import` was
+  rejected for its file-format connotation. The CLI leaf name is fixed before any op is written.
+- **Discovery shape**: **bare `forge session adopt` previews** adoptable candidates; no `--list` flag is added. This
+  **follows** the preview-default precedent (`session clean`, `forge clean`, `extension cleanup-project`) and the
+  leaf-does-the-sensible-action rule in [cli_reference.md §1](../../../cli_reference.md#1-terminal-command-reference) --
+  with no UUID supplied, listing candidates is the only sensible action.
+- **Double-attach**: **warn and require confirmation** when the transcript mtime is within **30 minutes**, skippable
+  with `--yes`. Deliberately not a block: Forge cannot observe a live native client (`ActiveSessionStore` tracks only
+  Forge launches), so refusing on a guess would reject the most common legitimate flow -- adopting a conversation that
+  just ended. The Codex-resume no-`--force` posture (design.md §3.9) is **not** mirrored, because there Forge knows the
+  session is live; here it is inferring. Accepted cost: a just-finished adopt will usually confirm once.
+
+Still open:
+
 - **Runtime ambiguity** (Phase 2): an id matching both a Claude transcript and a codex rollout requires `--runtime`.
 - **Passive sighting** (explicitly deferred): post-epic (T3 registry + T5 user-scope hooks), a SessionStart hook firing
   in an enrolled project *could* record native-session sightings to make discovery instant -- that changes the normative

@@ -13,9 +13,9 @@ its first three items are owner decisions rather than implementation work.
 
 ## Current focus
 
-Slice 0, narrowed. **P2 is answered.** **P1 remains open**: local evidence found no counterexample, but none of it
-observes the reattach leg the contract actually turns on, so the real-Claude gate now blocks **Slice 2** instead of
-riding Slice 5. Remaining before the adopt op: P1's gate, **P3**, and the three owner decisions. Slice 1 is unblocked.
+Slice 0, nearly closed. The three owner decisions are settled and P2 is answered. **Remaining: P1's real-Claude gate and
+P3** -- both block Slice 2 (the adopt op), because P1 is the contract the binding rests on and P3 decides what an
+adopted direct-mode session does under `--proxy`. Slice 1 is unblocked and depends on neither.
 
 ## Re-grounding (2026-07-26)
 
@@ -54,14 +54,15 @@ deliberate answer for adopted sessions.
 
 ## Slice 0 -- Decisions and probes (no production code)
 
-Blocking decisions (card "Open questions"):
+Blocking decisions (card "Open questions") -- **all three settled 2026-07-26 and recorded in the card**:
 
-- [ ] **Verb** `adopt` vs `import` ratified. Assertion: decision recorded in the card; the CLI leaf name is fixed before
-  any op is written.
-- [ ] **Discovery shape**: bare `adopt` previews vs an explicit `--list` flag. Assertion: one shape chosen, and the card
-  states whether it follows the `session clean` preview-default precedent or deliberately departs from it.
-- [ ] **Double-attach policy**: a concrete recent-mtime threshold **and** a warn-vs-block posture. Assertion: both a
-  number and a posture are recorded; "warn when recent" alone is not a decision.
+- [x] **Verb**: **`adopt`**. Lifecycle-verb family; `import` rejected for its file-format connotation. Leaf name fixed
+  before any op is written.
+- [x] **Discovery shape**: **bare `adopt` previews**, no `--list` flag. The card states this **follows** the
+  preview-default precedent and the leaf-does-the-sensible-action rule, rather than departing from it.
+- [x] **Double-attach policy**: **warn + require confirmation** when transcript mtime is within **30 minutes**,
+  skippable with `--yes` -- both a number and a posture. Not a block, because Forge is inferring liveness rather than
+  observing it; the Codex-resume no-`--force` posture is explicitly not mirrored.
 
 New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
 
