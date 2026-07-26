@@ -29,28 +29,33 @@ Unchanged: `_is_resumable_session` (`cli/session_lifecycle.py:168`), `_scan_mani
 (`cli/session_codex.py:237`), the three `codex_rollouts.py` seams (`:52`, `:89`, `:147`), and the `rollout_source`
 docstring (`session/models.py:531`).
 
-| Drifted anchor                     | Card cites                                   | Actual today                     |
-| ---------------------------------- | -------------------------------------------- | -------------------------------- |
-| `start_session` signature          | `session/manager.py:421`                     | `:411` (sets the UUID at `:637`) |
-| `start_claude_session`             | `core/ops/claude_session.py:544`             | `:512`                           |
-| `add_from_state`                   | `session/index.py:485`                       | `:448`                           |
-| Stop artifact entry / UUID rewrite | `cli/hooks/commands.py:133-144` / `:146-158` | `:165-178` / `:179-180`          |
-| `_reconnect_in_place`              | `cli/session_lifecycle.py:1658`              | `:1624`                          |
-| `encode_project_path`              | `session/claude/paths.py:74`                 | `:47`                            |
-| `claude_project_root` pre-seed     | `cli/session_fork.py:896`                    | `:554-558`                       |
+| Drifted anchor                     | Card cites                                   | Actual today                           |
+| ---------------------------------- | -------------------------------------------- | -------------------------------------- |
+| `start_session` signature          | `session/manager.py:421`                     | `:411` (param `:426`, UUID `:636-637`) |
+| `start_claude_session`             | `core/ops/claude_session.py:544`             | `:512`                                 |
+| `add_from_state`                   | `session/index.py:485`                       | `:448`                                 |
+| Stop artifact entry / UUID rewrite | `cli/hooks/commands.py:133-144` / `:146-158` | `:166-177` / `:179`                    |
+| `_reconnect_in_place`              | `cli/session_lifecycle.py:1658`              | `:1624`                                |
+| `encode_project_path`              | `session/claude/paths.py:74`                 | `:47`                                  |
+| `claude_project_root` pre-seed     | `cli/session_fork.py:896`                    | `:908-917`                             |
 
 **Relocated mechanism.** The card's "future resume model" risk cites the `ANTHROPIC_MODEL` env pin at
 `core/ops/claude_session.py:1411-1416`. That file no longer contains the string. The pin moved to the leaf
-`core/models/direct_model.py` (`apply_direct_model_env`, `DirectModelPin.env`) and is applied at
-`core/ops/claude_session.py:1450` (direct branch) with a second branch `_apply_direct_model_env_if_supported` at `:1454`
-that did not exist when the card was written. The **risk is unchanged and still real** -- the pin still reaches the
-plain `--resume` reattach path -- but every citation must move to the leaf, and the proxy-supported branch needs a
-deliberate answer for adopted sessions.
+`core/models/direct_model.py` (`apply_direct_model_env` `:86`, `direct_model_env` `:79`, `DirectModelPin` `:23`) and is
+applied at `core/ops/claude_session.py:1450` (direct branch) with a second branch `_apply_direct_model_env_if_supported`
+(defined `session/model_pin.py:37`, applied at `core/ops/claude_session.py:1454`) that did not exist when the card was
+written. The **risk is unchanged and still real** -- the pin still reaches the plain `--resume` reattach path -- but
+every citation must move to the leaf, and the proxy-supported branch needs a deliberate answer for adopted sessions.
 
-- [ ] Card corrections applied to `card.md` before implementation, so the active card stops presenting stale locations
-  as current grounding: the drifted anchors above (Design step 3, Risks "Future resume model", Grounding) **and** the
-  "Write ordering (fail-closed atomicity)" paragraph, whose "index entry last" sequence the current `start_session()`
-  cannot produce (see Slice 2).
+- [x] Card corrections applied to `card.md` (2026-07-26), so the active card stops presenting stale locations as current
+  grounding. Verified: `grep -nE ':421|:620-621|:544|1411-1416|:1658|:896|146-158|133-144|:485|paths.py:74'` returns
+  nothing. Three substantive changes beyond line numbers: (a) the `ANTHROPIC_MODEL` pin now cites
+  `core/models/direct_model.py:86` with the proxy-branch sibling named as P3's subject; (b) the "Write ordering
+  (fail-closed atomicity)" paragraph no longer specifies an index-last sequence `start_session` cannot produce -- it
+  delegates to the existing compensation block (`session/manager.py:666-681`) and states the observable guarantee
+  instead; (c) the partial-failure acceptance row now names two constructible fixtures rather than an unreachable seam.
+  A **fourth** correction landed in the table above: `cli/session_fork.py:554-558` is a *read* of `claude_project_root`,
+  not the pre-seed; the actual pre-seed is `:908-917`.
 
 ## Slice 0 -- Decisions and probes (no production code)
 
