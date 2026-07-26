@@ -2,8 +2,10 @@
 
 **Epic**: [epic_budgeted_review_guards](../epic_budgeted_review_guards/card.md) (M1 -- first guard on the M0 substrate).
 
-**Lane**: `proposed/`. Depends on [ambient_policy_scope](../ambient_policy_scope/card.md) (M0) and the schema/state
-contract from [review_budget_envelope](../review_budget_envelope/card.md) (M2).
+**Lane**: `proposed/`. **v1 depends on [ambient_policy_scope](../ambient_policy_scope/card.md) (M0) only.** The
+schema/state dependency on [review_budget_envelope](../review_budget_envelope/card.md) (M2) applies to the v2
+`budget-required` mode, not to the v1 `block` default -- refusing a launch requires no agent counter (epic posture
+revision, 2026-07-26).
 
 ## Goal
 
@@ -15,16 +17,24 @@ Ship the first ambient guard: a deterministic policy that intercepts Claude Code
 policy:
   guards:
     native_review:
-      mode: warn # block | warn | budget-required | allow
+      mode: block # block | warn | budget-required | allow
 ```
 
 Semantics:
 
-- `block`: deny native review before expensive behavior starts; the deny message points at `/forge:review`.
-- `warn`: allow, but emit a visible preflight estimate (agent-count range, diff size, context floor) at the Skill
-  boundary before fan-out -- the shipped default per epic D3. It does not enforce an envelope.
-- `budget-required`: deny unless the session supplies an explicit budget envelope (schema owned by M2).
+- `block`: deny native review before expensive behavior starts; the deny message points at `/forge:review`. **The
+  shipped v1 default per epic D3.** It is the only cheap mode with a hard guarantee: the deny contract instructs the
+  model to explain the conflict and ask how to proceed, so the refusal becomes a user decision point before spend.
+- `warn`: allow, but emit a preflight estimate (agent-count range, diff size, context floor) at the Skill boundary
+  before fan-out. **Not the default, and not guard-grade.** Warn output is model-facing stderr, so it neither stops
+  spend nor reaches the user at the consent moment the incident identified; its residual value is observability.
+- `budget-required`: deny unless the session supplies an explicit budget envelope (schema owned by M2). **v2** -- gated
+  on Seam 5 agent-counter state and the `SubagentStop` correlation probe. If correlation proves unavailable, `block` is
+  a fine terminal state rather than a degraded one.
 - `allow`: preserve current runtime behavior without estimates or cap enforcement.
+
+**Release gate (epic D3).** A blocking default is admissible only if M0's opt-out ships in the same release and the deny
+text names the exact escape command. Ship the escape hatch with the block, never after it.
 
 Session opt-out is separate vocabulary: `%policy guard disable native_review` suppresses this guard for the current
 session. It never changes the global mode and cannot be confused with `block`.
@@ -74,10 +84,10 @@ Provable now (assistant-initiated path):
 - With `mode: block`, an assistant-initiated native review (Skill-tool invocation) is denied before broad reads or
   subagent fan-out; the deny message names `/forge:review` and carries the guard's intent.
 - With `mode: warn`, the review proceeds and a preflight estimate is visibly emitted before fan-out.
-- With `mode: budget-required`, no envelope means denial before fan-out. With an envelope and proven parent-operation
-  correlation, launches beyond its total-agent cap are denied; parallel-agent denial additionally requires reliable
-  active-slot release. Without parent-operation correlation, the Skill is denied with an enforceability explanation and
-  `/forge:review` fallback.
+- (**v2**, with Seam 5) With `mode: budget-required`, no envelope means denial before fan-out. With an envelope and
+  proven parent-operation correlation, launches beyond its total-agent cap are denied; parallel-agent denial
+  additionally requires reliable active-slot release. Without parent-operation correlation, the Skill is denied with an
+  enforceability explanation and `/forge:review` fallback.
 - With `mode: allow`, no estimate or agent-budget enforcement changes native behavior.
 - A session opt-out override suppresses the guard for that session only and is auditable.
 - `/forge:review` is unaffected in every mode and still starts with its current preflight summary.

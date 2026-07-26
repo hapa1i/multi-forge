@@ -6,6 +6,13 @@ enforcement).
 **Lane**: `proposed/`. Depends on M0's normalized Claude fan-out lifecycle. This member owns the schema and state
 contract M1 consumes; M1 does not ship `budget-required` before M2.
 
+**Scope split (epic posture revision, 2026-07-26).** v1 ships Seam 2 (the envelope schema, read by M3) plus workflow
+preflight admission for `forge workflow` fan-out -- Forge-core work that no upstream Claude Code setting can govern.
+**Seam 5 (agent-budget state) defers to v2** alongside M1's `budget-required` mode: locked total/active counters,
+`SubagentStop` decrement, correlation ids, rollover-stable keys, compact migration, and stale-state cleanup exist to
+enforce *native* review caps, and M1's v1 `block` default never counts agents. M3 counts Forge's own workers in-process
+through the existing fan-out concurrency domain, not through this hook-based counter, so the deferral does not block it.
+
 ## Goal
 
 Define one budget envelope schema for review-like work and enforce it at every point that can multiply cost:
