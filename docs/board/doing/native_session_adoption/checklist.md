@@ -97,7 +97,9 @@ New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
   `if direct_model_pin`) -- so a fabricated default would reach the proxy unvalidated and silently no-op
   (`session/model_pin.py:61-62`) instead of erroring. When a basis exists the pin behaves as it does for any Forge-born
   `--model` session; the silent-skip asymmetry is pre-existing and explicitly not fixed here. New acceptance row:
-  "Adopted default never pins a proxy".
+  "Adoption adds no model pin" -- worded around what adoption **contributes**, since `build_claude_env` starts from the
+  current process environment (`core/reactive/env.py:210`) and an ambient `ANTHROPIC_MODEL` reaches Claude regardless of
+  the manifest.
 
 ### P1 gate result (2026-07-26, Claude Code 2.1.220)
 
@@ -109,6 +111,12 @@ which hook produced it). The Stop handler copies the payload's `session_id` verb
 (`cli/hooks/commands.py:169`) and `_append_artifact_entry` (`cli/hooks/_helpers.py:131-149`) appends without dedup, so
 `confirmed.artifacts.transcripts` is an **append-only log of every Stop payload**. Claude re-invokes Stop as a
 transcript grows (`commands.py:541-544`), so the gate asserts *every* recorded id matches, not a fixed entry count.
+
+Entries are filtered to `reason in {"stop", "stop-failure"}` -- the two written by `_capture_transcript_artifact`
+(`:550`, `:755`), which are exactly the paths that also rewrite the binding at `:179`. The filter is load-bearing, not
+tidiness: `reason="pre-compact"` (`:875`) shares this same artifact list but **omits `session_id`**, so an unfiltered
+read would surface a `None` and fail the drift check spuriously the first time a compaction fired mid-gate. An assertion
+requires the filtered list to be non-empty so the filter cannot silently empty out.
 
 | Point                           | Recorded Stop payload ids              |
 | ------------------------------- | -------------------------------------- |
@@ -181,9 +189,13 @@ shape. Worth a separate card only if artifact readers care.
 
 ## Slice 1 -- Manifest provenance schema
 
-- [ ] `confirmed.adoption` added as a strict dataclass field (`{source_runtime, adopted_at, source_path}`). Assertion:
-  `SessionStore.read` round-trips it; a pre-adoption manifest without the field still reads (optional + defaulted); an
-  ad hoc dict key is rejected by the strict reader.
+- [ ] `confirmed.adoption` added as a strict dataclass field (`{source_runtime, adopted_at, source_path, model_basis}`).
+  Assertion: `SessionStore.read` round-trips it; a pre-adoption manifest without the field still reads (optional +
+  defaulted); an ad hoc dict key is rejected by the strict reader.
+- [ ] `model_basis` records which P3 basis produced `intent.launch.direct_model`: `explicit` (`--model`), `inferred`
+  (transcript metadata), or `none` (left unset). Assertion: each of the three values round-trips, and `none` coexists
+  with `direct_model is None` -- so "why is this pinned?" is answerable from the manifest alone, without re-reading a
+  transcript that may no longer exist.
 - [ ] Provenance survives hook confirmation. Assertion: a simulated Stop leaves `confirmed.adoption` intact and
   `confirmed.claude_session_id` unchanged while `confirmed_by` becomes `hook:stop`.
 - [ ] Compaction cannot disturb the binding. Assertion: a simulated `pre-compact` on an adopted session leaves
@@ -201,6 +213,14 @@ shape. Worth a separate card only if artifact readers care.
 - [ ] Preconditions fail-closed in the card's order: inside a Forge project; strict project-compatibility guard for a
   state-mutating command path; transcript exists; UUID not already bound. Assertion: each reject path creates **no**
   manifest, artifact, or index entry, and names the owning session when already bound.
+- [ ] **Atomic UUID-unbound check inside the index write lock.** The step-1 check and the index write take the lock
+  separately today -- `find_session_by_uuid` (`session/index.py:503`) and `add_session` (`:372`) each open their own
+  `file_lock_for_target` -- so two concurrent `adopt` calls on one UUID can both pass and both bind. Adoption cannot
+  wrap this from outside because `start_session` owns the add, so add a locked index-layer entry point (e.g.
+  `add_session_if_uuid_unbound`) that re-checks uniqueness inside the write lock. Assertion: two racing adopts on one
+  UUID leave exactly one binding; the loser creates no manifest and no index entry. Scope honestly: only the **index**
+  becomes atomic -- the manifest-scan fallback (`core/ops/session_context.py:405`) holds no lock, so the guarantee is
+  "atomic against the index, best-effort against the manifest scan".
 - [ ] Recorded-`cwd` cross-check on the discovered transcript (the Claude analog of `_rollout_head_cwd`). Assertion: a
   lossy-encoding sibling's transcript (`a.b` / `a_b` / `a-b` collision) is rejected, not bound.
 - [ ] Write ordering, reconciled with the actual API (**card correction owed**). The card's "index entry last" ordering
@@ -211,10 +231,20 @@ shape. Worth a separate card only if artifact readers care.
   `start_session()` (manifest + index, self-rolling-back) -> artifact copy, with adoption compensating manifest and
   index if the copy fails. Assertion (the invariant the card actually wants, unchanged): an injected failure at any step
   leaves no UUID-bound session, and a re-run succeeds cleanly.
+- [ ] **Rollback stays narrow.** Adoption is the first op whose input is user-owned state Forge did not create, so its
+  compensation removes exactly the index entry, the manifest, the artifact **copy** under `.forge/artifacts/<name>/`,
+  and the queued search-index marker -- and nothing else. Assertion: after a failure injected *after* the artifact copy,
+  the native `~/.claude/projects/<enc>/<uuid>.jsonl` is still present and byte-identical, no worktree or branch was
+  removed, and no orphan index marker survives pointing at the deleted copy. Adoption must never pass
+  `create_worktree=True`; the default is `False` (`session/manager.py:416`) and `_rollback_worktree` short-circuits on
+  `if not created_worktree` (`:482`), so this is a constraint to state, not a default to lean on.
 - [ ] Future-resume model made explicit per P2 and P3. Assertion: `direct_model` is persisted only when inferred (last
-  real model, `<synthetic>` filtered) or supplied via `--model`; with no basis, adopt warns and leaves the field `None`.
-  Covered by the "Adopted default never pins a proxy" acceptance row -- a later `resume --proxy` must not pick up a pin
-  adoption invented.
+  real model, `<synthetic>` filtered) or supplied via `--model`; with no basis, adopt warns, leaves the field `None`,
+  and records `model_basis="none"`. Covered by the "Adoption adds no model pin" acceptance row. Scope the claim to what
+  adoption **contributes**: `build_claude_env` starts from the current process environment (`core/reactive/env.py:210`),
+  so an ambient `ANTHROPIC_MODEL` reaches Claude regardless of the manifest. Asserting "no `ANTHROPIC_MODEL` in the
+  child env" would be testing the shell, not adoption; scrubbing inherited model variables is a routing-wide change and
+  belongs to a separate card.
 - [ ] Transcript artifact copy with reason `"adopt"`, matching the Stop entry shape (`cli/hooks/commands.py:165-178`),
   and a queued search-index marker. Assertion: the copy is indexed through the normal idempotent path, and **no**
   memory-writer handoff marker is enqueued at adopt time.

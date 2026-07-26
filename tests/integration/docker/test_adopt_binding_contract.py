@@ -56,6 +56,10 @@ _TRANSCRIPT_ARTIFACTS = f"/workspace/.forge/artifacts/{_SESSION}/transcripts"
 FIRST_PROMPT = "Say just the word one"
 RESUME_PROMPT = "Say just the word two"
 
+# Artifact reasons written by _capture_transcript_artifact (commands.py:550, :755) --
+# the two paths that also rewrite confirmed.claude_session_id from the payload.
+_BINDING_REASONS = frozenset({"stop", "stop-failure"})
+
 
 @pytest.fixture(scope="module", autouse=True)
 def _require_anthropic_api_key() -> None:
@@ -80,11 +84,18 @@ def _read_manifest(workspace: ContainerLike) -> dict[str, Any]:
 
 
 def _stop_payload_ids(manifest: dict[str, Any]) -> list[str | None]:
-    """Session ids recorded by each Stop payload, oldest first."""
+    """Session ids recorded by each binding-rewriting Stop payload, oldest first.
+
+    Filtered to the reasons written by ``_capture_transcript_artifact`` -- exactly
+    the entries that also rewrite ``confirmed.claude_session_id``
+    (``cli/hooks/commands.py:179``), so the list matches the contract under test.
+    ``reason="pre-compact"`` (``commands.py:875``) shares this artifact list but
+    OMITS ``session_id`` entirely, and would otherwise read as a ``None`` drift.
+    """
     entries = manifest.get("confirmed", {}).get("artifacts", {}).get("transcripts", [])
     if not isinstance(entries, list):
         pytest.fail(f"confirmed.artifacts.transcripts is not a list: {entries!r}")
-    return [entry.get("session_id") for entry in entries]
+    return [entry.get("session_id") for entry in entries if entry.get("reason") in _BINDING_REASONS]
 
 
 class TestAdoptBindingContract:
@@ -100,17 +111,25 @@ class TestAdoptBindingContract:
             session_name=_SESSION,
             timeout=60,
         )
+        first_tail = (
+            f"\n---- turn 1 stdout (tail) ----\n{first_stdout[-1000:]}"
+            f"\n---- turn 1 stderr (tail) ----\n{first_stderr[-1000:]}"
+        )
+        # Unlike the best-effort hook smoke tests, this gate needs a real conversation
+        # to exist before it can mean anything -- a degraded turn 1 would make every
+        # downstream identity assertion untrustworthy rather than merely noisy.
+        assert first_exit == 0, f"turn 1 `claude --print` failed on {version} (exit={first_exit}).{first_tail}"
 
         original_uuid = _read_manifest(forge_workspace).get("confirmed", {}).get("claude_session_id")
         assert original_uuid, (
             f"SessionStart/Stop did not record a claude_session_id on claude {version}; "
-            f"the gate cannot run. exit={first_exit} stdout={first_stdout[-500:]!r} stderr={first_stderr[-500:]!r}"
+            f"the gate cannot run.{first_tail}"
         )
 
         ids_after_first = _stop_payload_ids(_read_manifest(forge_workspace))
         assert ids_after_first, (
-            f"Stop recorded no transcript artifact on claude {version}, so no payload session_id is observable. "
-            f"exit={first_exit} stdout={first_stdout[-500:]!r} stderr={first_stderr[-500:]!r}"
+            f"no {sorted(_BINDING_REASONS)} transcript artifact after turn 1 on claude {version}, so no payload "
+            f"session_id is observable and the gate would pass vacuously.{first_tail}"
         )
 
         # Plain reattach: --resume without --fork-session, the exact dispatch a
