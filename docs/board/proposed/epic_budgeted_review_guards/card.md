@@ -100,10 +100,15 @@ multi-agent path where fan-out drives the burn, and a direct-runtime path where 
   manifest. Precedence: session override > global config > built-in default. Today only proxied sidecars mount
   `~/.forge/config.yaml`; M0 must move the read-only config mount into the common sidecar path so direct-subscription
   sidecars receive the same guard configuration.
-- **D3 -- warn-first default ramp.** Guard modes are `block | warn | budget-required | allow`. Ship with default `warn`
-  (visible preflight estimate on every native-review fan-out, no blocking), then flip the default to `budget-required`
-  once the deny message and opt-out UX have been exercised in real sessions. A blocking default before the escape hatch
-  is proven is how a guardrail becomes the next incident report.
+- **D3 -- block-first default; `budget-required` is a later relaxation, not a later tightening.** Guard modes remain
+  `block | warn | budget-required | allow`, but the ramp direction inverts (revised 2026-07-26, see "Posture revision"
+  below). `warn` is model-facing stderr that neither stops spend nor reaches the user at the consent moment, so it is
+  observability-grade rather than guard-grade and is never the default. Ship default `block`: it is the only cheap mode
+  carrying a hard guarantee, because the deny contract instructs the model to explain the conflict and ask how to
+  proceed, converting a model-facing message into a user decision point **before** spend. `budget-required` then relaxes
+  that block once agent-counter state (Seam 5) and the correlation probe land. **Release gate:** block-by-default is
+  admissible only if M0's opt-out ships in the same release and the deny text names the exact escape command. An
+  unescapable block is how a guardrail becomes the next incident report.
 
 ### Resolved operational decisions
 
@@ -123,46 +128,92 @@ multi-agent path where fan-out drives the burn, and a direct-runtime path where 
   once lifecycle probes pass, simultaneous-worker admission. Direct-runtime token usage is observed after completion and
   can stop later scheduling, but cannot terminate an already-running provider turn.
 
+### Posture revision (2026-07-26 -- upstream workflow-size config)
+
+Claude Code now exposes a user-facing **workflow size** setting. Two properties are observable from the runtime itself:
+the guideline text is injected into the **`Workflow` tool description** (not the `Agent` tool description), and it is
+explicitly advisory -- "a guideline, not a hard limit -- follow it unless the user's prompt calls for a different
+scale". The incident's fan-out was observed on the **Skill and Agent** tools, so reachability into the native review
+path is substantially falsified by inspection, though not proven either way; a bounded test is owed below.
+
+This does not retire the epic, because two of the incident's failure modes are untouched by any upstream size setting:
+the consent moment still carries no cost semantics, and direct-runtime spend is still invisible to Forge (no proxy rows,
+no receipt). It does resize three members:
+
+- **M1 -- materially reduced.** v1 ships `block` + `allow` only. Refusing a launch requires no agent counter, so v1
+  needs neither Seam 5 nor the correlation probe. `warn` and `budget-required` both move to v2; the enum keeps all four
+  modes.
+- **M2 -- Forge core unchanged; native enforcement slice deferred.** Seam 2 (envelope schema) and workflow preflight
+  admission ship as planned; Seam 5 (agent-budget state) defers to v2 alongside `budget-required`. Claude's setting
+  cannot govern `forge workflow` fan-out, which remains Forge-spawned `claude -p` subprocesses in Forge's own
+  concurrency domain.
+- **M0 -- business case weakened, implementation unchanged.** Upstream may now partially protect the configured-nothing
+  user for this specific case, but an enforcing ambient guard still requires activation scope and opt-out UX. Note that
+  D1's "four parallel drift surfaces" rationale thins if this epic ships only one ambient guard; `read-hygiene` remains
+  the second prospective consumer. Independently retainable regardless of the epic's fate: D2's requirement to move the
+  read-only `~/.forge/config.yaml` mount into the common sidecar path, since direct-subscription sidecars cannot see
+  runtime config today.
+
+M3 is unaffected.
+
 ### Decisions owed
 
-- **Exact PreToolUse tool names for the fan-out matchers** (owner M0). The incident observed `PreToolUse` on the Skill
-  and Agent tools; the registered matcher strings must match the runtime's actual tool names across Claude versions --
-  pin by probe before registering.
-- **Review/agent correlation through existing `SubagentStop`** (owner M0 probe, M2 state contract). Forge already
-  registers observe-only `SubagentStop` and receives `agent_id`; pin whether that id correlates to the launching
-  PreToolUse Agent call and whether the event fires for failure/cancellation. Also pin the guarded Skill operation id
-  and how Agent launches identify that parent. If Forge cannot distinguish review-owned agents from unrelated agents in
-  the same session, native review caps cannot ship as operation-scoped enforcement. If only completion correlation is
-  missing, native `max_parallel_agents` must remain an estimate.
-- **User-typed `/review` visibility** (owner M1, phase 0 probe). Assistant-initiated review is observable today; the
-  user-typed slash-command path is unprobed.
+- **Exact PreToolUse tool names for the fan-out matchers** (owner M0). **v1-blocking.** The incident observed
+  `PreToolUse` on the Skill and Agent tools; the registered matcher strings must match the runtime's actual tool names
+  across Claude versions -- pin by probe before registering.
+- **User-typed `/review` visibility** (owner M1, phase 0 probe). **v1-blocking, elevated by D3.** Assistant-initiated
+  review is observable today; the user-typed slash-command path is unprobed. Under `warn` this was a coverage gap; under
+  a blocking default it is a bypass, and a guard with a known hole manufactures false assurance.
+- **Workflow-size reachability -- bounded falsification test** (owner M1, phase 0). Purpose is to **calibrate the deny
+  message's fan-out estimate**, not to justify the guard. Step 0 is free inspection: does the guideline text appear in
+  the fan-out tool's description at all? Then a paired run on an identical small diff at identical effort, differing
+  only in the setting (most restrictive vs dynamic/largest). Count `PreToolUse` events for the fan-out tool and
+  deny/interrupt **before execution** -- the hook fires before spend, so the scheduled fan-out is observable without
+  funding it. Arm A exceeding the guideline falsifies reachability in one run; identical counts across arms falsify it
+  as well. Only if counts differ does the follow-on question open: is an advisory cap honored under adversarial
+  prompting ("be thorough", "review everything")? Do not design this as a single run intended to prove capping -- that
+  requires letting the expensive path run to completion.
+- **Review/agent correlation through existing `SubagentStop`** (owner M0 probe, M2 state contract). **Deferred to v2**
+  with `budget-required`; not v1-blocking. Forge already registers observe-only `SubagentStop` and receives `agent_id`;
+  pin whether that id correlates to the launching PreToolUse Agent call and whether the event fires for
+  failure/cancellation. Also pin the guarded Skill operation id and how Agent launches identify that parent. If Forge
+  cannot distinguish review-owned agents from unrelated agents in the same session, native review caps cannot ship as
+  operation-scoped enforcement -- in which case `block` is a fine terminal state, not a degraded one. If only completion
+  correlation is missing, native `max_parallel_agents` must remain an estimate.
 
 ## Members
 
-| Id  | Card                                                            | Delivers                                                                         | Depends on |
-| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------- |
-| M0  | [ambient_policy_scope](../ambient_policy_scope/card.md)         | Engine second activation scope, `policy.guards` config, opt-out UX, new matchers | --         |
-| M1  | [native_review_guard](../native_review_guard/card.md)           | The native-review guard policy (`block/warn/budget-required/allow`)              | M0, M2     |
-| M2  | [review_budget_envelope](../review_budget_envelope/card.md)     | Budget schema, agent-counter state, and workflow preflight enforcement           | M0         |
-| M3  | [adaptive_review_behavior](../adaptive_review_behavior/card.md) | Single-agent narrowing, workflow batch scheduling, and coverage receipts         | M2         |
+| Id  | Card                                                            | Delivers (v1)                                                                    | Depends on | Deferred to v2                   |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------- | -------------------------------- |
+| M0  | [ambient_policy_scope](../ambient_policy_scope/card.md)         | Engine second activation scope, `policy.guards` config, opt-out UX, new matchers | --         | --                               |
+| M1  | [native_review_guard](../native_review_guard/card.md)           | Native-review guard, `block` default + `allow` opt-out                           | M0         | `warn` + `budget-required` modes |
+| M2  | [review_budget_envelope](../review_budget_envelope/card.md)     | Budget envelope schema (Seam 2) + workflow preflight enforcement                 | M0         | Seam 5 agent-counter state       |
+| M3  | [adaptive_review_behavior](../adaptive_review_behavior/card.md) | Single-agent narrowing, workflow batch scheduling, and coverage receipts         | M2         | --                               |
 
-**Sequencing**: M0 first -- activation and hook vocabulary before enforcement. M2 follows with the envelope schema,
-agent-counter state contract, and workflow admission checks. M1 then consumes both M0 and M2 for native-review policy;
-M3 can proceed after M2 in parallel with M1 because it adapts Forge-owned review surfaces rather than native review.
+**Sequencing (revised 2026-07-26)**: M0 first -- activation, opt-out UX, and hook vocabulary before enforcement. **M1 v1
+then ships directly on M0 and no longer depends on M2**, because refusing a launch requires no agent counter; the
+M1-to-M2 dependency returns only for the v2 `budget-required` relaxation. M2 (envelope schema plus workflow admission)
+and M3 run as a parallel Forge-core track, since they govern `forge workflow` fan-out rather than native review. v2
+rejoins the tracks: Seam 5 unblocks `budget-required`, gated on the correlation probe.
 
 ## Shared-Contract Seams (drift watch)
 
 - **Seam 1** -- `policy.guards` runtime-config schema + the precedence rule (session override > global > built-in).
   Owner M0; M1 reads.
-- **Seam 2** -- budget envelope schema. Owner M2; M1 (`budget-required` mode) and M3 (adaptive narrowing) read.
+- **Seam 2** -- budget envelope schema. Owner M2; M3 (adaptive narrowing) reads it in v1, M1 only in v2
+  (`budget-required` mode).
 - **Seam 3** -- registered PreToolUse matcher rows for the fan-out tools. Owner M0. Byte-identity is the API: new rows
   in the registered-command contract golden, delivered to existing installs via `forge extension sync`.
 - **Seam 4** -- deny-message contract (three-tier + `Intent:`) stays engine-owned; members supply intent text only.
 - **Seam 5** -- agent-budget state: rollover-stable guard-operation key, runtime-session-id aliases, invocation
   correlation id, locked total/active counters, `SubagentStop` decrement, compact migration, stale-state cleanup, and
-  Stop cleanup. M2 owns the state contract; M1 consumes it.
+  Stop cleanup. M2 owns the state contract; M1 consumes it. **Deferred to v2** -- this is the bulk of M2's stateful
+  complexity and its only consumer is M1's `budget-required` mode. A `block` default never counts agents, and M3 counts
+  Forge's own workers in-process through the existing fan-out concurrency domain rather than through this hook-based
+  counter.
 - **Seam 6** -- ambient mutation and diagnostics: terminal/direct commands share command-core ops; invalid guard config
-  is consistently visible through doctor and policy status. Owner M0.
+  is consistently visible through doctor and policy status. Owner M0; M1 reads the opt-out spelling because its deny
+  text must name the exact escape command (D3 release gate), so renaming the opt-out surface is a cross-card change.
 
 ## Out of Scope
 
