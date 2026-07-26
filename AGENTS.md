@@ -57,13 +57,23 @@ and `forge extension status --json`; also exercise `forge extension sync` and `f
 ownership changes. `--runtime` filters only the SKILLS module, sync preserves the installation's tracked runtime set,
 and runtime-package health belongs to `extension status`, not `extension doctor`. Codex skills support user and project
 scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local scope onto the shared project
-target.
+target. For installer/GC changes involving untracked runtime packages, verify the schema-v2
+`forge extension status --json` object (`installations` plus `unmanaged_skill_packages`), then preview cleanup with
+`forge clean --scope <project|workspace|all> --verbose` before applying the same scope with `--yes`. Cleanup must remain
+fail-closed: unmarked, modified, malformed/newer, or unsafe packages are report-only and must not be removed
+automatically.
 
 For auth, proxy, and workflow changes, test the no-`.env` path explicitly: credentials should resolve from environment
 variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
 and workflow preflight should fail fast when required auth or proxies are missing. Remember that proxy health only
 confirms the local proxy process is reachable; use `forge proxy start <proxy_id> --smoke-test` to verify upstream LLM
 connectivity after first setup, credential changes, or proxy auth changes.
+
+For workflow-worker or review-engine changes, run `forge workflow list-models --available --json`, refresh Codex
+readiness with `forge runtime preflight codex`, then exercise `forge workflow panel -p "<review prompt>" -m codex` and
+`forge workflow panel -p "<review prompt>" -m claude-opus,codex`. Codex workers are opt-in and run read-only; panels
+that include one must use blind context (`--context blind`). The default worker set remains Claude-backed. `--proxy`
+does not reroute direct Claude or Codex workers, and `--effort` applies only to Claude workers.
 
 For CLI surface changes, check `docs/developer/cli_style_guidelines.md`: use explicit leaf verbs, keep read-command
 results on stdout, route diagnostics/errors/prompts to stderr, expose stable `--json` on scriptable list/show/status
@@ -117,8 +127,8 @@ Use `pytest`, not `unittest`. Mirror source paths in `tests/src/` (for example, 
 tests should be fixed or removed rather than skipped. Docker is expected to be running locally: run integration tests
 (target relevant files via `./scripts/test-integration.sh <path-or-pytest-args>`, not the full suite) for changes
 touching hooks, sessions (including Codex runtime/frontend), the memory writer, proxy runtime, backend source catalog,
-consumer-lane bindings, telemetry/cost/provider-trace paths, rewind resume/fork behavior, or the installer — don't defer
-them to closeout.
+consumer-lane bindings, telemetry/cost/provider-trace paths, rewind resume/fork behavior, workflow-worker/headless
+invoker fan-out, or the installer — don't defer them to closeout.
 
 ## GitHub CLI Auth
 
