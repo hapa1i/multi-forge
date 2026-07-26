@@ -469,17 +469,21 @@ class TestAdoptionProvenanceSurvivesHooks:
     here protect that binding against the hooks that run afterwards.
     """
 
-    def _adopted_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
-        store = _write_manifest(tmp_path, monkeypatch, session_name="adopted")
-        manifest = store.read()
-        manifest.confirmed.claude_session_id = "native-uuid"
-        manifest.confirmed.confirmed_by = "cli:adopt"
-        manifest.confirmed.adoption = AdoptionConfirmed(
+    def _adoption(self, tmp_path: Path) -> AdoptionConfirmed:
+        """Fully populated, so hook survival is checked on all four fields."""
+        return AdoptionConfirmed(
             source_runtime="claude_code",
             adopted_at="2026-07-26T12:00:00Z",
             source_path=str(tmp_path / "native.jsonl"),
             model_basis="inferred",
         )
+
+    def _adopted_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
+        store = _write_manifest(tmp_path, monkeypatch, session_name="adopted")
+        manifest = store.read()
+        manifest.confirmed.claude_session_id = "native-uuid"
+        manifest.confirmed.confirmed_by = "cli:adopt"
+        manifest.confirmed.adoption = self._adoption(tmp_path)
         store.write(manifest)
         return store
 
@@ -514,10 +518,9 @@ class TestAdoptionProvenanceSurvivesHooks:
         updated = store.read()
         assert updated.confirmed.confirmed_by == "hook:stop"  # expected to change
         assert updated.confirmed.claude_session_id == "native-uuid"  # P1: reattach is idempotent
-        assert updated.confirmed.adoption is not None
-        assert updated.confirmed.adoption.source_runtime == "claude_code"
-        assert updated.confirmed.adoption.model_basis == "inferred"
-        assert updated.confirmed.adoption.adopted_at == "2026-07-26T12:00:00Z"
+        # Whole-record compare: a per-field check would miss the hook clearing a
+        # field the test happens not to name.
+        assert updated.confirmed.adoption == self._adoption(tmp_path)
 
     def test_pre_compact_leaves_the_binding_untouched(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A compaction snapshot must not disturb the adopted UUID or its provenance.
@@ -549,8 +552,7 @@ class TestAdoptionProvenanceSurvivesHooks:
 
         updated = store.read()
         assert updated.confirmed.claude_session_id == "native-uuid"
-        assert updated.confirmed.adoption is not None
-        assert updated.confirmed.adoption.model_basis == "inferred"
+        assert updated.confirmed.adoption == self._adoption(tmp_path)
         # confirmed_by churns -- this is its THIRD writer after cli:adopt and hook:stop
         # (commands.py:891), which is exactly why provenance cannot live there.
         assert updated.confirmed.confirmed_by == "hook:pre-compact"

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from forge.core.state import now_iso
+from forge.session import SessionStore
 from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
@@ -250,6 +254,16 @@ class TestCodexConfirmed:
         assert restored.codex is None
 
 
+def _sample_adoption() -> AdoptionConfirmed:
+    """A fully-populated provenance record, so round-trips compare all four fields."""
+    return AdoptionConfirmed(
+        source_runtime="claude_code",
+        adopted_at="2026-07-26T12:00:00Z",
+        source_path="/home/u/.claude/projects/-home-u-repo/470b1a1b.jsonl",
+        model_basis="inferred",
+    )
+
+
 class TestAdoptionConfirmed:
     """Adoption provenance schema (native_session_adoption Slice 1)."""
 
@@ -261,22 +275,43 @@ class TestAdoptionConfirmed:
 
         import dacite
 
-        source_path = "/home/u/.claude/projects/-home-u-repo/470b1a1b.jsonl"
+        adoption = _sample_adoption()
         confirmed = SessionConfirmed(
             claude_session_id="470b1a1b-202b-4ead-a3ea-d0dca69243f2",
-            adoption=AdoptionConfirmed(
-                source_runtime="claude_code",
-                adopted_at="2026-07-26T12:00:00Z",
-                source_path=source_path,
-                model_basis="inferred",
-            ),
+            adoption=adoption,
         )
         restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
-        assert restored.adoption is not None
-        assert restored.adoption.source_runtime == "claude_code"
-        assert restored.adoption.adopted_at == "2026-07-26T12:00:00Z"
-        assert restored.adoption.source_path == source_path
-        assert restored.adoption.model_basis == "inferred"
+        # Whole-object compare: a field-by-field check silently tolerates a field
+        # added later that never round-trips.
+        assert restored.adoption == adoption
+
+    def test_session_store_round_trip(self, tmp_path: Path) -> None:
+        """Round-trip through the real storage boundary, not just dacite.
+
+        `SessionStore.write`/`read` adds JSON serialization to disk, the strict
+        dacite config, and the pre-parse strip helpers -- none of which an
+        in-memory `asdict` -> `from_dict` exercises.
+        """
+        adoption = _sample_adoption()
+        state = create_session_state("adopted-session")
+        state.confirmed.claude_session_id = "470b1a1b-202b-4ead-a3ea-d0dca69243f2"
+        state.confirmed.adoption = adoption
+
+        store = SessionStore(str(tmp_path), "adopted-session")
+        store.write(state)
+        restored = store.read()
+
+        assert restored.confirmed.adoption == adoption
+
+        # The field must survive as real JSON, not as an object dacite happened to
+        # rebuild from memory.
+        on_disk = json.loads((tmp_path / ".forge" / "sessions" / "adopted-session" / "forge.session.json").read_text())
+        assert on_disk["confirmed"]["adoption"] == {
+            "source_runtime": "claude_code",
+            "adopted_at": "2026-07-26T12:00:00Z",
+            "source_path": "/home/u/.claude/projects/-home-u-repo/470b1a1b.jsonl",
+            "model_basis": "inferred",
+        }
 
     def test_old_manifest_without_adoption_deserializes(self) -> None:
         """A pre-adoption manifest must still read: the field is additive, not required."""

@@ -18,8 +18,14 @@ line refs).
 corrections: the `ANTHROPIC_MODEL` pin **relocated** out of `core/ops/claude_session.py` into
 `core/models/direct_model.py`, and gained a proxy-branch sibling that did not exist when this card was written (now
 tracked as checklist probe P3); and the "Write ordering" paragraph specified an index-last sequence that `start_session`
-**cannot produce**, since it writes the manifest and index entry back-to-back in one try block -- that paragraph now
-delegates to the existing compensation block instead. Line anchors throughout were refreshed.
+**cannot produce**, since it writes the manifest and index entry back-to-back in one try block. Line anchors throughout
+were refreshed.
+
+**Rollback mechanism resolved 2026-07-27.** The first fix for that ordering paragraph was itself wrong: it told adoption
+to "extend" `start_session`'s compensation block, which is unreachable once that function returns. Compensation is now
+specified as two disjoint stages, with an explicit prohibition on reaching for `SessionManager.delete_session()` --
+whose default `delete_transcripts=True` would unlink the user's native transcript, since an adopted session's
+`claude_session_id` is the native UUID. See "Rollback mechanism" below.
 
 ## Goal
 
@@ -145,14 +151,32 @@ constrained by an existing seam rather than free to sequence: because step 3 reu
 **cannot** interleave its artifact copy between them or append the index entry last. Do not specify an ordering the API
 cannot produce.
 
-The atomicity guarantee is therefore delegated, not reinvented: `start_session` already carries a compensation block
-(`:666-681`) that, on any failure after the manifest write, removes the index entry, deletes the manifest, and rolls
-back the worktree, tracked by the `wrote_manifest` / `added_to_index` flags (`:648-649`). Adoption's own post-`start`
-work -- the artifact copy (5) and the index marker -- must extend that same compensation path so a failure there also
-unwinds the manifest and index entry, rather than adding a second half-rollback of its own. The user-visible contract is
-unchanged and is what the reject tests assert: **after any failed `adopt`, no UUID-bound session remains and re-running
-succeeds cleanly.** Re-adopting an already-bound UUID is the *already-bound reject* path (step 1), never a silent
-overwrite.
+**Rollback mechanism (resolved 2026-07-27).** Compensation happens in **two disjoint stages**, because `start_session`'s
+own block cannot reach adoption's work:
+
+| Failure point                                         | Who compensates                         | How                                                                                                   |
+| ----------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| inside `start_session` (manifest write, index add)    | `start_session` itself, already shipped | its `except` block (`:666-681`), driven by the `wrote_manifest` / `added_to_index` flags (`:648-649`) |
+| after `start_session` returns (artifact copy, marker) | **the adopt op**                        | remove the marker and artifact copy, then `index_store.remove_session(name)`, then `store.delete()`   |
+
+An earlier draft said adoption should "extend that same compensation path rather than add a second rollback of its own".
+That is **not implementable**: the `except` at `:666` is unreachable once `return state` executes at `:664`, and
+adoption's artifact copy runs after that return. A second compensation is the only possible design -- and it is not the
+hazard the earlier wording implied, because the two stages are **disjoint in time** and cannot both fire for one
+failure.
+
+**Do not implement stage 2 by calling `SessionManager.delete_session()`.** Its default `delete_transcripts=True` reaches
+`cleanup_session` -> `delete_session_data`, which unlinks `get_transcript_path(project_root, session_id)` and the
+matching agent logs (`session/claude/cleanup.py:63-80`). That path resolves into `~/.claude/projects/<encoded>/`, and
+for an adopted session `claude_session_id` **is the user's native UUID** -- so the convenient rollback would delete the
+very conversation the user asked Forge to adopt. Use the two narrow primitives instead: `remove_session` for the index
+row and `SessionStore.delete()`, which removes only `.forge/sessions/<name>/` (`session/store.py:262-275`). Note that
+`store.delete()` does **not** remove the artifact copy, which lives under a different root (`.forge/artifacts/<name>/`),
+so the op must unlink that explicitly.
+
+The user-visible contract is unchanged and is what the reject tests assert: **after any failed `adopt`, no UUID-bound
+session remains, the native transcript is untouched, and re-running succeeds cleanly.** Re-adopting an already-bound
+UUID is the *already-bound reject* path (step 1), never a silent overwrite.
 
 **Rollback scope is narrow and must stay narrow.** Adoption is the first op whose inputs are *user-owned state Forge did
 not create*, so its rollback removes exactly four things and nothing else:
@@ -162,7 +186,7 @@ not create*, so its rollback removes exactly four things and nothing else:
 | the index entry adoption added                           | the native transcript at `~/.claude/projects/...` (the adopt source) |
 | the session manifest adoption wrote                      | any worktree or branch                                               |
 | the transcript **copy** under `.forge/artifacts/<name>/` | any pre-existing session that already owned the UUID                 |
-| the queued search-index marker for that copy             | the `~/.claude` store in any form                                    |
+| the queued search-index marker for that copy             | the `~/.claude` store -- transcripts **or** agent logs               |
 
 The worktree column is not hypothetical safety text: `create_worktree` defaults to `False` (`session/manager.py:416`)
 and `_rollback_worktree` short-circuits on `if not created_worktree` (`:482`), so adoption is already safe **provided it

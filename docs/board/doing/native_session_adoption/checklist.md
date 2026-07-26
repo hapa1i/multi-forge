@@ -48,7 +48,7 @@ docstring (`session/models.py:531`).
 applied at `core/ops/claude_session.py:1450` (direct branch) with a second branch `_apply_direct_model_env_if_supported`
 (defined `session/model_pin.py:37`, applied at `core/ops/claude_session.py:1454`) that did not exist when the card was
 written. The **risk is unchanged and still real** -- the pin still reaches the plain `--resume` reattach path -- but
-every citation must move to the leaf, and the proxy-supported branch needs a deliberate answer for adopted sessions.
+every citation moved to the leaf (done), and the proxy-supported branch got its answer in P3 below.
 
 - [x] Card corrections applied to `card.md` (2026-07-26), so the active card stops presenting stale locations as current
   grounding. Verified: `grep -nE ':421|:620-621|:544|1411-1416|:1658|:896|146-158|133-144|:485|paths.py:74'` returns
@@ -190,19 +190,25 @@ real cases are `claude-fable-5 -> claude-opus-4-8`, so "take the **last** real m
 with a mandatory fixture, not a defensive nicety. `<synthetic>` is a sentinel, not a model id, and must be filtered
 before it reaches `direct_model`.
 
-**Incidental finding (not this card's scope).** `pre-compact` artifact entries omit `session_id` while `stop` entries
-include it, so the two capture shapes disagree in `confirmed.artifacts.transcripts[]`. Adoption should follow the `stop`
-shape. Worth a separate card only if artifact readers care.
+**Shape divergence -- now in scope, not incidental.** `pre-compact` artifact entries omit `session_id` while `stop`
+entries include it, so the two capture shapes disagree inside one `confirmed.artifacts.transcripts[]` list. First
+recorded here as an aside; it turned out to matter twice. The P1 Docker gate must filter to
+`reason in {stop, stop-failure}` or read a `None` as drift, and a Slice 1 unit test now pins the divergence
+(`test_pre_compact_leaves_the_binding_untouched`) so it cannot change unnoticed. Adoption's own entry follows the `stop`
+shape. Unifying the two shapes is still a separate card.
 
 ## Slice 1 -- Manifest provenance schema
 
 - [x] `confirmed.adoption` added as a strict dataclass field (`{source_runtime, adopted_at, source_path, model_basis}`)
   -- `AdoptionConfirmed`, `session/models.py:555`, wired at `SessionConfirmed.adoption`. Verified in
-  `tests/src/session/test_models.py::TestAdoptionConfirmed`: dacite round-trips it; a manifest without the field still
-  reads (additive, defaults `None`); an ad hoc `adoption_source` key raises `UnexpectedDataError` under the strict read.
-  Plain `str` fields, no `__post_init__` validation -- matching the sibling `*Confirmed` fail-open rule
-  (`LaunchConfirmed`, `:498`), because a confirmed-facts class that refuses to load strands the whole session, not one
-  field. Value constants stay with the writing op (`ROLLOUT_SOURCE_*` precedent, `core/ops/codex_session.py:69`), so
+  `tests/src/session/test_models.py::TestAdoptionConfirmed` at the **real storage boundary**, not just dacite:
+  `SessionStore.write` -> `read` restores the record and the on-disk JSON carries all four keys verbatim -- an in-memory
+  `asdict` -> `from_dict` exercises neither JSON serialization nor the pre-parse strip helpers. A manifest without the
+  field still reads (additive, defaults `None`); an ad hoc `adoption_source` key raises `UnexpectedDataError` under the
+  strict read. Round-trips compare the **whole record**, so a field added later that fails to persist cannot slip past a
+  per-field assertion. Plain `str` fields, no `__post_init__` validation -- matching the sibling `*Confirmed` fail-open
+  rule (`LaunchConfirmed`, `:498`), because a confirmed-facts class that refuses to load strands the whole session, not
+  one field. Value constants stay with the writing op (`ROLLOUT_SOURCE_*` precedent, `core/ops/codex_session.py:69`), so
   they land in Slice 2.
 - [x] `model_basis` records which P3 basis produced `intent.launch.direct_model`: `explicit` (`--model`), `inferred`
   (transcript metadata), or `none` (left unset). Verified: all three round-trip (parametrized), and `none` coexists with
@@ -210,7 +216,8 @@ shape. Worth a separate card only if artifact readers care.
 - [x] Provenance survives hook confirmation. Verified in
   `tests/src/cli/test_artifact_hooks.py::TestAdoptionProvenanceSurvivesHooks` against the **real** Stop handler through
   `CliRunner`, not a simulated mutation: `confirmed_by` becomes `hook:stop`, `claude_session_id` stays the adopted uuid
-  (P1's idempotency, now also covered at unit speed), and every `confirmed.adoption` field survives.
+  (P1's idempotency, now also covered at unit speed), and the `confirmed.adoption` record compares **equal as a whole**
+  after the hook runs -- a per-field check would tolerate the hook clearing a field the test happens not to name.
 - [x] Compaction cannot disturb the binding. Verified against the real `pre-compact` handler: `claude_session_id` and
   `confirmed.adoption` are untouched, and the recorded snapshot entry carries **no** `session_id` key. Pre-compact never
   mutates the binding today, so this is a guard against a future refactor unifying the two capture paths, given the Stop
@@ -220,13 +227,9 @@ shape. Worth a separate card only if artifact readers care.
   Hooks-write list states hooks never write it and their `confirmed_by` / `claude_session_id` rewrites leave it intact.
   The entry records *why* the field exists rather than restating its shape: `confirmed_by` has **three** writers
   (`cli:adopt`, `hook:stop`, `hook:pre-compact` -- `commands.py:891`, discovered by a failing assertion in this slice),
-  so origin stored there is overwritten within a turn.
-- [ ] design.md **§3.3** sync **deferred to Slice 2, deliberately**: the third origination path (start **pre-seeds**,
-  native fork **records**, adopt **binds**) describes a command that does not exist yet, and design docs must describe
-  shipped behavior (documentation_guidelines "Design Documents"). Slice 1 shipped the schema, so §3.5 documents the
-  schema; §3.3's origination sentence lands with the op. §3.5 says so explicitly ("the binding command that populates
-  this field is not shipped yet; the schema and its hook-survival guarantees are") so the gap is visible in the design
-  doc, not just here.
+  so origin stored there is overwritten within a turn. §3.3's origination sentence is **deliberately not** a Slice 1
+  item -- see the matching Slice 2 task. Design docs must describe shipped behavior (documentation_guidelines "Design
+  Documents"), and that sentence describes a command that did not exist when Slice 1 shipped.
 
 ## Slice 2 -- Claude adopt op and CLI (card Phase 1)
 
@@ -245,21 +248,28 @@ shape. Worth a separate card only if artifact readers care.
   "atomic against the index, best-effort against the manifest scan".
 - [ ] Recorded-`cwd` cross-check on the discovered transcript (the Claude analog of `_rollout_head_cwd`). Assertion: a
   lossy-encoding sibling's transcript (`a.b` / `a_b` / `a-b` collision) is rejected, not bound.
-- [ ] Write ordering, reconciled with the actual API (**card correction owed**). The card's "index entry last" ordering
-  is **not achievable** through `start_session()`, which writes the manifest and adds the index row back-to-back before
-  returning (`session/manager.py:645`, `:655`) -- there is no seam to insert the artifact copy between them. Resolution:
-  reuse `start_session()` and extend its **existing** best-effort compensation (`:667-680` removes the index row, then
-  deletes the manifest) rather than inventing a deferred-commit seam for one caller. Ordering becomes validate ->
-  `start_session()` (manifest + index, self-rolling-back) -> artifact copy, with adoption compensating manifest and
-  index if the copy fails. Assertion (the invariant the card actually wants, unchanged): an injected failure at any step
-  leaves no UUID-bound session, and a re-run succeeds cleanly.
-- [ ] **Rollback stays narrow.** Adoption is the first op whose input is user-owned state Forge did not create, so its
-  compensation removes exactly the index entry, the manifest, the artifact **copy** under `.forge/artifacts/<name>/`,
-  and the queued search-index marker -- and nothing else. Assertion: after a failure injected *after* the artifact copy,
-  the native `~/.claude/projects/<enc>/<uuid>.jsonl` is still present and byte-identical, no worktree or branch was
-  removed, and no orphan index marker survives pointing at the deleted copy. Adoption must never pass
-  `create_worktree=True`; the default is `False` (`session/manager.py:416`) and `_rollback_worktree` short-circuits on
-  `if not created_worktree` (`:482`), so this is a constraint to state, not a default to lean on.
+- [ ] Write ordering: validate -> `start_session()` (manifest + index, self-rolling-back) -> artifact copy -> index
+  marker. The card's original "index entry last" ordering is not achievable, since `start_session()` writes the manifest
+  and adds the index row back-to-back before returning (`session/manager.py:652`, `:655`) with no seam between.
+  Assertion: an injected failure at any step leaves no UUID-bound session, and a re-run succeeds cleanly.
+- [ ] **Rollback: two disjoint stages, resolved 2026-07-27** (card "Rollback mechanism"). Stage 1 is `start_session()`'s
+  own `except` (`:666-681`) for failures **inside** it -- already shipped, nothing to build. Stage 2 is adoption's own
+  compensation for everything **after** `start_session()` returns. A second compensation is not optional and not a
+  hazard: the stage-1 block is unreachable once `return state` executes at `:664`, so the two stages are disjoint in
+  time and cannot both fire for one failure. An earlier draft said to "extend that same compensation path rather than
+  add a second rollback", which is not implementable.
+- [ ] **Stage 2 must not call `SessionManager.delete_session()`.** Its default `delete_transcripts=True` reaches
+  `cleanup_session` -> `delete_session_data`, which unlinks `get_transcript_path(project_root, session_id)` plus the
+  matching agent logs (`session/claude/cleanup.py:63-80`) -- a path that resolves into `~/.claude/projects/<encoded>/`.
+  For an adopted session `claude_session_id` **is the user's native UUID**, so the convenient rollback deletes the
+  conversation the user asked Forge to adopt. Use the narrow primitives: unlink the marker and the artifact copy, then
+  `IndexStore.remove_session(name)`, then `SessionStore.delete()` -- which removes only `.forge/sessions/<name>/`
+  (`session/store.py:262-275`) and therefore does **not** reach the artifact copy under `.forge/artifacts/<name>/`.
+  Assertion: after a failure injected *after* the artifact copy, the native `~/.claude/projects/<enc>/<uuid>.jsonl` is
+  present and byte-identical, its agent logs are intact, no worktree or branch was removed, and no orphan index marker
+  survives. Adoption must never pass `create_worktree=True`; the default is `False` (`session/manager.py:416`) and
+  `_rollback_worktree` short-circuits on `if not created_worktree` (`:482`), so this is a constraint to state, not a
+  default to lean on.
 - [ ] Future-resume model made explicit per P2 and P3. Assertion: `direct_model` is persisted only when inferred (last
   real model, `<synthetic>` filtered) or supplied via `--model`; with no basis, adopt warns, leaves the field `None`,
   and records `model_basis="none"`. Covered by the "Adoption adds no model pin" acceptance row. Scope the claim to what
@@ -274,6 +284,11 @@ shape. Worth a separate card only if artifact readers care.
   `print_error`/`print_tip`; no hand-rolled `Tip:` or `[red]Error:[/red]`.
 - [ ] Reattach works with zero new resume code. Assertion: post-adopt `forge session resume <name>` builds argv
   `--resume <uuid>` with no `--fork-session`.
+- [ ] design.md **§3.3** sync, carried over from Slice 1: `claude_session_id` gains a third origination path -- start
+  **pre-seeds**, native fork **records**, adopt **binds** an existing native UUID. Held until now because design docs
+  describe shipped behavior and the sentence names a command. Assertion: §3.3 lists all three paths, and §3.5's caveat
+  ("the binding command that populates this field is not shipped yet") is removed in the same change, since leaving it
+  would then be false.
 
 ## Slice 3 -- Discovery preview
 
