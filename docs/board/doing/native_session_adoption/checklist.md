@@ -13,9 +13,9 @@ its first three items are owner decisions rather than implementation work.
 
 ## Current focus
 
-Slice 0, nearly closed. The three owner decisions are settled and P2 is answered. **Remaining: P1's real-Claude gate and
-P3** -- both block Slice 2 (the adopt op), because P1 is the contract the binding rests on and P3 decides what an
-adopted direct-mode session does under `--proxy`. Slice 1 is unblocked and depends on neither.
+Slice 0 is closed except **P1**, whose real-Claude Docker gate is the one remaining blocker on Slice 2 (the adopt op):
+it is the contract the binding rests on, and no local evidence can stand in for it. The three owner decisions, the card
+corrections, P2, and P3 are all settled and recorded in the card. Slice 1 is unblocked and does not depend on P1.
 
 ## Re-grounding (2026-07-26)
 
@@ -85,12 +85,21 @@ New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
   **full** intended population (470 top-level transcripts, the feature's own scan shape), `message.model` is present on
   **15870/15870** assistant entries with real canonical ids (`claude-opus-5`, `claude-fable-5`, `claude-opus-4-8`).
   Scope the extractor into Slice 2 with three measured edge cases (see "Probe results"): filter the `<synthetic>`
-  sentinel; tolerate transcripts with no assistant turn (**346/470**, so warn-and-persist is the ordinary path and
-  inference the optimization); and take the **last** real model as a required deterministic tie-break -- 2/470 do mix
-  two real models, so a mixed-model fixture is mandatory.
-- [ ] **P3 -- adopted session on the proxy branch.** Decide what an adopted (direct-mode) session does if a later resume
-  supplies `--proxy`, given the new `_apply_direct_model_env_if_supported` branch. Assertion: behavior stated in the
-  card; adoption records direct mode honestly and does not silently acquire a proxy model pin.
+  sentinel; tolerate transcripts with no assistant turn (**346/470**, so the no-basis path is the ordinary one and
+  inference the optimization -- P3 settles that path as warn-and-leave-`None`, not warn-and-persist); and take the
+  **last** real model as a required deterministic tie-break -- 2/470 do mix two real models, so a mixed-model fixture is
+  mandatory.
+- [x] **P3 -- adopted session on the proxy branch. ANSWERED: adoption writes `direct_model` only when it has a basis**
+  (explicit `--model` or transcript inference); with neither it warns and leaves the field `None` rather than persisting
+  the current direct default. Recorded in card Design step 3. Two code facts decide it: the direct branch already
+  evaluates `direct_model or get_default_direct_model()` at launch (`core/ops/claude_session.py:1448-1449`), so
+  persisting the default changes nothing on the direct path; and the proxy branch
+  (`_apply_direct_model_env_if_supported`, applied `:1454`) reads the **stored** `intent.launch.direct_model` while the
+  resume-path validation gate fires only for a pin passed on that invocation (`cli/session_lifecycle.py:1375`,
+  `if direct_model_pin`) -- so a fabricated default would reach the proxy unvalidated and silently no-op
+  (`session/model_pin.py:61-62`) instead of erroring. When a basis exists the pin behaves as it does for any Forge-born
+  `--model` session; the silent-skip asymmetry is pre-existing and explicitly not fixed here. New acceptance row:
+  "Adopted default never pins a proxy".
 
 ### Probe results (2026-07-26)
 
@@ -135,11 +144,12 @@ that unified the two capture paths could introduce one.
 | transcripts mixing two real model ids         | **2 of 470**      |
 
 Two rows drive Slice 2's design. The no-assistant-turn row resizes card Design step 3: such a transcript cannot yield a
-model, and it is the **majority** case, so warn-and-persist is the ordinary path and inference is the optimization. The
-mixed-model row reverses an earlier claim in this checklist that no tie-break was needed -- that came from a 120-file
-sample which happened to contain none. Both real cases are `claude-fable-5 -> claude-opus-4-8`, so "take the **last**
-real model" is a required deterministic rule with a mandatory fixture, not a defensive nicety. `<synthetic>` is a
-sentinel, not a model id, and must be filtered before it reaches `direct_model`.
+model, and it is the **majority** case, so the no-basis path is the ordinary one and inference is the optimization -- P3
+then settles what that path does (warn, leave `direct_model` unset). The mixed-model row reverses an earlier claim in
+this checklist that no tie-break was needed -- that came from a 120-file sample which happened to contain none. Both
+real cases are `claude-fable-5 -> claude-opus-4-8`, so "take the **last** real model" is a required deterministic rule
+with a mandatory fixture, not a defensive nicety. `<synthetic>` is a sentinel, not a model id, and must be filtered
+before it reaches `direct_model`.
 
 **Incidental finding (not this card's scope).** `pre-compact` artifact entries omit `session_id` while `stop` entries
 include it, so the two capture shapes disagree in `confirmed.artifacts.transcripts[]`. Adoption should follow the `stop`
@@ -177,8 +187,10 @@ shape. Worth a separate card only if artifact readers care.
   `start_session()` (manifest + index, self-rolling-back) -> artifact copy, with adoption compensating manifest and
   index if the copy fails. Assertion (the invariant the card actually wants, unchanged): an injected failure at any step
   leaves no UUID-bound session, and a re-run succeeds cleanly.
-- [ ] Future-resume model made explicit per P2's outcome. Assertion: the persisted `direct_model` is inferred, supplied
-  via `--model`, or warned-and-persisted -- never an unannounced default.
+- [ ] Future-resume model made explicit per P2 and P3. Assertion: `direct_model` is persisted only when inferred (last
+  real model, `<synthetic>` filtered) or supplied via `--model`; with no basis, adopt warns and leaves the field `None`.
+  Covered by the "Adopted default never pins a proxy" acceptance row -- a later `resume --proxy` must not pick up a pin
+  adoption invented.
 - [ ] Transcript artifact copy with reason `"adopt"`, matching the Stop entry shape (`cli/hooks/commands.py:165-178`),
   and a queued search-index marker. Assertion: the copy is indexed through the normal idempotent path, and **no**
   memory-writer handoff marker is enqueued at adopt time.
