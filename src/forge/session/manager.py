@@ -426,6 +426,7 @@ class SessionManager:
         claude_session_id: str | None = None,
         runtime: str = "claude_code",
         parent_session: str | None = None,
+        require_uuid_unbound: bool = False,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -449,12 +450,17 @@ class SessionManager:
             runtime: Runtime registry id for launcher dispatch ("claude_code" | "codex").
             parent_session: Derivation source recorded on the state (codex start path;
                 Claude resume/fork paths record it via their own child-creation flows).
+            require_uuid_unbound: Re-check `claude_session_id` uniqueness inside the
+                index write lock. Only meaningful when binding a **pre-existing**
+                conversation (`forge session adopt`); the ordinary start paths mint a
+                fresh UUID that cannot collide.
 
         Returns:
             The created session state with candidate UUID.
 
         Raises:
             SessionExistsError: If session name already exists.
+            UuidAlreadyBoundError: If require_uuid_unbound and the UUID is taken.
             InvalidSessionNameError: If name is invalid.
             FileNotFoundError: If no git repository found.
             BranchExistsError: If branch already exists (when create_worktree=True).
@@ -658,6 +664,7 @@ class SessionManager:
                 checkout_root=checkout_root_str,
                 forge_root=forge_root_str,
                 relative_path=relative_path_str,
+                require_uuid_unbound=require_uuid_unbound,
             )
             added_to_index = True
 

@@ -29,6 +29,7 @@ from .exceptions import (
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
+    UuidAlreadyBoundError,
 )
 from .identity import (
     make_scoped_key,
@@ -299,6 +300,7 @@ class IndexStore:
         forge_root: str | None = None,
         checkout_root: str | None = None,
         relative_path: str | None = None,
+        require_uuid_unbound: bool = False,
     ) -> SessionIndexEntry:
         """Add a new session to the index.
 
@@ -315,6 +317,13 @@ class IndexStore:
             forge_root: Forge project root (where .forge/ lives).
             checkout_root: Git checkout root (--show-toplevel).
             relative_path: forge_root relative to checkout_root.
+            require_uuid_unbound: Re-check UUID uniqueness **inside** this
+                method's write lock. Callers that bind a pre-existing
+                conversation (``forge session adopt``) pass True: their
+                precondition check runs under a separate lock acquisition, so
+                without this two concurrent adopts on one UUID would both pass
+                and both bind. The check lives here rather than in a sibling
+                method so it shares this lock instead of duplicating the write.
 
         Returns:
             The created SessionIndexEntry.
@@ -322,6 +331,7 @@ class IndexStore:
         Raises:
             InvalidSessionNameError: If name is invalid.
             SessionExistsError: If session already exists in this project.
+            UuidAlreadyBoundError: If require_uuid_unbound and the UUID is taken.
         """
         validate_name(name)
         effective_forge_root = forge_root or worktree_path
@@ -332,6 +342,11 @@ class IndexStore:
             scoped_key = make_scoped_key(name, effective_forge_root)
             if scoped_key in index.sessions:
                 raise SessionExistsError(name)
+
+            if require_uuid_unbound and claude_session_id:
+                for existing_key, existing in index.sessions.items():
+                    if existing.claude_session_id == claude_session_id:
+                        raise UuidAlreadyBoundError(claude_session_id, session_name_from_key(existing_key))
 
             entry = SessionIndexEntry(
                 worktree_path=worktree_path,
@@ -453,6 +468,7 @@ class IndexStore:
         checkout_root: str | None = None,
         forge_root: str | None = None,
         relative_path: str | None = None,
+        require_uuid_unbound: bool = False,
     ) -> SessionIndexEntry:
         """Add session to index from a session state.
 
@@ -486,6 +502,7 @@ class IndexStore:
             forge_root=effective_forge_root,
             checkout_root=checkout_root,
             relative_path=relative_path,
+            require_uuid_unbound=require_uuid_unbound,
         )
 
     def find_session_by_uuid(

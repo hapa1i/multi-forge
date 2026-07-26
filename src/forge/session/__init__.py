@@ -69,6 +69,7 @@ from .exceptions import (
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
+    UuidAlreadyBoundError,
 )
 
 # Index
@@ -127,4 +128,5 @@ __all__ = [
     "SessionNotFoundError",
     "SessionExistsError",
     "InvalidSessionNameError",
+    "UuidAlreadyBoundError",
 ]

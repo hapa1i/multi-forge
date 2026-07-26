@@ -5,20 +5,21 @@
 **Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly; the `todo/` parking step was
 skipped because acceptance and activation happened in the same decision.
 
-**Execution branch**: `feat/native-session-adoption`. Slice 0 shipped one test file
-(`tests/integration/docker/test_adopt_binding_contract.py`, the P1 gate) with no `src/` change. Slice 1 shipped the
-first production change: `AdoptionConfirmed` in `src/forge/session/models.py`. No CLI surface exists yet -- Slice 2 adds
-the op and leaf.
+**Execution branch**: `feat/native-session-adoption`. Slice 0 shipped the P1 gate
+(`tests/integration/docker/test_adopt_binding_contract.py`) with no `src/` change; Slice 1 the manifest schema
+(`AdoptionConfirmed`); Slice 2 the `forge session adopt` op and CLI leaf. The command is usable from Slice 2 onward with
+an explicit conversation id -- Slice 3 adds the bare-`adopt` preview.
 
 **Slice numbering note**: the card uses "Phase 1 / Phase 2" for the **Claude** and **Codex arms**. This checklist uses
 "Slice" numbering to avoid collision; the arm mapping is called out where it applies.
 
 ## Current focus
 
-**Slices 0 and 1 are closed.** Slice 0's three owner decisions and all three probes (P1 gated on real Claude 2.1.220,
-P2, P3) are settled and recorded in the card. Slice 1 shipped `confirmed.AdoptionConfirmed` plus its hook-survival tests
-and the design.md §3.5 ownership entry; §3.3's origination sentence is deliberately deferred to Slice 2, since it would
-describe a command that does not exist yet. **Cursor: Slice 2** (the adopt op and CLI leaf) -- nothing blocks it.
+**Slices 0, 1 and 2 are closed.** Slice 0 settled the three owner decisions and all three probes (P1 gated on real
+Claude 2.1.220, P2, P3). Slice 1 shipped `confirmed.AdoptionConfirmed`. Slice 2 shipped `forge session adopt` -- the
+command-core op, the CLI leaf, and the locked index guard that closes the already-bound TOCTOU -- with design.md §3.3
+and §3.5 and `cli_reference.md` synced. **Cursor: Slice 3** (bare-`adopt` discovery preview), which is the last piece of
+the settled discovery decision; the Claude arm is otherwise complete.
 
 ## Re-grounding (2026-07-26)
 
@@ -233,12 +234,27 @@ shape. Unifying the two shapes is still a separate card.
 
 ## Slice 2 -- Claude adopt op and CLI (card Phase 1)
 
-- [ ] `core/ops/session_adopt.py` command-core op: pure logic, typed exceptions, no Click and no printing (§3.12).
+**Shipped 2026-07-27.** `core/ops/session_adopt.py` (op), `cli/session_adopt.py` (leaf), plus the locked index guard.
+Verification: `tests/src/core/ops/test_session_adopt.py` (22) and `tests/src/cli/test_session_adopt.py` (8) pass; full
+unit suite 8408 passed / 1 pre-existing skip; `test_session_lifecycle.py` 21 passed in Docker; `make pre-commit` clean.
+
+Two conventions the implementation had to discover rather than assume:
+
+- The op splits into read-only `plan_adoption` and mutating `adopt_session`. The double-attach decision needs a
+  confirmation point **before** any write, which one combined function cannot offer.
+
+- `print_error` / `print_error_with_tip` must **not** receive the stdout `console`; they default to the error console.
+  An AST guard (`tests/src/cli/test_output_streams.py::test_error_helpers_do_not_pass_stdout_console`) caught six
+  violations that line-based greps would have missed.
+
+- [x] `core/ops/session_adopt.py` command-core op: pure logic, typed exceptions, no Click and no printing (§3.12).
   Assertion: no `click` import; the CLI leaf owns all rendering and exit codes.
-- [ ] Preconditions fail-closed in the card's order: inside a Forge project; strict project-compatibility guard for a
+
+- [x] Preconditions fail-closed in the card's order: inside a Forge project; strict project-compatibility guard for a
   state-mutating command path; transcript exists; UUID not already bound. Assertion: each reject path creates **no**
   manifest, artifact, or index entry, and names the owning session when already bound.
-- [ ] **Atomic UUID-unbound check inside the index write lock.** The step-1 check and the index write take the lock
+
+- [x] **Atomic UUID-unbound check inside the index write lock.** The step-1 check and the index write take the lock
   separately today -- `find_session_by_uuid` (`session/index.py:503`) and `add_session` (`:372`) each open their own
   `file_lock_for_target` -- so two concurrent `adopt` calls on one UUID can both pass and both bind. Adoption cannot
   wrap this from outside because `start_session` owns the add, so add a locked index-layer entry point (e.g.
@@ -246,19 +262,23 @@ shape. Unifying the two shapes is still a separate card.
   UUID leave exactly one binding; the loser creates no manifest and no index entry. Scope honestly: only the **index**
   becomes atomic -- the manifest-scan fallback (`core/ops/session_context.py:405`) holds no lock, so the guarantee is
   "atomic against the index, best-effort against the manifest scan".
-- [ ] Recorded-`cwd` cross-check on the discovered transcript (the Claude analog of `_rollout_head_cwd`). Assertion: a
+
+- [x] Recorded-`cwd` cross-check on the discovered transcript (the Claude analog of `_rollout_head_cwd`). Assertion: a
   lossy-encoding sibling's transcript (`a.b` / `a_b` / `a-b` collision) is rejected, not bound.
-- [ ] Write ordering: validate -> `start_session()` (manifest + index, self-rolling-back) -> artifact copy -> index
+
+- [x] Write ordering: validate -> `start_session()` (manifest + index, self-rolling-back) -> artifact copy -> index
   marker. The card's original "index entry last" ordering is not achievable, since `start_session()` writes the manifest
   and adds the index row back-to-back before returning (`session/manager.py:652`, `:655`) with no seam between.
   Assertion: an injected failure at any step leaves no UUID-bound session, and a re-run succeeds cleanly.
-- [ ] **Rollback: two disjoint stages, resolved 2026-07-27** (card "Rollback mechanism"). Stage 1 is `start_session()`'s
+
+- [x] **Rollback: two disjoint stages, resolved 2026-07-27** (card "Rollback mechanism"). Stage 1 is `start_session()`'s
   own `except` (`:666-681`) for failures **inside** it -- already shipped, nothing to build. Stage 2 is adoption's own
   compensation for everything **after** `start_session()` returns. A second compensation is not optional and not a
   hazard: the stage-1 block is unreachable once `return state` executes at `:664`, so the two stages are disjoint in
   time and cannot both fire for one failure. An earlier draft said to "extend that same compensation path rather than
   add a second rollback", which is not implementable.
-- [ ] **Stage 2 must not call `SessionManager.delete_session()`.** Its default `delete_transcripts=True` reaches
+
+- [x] **Stage 2 must not call `SessionManager.delete_session()`.** Its default `delete_transcripts=True` reaches
   `cleanup_session` -> `delete_session_data`, which unlinks `get_transcript_path(project_root, session_id)` plus the
   matching agent logs (`session/claude/cleanup.py:63-80`) -- a path that resolves into `~/.claude/projects/<encoded>/`.
   For an adopted session `claude_session_id` **is the user's native UUID**, so the convenient rollback deletes the
@@ -270,21 +290,26 @@ shape. Unifying the two shapes is still a separate card.
   survives. Adoption must never pass `create_worktree=True`; the default is `False` (`session/manager.py:416`) and
   `_rollback_worktree` short-circuits on `if not created_worktree` (`:482`), so this is a constraint to state, not a
   default to lean on.
-- [ ] Future-resume model made explicit per P2 and P3. Assertion: `direct_model` is persisted only when inferred (last
+
+- [x] Future-resume model made explicit per P2 and P3. Assertion: `direct_model` is persisted only when inferred (last
   real model, `<synthetic>` filtered) or supplied via `--model`; with no basis, adopt warns, leaves the field `None`,
   and records `model_basis="none"`. Covered by the "Adoption adds no model pin" acceptance row. Scope the claim to what
   adoption **contributes**: `build_claude_env` starts from the current process environment (`core/reactive/env.py:210`),
   so an ambient `ANTHROPIC_MODEL` reaches Claude regardless of the manifest. Asserting "no `ANTHROPIC_MODEL` in the
   child env" would be testing the shell, not adoption; scrubbing inherited model variables is a routing-wide change and
   belongs to a separate card.
-- [ ] Transcript artifact copy with reason `"adopt"`, matching the Stop entry shape (`cli/hooks/commands.py:165-178`),
+
+- [x] Transcript artifact copy with reason `"adopt"`, matching the Stop entry shape (`cli/hooks/commands.py:165-178`),
   and a queued search-index marker. Assertion: the copy is indexed through the normal idempotent path, and **no**
   memory-writer handoff marker is enqueued at adopt time.
-- [ ] CLI leaf under `forge session`, using `forge.cli.output` helpers. Assertion: recovery text goes through
+
+- [x] CLI leaf under `forge session`, using `forge.cli.output` helpers. Assertion: recovery text goes through
   `print_error`/`print_tip`; no hand-rolled `Tip:` or `[red]Error:[/red]`.
-- [ ] Reattach works with zero new resume code. Assertion: post-adopt `forge session resume <name>` builds argv
+
+- [x] Reattach works with zero new resume code. Assertion: post-adopt `forge session resume <name>` builds argv
   `--resume <uuid>` with no `--fork-session`.
-- [ ] design.md **§3.3** sync, carried over from Slice 1: `claude_session_id` gains a third origination path -- start
+
+- [x] design.md **§3.3** sync, carried over from Slice 1: `claude_session_id` gains a third origination path -- start
   **pre-seeds**, native fork **records**, adopt **binds** an existing native UUID. Held until now because design docs
   describe shipped behavior and the sentence names a command. Assertion: §3.3 lists all three paths, and §3.5's caveat
   ("the binding command that populates this field is not shipped yet") is removed in the same change, since leaving it

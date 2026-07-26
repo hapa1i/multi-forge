@@ -29,6 +29,20 @@ class SessionExistsError(ForgeSessionError):
         super().__init__(f"session '{name}' already exists")
 
 
+class UuidAlreadyBoundError(ForgeSessionError):
+    """Raised when a Claude UUID is already bound to another session.
+
+    Carries the owning session name so callers can name it in recovery output
+    instead of re-querying the index (which would reopen the race this check
+    exists to close).
+    """
+
+    def __init__(self, session_uuid: str, owner: str) -> None:
+        self.session_uuid = session_uuid
+        self.owner = owner
+        super().__init__(f"conversation '{session_uuid}' is already bound to session '{owner}'")
+
+
 class SessionFileNotFoundError(ForgeSessionError):
     """Raised when session state file doesn't exist in expected location."""
 

@@ -1,0 +1,136 @@
+"""`forge session adopt` -- bind a Forge session to an existing native conversation.
+
+Rendering and exit codes live here; all logic is in
+``forge.core.ops.session_adopt`` (design.md section 3.12).
+
+The conversation id is required in this slice. Bare ``forge session adopt``
+previews adoptable candidates, which arrives with the discovery slice.
+"""
+
+from __future__ import annotations
+
+import sys
+from typing import cast
+
+import click
+
+from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.session import console
+from forge.cli.session import session as _session_untyped
+from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session_adopt import (
+    MODEL_BASIS_INFERRED,
+    MODEL_BASIS_NONE,
+    AdoptError,
+    adopt_session,
+    plan_adoption,
+)
+from forge.session import ForgeSessionError, UuidAlreadyBoundError
+from forge.session.exceptions import SessionExistsError
+
+session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
+
+
+@session.command()
+@click.argument("conversation_id")
+@click.option("--name", "-n", help="Forge session name (defaults to the conversation id prefix)")
+@click.option("--model", "-m", help="Model to pin for future Forge resumes (overrides transcript inference)")
+@click.option("--yes", "-y", is_flag=True, help="Skip the confirmation for a recently-active conversation")
+def adopt(conversation_id: str, name: str | None, model: str | None, yes: bool) -> None:
+    """Adopt a native Claude conversation as a managed Forge session.
+
+    \b
+    Examples:
+        forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2
+        forge session adopt 470b1a1b --name my-session --model claude-opus-5
+
+    Run this from the directory the native session was launched in: Claude
+    stores transcripts under an encoding of that path, and adoption verifies
+    the transcript's recorded directory matches before binding it.
+
+    Adoption does not attach hooks, env, or supervision to an already-running
+    client; those begin with the next Forge-managed resume or fork.
+    """
+    ctx = ExecutionContext.from_cwd()
+
+    try:
+        plan = plan_adoption(ctx, conversation_id, model_override=model)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Conversation '{e.session_uuid}' is already adopted by session '{e.owner}'.",
+            "Resume the existing session instead of adopting it twice.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if plan.recently_active and not yes:
+        console.print(
+            "[yellow]This conversation was active in the last 30 minutes.[/yellow] "
+            "Forge cannot tell whether a native client is still attached to it."
+        )
+        print_tip(
+            "Adopting a live conversation and then resuming it would put two clients on one transcript.",
+            "Close the other client first if one is running.",
+            console=console,
+        )
+        if not click.confirm("Adopt it anyway?", default=False):
+            console.print("[dim]Adoption cancelled.[/dim]")
+            return
+
+    session_name = name or conversation_id.split("-")[0]
+
+    try:
+        result = adopt_session(ctx, plan, name=session_name)
+    except UuidAlreadyBoundError as e:
+        # Lost a race with a concurrent adopt between the plan and the index write.
+        print_error_with_tip(
+            f"Conversation '{e.session_uuid}' was adopted by session '{e.owner}' while this command ran.",
+            "Nothing was created here.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except SessionExistsError as e:
+        print_error_with_tip(
+            f"Session '{e.name}' already exists.",
+            "Choose a different name.",
+            commands=[f"forge session adopt {conversation_id} --name <name>"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+    except ForgeSessionError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    console.print(f"[green]Adopted[/green] conversation [bold]{result.session_uuid}[/bold] as '{result.name}'")
+
+    if result.model_basis == MODEL_BASIS_INFERRED:
+        console.print(f"  Model (inferred from transcript): {result.model}")
+    elif result.model_basis == MODEL_BASIS_NONE:
+        console.print("  [yellow]Model: unknown[/yellow] -- the transcript has no assistant turn to infer from")
+        print_tip(
+            "Forge did not pin a model, so a resume uses the current direct default.",
+            "Pin one explicitly if this conversation should continue on a specific model.",
+            commands=[f"forge session adopt {conversation_id} --model <model>"],
+            console=console,
+        )
+    else:
+        console.print(f"  Model: {result.model}")
+
+    if not result.indexed:
+        print_tip(
+            "The transcript was copied but could not be queued for search indexing.",
+            "Rebuild the index to make it searchable.",
+            commands=["forge search reindex"],
+            console=console,
+        )
+
+    print_tip(
+        "Resume it as a managed session:",
+        commands=[f"forge session resume {result.name}"],
+        console=console,
+    )

@@ -238,11 +238,14 @@ on Claude via `--session-id`; the SessionStart hook then **validates** that UUID
 **transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): the CLI mints a
 **new** UUID and imposes it via `--session-id`. The exception is a **native** fork (`--resume-mode native`, which passes
 `--fork-session`): there the CLI does **not** pre-seed — Claude mints the child UUID and SessionStart **discovers and
-records** it (`native-relocate` instead reuses the parent's UUID). Stop and StopFailure also reconcile
-`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
-sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
-mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
-"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
+records** it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`,
+which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
+records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
+— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session). Stop and StopFailure
+also reconcile `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where
+SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does
+**not** by itself mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded
+UUID); "used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
@@ -423,8 +426,9 @@ To avoid writer conflicts:
     least three writers stamp it (`cli:adopt`, `hook:stop`, `hook:pre-compact`), so origin recorded there would be
     overwritten within one turn. `model_basis` (`explicit` | `inferred` | `none`) records what produced
     `intent.launch.direct_model`, since a transcript that justified an inference is user-owned and may be gone before
-    anyone asks why the session resumes on that model. The binding command that populates this field is not shipped yet;
-    the schema and its hook-survival guarantees are.
+    anyone asks why the session resumes on that model. Adoption writes `direct_model` **only** when it has a basis; with
+    none it warns and leaves the field unset rather than persisting the current default, which would otherwise be
+    applied unvalidated on a later `resume --proxy`.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,

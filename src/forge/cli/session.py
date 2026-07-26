@@ -510,6 +510,7 @@ def session() -> None:
 
 
 # Import command modules for their Click registration side effects.
+from . import session_adopt as session_adopt  # noqa: E402,F401
 from . import session_fork as session_fork  # noqa: E402,F401
 from . import session_lifecycle as session_lifecycle  # noqa: E402,F401
 from . import session_manage as session_manage  # noqa: E402,F401
