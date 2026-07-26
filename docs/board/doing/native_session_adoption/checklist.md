@@ -5,17 +5,18 @@
 **Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly; the `todo/` parking step was
 skipped because acceptance and activation happened in the same decision.
 
-**Execution branch**: `feat/native-session-adoption`. No production code is written yet -- Slice 0 is the cursor, and
-its first three items are owner decisions rather than implementation work.
+**Execution branch**: `feat/native-session-adoption`. No production code is written yet. Slice 0 shipped one test file
+(`tests/integration/docker/test_adopt_binding_contract.py`, the P1 gate) and no `src/` change; Slice 1 is the first
+slice that touches production code.
 
 **Slice numbering note**: the card uses "Phase 1 / Phase 2" for the **Claude** and **Codex arms**. This checklist uses
 "Slice" numbering to avoid collision; the arm mapping is called out where it applies.
 
 ## Current focus
 
-Slice 0 is closed except **P1**, whose real-Claude Docker gate is the one remaining blocker on Slice 2 (the adopt op):
-it is the contract the binding rests on, and no local evidence can stand in for it. The three owner decisions, the card
-corrections, P2, and P3 are all settled and recorded in the card. Slice 1 is unblocked and does not depend on P1.
+**Slice 0 is closed.** The three owner decisions, the card corrections, and all three probes (P1 gated on real Claude
+2.1.220, P2, P3) are settled and recorded in the card. Nothing blocks Slice 1 or Slice 2; the cursor moves to Slice 1
+(manifest provenance schema), which Slice 2 builds on.
 
 ## Re-grounding (2026-07-26)
 
@@ -71,16 +72,13 @@ Blocking decisions (card "Open questions") -- **all three settled 2026-07-26 and
 
 New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
 
-- [ ] **P1 -- Stop-rewrite idempotency. OPEN. Gates Slice 2.** The binding survives the first Forge-managed Stop only if
-  a plain `claude --resume <uuid>` reports the **same** `session_id`; `cli/hooks/commands.py:179` rewrites
-  `confirmed.claude_session_id` from that payload unconditionally, so a differing id drifts the binding after one turn,
-  silently. Local evidence (see "Probe results") found **zero** counterexamples across three axes, but **none of them
-  observes a reattach**: every multi-capture session sampled had `resume_mode: None`, and Forge does not record
-  reconnects distinguishably, so the reattach leg is inferred rather than seen. Absence of a counterexample in data that
-  cannot contain one is not evidence. Assertion (unchanged): a real-Claude Docker gate -- precedent
-  `test_native_relocate_contract.py`, `test_rewind_native_contract.py` -- creates a conversation, reattaches by UUID,
-  and asserts the Stop-payload `session_id` equals the original. Record the pinned Claude version, matching the
-  `CLAUDE_VERSION_VALIDATED` convention. **Run before Slice 2 builds the binding**, not at Slice 5 closeout.
+- [x] **P1 -- Stop-rewrite idempotency. ANSWERED on real Claude 2.1.220: the reattach reports the same `session_id`, so
+  the Stop rewrite is idempotent and adoption's binding is safe.** The binding survives the first Forge-managed Stop
+  only if a plain `claude --resume <uuid>` reports the **same** `session_id`; `cli/hooks/commands.py:179` rewrites
+  `confirmed.claude_session_id` from that payload unconditionally, so a differing id would drift the binding after one
+  turn, silently. Local evidence could not answer it -- every multi-capture session sampled had `resume_mode: None`, so
+  no on-disk sample observes a reattach at all. Gate: `tests/integration/docker/test_adopt_binding_contract.py`
+  (`integration` + `docker_in` + `slow`), `CLAUDE_VERSION_VALIDATED = "2.1.220"`. See "P1 gate result" below.
 - [x] **P2 -- transcript model metadata (scope-affecting). ANSWERED: inference is viable; keep it in v1.** Over the
   **full** intended population (470 top-level transcripts, the feature's own scan shape), `message.model` is present on
   **15870/15870** assistant entries with real canonical ids (`claude-opus-5`, `claude-fable-5`, `claude-opus-4-8`).
@@ -100,6 +98,32 @@ New probes (surfaced by the 2026-07-26 re-grounding, not in the card):
   (`session/model_pin.py:61-62`) instead of erroring. When a basis exists the pin behaves as it does for any Forge-born
   `--model` session; the silent-skip asymmetry is pre-existing and explicitly not fixed here. New acceptance row:
   "Adopted default never pins a proxy".
+
+### P1 gate result (2026-07-26, Claude Code 2.1.220)
+
+`tests/integration/docker/test_adopt_binding_contract.py` -- one test, 1 passed in ~27s, two real `claude --print` turns
+per run.
+
+**Observable.** Not `confirmed.claude_session_id`, which both SessionStart and Stop write (a match there would not say
+which hook produced it). The Stop handler copies the payload's `session_id` verbatim into each artifact entry
+(`cli/hooks/commands.py:169`) and `_append_artifact_entry` (`cli/hooks/_helpers.py:131-149`) appends without dedup, so
+`confirmed.artifacts.transcripts` is an **append-only log of every Stop payload**. Claude re-invokes Stop as a
+transcript grows (`commands.py:541-544`), so the gate asserts *every* recorded id matches, not a fixed entry count.
+
+| Point                           | Recorded Stop payload ids              |
+| ------------------------------- | -------------------------------------- |
+| after turn 1 (fresh)            | `['470b1a1b-...f2']`                   |
+| after turn 2 (plain `--resume`) | `['470b1a1b-...f2', '470b1a1b-...f2']` |
+
+The reattach turn produced a **new** Stop entry carrying the original id -- the gate is not vacuous, and an assertion
+requires the entry count to grow so it cannot become vacuous later. Two corroborations: exactly one UUID-named artifact
+file exists (a drifted id would create a second), and the captured transcript contains **both** prompts, proving the
+reattach continued the conversation rather than starting fresh under the same id -- without which a matching
+`session_id` would prove nothing.
+
+**Consequence for Slice 2.** Adoption may rely on Stop idempotency; no drift guard is needed. The
+`CLAUDE_VERSION_VALIDATED = "2.1.220"` marker is reported on failure rather than hard-asserted, so a routine CLI bump
+does not red the suite while a real identity regression still fails on the payload assertions.
 
 ### Probe results (2026-07-26)
 
