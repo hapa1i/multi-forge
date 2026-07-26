@@ -15,7 +15,7 @@
 **Last updated**: 2026-07-26 (July 2026 model refresh: section 4 tier assertions now expect Opus 5 on
 openrouter-anthropic, Kimi K3 on openrouter-kimi, Qwen3.7 Plus/Max on openrouter-qwen, and Gemini 3.6 Flash on the
 gemini/gemini-flash templates). Earlier 2026-07-23: runtime skill inventory assertions now cover all nine portable Codex
-packages across enable, status, sync, cleanup, and disable). Earlier 2026-07-22: extension status probes now enforce the
+packages across enable, status, sync, cleanup, and disable. Earlier 2026-07-22: extension status probes now enforce the
 schema-v2 object, runtime-package QA verifies the always-copied provenance sentinel, and a disposable project exercises
 tracking-loss plus compiled-cache-reset cleanup and re-enable. Earlier 2026-07-17: runtime-aware skill QA also covers
 Codex-host-authoritative `openai` family selection, dangling leaf health, strict package/file-ledger failure, and

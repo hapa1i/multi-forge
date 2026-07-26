@@ -380,13 +380,14 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="module")
-def local_litellm_gemini(module_forge_home: Path) -> Generator[str, None, None]:
+def local_litellm_gemini(tmp_path_factory) -> Generator[str, None, None]:
     """Start an isolated local LiteLLM from the current bundled config (Gemini routes).
 
     Unlike ``local_litellm``, this never reuses a running instance or a stale
     materialized config: the bundled backends/litellm.yaml is freshly
-    materialized into an isolated FORGE_HOME, so the routes under test are the
-    ones this checkout ships.
+    materialized into a private FORGE_HOME. Private (not module_forge_home)
+    because ``forge model backend create`` rejects an existing config and
+    ``local_litellm_openai`` materializes its own copy in the shared home.
     """
     if not os.environ.get("GEMINI_API_KEY"):
         pytest.fail("GEMINI_API_KEY not set (required for local Gemini LiteLLM tests)")
@@ -394,7 +395,7 @@ def local_litellm_gemini(module_forge_home: Path) -> Generator[str, None, None]:
     test_port = allocate_ephemeral_port()
     base_url = f"http://localhost:{test_port}"
     env = os.environ.copy()
-    env["FORGE_HOME"] = str(module_forge_home)
+    env["FORGE_HOME"] = str(tmp_path_factory.mktemp("forge_home_gemini_litellm_"))
 
     create_result = subprocess.run(
         ["uv", "run", "forge", "model", "backend", "create", "litellm"],

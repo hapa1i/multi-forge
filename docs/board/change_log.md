@@ -55,7 +55,9 @@ passed with GEMINI_API_KEY (cache probe negative, recorded in catalog). OpenRout
 Gemini 3.6 Flash completions passed through their new template defaults; the qwen completions are blocked by this
 account's OpenRouter data-policy settings (404 "no endpoints available" for every qwen slug, including the pre-existing
 3.6-flash — environment limit, remediation at openrouter.ai/settings/privacy), so qwen live coverage here is the boot +
-tier-mapping assertion. `make pre-commit` clean; `uv build` wheel smoke at closeout.
+tier-mapping assertion. The pre-existing `test_sonnet_completion_resolves_to_gpt_56_sol` local-LiteLLM e2e fails
+identically on main in this environment (OpenAI upstream 500 through the local backend — account/key limit, not a branch
+regression). `make pre-commit` clean; `uv build` wheel smoke at closeout.
 
 ## 2026-07-24
 

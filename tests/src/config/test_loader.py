@@ -1055,7 +1055,6 @@ class TestTemplateResolution:
         assert "openrouter-qwen" in names
         assert "openrouter-glm" in names
         assert "openrouter-minimax" in names
-        assert "openrouter-qwen" in names
 
     def test_openrouter_open_model_templates_load(self, user_templates_dir: Path) -> None:
         """OpenRouter open-model family templates load with expected tiers."""

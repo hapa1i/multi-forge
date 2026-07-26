@@ -15,10 +15,11 @@ relying on the remote map for packaged-era models.
 from __future__ import annotations
 
 import importlib.metadata
+import json
+import os
 import re
+import subprocess
 import sys
-
-import pytest
 
 # First litellm release line whose packaged cost map contains
 # gemini/gemini-3.6-flash (commit 59ebe043, merged 2026-07-21).
@@ -38,16 +39,23 @@ def _installed_litellm_version() -> tuple[int, int, int]:
     return (numeric[0], numeric[1], numeric[2])
 
 
-def test_gemini_36_flash_packaged_cost_map_matches_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The env var is read at first import; nothing else in Forge imports
-    # litellm in-process (it runs as a subprocess backend), so this test owns
-    # the first import in the suite.
-    assert "litellm" not in sys.modules, "litellm pre-imported; packaged-map check would be nondeterministic"
-    monkeypatch.setenv("LITELLM_LOCAL_MODEL_COST_MAP", "true")
-    import litellm
+def _model_in_packaged_cost_map() -> bool:
+    # Subprocess so this probe owns litellm's first import: the env var is
+    # read at import time, and in-process the module may already be loaded
+    # (e.g. proxy_orchestrator._check_proxy_dependencies imports litellm).
+    result = subprocess.run(
+        [sys.executable, "-c", f"import litellm, json; print(json.dumps({MODEL_KEY!r} in litellm.model_cost))"],
+        env={**os.environ, "LITELLM_LOCAL_MODEL_COST_MAP": "true"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return bool(json.loads(result.stdout.strip().splitlines()[-1]))
 
+
+def test_gemini_36_flash_packaged_cost_map_matches_version() -> None:
     version = _installed_litellm_version()
-    in_packaged_map = MODEL_KEY in litellm.model_cost
+    in_packaged_map = _model_in_packaged_cost_map()
 
     if version >= FIRST_PACKAGED_SUPPORT:
         assert in_packaged_map, (

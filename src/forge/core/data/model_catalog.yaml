@@ -1001,7 +1001,7 @@ models:
     tags: []
 
   # ---------------------------------------------------------------------------
-  # Claude Models (4.8 + 4.7 + 4.6 + 4.5 series)
+  # Claude Models (5 + 4.8 + 4.7 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
 
   # --- Claude 4.6 Series ---
@@ -1673,9 +1673,9 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    # Tops the catalog's non-frontier tier. Vendor benchmarks (SWE-Bench Pro
-    # 59%, Terminal-Bench 2.1 66%) claim parity with the proprietary frontier
-    # but are unverified, so scored just above qwen3.6-max (90), below sonnet-4-6.
+    # Vendor benchmarks (SWE-Bench Pro 59%, Terminal-Bench 2.1 66%) claim
+    # parity with the proprietary frontier but are unverified, so scored just
+    # above qwen3.6-max (90), below Qwen3.7 Max (92) and Kimi K3 (98).
     intelligence_score: 91
     tags: [agentic, code-gen]
 
