@@ -1585,7 +1585,7 @@ class TestSupervisorCascade:
         sup = _read_supervisor(store)
         assert sup.checker_provider == "litellm_local"
         assert sup.checker_budget_tokens is None
-        assert "gemini/gemini-3.5-flash via litellm_local" in result.output
+        assert "gemini/gemini-3.6-flash via litellm_local" in result.output
 
     def test_checker_budget_is_not_a_cascade_option(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         _make_supervised_project(temp_guard_env, monkeypatch)
@@ -1683,7 +1683,7 @@ class TestSupervisorCascade:
         assert result.exit_code == 0
         assert "Cascade: on" in result.output
         assert "Checker provider: openrouter" in result.output
-        assert "Checker model: google/gemini-3.5-flash" in result.output
+        assert "Checker model: google/gemini-3.6-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
     def test_status_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:

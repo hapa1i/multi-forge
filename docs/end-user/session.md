@@ -626,10 +626,10 @@ lane to the child, which re-freezes on its own first check. See [policy.md](poli
 ```bash
 # Fork with the tier-1 plan check (cascade) and a specific checker model/provider
 forge session fork planner --worktree --supervise \
-  --cascade --checker-model google/gemini-3.5-flash --checker-provider openrouter
+  --cascade --checker-model google/gemini-3.6-flash --checker-provider openrouter
 
 # Same knobs on session start
-forge session start executor --supervise planner --cascade --checker-model google/gemini-3.5-flash
+forge session start executor --supervise planner --cascade --checker-model google/gemini-3.6-flash
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the
@@ -728,8 +728,8 @@ Rejected for sidecar or host-proxy launches.
 Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
 `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. `forge session resume --model ...` updates the
 current session's stored pin; `forge session fork --model ...` writes the pin to the child session. This is useful when
-moving a planner between Opus 4.8 execution and Opus 4.6 final review. The `claude-opus`/`opus` aliases point at Claude
-Opus 4.8; pin `claude-opus-4-6` explicitly for Opus 4.6.
+moving a planner between Opus 5 execution and Opus 4.6 final review. The `claude-opus`/`opus` aliases point at Claude
+Opus 5; pin `claude-opus-4-8` or `claude-opus-4-6` explicitly for the displaced versions.
 
 For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
 a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.

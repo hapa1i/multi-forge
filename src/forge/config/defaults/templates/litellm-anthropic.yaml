@@ -1,12 +1,12 @@
 # Template: litellm-anthropic
 # Anthropic Claude via remote/shared LiteLLM
 #
-# Access to Claude Sonnet 5, Fable 5, Opus 4.8/4.6, Sonnet 4.6, and Haiku 4.5.
+# Access to Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8/4.6, Sonnet 4.6, and Haiku 4.5.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
-# NOTE: the shared LiteLLM instance must serve anthropic/claude-opus-4-8 and anthropic/claude-sonnet-5.
+# NOTE: the shared LiteLLM instance must serve anthropic/claude-opus-5 and anthropic/claude-sonnet-5.
 #
-# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 4.8. Use --model to select
-# an alternative (claude-fable-5, claude-opus-4-6, claude-sonnet-4-6).
+# Defaults: sonnet tier -> Sonnet 5, opus tier -> Opus 5. Use --model to select
+# an alternative (claude-fable-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6).
 # prompt_caching: passthrough respects Anthropic's 4-breakpoint cache_control limit.
 
 proxy:
@@ -19,10 +19,11 @@ proxy:
     tiers:
       haiku: anthropic/claude-haiku-4-5
       sonnet: anthropic/claude-sonnet-5
-      opus: anthropic/claude-opus-4-8
+      opus: anthropic/claude-opus-5
     model_alternatives:
       opus:
         claude-fable-5: anthropic/claude-fable-5
+        claude-opus-4-8: anthropic/claude-opus-4-8
         claude-opus-4-6: anthropic/claude-opus-4-6
       sonnet:
         claude-sonnet-4-6: anthropic/claude-sonnet-4-6

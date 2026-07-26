@@ -1,9 +1,10 @@
 # Template: openrouter-qwen
 # Qwen models via OpenRouter (direct, no LiteLLM)
 #
-# Haiku uses Qwen3.6 Flash for fast multimodal work. Sonnet uses Qwen3.6 Plus.
-# Opus uses Qwen3.6 Max Preview for the strongest current Qwen tier.
-# qwen3-coder is available as a model_alternative for explicit proxy requests.
+# Haiku uses Qwen3.6 Flash for fast multimodal work. Sonnet uses Qwen3.7 Plus.
+# Opus uses Qwen3.7 Max (GA flagship) for the strongest current Qwen tier.
+# The Qwen3.6 predecessors and qwen3-coder are available as
+# model_alternatives for explicit proxy requests.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 
 proxy:
@@ -15,11 +16,13 @@ proxy:
   openrouter:
     tiers:
       haiku: qwen/qwen3.6-flash
-      sonnet: qwen/qwen3.6-plus
-      opus: qwen/qwen3.6-max-preview
+      sonnet: qwen/qwen3.7-plus
+      opus: qwen/qwen3.7-max
     model_alternatives:
       sonnet:
+        qwen3.6-plus: qwen/qwen3.6-plus
         qwen3-coder: qwen/qwen3-coder
       opus:
+        qwen3.6-max-preview: qwen/qwen3.6-max-preview
         qwen3-coder: qwen/qwen3-coder
     error_hints: true

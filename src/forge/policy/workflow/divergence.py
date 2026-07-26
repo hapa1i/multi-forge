@@ -90,7 +90,7 @@ def build_divergence_config(**overrides: Any) -> WorkflowConfig:
             "patterns need review to ensure they are intentional improvements, not accidental "
             "divergence from project conventions."
         ),
-        "tagger_model": "gemini/gemini-2.0-flash",
+        "tagger_model": "gemini/gemini-3.6-flash",
         "tagger_prompt": DIVERGENCE_TAGGER_PROMPT,
         "branches": [
             BranchConfig(

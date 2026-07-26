@@ -380,6 +380,68 @@ def local_litellm_openai(module_forge_home: Path) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="module")
+def local_litellm_gemini(tmp_path_factory) -> Generator[str, None, None]:
+    """Start an isolated local LiteLLM from the current bundled config (Gemini routes).
+
+    Unlike ``local_litellm``, this never reuses a running instance or a stale
+    materialized config: the bundled backends/litellm.yaml is freshly
+    materialized into a private FORGE_HOME. Private (not module_forge_home)
+    because ``forge model backend create`` rejects an existing config and
+    ``local_litellm_openai`` materializes its own copy in the shared home.
+    """
+    if not os.environ.get("GEMINI_API_KEY"):
+        pytest.fail("GEMINI_API_KEY not set (required for local Gemini LiteLLM tests)")
+
+    test_port = allocate_ephemeral_port()
+    base_url = f"http://localhost:{test_port}"
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(tmp_path_factory.mktemp("forge_home_gemini_litellm_"))
+
+    create_result = subprocess.run(
+        ["uv", "run", "forge", "model", "backend", "create", "litellm"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if create_result.returncode != 0:
+        pytest.fail(f"Failed to create isolated LiteLLM config: {create_result.stderr[-500:]}")
+
+    start_result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "forge",
+            "model",
+            "backend",
+            "start",
+            "litellm",
+            "--port",
+            str(test_port),
+        ],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if start_result.returncode != 0:
+        pytest.fail(f"Failed to start isolated LiteLLM: {start_result.stderr[-500:]}")
+    if not wait_for_port(test_port, timeout=30):
+        pytest.fail(f"Isolated LiteLLM failed to start on port {test_port}")
+
+    try:
+        yield base_url
+    finally:
+        subprocess.run(
+            ["uv", "run", "forge", "model", "backend", "stop", f"litellm-{test_port}"],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+
+@pytest.fixture(scope="module")
 def fake_litellm_openai() -> Generator[FakeOpenAIUpstream, None, None]:
     """Serve a hermetic Responses API endpoint and capture its request bodies."""
     port = allocate_ephemeral_port()
@@ -773,6 +835,79 @@ def proxy_server_openrouter_openai(module_forge_home: Path, tmp_path_factory) ->
         yield proxy_base_url
     finally:
         kill_process(proc.pid)
+
+
+def _openrouter_family_proxy(
+    template: str,
+    module_forge_home: Path,
+    tmp_path_factory,
+    unreachable_fail_reason: str,
+    *,
+    preflight: bool = True,
+) -> Generator[str, None, None]:
+    """Start an OpenRouter family proxy, optionally with a cheap haiku-tier preflight.
+
+    preflight=False boots the proxy without contacting OpenRouter, so
+    routing-metadata assertions still run when an account's data-policy
+    settings block a family's upstream endpoints.
+    """
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        pytest.fail("OPENROUTER_API_KEY not set (required for OpenRouter proxy tests)")
+
+    port = allocate_ephemeral_port()
+    env = os.environ.copy()
+    env["FORGE_HOME"] = str(module_forge_home)
+
+    cwd = tmp_path_factory.mktemp("forge_proxy_cwd_")
+    proc = _start_proxy_subprocess(
+        template=template,
+        port=port,
+        forge_home=module_forge_home,
+        env=env,
+        cwd=cwd,
+    )
+    proxy_base_url = f"http://localhost:{port}"
+
+    try:
+        if preflight:
+            _preflight_proxy(
+                proxy_base_url=proxy_base_url,
+                request_model="claude-3-5-haiku-20241022",
+                max_tokens=8,
+                unreachable_fail_reason=unreachable_fail_reason,
+                template=template,
+            )
+        yield proxy_base_url
+    finally:
+        kill_process(proc.pid)
+
+
+@pytest.fixture(scope="module")
+def proxy_server_openrouter_kimi(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    yield from _openrouter_family_proxy(
+        "openrouter-kimi", module_forge_home, tmp_path_factory, "OpenRouter Kimi proxy unreachable"
+    )
+
+
+@pytest.fixture(scope="module")
+def proxy_server_openrouter_qwen(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    # No preflight: OpenRouter serves the qwen family only through providers
+    # some account data policies exclude (404 "no endpoints available"). The
+    # health test below must still run on such accounts.
+    yield from _openrouter_family_proxy(
+        "openrouter-qwen",
+        module_forge_home,
+        tmp_path_factory,
+        "OpenRouter Qwen proxy unreachable",
+        preflight=False,
+    )
+
+
+@pytest.fixture(scope="module")
+def proxy_server_openrouter_gemini_flash(module_forge_home: Path, tmp_path_factory) -> Generator[str, None, None]:
+    yield from _openrouter_family_proxy(
+        "openrouter-gemini-flash", module_forge_home, tmp_path_factory, "OpenRouter Gemini Flash proxy unreachable"
+    )
 
 
 @pytest.fixture(scope="module")

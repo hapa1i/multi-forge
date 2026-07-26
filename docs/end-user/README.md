@@ -201,7 +201,7 @@ those are different jobs that reward different capabilities. The same provider's
 for one role and the wrong pick for another:
 
 ```bash
-# Planner/supervisor source on the proxy default (Opus 4.8)
+# Planner/supervisor source on the proxy default (Opus 5)
 forge session start planner --proxy openrouter-anthropic
 
 # Executor pinned to the top-tier Fable 5, checked against the planner by a read-only supervisor

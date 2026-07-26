@@ -254,12 +254,13 @@ class TestLoadConfig:
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-5"
-        # Defaults: sonnet -> Sonnet 5, opus -> Opus 4.8; displaced models stay selectable via --model.
-        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-4.8"
+        # Defaults: sonnet -> Sonnet 5, opus -> Opus 5; displaced models stay selectable via --model.
+        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-5"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
         assert config.proxy.openrouter.model_alternatives == {
             "opus": {
                 "claude-fable-5": "anthropic/claude-fable-5",
+                "claude-opus-4-8": "anthropic/claude-opus-4.8",
                 "claude-opus-4-6": "anthropic/claude-opus-4.6",
             },
             "sonnet": {
@@ -319,17 +320,18 @@ class TestLoadConfig:
         assert config.proxy.backend == "litellm-remote"
         assert config.proxy.litellm.base_url == ""
 
-    def test_litellm_anthropic_templates_default_opus_to_4_8(self):
-        """LiteLLM Anthropic templates default opus to Opus 4.8, sonnet to Sonnet 5."""
+    def test_litellm_anthropic_templates_default_opus_to_5(self):
+        """LiteLLM Anthropic templates default opus to Opus 5, sonnet to Sonnet 5."""
         for template in ("litellm-anthropic", "litellm-anthropic-local"):
             config = load_config(template=template)
 
             assert config.proxy.preferred_provider == "litellm", template
             assert config.proxy.litellm.tiers.sonnet == "anthropic/claude-sonnet-5", template
-            assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-4-8", template
+            assert config.proxy.litellm.tiers.opus == "anthropic/claude-opus-5", template
             assert config.proxy.litellm.model_alternatives == {
                 "opus": {
                     "claude-fable-5": "anthropic/claude-fable-5",
+                    "claude-opus-4-8": "anthropic/claude-opus-4-8",
                     "claude-opus-4-6": "anthropic/claude-opus-4-6",
                 },
                 "sonnet": {
@@ -337,14 +339,14 @@ class TestLoadConfig:
                 },
             }, template
 
-    def test_anthropic_passthrough_opus_tier_is_4_8(self):
-        """Passthrough forwards the client model unchanged; opus tier default is Opus 4.8 (no alternatives map)."""
+    def test_anthropic_passthrough_opus_tier_is_5(self):
+        """Passthrough forwards the client model unchanged; opus tier default is Opus 5 (no alternatives map)."""
         config = load_config(template="anthropic-passthrough")
 
         assert config.proxy.backend == "anthropic-passthrough"
         assert config.proxy.litellm.base_url == "https://api.anthropic.com"
         assert config.proxy.litellm.tiers.sonnet == "claude-sonnet-5"
-        assert config.proxy.litellm.tiers.opus == "claude-opus-4-8"
+        assert config.proxy.litellm.tiers.opus == "claude-opus-5"
         assert config.proxy.litellm.model_alternatives == {}
 
     def test_openrouter_config_placed_on_correct_field(self):
@@ -1050,9 +1052,9 @@ class TestTemplateResolution:
         assert "openrouter-gemini-flash" in names
         assert "openrouter-deepseek" in names
         assert "openrouter-kimi" in names
+        assert "openrouter-qwen" in names
         assert "openrouter-glm" in names
         assert "openrouter-minimax" in names
-        assert "openrouter-qwen" in names
 
     def test_openrouter_open_model_templates_load(self, user_templates_dir: Path) -> None:
         """OpenRouter open-model family templates load with expected tiers."""
@@ -1062,8 +1064,8 @@ class TestTemplateResolution:
                 "deepseek/deepseek-v4-pro",
                 "deepseek/deepseek-v4-pro",
             ),
-            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.6-plus", "qwen/qwen3.6-max-preview"),
-            "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k2.6", "moonshotai/kimi-k2.6"),
+            "openrouter-qwen": ("qwen/qwen3.6-flash", "qwen/qwen3.7-plus", "qwen/qwen3.7-max"),
+            "openrouter-kimi": ("google/gemma-4-31b-it", "moonshotai/kimi-k3", "moonshotai/kimi-k3"),
             "openrouter-glm": ("z-ai/glm-4.7-flash", "z-ai/glm-5.2", "z-ai/glm-5.2"),
             "openrouter-minimax": ("google/gemma-4-31b-it", "minimax/minimax-m3", "minimax/minimax-m3"),
         }
@@ -1077,13 +1079,13 @@ class TestTemplateResolution:
 
         qwen = load_config(template="openrouter-qwen")
         assert qwen.proxy.openrouter.model_alternatives == {
-            "sonnet": {"qwen3-coder": "qwen/qwen3-coder"},
-            "opus": {"qwen3-coder": "qwen/qwen3-coder"},
+            "sonnet": {"qwen3.6-plus": "qwen/qwen3.6-plus", "qwen3-coder": "qwen/qwen3-coder"},
+            "opus": {"qwen3.6-max-preview": "qwen/qwen3.6-max-preview", "qwen3-coder": "qwen/qwen3-coder"},
         }
         kimi = load_config(template="openrouter-kimi")
         assert kimi.proxy.openrouter.model_alternatives == {
-            "sonnet": {"kimi-k2.5": "moonshotai/kimi-k2.5"},
-            "opus": {"kimi-k2.5": "moonshotai/kimi-k2.5"},
+            "sonnet": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
+            "opus": {"kimi-k2.6": "moonshotai/kimi-k2.6", "kimi-k2.5": "moonshotai/kimi-k2.5"},
         }
         minimax = load_config(template="openrouter-minimax")
         assert minimax.proxy.openrouter.model_alternatives == {

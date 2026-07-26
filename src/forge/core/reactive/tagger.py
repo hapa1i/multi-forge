@@ -30,7 +30,7 @@ def tag_action(
 
     Args:
         context: Action being classified.
-        model: Prefixed model ID (e.g., "gemini/gemini-2.0-flash").
+        model: Prefixed model ID (e.g., "gemini/gemini-3.6-flash").
         prompt_template: Template with {tool_name}, {target_path}, {content}
                          placeholders.
 

@@ -158,19 +158,53 @@ class TestClaudeFable5:
         assert spec.native_thinking_param == "output_config.effort"
 
     def test_fable_is_not_a_catalog_default(self):
-        """Catalog opus defaults are Opus 4.8; Fable 5 is opt-in via template/--model."""
+        """Catalog opus defaults are Opus 5; Fable 5 is opt-in via template/--model."""
         catalog = load_model_catalog()
 
         for provider in ("anthropic", "openrouter"):
-            assert catalog.defaults[provider]["opus"] == "claude-opus-4-8"
+            assert catalog.defaults[provider]["opus"] == "claude-opus-5"
 
     def test_fable_outranks_opus_and_peers_gpt55_pro(self):
-        """Fable tops the ladder with gpt-5.5-pro; Opus 4.8 / gpt-5.5 / Gemini 3.1 are one tier below."""
+        """Fable tops the ladder with gpt-5.5-pro; Opus 5 / gpt-5.5 / Gemini 3.1 are one tier below."""
         score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
 
         assert score("claude-fable-5") == score("gpt-5.5-pro")
-        assert score("claude-fable-5") > score("claude-opus-4-8")
-        assert score("gpt-5.5") == score("claude-opus-4-8") == score("gemini-3.1-pro-preview")
+        assert score("claude-fable-5") > score("claude-opus-5")
+        assert score("gpt-5.5") == score("claude-opus-5") == score("gemini-3.1-pro-preview")
+        assert score("claude-opus-5") > score("claude-opus-4-8")
+
+
+class TestClaudeOpus5:
+    """Tests for the claude-opus-5 catalog entry, aliases, and default status."""
+
+    def test_opus_5_is_canonical(self):
+        """claude-opus-5 exists as a canonical model, not an alias."""
+        catalog = load_model_catalog()
+
+        assert "claude-opus-5" in catalog.models
+        assert "claude-opus-5" not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["anthropic/claude-opus-5", "claude-opus", "opus", "opus-5"],
+    )
+    def test_aliases_resolve_to_opus_5(self, alias):
+        """Provider-prefixed and friendly aliases resolve to claude-opus-5."""
+        assert resolve_model_id(alias) == "claude-opus-5"
+
+    def test_opus_5_intrinsic_properties(self):
+        """Opus 5 shares the Opus 4.8 surface: native 1M, adaptive-only, no sampling overrides."""
+        spec = get_model_spec("claude-opus-5")
+
+        assert spec.context_window_tokens == 1_000_000
+        assert spec.max_output_tokens == 128_000
+        assert spec.supports_1m_context is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.thinking_modes == ("adaptive",)
+        assert spec.native_thinking_param == "output_config.effort"
+        assert spec.litellm_reasoning_efforts == ("low", "medium", "high", "xhigh")
+        assert spec.token_estimate_multiplier == 1.35
 
 
 class TestClaudeSonnet5:
@@ -203,13 +237,13 @@ class TestClaudeSonnet5:
         assert spec.native_thinking_param == "output_config.effort"
         assert spec.token_estimate_multiplier == 1.35
 
-    def test_sonnet_5_is_the_sonnet_default_and_opus_is_4_8(self):
-        """Sonnet 5 is the catalog sonnet default; Opus 4.8 is the opus default (both layers)."""
+    def test_sonnet_5_is_the_sonnet_default_and_opus_is_5(self):
+        """Sonnet 5 is the catalog sonnet default; Opus 5 is the opus default (both layers)."""
         catalog = load_model_catalog()
 
         for provider in ("anthropic", "openrouter"):
             assert catalog.defaults[provider]["sonnet"] == "claude-sonnet-5"
-            assert catalog.defaults[provider]["opus"] == "claude-opus-4-8"
+            assert catalog.defaults[provider]["opus"] == "claude-opus-5"
 
 
 class TestGemini31ProPreviewIsCanonical:
@@ -254,6 +288,129 @@ class TestGemini31ProPreviewIsCanonical:
         assert canonical == "gemini-3.1-pro-preview"
 
 
+class TestGemini36Flash:
+    """Tests for the gemini-3.6-flash catalog entry."""
+
+    def test_gemini_36_flash_is_canonical(self):
+        catalog = load_model_catalog()
+
+        assert "gemini-3.6-flash" in catalog.models
+        assert "gemini-3.6-flash" not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["vertex_ai/gemini-3.6-flash", "gemini/gemini-3.6-flash", "google/gemini-3.6-flash"],
+    )
+    def test_prefixed_aliases_resolve(self, alias):
+        assert resolve_model_id(alias) == "gemini-3.6-flash"
+
+    def test_gemini_36_flash_intrinsic_properties(self):
+        """3.6 is not a 3.5 clone: sampling deprecated, thinking default medium, no none/disable."""
+        spec = get_model_spec("gemini-3.6-flash")
+
+        assert spec.context_window_tokens == 1_048_576
+        assert spec.max_output_tokens == 65_536
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "thinking_level"
+        assert spec.thinking_levels == ("minimal", "low", "medium", "high")
+        assert spec.default_thinking_level == "medium"
+        assert spec.litellm_reasoning_efforts == ("minimal", "low", "medium", "high")
+        assert spec.default_reasoning_effort == "medium"
+        assert spec.system_prompt_addendum == "system_prompt_addendums/gemini.md"
+
+    def test_gemini_36_flash_scores_with_35(self):
+        """Efficiency release: same measured intelligence bucket as 3.5 Flash."""
+        assert (
+            get_model_spec("gemini-3.6-flash").intelligence_score
+            == get_model_spec("gemini-3.5-flash").intelligence_score
+        )
+
+
+class TestKimiK3:
+    """Tests for the kimi-k3 catalog entry and kimi default status."""
+
+    def test_kimi_k3_is_canonical_and_the_kimi_default(self):
+        catalog = load_model_catalog()
+
+        assert "kimi-k3" in catalog.models
+        assert "kimi-k3" not in catalog.aliases
+        assert catalog.defaults["kimi"]["sonnet"] == "kimi-k3"
+        assert catalog.defaults["kimi"]["opus"] == "kimi-k3"
+        assert catalog.defaults["kimi"]["haiku"] == "gemma-4-31b-it"
+
+    def test_kimi_k3_slug_resolves(self):
+        assert resolve_model_id("moonshotai/kimi-k3") == "kimi-k3"
+
+    def test_kimi_k3_intrinsic_properties(self):
+        """K3 drops the K2.x range sampling surface and advertises [low, high] efforts."""
+        spec = get_model_spec("kimi-k3")
+
+        assert spec.context_window_tokens == 1_048_576
+        assert spec.max_output_tokens == 131_072
+        assert spec.supports_images is True
+        assert spec.supports_top_p is False
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "reasoning_effort"
+        assert spec.litellm_reasoning_efforts == ("low", "high")
+        assert spec.default_reasoning_effort == "high"
+
+    def test_kimi_k3_score_ordering(self):
+        """K3 sits with the Claude 98 bucket, above every other open-weight model."""
+        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
+
+        assert score("kimi-k3") == score("claude-opus-4-8") == score("claude-sonnet-5")
+        assert score("kimi-k3") > score("kimi-k2.6")
+        assert score("kimi-k3") > score("glm-5.2")
+
+
+class TestQwen37:
+    """Tests for the qwen3.7 catalog entries and qwen default status."""
+
+    def test_qwen_37_models_are_canonical_and_the_qwen_defaults(self):
+        catalog = load_model_catalog()
+
+        assert "qwen3.7-plus" in catalog.models
+        assert "qwen3.7-max" in catalog.models
+        assert catalog.defaults["qwen"]["haiku"] == "qwen3.6-flash"
+        assert catalog.defaults["qwen"]["sonnet"] == "qwen3.7-plus"
+        assert catalog.defaults["qwen"]["opus"] == "qwen3.7-max"
+
+    @pytest.mark.parametrize(
+        "alias, canonical",
+        [
+            ("qwen/qwen3.7-plus", "qwen3.7-plus"),
+            ("qwen/qwen3.7-max", "qwen3.7-max"),
+            ("qwen3-7-plus", "qwen3.7-plus"),
+            ("qwen3-7-max", "qwen3.7-max"),
+        ],
+    )
+    def test_qwen_37_aliases_resolve(self, alias, canonical):
+        assert resolve_model_id(alias) == canonical
+
+    def test_qwen_37_intrinsic_properties(self):
+        """Both 3.7 models publish 1M context / 64k output; only Plus is multimodal."""
+        plus = get_model_spec("qwen3.7-plus")
+        maxx = get_model_spec("qwen3.7-max")
+
+        for spec in (plus, maxx):
+            assert spec.context_window_tokens == 1_000_000
+            assert spec.max_output_tokens == 65_536
+            assert spec.supports_thinking is True
+            assert spec.litellm_reasoning_efforts is None
+        assert plus.supports_images is True
+        assert maxx.supports_images is False
+
+    def test_qwen_37_score_ordering(self):
+        """Max (GA flagship) tops the qwen family; Plus sits above the 3.6 Plus it replaces."""
+        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
+
+        assert score("qwen3.7-max") > score("qwen3.6-max-preview")
+        assert score("qwen3.7-max") > score("glm-5.2")
+        assert score("qwen3.7-plus") > score("qwen3.6-plus")
+        assert score("qwen3.7-max") > score("qwen3.7-plus")
+
+
 class TestOpenRouterSlugAliases:
     """OpenRouter provider slugs can differ from Forge canonical IDs."""
 
@@ -261,6 +418,7 @@ class TestOpenRouterSlugAliases:
         assert resolve_model_id("anthropic/claude-opus-4.6") == "claude-opus-4-6-1m"
         assert resolve_model_id("anthropic/claude-sonnet-4.6") == "claude-sonnet-4-6-1m"
         assert resolve_model_id("anthropic/claude-opus-4.8") == "claude-opus-4-8"
+        assert resolve_model_id("moonshotai/kimi-k3") == "kimi-k3"
         assert resolve_model_id("qwen/qwen3.6-flash") == "qwen3.6-flash"
         assert resolve_model_id("qwen/qwen3.6-plus") == "qwen3.6-plus"
         assert resolve_model_id("minimax/minimax-m2.5") == "minimax-m2.5"

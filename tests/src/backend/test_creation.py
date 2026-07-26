@@ -52,6 +52,29 @@ class TestCreateBackendConfig:
 
         assert (model_name, upstream_model) in model_pairs
 
+    @pytest.mark.parametrize(
+        "model_name, upstream_model",
+        [
+            ("gemini/gemini-3.6-flash", "gemini/gemini-3.6-flash"),
+            ("gemini-3.6-flash", "gemini/gemini-3.6-flash"),
+        ],
+    )
+    def test_default_config_has_gemini_36_flash_route(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        model_name: str,
+        upstream_model: str,
+    ) -> None:
+        """The generated LiteLLM config exposes the gemini-3.6-flash route pair."""
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        config_path = create_backend_config(adapter_type="litellm")
+        config = yaml.safe_load(config_path.read_text())
+        model_pairs = {(entry["model_name"], entry["litellm_params"]["model"]) for entry in config["model_list"]}
+
+        assert (model_name, upstream_model) in model_pairs
+
     def test_creates_config_from_custom_source(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify config can be created from custom source."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))

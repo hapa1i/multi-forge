@@ -46,7 +46,7 @@ Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 
 - `gpt-5.6-sol` -- OpenRouter (preferred proxy: `openrouter-openai`)
 - `gemini-3.1-pro-preview` -- OpenRouter (preferred proxy: `openrouter-gemini`)
-- `claude-opus` -- direct Anthropic, pinned to Claude Opus 4.8
+- `claude-opus` -- direct Anthropic, pinned to Claude Opus 5
 
 This default set is unchanged and entirely Claude-backed. Add `-m codex` explicitly to run the runtime-native Codex
 worker. Codex selects its own model; Forge does not pass a model pin.
@@ -56,8 +56,8 @@ runtime from proxy templates and credentials. The preferred proxy is a catalog h
 compatible proxy found in the registry will work.
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, `claude-opus-4.8`, and `claude-fable`
-(most capable). Additional OSS models include `deepseek-v4-pro`, `minimax-m3`, `qwen3.6-max-preview`, `kimi-k2.6`, and
-`glm-5.2`. Use `--proxy` to route all workers through a specific proxy:
+(most capable). Additional OSS models include `deepseek-v4-pro`, `minimax-m3`, `qwen3.7-max`, `kimi-k3`, and `glm-5.2`.
+Use `--proxy` to route all workers through a specific proxy:
 
 ```bash
 # Route all workers through one proxy (single OPENROUTER_API_KEY setup)

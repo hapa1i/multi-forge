@@ -43,11 +43,11 @@ defaults:
   anthropic:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-4-8
+    opus: claude-opus-5
   openrouter:
     haiku: claude-haiku-4-5-20251001
     sonnet: claude-sonnet-5
-    opus: claude-opus-4-8
+    opus: claude-opus-5
   deepseek:
     haiku: deepseek-v4-flash
     sonnet: deepseek-v4-pro
@@ -58,16 +58,16 @@ defaults:
     opus: minimax-m3
   qwen:
     haiku: qwen3.6-flash
-    sonnet: qwen3.6-plus
-    opus: qwen3.6-max-preview
+    sonnet: qwen3.7-plus
+    opus: qwen3.7-max
   glm:
     haiku: glm-4.7-flash
     sonnet: glm-5.2
     opus: glm-5.2
   kimi:
     haiku: gemma-4-31b-it
-    sonnet: kimi-k2.6
-    opus: kimi-k2.6
+    sonnet: kimi-k3
+    opus: kimi-k3
 
 # =============================================================================
 # MODELS - Canonical IDs are provider-agnostic
@@ -836,7 +836,7 @@ models:
     # minimal/low/none/disable -> low, medium/high -> high
     litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
     default_reasoning_effort: high
-    intelligence_score: 99  # Peer of gpt-5.5 / Claude Opus 4.8
+    intelligence_score: 99  # Peer of gpt-5.5 / Claude Opus 5
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
@@ -966,8 +966,42 @@ models:
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
+  # Gemini 3.6 Flash: efficiency release built on 3.5 Flash (same measured
+  # intelligence, fewer output tokens). Google deprecates temperature/top_p/
+  # top_k for this model (values are ignored), so sampling overrides are off.
+  # Thinking levels minimal/low/medium/high with medium the documented
+  # default; derived efforts above high clamp to high at the proxy seam.
+  gemini-3.6-flash:
+    friendly_name: Gemini 3.6 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      # Probed via Forge's LiteLLM path on 1.88.0 (2026-07-26): repeated
+      # ~2.8k-token identical prefix, 4 probes over 30s, cached_tokens
+      # always 0 — no usable cache accounting despite Google/LiteLLM
+      # metadata advertising support. Re-probe before flipping this.
+      supports: false
+    native_thinking_param: thinking_level
+    thinking_levels: [minimal, low, medium, high]
+    default_thinking_level: medium
+    # LiteLLM mapping: reasoning_effort -> thinking_level. none/disable are
+    # 3.5-era aliases, unproven for 3.6 — extend only with LiteLLM test proof.
+    litellm_reasoning_efforts: [minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 84  # Same measured intelligence as 3.5 Flash (efficiency release)
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
   # ---------------------------------------------------------------------------
-  # Claude Models (4.8 + 4.7 + 4.6 + 4.5 series)
+  # Claude Models (5 + 4.8 + 4.7 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
 
   # --- Claude 4.6 Series ---
@@ -997,7 +1031,7 @@ models:
     tags: []
 
   # --- Claude 4.7 Series ---
-  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 4.8.
+  # Opus 4.7 is opt-in only (not a default tier); the opus default is Opus 5.
   claude-opus-4-7:
     friendly_name: Claude Opus 4.7
     context_window_tokens: 1000000
@@ -1025,10 +1059,42 @@ models:
     tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
-  # Opus 4.8 is the catalog opus default (anthropic + openrouter) and the proxy
-  # opus-tier default. Opus 4.6 and Fable 5 remain selectable via --model.
+  # Opus 4.8 is the displaced standard opus (Opus 5 is the default); still
+  # selectable via --model (opus model_alternatives).
   claude-opus-4-8:
     friendly_name: Claude Opus 4.8
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    token_estimate_multiplier: 1.35
+    intelligence_score: 98  # Displaced by Opus 5; peer of Sonnet 5 / Opus 4.7
+    tags: []
+
+  # --- Claude Opus 5 ---
+  # Opus 5 replaces Opus 4.8 as the standard opus: catalog opus default
+  # (anthropic + openrouter) and the proxy opus-tier default. Same request
+  # surface as Opus 4.8 / Sonnet 5: adaptive-only thinking, sampling overrides
+  # removed, native 1M context (default and max), same pricing as Opus 4.8.
+  # Below Fable 5.
+  claude-opus-5:
+    friendly_name: Claude Opus 5
     context_window_tokens: 1000000
     max_output_tokens: 128000
     max_thinking_tokens: 128000
@@ -1055,9 +1121,9 @@ models:
 
   # --- Claude Fable Series ---
   # Fable 5 is the most capable model (a tier above Opus). Same request surface
-  # as Opus 4.8 -- adaptive thinking only, sampling overrides removed. Not a
-  # catalog or template default: the opus tier defaults to Opus 4.8; Fable 5 and
-  # Opus 4.6 stay selectable via --model (opus model_alternatives).
+  # as Opus 5 -- adaptive thinking only, sampling overrides removed. Not a
+  # catalog or template default: the opus tier defaults to Opus 5; Fable 5 and
+  # Opus 4.8 stay selectable via --model (opus model_alternatives).
   claude-fable-5:
     friendly_name: Claude Fable 5
     context_window_tokens: 1000000
@@ -1111,7 +1177,7 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 98  # Between Opus 4.6 (97) and Opus 4.8 (99); peer of Opus 4.7
+    intelligence_score: 98  # Peer of Opus 4.8 / Opus 4.7 (all 98); below Opus 5 (99)
     tags: []
 
   claude-sonnet-4-6:
@@ -1370,6 +1436,38 @@ models:
     intelligence_score: 89
     tags: [agentic, code-gen, vision]
 
+  # Kimi K3: strongest open-weight model, placed with Opus 4.8 / Sonnet 5.
+  # Fixed sampling (unlike the K2.x range surface). Native reasoning_effort
+  # levels are low/high/max with max the provider-side default; Forge's effort
+  # vocabulary has no "max" (reasoning.py EFFORT_RANK tops out at xhigh), so
+  # the catalog advertises [low, high], the bundled template pins high, and
+  # derived efforts above high clamp to high at the proxy seam.
+  # max_output_tokens is the provider DEFAULT cap (raisable to 1,048,576);
+  # Forge keeps the default as a deliberate conservative cap.
+  # supports_images covers Forge's OpenRouter route (text+image); Moonshot's
+  # direct API additionally accepts video, which Forge's route does not carry.
+  kimi-k3:
+    friendly_name: Kimi K3
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, high]
+    default_reasoning_effort: high
+    intelligence_score: 98  # Strongest open-weight; peer of Opus 4.8 / Sonnet 5
+    tags: [agentic, code-gen, vision]
+
   qwen3.6-plus:
     friendly_name: Qwen3.6 Plus
     context_window_tokens: 1000000
@@ -1434,6 +1532,57 @@ models:
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
     intelligence_score: 90
+    tags: [agentic, code-gen]
+
+  # Qwen3.7: successor generation. Plus is the qwen sonnet default (multimodal,
+  # 1M published context); Max is the GA flagship and the qwen opus default
+  # (text-only, replaces the 3.6 Max Preview default).
+  qwen3.7-plus:
+    friendly_name: Qwen3.7 Plus
+    context_window_tokens: 1000000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024  # Conservative Forge floor; Alibaba's implicit cache may hit below this
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 89  # Above Qwen3.6 Plus (88)
+    tags: [agentic, code-gen, vision]
+
+  qwen3.7-max:
+    friendly_name: Qwen3.7 Max
+    context_window_tokens: 1000000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024  # Conservative Forge floor; Alibaba's implicit cache may hit below this
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 92  # GA flagship; above GLM-5.2 / Qwen3.6 Max Preview (both 90)
     tags: [agentic, code-gen]
 
   qwen3-coder:
@@ -1524,9 +1673,9 @@ models:
     native_thinking_param: null
     litellm_reasoning_efforts: null
     default_reasoning_effort: null
-    # Tops the catalog's non-frontier tier. Vendor benchmarks (SWE-Bench Pro
-    # 59%, Terminal-Bench 2.1 66%) claim parity with the proprietary frontier
-    # but are unverified, so scored just above qwen3.6-max (90), below sonnet-4-6.
+    # Vendor benchmarks (SWE-Bench Pro 59%, Terminal-Bench 2.1 66%) claim
+    # parity with the proprietary frontier but are unverified, so scored just
+    # above qwen3.6-max (90), below Qwen3.7 Max (92) and Kimi K3 (98).
     intelligence_score: 91
     tags: [agentic, code-gen]
 
@@ -1671,6 +1820,7 @@ aliases:
   vertex_ai/gemini-2.5-pro: gemini-2.5-pro
   vertex_ai/gemini-2.5-flash: gemini-2.5-flash
   vertex_ai/gemini-3.5-flash: gemini-3.5-flash
+  vertex_ai/gemini-3.6-flash: gemini-3.6-flash
 
   # Google AI Studio provider prefix (LiteLLM style)
   gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1679,6 +1829,7 @@ aliases:
   gemini/gemini-2.5-pro: gemini-2.5-pro
   gemini/gemini-2.5-flash: gemini-2.5-flash
   gemini/gemini-3.5-flash: gemini-3.5-flash
+  gemini/gemini-3.6-flash: gemini-3.6-flash
 
   # Google provider prefix (OpenRouter style)
   google/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1686,17 +1837,16 @@ aliases:
   google/gemini-2.5-pro: gemini-2.5-pro
   google/gemini-2.5-flash: gemini-2.5-flash
   google/gemini-3.5-flash: gemini-3.5-flash
+  google/gemini-3.6-flash: gemini-3.6-flash
 
   # Anthropic provider prefix + friendly aliases
   # Opus 4.6
   anthropic/claude-opus-4-6: claude-opus-4-6
   anthropic/claude-opus-4-6-1m: claude-opus-4-6-1m
   claude-opus-4.6: claude-opus-4-6
-  claude-opus: claude-opus-4-8
   opus-4-6: claude-opus-4-6
   opus-4.6: claude-opus-4-6
   opus-4-6-1m: claude-opus-4-6-1m
-  opus: claude-opus-4-8
 
   # Opus 4.7 (explicit opt-in only)
   anthropic/claude-opus-4-7: claude-opus-4-7
@@ -1705,12 +1855,18 @@ aliases:
   opus-4-7: claude-opus-4-7
   opus-4.7: claude-opus-4-7
 
-  # Opus 4.8 (default opus tier)
+  # Opus 4.8 (displaced default; still selectable)
   anthropic/claude-opus-4-8: claude-opus-4-8
   anthropic/claude-opus-4.8: claude-opus-4-8
   claude-opus-4.8: claude-opus-4-8
   opus-4-8: claude-opus-4-8
   opus-4.8: claude-opus-4-8
+
+  # Opus 5 (default opus tier)
+  anthropic/claude-opus-5: claude-opus-5  # also the OpenRouter slug (no dot)
+  claude-opus: claude-opus-5
+  opus-5: claude-opus-5
+  opus: claude-opus-5
 
   # Fable 5 (most capable; opus --model alternative, direct --model fable)
   anthropic/claude-fable-5: claude-fable-5
@@ -1764,6 +1920,7 @@ aliases:
   # Kimi / MoonshotAI (via OpenRouter)
   moonshotai/kimi-k2.5: kimi-k2.5
   moonshotai/kimi-k2.6: kimi-k2.6
+  moonshotai/kimi-k3: kimi-k3
   kimi-k2-5: kimi-k2.5
   kimi-k2-6: kimi-k2.6
 
@@ -1771,11 +1928,15 @@ aliases:
   qwen/qwen3.6-flash: qwen3.6-flash
   qwen/qwen3.6-plus: qwen3.6-plus
   qwen/qwen3.6-max-preview: qwen3.6-max-preview
+  qwen/qwen3.7-plus: qwen3.7-plus
+  qwen/qwen3.7-max: qwen3.7-max
   qwen/qwen3-coder: qwen3-coder
   qwen3-6-flash: qwen3.6-flash
   qwen3-6-plus: qwen3.6-plus
   qwen3-6-max-preview: qwen3.6-max-preview
   qwen3-6-max: qwen3.6-max-preview
+  qwen3-7-plus: qwen3.7-plus
+  qwen3-7-max: qwen3.7-max
   qwen-coder: qwen3-coder
 
   # MiniMax / Z.ai / Google / Mistral (via OpenRouter)

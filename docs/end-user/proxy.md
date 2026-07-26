@@ -146,6 +146,27 @@ forge model backend start litellm --port 4000
 After updating the local adapter, restart each affected proxy with `--smoke-test`. Custom templates under
 `~/.forge/templates/` are also preserved and must be updated explicitly.
 
+### Picking up the July 2026 model defaults after an upgrade
+
+New proxies created from the current built-in templates use these defaults:
+
+| Template                                            | New default tiers                           |
+| --------------------------------------------------- | ------------------------------------------- |
+| `openrouter-anthropic`, `litellm-anthropic(-local)` | opus -> Claude Opus 5                       |
+| `anthropic-passthrough`                             | opus -> Claude Opus 5 (informational)       |
+| `openrouter-kimi`                                   | sonnet/opus -> Kimi K3                      |
+| `openrouter-qwen`                                   | sonnet -> Qwen3.7 Plus, opus -> Qwen3.7 Max |
+| `openrouter-gemini-flash`                           | all tiers -> Gemini 3.6 Flash               |
+| `openrouter-gemini`, `litellm-gemini`               | haiku -> Gemini 3.6 Flash                   |
+
+The tier-1 cascade checker default also moves to Gemini 3.6 Flash (see [policy.md](policy.md)).
+
+Existing `proxy.yaml` files and the local LiteLLM adapter config are user-owned snapshots; upgrading Forge does not
+rewrite them. Follow the same remediation as the GPT-5.6 section above: edit the affected tiers with
+`forge proxy edit <proxy_id>` or recreate the proxy from the template, then restart with `--smoke-test`. For the local
+LiteLLM path, the new `gemini/gemini-3.6-flash` route must exist in `~/.forge/backends/litellm/config.yaml` — update the
+materialized config or delete/recreate it, then restart the backend; restarting alone re-reads the old copy.
+
 ---
 
 ## Core commands (cheat sheet)
@@ -215,7 +236,7 @@ Default tiers use Anthropic Claude models on OpenRouter. Edit the proxy to use a
 ```bash
 forge proxy edit <proxy_id>
 # Change tiers to e.g.:
-#   haiku: google/gemini-3.5-flash
+#   haiku: google/gemini-3.6-flash
 #   sonnet: anthropic/claude-sonnet-4.6
 #   opus: openai/gpt-5.5
 ```
@@ -228,16 +249,16 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 ## Model alternatives
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
-`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 4.8
-and their sonnet tier to Sonnet 5, with Fable 5, Opus 4.6, and Sonnet 4.6 as alternatives. (`anthropic-passthrough`
-forwards the client's model unchanged, so `--model` selects any Claude model directly with no alternatives map.) Use
-`--model` to select an alternative:
+`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Opus 5 and
+their sonnet tier to Sonnet 5, with Fable 5, Opus 4.8, Opus 4.6, and Sonnet 4.6 as alternatives.
+(`anthropic-passthrough` forwards the client's model unchanged, so `--model` selects any Claude model directly with no
+alternatives map.) Use `--model` to select an alternative:
 
 ```bash
-# Default: opus tier routes to Opus 4.8, sonnet tier to Sonnet 5
+# Default: opus tier routes to Opus 5, sonnet tier to Sonnet 5
 forge session start my-session --proxy openrouter-anthropic
 
-# Select an alternative instead (e.g. Fable 5, Opus 4.6, or Sonnet 4.6)
+# Select an alternative instead (e.g. Fable 5, Opus 4.8, or Sonnet 4.6)
 forge session start my-session --proxy openrouter-anthropic --model claude-fable-5
 ```
 
@@ -254,12 +275,13 @@ To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 model_alternatives:
   opus:
     claude-fable-5: anthropic/claude-fable-5
+    claude-opus-4-8: anthropic/claude-opus-4.8
     claude-opus-4-6: anthropic/claude-opus-4.6
   sonnet:
     claude-sonnet-4-6: anthropic/claude-sonnet-4.6
 ```
 
-For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable-5`) vs leave the default Opus 4.8
+For per-role guidance on when to pin an opus alternative (e.g. `--model claude-fable-5`) vs leave the default Opus 5
 mapping in place — including the supervisor-vs-executor split, the structural reasons MRCR varies across model versions,
 and per-family cost + multi-needle retrieval data — see [model_selection.md](model_selection.md).
 

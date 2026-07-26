@@ -25,8 +25,8 @@ from forge.proxy.audit_logger import hash_system_prompt
 _ANTHROPIC_MIN_THINKING_BUDGET = 1024
 
 # Effort floor -> minimum thinking.budget_tokens (Anthropic units). Mirrors the
-# inversion of server._BUDGET_THRESHOLDS; test_intercept pins them consistent so
-# the two tables cannot silently drift.
+# inversion of reasoning.BUDGET_THRESHOLDS; test_intercept pins them consistent
+# so the two tables cannot silently drift.
 _EFFORT_BUDGET_FLOOR: dict[str, int] = {
     "minimal": 1,
     "low": 500,
@@ -172,7 +172,7 @@ def pin_reasoning(thinking: Any, floor_effort: str | None, max_tokens: Any) -> t
     to host any thinking budget.
 
     Floor semantics (intentional, consistent with the translated path's
-    ``_max_effort``): a configured floor force-ENABLES thinking even when the client
+    ``max_effort``): a configured floor force-ENABLES thinking even when the client
     omitted it or set ``type='disabled'`` — the tier override is a guarantee, not a
     suggestion. Unknown sibling keys on the inbound ``thinking`` dict are preserved
     (forward-safe for passthrough).
