@@ -36,6 +36,27 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Binding a pre-existing conversation is a uniqueness problem, not a write problem (native_session_adoption, shipped 2026-07-27)
+
+- **A lock only excludes what it encloses.** Uniqueness needs its guard at the narrowest scope covering *every* writer.
+  The index write lock is the only lock shared across session names, so a cross-session id must live in the index row --
+  but that is not sufficient on its own, because session creation writes the manifest first and a killed create owns the
+  conversation without ever reaching the index. Adoption holds a global per-conversation `flock` across its final scan
+  and commit, with the index column as the second line. A pre-check plus a later write under a *different* lock is not
+  exclusion at any ordering.
+- **Session names are project-scoped, so a bare name is never an identity key.** This recurs: an unscoped rollback
+  `remove_session` resolved by name prefix across projects, and a manifest-read dedup keyed on name let another
+  project's session hide this project's orphan binding. Key on `(resolved forge_root, name)`, or scope the lookup.
+- **A swallowed read is not an absent record.** Binding and uniqueness lookups must fail closed on *every* source they
+  consult, not just the first. A skipped corrupt manifest reports exactly what an unbound conversation reports, so the
+  degradation is invisible at the decision point that matters.
+- **Validate a caller-supplied path component before joining it, never after.** `Path(base) / "/abs"` silently discards
+  `base`. This bit three times here; the worst case aliased an artifact copy onto its own source, so rollback unlinked
+  the user's native transcript.
+- **Adoption inverts transcript ownership.** For a session Forge launched, the transcript is Forge's to delete; for an
+  adopted one it is the user's. Deletion paths must exempt it -- including the automatic retention sweep that runs on
+  CLI startup, not just an explicit `session delete`.
+
 ### Mixed headless runtime workflows separate execution from routing (runtime_neutral_workflow_workers, shipped 2026-07-23)
 
 - **Execution runtime and model routing are separate axes.** Give runtime-owned transports an explicit routing source

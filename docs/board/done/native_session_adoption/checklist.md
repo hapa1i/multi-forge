@@ -2,10 +2,10 @@
 
 **Card**: [card.md](card.md).
 
-**Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly (the `todo/` parking step was
-skipped because acceptance and activation happened in the same decision). Moved to `done/` on 2026-07-27 and **moved
-back the same day**: review found the lesson-review step (closeout item 3) is a precondition for the lane move, not
-something a `done/` card may still be waiting on, and found four binding-safety defects alongside it.
+**Lane**: `done/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly (the `todo/` parking step was
+skipped because acceptance and activation happened in the same decision). Moved to `done/` on 2026-07-27, **reverted the
+same day** when review found the lesson-review step (closeout item 3) is a precondition for the lane move rather than
+something a `done/` card may still await -- plus four binding-safety defects -- and closed again once both were done.
 
 **Execution branch**: `feat/native-session-adoption`. Slice 0 shipped the P1 gate
 (`tests/integration/docker/test_adopt_binding_contract.py`) with no `src/` change; Slice 1 the manifest schema
@@ -45,10 +45,9 @@ defects, all reproduced before fixing:
 Two smaller items from the same review: the dual-runtime refusal now names both matched paths (the card promised that
 diagnostic), and the concurrency regression no longer accepts zero surviving bindings.
 
-**Still open.** The `impl_notes.md` promotion (closeout item 3) needs human review before this card can move to `done/`;
-its four candidates are listed under Slice 5. Carried forward as debt needing its own card: session creation is not
-crash-atomic across manifest and index. `conversation_lock` bounds the *adoption* consequence of that, but the orphan
-manifest itself still survives a kill.
+**Card closed 2026-07-27**, after the lesson review. Carried forward as debt needing its own card: session creation is
+not crash-atomic across manifest and index. `conversation_lock` bounds the *adoption* consequence of that, but the
+orphan manifest itself still survives a kill.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -564,22 +563,15 @@ transaction -- is broader than this card and needs its own.
   this card to that one keeps the same depth under `done/`, so it needs no repoint.
 - [x] `cli_reference.md` session table gains the `adopt` leaf. Verified at line 131 -- already synced during Slice 2 and
   extended for the Codex arm in Slice 4; re-read rather than assumed.
-- [ ] Change-log entry with Goal / Key changes / Verification. Drafted and then **withdrawn** when the card returned to
-  `doing/`: `change_log.md` records completed work, so an entry for an open card is a false completion record. Re-add at
-  the real closeout.
-- [ ] Durable lessons proposed for `impl_notes.md` after human review. Candidates, awaiting review:
-  1. **`Path(base) / "/abs"` discards `base`.** Hit three times on this card (adoption id, `SessionStore` session name).
-     Any caller-supplied path component needs shape validation *before* it is joined, not after.
-  2. **Uniqueness must be enforced under the lock that publishes the row.** A pre-check plus a later write under a
-     different lock is not exclusion, however carefully ordered. If an id must be unique across sessions, it belongs in
-     the index row, because the index write lock is the only lock shared across session names.
-  3. **The encoded-project-directory encoding is lossy** (`/`, `.`, `_` all fold to `-`), so a transcript found under it
-     must still be cross-checked against the `cwd` recorded inside the file.
-  4. **A swallowed read is not an absent record.** Binding/uniqueness lookups must fail closed on every source they
-     consult, not just the first one.
-- [ ] Card moved to `done/`. Attempted 2026-07-27 and reverted the same day (see Slice 5a): the lesson review above is a
-  precondition, not a parallel task. No inbound board links to repoint -- verified by grep across `docs/`; the outbound
-  link to `workspace_scope` keeps the same relative depth either way.
+- [x] Change-log entry with Goal / Key changes / Verification. Withdrawn when the card returned to `doing/`, then
+  re-added at the real closeout with the third round's corrections folded in.
+- [x] Durable lessons reviewed with the owner and promoted to `impl_notes.md` as one section, "Binding a pre-existing
+  conversation is a uniqueness problem, not a write problem". Four of the six candidates were promoted; the
+  encoded-directory lossiness was dropped as a duplicate of design.md §3.3, and the concurrency-test lesson as closer to
+  general practice than Forge memory. The lock candidate was promoted **corrected**: as first drafted it said uniqueness
+  belongs in the index row, which the third review round disproved.
+- [x] Card moved to `done/`, after the lesson review rather than alongside it. No inbound board links to repoint --
+  verified by grep across `docs/`; the outbound link to `workspace_scope` keeps the same relative depth.
 
 ## Acceptance-test mapping
 
