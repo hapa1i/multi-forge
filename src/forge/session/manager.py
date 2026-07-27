@@ -214,6 +214,24 @@ def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
     return confirmed.get(key)
 
 
+def _is_adopted_session(state: SessionState | None, raw_data: dict[str, Any] | None) -> bool:
+    """Return True when this session was bound to a pre-existing native conversation.
+
+    Adoption is the one origination path where the native transcript under
+    ``~/.claude/projects`` predates the Forge session and outlives it: the user
+    created that conversation, and may still resume it natively. Deleting a
+    session must therefore not delete it, including via automatic retention
+    cleanup (``auto_clean_old_sessions`` passes ``delete_transcripts=True``).
+
+    Reads the raw manifest when the typed read failed, matching
+    ``_transcript_cleanup_project_root``: a session too corrupt to parse must
+    still not cost the user their conversation.
+    """
+    if state is not None:
+        return state.confirmed.adoption is not None
+    return isinstance(_raw_confirmed_value(raw_data, "adoption"), dict)
+
+
 def _transcript_cleanup_project_root(
     state: SessionState | None,
     fallback_root: str,
@@ -655,9 +673,13 @@ class SessionManager:
         added_to_index = False
 
         try:
-            store.write(state)
-            wrote_manifest = True
-
+            # Index first, then manifest -- the ordering create_child_session already
+            # uses (see its SessionExistsError handler). The early session_exists check
+            # above runs outside the index lock, so two concurrent creates of one name
+            # both reach here; only add_from_state's in-lock check rejects the loser.
+            # Manifest-first would let the loser clobber the winner's manifest and then
+            # delete it during rollback, leaving the winner indexed with no state.
+            # Reserving the name first means the loser never writes that manifest.
             self.index_store.add_from_state(
                 state,
                 str(project_root),
@@ -667,6 +689,9 @@ class SessionManager:
                 require_uuid_unbound=require_uuid_unbound,
             )
             added_to_index = True
+
+            store.write(state)
+            wrote_manifest = True
 
             return state
 
@@ -1849,8 +1874,19 @@ class SessionManager:
                 exclude_forge_root=entry_forge_root,
             )
 
-            _filtered_claude_session_id = None if _claude_session_id in shared_ids else _claude_session_id
-            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in shared_ids]
+            # An adopted session's native transcript is user-owned, so it is
+            # protected the same way a transcript shared with another session is.
+            _protected_ids = dict(shared_ids)
+            if _is_adopted_session(state, _raw_data):
+                _protected_ids.setdefault(_claude_session_id, ["adopted native conversation"])
+                logger.info(
+                    "Preserving adopted native transcript %s while deleting session '%s'",
+                    _claude_session_id,
+                    name,
+                )
+
+            _filtered_claude_session_id = None if _claude_session_id in _protected_ids else _claude_session_id
+            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in _protected_ids]
 
             if shared_ids:
                 logger.info(

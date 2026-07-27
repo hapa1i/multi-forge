@@ -42,7 +42,9 @@ def adopt(conversation_id: str, name: str | None, model: str | None, yes: bool) 
     \b
     Examples:
         forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2
-        forge session adopt 470b1a1b --name my-session --model claude-opus-5
+        forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name my-session --model claude-opus-5
+
+    CONVERSATION_ID is the full transcript UUID, not a prefix.
 
     Run this from the directory the native session was launched in: Claude
     stores transcripts under an encoding of that path, and adoption verifies
@@ -52,6 +54,16 @@ def adopt(conversation_id: str, name: str | None, model: str | None, yes: bool) 
     client; those begin with the next Forge-managed resume or fork.
     """
     ctx = ExecutionContext.from_cwd()
+
+    # Checked here rather than left to the op's AdoptError: the op stays
+    # UI-agnostic, and this is the one precondition with a fixed remedy.
+    if ctx.forge_root is None:
+        print_error_with_tip(
+            "Not inside a Forge project.",
+            "Enable Forge in this repository first, then adopt from the conversation's directory.",
+            commands=["forge extension enable"],
+        )
+        sys.exit(1)
 
     try:
         plan = plan_adoption(ctx, conversation_id, model_override=model)
@@ -80,7 +92,8 @@ def adopt(conversation_id: str, name: str | None, model: str | None, yes: bool) 
             console.print("[dim]Adoption cancelled.[/dim]")
             return
 
-    session_name = name or conversation_id.split("-")[0]
+    # Derive from the plan's normalized id, never the raw argument.
+    session_name = name or plan.session_uuid.split("-")[0]
 
     try:
         result = adopt_session(ctx, plan, name=session_name)
@@ -114,8 +127,8 @@ def adopt(conversation_id: str, name: str | None, model: str | None, yes: bool) 
         console.print("  [yellow]Model: unknown[/yellow] -- the transcript has no assistant turn to infer from")
         print_tip(
             "Forge did not pin a model, so a resume uses the current direct default.",
-            "Pin one explicitly if this conversation should continue on a specific model.",
-            commands=[f"forge session adopt {conversation_id} --model <model>"],
+            "Pin one on the adopted session if this conversation should continue on a specific model.",
+            commands=[f"forge session resume {result.name} --model <model>"],
             console=console,
         )
     else:

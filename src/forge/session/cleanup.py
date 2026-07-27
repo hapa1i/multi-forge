@@ -210,7 +210,9 @@ def auto_clean_old_sessions() -> None:
     exceptions to avoid breaking CLI commands.
 
     Auto-cleanup uses safe defaults:
-    - delete_transcripts=True (transcripts are useless without sessions)
+    - delete_transcripts=True (a transcript Forge created is useless without its
+      session; an adopted session's native transcript is exempted downstream in
+      SessionManager.delete_session, since the user created it)
     - delete_worktree=False (too destructive for automatic operation)
     - delete_branch=False (branches are lightweight, keep them)
     - force=True (safe because delete_worktree=False means dirty-check is never reached)

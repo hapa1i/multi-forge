@@ -175,7 +175,7 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             return uuid_result[0], uuid_result[1]
 
         # Fall back to scanning session manifests when the index is stale.
-        scan_result = _scan_manifests_for_uuid(session)
+        scan_result = scan_manifests_for_uuid(session)
         if scan_result:
             return scan_result
 
@@ -402,11 +402,14 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
     )
 
 
-def _scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
+def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
     """Search session manifests for a Claude UUID when the index is stale.
 
     Returns (display_name, forge_root) to preserve project scope for
     subsequent lookups, or None if not found.
+
+    Catches a stale ``claude_session_id`` column on an existing index row -- it
+    enumerates via the index, so a wholly missing row stays invisible here.
     """
     index = IndexStore()
     try:

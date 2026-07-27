@@ -134,6 +134,9 @@ forge session start [name] \
   [--sidecar|--host-proxy] [--mount <host:container>] [--image <name>] \
   [--no-launch]
 
+# Adopt a conversation you started outside Forge (run from its launch directory)
+forge session adopt <conversation-id> [--name/-n <name>] [--model/-m <model>] [--yes/-y]
+
 # Resume an existing session (default: reattach when safe; --fresh: context assembly)
 forge session resume <name>
 forge session resume <name> --force  # active Claude session: launch a lineage child
@@ -371,6 +374,44 @@ the existing conversation in place after the previous launch has ended.
   inactive. A pre-seeded UUID by itself is not enough evidence.
 - If that resumable session appears active, resume fails unless `--force` is supplied; `--force` launches a new lineage
   child instead of attaching a second process to the active conversation.
+
+### Adopt a conversation you started outside Forge
+
+You started `claude` directly, the conversation turned out to matter, and now you want Forge to manage it. Adoption
+binds a Forge session to that existing conversation instead of copying or replaying it.
+
+```bash
+# Run from the directory you launched the native session in
+forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name auth-spike
+forge session resume auth-spike
+```
+
+Find the conversation id with `forge search` or by listing `~/.claude/projects/<encoded-cwd>/`; it is the transcript
+filename without `.jsonl`. Pass the full UUID, not a prefix.
+
+**Why the directory matters:** Claude stores transcripts under an encoding of the launch directory, and that encoding is
+lossy — `api.v2`, `api_v2`, and `api-v2` all collapse to the same folder. Adoption reads the directory recorded inside
+the transcript and refuses to bind one that was launched elsewhere, so a sibling project's conversation cannot be
+adopted by accident.
+
+**What adoption does and does not do:**
+
+- **Does**: bind the conversation's UUID to a new Forge session, copy the transcript into
+  `.forge/artifacts/<name>/transcripts/` for search, and record where it came from under `confirmed.adoption`.
+- **Does not**: attach hooks, env, policy, or supervision to a client that is already running. Those begin with the next
+  Forge-managed `resume` or `--fresh` child.
+- **Does not**: delete or move your original transcript — including when you later delete the adopted session or when
+  automatic retention cleanup runs.
+
+**Model pin:** Forge infers the model from the transcript's last assistant turn. A conversation with no assistant turn
+yet, or one on a model Forge's catalog does not know, is adopted without a pin and resumes on the current direct
+default. Set one explicitly with `--model`, or later with `forge session resume <name> --model <model>`.
+
+**If the conversation was active in the last 30 minutes**, Forge asks for confirmation: it cannot see whether a native
+client is still attached, and adopting then resuming would put two clients on one transcript. Close the other client
+first, or pass `--yes` if you know it is gone.
+
+A conversation can only be adopted once — a second attempt names the session that already owns it.
 
 ### Derive a fresh session from an existing one
 

@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from forge.core.models.direct_model import resolve_direct_model_pin
 from forge.core.state import now_iso
 from forge.core.workqueue import enqueue_index_marker
 from forge.install.project_compat import (
@@ -34,6 +36,7 @@ from forge.session.store import CLI_LOCK_TIMEOUT_S
 
 from .context import ExecutionContext
 from .session import ForgeOpError
+from .session_context import scan_manifests_for_uuid
 
 _log = logging.getLogger(__name__)
 
@@ -57,6 +60,13 @@ SYNTHETIC_MODEL = "<synthetic>"
 # (ActiveSessionStore only tracks Forge launches), so this drives a confirmation
 # prompt rather than a refusal.
 RECENT_ACTIVITY_WINDOW_S = 30 * 60
+
+# Claude names transcripts `<uuid>.jsonl`, so the id is the only caller-controlled
+# component of every path adoption touches. `Path(base) / "/etc/passwd"` silently
+# discards `base`, which would point both the read and the artifact copy outside
+# the project; anchoring the id to canonical UUID shape closes that before any
+# path is built. Case-insensitive because Claude has emitted both casings.
+_UUID_RE = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
 
 class AdoptError(ForgeOpError):
@@ -96,6 +106,29 @@ class AdoptResult:
     model_basis: str
     artifact_rel: str
     indexed: bool
+
+
+def normalize_conversation_id(session_uuid: str) -> str:
+    """Return the id in canonical form, rejecting anything that is not a UUID.
+
+    Must run before any path is constructed from the id. Case is preserved rather
+    than folded: the id is a filename component, and lowercasing an
+    upper-case-on-disk transcript would turn a valid adopt into a spurious
+    "no transcript" on case-sensitive filesystems.
+
+    Raises:
+        AdoptError: If the id is empty or not canonical 8-4-4-4-12 UUID shape.
+    """
+    candidate = session_uuid.strip()
+    if not candidate:
+        raise AdoptError("a conversation id is required")
+    if not _UUID_RE.match(candidate):
+        raise AdoptError(
+            f"'{session_uuid}' is not a conversation id. Expected a full UUID like "
+            "470b1a1b-2c3d-4e5f-8a9b-0c1d2e3f4a5b, which is the transcript filename "
+            "Claude records under ~/.claude/projects/."
+        )
+    return candidate
 
 
 def read_transcript_cwd(transcript_path: Path) -> str | None:
@@ -171,8 +204,7 @@ def plan_adoption(
             only -- the authoritative check runs inside the index write lock, since
             this one releases its lock before adoption writes.
     """
-    if not session_uuid:
-        raise AdoptError("a conversation id is required")
+    session_uuid = normalize_conversation_id(session_uuid)
 
     if ctx.forge_root is None:
         raise AdoptError("not inside a Forge project")
@@ -185,6 +217,37 @@ def plan_adoption(
     # v1 treats the current directory as the native launch CWD (card step 2).
     claude_project_root = str(ctx.cwd)
     transcript_path = get_transcript_path(claude_project_root, session_uuid)
+
+    _check_still_adoptable(session_uuid, transcript_path, claude_project_root)
+
+    model, basis = _resolve_model_pin(transcript_path, model_override)
+
+    try:
+        age_s = time.time() - transcript_path.stat().st_mtime
+    except OSError:
+        age_s = float("inf")
+
+    return AdoptPlan(
+        session_uuid=session_uuid,
+        transcript_path=transcript_path,
+        claude_project_root=claude_project_root,
+        model=model,
+        model_basis=basis,
+        recently_active=age_s < RECENT_ACTIVITY_WINDOW_S,
+    )
+
+
+def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_project_root: str) -> None:
+    """Run every precondition that can change between planning and writing.
+
+    Split out of ``plan_adoption`` so ``adopt_session`` can re-run it after the
+    double-attach prompt. That prompt blocks on a human, so the transcript can be
+    deleted, or another terminal can adopt the same UUID, while it waits.
+
+    Raises:
+        AdoptError: If the transcript is missing or belongs to another directory.
+        UuidAlreadyBoundError: If the UUID already belongs to a session.
+    """
     if not transcript_path.is_file():
         raise AdoptError(
             f"no transcript for conversation '{session_uuid}' under {claude_project_root}. "
@@ -204,34 +267,49 @@ def plan_adoption(
             "Adopt from the recorded directory instead."
         )
 
+    # Index first, then manifests (card step 1). The in-lock check inside
+    # add_session is index-only, so a UUID recorded in a manifest but missing
+    # from its index column would otherwise pass every gate and double-bind.
     owner = IndexStore().find_session_by_uuid(session_uuid)
+    if owner is None:
+        owner = scan_manifests_for_uuid(session_uuid)
     if owner is not None:
         raise UuidAlreadyBoundError(session_uuid, owner[0])
 
-    model: str | None
-    basis: str
+
+def _resolve_model_pin(transcript_path: Path, model_override: str | None) -> tuple[str | None, str]:
+    """Return the (pin, basis) to persist, normalized the way `session start` does.
+
+    Both branches must store ``DirectModelPin.env_model`` rather than the raw
+    string. A pin the catalog cannot resolve is not inert: a later
+    ``resume --proxy`` reaches ``_apply_direct_model_env_if_supported``
+    (model_pin.py:61), which calls ``resolve_direct_model_pin`` unguarded and
+    raises. Persisting an unresolvable value would permanently break resume.
+
+    The two sources get opposite failure policies. An explicit ``--model`` is
+    typed by the user, so an unknown value is their error to fix. An inferred
+    model is best-effort evidence about a conversation that really ran, so an
+    unknown id (a model newer than the catalog) drops to no pin instead of
+    failing an otherwise valid adoption.
+    """
     if model_override:
-        model, basis = model_override, MODEL_BASIS_EXPLICIT
-    else:
-        inferred = infer_transcript_model(transcript_path)
+        try:
+            return resolve_direct_model_pin(model_override).env_model, MODEL_BASIS_EXPLICIT
+        except ValueError as e:
+            raise AdoptError(str(e)) from e
+
+    inferred = infer_transcript_model(transcript_path)
+    if not inferred:
         # No basis means the field stays unset: persisting the current default
         # would change nothing on the direct path (it already falls back) while
         # silently pinning a later `resume --proxy`.
-        model, basis = (inferred, MODEL_BASIS_INFERRED) if inferred else (None, MODEL_BASIS_NONE)
+        return None, MODEL_BASIS_NONE
 
     try:
-        age_s = time.time() - transcript_path.stat().st_mtime
-    except OSError:
-        age_s = float("inf")
-
-    return AdoptPlan(
-        session_uuid=session_uuid,
-        transcript_path=transcript_path,
-        claude_project_root=claude_project_root,
-        model=model,
-        model_basis=basis,
-        recently_active=age_s < RECENT_ACTIVITY_WINDOW_S,
-    )
+        return resolve_direct_model_pin(inferred).env_model, MODEL_BASIS_INFERRED
+    except ValueError as e:
+        _log.debug("Transcript model %r is not in the catalog, adopting without a pin: %s", inferred, e)
+        return None, MODEL_BASIS_NONE
 
 
 def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> AdoptResult:
@@ -251,6 +329,8 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     """
     if ctx.forge_root is None:
         raise AdoptError("not inside a Forge project")
+
+    _check_still_adoptable(plan.session_uuid, plan.transcript_path, plan.claude_project_root)
 
     # worktree_path is passed explicitly rather than left to start_session's
     # `Path.cwd()` default (manager.py:542): the op must not depend on process
@@ -305,7 +385,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
 
         store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        _rollback_adoption(name, ctx=ctx, store=store, artifact_abs=dst_abs, marker_uuid=None)
+        _rollback_adoption(name, ctx=ctx, store=store, artifact_abs=dst_abs)
         raise AdoptError(f"could not capture the transcript for '{plan.session_uuid}': {e}") from e
 
     # Search indexing goes through the same deferred marker the Stop hook uses.
@@ -335,7 +415,6 @@ def _rollback_adoption(
     ctx: ExecutionContext,
     store: SessionStore,
     artifact_abs: Path,
-    marker_uuid: str | None,
 ) -> None:
     """Undo adoption's own writes, and only those.
 
@@ -345,16 +424,11 @@ def _rollback_adoption(
     For an adopted session that path is the **user's** native conversation, so
     the convenient rollback would delete what they asked Forge to adopt.
 
+    Takes no index marker: enqueueing happens after the guarded block, so a
+    marker only ever exists on a path that already succeeded.
+
     Best-effort throughout: a failed unwind must not mask the original error.
     """
-    if marker_uuid:
-        try:
-            from forge.core.workqueue import pending_work_dir
-
-            (pending_work_dir() / f"idx-{marker_uuid}.json").unlink(missing_ok=True)
-        except Exception as e:
-            _log.warning("Adopt rollback failed (index marker): %s", e)
-
     try:
         artifact_abs.unlink(missing_ok=True)
     except OSError as e:

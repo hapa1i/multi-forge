@@ -21,6 +21,37 @@ command-core op, the CLI leaf, and the locked index guard that closes the alread
 and §3.5 and `cli_reference.md` synced. **Cursor: Slice 3** (bare-`adopt` discovery preview), which is the last piece of
 the settled discovery decision; the Claude arm is otherwise complete.
 
+**Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
+were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
+bugs, so Slice 2's original "closed" note above understated the risk it shipped with:
+
+- **Unvalidated conversation id deleted arbitrary files** (critical). Reproduced end to end: `Path(base) / "/abs"`
+  discards `base`, so the read and the artifact copy aliased to one file and rollback unlinked the source.
+  `normalize_conversation_id` now anchors canonical UUID shape before any path is built. Test:
+  `tests/regression/test_bug_adopt_id_traversal.py`.
+- **Adopted native transcript exposed to cleanup.** Worse than reported: `auto_clean_old_sessions` passes
+  `delete_transcripts=True` on CLI startup (`cleanup.py:225`), so this fired with no explicit delete.
+  `_is_adopted_session` protects the bound UUID through the existing shared-transcript filter. Test:
+  `tests/regression/test_bug_adopt_transcript_retention.py`.
+- **Same-name concurrent create orphans the winner.** Real, but **not adoption-specific** -- it is pre-existing in
+  `start_session` and needs both the index pre-check (`:498`) and the manifest pre-check (`:599`) to miss. Fixed by
+  reserving the index name before writing the manifest, the ordering `create_child_session` already used. Test:
+  `tests/regression/test_bug_start_session_name_race.py`.
+- **Missing manifest-scan fallback** (card step 1). Confirmed. `scan_manifests_for_uuid`, promoted from private, now
+  runs after the index lookup. Test: `test_binding_recorded_only_in_a_manifest_still_blocks_adoption`.
+- **No revalidation after the double-attach prompt.** Confirmed, and the docstring claimed otherwise.
+  `_check_still_adoptable` is now shared by plan and write. Test:
+  `test_transcript_deleted_during_the_prompt_aborts_before_writing`.
+- **Model values bypass `resolve_direct_model_pin`.** Confirmed, with a consequence the review missed: an unresolvable
+  stored pin makes a later `resume --proxy` raise at `model_pin.py:61`. Both sources now normalize to `env_model`. Test:
+  `TestModelBasis` (4 cases).
+- **Dead `marker_uuid` rollback branch.** Confirmed unreachable; the parameter is removed.
+
+Deliberate deviation from the review on the model finding: it implied uniform validation. `claude-3-5-sonnet-20241022`
+resolves in real transcripts but not in Forge's catalog, so uniform validation would make genuine conversations
+un-adoptable. Explicit `--model` is a user assertion (fail loudly); an inferred model is evidence about a conversation
+that really ran (degrade to no pin).
+
 ## Re-grounding (2026-07-26)
 
 The card's grounding was verified 2026-07-07; five feature merges have landed since. Re-checked against `main` today:

@@ -205,6 +205,13 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
 
+**Session creation reserves the index name before writing the manifest.** Name uniqueness is only authoritative inside
+`add_session`'s index lock; the pre-checks in `start_session` run outside it, so two concurrent creates of one name both
+reach the commit phase. Reserving first means the loser fails before touching `.forge/sessions/<name>/`, so its rollback
+cannot delete a manifest the winner now owns. `create_child_session` already used this ordering; `start_session` follows
+it. The cost is the inverted window — an index entry can briefly exist without a manifest, which is recoverable, unlike
+a clobbered manifest.
+
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
 ```python
@@ -241,11 +248,15 @@ on Claude via `--session-id`; the SessionStart hook then **validates** that UUID
 records** it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`,
 which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
 records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
-— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session). Stop and StopFailure
-also reconcile `claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where
-SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does
-**not** by itself mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded
-UUID); "used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
+— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session). The conversation id
+must be a canonical UUID: it is the only caller-supplied component of every path adoption reads or writes. Adoption also
+inverts transcript ownership, so `SessionManager.delete_session` exempts an adopted session's native transcript from
+`delete_transcripts` (including the `delete_transcripts=True` automatic retention sweep) using the same filter that
+spares transcripts shared with another session. Stop and StopFailure also reconcile `claude_session_id` and
+`transcript_path` from their hook payloads to correct fork-session launches where SessionStart sees an inherited parent
+UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself mean the session ran (a
+`--no-launch` or not-yet-launched start session already carries a pre-seeded UUID); "used"/resumable requires hook
+confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently

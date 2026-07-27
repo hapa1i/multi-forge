@@ -143,6 +143,33 @@ class TestPlanPreconditions:
         with pytest.raises(AdoptError, match="conversation id is required"):
             plan_adoption(ExecutionContext.from_cwd(project), "")
 
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "/etc/passwd",
+            "../../../etc/passwd",
+            "not-a-uuid",
+            "aaaa1111-2222-3333-4444-555566667777/../evil",
+            "aaaa1111-2222-3333-4444-55556666777",  # one hex digit short
+            "aaaa1111-2222-3333-4444-5555666677778",  # one too many
+        ],
+    )
+    def test_rejects_ids_that_are_not_canonical_uuids(self, tmp_path: Path, bad_id: str) -> None:
+        """The id is a filename component, so shape is a path-safety boundary."""
+        project = _make_project(tmp_path)
+        with pytest.raises(AdoptError, match="is not a conversation id"):
+            plan_adoption(ExecutionContext.from_cwd(project), bad_id)
+
+    def test_accepts_surrounding_whitespace_and_uppercase(self, tmp_path: Path) -> None:
+        """Copy-paste artifacts are normalized; case is preserved for the filename."""
+        upper = _UUID.upper()
+        project = _make_project(tmp_path)
+        _write_transcript(project, session_uuid=upper)
+
+        plan = plan_adoption(ExecutionContext.from_cwd(project), f"  {upper}\n")
+
+        assert plan.session_uuid == upper
+
     def test_no_state_is_created_by_a_rejected_plan(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path)
         with pytest.raises(AdoptError):
@@ -168,6 +195,38 @@ class TestModelBasis:
         """P3: adoption must not invent a default it would then apply to a proxy resume."""
         project = _make_project(tmp_path)
         _write_transcript(project, models=())
+        plan = plan_adoption(ExecutionContext.from_cwd(project), _UUID)
+        assert (plan.model, plan.model_basis) == (None, MODEL_BASIS_NONE)
+
+    def test_explicit_alias_is_normalized_like_session_start(self, tmp_path: Path) -> None:
+        """`session start` persists DirectModelPin.env_model; adoption must match."""
+        project = _make_project(tmp_path)
+        _write_transcript(project)
+        plan = plan_adoption(ExecutionContext.from_cwd(project), _UUID, model_override="opus")
+        assert (plan.model, plan.model_basis) == ("claude-opus-5", MODEL_BASIS_EXPLICIT)
+
+    @pytest.mark.parametrize(
+        ("bad_model", "expected"),
+        [
+            ("gpt-4o", "only supports Claude models"),  # catalogued, but not Claude
+            ("claude-nonesuch-9", "Unknown direct Claude model"),
+        ],
+    )
+    def test_explicit_bad_model_is_rejected(self, tmp_path: Path, bad_model: str, expected: str) -> None:
+        """The user typed it, so it fails loudly -- unlike an inferred value."""
+        project = _make_project(tmp_path)
+        _write_transcript(project)
+        with pytest.raises(AdoptError, match=expected):
+            plan_adoption(ExecutionContext.from_cwd(project), _UUID, model_override=bad_model)
+
+    def test_uncatalogued_transcript_model_degrades_instead_of_failing(self, tmp_path: Path) -> None:
+        """An unresolvable pin is not inert: model_pin.py:61 raises on it at resume.
+
+        The conversation really ran on this model, so refusing to adopt would be
+        wrong; dropping the pin keeps the session resumable.
+        """
+        project = _make_project(tmp_path)
+        _write_transcript(project, models=("claude-3-5-sonnet-20241022",))
         plan = plan_adoption(ExecutionContext.from_cwd(project), _UUID)
         assert (plan.model, plan.model_basis) == (None, MODEL_BASIS_NONE)
 
@@ -322,3 +381,41 @@ class TestConcurrencyAndRollback:
         # And the failure is recoverable: a re-run succeeds.
         result = adopt_session(ctx, plan_adoption(ctx, _UUID), name="doomed")
         assert result.session_uuid == _UUID
+
+    def test_binding_recorded_only_in_a_manifest_still_blocks_adoption(self, tmp_path: Path) -> None:
+        """Card step 1: index first, then manifests.
+
+        The in-lock check reads the index alone, so a UUID that drifted out of
+        its index column would double-bind without the manifest fallback.
+        """
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project)
+        adopt_session(ctx, plan_adoption(ctx, _UUID), name="owner")
+
+        # Drop just the index column, leaving the manifest authoritative.
+        store = IndexStore()
+        index = store.read()
+        for entry in index.sessions.values():
+            entry.claude_session_id = None
+        store.write(index)
+        assert store.find_session_by_uuid(_UUID) is None
+
+        with pytest.raises(UuidAlreadyBoundError) as excinfo:
+            plan_adoption(ctx, _UUID)
+        assert excinfo.value.owner == "owner"
+
+    def test_transcript_deleted_during_the_prompt_aborts_before_writing(self, tmp_path: Path) -> None:
+        """The double-attach prompt blocks on a human, so the plan can go stale."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        source = _write_transcript(project)
+
+        plan = plan_adoption(ctx, _UUID)
+        source.unlink()  # user closed and cleaned up while the prompt waited
+
+        with pytest.raises(AdoptError, match="no transcript"):
+            adopt_session(ctx, plan, name="adopted")
+
+        assert not (project / ".forge" / "sessions" / "adopted").exists()
+        assert IndexStore().read().sessions == {}
