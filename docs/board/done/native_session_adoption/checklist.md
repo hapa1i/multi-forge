@@ -2,8 +2,9 @@
 
 **Card**: [card.md](card.md).
 
-**Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly; the `todo/` parking step was
-skipped because acceptance and activation happened in the same decision.
+**Lane**: `done/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly (the `todo/` parking step was
+skipped because acceptance and activation happened in the same decision), then `doing/` -> `done/` at closeout on
+2026-07-27.
 
 **Execution branch**: `feat/native-session-adoption`. Slice 0 shipped the P1 gate
 (`tests/integration/docker/test_adopt_binding_contract.py`) with no `src/` change; Slice 1 the manifest schema
@@ -20,8 +21,11 @@ Claude 2.1.220, P2, P3). Slice 1 shipped `confirmed.AdoptionConfirmed`. Slice 2 
 command-core op, the CLI leaf, and the locked index guard that closes the already-bound TOCTOU -- with design.md §3.3
 and §3.5 and `cli_reference.md` synced. Slice 3 shipped the bare-`adopt` discovery preview, completing the settled
 discovery decision. Slice 4 shipped the Codex arm with evidence-based runtime detection, and Slice 4a closed the
-one-thread/one-manifest hole review found in it. **Cursor: Slice 5** (gates, docs, closeout), plus the crash-atomicity
-debt recorded above.
+one-thread/one-manifest hole review found in it. Slice 5 shipped the end-to-end Docker gate and the doc sync.
+
+**Card closed 2026-07-27.** One item is deliberately left open rather than ticked: the `impl_notes.md` promotion, which
+the board contract gates on human review. Its four candidates are listed under Slice 5. Carried forward as debt needing
+its own card: session creation is not crash-atomic across manifest and index.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -548,7 +552,8 @@ transaction -- is broader than this card and needs its own.
      must still be cross-checked against the `cwd` recorded inside the file.
   4. **A swallowed read is not an absent record.** Binding/uniqueness lookups must fail closed on every source they
      consult, not just the first one.
-- [ ] Card moved to `done/` (no inbound board links to repoint -- verified by grep across `docs/`).
+- [x] Card moved to `done/` (no inbound board links to repoint -- verified by grep across `docs/`; the outbound link to
+  `workspace_scope` keeps the same relative depth).
 
 ## Acceptance-test mapping
 
