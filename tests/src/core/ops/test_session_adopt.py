@@ -9,6 +9,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -440,6 +443,58 @@ class TestConcurrencyAndRollback:
         # And the failure is recoverable: a re-run succeeds.
         result = adopt_session(ctx, plan_adoption(ctx, _UUID), name="doomed")
         assert result.session_uuid == _UUID
+
+    def test_threaded_adopts_of_one_uuid_bind_once(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Claude-arm counterpart of the Codex interleaved-adopt regression.
+
+        A barrier in front of `conversation_lock` puts both adopts at the flock
+        together. The loser must block, rescan under the lock, and raise
+        `UuidAlreadyBoundError` -- an `AdoptError` here would mean it timed out
+        on the lock instead of being excluded by the in-lock scan.
+        """
+        import forge.core.ops.session_adopt as adopt_mod
+
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project)
+        plans = {name: plan_adoption(ctx, _UUID) for name in ("racer-a", "racer-b")}
+
+        real_lock = adopt_mod.conversation_lock
+        barrier = threading.Barrier(2, timeout=15)
+
+        @contextmanager
+        def gated(conversation_id: str) -> Iterator[None]:
+            barrier.wait()
+            with real_lock(conversation_id):
+                yield
+
+        monkeypatch.setattr(adopt_mod, "conversation_lock", gated)
+
+        outcomes: dict[str, Exception | None] = {}
+
+        def run(name: str) -> None:
+            try:
+                adopt_session(ctx, plans[name], name=name)
+                outcomes[name] = None
+            except Exception as e:  # recorded for the assertions below
+                outcomes[name] = e
+
+        threads = [threading.Thread(target=run, args=(name,)) for name in plans]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        assert not any(thread.is_alive() for thread in threads), "adoption deadlocked"
+
+        winners = [name for name, err in outcomes.items() if err is None]
+        losers = [err for err in outcomes.values() if err is not None]
+        assert len(winners) == 1, outcomes
+        assert len(losers) == 1, outcomes
+        assert isinstance(losers[0], UuidAlreadyBoundError), losers[0]
+        assert losers[0].owner == winners[0]
+
+        session_dirs = {p.name for p in (project / ".forge" / "sessions").iterdir()}
+        assert session_dirs == set(winners), "exactly one manifest may bind the conversation"
 
     def test_binding_recorded_only_in_a_manifest_still_blocks_adoption(self, tmp_path: Path) -> None:
         """Card step 1: index first, then manifests.

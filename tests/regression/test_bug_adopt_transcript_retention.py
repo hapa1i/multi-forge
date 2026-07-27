@@ -9,10 +9,11 @@ safe; adoption binds one the *user* created and may still resume natively.
 opportunistically on CLI startup (cleanup.py:225), so this fired with no
 explicit delete at all.
 
-Fix: `_is_adopted_session` marks every tracked transcript id protected, reusing
-the same filter that already spares transcripts shared with another session. All
-of them, not just the bound one: nothing pins `claude_session_id` to the adoption
-source once hooks reconcile it.
+Fix: `_adopted_source_uuids` feeds the same filter that already spares
+transcripts shared with another session. Keyed on provenance --
+`adoption.source_path` and the `reason="adopt"` artifact -- not on the bound
+id: hooks can move `claude_session_id` off the adoption source, while later
+Forge-created transcripts remain Forge's to clean up (the last test below).
 
 Affected: src/forge/session/manager.py
 """
@@ -69,11 +70,12 @@ def test_deleting_an_adopted_session_spares_the_native_transcript(tmp_path: Path
 
 
 def test_protection_survives_the_bound_uuid_drifting_from_the_adopted_one(tmp_path: Path) -> None:
-    """Nothing pins `claude_session_id` to the adoption source, so protect every tracked id.
+    """Nothing pins `claude_session_id` to the adoption source; provenance must name it.
 
     Hooks reconcile `claude_session_id` from their payloads. If it ever moves off
-    the adopted UUID, that UUID still sits in `artifacts["transcripts"]` -- and a
-    guard keyed only on the bound id would delete the user's conversation.
+    the adopted UUID, that UUID still sits in `adoption.source_path` and the
+    `reason="adopt"` artifact -- a guard keyed only on the bound id would delete
+    the user's conversation.
     """
     project, native = _adopted_project(tmp_path)
 

@@ -269,7 +269,10 @@ def adopt_codex_session(ctx: ExecutionContext, plan: CodexAdoptPlan, *, name: st
             # the name collision fires before the uniqueness check. Report the
             # binding, which is the contract, rather than a name clash the user did
             # not choose.
-            owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
+            try:
+                owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
+            except BindingLookupError as lookup_err:
+                raise AdoptError(str(lookup_err)) from lookup_err
             if owner is not None:
                 raise UuidAlreadyBoundError(plan.thread_id, owner) from None
             raise

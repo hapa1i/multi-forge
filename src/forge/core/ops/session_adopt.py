@@ -592,9 +592,10 @@ def _resolve_model_pin(summary: TranscriptSummary, model_override: str | None) -
 def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> AdoptResult:
     """Bind a Forge session to the planned native conversation.
 
-    Ordering is validate -> ``start_session`` -> artifact copy -> index marker.
-    The manifest and index row cannot be separated: ``start_session`` writes them
-    back-to-back inside one try block and self-rolls-back on failure there.
+    Ordering is validate -> ``start_session`` (binding **and** adoption
+    provenance in one write) -> artifact copy -> index marker. The manifest and
+    index row cannot be separated: ``start_session`` writes them back-to-back
+    inside one try block and self-rolls-back on failure there.
 
     Compensation for anything after ``start_session`` returns is this function's
     job -- that block is unreachable once it returns, so the two stages are
@@ -637,7 +638,10 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
         # `Path.cwd()` default (manager.py:542): the op must not depend on process
         # cwd. create_worktree stays False -- adoption binds an existing conversation
         # in place, and a True here would arm _rollback_worktree against a checkout
-        # Forge did not create.
+        # Forge did not create. Adoption provenance rides this same write, not the
+        # artifact update below: a kill in between must not leave a bound session
+        # that _adopted_source_uuids cannot recognize, or the retention sweep
+        # would delete the user's native transcript.
         try:
             state = SessionManager().start_session(
                 name,
@@ -645,6 +649,13 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 direct=True,
                 claude_session_id=plan.session_uuid,
                 direct_model=model,
+                adoption=AdoptionConfirmed(
+                    source_runtime=SOURCE_RUNTIME_CLAUDE,
+                    adopted_at=now_iso(),
+                    source_path=str(plan.transcript_path),
+                    model_basis=model_basis,
+                ),
+                confirmed_by="cli:adopt",
                 require_uuid_unbound=True,
             )
         except SessionExistsError:
@@ -652,7 +663,10 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
             # the name collision fires before the UUID check. Report the binding,
             # which is the contract, rather than a name clash the user did not
             # choose.
-            owner = collect_bound_uuids(str(ctx.forge_root)).get(plan.session_uuid)
+            try:
+                owner = collect_bound_uuids(str(ctx.forge_root)).get(plan.session_uuid)
+            except BindingLookupError as lookup_err:
+                raise AdoptError(str(lookup_err)) from lookup_err
             if owner is not None:
                 raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
             raise
@@ -685,12 +699,8 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 }
             )
             m.confirmed.claude_project_root = plan.claude_project_root
-            m.confirmed.adoption = AdoptionConfirmed(
-                source_runtime=SOURCE_RUNTIME_CLAUDE,
-                adopted_at=now_iso(),
-                source_path=str(plan.transcript_path),
-                model_basis=model_basis,
-            )
+            # confirmed.adoption was pre-seeded by start_session (write-once);
+            # only the copy-dependent facts land here.
             m.confirmed.confirmed_by = "cli:adopt"
             m.confirmed.confirmed_at = now_iso()
 

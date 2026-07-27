@@ -187,7 +187,7 @@ def adopt(conversation_id: str | None, name: str | None, model: str | None, yes:
         print_tip(
             "The transcript was copied but could not be queued for search indexing.",
             "Rebuild the index to make it searchable.",
-            commands=["forge search reindex"],
+            commands=["forge search rebuild-index"],
             console=console,
         )
 

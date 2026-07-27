@@ -33,9 +33,10 @@ Quick Start:
         proxy_base_url="http://localhost:8084",
     )
 
-    # Write state to worktree (per-session directory)
+    # Create the manifest -- the manifest itself is the name reservation, so
+    # creation uses create_exclusive; write() is for intended overwrites only.
     store = SessionStore("/path/to/worktree", "my-session")
-    store.write(state)
+    store.create_exclusive(state)
 
     # Add to global index
     index = IndexStore()

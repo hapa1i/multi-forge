@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,24 @@ class TestAdoptCli:
         assert result.exit_code == 0, result.output
         assert (temp_env / ".forge" / "sessions" / "adopted").exists()
 
+    def test_failed_index_enqueue_names_a_real_recovery_command(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The recovery tip must name a command that exists.
+
+        It once suggested `forge search reindex`; the actual leaf is
+        `forge search rebuild-index`, and nothing else validates tip commands.
+        """
+        import forge.core.ops.session_adopt as adopt_mod
+
+        _write_transcript(temp_env)
+        monkeypatch.setattr(adopt_mod, "enqueue_index_marker", lambda **_: None)
+
+        result = runner.invoke(main, ["session", "adopt", _UUID, "--name", "adopted"])
+
+        assert result.exit_code == 0, result.output
+        assert "forge search rebuild-index" in result.output
+
     def test_adopted_session_reattaches_with_no_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
         """The card's headline claim: reattach needs zero new resume code."""
         _write_transcript(temp_env)
@@ -183,8 +202,16 @@ class TestPreviewContract:
         assert payload["cwd"] == str(temp_env)
         assert payload["scanned_dir"]
         assert [c["conversation_id"] for c in payload["candidates"]] == [_UUID]
-        assert payload["candidates"][0]["user_turns"] == 1
-        assert payload["candidates"][0]["preview"] == "check the retry path"
+
+        # The payload is a machine contract: pin the exact key sets so a field
+        # cannot drift or vanish without this test noticing.
+        assert set(payload) == {"cwd", "scanned_dir", "candidates"}
+        candidate = payload["candidates"][0]
+        assert set(candidate) == {"conversation_id", "transcript_path", "modified_at", "user_turns", "preview"}
+        assert candidate["transcript_path"] == str(path)
+        assert datetime.fromisoformat(candidate["modified_at"])
+        assert candidate["user_turns"] == 1
+        assert candidate["preview"] == "check the retry path"
 
     def test_json_with_a_conversation_id_is_rejected(self, runner: CliRunner, temp_env: Path) -> None:
         _write_transcript(temp_env)

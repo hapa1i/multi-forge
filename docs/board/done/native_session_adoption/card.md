@@ -212,7 +212,7 @@ The search-index marker is deliberately **not** a rollback item, correcting an e
 The concern behind that row was real -- a marker outliving its artifact points the indexer at a deleted file -- but the
 enqueue happens *after* the guarded block, so a marker only ever exists on a path that already succeeded. Keeping the
 row would have meant a permanently unreachable branch. Marker enqueue failure is best-effort and surfaces as
-`AdoptResult.indexed=False` plus a `forge search reindex` tip, not as a failed adoption.
+`AdoptResult.indexed=False` plus a `forge search rebuild-index` tip, not as a failed adoption.
 
 **Already-bound is a TOCTOU today.** The step-1 check and the index write take the index lock *separately* --
 `find_session_by_uuid` (`session/index.py:503`) and `add_session` (`:372`) each open their own `file_lock_for_target` --
