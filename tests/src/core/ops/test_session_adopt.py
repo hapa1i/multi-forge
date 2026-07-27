@@ -548,3 +548,63 @@ class TestDiscovery:
         bare.mkdir()
         with pytest.raises(AdoptError, match="not inside a Forge project"):
             discover_adoptable(ExecutionContext.from_cwd(bare))
+
+    def test_orphan_manifest_from_a_crashed_adopt_blocks_a_second_bind(self, tmp_path: Path) -> None:
+        """Creation writes the manifest first, so a crash before the index leaves an orphan.
+
+        Every binding check used to enumerate through the index, which cannot see
+        that orphan -- so the conversation looked free and bound twice.
+        """
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project)
+
+        def _die(self, *args, **kwargs):
+            raise KeyboardInterrupt("hard exit before the index row was written")
+
+        original = IndexStore.add_from_state
+        IndexStore.add_from_state = _die  # type: ignore[method-assign]
+        try:
+            with pytest.raises(KeyboardInterrupt):
+                adopt_session(ctx, plan_adoption(ctx, _UUID), name="crashed")
+        finally:
+            IndexStore.add_from_state = original  # type: ignore[method-assign]
+
+        assert SessionStore(str(project), "crashed").exists(), "the orphan manifest this test is about"
+        assert IndexStore().read().sessions == {}, "and it never reached the index"
+
+        with pytest.raises(UuidAlreadyBoundError) as excinfo:
+            plan_adoption(ctx, _UUID)
+        assert excinfo.value.owner == "crashed"
+
+        assert discover_adoptable(ctx)[1] == [], "and the preview must not offer it either"
+
+    def test_model_is_re_resolved_from_the_transcript_at_write_time(self, tmp_path: Path) -> None:
+        """The double-attach prompt blocks on a human; the conversation can move on."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project, models=("claude-fable-5",))
+
+        plan = plan_adoption(ctx, _UUID)
+        assert plan.model == "claude-fable-5"
+
+        _write_transcript(project, models=("claude-fable-5", "claude-opus-5"))
+        result = adopt_session(ctx, plan, name="adopted")
+
+        assert result.model == "claude-opus-5"
+        state = SessionStore(str(project), "adopted").read()
+        assert state.intent.launch is not None
+        assert state.intent.launch.direct_model == "claude-opus-5"
+
+    def test_an_explicit_model_is_never_re_derived(self, tmp_path: Path) -> None:
+        """--model is the user's instruction, not an observation to refresh."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project, models=("claude-fable-5",))
+
+        plan = plan_adoption(ctx, _UUID, model_override="claude-opus-4-8")
+        _write_transcript(project, models=("claude-fable-5", "claude-opus-5"))
+        result = adopt_session(ctx, plan, name="adopted")
+
+        assert result.model == "claude-opus-4-8"
+        assert result.model_basis == MODEL_BASIS_EXPLICIT

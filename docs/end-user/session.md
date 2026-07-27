@@ -135,7 +135,7 @@ forge session start [name] \
   [--no-launch]
 
 # Adopt a conversation you started outside Forge (run from its launch directory)
-forge session adopt                                   # preview unbound conversations here
+forge session adopt [--json]                          # preview unbound conversations here
 forge session adopt <conversation-id> [--name/-n <name>] [--model/-m <model>] [--yes/-y]
 
 # Resume an existing session (default: reattach when safe; --fresh: context assembly)
@@ -390,7 +390,7 @@ forge session resume auth-spike
 
 Bare `forge session adopt` previews the unbound conversations launched from the current directory — id, when it was last
 active, how many turns you took, and your first message — and names the directory it scanned. Already-adopted
-conversations are omitted. Nothing is written by the preview.
+conversations are omitted. The preview writes nothing and takes no binding flags; add `--json` for a scriptable shape.
 
 You can also pass the id directly: it is the transcript filename without `.jsonl` under
 `~/.claude/projects/<encoded-cwd>/`. Pass the full UUID, not a prefix.

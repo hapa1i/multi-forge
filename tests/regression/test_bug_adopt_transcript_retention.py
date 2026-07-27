@@ -104,3 +104,28 @@ def test_a_normal_session_still_has_its_transcript_deleted(tmp_path: Path) -> No
     manager.delete_session("owned", forge_root=str(project))
 
     assert not owned.exists()
+
+
+def test_only_the_adopted_source_is_spared_not_later_forge_transcripts(tmp_path: Path) -> None:
+    """Protection is keyed on provenance, so Forge's own transcripts still clean up.
+
+    Protecting every tracked id would preserve later Forge-created transcripts
+    indefinitely; `adoption.source_path` and the `reason="adopt"` artifact name
+    the user's conversation exactly.
+    """
+    project, native = _adopted_project(tmp_path)
+    forge_owned = "dddd4444-5555-6666-7777-888899990000"
+
+    store = SessionStore(str(project), "adopted")
+    state = store.read()
+    state.confirmed.artifacts["transcripts"].append({"reason": "stop", "session_id": forge_owned, "copied": True})
+    store.write(state)
+
+    later = get_transcript_path(str(project), forge_owned)
+    later.parent.mkdir(parents=True, exist_ok=True)
+    later.write_text("{}\n", encoding="utf-8")
+
+    SessionManager().delete_session("adopted", forge_root=str(project))
+
+    assert native.is_file(), "the adopted source is the user's"
+    assert not later.exists(), "a transcript Forge created for this session is Forge's to remove"

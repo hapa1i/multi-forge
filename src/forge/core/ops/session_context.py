@@ -25,7 +25,9 @@ from forge.session import (
     compute_effective_intent,
 )
 from forge.session.exceptions import AmbiguousSessionError
+from forge.session.identity import session_name_from_key
 from forge.session.index import IndexStore
+from forge.session.store import get_sessions_dir
 
 _log = logging.getLogger(__name__)
 
@@ -402,39 +404,75 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
     )
 
 
-def collect_bound_uuids() -> set[str]:
-    """Return every Claude UUID currently bound to a session, lowercased.
+class BindingLookupError(SessionContextError):
+    """Raised when the set of bound Claude UUIDs cannot be established."""
 
-    The bulk counterpart to ``scan_manifests_for_uuid``, for callers testing many
-    UUIDs at once: that helper short-circuits on the first match and takes the
-    index lock per call, which a per-candidate loop would pay repeatedly.
 
-    Reads the index row and the manifest for each session, since either can carry
-    a binding the other is missing.
+def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
+    """Map every bound Claude UUID (lowercased) to the session that owns it.
+
+    Three sources, because no single one is complete:
+
+    - index rows, which span projects but can lag a manifest;
+    - the manifest behind each row, which can carry a binding the row lost;
+    - every manifest directory under ``forge_root``, which is the only way to see
+      a session whose index row was never written. Session creation writes the
+      manifest first (``SessionStore.create_exclusive``), so a process killed
+      between the two leaves exactly that orphan -- and an adoption gated only on
+      the index would then bind the same conversation twice.
+
+    Reads without pruning: ``list_sessions`` self-heals by deleting index rows,
+    which a read-only caller such as the adoption preview must not trigger.
+
+    Fails closed. An unreadable index cannot be reported as "nothing is bound"
+    when the caller is using this to decide whether a conversation is free.
+
+    Raises:
+        BindingLookupError: If the index itself cannot be read.
     """
     index = IndexStore()
     try:
-        sessions = index.list_sessions(include_incognito=True)
-    except Exception:
-        _log.debug("Failed to list sessions while collecting bound UUIDs", exc_info=True)
-        return set()
+        rows = index.read().sessions
+    except Exception as e:
+        raise BindingLookupError(f"Could not read the session index: {e}") from e
 
-    bound: set[str] = set()
-    for name, entry in sessions:
-        if entry.claude_session_id:
-            bound.add(entry.claude_session_id.lower())
+    bound: dict[str, str] = {}
+
+    def _record(session_uuid: object, owner: str) -> None:
+        if isinstance(session_uuid, str) and session_uuid:
+            bound.setdefault(session_uuid.lower(), owner)
+
+    for key, entry in rows.items():
+        name = session_name_from_key(key)
+        _record(entry.claude_session_id, name)
         try:
-            store = SessionStore(entry.root, name)
-            if not store.exists():
-                continue
-            state = store.read()
+            store = SessionStore(entry.forge_root or entry.worktree_path, name)
+            if store.exists():
+                _record(store.read().confirmed.claude_session_id, name)
         except Exception:
-            _log.debug("Failed to read session manifest while collecting bound UUIDs", exc_info=True)
-            continue
-        if state.confirmed.claude_session_id:
-            bound.add(state.confirmed.claude_session_id.lower())
+            _log.debug("Failed to read manifest for '%s' while collecting bound UUIDs", name, exc_info=True)
+
+    if forge_root:
+        for manifest_dir in _manifest_dirs(forge_root):
+            name = manifest_dir.name
+            if name in bound.values():
+                continue
+            try:
+                store = SessionStore(forge_root, name)
+                if store.exists():
+                    _record(store.read().confirmed.claude_session_id, name)
+            except Exception:
+                _log.debug("Failed to read orphan manifest '%s'", name, exc_info=True)
 
     return bound
+
+
+def _manifest_dirs(forge_root: str) -> list[Path]:
+    """Return the per-session directories under a project's ``.forge/sessions/``."""
+    try:
+        return sorted(p for p in get_sessions_dir(forge_root).iterdir() if p.is_dir())
+    except OSError:
+        return []
 
 
 def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:

@@ -214,6 +214,12 @@ under its own creator. A successful `create_exclusive` is therefore an ownership
 rollback to delete the manifest at that path. `write` remains for intended overwrites (rollback restores, deliberate
 stale fork-target replacement).
 
+Manifest-first creation is not atomic with index publication: a process killed between the two leaves a manifest with no
+index row. Such an orphan is inert for listing but still owns its name, and any check that enumerates sessions through
+the index cannot see it. Reads that decide whether a **conversation** is already bound must therefore also scan manifest
+directories under the project root — `collect_bound_uuids(forge_root)`, which additionally reads without pruning and
+fails closed, so a read-only caller neither mutates the index nor reports "unbound" because a read failed.
+
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
 ```python

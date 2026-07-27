@@ -414,6 +414,45 @@ Discovery also collapsed `read_transcript_cwd` and `infer_transcript_model` into
 full-file readers over the same format, so `plan_adoption` was opening each transcript twice; discovery needs cwd, turns
 and preview from the same pass anyway.
 
+**Third-round remediation (2026-07-27).** A conformance review found seven design violations plus four standard issues;
+all were reproduced against source before fixing. Three were HIGH:
+
+- **Crash between manifest create and index publish double-bound a UUID.** Reproduced: killing the process after
+  `create_exclusive` left a manifest bound to the conversation, invisible to every binding check because all of them
+  enumerated through the index -- so the preview listed it and a second adopt succeeded, leaving two manifests on one
+  conversation. This was the direct consequence of the second round's manifest-first ordering, and
+  `scan_manifests_for_uuid`'s own docstring already admitted the enumeration limit. `collect_bound_uuids(forge_root)`
+  now also scans manifest directories under the project root. Test:
+  `test_orphan_manifest_from_a_crashed_adopt_blocks_a_second_bind`.
+- **Force-fork rollback restored its stale target over a concurrent winner.** `replaced_target_state` is set before the
+  name is claimed, so a losing `create_exclusive` still ran `_restore_previous_target_state`, whose unconditional
+  `write()` clobbered the winner. Restoration is now guarded on `wrote_manifest` (the ownership token) and a free path.
+  Test: `tests/regression/test_bug_fork_restore_clobbers_winner.py`.
+- **Mutation persisted a stale inferred model.** `_check_still_adoptable` returned a fresh summary that `adopt_session`
+  discarded. Changing the transcript's model between plan and adopt persisted the planned one -- the first-resume
+  surprise the pin exists to prevent. The pin is now re-resolved from the mutation-time summary; an explicit `--model`
+  is never re-derived. Test: `test_model_is_re_resolved_from_the_transcript_at_write_time`.
+
+The MEDIUM and standard fixes: the preview no longer mutates the index (`read()` instead of the pruning `list_sessions`)
+and fails closed on an unreadable index; `--json` added and binding flags refused in preview mode; a same-UUID name
+collision now reports the owner-aware already-bound rejection instead of `SessionExistsError`; deletion protection
+narrowed from every tracked id to the provenance-named source (`adoption.source_path` plus the `reason="adopt"`
+artifact); `SessionStore` validates the session name before creating any directory (an absolute name previously created
+a directory outside the project -- the same `Path / "/abs"` trap as the Slice 2 critical); transcript text and paths
+render as literal `Text` so Rich cannot interpret `[...]` from a conversation; and `user_turns` no longer counts
+machine-output wrappers, matching what it documents.
+
+`ADOPT_ARTIFACT_REASON` moved from the op to `session/artifacts.py`: `session.manager` reads it during deletion and the
+session layer cannot import from `core.ops`. A deliberate exception to the constants-live-with-the-writing-op
+convention, recorded so it does not read as drift.
+
+**Open debt -- creation is still not crash-atomic.** The fix above removes the double-bind, not the orphan. A process
+killed between `create_exclusive` and `add_from_state` still leaves a manifest with no index row: invisible to
+`session list`, yet still owning its name. The review's recommendation is to hold the index lock across both writes so
+the crash windows become "prunable row" or "both present". That is the right shape -- nothing nests manifest->index
+today, so index->manifest introduces no deadlock -- but it restructures `IndexStore.add_session` into a transaction form
+used by all four creation paths, which is broader than this card. Not attempted here; carry as its own card.
+
 ## Slice 4 -- Codex arm (card Phase 2)
 
 - [ ] Thread-id lookup scans **all** matching rollouts rather than inheriting `find_rollout_path`'s newest-match

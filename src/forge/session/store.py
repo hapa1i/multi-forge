@@ -238,9 +238,9 @@ class SessionStore:
             manifest: The manifest to write.
 
         Raises:
-            InvalidSessionNameError: If manifest name is invalid.
+            InvalidSessionNameError: If the store's or the manifest's name is invalid.
         """
-        self.session_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_session_dir()
 
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             self._write_unlocked(manifest)
@@ -262,14 +262,26 @@ class SessionStore:
 
         Raises:
             SessionExistsError: If the manifest already exists.
-            InvalidSessionNameError: If manifest name is invalid.
+            InvalidSessionNameError: If the store's or the manifest's name is invalid.
         """
-        self.session_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_session_dir()
 
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             if self._manifest_path.is_file():
                 raise SessionExistsError(self._session_name)
             self._write_unlocked(manifest)
+
+    def _ensure_session_dir(self) -> None:
+        """Create the session directory, but only for a name that can be one.
+
+        Validation comes first because ``_manifest_path`` is built by joining the
+        name onto the project root, and an absolute name discards that root
+        (``Path('/a') / '/etc'`` is ``/etc``). Creating the directory before
+        checking would leave a directory anywhere on disk that the caller named,
+        even though the write itself then fails.
+        """
+        validate_name(self._session_name)
+        self.session_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_unlocked(self, manifest: SessionState) -> None:
         """Write manifest without acquiring lock (caller must hold it)."""

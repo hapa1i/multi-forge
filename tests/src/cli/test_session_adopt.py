@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
@@ -162,3 +163,51 @@ class TestAdoptPreview:
         assert result.exit_code == 0, result.output
         assert _UUID not in result.output
         assert "No unbound conversations" in result.output
+
+
+class TestPreviewContract:
+    def test_json_preview_is_machine_readable(self, runner: CliRunner, temp_env: Path) -> None:
+        path = _write_transcript(temp_env)
+        entries = [
+            {"type": "user", "cwd": str(temp_env), "message": {"content": "check the retry path"}},
+            {"type": "assistant", "cwd": str(temp_env), "message": {"model": "claude-opus-5"}},
+        ]
+        path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+        os.utime(path, (0, 0))
+
+        result = runner.invoke(main, ["session", "adopt", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        assert payload["cwd"] == str(temp_env)
+        assert payload["scanned_dir"]
+        assert [c["conversation_id"] for c in payload["candidates"]] == [_UUID]
+        assert payload["candidates"][0]["user_turns"] == 1
+        assert payload["candidates"][0]["preview"] == "check the retry path"
+
+    def test_json_with_a_conversation_id_is_rejected(self, runner: CliRunner, temp_env: Path) -> None:
+        _write_transcript(temp_env)
+        result = runner.invoke(main, ["session", "adopt", _UUID, "--json"])
+        assert result.exit_code == 1
+        assert "--json applies to the preview" in result.output
+
+    @pytest.mark.parametrize("flag", [["--name", "x"], ["--model", "claude-opus-5"], ["--yes"]])
+    def test_binding_flags_are_refused_in_preview_mode(
+        self, runner: CliRunner, temp_env: Path, flag: list[str]
+    ) -> None:
+        """Silently ignoring them would imply the preview had adopted something."""
+        result = runner.invoke(main, ["session", "adopt", *flag])
+        assert result.exit_code == 1
+        assert "not to previewing" in result.output
+
+    def test_transcript_markup_is_not_interpreted(self, runner: CliRunner, temp_env: Path) -> None:
+        """A conversation is external input; Rich must not read `[...]` in it."""
+        path = _write_transcript(temp_env)
+        entries = [{"type": "user", "cwd": str(temp_env), "message": {"content": "why is [red] logged here?"}}]
+        path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+        os.utime(path, (0, 0))
+
+        result = runner.invoke(main, ["session", "adopt"])
+
+        assert result.exit_code == 0, result.output
+        assert "[red]" in result.output, "the bracket text must survive verbatim"

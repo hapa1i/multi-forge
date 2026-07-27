@@ -22,7 +22,7 @@ from forge.install.project_compat import (
     enforce_project_compatibility_toml,
 )
 
-from .artifacts import resolve_artifact_path
+from .artifacts import ADOPT_ARTIFACT_REASON, resolve_artifact_path
 from .claude.paths import (
     get_transcript_path,
     resolve_claude_project_root,
@@ -214,22 +214,51 @@ def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
     return confirmed.get(key)
 
 
-def _is_adopted_session(state: SessionState | None, raw_data: dict[str, Any] | None) -> bool:
-    """Return True when this session was bound to a pre-existing native conversation.
+def _adopted_source_uuids(state: SessionState | None, raw_data: dict[str, Any] | None) -> list[str]:
+    """Return the native conversation UUIDs this session adopted rather than created.
 
-    Adoption is the one origination path where the native transcript under
+    Adoption is the one origination path where the transcript under
     ``~/.claude/projects`` predates the Forge session and outlives it: the user
-    created that conversation, and may still resume it natively. Deleting a
-    session must therefore not delete it, including via automatic retention
-    cleanup (``auto_clean_old_sessions`` passes ``delete_transcripts=True``).
+    created that conversation and may still resume it natively. Deleting a
+    session must not delete it, including via automatic retention cleanup
+    (``auto_clean_old_sessions`` passes ``delete_transcripts=True``).
+
+    Only the adopted source is protected, not every transcript the session went
+    on to reference -- provenance names it exactly, so the transcripts Forge
+    itself created for an adopted session are still cleaned up normally. Two
+    independent records identify it: ``confirmed.adoption.source_path``, whose
+    stem is the UUID, and the ``reason="adopt"`` transcript artifact.
 
     Reads the raw manifest when the typed read failed, matching
     ``_transcript_cleanup_project_root``: a session too corrupt to parse must
     still not cost the user their conversation.
     """
     if state is not None:
-        return state.confirmed.adoption is not None
-    return isinstance(_raw_confirmed_value(raw_data, "adoption"), dict)
+        adoption = state.confirmed.adoption
+        source_path = adoption.source_path if adoption is not None else None
+        artifacts: Any = state.confirmed.artifacts
+    else:
+        raw_adoption = _raw_confirmed_value(raw_data, "adoption")
+        if not isinstance(raw_adoption, dict):
+            return []
+        source_path = raw_adoption.get("source_path")
+        artifacts = _raw_confirmed_value(raw_data, "artifacts")
+
+    if state is not None and state.confirmed.adoption is None:
+        return []
+
+    sources: list[str] = []
+    if isinstance(source_path, str) and source_path:
+        _append_unique_string(sources, Path(source_path).stem)
+
+    if isinstance(artifacts, dict):
+        transcripts = artifacts.get("transcripts")
+        if isinstance(transcripts, list):
+            for artifact in transcripts:
+                if isinstance(artifact, dict) and artifact.get("reason") == ADOPT_ARTIFACT_REASON:
+                    _append_unique_string(sources, artifact.get("session_id"))
+
+    return sources
 
 
 def _transcript_cleanup_project_root(
@@ -1505,6 +1534,18 @@ class SessionManager:
             if not restore_target_state or not replaced_target_state or target_store is None or target_state is None:
                 return
 
+            # Only restore over a path this fork owned. Between deleting the stale
+            # target and claiming the name, another creator can win it; without
+            # this guard the restore would write the stale manifest over that
+            # winner's. wrote_manifest is the ownership token create_exclusive
+            # produced, and the rollback above has already removed our own copy.
+            if not wrote_manifest or target_store.exists():
+                logger.info(
+                    "Not restoring the previous fork target '%s': this fork never owned that manifest",
+                    fork_name,
+                )
+                return
+
             try:
                 target_store.write(target_state)
             except Exception as e:
@@ -1917,18 +1958,17 @@ class SessionManager:
 
             # An adopted session's native transcript is user-owned, so it is
             # protected the same way a transcript shared with another session is.
-            # Every tracked id is protected, not just the bound one: the adoption
-            # source UUID lives in the artifact list too, and nothing enforces that
-            # claude_session_id still equals it once hooks have reconciled. Over-
-            # protecting leaks a Forge-written transcript; under-protecting destroys
-            # a conversation Forge did not create.
+            # Keyed on provenance rather than on the bound id: `claude_session_id`
+            # can drift off the adoption source once hooks reconcile it, and the
+            # session's other transcripts are Forge's to clean up.
             _protected_ids = dict(shared_ids)
-            if _is_adopted_session(state, _raw_data):
-                for _adopted_id in _cleanup_ids:
+            _adopted_ids = _adopted_source_uuids(state, _raw_data)
+            if _adopted_ids:
+                for _adopted_id in _adopted_ids:
                     _protected_ids.setdefault(_adopted_id, ["adopted native conversation"])
                 logger.info(
                     "Preserving adopted native transcript(s) %s while deleting session '%s'",
-                    ", ".join(_cleanup_ids),
+                    ", ".join(_adopted_ids),
                     name,
                 )
 

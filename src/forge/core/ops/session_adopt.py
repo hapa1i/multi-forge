@@ -29,15 +29,20 @@ from forge.install.project_compat import (
     enforce_project_compatibility,
 )
 from forge.session import SessionManager, SessionStore, UuidAlreadyBoundError
-from forge.session.artifacts import get_artifact_paths, safe_copy_file
+from forge.session.artifacts import (
+    ADOPT_ARTIFACT_REASON,
+    get_artifact_paths,
+    safe_copy_file,
+)
 from forge.session.claude.paths import get_project_encoded_dir, get_transcript_path
+from forge.session.exceptions import SessionExistsError
 from forge.session.index import IndexStore
 from forge.session.models import AdoptionConfirmed
 from forge.session.store import CLI_LOCK_TIMEOUT_S
 
 from .context import ExecutionContext
 from .session import ForgeOpError
-from .session_context import collect_bound_uuids, scan_manifests_for_uuid
+from .session_context import BindingLookupError, collect_bound_uuids
 
 _log = logging.getLogger(__name__)
 
@@ -49,9 +54,6 @@ MODEL_BASIS_INFERRED = "inferred"
 MODEL_BASIS_NONE = "none"
 
 SOURCE_RUNTIME_CLAUDE = "claude_code"
-
-# Matches the Stop hook's artifact vocabulary (cli/hooks/commands.py:550).
-ADOPT_ARTIFACT_REASON = "adopt"
 
 # Claude stamps this sentinel instead of a model id on synthetic assistant turns.
 # Measured on 13 of 470 local transcripts; it is not a resolvable model.
@@ -70,12 +72,16 @@ RECENT_ACTIVITY_WINDOW_S = 30 * 60
 # error only when it deserves one; normalize_conversation_id folds the result.
 _UUID_RE = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
-# Claude injects synthetic user turns wrapped in an XML-ish tag: command-message,
-# local-command-caveat, local-command-stdout, task-notification, bash-input,
-# bash-stdout. Measured across 200 local transcripts: ~187 tagged against 608
-# plain human messages. They identify nothing, so the discovery preview skips
-# them to find the message a user would actually recognize.
-_SYNTHETIC_PREFIX_RE = re.compile(r"\A\s*<[a-z-]+>")
+# Claude wraps synthetic user entries in an XML-ish tag. Measured across 200 local
+# transcripts: ~187 tagged against 608 plain human messages. None of them makes a
+# useful preview, so the preview always skips them.
+_SYNTHETIC_PREFIX_RE = re.compile(r"\A\s*<([a-z-]+)>")
+
+# Of those wrappers, these carry machine output rather than anything the user did,
+# so they are not turns either. The rest (`command-message`, `command-name`,
+# `bash-input`) record a human action -- typing `/init` is a turn even though its
+# text is generated -- and stay counted.
+_MACHINE_OUTPUT_TAGS = frozenset({"local-command-caveat", "local-command-stdout", "bash-stdout", "task-notification"})
 
 # Long enough to recognize a conversation, short enough for one terminal row.
 PREVIEW_CHARS = 72
@@ -115,7 +121,8 @@ class TranscriptSummary:
     Attributes:
         recorded_cwd: The launch directory Claude stamps on entries, or None.
         last_model: Last real assistant model; None when no assistant turn ran.
-        user_turns: Human-authored user entries, excluding tool results.
+        user_turns: User entries the human caused, excluding tool results and
+            machine-output wrappers. A slash command counts; its stdout does not.
         preview: First human message that is not a synthetic wrapper.
     """
 
@@ -232,8 +239,13 @@ def summarize_transcript(transcript_path: Path) -> TranscriptSummary:
                 text = _user_message_text(message)
                 if text is None:
                     continue
+
+                wrapper = _SYNTHETIC_PREFIX_RE.match(text)
+                if wrapper and wrapper.group(1) in _MACHINE_OUTPUT_TAGS:
+                    continue
+
                 user_turns += 1
-                if preview is None and not _SYNTHETIC_PREFIX_RE.match(text):
+                if preview is None and not wrapper:
                     preview = " ".join(text.split())
     except OSError as e:
         _log.debug("Could not read transcript %s: %s", transcript_path, e)
@@ -293,7 +305,10 @@ def discover_adoptable(ctx: ExecutionContext) -> tuple[Path, list[AdoptCandidate
 
     # Collected once rather than per candidate: both lookups take the index lock,
     # and the manifest scan reads every session manifest.
-    bound = collect_bound_uuids()
+    try:
+        bound = collect_bound_uuids(str(ctx.forge_root))
+    except BindingLookupError as e:
+        raise AdoptError(str(e)) from e
     here = Path(ctx.cwd).resolve()
 
     found: list[tuple[float, AdoptCandidate]] = []
@@ -363,7 +378,7 @@ def plan_adoption(
     claude_project_root = str(ctx.cwd)
     transcript_path = get_transcript_path(claude_project_root, session_uuid)
 
-    summary = _check_still_adoptable(session_uuid, transcript_path, claude_project_root)
+    summary = _check_still_adoptable(session_uuid, transcript_path, claude_project_root, str(ctx.forge_root))
 
     model, basis = _resolve_model_pin(summary, model_override)
 
@@ -404,7 +419,9 @@ def _check_plan_invariants(ctx: ExecutionContext, plan: AdoptPlan) -> None:
         raise AdoptError(f"plan transcript path {plan.transcript_path} is not the canonical path for its conversation")
 
 
-def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_project_root: str) -> TranscriptSummary:
+def _check_still_adoptable(
+    session_uuid: str, transcript_path: Path, claude_project_root: str, forge_root: str
+) -> TranscriptSummary:
     """Run every precondition that can change between planning and writing.
 
     Split out of ``plan_adoption`` so ``adopt_session`` can re-run it after the
@@ -438,14 +455,15 @@ def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_proj
             "Adopt from the recorded directory instead."
         )
 
-    # Index first, then manifests (card step 1). The in-lock check inside
-    # add_session is index-only, so a UUID recorded in a manifest but missing
-    # from its index column would otherwise pass every gate and double-bind.
-    owner = IndexStore().find_session_by_uuid(session_uuid)
-    if owner is None:
-        owner = scan_manifests_for_uuid(session_uuid)
+    # Index rows, their manifests, and orphan manifests under this project (card
+    # step 1). The in-lock check inside add_session is index-only, so any binding
+    # the index has not recorded would otherwise pass every gate and double-bind.
+    try:
+        owner = collect_bound_uuids(forge_root).get(session_uuid)
+    except BindingLookupError as e:
+        raise AdoptError(str(e)) from e
     if owner is not None:
-        raise UuidAlreadyBoundError(session_uuid, owner[0])
+        raise UuidAlreadyBoundError(session_uuid, owner)
 
     return summary
 
@@ -512,21 +530,39 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     except ProjectCompatibilityError as e:
         raise AdoptError(str(e)) from e
 
-    _check_still_adoptable(plan.session_uuid, plan.transcript_path, plan.claude_project_root)
+    summary = _check_still_adoptable(
+        plan.session_uuid, plan.transcript_path, plan.claude_project_root, str(ctx.forge_root)
+    )
+
+    # Re-resolve from the transcript as it is NOW. The double-attach prompt blocks
+    # on a human, and a still-attached native client can add turns on a different
+    # model while it waits -- persisting the planned pin would then produce exactly
+    # the first-resume surprise the pin exists to prevent. An explicit --model is
+    # the user's instruction, so it is never re-derived.
+    model, model_basis = _resolve_model_pin(summary, plan.model if plan.model_basis == MODEL_BASIS_EXPLICIT else None)
 
     # worktree_path is passed explicitly rather than left to start_session's
     # `Path.cwd()` default (manager.py:542): the op must not depend on process
     # cwd. create_worktree stays False -- adoption binds an existing conversation
     # in place, and a True here would arm _rollback_worktree against a checkout
     # Forge did not create.
-    state = SessionManager().start_session(
-        name,
-        worktree_path=str(ctx.cwd),
-        direct=True,
-        claude_session_id=plan.session_uuid,
-        direct_model=plan.model,
-        require_uuid_unbound=True,
-    )
+    try:
+        state = SessionManager().start_session(
+            name,
+            worktree_path=str(ctx.cwd),
+            direct=True,
+            claude_session_id=plan.session_uuid,
+            direct_model=model,
+            require_uuid_unbound=True,
+        )
+    except SessionExistsError:
+        # A same-UUID adopt that got here first owns the derived name too, so the
+        # name collision fires before the UUID check. Report the binding, which is
+        # the contract, rather than a name clash the user did not choose.
+        owner = collect_bound_uuids(str(ctx.forge_root)).get(plan.session_uuid)
+        if owner is not None:
+            raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
+        raise
 
     store = SessionStore(str(ctx.forge_root), name)
     paths = get_artifact_paths(ctx.forge_root, name)
@@ -560,7 +596,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 source_runtime=SOURCE_RUNTIME_CLAUDE,
                 adopted_at=now_iso(),
                 source_path=str(plan.transcript_path),
-                model_basis=plan.model_basis,
+                model_basis=model_basis,
             )
             m.confirmed.confirmed_by = "cli:adopt"
             m.confirmed.confirmed_at = now_iso()
@@ -584,8 +620,8 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     return AdoptResult(
         name=name,
         session_uuid=plan.session_uuid,
-        model=state.intent.launch.direct_model if state.intent.launch else plan.model,
-        model_basis=plan.model_basis,
+        model=state.intent.launch.direct_model if state.intent.launch else model,
+        model_basis=model_basis,
         artifact_rel=str(dst_rel),
         indexed=marker is not None,
     )

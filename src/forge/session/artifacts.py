@@ -23,6 +23,12 @@ from .claude.paths import find_project_root
 logger = logging.getLogger(__name__)
 
 
+# Transcript-artifact `reason` values. This one lives here rather than with its
+# writing op (`core.ops.session_adopt`) because `session.manager` reads it during
+# deletion, and the session layer cannot import from core.ops.
+ADOPT_ARTIFACT_REASON = "adopt"
+
+
 @dataclass(frozen=True)
 class ArtifactPaths:
     """Computed artifact roots for a session."""

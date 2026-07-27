@@ -9,12 +9,14 @@ directory; passing a conversation id binds one.
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import cast
 
 import click
 from rich import box
 from rich.table import Table
+from rich.text import Text
 
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session import _format_relative_time, console
@@ -39,12 +41,14 @@ session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circu
 @click.option("--name", "-n", help="Forge session name (defaults to the conversation id prefix)")
 @click.option("--model", "-m", help="Model to pin for future Forge resumes (overrides transcript inference)")
 @click.option("--yes", "-y", is_flag=True, help="Skip the confirmation for a recently-active conversation")
-def adopt(conversation_id: str | None, name: str | None, model: str | None, yes: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output the preview as JSON (no conversation id)")
+def adopt(conversation_id: str | None, name: str | None, model: str | None, yes: bool, as_json: bool) -> None:
     """Adopt a native Claude conversation as a managed Forge session.
 
     \b
     Examples:
         forge session adopt                       # preview adoptable conversations here
+        forge session adopt --json                # same preview, machine-readable
         forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2
         forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name my-session --model claude-opus-5
 
@@ -71,8 +75,27 @@ def adopt(conversation_id: str | None, name: str | None, model: str | None, yes:
         sys.exit(1)
 
     if conversation_id is None:
-        _preview_candidates(ctx)
+        # Refused rather than ignored: these only describe a binding, so accepting
+        # them silently would imply the preview had adopted something.
+        unusable = [flag for flag, given in (("--name", name), ("--model", model), ("--yes", yes)) if given]
+        if unusable:
+            print_error_with_tip(
+                f"{', '.join(unusable)} {'apply' if len(unusable) > 1 else 'applies'} to adopting a conversation, "
+                "not to previewing.",
+                "Pass the conversation id to adopt one.",
+                commands=["forge session adopt <conversation-id> --name <name>"],
+            )
+            sys.exit(1)
+        _preview_candidates(ctx, as_json=as_json)
         return
+
+    if as_json:
+        print_error_with_tip(
+            "--json applies to the preview, which takes no conversation id.",
+            "Drop the conversation id to list what is adoptable here.",
+            commands=["forge session adopt --json"],
+        )
+        sys.exit(1)
 
     try:
         plan = plan_adoption(ctx, conversation_id, model_override=model)
@@ -158,7 +181,7 @@ def adopt(conversation_id: str | None, name: str | None, model: str | None, yes:
     )
 
 
-def _preview_candidates(ctx: ExecutionContext) -> None:
+def _preview_candidates(ctx: ExecutionContext, *, as_json: bool) -> None:
     """Render the read-only preview shown by bare `forge session adopt`."""
     try:
         scanned_dir, candidates = discover_adoptable(ctx)
@@ -166,10 +189,34 @@ def _preview_candidates(ctx: ExecutionContext) -> None:
         print_error(str(e))
         sys.exit(1)
 
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "cwd": str(ctx.cwd),
+                    "scanned_dir": str(scanned_dir),
+                    "candidates": [
+                        {
+                            "conversation_id": c.session_uuid,
+                            "transcript_path": str(c.transcript_path),
+                            "modified_at": c.modified_at,
+                            "user_turns": c.user_turns,
+                            "preview": c.preview,
+                        }
+                        for c in candidates
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return
+
     # Printed in both branches: Claude's encoded directory names are lossy, so
     # "nothing here" is only actionable once you know which directory was read.
-    console.print(f"Scanning conversations launched from [bold]{ctx.cwd}[/bold]")
-    console.print(f"  [dim]{scanned_dir}[/dim]")
+    # Paths and transcript text are external input; Rich would read `[...]` in
+    # them as markup, so they are rendered as literal Text.
+    console.print(Text.assemble("Scanning conversations launched from ", (str(ctx.cwd), "bold")))
+    console.print(Text(f"  {scanned_dir}", style="dim"))
 
     if not candidates:
         console.print("\nNo unbound conversations found here.")
@@ -193,7 +240,7 @@ def _preview_candidates(ctx: ExecutionContext) -> None:
             candidate.session_uuid,
             _format_relative_time(candidate.modified_at),
             str(candidate.user_turns),
-            candidate.preview or "[dim](no message yet)[/dim]",
+            Text(candidate.preview) if candidate.preview else Text("(no message yet)", style="dim"),
         )
 
     console.print()
