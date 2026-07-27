@@ -205,12 +205,14 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
 
-**Session creation reserves the index name before writing the manifest.** Name uniqueness is only authoritative inside
-`add_session`'s index lock; the pre-checks in `start_session` run outside it, so two concurrent creates of one name both
-reach the commit phase. Reserving first means the loser fails before touching `.forge/sessions/<name>/`, so its rollback
-cannot delete a manifest the winner now owns. `create_child_session` already used this ordering; `start_session` follows
-it. The cost is the inverted window — an index entry can briefly exist without a manifest, which is recoverable, unlike
-a clobbered manifest.
+**The manifest is the session-name reservation.** Every path that mints a session (`start_session`, fork, resume-child,
+relaunch) claims its name with `SessionStore.create_exclusive`, which tests and writes under that manifest's own lock.
+Name pre-checks run outside any lock, so two concurrent creates of one name both reach the commit phase; the loser is
+rejected by the create, before it can touch the winner's manifest. An index row cannot serve as the reservation instead:
+`list_sessions` prunes rows whose manifest is missing, so a row written ahead of its manifest can be pruned out from
+under its own creator. A successful `create_exclusive` is therefore an ownership token -- it is what makes it safe for a
+rollback to delete the manifest at that path. `write` remains for intended overwrites (rollback restores, deliberate
+stale fork-target replacement).
 
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 

@@ -65,7 +65,8 @@ RECENT_ACTIVITY_WINDOW_S = 30 * 60
 # component of every path adoption touches. `Path(base) / "/etc/passwd"` silently
 # discards `base`, which would point both the read and the artifact copy outside
 # the project; anchoring the id to canonical UUID shape closes that before any
-# path is built. Case-insensitive because Claude has emitted both casings.
+# path is built. Accepts either casing so a pasted upper-case id gets a shape
+# error only when it deserves one; normalize_conversation_id folds the result.
 _UUID_RE = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
 
@@ -111,10 +112,16 @@ class AdoptResult:
 def normalize_conversation_id(session_uuid: str) -> str:
     """Return the id in canonical form, rejecting anything that is not a UUID.
 
-    Must run before any path is constructed from the id. Case is preserved rather
-    than folded: the id is a filename component, and lowercasing an
-    upper-case-on-disk transcript would turn a valid adopt into a spurious
-    "no transcript" on case-sensitive filesystems.
+    Must run before any path is constructed from the id, and before the id is
+    compared against a stored ``claude_session_id``.
+
+    Case is folded to lower. Claude writes lowercase transcript filenames (0 of
+    470 local transcripts carry an upper-case hex digit), so lowercasing cannot
+    misdirect the path lookup, while accepting mixed case verbatim would defeat
+    the already-bound check: that comparison is a string equality, so ``AAAA...``
+    and ``aaaa...`` would bind twice to one conversation -- and on a
+    case-insensitive filesystem, which is the primary supported platform, both
+    resolve to the same transcript.
 
     Raises:
         AdoptError: If the id is empty or not canonical 8-4-4-4-12 UUID shape.
@@ -128,7 +135,7 @@ def normalize_conversation_id(session_uuid: str) -> str:
             "470b1a1b-2c3d-4e5f-8a9b-0c1d2e3f4a5b, which is the transcript filename "
             "Claude records under ~/.claude/projects/."
         )
-    return candidate
+    return candidate.lower()
 
 
 def read_transcript_cwd(transcript_path: Path) -> str | None:
@@ -237,6 +244,28 @@ def plan_adoption(
     )
 
 
+def _check_plan_invariants(ctx: ExecutionContext, plan: AdoptPlan) -> None:
+    """Re-derive the plan's paths and reject one that does not match.
+
+    ``AdoptPlan`` is an ordinary dataclass, so ``adopt_session`` cannot assume its
+    fields came from ``plan_adoption``; a hand-built plan would otherwise reach the
+    same read-and-copy that the unvalidated-id defect exploited. Internal boundary
+    per coding_standards section 5: re-derive rather than trust.
+
+    Raises:
+        AdoptError: If the id, project root, or transcript path is not canonical.
+    """
+    if plan.session_uuid != normalize_conversation_id(plan.session_uuid):
+        raise AdoptError(f"plan carries a non-canonical conversation id: '{plan.session_uuid}'")
+
+    if Path(plan.claude_project_root).resolve() != Path(ctx.cwd).resolve():
+        raise AdoptError(f"plan targets {plan.claude_project_root}, but this command is running in {ctx.cwd}")
+
+    expected = get_transcript_path(plan.claude_project_root, plan.session_uuid)
+    if plan.transcript_path.resolve() != expected.resolve():
+        raise AdoptError(f"plan transcript path {plan.transcript_path} is not the canonical path for its conversation")
+
+
 def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_project_root: str) -> None:
     """Run every precondition that can change between planning and writing.
 
@@ -329,6 +358,15 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     """
     if ctx.forge_root is None:
         raise AdoptError("not inside a Forge project")
+
+    _check_plan_invariants(ctx, plan)
+
+    # Compatibility is re-enforced, not just re-read: the prompt between planning
+    # and here blocks on a human, long enough for .forge/project.toml to change.
+    try:
+        enforce_project_compatibility(ctx.forge_root)
+    except ProjectCompatibilityError as e:
+        raise AdoptError(str(e)) from e
 
     _check_still_adoptable(plan.session_uuid, plan.transcript_path, plan.claude_project_root)
 

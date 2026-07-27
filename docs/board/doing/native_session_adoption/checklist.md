@@ -34,8 +34,8 @@ bugs, so Slice 2's original "closed" note above understated the risk it shipped 
   `_is_adopted_session` protects the bound UUID through the existing shared-transcript filter. Test:
   `tests/regression/test_bug_adopt_transcript_retention.py`.
 - **Same-name concurrent create orphans the winner.** Real, but **not adoption-specific** -- it is pre-existing in
-  `start_session` and needs both the index pre-check (`:498`) and the manifest pre-check (`:599`) to miss. Fixed by
-  reserving the index name before writing the manifest, the ordering `create_child_session` already used. Test:
+  `start_session` and needs both the index pre-check (`:498`) and the manifest pre-check (`:599`) to miss. The first fix
+  reserved the index name first; see the second-round entry below for why that was wrong and what replaced it. Test:
   `tests/regression/test_bug_start_session_name_race.py`.
 - **Missing manifest-scan fallback** (card step 1). Confirmed. `scan_manifests_for_uuid`, promoted from private, now
   runs after the index lookup. Test: `test_binding_recorded_only_in_a_manifest_still_blocks_adoption`.
@@ -51,6 +51,47 @@ Deliberate deviation from the review on the model finding: it implied uniform va
 resolves in real transcripts but not in Forge's catalog, so uniform validation would make genuine conversations
 un-adoptable. Explicit `--model` is a user assertion (fail loudly); an inferred model is evidence about a conversation
 that really ran (degrade to no pin).
+
+**Second-round remediation (2026-07-27).** A follow-up review found six more issues; all six were verified against
+source. One was a regression introduced by the first round:
+
+- **Index-first reservation was not durable** (regression, first round). `IndexStore.list_sessions` prunes index rows
+  whose manifest is missing (`index.py:170`) -- precisely the window the reservation opened -- so a concurrent
+  `session list` could delete a reservation out from under its creator. Its own comment ("worst case is a false-positive
+  prune that gets re-added on the next session start") was only true while manifests were written first. Replaced with
+  `SessionStore.create_exclusive`, which claims the name under the manifest's own lock, and applied to all four true
+  creation paths: `start_session`, fork, resume-child, relaunch. `_restore_previous_target_state` and the deliberate
+  stale-fork-target replacement keep `write`, since both intend to overwrite.
+- **Unscoped rollback `remove_session`.** Confirmed: with `forge_root=None`, `resolve_key_strict` scans by name prefix,
+  so a same-named session in another project makes the rollback raise `AmbiguousSessionError` or delete the wrong
+  project's row. Latent before the first round made the branch reachable; now scoped.
+- **Adoption protection keyed only on the bound UUID.** Nothing pins `claude_session_id` to the adoption source once
+  hooks reconcile it, and the source UUID also sits in the artifact list. Now protects every tracked id -- over-
+  protecting leaks a Forge-written transcript, under-protecting destroys a user's conversation. Test:
+  `test_protection_survives_the_bound_uuid_drifting_from_the_adopted_one`.
+- **Case-sensitive UUID identity.** The already-bound check is a string equality, so `AAAA...` and `aaaa...` would bind
+  twice to one conversation -- and on macOS both resolve to the same transcript file. Now folded to lowercase, which is
+  safe because 0 of 470 local transcripts carry an upper-case hex digit. This corrects a first-round comment that
+  asserted, without evidence, that Claude emits both casings. Test:
+  `test_uppercase_cannot_double_bind_an_adopted_conversation`.
+- **No invariant recheck in `adopt_session`.** `AdoptPlan` is an ordinary dataclass, so a hand-built plan could reach
+  the same read-and-copy the unvalidated-id defect exploited. `_check_plan_invariants` re-derives the canonical id and
+  transcript path and re-enforces project compatibility.
+- **Card contradicted the implementation.** The rollback table listed the index marker as a fourth unwind item (the
+  enqueue is outside the guarded block, so that branch was unreachable), and the write-ordering section did not say what
+  makes a name reserved. Both reconciled, with the marker's best-effort semantics stated explicitly.
+
+One correction to the review's framing on the creation primitive: it asked for "one creation primitive across start,
+fork, resume-child, and relaunch." Applied to those four, but **not** blanket-applied --
+`_restore_previous_target_state` restores a prior manifest and the fork path deliberately replaces a stale target, so
+both are real overwrites and `create_exclusive` would be wrong there.
+
+Flipping the primitive also exposed that `_generate_resume_name` consulted only the index, so a collision retry could
+regenerate the same taken name; it now checks the manifest too, via `_name_is_taken`. That changed which mechanism
+`test_bug_resume_autoname_context_retry.py`'s third case exercises -- the name is now sidestepped rather than collided
+on -- so that test was updated to inject the winner between name generation and the create, the only interleaving that
+still reaches the collision branch. Its assertions were kept, not weakened, and it was re-verified to fail when the
+primitive is made non-exclusive.
 
 ## Re-grounding (2026-07-26)
 

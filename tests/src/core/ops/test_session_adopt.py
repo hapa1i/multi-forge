@@ -160,15 +160,25 @@ class TestPlanPreconditions:
         with pytest.raises(AdoptError, match="is not a conversation id"):
             plan_adoption(ExecutionContext.from_cwd(project), bad_id)
 
-    def test_accepts_surrounding_whitespace_and_uppercase(self, tmp_path: Path) -> None:
-        """Copy-paste artifacts are normalized; case is preserved for the filename."""
-        upper = _UUID.upper()
+    def test_normalizes_whitespace_and_case(self, tmp_path: Path) -> None:
+        """Copy-paste artifacts are folded to the canonical lowercase id."""
         project = _make_project(tmp_path)
-        _write_transcript(project, session_uuid=upper)
+        _write_transcript(project)
 
-        plan = plan_adoption(ExecutionContext.from_cwd(project), f"  {upper}\n")
+        plan = plan_adoption(ExecutionContext.from_cwd(project), f"  {_UUID.upper()}\n")
 
-        assert plan.session_uuid == upper
+        assert plan.session_uuid == _UUID
+
+    def test_uppercase_cannot_double_bind_an_adopted_conversation(self, tmp_path: Path) -> None:
+        """The already-bound check is a string equality, so casing must not slip past it."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project)
+        adopt_session(ctx, plan_adoption(ctx, _UUID), name="first")
+
+        with pytest.raises(UuidAlreadyBoundError) as excinfo:
+            plan_adoption(ctx, _UUID.upper())
+        assert excinfo.value.owner == "first"
 
     def test_no_state_is_created_by_a_rejected_plan(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path)

@@ -27,9 +27,7 @@ from forge.session.exceptions import SessionExistsError
 pytestmark = pytest.mark.regression
 
 
-def test_losing_a_name_race_leaves_the_winners_manifest_intact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_losing_a_name_race_leaves_the_winners_manifest_intact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "proj"
     project.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)

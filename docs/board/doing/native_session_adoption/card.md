@@ -27,6 +27,13 @@ specified as two disjoint stages, with an explicit prohibition on reaching for `
 whose default `delete_transcripts=True` would unlink the user's native transcript, since an adopted session's
 `claude_session_id` is the native UUID. See "Rollback mechanism" below.
 
+**Creation primitive and marker semantics reconciled 2026-07-27**, after review of the shipped Slice 2 code. Two points
+here contradicted the implementation. The rollback table listed the search-index marker as a fourth item to unwind, but
+the enqueue happens after the guarded block, so that branch was unreachable and is now removed. And the write-ordering
+paragraph described only *which* of the manifest and index row goes first, not *what makes the name a reservation*: it
+is `SessionStore.create_exclusive`, because `list_sessions` prunes index rows whose manifest is missing, so an index row
+cannot reserve anything. Both sections below now match the code.
+
 ## Goal
 
 `forge session adopt <claude-uuid | codex-thread-id> [--name <name>]` creates a Forge session manifest **bound to an
@@ -147,20 +154,29 @@ A new command-core op (`core/ops/session_adopt.py`), CLI leaf under `forge sessi
 
 **Write ordering (fail-closed atomicity).** Validate every precondition first (steps 1-2). Everything after that is
 constrained by an existing seam rather than free to sequence: because step 3 reuses `start_session`, the manifest
-(`session/manager.py:652`) and the index entry (`:655`) are written back-to-back inside a single try block, so adoption
+(`session/manager.py:681`) and the index entry (`:684`) are written back-to-back inside a single try block, so adoption
 **cannot** interleave its artifact copy between them or append the index entry last. Do not specify an ordering the API
 cannot produce.
 
-**Rollback mechanism (resolved 2026-07-27).** Compensation happens in **two disjoint stages**, because `start_session`'s
-own block cannot reach adoption's work:
+The manifest goes first, via `SessionStore.create_exclusive` (`session/store.py:248`) rather than `write`. That is the
+name reservation for every creation path: the index's authoritative uniqueness check lives inside its own lock, and
+`IndexStore.list_sessions` prunes index rows whose manifest is missing (`session/index.py:170`), so an index row is not
+a durable reservation. Creating under the manifest's own lock also makes `wrote_manifest` an ownership token, which is
+what lets the rollback below delete a manifest without risking someone else's.
 
-| Failure point                                         | Who compensates                         | How                                                                                                   |
-| ----------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| inside `start_session` (manifest write, index add)    | `start_session` itself, already shipped | its `except` block (`:666-681`), driven by the `wrote_manifest` / `added_to_index` flags (`:648-649`) |
-| after `start_session` returns (artifact copy, marker) | **the adopt op**                        | remove the marker and artifact copy, then `index_store.remove_session(name)`, then `store.delete()`   |
+**Rollback mechanism (resolved 2026-07-27; marker row corrected 2026-07-27).** Compensation happens in **two disjoint
+stages**, because `start_session`'s own block cannot reach adoption's work:
+
+| Failure point                                       | Who compensates                         | How                                                                                                      |
+| --------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| inside `start_session` (manifest create, index add) | `start_session` itself, already shipped | its `except` block (`:696`), driven by the `wrote_manifest` / `added_to_index` flags (`:672-673`)        |
+| after `start_session` returns (artifact copy)       | **the adopt op**                        | unlink the artifact copy, then `index_store.remove_session(name, forge_root=...)`, then `store.delete()` |
+
+Both `remove_session` calls pass `forge_root`. An unscoped remove resolves the name across projects, so a same-named
+session elsewhere makes the rollback either ambiguous or a delete of the wrong project's row.
 
 An earlier draft said adoption should "extend that same compensation path rather than add a second rollback of its own".
-That is **not implementable**: the `except` at `:666` is unreachable once `return state` executes at `:664`, and
+That is **not implementable**: the `except` at `:696` is unreachable once `return state` executes at `:694`, and
 adoption's artifact copy runs after that return. A second compensation is the only possible design -- and it is not the
 hazard the earlier wording implied, because the two stages are **disjoint in time** and cannot both fire for one
 failure.
@@ -179,20 +195,24 @@ session remains, the native transcript is untouched, and re-running succeeds cle
 UUID is the *already-bound reject* path (step 1), never a silent overwrite.
 
 **Rollback scope is narrow and must stay narrow.** Adoption is the first op whose inputs are *user-owned state Forge did
-not create*, so its rollback removes exactly four things and nothing else:
+not create*, so its rollback removes exactly three things and nothing else:
 
 | Rollback removes                                         | Rollback must NOT touch                                              |
 | -------------------------------------------------------- | -------------------------------------------------------------------- |
 | the index entry adoption added                           | the native transcript at `~/.claude/projects/...` (the adopt source) |
-| the session manifest adoption wrote                      | any worktree or branch                                               |
+| the session manifest adoption created                    | any worktree or branch                                               |
 | the transcript **copy** under `.forge/artifacts/<name>/` | any pre-existing session that already owned the UUID                 |
-| the queued search-index marker for that copy             | the `~/.claude` store -- transcripts **or** agent logs               |
+|                                                          | the `~/.claude` store -- transcripts **or** agent logs               |
 
-The worktree column is not hypothetical safety text: `create_worktree` defaults to `False` (`session/manager.py:416`)
-and `_rollback_worktree` short-circuits on `if not created_worktree` (`:482`), so adoption is already safe **provided it
-never passes `create_worktree=True`**. State that as a constraint rather than relying on a default. The marker row
-matters because a marker outliving its artifact points the indexer at a deleted file; remove it in the same compensation
-path, not as a later sweep.
+The worktree column is not hypothetical safety text: `create_worktree` defaults to `False` (`session/manager.py:434`)
+and `_rollback_worktree` short-circuits on `if not created_worktree` (`:506`), so adoption is already safe **provided it
+never passes `create_worktree=True`**. State that as a constraint rather than relying on a default.
+
+The search-index marker is deliberately **not** a rollback item, correcting an earlier draft that listed it as a fourth.
+The concern behind that row was real -- a marker outliving its artifact points the indexer at a deleted file -- but the
+enqueue happens *after* the guarded block, so a marker only ever exists on a path that already succeeded. Keeping the
+row would have meant a permanently unreachable branch. Marker enqueue failure is best-effort and surfaces as
+`AdoptResult.indexed=False` plus a `forge search reindex` tip, not as a failed adoption.
 
 **Already-bound is a TOCTOU today.** The step-1 check and the index write take the index lock *separately* --
 `find_session_by_uuid` (`session/index.py:503`) and `add_session` (`:372`) each open their own `file_lock_for_target` --
@@ -331,27 +351,27 @@ Still open:
 
 ## Acceptance tests
 
-| Test                              | Fixture                                                                                                               | Assertion                                                                                                                                    | Test File                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Adopt binds + reattach            | native `<uuid>.jsonl` in exact encoded cwd                                                                            | manifest has `claude_session_id=<uuid>` + `claude_project_root`; resume argv `--resume <uuid>`, no `--fork-session`                          | `tests/src/cli/test_session_adopt.py` (new)                                   |
-| Adopted model is explicit         | native transcript with model metadata / two real models / no assistant turn                                           | inferred (**last** real model) or `--model` value persists; the no-basis path warns and leaves `direct_model` unset                          | same                                                                          |
-| Adoption adds no model pin        | adopted with no model basis, then `resume --proxy <id>`                                                               | `direct_model` is `None` and `model_basis` is `none`, so the adopted manifest contributes no `ANTHROPIC_MODEL` (ambient env is out of scope) | same                                                                          |
-| Adoption schema round trip        | adopted manifest read through `SessionStore.read`                                                                     | strict read/write preserves `confirmed.adoption` incl. `model_basis`; unknown ad hoc keys are not required                                   | `tests/src/session/test_models.py` or same                                    |
-| Adopt queues search indexing      | adopted transcript artifact                                                                                           | copied artifact is passed through the normal index marker/index path; `search query` can find it after processing                            | same                                                                          |
-| Adopt does not run memory writer  | memory-enabled adopted session before any Forge Stop                                                                  | no handoff marker is created at adopt; first simulated Stop enqueues memory work with the full transcript snapshot                           | same                                                                          |
-| Already-bound reject              | UUID present in index / a manifest                                                                                    | error names the owning session; no state created                                                                                             | same                                                                          |
-| Missing transcript reject         | UUID with no JSONL on disk                                                                                            | fail-closed error; no manifest, no index entry                                                                                               | same                                                                          |
-| Outside Forge project reject      | cwd without `.forge/`                                                                                                 | error names `forge extension enable`                                                                                                         | same                                                                          |
-| Project compatibility guard       | incompatible `.forge/project.toml`                                                                                    | command-path mutation blocks before manifest/artifact/index writes; missing file remains compatible                                          | same                                                                          |
-| Discovery lists unbound only      | two native transcripts in exact cwd, one already bound                                                                | listing shows the unbound one only and names the cwd scanned                                                                                 | same                                                                          |
-| Subdir exact-CWD guidance         | native transcript launched from subdir, command run at root                                                           | root preview/adopt does not misattribute; diagnostic says to run from the native launch directory                                            | same                                                                          |
-| Provenance survives Stop          | adopted session, then simulated Stop capture                                                                          | `confirmed.adoption` intact and `confirmed.claude_session_id` unchanged while `confirmed_by` becomes `hook:stop`                             | same                                                                          |
-| Adopted transfer works            | adopted manifest, `resume --fresh`                                                                                    | transfer context assembled from the native transcript                                                                                        | same                                                                          |
-| Codex adopt binds (Phase 2)       | rollout fixture with matching head cwd                                                                                | `confirmed.codex.thread_id` set, `rollout_source="adopted"`; resume dispatches `codex resume <thread>`                                       | same                                                                          |
-| Codex rollout mismatch reject     | rollout fixtures with wrong cwd / duplicate matching cwd                                                              | adoption rejects cwd mismatch and multiple candidates instead of silently choosing newest                                                    | same                                                                          |
-| Claude cwd cross-check reject     | native transcript whose recorded `cwd` differs from the run cwd (lossy-encoding sibling)                              | adoption rejects on recorded-`cwd` mismatch instead of binding the sibling's transcript                                                      | same                                                                          |
-| Partial-failure leaves no binding | (a) `add_from_state` raises inside `start_session`; (b) adoption's artifact copy raises after `start_session` returns | both leave no UUID-bound session and no manifest; re-running `adopt` succeeds cleanly                                                        | same                                                                          |
-| Rollback spares the native source | adopt fails after the artifact copy                                                                                   | the native `~/.claude/projects/<enc>/<uuid>.jsonl` still exists byte-identical; no worktree/branch was removed; no index marker survives     | same                                                                          |
-| Concurrent adopt binds once       | two `adopt` calls racing on one UUID                                                                                  | exactly one succeeds; the loser gets the already-bound reject and creates no manifest or index entry                                         | same                                                                          |
-| Reattach identity (**shipped**)   | Forge session, one fresh `--print` turn, then a plain `--resume` turn                                                 | every Stop payload's `session_id` equals the original; one UUID-named artifact; both prompts in the one transcript                           | `tests/integration/docker/test_adopt_binding_contract.py` (slow, real Claude) |
-| Real-Claude adoption gate         | bare-`claude` conversation created in container                                                                       | adopt + `claude --resume <uuid>` continues the conversation (manifest Forge never launched)                                                  | `tests/integration/docker/` (slow, real Claude)                               |
+| Test                              | Fixture                                                                                                               | Assertion                                                                                                                                         | Test File                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Adopt binds + reattach            | native `<uuid>.jsonl` in exact encoded cwd                                                                            | manifest has `claude_session_id=<uuid>` + `claude_project_root`; resume argv `--resume <uuid>`, no `--fork-session`                               | `tests/src/cli/test_session_adopt.py` (new)                                   |
+| Adopted model is explicit         | native transcript with model metadata / two real models / no assistant turn                                           | inferred (**last** real model) or `--model` value persists; the no-basis path warns and leaves `direct_model` unset                               | same                                                                          |
+| Adoption adds no model pin        | adopted with no model basis, then `resume --proxy <id>`                                                               | `direct_model` is `None` and `model_basis` is `none`, so the adopted manifest contributes no `ANTHROPIC_MODEL` (ambient env is out of scope)      | same                                                                          |
+| Adoption schema round trip        | adopted manifest read through `SessionStore.read`                                                                     | strict read/write preserves `confirmed.adoption` incl. `model_basis`; unknown ad hoc keys are not required                                        | `tests/src/session/test_models.py` or same                                    |
+| Adopt queues search indexing      | adopted transcript artifact                                                                                           | copied artifact is passed through the normal index marker/index path; `search query` can find it after processing                                 | same                                                                          |
+| Adopt does not run memory writer  | memory-enabled adopted session before any Forge Stop                                                                  | no handoff marker is created at adopt; first simulated Stop enqueues memory work with the full transcript snapshot                                | same                                                                          |
+| Already-bound reject              | UUID present in index / a manifest                                                                                    | error names the owning session; no state created                                                                                                  | same                                                                          |
+| Missing transcript reject         | UUID with no JSONL on disk                                                                                            | fail-closed error; no manifest, no index entry                                                                                                    | same                                                                          |
+| Outside Forge project reject      | cwd without `.forge/`                                                                                                 | error names `forge extension enable`                                                                                                              | same                                                                          |
+| Project compatibility guard       | incompatible `.forge/project.toml`                                                                                    | command-path mutation blocks before manifest/artifact/index writes; missing file remains compatible                                               | same                                                                          |
+| Discovery lists unbound only      | two native transcripts in exact cwd, one already bound                                                                | listing shows the unbound one only and names the cwd scanned                                                                                      | same                                                                          |
+| Subdir exact-CWD guidance         | native transcript launched from subdir, command run at root                                                           | root preview/adopt does not misattribute; diagnostic says to run from the native launch directory                                                 | same                                                                          |
+| Provenance survives Stop          | adopted session, then simulated Stop capture                                                                          | `confirmed.adoption` intact and `confirmed.claude_session_id` unchanged while `confirmed_by` becomes `hook:stop`                                  | same                                                                          |
+| Adopted transfer works            | adopted manifest, `resume --fresh`                                                                                    | transfer context assembled from the native transcript                                                                                             | same                                                                          |
+| Codex adopt binds (Phase 2)       | rollout fixture with matching head cwd                                                                                | `confirmed.codex.thread_id` set, `rollout_source="adopted"`; resume dispatches `codex resume <thread>`                                            | same                                                                          |
+| Codex rollout mismatch reject     | rollout fixtures with wrong cwd / duplicate matching cwd                                                              | adoption rejects cwd mismatch and multiple candidates instead of silently choosing newest                                                         | same                                                                          |
+| Claude cwd cross-check reject     | native transcript whose recorded `cwd` differs from the run cwd (lossy-encoding sibling)                              | adoption rejects on recorded-`cwd` mismatch instead of binding the sibling's transcript                                                           | same                                                                          |
+| Partial-failure leaves no binding | (a) `add_from_state` raises inside `start_session`; (b) adoption's artifact copy raises after `start_session` returns | both leave no UUID-bound session and no manifest; re-running `adopt` succeeds cleanly                                                             | same                                                                          |
+| Rollback spares the native source | adopt fails after the artifact copy                                                                                   | the native `~/.claude/projects/<enc>/<uuid>.jsonl` still exists byte-identical; no worktree/branch was removed; no manifest or index row survives | same                                                                          |
+| Concurrent adopt binds once       | two `adopt` calls racing on one UUID                                                                                  | exactly one succeeds; the loser gets the already-bound reject and creates no manifest or index entry                                              | same                                                                          |
+| Reattach identity (**shipped**)   | Forge session, one fresh `--print` turn, then a plain `--resume` turn                                                 | every Stop payload's `session_id` equals the original; one UUID-named artifact; both prompts in the one transcript                                | `tests/integration/docker/test_adopt_binding_contract.py` (slow, real Claude) |
+| Real-Claude adoption gate         | bare-`claude` conversation created in container                                                                       | adopt + `claude --resume <uuid>` continues the conversation (manifest Forge never launched)                                                       | `tests/integration/docker/` (slow, real Claude)                               |
