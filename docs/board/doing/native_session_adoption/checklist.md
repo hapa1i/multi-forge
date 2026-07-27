@@ -522,17 +522,33 @@ transaction -- is broader than this card and needs its own.
 
 ## Slice 5 -- Gates, docs, closeout
 
-- [ ] Real-Claude adoption gate (slow, Docker): a bare-`claude` conversation created in-container is adopted and
+- [x] Real-Claude adoption gate (slow, Docker): a bare-`claude` conversation created in-container is adopted and
   continued via `claude --resume <uuid>` from a manifest Forge never launched.
-- [ ] Integration suites run, not deferred to closeout -- adoption touches session lifecycle, hooks, and the index, none
-  of which unit tests exercise (`testing_guidelines.md`, "When to Run Integration Tests").
-- [ ] `workspace_scope` identity-table line extended to "bound when launched **or adopted**"; the inbound link from that
-  card still resolves.
-- [ ] `cli_reference.md` session table gains the `adopt` leaf.
-- [ ] Change-log entry with Goal / Key changes / Verification.
-- [ ] Durable lessons proposed for `impl_notes.md` after human review (candidates: the encoded-dir lossiness cross-check
-  as a binding precondition; P1's outcome as a pinned runtime contract).
-- [ ] Card moved to `done/`, inbound board links repointed.
+  `tests/integration/docker/test_adopt_native_conversation.py`, green on Claude Code 2.1.220. The conversation is
+  created with `FORGE_SESSION` unset so no hook writes anything; the gate then asserts the `--json` preview finds
+  exactly one candidate (a never-launched Forge session is the control that must not appear), the 30-minute
+  double-attach guard fires on a conversation that ended seconds ago, `_is_resumable_session` accepts a transcript Forge
+  never wrote, and the resumed turn recalls a number stated only before adoption -- continuity, not just exit 0. Also
+  asserts the native transcript still exists afterwards.
+- [x] Integration suites run, not deferred to closeout -- adoption touches session lifecycle, hooks, and the index, none
+  of which unit tests exercise (`testing_guidelines.md`, "When to Run Integration Tests"). Ran
+  `test_session_commands_integration.py` (43 passed) and both Docker adoption gates.
+- [x] `workspace_scope` identity-table line extended to "bound when launched **or adopted**"; the outbound link from
+  this card to that one keeps the same depth under `done/`, so it needs no repoint.
+- [x] `cli_reference.md` session table gains the `adopt` leaf. Verified at line 131 -- already synced during Slice 2 and
+  extended for the Codex arm in Slice 4; re-read rather than assumed.
+- [x] Change-log entry with Goal / Key changes / Verification.
+- [ ] Durable lessons proposed for `impl_notes.md` after human review. Candidates, awaiting review:
+  1. **`Path(base) / "/abs"` discards `base`.** Hit three times on this card (adoption id, `SessionStore` session name).
+     Any caller-supplied path component needs shape validation *before* it is joined, not after.
+  2. **Uniqueness must be enforced under the lock that publishes the row.** A pre-check plus a later write under a
+     different lock is not exclusion, however carefully ordered. If an id must be unique across sessions, it belongs in
+     the index row, because the index write lock is the only lock shared across session names.
+  3. **The encoded-project-directory encoding is lossy** (`/`, `.`, `_` all fold to `-`), so a transcript found under it
+     must still be cross-checked against the `cwd` recorded inside the file.
+  4. **A swallowed read is not an absent record.** Binding/uniqueness lookups must fail closed on every source they
+     consult, not just the first one.
+- [ ] Card moved to `done/` (no inbound board links to repoint -- verified by grep across `docs/`).
 
 ## Acceptance-test mapping
 
