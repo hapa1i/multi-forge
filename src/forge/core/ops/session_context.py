@@ -424,11 +424,13 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
     Reads without pruning: ``list_sessions`` self-heals by deleting index rows,
     which a read-only caller such as the adoption preview must not trigger.
 
-    Fails closed. An unreadable index cannot be reported as "nothing is bound"
-    when the caller is using this to decide whether a conversation is free.
+    Fails closed throughout. Neither an unreadable index nor an unreadable manifest
+    can be reported as "nothing is bound" when the caller is using this to decide
+    whether a conversation is free -- a swallowed read is indistinguishable from an
+    absent binding, and would let the same conversation bind twice.
 
     Raises:
-        BindingLookupError: If the index itself cannot be read.
+        BindingLookupError: If the index, or any manifest it names, cannot be read.
     """
     index = IndexStore()
     try:
@@ -442,27 +444,26 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
         if isinstance(session_uuid, str) and session_uuid:
             bound.setdefault(session_uuid.lower(), owner)
 
+    def _read_manifest_uuid(root: str, name: str) -> None:
+        try:
+            store = SessionStore(root, name)
+            if store.exists():
+                _record(store.read().confirmed.claude_session_id, name)
+        except Exception as e:
+            raise BindingLookupError(
+                f"Could not read the manifest for session '{name}': {e}. "
+                f"Repair or remove {get_sessions_dir(root) / name} before adopting."
+            ) from e
+
     for key, entry in rows.items():
         name = session_name_from_key(key)
         _record(entry.claude_session_id, name)
-        try:
-            store = SessionStore(entry.forge_root or entry.worktree_path, name)
-            if store.exists():
-                _record(store.read().confirmed.claude_session_id, name)
-        except Exception:
-            _log.debug("Failed to read manifest for '%s' while collecting bound UUIDs", name, exc_info=True)
+        _read_manifest_uuid(entry.forge_root or entry.worktree_path, name)
 
     if forge_root:
         for manifest_dir in _manifest_dirs(forge_root):
-            name = manifest_dir.name
-            if name in bound.values():
-                continue
-            try:
-                store = SessionStore(forge_root, name)
-                if store.exists():
-                    _record(store.read().confirmed.claude_session_id, name)
-            except Exception:
-                _log.debug("Failed to read orphan manifest '%s'", name, exc_info=True)
+            if manifest_dir.name not in bound.values():
+                _read_manifest_uuid(forge_root, manifest_dir.name)
 
     return bound
 
@@ -470,13 +471,18 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
 def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]:
     """Map every bound Codex thread id (lowercased) to the session that owns it.
 
-    The Codex counterpart to ``collect_bound_uuids``. Thread ids have no index
-    column of their own, so this reads manifests only -- which makes the orphan
-    scan under ``forge_root`` the sole defence against a crashed adopt letting the
-    same thread bind twice.
+    The Codex counterpart to ``collect_bound_uuids``. Only adopted threads carry an
+    index column (``codex_thread_id``); the ordinary Codex paths discover their
+    thread after the run and record it on the manifest alone. So this reads
+    manifests, and the orphan scan under ``forge_root`` is the only way to see a
+    session whose index row was never written.
+
+    Fails closed for the same reason as ``collect_bound_uuids``, and more sharply:
+    with manifests as the sole source, one swallowed read is a thread that looks
+    free.
 
     Raises:
-        BindingLookupError: If the index itself cannot be read.
+        BindingLookupError: If the index, or any manifest it names, cannot be read.
     """
     index = IndexStore()
     try:
@@ -486,35 +492,49 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
 
     bound: dict[str, str] = {}
 
-    def _record(store: SessionStore, name: str) -> None:
+    def _record(root: str, name: str) -> None:
         try:
+            store = SessionStore(root, name)
             if not store.exists():
                 return
             codex = store.read().confirmed.codex
-        except Exception:
-            _log.debug("Failed to read manifest for '%s' while collecting Codex threads", name, exc_info=True)
-            return
+        except Exception as e:
+            raise BindingLookupError(
+                f"Could not read the manifest for session '{name}': {e}. "
+                f"Repair or remove {get_sessions_dir(root) / name} before adopting."
+            ) from e
         if codex is not None and codex.thread_id:
             bound.setdefault(codex.thread_id.lower(), name)
 
     for key, entry in rows.items():
         name = session_name_from_key(key)
-        _record(SessionStore(entry.forge_root or entry.worktree_path, name), name)
+        _record(entry.forge_root or entry.worktree_path, name)
 
     if forge_root:
         for manifest_dir in _manifest_dirs(forge_root):
             if manifest_dir.name not in bound.values():
-                _record(SessionStore(forge_root, manifest_dir.name), manifest_dir.name)
+                _record(forge_root, manifest_dir.name)
 
     return bound
 
 
 def _manifest_dirs(forge_root: str) -> list[Path]:
-    """Return the per-session directories under a project's ``.forge/sessions/``."""
+    """Return the per-session directories under a project's ``.forge/sessions/``.
+
+    A missing directory is a project with no sessions yet. Any other error is
+    reported, not flattened to "no sessions": callers use this to decide whether a
+    conversation is free, and an unreadable directory is unknown, not empty.
+
+    Raises:
+        BindingLookupError: If the directory exists but cannot be listed.
+    """
+    sessions_dir = get_sessions_dir(forge_root)
     try:
-        return sorted(p for p in get_sessions_dir(forge_root).iterdir() if p.is_dir())
-    except OSError:
+        return sorted(p for p in sessions_dir.iterdir() if p.is_dir())
+    except FileNotFoundError:
         return []
+    except OSError as e:
+        raise BindingLookupError(f"Could not list sessions under {sessions_dir}: {e}") from e
 
 
 def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:

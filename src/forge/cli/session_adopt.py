@@ -42,11 +42,11 @@ session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circu
 @session.command()
 @click.argument("conversation_id", required=False)
 @click.option("--name", "-n", help="Forge session name (defaults to the conversation id prefix)")
-@click.option("--model", "-m", help="Model to pin for future Forge resumes (overrides transcript inference)")
+@click.option("--model", "-m", help="Claude only: pin a model for future Forge resumes (overrides inference)")
 @click.option("--yes", "-y", is_flag=True, help="Skip the confirmation for a recently-active conversation")
 @click.option("--json", "as_json", is_flag=True, help="Output the preview as JSON (no conversation id)")
 def adopt(conversation_id: str | None, name: str | None, model: str | None, yes: bool, as_json: bool) -> None:
-    """Adopt a native Claude conversation as a managed Forge session.
+    """Adopt a native Claude or Codex conversation as a managed Forge session.
 
     \b
     Examples:
@@ -55,12 +55,16 @@ def adopt(conversation_id: str | None, name: str | None, model: str | None, yes:
         forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2
         forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name my-session --model claude-opus-5
 
-    CONVERSATION_ID is the full transcript UUID, not a prefix. Omit it to list
-    the unbound conversations launched from this directory.
+    CONVERSATION_ID is the full Claude transcript UUID or Codex thread id, not a
+    prefix; the runtime is detected from which one has a matching file on disk.
+    Omit it to list the unbound Claude conversations launched from this directory
+    -- the preview does not cover Codex, whose rollouts are not indexed by path.
 
-    Run this from the directory the native session was launched in: Claude
-    stores transcripts under an encoding of that path, and adoption verifies
-    the transcript's recorded directory matches before binding it.
+    Run this from the directory the native session was launched in. Both runtimes
+    verify that recorded directory before binding, and neither is adoptable from
+    anywhere else.
+
+    --model applies to Claude only; Codex resolves its own model per turn.
 
     Adoption does not attach hooks, env, or supervision to an already-running
     client; those begin with the next Forge-managed resume or fork.
@@ -319,10 +323,10 @@ def _adopt_codex(ctx: ExecutionContext, thread_id: str, *, name: str | None, mod
         print_error(str(e))
         sys.exit(1)
 
-    console.print(f"[green]Adopted[/green] Codex thread [bold]{plan.thread_id}[/bold] as '{adopted}'")
-    console.print(Text(f"  Rollout: {plan.rollout_path}", style="dim"))
+    console.print(f"[green]Adopted[/green] Codex thread [bold]{adopted.thread_id}[/bold] as '{adopted.name}'")
+    console.print(Text(f"  Rollout: {adopted.rollout_path}", style="dim"))
     print_tip(
         "Continue it as a managed session:",
-        commands=[f"forge session resume {adopted} --task '<next task>'"],
+        commands=[f"forge session resume {adopted.name} --task '<next task>'"],
         console=console,
     )

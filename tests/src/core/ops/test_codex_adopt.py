@@ -116,6 +116,27 @@ class TestRolloutLookup:
         with pytest.raises(AdoptError, match="records no launch directory"):
             find_adoptable_rollout(_THREAD, project)
 
+    def test_an_unreadable_head_keeps_a_verified_match_ambiguous(self, tmp_path: Path) -> None:
+        """Missing evidence is not evidence of a different directory.
+
+        Dropping the unverifiable rollout would silently bind the other one -- and
+        the unverifiable one may be the conversation the user meant.
+        """
+        project = _make_project(tmp_path)
+        _write_rollout(tmp_path, project, day="2026/06/27", stamp="2026-06-27T19-24-02")
+        _write_rollout(tmp_path, project, day="2026/06/28", stamp="2026-06-28T09-00-00", include_cwd=False)
+
+        with pytest.raises(AdoptError, match="matches 2 rollouts"):
+            find_adoptable_rollout(_THREAD, project)
+
+    def test_ignores_a_file_whose_name_is_not_a_rollout(self, tmp_path: Path) -> None:
+        """The glob is looser than the naming contract; the parser is the authority."""
+        project = _make_project(tmp_path)
+        real = _write_rollout(tmp_path, project)
+        (real.parent / f"rollout-{_THREAD}.jsonl").write_text("{}\n", encoding="utf-8")
+
+        assert find_adoptable_rollout(_THREAD, project) == real
+
 
 class TestRuntimeDetection:
     def test_routes_a_codex_thread_to_the_codex_arm(self, tmp_path: Path) -> None:
@@ -154,9 +175,10 @@ class TestCodexAdoptWrites:
         rollout = _write_rollout(tmp_path, project)
         ctx = ExecutionContext.from_cwd(project)
 
-        name = adopt_codex_session(ctx, plan_codex_adoption(ctx, _THREAD), name="adopted")
+        result = adopt_codex_session(ctx, plan_codex_adoption(ctx, _THREAD), name="adopted")
 
-        state = SessionStore(str(project), name).read()
+        assert result.rollout_path == rollout, "the re-resolved path is what callers report"
+        state = SessionStore(str(project), result.name).read()
         assert state.confirmed.codex is not None
         assert state.confirmed.codex.thread_id == _THREAD
         assert state.confirmed.codex.rollout_path == str(rollout)

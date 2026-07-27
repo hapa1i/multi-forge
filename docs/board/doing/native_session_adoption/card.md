@@ -337,7 +337,12 @@ All ingredients exist; nothing constructs a manifest *from* a rollout today:
 
 Still open:
 
-- **Runtime ambiguity** (Phase 2): an id matching both a Claude transcript and a codex rollout requires `--runtime`.
+- ~~**Runtime ambiguity** (Phase 2): an id matching both a Claude transcript and a codex rollout requires `--runtime`.~~
+  **Decided in Slice 4: refuse instead, no flag.** A dual match needs one id string to name both a Claude transcript and
+  a Codex thread. Claude mints v4 UUIDs and Codex v7, and the ids come from unrelated generators, so a collision means
+  something is wrong with the files rather than that the user has two real conversations to choose between. A
+  `--runtime` flag would let the user assert past that instead of looking. Shipped behavior is a hard refusal naming
+  both matched paths (`detect_adoption_runtime`), documented in design.md §3.3.
 - **Passive sighting** (explicitly deferred): post-epic (T3 registry + T5 user-scope hooks), a SessionStart hook firing
   in an enrolled project *could* record native-session sightings to make discovery instant -- that changes the normative
   "hooks use `FORGE_SESSION` only" rule and belongs to a future card, gated on the epic landing.

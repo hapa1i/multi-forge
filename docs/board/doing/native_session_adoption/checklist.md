@@ -19,8 +19,9 @@ The Claude arm is usable end to end: bare `adopt` to find a conversation, `adopt
 Claude 2.1.220, P2, P3). Slice 1 shipped `confirmed.AdoptionConfirmed`. Slice 2 shipped `forge session adopt` -- the
 command-core op, the CLI leaf, and the locked index guard that closes the already-bound TOCTOU -- with design.md §3.3
 and §3.5 and `cli_reference.md` synced. Slice 3 shipped the bare-`adopt` discovery preview, completing the settled
-discovery decision. Slice 4 shipped the Codex arm with evidence-based runtime detection. **Cursor: Slice 5** (gates,
-docs, closeout), plus the crash-atomicity debt recorded above.
+discovery decision. Slice 4 shipped the Codex arm with evidence-based runtime detection, and Slice 4a closed the
+one-thread/one-manifest hole review found in it. **Cursor: Slice 5** (gates, docs, closeout), plus the crash-atomicity
+debt recorded above.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -486,6 +487,38 @@ Two smaller decisions:
   of this card. Verified by `test_the_rollout_is_never_copied_or_moved`.
 - **`--model` is refused for Codex, not ignored.** Codex resolves its own model per turn, so accepting the flag would
   imply a pin that nothing reads.
+
+### Slice 4a -- one-thread/one-manifest made atomic (review follow-up, 2026-07-27)
+
+Review of the shipped Slice 4 found the card's core invariant still breakable. Confirmed by reproduction before fixing:
+a barrier-gated probe released two differently-named adopts after each had seen the thread id as free, and **both
+bound**.
+
+- [x] Codex thread identity is committed by the write that publishes the session. Assertion: two interleaved adopts of
+  one thread produce exactly one binding and one `UuidAlreadyBoundError`; a published Codex session never has
+  `confirmed.codex = None`. Verified by `tests/regression/test_bug_codex_adopt_double_bind.py` (2 cases), confirmed
+  non-vacuous by removing the index derivation and watching both fail.
+- [x] Binding discovery fails closed on manifests, not just on the index. Assertion: an unparseable manifest raises
+  `BindingLookupError` naming the directory to repair, rather than reporting the conversation as free. Verified by
+  `TestBindingCollectionFailsClosed` (3 cases, including that an absent sessions dir is still empty, not an error).
+- [x] An unreadable rollout head keeps the candidate set ambiguous instead of being dropped, and the filename parser --
+  not the looser glob -- decides what counts as a rollout. Verified by
+  `test_an_unreadable_head_keeps_a_verified_match_ambiguous` and `test_ignores_a_file_whose_name_is_not_a_rollout`.
+- [x] Success output reports the re-resolved rollout path (`CodexAdoptResult`), not the planning-time one.
+- [x] CLI help and `docs/end-user/session.md` cover both arms; the transcript-copy claim is scoped to Claude.
+- [x] Card's "requires `--runtime`" open item closed as a recorded decision (refuse, no flag).
+
+**Why the fix is in `start_session` rather than the op.** The pre-check and the binding write took different locks (the
+index's vs. the session's own manifest lock), so no ordering of them inside `codex_adopt.py` could exclude a concurrent
+adopt. The index write lock is the only lock shared across session names, which means the thread id has to be *in* the
+index row to be checkable there -- hence the new `codex_thread_id` column and `require_uuid_unbound` covering both
+bindings. Handing the whole `CodexConfirmed` to `start_session` also removes the second write, so
+`_rollback_codex_adoption` became unreachable and was deleted.
+
+**Not fixed here, still open debt:** session creation remains non-atomic across manifest and index (a kill between
+`create_exclusive` and `add_from_state` leaves an orphan manifest). The orphan manifest scan in
+`collect_bound_codex_threads` covers the adoption invariant against it, but the general fix -- an index-lock-spanning
+transaction -- is broader than this card and needs its own.
 
 ## Slice 5 -- Gates, docs, closeout
 

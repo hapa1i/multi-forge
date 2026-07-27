@@ -297,6 +297,7 @@ class IndexStore:
         is_incognito: bool = False,
         parent_session: str | None = None,
         claude_session_id: str | None = None,
+        codex_thread_id: str | None = None,
         forge_root: str | None = None,
         checkout_root: str | None = None,
         relative_path: str | None = None,
@@ -317,12 +318,14 @@ class IndexStore:
             forge_root: Forge project root (where .forge/ lives).
             checkout_root: Git checkout root (--show-toplevel).
             relative_path: forge_root relative to checkout_root.
-            require_uuid_unbound: Re-check UUID uniqueness **inside** this
-                method's write lock. Callers that bind a pre-existing
+            codex_thread_id: Native Codex thread id, when binding a pre-existing one.
+            require_uuid_unbound: Re-check conversation uniqueness **inside** this
+                method's write lock, for whichever of ``claude_session_id`` /
+                ``codex_thread_id`` is set. Callers that bind a pre-existing
                 conversation (``forge session adopt``) pass True: their
                 precondition check runs under a separate lock acquisition, so
-                without this two concurrent adopts on one UUID would both pass
-                and both bind. The check lives here rather than in a sibling
+                without this two concurrent adopts on one conversation would both
+                pass and both bind. The check lives here rather than in a sibling
                 method so it shares this lock instead of duplicating the write.
 
         Returns:
@@ -331,7 +334,7 @@ class IndexStore:
         Raises:
             InvalidSessionNameError: If name is invalid.
             SessionExistsError: If session already exists in this project.
-            UuidAlreadyBoundError: If require_uuid_unbound and the UUID is taken.
+            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
         """
         validate_name(name)
         effective_forge_root = forge_root or worktree_path
@@ -343,10 +346,14 @@ class IndexStore:
             if scoped_key in index.sessions:
                 raise SessionExistsError(name)
 
-            if require_uuid_unbound and claude_session_id:
+            if require_uuid_unbound:
                 for existing_key, existing in index.sessions.items():
-                    if existing.claude_session_id == claude_session_id:
-                        raise UuidAlreadyBoundError(claude_session_id, session_name_from_key(existing_key))
+                    for wanted, held in (
+                        (claude_session_id, existing.claude_session_id),
+                        (codex_thread_id, existing.codex_thread_id),
+                    ):
+                        if wanted and held == wanted:
+                            raise UuidAlreadyBoundError(wanted, session_name_from_key(existing_key))
 
             entry = SessionIndexEntry(
                 worktree_path=worktree_path,
@@ -356,6 +363,7 @@ class IndexStore:
                 is_incognito=is_incognito,
                 parent_session=parent_session,
                 claude_session_id=claude_session_id,
+                codex_thread_id=codex_thread_id,
                 forge_root=effective_forge_root,
                 checkout_root=checkout_root or worktree_path,
                 relative_path=relative_path or ".",
@@ -499,6 +507,7 @@ class IndexStore:
             is_incognito=state.is_incognito,
             parent_session=state.parent_session,
             claude_session_id=state.confirmed.claude_session_id,
+            codex_thread_id=state.confirmed.codex.thread_id if state.confirmed.codex else None,
             forge_root=effective_forge_root,
             checkout_root=checkout_root,
             relative_path=relative_path,

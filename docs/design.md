@@ -217,8 +217,20 @@ stale fork-target replacement).
 Manifest-first creation is not atomic with index publication: a process killed between the two leaves a manifest with no
 index row. Such an orphan is inert for listing but still owns its name, and any check that enumerates sessions through
 the index cannot see it. Reads that decide whether a **conversation** is already bound must therefore also scan manifest
-directories under the project root — `collect_bound_uuids(forge_root)`, which additionally reads without pruning and
-fails closed, so a read-only caller neither mutates the index nor reports "unbound" because a read failed.
+directories under the project root — `collect_bound_uuids(forge_root)` and `collect_bound_codex_threads(forge_root)`,
+which additionally read without pruning and fail closed on the index *and* on every manifest they touch, so a read-only
+caller neither mutates the index nor reports "unbound" because a read failed. An unreadable manifest raises
+`BindingLookupError` naming the directory to repair: a swallowed read is indistinguishable from an absent binding, which
+is what would let one conversation bind twice.
+
+**A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
+`start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it
+afterwards. Two properties follow. The id reaches the index row, so `require_uuid_unbound` can re-check uniqueness
+**inside the index write lock**, the only lock shared across session names; the pre-check alone runs under a separate
+acquisition and cannot stop two differently-named adopts of one conversation from both passing it. And no window exists
+in which a published session lacks its binding. The Codex arm needs an index column of its own for this
+(`codex_thread_id`), set only where a pre-existing thread is bound; the ordinary Codex paths discover their thread after
+the run and record it on the manifest alone, which is why the manifest scan above stays the completeness check.
 
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
@@ -234,6 +246,7 @@ class SessionIndexEntry:
     is_incognito: bool = False
     parent_session: str | None = None
     claude_session_id: str | None = None
+    codex_thread_id: str | None = None   # adopted threads only -- see the uniqueness note above
 ```
 
 `session list --scope` controls filtering: **`workspace`** (default) filters by `project_root` -- shows sessions across

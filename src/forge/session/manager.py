@@ -46,6 +46,8 @@ from .exceptions import (
 )
 from .index import IndexStore
 from .models import (
+    AdoptionConfirmed,
+    CodexConfirmed,
     Derivation,
     LaunchIntent,
     SessionIndexEntry,
@@ -471,6 +473,9 @@ class SessionManager:
         sidecar_image: str | None = None,
         direct_model: str | None = None,
         claude_session_id: str | None = None,
+        codex_confirmed: CodexConfirmed | None = None,
+        adoption: AdoptionConfirmed | None = None,
+        confirmed_by: str | None = None,
         runtime: str = "claude_code",
         parent_session: str | None = None,
         require_uuid_unbound: bool = False,
@@ -494,20 +499,29 @@ class SessionManager:
             sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
             sidecar_image: Optional sidecar image override to persist for relaunch.
             direct_model: Optional Claude Code env-ready direct model pin.
+            claude_session_id: Pre-seed the bound Claude conversation.
+            codex_confirmed: Pre-seed `confirmed.codex`. Codex adoption passes it here
+                rather than writing it afterwards so the thread id is committed by the
+                same call that publishes the session: it reaches the index row (whose
+                write lock enforces uniqueness), and no window exists in which an
+                indexed Codex session carries `confirmed.codex = None`.
+            adoption: Pre-seed `confirmed.adoption` for the same reason.
+            confirmed_by: Pre-seed `confirmed.confirmed_by`/`confirmed_at`.
             runtime: Runtime registry id for launcher dispatch ("claude_code" | "codex").
             parent_session: Derivation source recorded on the state (codex start path;
                 Claude resume/fork paths record it via their own child-creation flows).
-            require_uuid_unbound: Re-check `claude_session_id` uniqueness inside the
-                index write lock. Only meaningful when binding a **pre-existing**
-                conversation (`forge session adopt`); the ordinary start paths mint a
-                fresh UUID that cannot collide.
+            require_uuid_unbound: Re-check conversation uniqueness inside the index
+                write lock, for whichever of `claude_session_id` / `codex_confirmed`
+                is given. Only meaningful when binding a **pre-existing** conversation
+                (`forge session adopt`); the ordinary start paths mint a fresh id that
+                cannot collide.
 
         Returns:
             The created session state with candidate UUID.
 
         Raises:
             SessionExistsError: If session name already exists.
-            UuidAlreadyBoundError: If require_uuid_unbound and the UUID is taken.
+            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
             InvalidSessionNameError: If name is invalid.
             FileNotFoundError: If no git repository found.
             BranchExistsError: If branch already exists (when create_worktree=True).
@@ -688,6 +702,14 @@ class SessionManager:
 
         if claude_session_id:
             state.confirmed.claude_session_id = claude_session_id
+
+        if codex_confirmed is not None:
+            state.confirmed.codex = codex_confirmed
+        if adoption is not None:
+            state.confirmed.adoption = adoption
+        if confirmed_by is not None:
+            state.confirmed.confirmed_by = confirmed_by
+            state.confirmed.confirmed_at = now_iso()
 
         if create_worktree and state.worktree:
             state.worktree.is_worktree = True
