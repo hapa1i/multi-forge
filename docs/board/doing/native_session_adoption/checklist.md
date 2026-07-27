@@ -7,8 +7,8 @@ skipped because acceptance and activation happened in the same decision.
 
 **Execution branch**: `feat/native-session-adoption`. Slice 0 shipped the P1 gate
 (`tests/integration/docker/test_adopt_binding_contract.py`) with no `src/` change; Slice 1 the manifest schema
-(`AdoptionConfirmed`); Slice 2 the `forge session adopt` op and CLI leaf. The command is usable from Slice 2 onward with
-an explicit conversation id -- Slice 3 adds the bare-`adopt` preview.
+(`AdoptionConfirmed`); Slice 2 the `forge session adopt` op and CLI leaf; Slice 3 the bare-`adopt` discovery preview.
+The Claude arm is usable end to end: bare `adopt` to find a conversation, `adopt <id>` to bind it, `resume` to continue.
 
 **Slice numbering note**: the card uses "Phase 1 / Phase 2" for the **Claude** and **Codex arms**. This checklist uses
 "Slice" numbering to avoid collision; the arm mapping is called out where it applies.
@@ -18,8 +18,8 @@ an explicit conversation id -- Slice 3 adds the bare-`adopt` preview.
 **Slices 0, 1 and 2 are closed.** Slice 0 settled the three owner decisions and all three probes (P1 gated on real
 Claude 2.1.220, P2, P3). Slice 1 shipped `confirmed.AdoptionConfirmed`. Slice 2 shipped `forge session adopt` -- the
 command-core op, the CLI leaf, and the locked index guard that closes the already-bound TOCTOU -- with design.md §3.3
-and §3.5 and `cli_reference.md` synced. **Cursor: Slice 3** (bare-`adopt` discovery preview), which is the last piece of
-the settled discovery decision; the Claude arm is otherwise complete.
+and §3.5 and `cli_reference.md` synced. Slice 3 shipped the bare-`adopt` discovery preview, completing the settled
+discovery decision. **Cursor: Slice 4** (Codex arm); the Claude arm is complete apart from Slice 5's gates and closeout.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -389,12 +389,30 @@ Two conventions the implementation had to discover rather than assume:
 
 ## Slice 3 -- Discovery preview
 
-- [ ] Bare `forge session adopt` lists unbound candidates for the exact cwd, showing mtime, turn count, first-message
+- [x] Bare `forge session adopt` lists unbound candidates for the exact cwd, showing mtime, turn count, first-message
   snippet, and the exact directory scanned. Assertion: an already-bound UUID is excluded; a recorded-`cwd` mismatch is
-  not listed.
-- [ ] Subdirectory guidance. Assertion: running the preview at the Forge root when the conversation was launched from a
-  subdirectory does not misattribute, and the diagnostic names the launch directory.
-- [ ] Hook rule untouched. Assertion: the CWD scan exists only in the CLI; no hook gains a scan (design.md §3.10).
+  not listed. Verified by `TestDiscovery` (6 cases) and `TestAdoptPreview` (3 cases); `agent-<uuid>.jsonl` sidecars are
+  excluded too.
+- [x] Subdirectory guidance. Assertion: running the preview at the Forge root when the conversation was launched from a
+  subdirectory does not misattribute, and the diagnostic names the launch directory. Verified by
+  `test_bare_adopt_with_nothing_here_points_at_the_launch_directory`; the scanned directory prints on both the empty and
+  non-empty branches.
+- [x] Hook rule untouched. Assertion: the CWD scan exists only in the CLI; no hook gains a scan (design.md §3.10).
+  Verified by `tests/src/cli/test_hook_no_cwd_scan.py`, an import guard over every hook module, checked non-vacuous by
+  temporarily importing `get_project_encoded_dir` into `hooks/commands.py`.
+
+Two decisions this slice settled, both grounded in the local 470-transcript corpus rather than assumption:
+
+- **Turn count excludes tool results.** Claude types tool results as `user` entries -- 612 of 662 user entries across a
+  200-transcript sample -- so counting every `user` entry would report mostly machine traffic. A turn is a `user` entry
+  whose content is a plain string or carries a `text` block.
+- **The preview skips synthetic wrappers.** `<command-message>`, `<local-command-caveat>`, `<local-command-stdout>`,
+  `<task-notification>`, `<bash-input>`, `<bash-stdout>` open many real transcripts (~187 tagged against 608 plain
+  messages) and identify nothing, so the preview takes the first untagged human message.
+
+Discovery also collapsed `read_transcript_cwd` and `infer_transcript_model` into one `summarize_transcript`. Both were
+full-file readers over the same format, so `plan_adoption` was opening each transcript twice; discovery needs cwd, turns
+and preview from the same pass anyway.
 
 ## Slice 4 -- Codex arm (card Phase 2)
 

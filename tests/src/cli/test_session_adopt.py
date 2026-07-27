@@ -124,3 +124,41 @@ class TestAdoptCli:
         kwargs = mock_invoke.call_args.kwargs
         assert kwargs.get("resume_id") == _UUID
         assert not kwargs.get("fork_session")
+
+
+class TestAdoptPreview:
+    def test_bare_adopt_lists_candidates_with_turns_and_preview(self, runner: CliRunner, temp_env: Path) -> None:
+        path = _write_transcript(temp_env, models=("claude-opus-5",))
+        entries = [
+            {"type": "user", "cwd": str(temp_env), "message": {"content": "<command-message>init</command-message>"}},
+            {"type": "user", "cwd": str(temp_env), "message": {"content": "wire up the payment retry"}},
+            {"type": "assistant", "cwd": str(temp_env), "message": {"model": "claude-opus-5"}},
+        ]
+        path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["session", "adopt"])
+
+        assert result.exit_code == 0, result.output
+        assert _UUID in result.output
+        assert "wire up the payment retry" in result.output, "synthetic wrapper must not win the preview"
+        assert str(temp_env) in result.output, "the scanned cwd must be named"
+
+    def test_bare_adopt_with_nothing_here_points_at_the_launch_directory(
+        self, runner: CliRunner, temp_env: Path
+    ) -> None:
+        result = runner.invoke(main, ["session", "adopt"])
+
+        assert result.exit_code == 0, result.output
+        assert "No unbound conversations" in result.output
+        assert "subdirectory" in result.output, "exact-CWD guidance is the actionable part"
+        assert str(temp_env) in result.output
+
+    def test_bare_adopt_hides_a_conversation_it_already_adopted(self, runner: CliRunner, temp_env: Path) -> None:
+        _write_transcript(temp_env)
+        assert runner.invoke(main, ["session", "adopt", _UUID, "--name", "mine"]).exit_code == 0
+
+        result = runner.invoke(main, ["session", "adopt"])
+
+        assert result.exit_code == 0, result.output
+        assert _UUID not in result.output
+        assert "No unbound conversations" in result.output

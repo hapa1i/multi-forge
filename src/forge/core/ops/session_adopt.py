@@ -18,6 +18,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from forge.core.models.direct_model import resolve_direct_model_pin
@@ -29,14 +30,14 @@ from forge.install.project_compat import (
 )
 from forge.session import SessionManager, SessionStore, UuidAlreadyBoundError
 from forge.session.artifacts import get_artifact_paths, safe_copy_file
-from forge.session.claude.paths import get_transcript_path
+from forge.session.claude.paths import get_project_encoded_dir, get_transcript_path
 from forge.session.index import IndexStore
 from forge.session.models import AdoptionConfirmed
 from forge.session.store import CLI_LOCK_TIMEOUT_S
 
 from .context import ExecutionContext
 from .session import ForgeOpError
-from .session_context import scan_manifests_for_uuid
+from .session_context import collect_bound_uuids, scan_manifests_for_uuid
 
 _log = logging.getLogger(__name__)
 
@@ -69,6 +70,16 @@ RECENT_ACTIVITY_WINDOW_S = 30 * 60
 # error only when it deserves one; normalize_conversation_id folds the result.
 _UUID_RE = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
+# Claude injects synthetic user turns wrapped in an XML-ish tag: command-message,
+# local-command-caveat, local-command-stdout, task-notification, bash-input,
+# bash-stdout. Measured across 200 local transcripts: ~187 tagged against 608
+# plain human messages. They identify nothing, so the discovery preview skips
+# them to find the message a user would actually recognize.
+_SYNTHETIC_PREFIX_RE = re.compile(r"\A\s*<[a-z-]+>")
+
+# Long enough to recognize a conversation, short enough for one terminal row.
+PREVIEW_CHARS = 72
+
 
 class AdoptError(ForgeOpError):
     """Raised when adoption cannot proceed."""
@@ -95,6 +106,38 @@ class AdoptPlan:
     model: str | None
     model_basis: str
     recently_active: bool
+
+
+@dataclass(frozen=True)
+class TranscriptSummary:
+    """Everything adoption reads out of a native transcript in one pass.
+
+    Attributes:
+        recorded_cwd: The launch directory Claude stamps on entries, or None.
+        last_model: Last real assistant model; None when no assistant turn ran.
+        user_turns: Human-authored user entries, excluding tool results.
+        preview: First human message that is not a synthetic wrapper.
+    """
+
+    recorded_cwd: str | None
+    last_model: str | None
+    user_turns: int
+    preview: str | None
+
+
+@dataclass(frozen=True)
+class AdoptCandidate:
+    """An unbound native conversation that could be adopted from this directory.
+
+    ``modified_at`` is ISO-8601 rather than an epoch float so the CLI can hand it
+    to the shared relative-time formatter without the op picking a display shape.
+    """
+
+    session_uuid: str
+    transcript_path: Path
+    modified_at: str
+    user_turns: int
+    preview: str | None
 
 
 @dataclass(frozen=True)
@@ -138,14 +181,22 @@ def normalize_conversation_id(session_uuid: str) -> str:
     return candidate.lower()
 
 
-def read_transcript_cwd(transcript_path: Path) -> str | None:
-    """Return the launch CWD a Claude transcript records, or None.
+def summarize_transcript(transcript_path: Path) -> TranscriptSummary:
+    """Read a native transcript once and return everything adoption needs from it.
 
-    Claude stamps ``cwd`` on every user/assistant/system entry. Reading the first
-    one is the Claude analog of the Codex arm's ``_rollout_head_cwd``: it proves
-    the transcript belongs to this directory rather than to a lossy-encoding
-    sibling (``a.b``, ``a_b`` and ``a-b`` share one encoded directory).
+    One pass rather than a reader per field: planning needs the recorded cwd and
+    the model, discovery needs the cwd, turn count and preview, and discovery
+    reads every candidate in the directory.
+
+    Unreadable or malformed content degrades to an empty summary rather than
+    raising -- this is a system boundary (coding_standards section 5), and a
+    truncated transcript should still be listable.
     """
+    recorded_cwd: str | None = None
+    last_model: str | None = None
+    user_turns = 0
+    preview: str | None = None
+
     try:
         with transcript_path.open("r", encoding="utf-8") as fh:
             for line in fh:
@@ -156,45 +207,132 @@ def read_transcript_cwd(transcript_path: Path) -> str | None:
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if isinstance(entry, dict):
+                if not isinstance(entry, dict):
+                    continue
+
+                if recorded_cwd is None:
                     cwd = entry.get("cwd")
                     if isinstance(cwd, str) and cwd:
-                        return cwd
-    except OSError as e:
-        _log.debug("Could not read cwd from %s: %s", transcript_path, e)
-    return None
+                        recorded_cwd = cwd
 
-
-def infer_transcript_model(transcript_path: Path) -> str | None:
-    """Return the model to pin for future resumes, or None if none is inferable.
-
-    Takes the **last** real assistant model. A single conversation can span two
-    real models (measured on 2 of 470 local transcripts), and last-wins is the
-    only deterministic reading of "what this conversation is running on now".
-    Filters the ``<synthetic>`` sentinel, which is not a model id.
-    """
-    latest: str | None = None
-    try:
-        with transcript_path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(entry, dict) or entry.get("type") != "assistant":
-                    continue
+                entry_type = entry.get("type")
                 message = entry.get("message")
                 if not isinstance(message, dict):
                     continue
-                model = message.get("model")
-                if isinstance(model, str) and model and model != SYNTHETIC_MODEL:
-                    latest = model
+
+                if entry_type == "assistant":
+                    model = message.get("model")
+                    if isinstance(model, str) and model and model != SYNTHETIC_MODEL:
+                        last_model = model
+                    continue
+
+                if entry_type != "user":
+                    continue
+
+                text = _user_message_text(message)
+                if text is None:
+                    continue
+                user_turns += 1
+                if preview is None and not _SYNTHETIC_PREFIX_RE.match(text):
+                    preview = " ".join(text.split())
     except OSError as e:
-        _log.debug("Could not infer model from %s: %s", transcript_path, e)
-    return latest
+        _log.debug("Could not read transcript %s: %s", transcript_path, e)
+
+    return TranscriptSummary(
+        recorded_cwd=recorded_cwd,
+        last_model=last_model,
+        user_turns=user_turns,
+        preview=preview,
+    )
+
+
+def _user_message_text(message: dict[str, object]) -> str | None:
+    """Return a user entry's human-authored text, or None if it is not one.
+
+    Claude types tool results as ``user`` entries too -- 612 of 662 user entries
+    across a 200-transcript sample -- so counting every ``user`` entry as a turn
+    would report mostly machine traffic. Human turns carry either a plain string
+    or a content list with a ``text`` block.
+    """
+    content = message.get("content")
+    if isinstance(content, str):
+        return content or None
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text")
+                if isinstance(text, str) and text:
+                    return text
+    return None
+
+
+def discover_adoptable(ctx: ExecutionContext) -> tuple[Path, list[AdoptCandidate]]:
+    """List unbound native conversations launched from this exact directory.
+
+    Returns ``(scanned_dir, candidates)`` newest-first. The directory is returned
+    even when nothing matches, because "which directory did you look in" is the
+    answer a user needs when the list is empty -- Claude's encoded directories
+    are lossy, so the scanned path is not obvious from the cwd.
+
+    Exact-CWD in v1, matching the adoption precondition: a candidate whose
+    recorded cwd is another directory is a lossy-encoding sibling, not something
+    adoptable here. CLI-only; hooks never scan a directory (design.md section 3.10).
+
+    Raises:
+        AdoptError: If not inside a Forge project.
+    """
+    if ctx.forge_root is None:
+        raise AdoptError("not inside a Forge project")
+
+    scanned_dir = get_project_encoded_dir(str(ctx.cwd))
+    try:
+        transcripts = sorted(scanned_dir.glob("*.jsonl"))
+    except OSError as e:
+        _log.debug("Could not scan %s: %s", scanned_dir, e)
+        return scanned_dir, []
+
+    # Collected once rather than per candidate: both lookups take the index lock,
+    # and the manifest scan reads every session manifest.
+    bound = collect_bound_uuids()
+    here = Path(ctx.cwd).resolve()
+
+    found: list[tuple[float, AdoptCandidate]] = []
+    for path in transcripts:
+        # Skips `agent-<uuid>.jsonl` sidecar logs, which are not conversations.
+        if not _UUID_RE.match(path.stem):
+            continue
+        session_uuid = path.stem.lower()
+        if session_uuid in bound:
+            continue
+
+        summary = summarize_transcript(path)
+        if summary.recorded_cwd is None or Path(summary.recorded_cwd).resolve() != here:
+            continue
+
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+
+        preview = summary.preview
+        if preview and len(preview) > PREVIEW_CHARS:
+            preview = preview[: PREVIEW_CHARS - 1].rstrip() + "…"
+
+        found.append(
+            (
+                mtime,
+                AdoptCandidate(
+                    session_uuid=session_uuid,
+                    transcript_path=path,
+                    modified_at=datetime.fromtimestamp(mtime, UTC).isoformat(),
+                    user_turns=summary.user_turns,
+                    preview=preview,
+                ),
+            )
+        )
+
+    found.sort(key=lambda pair: pair[0], reverse=True)
+    return scanned_dir, [candidate for _, candidate in found]
 
 
 def plan_adoption(
@@ -225,9 +363,9 @@ def plan_adoption(
     claude_project_root = str(ctx.cwd)
     transcript_path = get_transcript_path(claude_project_root, session_uuid)
 
-    _check_still_adoptable(session_uuid, transcript_path, claude_project_root)
+    summary = _check_still_adoptable(session_uuid, transcript_path, claude_project_root)
 
-    model, basis = _resolve_model_pin(transcript_path, model_override)
+    model, basis = _resolve_model_pin(summary, model_override)
 
     try:
         age_s = time.time() - transcript_path.stat().st_mtime
@@ -266,12 +404,15 @@ def _check_plan_invariants(ctx: ExecutionContext, plan: AdoptPlan) -> None:
         raise AdoptError(f"plan transcript path {plan.transcript_path} is not the canonical path for its conversation")
 
 
-def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_project_root: str) -> None:
+def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_project_root: str) -> TranscriptSummary:
     """Run every precondition that can change between planning and writing.
 
     Split out of ``plan_adoption`` so ``adopt_session`` can re-run it after the
     double-attach prompt. That prompt blocks on a human, so the transcript can be
     deleted, or another terminal can adopt the same UUID, while it waits.
+
+    Returns the summary it had to read anyway, so planning does not re-open the
+    file to resolve the model.
 
     Raises:
         AdoptError: If the transcript is missing or belongs to another directory.
@@ -283,7 +424,8 @@ def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_proj
             "Adopt from the directory the native session was launched from."
         )
 
-    recorded_cwd = read_transcript_cwd(transcript_path)
+    summary = summarize_transcript(transcript_path)
+    recorded_cwd = summary.recorded_cwd
     if recorded_cwd is None:
         raise AdoptError(
             f"transcript for '{session_uuid}' records no launch directory, so it cannot be verified as belonging "
@@ -305,8 +447,10 @@ def _check_still_adoptable(session_uuid: str, transcript_path: Path, claude_proj
     if owner is not None:
         raise UuidAlreadyBoundError(session_uuid, owner[0])
 
+    return summary
 
-def _resolve_model_pin(transcript_path: Path, model_override: str | None) -> tuple[str | None, str]:
+
+def _resolve_model_pin(summary: TranscriptSummary, model_override: str | None) -> tuple[str | None, str]:
     """Return the (pin, basis) to persist, normalized the way `session start` does.
 
     Both branches must store ``DirectModelPin.env_model`` rather than the raw
@@ -327,7 +471,7 @@ def _resolve_model_pin(transcript_path: Path, model_override: str | None) -> tup
         except ValueError as e:
             raise AdoptError(str(e)) from e
 
-    inferred = infer_transcript_model(transcript_path)
+    inferred = summary.last_model
     if not inferred:
         # No basis means the field stays unset: persisting the current default
         # would change nothing on the direct path (it already falls back) while

@@ -402,6 +402,41 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
     )
 
 
+def collect_bound_uuids() -> set[str]:
+    """Return every Claude UUID currently bound to a session, lowercased.
+
+    The bulk counterpart to ``scan_manifests_for_uuid``, for callers testing many
+    UUIDs at once: that helper short-circuits on the first match and takes the
+    index lock per call, which a per-candidate loop would pay repeatedly.
+
+    Reads the index row and the manifest for each session, since either can carry
+    a binding the other is missing.
+    """
+    index = IndexStore()
+    try:
+        sessions = index.list_sessions(include_incognito=True)
+    except Exception:
+        _log.debug("Failed to list sessions while collecting bound UUIDs", exc_info=True)
+        return set()
+
+    bound: set[str] = set()
+    for name, entry in sessions:
+        if entry.claude_session_id:
+            bound.add(entry.claude_session_id.lower())
+        try:
+            store = SessionStore(entry.root, name)
+            if not store.exists():
+                continue
+            state = store.read()
+        except Exception:
+            _log.debug("Failed to read session manifest while collecting bound UUIDs", exc_info=True)
+            continue
+        if state.confirmed.claude_session_id:
+            bound.add(state.confirmed.claude_session_id.lower())
+
+    return bound
+
+
 def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
     """Search session manifests for a Claude UUID when the index is stale.
 

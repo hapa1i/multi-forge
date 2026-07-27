@@ -135,6 +135,7 @@ forge session start [name] \
   [--no-launch]
 
 # Adopt a conversation you started outside Forge (run from its launch directory)
+forge session adopt                                   # preview unbound conversations here
 forge session adopt <conversation-id> [--name/-n <name>] [--model/-m <model>] [--yes/-y]
 
 # Resume an existing session (default: reattach when safe; --fresh: context assembly)
@@ -382,12 +383,17 @@ binds a Forge session to that existing conversation instead of copying or replay
 
 ```bash
 # Run from the directory you launched the native session in
+forge session adopt                                            # see what is adoptable here
 forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name auth-spike
 forge session resume auth-spike
 ```
 
-Find the conversation id with `forge search` or by listing `~/.claude/projects/<encoded-cwd>/`; it is the transcript
-filename without `.jsonl`. Pass the full UUID, not a prefix.
+Bare `forge session adopt` previews the unbound conversations launched from the current directory — id, when it was last
+active, how many turns you took, and your first message — and names the directory it scanned. Already-adopted
+conversations are omitted. Nothing is written by the preview.
+
+You can also pass the id directly: it is the transcript filename without `.jsonl` under
+`~/.claude/projects/<encoded-cwd>/`. Pass the full UUID, not a prefix.
 
 **Why the directory matters:** Claude stores transcripts under an encoding of the launch directory, and that encoding is
 lossy — `api.v2`, `api_v2`, and `api-v2` all collapse to the same folder. Adoption reads the directory recorded inside

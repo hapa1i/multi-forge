@@ -251,7 +251,9 @@ records** it (`native-relocate` instead reuses the parent's UUID). A third origi
 which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
 records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
 — one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session). The conversation id
-must be a canonical UUID: it is the only caller-supplied component of every path adoption reads or writes. Adoption also
+must be a canonical UUID: it is the only caller-supplied component of every path adoption reads or writes. Omitting it
+previews the unbound conversations whose recorded `cwd` is the current directory — a read-only CLI scan of one encoded
+project directory, which does not relax §3.10: hooks still resolve sessions by identity and never scan. Adoption also
 inverts transcript ownership, so `SessionManager.delete_session` exempts an adopted session's native transcript from
 `delete_transcripts` (including the `delete_transcripts=True` automatic retention sweep) using the same filter that
 spares transcripts shared with another session. Stop and StopFailure also reconcile `claude_session_id` and

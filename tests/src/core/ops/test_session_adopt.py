@@ -20,9 +20,9 @@ from forge.core.ops.session_adopt import (
     MODEL_BASIS_NONE,
     AdoptError,
     adopt_session,
-    infer_transcript_model,
+    discover_adoptable,
     plan_adoption,
-    read_transcript_cwd,
+    summarize_transcript,
 )
 from forge.session import SessionStore, UuidAlreadyBoundError
 from forge.session.claude.paths import get_transcript_path
@@ -67,34 +67,34 @@ def _write_transcript(
     return path
 
 
-class TestTranscriptReaders:
+class TestTranscriptSummary:
     def test_reads_recorded_cwd(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path)
         path = _write_transcript(project)
-        assert read_transcript_cwd(path) == str(project)
+        assert summarize_transcript(path).recorded_cwd == str(project)
 
     def test_missing_cwd_returns_none(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path)
         path = _write_transcript(project, include_cwd=False)
-        assert read_transcript_cwd(path) is None
+        assert summarize_transcript(path).recorded_cwd is None
 
     def test_infers_last_real_model(self, tmp_path: Path) -> None:
         """Mixed-model transcripts are real (2 of 470 sampled); last-wins is the rule."""
         project = _make_project(tmp_path)
         path = _write_transcript(project, models=("claude-fable-5", "claude-opus-4-8"))
-        assert infer_transcript_model(path) == "claude-opus-4-8"
+        assert summarize_transcript(path).last_model == "claude-opus-4-8"
 
     def test_filters_synthetic_sentinel(self, tmp_path: Path) -> None:
         """`<synthetic>` is a sentinel, not a model id, even when it is last."""
         project = _make_project(tmp_path)
         path = _write_transcript(project, models=("claude-opus-5", "<synthetic>"))
-        assert infer_transcript_model(path) == "claude-opus-5"
+        assert summarize_transcript(path).last_model == "claude-opus-5"
 
     def test_no_assistant_turn_infers_nothing(self, tmp_path: Path) -> None:
         """The majority case locally (346 of 470): user-only transcripts."""
         project = _make_project(tmp_path)
         path = _write_transcript(project, models=())
-        assert infer_transcript_model(path) is None
+        assert summarize_transcript(path).last_model is None
 
     def test_malformed_lines_do_not_abort_the_scan(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path)
@@ -103,7 +103,56 @@ class TestTranscriptReaders:
             "not json\n\n" + json.dumps({"type": "assistant", "message": {"model": "claude-opus-5"}}) + "\n",
             encoding="utf-8",
         )
-        assert infer_transcript_model(path) == "claude-opus-5"
+        assert summarize_transcript(path).last_model == "claude-opus-5"
+
+    def test_tool_results_are_not_human_turns(self, tmp_path: Path) -> None:
+        """612 of 662 user entries in a 200-transcript sample are tool results."""
+        project = _make_project(tmp_path)
+        path = get_transcript_path(str(project), _UUID)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(
+                json.dumps(e)
+                for e in [
+                    {"type": "user", "cwd": str(project), "message": {"content": "real question"}},
+                    {"type": "user", "cwd": str(project), "message": {"content": [{"type": "tool_result"}]}},
+                    {"type": "user", "cwd": str(project), "message": {"content": [{"type": "text", "text": "more"}]}},
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        summary = summarize_transcript(path)
+
+        assert summary.user_turns == 2
+        assert summary.preview == "real question"
+
+    def test_preview_skips_synthetic_wrappers(self, tmp_path: Path) -> None:
+        """Slash-command and caveat wrappers open many real transcripts and identify nothing."""
+        project = _make_project(tmp_path)
+        path = get_transcript_path(str(project), _UUID)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(
+                json.dumps(e)
+                for e in [
+                    {
+                        "type": "user",
+                        "cwd": str(project),
+                        "message": {"content": "<command-message>init</command-message>"},
+                    },
+                    {"type": "user", "cwd": str(project), "message": {"content": "  fix the auth bug\n"}},
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        summary = summarize_transcript(path)
+
+        assert summary.preview == "fix the auth bug"
+        assert summary.user_turns == 2, "the wrapper is still a turn, just not a useful preview"
 
 
 class TestPlanPreconditions:
@@ -429,3 +478,73 @@ class TestConcurrencyAndRollback:
 
         assert not (project / ".forge" / "sessions" / "adopted").exists()
         assert IndexStore().read().sessions == {}
+
+
+class TestDiscovery:
+    def test_lists_unbound_candidates_newest_first(self, tmp_path: Path) -> None:
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        older = _write_transcript(project, session_uuid="11111111-1111-1111-1111-111111111111")
+        newer = _write_transcript(project, session_uuid="22222222-2222-2222-2222-222222222222")
+        os.utime(older, (1000, 1000))
+        os.utime(newer, (2000, 2000))
+
+        scanned_dir, candidates = discover_adoptable(ctx)
+
+        assert scanned_dir == older.parent
+        assert [c.session_uuid for c in candidates] == [
+            "22222222-2222-2222-2222-222222222222",
+            "11111111-1111-1111-1111-111111111111",
+        ]
+
+    def test_excludes_an_already_bound_conversation(self, tmp_path: Path) -> None:
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project, session_uuid="11111111-1111-1111-1111-111111111111")
+        _write_transcript(project, session_uuid="22222222-2222-2222-2222-222222222222")
+        adopt_session(ctx, plan_adoption(ctx, "11111111-1111-1111-1111-111111111111"), name="taken")
+
+        _, candidates = discover_adoptable(ctx)
+
+        assert [c.session_uuid for c in candidates] == ["22222222-2222-2222-2222-222222222222"]
+
+    def test_excludes_a_lossy_encoding_sibling(self, tmp_path: Path) -> None:
+        """`a.b`, `a_b` and `a-b` share one encoded dir, so cwd decides membership."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        _write_transcript(project, session_uuid="11111111-1111-1111-1111-111111111111")
+        _write_transcript(
+            project,
+            session_uuid="22222222-2222-2222-2222-222222222222",
+            cwd=str(project.parent / "other-project"),
+        )
+
+        _, candidates = discover_adoptable(ctx)
+
+        assert [c.session_uuid for c in candidates] == ["11111111-1111-1111-1111-111111111111"]
+
+    def test_ignores_agent_sidecar_logs(self, tmp_path: Path) -> None:
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        transcript = _write_transcript(project)
+        sidecar = transcript.parent / f"agent-{_UUID}.jsonl"
+        sidecar.write_text(json.dumps({"type": "user", "cwd": str(project)}) + "\n", encoding="utf-8")
+
+        _, candidates = discover_adoptable(ctx)
+
+        assert [c.session_uuid for c in candidates] == [_UUID]
+
+    def test_reports_the_scanned_directory_even_when_empty(self, tmp_path: Path) -> None:
+        """The empty case is only actionable if the user learns which dir was read."""
+        project = _make_project(tmp_path)
+
+        scanned_dir, candidates = discover_adoptable(ExecutionContext.from_cwd(project))
+
+        assert candidates == []
+        assert scanned_dir == get_transcript_path(str(project), _UUID).parent
+
+    def test_rejects_outside_a_forge_project(self, tmp_path: Path) -> None:
+        bare = tmp_path / "bare"
+        bare.mkdir()
+        with pytest.raises(AdoptError, match="not inside a Forge project"):
+            discover_adoptable(ExecutionContext.from_cwd(bare))
