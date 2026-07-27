@@ -34,6 +34,7 @@ from .exceptions import (
     ManifestCorruptedError,
     ManifestUnreadableError,
     ManifestValidationError,
+    SessionExistsError,
     SessionFileNotFoundError,
 )
 from .models import SCHEMA_VERSION, SessionState, session_state_to_dict
@@ -237,12 +238,50 @@ class SessionStore:
             manifest: The manifest to write.
 
         Raises:
-            InvalidSessionNameError: If manifest name is invalid.
+            InvalidSessionNameError: If the store's or the manifest's name is invalid.
         """
-        self.session_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_session_dir()
 
         with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             self._write_unlocked(manifest)
+
+    def create_exclusive(self, manifest: SessionState) -> None:
+        """Write the manifest for a **new** session, failing if one already exists.
+
+        The creation primitive for every path that mints a session. Name
+        uniqueness cannot be established by a pre-check: the global index's
+        authoritative check lives inside its own lock, and `list_sessions` prunes
+        index entries whose manifest is missing, so an index row is not a durable
+        reservation. Testing and writing under this manifest's own lock makes the
+        manifest itself the reservation, and makes `SessionExistsError` mean "the
+        caller does not own this name" rather than "the caller may have clobbered
+        someone else's state".
+
+        Use `write` instead when overwriting an existing manifest is intended
+        (rollback restores, deliberate stale-target replacement).
+
+        Raises:
+            SessionExistsError: If the manifest already exists.
+            InvalidSessionNameError: If the store's or the manifest's name is invalid.
+        """
+        self._ensure_session_dir()
+
+        with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            if self._manifest_path.is_file():
+                raise SessionExistsError(self._session_name)
+            self._write_unlocked(manifest)
+
+    def _ensure_session_dir(self) -> None:
+        """Create the session directory, but only for a name that can be one.
+
+        Validation comes first because ``_manifest_path`` is built by joining the
+        name onto the project root, and an absolute name discards that root
+        (``Path('/a') / '/etc'`` is ``/etc``). Creating the directory before
+        checking would leave a directory anywhere on disk that the caller named,
+        even though the write itself then fails.
+        """
+        validate_name(self._session_name)
+        self.session_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_unlocked(self, manifest: SessionState) -> None:
         """Write manifest without acquiring lock (caller must hold it)."""

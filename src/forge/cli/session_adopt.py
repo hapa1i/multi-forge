@@ -1,0 +1,332 @@
+"""`forge session adopt` -- bind a Forge session to an existing native conversation.
+
+Rendering and exit codes live here; all logic is in
+``forge.core.ops.session_adopt`` (design.md section 3.12).
+
+Bare ``forge session adopt`` previews the adoptable conversations in the current
+directory; passing a conversation id binds one.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import cast
+
+import click
+from rich import box
+from rich.table import Table
+from rich.text import Text
+
+from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.session import _format_relative_time, console
+from forge.cli.session import session as _session_untyped
+from forge.core.ops.codex_adopt import adopt_codex_session, plan_codex_adoption
+from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session_adopt import (
+    CODEX_RUNTIME,
+    MODEL_BASIS_INFERRED,
+    MODEL_BASIS_NONE,
+    AdoptError,
+    adopt_session,
+    detect_adoption_runtime,
+    discover_adoptable,
+    plan_adoption,
+)
+from forge.session import ForgeSessionError, UuidAlreadyBoundError
+from forge.session.exceptions import SessionExistsError
+
+session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
+
+
+@session.command()
+@click.argument("conversation_id", required=False)
+@click.option("--name", "-n", help="Forge session name (defaults to the conversation id prefix)")
+@click.option("--model", "-m", help="Claude only: pin a model for future Forge resumes (overrides inference)")
+@click.option("--yes", "-y", is_flag=True, help="Skip the confirmation for a recently-active conversation")
+@click.option("--json", "as_json", is_flag=True, help="Output the preview as JSON (no conversation id)")
+def adopt(conversation_id: str | None, name: str | None, model: str | None, yes: bool, as_json: bool) -> None:
+    """Adopt a native Claude or Codex conversation as a managed Forge session.
+
+    \b
+    Examples:
+        forge session adopt                       # preview adoptable conversations here
+        forge session adopt --json                # same preview, machine-readable
+        forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2
+        forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name my-session --model claude-opus-5
+
+    CONVERSATION_ID is the full Claude transcript UUID or Codex thread id, not a
+    prefix; the runtime is detected from which one has a matching file on disk.
+    Omit it to list the unbound Claude conversations launched from this directory
+    -- the preview does not cover Codex, whose rollouts are not indexed by path.
+
+    Run this from the directory the native session was launched in. Both runtimes
+    verify that recorded directory before binding, and neither is adoptable from
+    anywhere else.
+
+    --model applies to Claude only; Codex resolves its own model per turn.
+
+    Adoption does not attach hooks, env, or supervision to an already-running
+    client; those begin with the next Forge-managed resume or fork.
+    """
+    ctx = ExecutionContext.from_cwd()
+
+    # Checked here rather than left to the op's AdoptError: the op stays
+    # UI-agnostic, and this is the one precondition with a fixed remedy.
+    if ctx.forge_root is None:
+        print_error_with_tip(
+            "Not inside a Forge project.",
+            "Enable Forge in this repository first, then adopt from the conversation's directory.",
+            commands=["forge extension enable"],
+        )
+        sys.exit(1)
+
+    if conversation_id is None:
+        # Refused rather than ignored: these only describe a binding, so accepting
+        # them silently would imply the preview had adopted something.
+        unusable = [flag for flag, given in (("--name", name), ("--model", model), ("--yes", yes)) if given]
+        if unusable:
+            print_error_with_tip(
+                f"{', '.join(unusable)} {'apply' if len(unusable) > 1 else 'applies'} to adopting a conversation, "
+                "not to previewing.",
+                "Pass the conversation id to adopt one.",
+                commands=["forge session adopt <conversation-id> --name <name>"],
+            )
+            sys.exit(1)
+        _preview_candidates(ctx, as_json=as_json)
+        return
+
+    if as_json:
+        print_error_with_tip(
+            "--json applies to the preview, which takes no conversation id.",
+            "Drop the conversation id to list what is adoptable here.",
+            commands=["forge session adopt --json"],
+        )
+        sys.exit(1)
+
+    try:
+        runtime = detect_adoption_runtime(ctx, conversation_id)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if runtime == CODEX_RUNTIME:
+        _adopt_codex(ctx, conversation_id, name=name, model=model, yes=yes)
+        return
+
+    try:
+        plan = plan_adoption(ctx, conversation_id, model_override=model)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Conversation '{e.session_uuid}' is already adopted by session '{e.owner}'.",
+            "Resume the existing session instead of adopting it twice.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if plan.recently_active and not yes:
+        console.print(
+            "[yellow]This conversation was active in the last 30 minutes.[/yellow] "
+            "Forge cannot tell whether a native client is still attached to it."
+        )
+        print_tip(
+            "Adopting a live conversation and then resuming it would put two clients on one transcript.",
+            "Close the other client first if one is running.",
+            console=console,
+        )
+        if not click.confirm("Adopt it anyway?", default=False):
+            console.print("[dim]Adoption cancelled.[/dim]")
+            return
+
+    # Derive from the plan's normalized id, never the raw argument.
+    session_name = name or plan.session_uuid.split("-")[0]
+
+    try:
+        result = adopt_session(ctx, plan, name=session_name)
+    except UuidAlreadyBoundError as e:
+        # Lost a race with a concurrent adopt between the plan and the index write.
+        print_error_with_tip(
+            f"Conversation '{e.session_uuid}' was adopted by session '{e.owner}' while this command ran.",
+            "Nothing was created here.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except SessionExistsError as e:
+        print_error_with_tip(
+            f"Session '{e.name}' already exists.",
+            "Choose a different name.",
+            commands=[f"forge session adopt {conversation_id} --name <name>"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+    except ForgeSessionError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    console.print(f"[green]Adopted[/green] conversation [bold]{result.session_uuid}[/bold] as '{result.name}'")
+
+    if result.model_basis == MODEL_BASIS_INFERRED:
+        console.print(f"  Model (inferred from transcript): {result.model}")
+    elif result.model_basis == MODEL_BASIS_NONE:
+        console.print("  [yellow]Model: unknown[/yellow] -- the transcript has no assistant turn to infer from")
+        print_tip(
+            "Forge did not pin a model, so a resume uses the current direct default.",
+            "Pin one on the adopted session if this conversation should continue on a specific model.",
+            commands=[f"forge session resume {result.name} --model <model>"],
+            console=console,
+        )
+    else:
+        console.print(f"  Model: {result.model}")
+
+    if not result.indexed:
+        print_tip(
+            "The transcript was copied but could not be queued for search indexing.",
+            "Rebuild the index to make it searchable.",
+            commands=["forge search rebuild-index"],
+            console=console,
+        )
+
+    print_tip(
+        "Resume it as a managed session:",
+        commands=[f"forge session resume {result.name}"],
+        console=console,
+    )
+
+
+def _preview_candidates(ctx: ExecutionContext, *, as_json: bool) -> None:
+    """Render the read-only preview shown by bare `forge session adopt`."""
+    try:
+        scanned_dir, candidates = discover_adoptable(ctx)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "cwd": str(ctx.cwd),
+                    "scanned_dir": str(scanned_dir),
+                    "candidates": [
+                        {
+                            "conversation_id": c.session_uuid,
+                            "transcript_path": str(c.transcript_path),
+                            "modified_at": c.modified_at,
+                            "user_turns": c.user_turns,
+                            "preview": c.preview,
+                        }
+                        for c in candidates
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return
+
+    # Printed in both branches: Claude's encoded directory names are lossy, so
+    # "nothing here" is only actionable once you know which directory was read.
+    # Paths and transcript text are external input; Rich would read `[...]` in
+    # them as markup, so they are rendered as literal Text.
+    console.print(Text.assemble("Scanning conversations launched from ", (str(ctx.cwd), "bold")))
+    console.print(Text(f"  {scanned_dir}", style="dim"))
+
+    if not candidates:
+        console.print("\nNo unbound conversations found here.")
+        print_tip(
+            "Adoption is exact-directory: a conversation is listed only where bare 'claude' was launched.",
+            "If you started it in a subdirectory, run this again from there.",
+            console=console,
+        )
+        return
+
+    table = Table(box=box.SIMPLE, header_style="bold", padding=(0, 1))
+    # The id is the value the user has to copy into the next command, so it never
+    # truncates; the message column absorbs the remaining width instead.
+    table.add_column("Conversation", no_wrap=True)
+    table.add_column("Last active", no_wrap=True)
+    table.add_column("Turns", justify="right", no_wrap=True)
+    table.add_column("First message", overflow="fold")
+
+    for candidate in candidates:
+        table.add_row(
+            candidate.session_uuid,
+            _format_relative_time(candidate.modified_at),
+            str(candidate.user_turns),
+            Text(candidate.preview) if candidate.preview else Text("(no message yet)", style="dim"),
+        )
+
+    console.print()
+    console.print(table)
+    print_tip(
+        "Adopt one by conversation id:",
+        commands=[f"forge session adopt {candidates[0].session_uuid} --name <name>"],
+        console=console,
+    )
+
+
+def _adopt_codex(ctx: ExecutionContext, thread_id: str, *, name: str | None, model: str | None, yes: bool) -> None:
+    """Bind a Forge session to a native Codex thread (card Phase 2)."""
+    if model:
+        print_error_with_tip(
+            "--model does not apply to Codex threads.",
+            "Codex resolves its own model; pin one per turn instead.",
+            commands=["forge session resume <name> --task '<next task>'"],
+        )
+        sys.exit(1)
+
+    try:
+        plan = plan_codex_adoption(ctx, thread_id)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Codex thread '{e.session_uuid}' is already adopted by session '{e.owner}'.",
+            "Resume the existing session instead of adopting it twice.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if plan.recently_active and not yes:
+        console.print(
+            "[yellow]This thread was active in the last 30 minutes.[/yellow] "
+            "Forge cannot tell whether a native Codex client is still attached to it."
+        )
+        if not click.confirm("Adopt it anyway?", default=False):
+            console.print("[dim]Adoption cancelled.[/dim]")
+            return
+
+    session_name = name or plan.thread_id.split("-")[0]
+
+    try:
+        adopted = adopt_codex_session(ctx, plan, name=session_name)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Codex thread '{e.session_uuid}' was adopted by session '{e.owner}' while this command ran.",
+            "Nothing was created here.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except SessionExistsError as e:
+        print_error_with_tip(
+            f"Session '{e.name}' already exists.",
+            "Choose a different name.",
+            commands=[f"forge session adopt {thread_id} --name <name>"],
+        )
+        sys.exit(1)
+    except (AdoptError, ForgeSessionError) as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    console.print(f"[green]Adopted[/green] Codex thread [bold]{adopted.thread_id}[/bold] as '{adopted.name}'")
+    console.print(Text(f"  Rollout: {adopted.rollout_path}", style="dim"))
+    print_tip(
+        "Continue it as a managed session:",
+        commands=[f"forge session resume {adopted.name} --task '<next task>'"],
+        console=console,
+    )

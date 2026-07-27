@@ -10,16 +10,20 @@ import pytest
 from forge.config.loader import write_proxy_instance_config
 from forge.config.schema import ProxyInstanceConfig, TierModels
 from forge.core.ops.session_context import (
+    BindingLookupError,
     SessionContext,
     SessionContextError,
     _model_to_family,
+    collect_bound_codex_threads,
+    collect_bound_uuids,
     detect_model_family,
     extract_field,
     get_session_context,
     resolve_session_identifier,
 )
 from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import PolicyIntent, StartedWithProxy
+from forge.session.models import CodexConfirmed, PolicyIntent, StartedWithProxy
+from forge.session.store import get_manifest_path
 
 
 class TestModelToFamily:
@@ -364,3 +368,71 @@ class TestGetSessionContext:
         assert ctx.policy.enabled is True
         assert ctx.policy.bundles == ["coding_standards"]
         assert ctx.policy.fail_mode == "closed"
+
+
+class TestBindingCollectionFailsClosed:
+    """A binding Forge cannot read is unknown, never "free".
+
+    These collectors decide whether `forge session adopt` may bind a conversation.
+    Swallowing a read error reports the same thing as an absent binding, which lets
+    one conversation bind to two sessions -- the invariant adoption exists to hold.
+    """
+
+    def _corrupt_manifest(self, worktree: Path, name: str) -> None:
+        state = create_session_state(name=name, worktree_path=str(worktree))
+        SessionStore(str(worktree), name).write(state)
+        IndexStore().add_from_state(state, str(worktree))
+        get_manifest_path(worktree, name).write_text("{ not json", encoding="utf-8")
+
+    def test_unreadable_manifest_stops_a_uuid_lookup(self, tmp_path: Path) -> None:
+        self._corrupt_manifest(tmp_path, "broken")
+
+        with pytest.raises(BindingLookupError, match="broken"):
+            collect_bound_uuids(str(tmp_path))
+
+    def test_unreadable_manifest_stops_a_codex_thread_lookup(self, tmp_path: Path) -> None:
+        self._corrupt_manifest(tmp_path, "broken")
+
+        with pytest.raises(BindingLookupError, match="broken"):
+            collect_bound_codex_threads(str(tmp_path))
+
+    def test_a_project_with_no_sessions_is_not_an_error(self, tmp_path: Path) -> None:
+        """Absent is genuinely empty; only unreadable is unknown."""
+        assert collect_bound_uuids(str(tmp_path)) == {}
+        assert collect_bound_codex_threads(str(tmp_path)) == {}
+
+
+class TestCrossProjectManifestVisibility:
+    """Session names are project-scoped, so a bare name cannot dedupe manifest reads.
+
+    Regression: both collectors skipped a current-root manifest whose *name* had
+    already been seen in any other project, hiding that project's orphan binding
+    and letting the same conversation bind twice.
+    """
+
+    _UUID_A = "aaaa1111-2222-3333-4444-555566667777"
+    _UUID_B = "bbbb1111-2222-3333-4444-555566667777"
+    _THREAD_A = "019f0b65-b51c-7683-99c7-bb48107faaaa"
+    _THREAD_B = "019f0b65-b51c-7683-99c7-bb48107fbbbb"
+
+    def _session(self, root: Path, uuid: str, thread: str, *, indexed: bool) -> None:
+        root.mkdir(parents=True, exist_ok=True)
+        state = create_session_state(name="same", worktree_path=str(root))
+        state.confirmed.claude_session_id = uuid
+        state.confirmed.codex = CodexConfirmed(thread_id=thread, rollout_path="/x", rollout_source="adopted")
+        SessionStore(str(root), "same").write(state)
+        if indexed:
+            IndexStore().add_from_state(state, str(root))
+
+    @pytest.fixture
+    def two_projects(self, tmp_path: Path) -> Path:
+        """Project A indexed, project B an orphan manifest -- both named `same`."""
+        self._session(tmp_path / "a", self._UUID_A, self._THREAD_A, indexed=True)
+        self._session(tmp_path / "b", self._UUID_B, self._THREAD_B, indexed=False)
+        return tmp_path / "b"
+
+    def test_another_project_cannot_hide_this_one_s_uuid(self, two_projects: Path) -> None:
+        assert self._UUID_B in collect_bound_uuids(str(two_projects))
+
+    def test_another_project_cannot_hide_this_one_s_codex_thread(self, two_projects: Path) -> None:
+        assert self._THREAD_B in collect_bound_codex_threads(str(two_projects))

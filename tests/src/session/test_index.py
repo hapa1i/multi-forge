@@ -17,6 +17,7 @@ from forge.session.exceptions import (
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
+    UuidAlreadyBoundError,
 )
 from forge.session.identity import make_scoped_key
 from forge.session.index import (
@@ -1066,3 +1067,44 @@ class TestProjectScopedNames:
 
         with pytest.raises(AmbiguousSessionError):
             store.remove_session("planner")
+
+
+class TestCodexThreadColumn:
+    """`codex_thread_id` is what the index write lock guards for Codex adoption."""
+
+    _THREAD = "019f0b65-b51c-7683-99c7-bb48107f7b83"
+    _DRIFTED = "019f0b65-b51c-7683-99c7-bb48107fffff"
+
+    def test_uniqueness_is_enforced_for_threads_too(self, tmp_path: Path) -> None:
+        store = IndexStore()
+        store.add_session("first", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD)
+
+        with pytest.raises(UuidAlreadyBoundError) as caught:
+            store.add_session(
+                "second", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD, require_uuid_unbound=True
+            )
+
+        assert caught.value.owner == "first"
+
+    def test_drift_reconciliation_moves_the_guard_to_the_live_id(self, tmp_path: Path) -> None:
+        """Codex can re-bind a thread across a resume; a stale column guards nothing."""
+        store = IndexStore()
+        store.add_session("drifter", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD)
+
+        store.update_codex_thread("drifter", self._DRIFTED, str(tmp_path))
+
+        entry = next(iter(store.read().sessions.values()))
+        assert entry.codex_thread_id == self._DRIFTED
+
+        # The guard must now refuse the live id, not the abandoned one.
+        with pytest.raises(UuidAlreadyBoundError):
+            store.add_session(
+                "adopter", str(tmp_path), str(tmp_path), codex_thread_id=self._DRIFTED, require_uuid_unbound=True
+            )
+        store.add_session(
+            "reuse-old", str(tmp_path), str(tmp_path), codex_thread_id=self._THREAD, require_uuid_unbound=True
+        )
+
+    def test_reconciling_an_unknown_session_is_a_no_op(self, tmp_path: Path) -> None:
+        """Best-effort by contract: drift already happened, so this must not raise."""
+        IndexStore().update_codex_thread("never-added", self._DRIFTED, str(tmp_path))

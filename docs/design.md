@@ -205,6 +205,42 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
 
+**The manifest is the session-name reservation.** Every path that mints a session (`start_session`, fork, resume-child,
+relaunch) claims its name with `SessionStore.create_exclusive`, which tests and writes under that manifest's own lock.
+Name pre-checks run outside any lock, so two concurrent creates of one name both reach the commit phase; the loser is
+rejected by the create, before it can touch the winner's manifest. An index row cannot serve as the reservation instead:
+`list_sessions` prunes rows whose manifest is missing, so a row written ahead of its manifest can be pruned out from
+under its own creator. A successful `create_exclusive` is therefore an ownership token -- it is what makes it safe for a
+rollback to delete the manifest at that path. `write` remains for intended overwrites (rollback restores, deliberate
+stale fork-target replacement).
+
+Manifest-first creation is not atomic with index publication: a process killed between the two leaves a manifest with no
+index row. Such an orphan is inert for listing but still owns its name, and any check that enumerates sessions through
+the index cannot see it. Reads that decide whether a **conversation** is already bound must therefore also scan manifest
+directories under the project root — `collect_bound_uuids(forge_root)` and `collect_bound_codex_threads(forge_root)`,
+which additionally read without pruning and fail closed on the index *and* on every manifest they touch, so a read-only
+caller neither mutates the index nor reports "unbound" because a read failed. An unreadable manifest raises
+`BindingLookupError` naming the directory to repair: a swallowed read is indistinguishable from an absent binding, which
+is what would let one conversation bind twice.
+
+**A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
+`start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it
+afterwards. Two properties follow. The id reaches the index row, so `require_uuid_unbound` can re-check uniqueness
+**inside the index write lock**, the only lock shared across session names; the pre-check alone runs under a separate
+acquisition and cannot stop two differently-named adopts of one conversation from both passing it. And no window exists
+in which a published session lacks its binding. The Codex arm needs an index column of its own for this
+(`codex_thread_id`), which mirrors `confirmed.codex.thread_id`: the ordinary Codex paths learn their thread only after
+the run, so they reconcile the column rather than set it at creation — including when Codex re-binds a thread across a
+resume ("drift"), where a stale column would guard an id the session no longer uses.
+
+**Adoption also holds a conversation-scoped lock across its final scan and commit** (`conversation_lock`, under
+`FORGE_HOME/locks/`). The index write lock is not sufficient on its own, because session creation writes the manifest
+first: an adopt killed between the two leaves an orphan manifest that owns the conversation and never reached the index.
+A concurrent adopt whose scan ran before that manifest appeared would publish a second binding, and the orphan scan
+could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the loser's scan cannot
+run until the winner's manifest exists. The lock is global rather than per-project because a conversation is not
+project-scoped, and `flock` releases on process death, so a killed adopt frees it.
+
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
 ```python
@@ -219,6 +255,7 @@ class SessionIndexEntry:
     is_incognito: bool = False
     parent_session: str | None = None
     claude_session_id: str | None = None
+    codex_thread_id: str | None = None   # mirrors confirmed.codex.thread_id -- see the uniqueness note above
 ```
 
 `session list --scope` controls filtering: **`workspace`** (default) filters by `project_root` -- shows sessions across
@@ -238,11 +275,27 @@ on Claude via `--session-id`; the SessionStart hook then **validates** that UUID
 **transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): the CLI mints a
 **new** UUID and imposes it via `--session-id`. The exception is a **native** fork (`--resume-mode native`, which passes
 `--fork-session`): there the CLI does **not** pre-seed — Claude mints the child UUID and SessionStart **discovers and
-records** it (`native-relocate` instead reuses the parent's UUID). Stop and StopFailure also reconcile
-`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
-sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
-mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
-"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
+records** it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`,
+which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
+records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
+— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session).
+
+The same command adopts a native **Codex** thread: the runtime is decided by which store holds a matching conversation,
+never by the shape of the id (both runtimes use UUIDs, and their differing versions are an undocumented third-party
+detail), and a match in both is refused rather than guessed. The Codex arm records
+`confirmed.codex.rollout_source="adopted"` and leaves `claude_session_id`/`confirmed.launch` unset; its lookup scans
+every thread-id match and filters by the rollout head's `cwd`, refusing an ambiguous result instead of taking
+`find_rollout_path`'s newest-mtime tie-break. The id must be a canonical UUID: it is the only caller-supplied component
+of every path adoption reads or writes. Omitting it previews the unbound Claude conversations whose recorded `cwd` is
+the current directory — a read-only CLI scan of one encoded project directory, which does not relax §3.10: hooks still
+resolve sessions by identity and never scan. Adoption also inverts transcript ownership, so
+`SessionManager.delete_session` exempts an adopted session's native transcript from `delete_transcripts` (including the
+`delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
+session. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to
+correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a
+non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start
+session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence
+(see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently
@@ -417,6 +470,15 @@ To avoid writer conflicts:
     turn, so the manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC
     key posture of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes
     every Claude-resume predicate refuse Codex sessions.
+  - `confirmed.adoption` — `source_runtime`, `adopted_at`, `source_path`, `model_basis` — is CLI-owned and written once
+    when a manifest is bound to a **pre-existing** native conversation. No hook writes it. It exists as a separate field
+    rather than a `confirmed_by` value because `confirmed_by` records who touched the manifest **most recently**: at
+    least three writers stamp it (`cli:adopt`, `hook:stop`, `hook:pre-compact`), so origin recorded there would be
+    overwritten within one turn. `model_basis` (`explicit` | `inferred` | `none`) records what produced
+    `intent.launch.direct_model`, since a transcript that justified an inference is user-owned and may be gone before
+    anyone asks why the session resumes on that model. Adoption writes `direct_model` **only** when it has a basis; with
+    none it warns and leaves the field unset rather than persisting the current default, which would otherwise be
+    applied unvalidated on a later `resume --proxy`.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -427,7 +489,8 @@ To avoid writer conflicts:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
     paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
     **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
-    points for the final live conversation identity.
+    points for the final live conversation identity. Hooks **never** write `confirmed.adoption`, and their rewrites of
+    `confirmed_by` and `claude_session_id` leave it intact.
   - `confirmed.consumer_lanes` (a frozen `ConsumerLaneBinding` per consumer): freezes a consumer's chosen lane
     **write-once** (epic consumer_lanes/T1b, T6a) -- but **only when an explicit lane was chosen**. All four mirror one
     guard: resolve the lane once (the read `backend_id` comes from), then under the lock re-check

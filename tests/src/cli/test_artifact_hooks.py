@@ -15,6 +15,7 @@ from click.testing import CliRunner
 from forge.cli.hooks import hooks
 from forge.session import SessionStore, create_session_state
 from forge.session.index import IndexStore
+from forge.session.models import AdoptionConfirmed
 
 
 def _write_pending_transcript_marker(
@@ -459,6 +460,109 @@ class TestStopHook:
         output = json.loads(result.output)
         assert output["success"] is False
         assert output["error"] == "copy_failed"
+
+
+class TestAdoptionProvenanceSurvivesHooks:
+    """`confirmed.adoption` outlives hook-written facts (native_session_adoption Slice 1).
+
+    Adoption binds a manifest to a pre-existing native conversation. Both assertions
+    here protect that binding against the hooks that run afterwards.
+    """
+
+    def _adoption(self, tmp_path: Path) -> AdoptionConfirmed:
+        """Fully populated, so hook survival is checked on all four fields."""
+        return AdoptionConfirmed(
+            source_runtime="claude_code",
+            adopted_at="2026-07-26T12:00:00Z",
+            source_path=str(tmp_path / "native.jsonl"),
+            model_basis="inferred",
+        )
+
+    def _adopted_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
+        store = _write_manifest(tmp_path, monkeypatch, session_name="adopted")
+        manifest = store.read()
+        manifest.confirmed.claude_session_id = "native-uuid"
+        manifest.confirmed.confirmed_by = "cli:adopt"
+        manifest.confirmed.adoption = self._adoption(tmp_path)
+        store.write(manifest)
+        return store
+
+    def test_stop_preserves_adoption_while_rewriting_confirmed_by(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Stop overwrites confirmed_by and re-stamps the UUID; provenance must survive both.
+
+        This is why provenance is a dedicated field: `confirmed_by="cli:adopt"` alone
+        would be gone after one turn (cli/hooks/commands.py:179-180).
+        """
+        monkeypatch.chdir(tmp_path)
+        store = self._adopted_session(tmp_path, monkeypatch)
+
+        transcript = tmp_path / "native.jsonl"
+        transcript.write_text("{}\n", encoding="utf-8")
+
+        result = CliRunner().invoke(
+            hooks,
+            ["stop"],
+            input=json.dumps(
+                {
+                    "hook_event_name": "Stop",
+                    "session_id": "native-uuid",
+                    "transcript_path": str(transcript),
+                }
+            ),
+        )
+        assert result.exit_code == 0
+        assert json.loads(result.output)["success"] is True
+
+        updated = store.read()
+        assert updated.confirmed.confirmed_by == "hook:stop"  # expected to change
+        assert updated.confirmed.claude_session_id == "native-uuid"  # P1: reattach is idempotent
+        # Whole-record compare: a per-field check would miss the hook clearing a
+        # field the test happens not to name.
+        assert updated.confirmed.adoption == self._adoption(tmp_path)
+
+    def test_pre_compact_leaves_the_binding_untouched(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A compaction snapshot must not disturb the adopted UUID or its provenance.
+
+        Pre-compact does not mutate the binding today -- it writes only a compaction
+        snapshot entry, which omits `session_id` entirely (commands.py:875). This is a
+        guard against a future refactor unifying the two capture paths, since the Stop
+        rewrite at :179 has no falsy guard and would happily write a None through.
+        """
+        monkeypatch.chdir(tmp_path)
+        store = self._adopted_session(tmp_path, monkeypatch)
+
+        transcript = tmp_path / "native.jsonl"
+        transcript.write_text("{}\n", encoding="utf-8")
+
+        result = CliRunner().invoke(
+            hooks,
+            ["pre-compact"],
+            input=json.dumps(
+                {
+                    "hook_event_name": "PreCompact",
+                    "session_id": "native-uuid",
+                    "transcript_path": str(transcript),
+                    "cwd": str(tmp_path),
+                }
+            ),
+        )
+        assert result.exit_code == 0
+
+        updated = store.read()
+        assert updated.confirmed.claude_session_id == "native-uuid"
+        assert updated.confirmed.adoption == self._adoption(tmp_path)
+        # confirmed_by churns -- this is its THIRD writer after cli:adopt and hook:stop
+        # (commands.py:891), which is exactly why provenance cannot live there.
+        assert updated.confirmed.confirmed_by == "hook:pre-compact"
+
+        # The compaction entry is the one artifact shape with no session_id; a reader
+        # that assumes every transcript entry carries one would read None as drift.
+        entries = updated.confirmed.artifacts.get("transcripts", [])
+        compaction_entries = [e for e in entries if e.get("reason") == "pre-compact"]
+        assert compaction_entries, "pre-compact should have recorded a snapshot entry"
+        assert all("session_id" not in e for e in compaction_entries)
 
 
 class TestStopFailureHook:

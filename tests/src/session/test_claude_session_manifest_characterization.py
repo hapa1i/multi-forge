@@ -126,6 +126,7 @@ def test_start_no_launch_manifest_shape(runner: CliRunner, temp_env: Path) -> No
     "is_sandboxed": false,
     "launch": null,
     "codex": null,
+    "adoption": null,
     "derivation": null,
     "claude_project_root": null,
     "consumer_lanes": null,
@@ -209,6 +210,7 @@ def test_incognito_start_manifest_shape_and_cleanup(runner: CliRunner, temp_env:
       "api_key_source": "env"
     },
     "codex": null,
+    "adoption": null,
     "derivation": null,
     "claude_project_root": "<project>",
     "consumer_lanes": null,
@@ -283,6 +285,7 @@ def test_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -> None:
       "api_key_source": "env"
     },
     "codex": null,
+    "adoption": null,
     "derivation": {
       "parent_session": "char-start",
       "parent_transcript": null,
@@ -372,6 +375,7 @@ def test_reconnect_in_place_manifest_shape(runner: CliRunner, temp_env: Path) ->
       "api_key_source": "env"
     },
     "codex": null,
+    "adoption": null,
     "derivation": null,
     "claude_project_root": "<project>",
     "consumer_lanes": null,
@@ -456,6 +460,7 @@ def test_launch_as_child_manifest_shape(runner: CliRunner, temp_env: Path) -> No
       "api_key_source": "env"
     },
     "codex": null,
+    "adoption": null,
     "derivation": null,
     "claude_project_root": "<project>",
     "consumer_lanes": null,
@@ -540,6 +545,7 @@ def test_native_fresh_resume_manifest_shape(runner: CliRunner, temp_env: Path) -
       "api_key_source": "env"
     },
     "codex": null,
+    "adoption": null,
     "derivation": {
       "parent_session": "char-native",
       "parent_transcript": null,

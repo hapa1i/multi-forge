@@ -130,7 +130,7 @@ attribution join is available.
 | Concept               | Current meaning                                               | Workspace relationship                                                          |
 | --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Claude Code project   | Native conversation namespace tied to path/CWD                | One workspace can contain many Claude project paths                             |
-| Claude native session | Runtime conversation UUID, path-scoped resume lookup          | Bound to a Forge session when launched                                          |
+| Claude native session | Runtime conversation UUID, path-scoped resume lookup          | Bound to a Forge session when launched or adopted                               |
 | Forge session         | Named, file-backed workflow state under a `forge_root`        | Indexed and queryable across a workspace                                        |
 | `checkout_root`       | One Git worktree checkout                                     | Workspace member                                                                |
 | `forge_root`          | Path-local `.forge/` + `.claude/` install root                | May appear in one or more workspace members                                     |

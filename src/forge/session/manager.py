@@ -22,7 +22,7 @@ from forge.install.project_compat import (
     enforce_project_compatibility_toml,
 )
 
-from .artifacts import resolve_artifact_path
+from .artifacts import ADOPT_ARTIFACT_REASON, resolve_artifact_path
 from .claude.paths import (
     get_transcript_path,
     resolve_claude_project_root,
@@ -46,6 +46,8 @@ from .exceptions import (
 )
 from .index import IndexStore
 from .models import (
+    AdoptionConfirmed,
+    CodexConfirmed,
     Derivation,
     LaunchIntent,
     SessionIndexEntry,
@@ -212,6 +214,53 @@ def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
     if not isinstance(confirmed, dict):
         return None
     return confirmed.get(key)
+
+
+def _adopted_source_uuids(state: SessionState | None, raw_data: dict[str, Any] | None) -> list[str]:
+    """Return the native conversation UUIDs this session adopted rather than created.
+
+    Adoption is the one origination path where the transcript under
+    ``~/.claude/projects`` predates the Forge session and outlives it: the user
+    created that conversation and may still resume it natively. Deleting a
+    session must not delete it, including via automatic retention cleanup
+    (``auto_clean_old_sessions`` passes ``delete_transcripts=True``).
+
+    Only the adopted source is protected, not every transcript the session went
+    on to reference -- provenance names it exactly, so the transcripts Forge
+    itself created for an adopted session are still cleaned up normally. Two
+    independent records identify it: ``confirmed.adoption.source_path``, whose
+    stem is the UUID, and the ``reason="adopt"`` transcript artifact.
+
+    Reads the raw manifest when the typed read failed, matching
+    ``_transcript_cleanup_project_root``: a session too corrupt to parse must
+    still not cost the user their conversation.
+    """
+    if state is not None:
+        adoption = state.confirmed.adoption
+        source_path = adoption.source_path if adoption is not None else None
+        artifacts: Any = state.confirmed.artifacts
+    else:
+        raw_adoption = _raw_confirmed_value(raw_data, "adoption")
+        if not isinstance(raw_adoption, dict):
+            return []
+        source_path = raw_adoption.get("source_path")
+        artifacts = _raw_confirmed_value(raw_data, "artifacts")
+
+    if state is not None and state.confirmed.adoption is None:
+        return []
+
+    sources: list[str] = []
+    if isinstance(source_path, str) and source_path:
+        _append_unique_string(sources, Path(source_path).stem)
+
+    if isinstance(artifacts, dict):
+        transcripts = artifacts.get("transcripts")
+        if isinstance(transcripts, list):
+            for artifact in transcripts:
+                if isinstance(artifact, dict) and artifact.get("reason") == ADOPT_ARTIFACT_REASON:
+                    _append_unique_string(sources, artifact.get("session_id"))
+
+    return sources
 
 
 def _transcript_cleanup_project_root(
@@ -424,8 +473,12 @@ class SessionManager:
         sidecar_image: str | None = None,
         direct_model: str | None = None,
         claude_session_id: str | None = None,
+        codex_confirmed: CodexConfirmed | None = None,
+        adoption: AdoptionConfirmed | None = None,
+        confirmed_by: str | None = None,
         runtime: str = "claude_code",
         parent_session: str | None = None,
+        require_uuid_unbound: bool = False,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -446,15 +499,29 @@ class SessionManager:
             sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
             sidecar_image: Optional sidecar image override to persist for relaunch.
             direct_model: Optional Claude Code env-ready direct model pin.
+            claude_session_id: Pre-seed the bound Claude conversation.
+            codex_confirmed: Pre-seed `confirmed.codex`. Codex adoption passes it here
+                rather than writing it afterwards so the thread id is committed by the
+                same call that publishes the session: it reaches the index row (whose
+                write lock enforces uniqueness), and no window exists in which an
+                indexed Codex session carries `confirmed.codex = None`.
+            adoption: Pre-seed `confirmed.adoption` for the same reason.
+            confirmed_by: Pre-seed `confirmed.confirmed_by`/`confirmed_at`.
             runtime: Runtime registry id for launcher dispatch ("claude_code" | "codex").
             parent_session: Derivation source recorded on the state (codex start path;
                 Claude resume/fork paths record it via their own child-creation flows).
+            require_uuid_unbound: Re-check conversation uniqueness inside the index
+                write lock, for whichever of `claude_session_id` / `codex_confirmed`
+                is given. Only meaningful when binding a **pre-existing** conversation
+                (`forge session adopt`); the ordinary start paths mint a fresh id that
+                cannot collide.
 
         Returns:
             The created session state with candidate UUID.
 
         Raises:
             SessionExistsError: If session name already exists.
+            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
             InvalidSessionNameError: If name is invalid.
             FileNotFoundError: If no git repository found.
             BranchExistsError: If branch already exists (when create_worktree=True).
@@ -636,6 +703,14 @@ class SessionManager:
         if claude_session_id:
             state.confirmed.claude_session_id = claude_session_id
 
+        if codex_confirmed is not None:
+            state.confirmed.codex = codex_confirmed
+        if adoption is not None:
+            state.confirmed.adoption = adoption
+        if confirmed_by is not None:
+            state.confirmed.confirmed_by = confirmed_by
+            state.confirmed.confirmed_at = now_iso()
+
         if create_worktree and state.worktree:
             state.worktree.is_worktree = True
 
@@ -649,7 +724,12 @@ class SessionManager:
         added_to_index = False
 
         try:
-            store.write(state)
+            # create_exclusive, not write: the session_exists checks above run
+            # outside any lock, so two concurrent creates of one name both reach
+            # here. The loser must fail without touching the winner's manifest,
+            # and wrote_manifest must mean "this call owns it" for the rollback
+            # below to be safe.
+            store.create_exclusive(state)
             wrote_manifest = True
 
             self.index_store.add_from_state(
@@ -658,6 +738,7 @@ class SessionManager:
                 checkout_root=checkout_root_str,
                 forge_root=forge_root_str,
                 relative_path=relative_path_str,
+                require_uuid_unbound=require_uuid_unbound,
             )
             added_to_index = True
 
@@ -667,11 +748,16 @@ class SessionManager:
             # Best-effort rollback for partial state.
             try:
                 if added_to_index:
-                    self.index_store.remove_session(name)
+                    # Scoped: an unscoped remove resolves by name across projects,
+                    # so a same-named session elsewhere makes this either ambiguous
+                    # or a delete of the wrong project's entry.
+                    self.index_store.remove_session(name, forge_root=forge_root_str)
             except Exception as rollback_err:
                 logger.warning("Rollback failed (index entry): %s", rollback_err)
 
             try:
+                # wrote_manifest is an ownership token (create_exclusive succeeded),
+                # so this can never delete a manifest another create owns.
                 if wrote_manifest and store.exists():
                     store.delete()
             except Exception as rollback_err:
@@ -954,26 +1040,43 @@ class SessionManager:
         """
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
         for attempt in range(2):
+            child_store = SessionStore(parent_forge_root, child_name)
             try:
-                self.index_store.add_from_state(
-                    child_state,
-                    str(project_root),
-                    checkout_root=parent_entry.checkout_root,
-                    forge_root=parent_entry.forge_root,
-                    relative_path=parent_entry.relative_path,
-                )
+                # Claim the name by creating its manifest. With a deterministic auto-name
+                # (<parent>-resumed), a concurrent resume can be racing for the same one;
+                # create_exclusive makes the winner's manifest unclobberable and tells this
+                # loser it never owned the name. Earlier this reserved the index row first,
+                # but list_sessions prunes index rows whose manifest is missing, so that
+                # reservation could be pruned out from under its own creator.
+                child_store.create_exclusive(child_state)
+
+                # Publish it. Both claims can report the collision -- the manifest here,
+                # the index inside add_session's lock -- so both must feed one retry.
+                try:
+                    self.index_store.add_from_state(
+                        child_state,
+                        str(project_root),
+                        checkout_root=parent_entry.checkout_root,
+                        forge_root=parent_entry.forge_root,
+                        relative_path=parent_entry.relative_path,
+                    )
+                except Exception:
+                    # Safe to unwind precisely because create_exclusive proved we own it.
+                    try:
+                        child_store.delete()
+                    except Exception as rollback_err:
+                        logger.warning("Rollback failed (child manifest '%s'): %s", child_name, rollback_err)
+                    raise
             except SessionExistsError:
-                # Reserve the index name BEFORE writing the manifest. With a deterministic auto-name
-                # (<parent>-resumed), a concurrent resume that already won `child_name` owns
-                # .forge/sessions/<child_name>/forge.session.json; writing it here would clobber the
-                # winner's manifest. Because the reservation comes first, this loser never wrote that
-                # manifest -- the winner's state is untouched. Only the curated transfer snapshot
-                # (children/<child>.md, written by assemble_transfer_context before this call) may be
-                # an orphan to reclaim, and only when no live session owns the name.
+                # Only the curated transfer snapshot (children/<child>.md, written by
+                # assemble_transfer_context before this call) may be an orphan to reclaim,
+                # and only when no live session owns the name.
                 if not name_was_auto or attempt > 0:
                     raise
 
-                winner_owns = self.index_store.session_exists(child_name, forge_root=parent_entry.forge_root)
+                winner_owns = child_store.exists() or self.index_store.session_exists(
+                    child_name, forge_root=parent_entry.forge_root
+                )
                 derivation = child_state.confirmed.derivation
                 if derivation is not None and derivation.resume_mode == "transfer" and not winner_owns:
                     orphan_context = child_path(Path(parent_forge_root), parent_name, child_name)
@@ -995,9 +1098,6 @@ class SessionManager:
                     derivation.context_file = child_path_rel(parent_name, child_name)
                 continue
 
-            # Name reserved: now publish the manifest. Writing the manifest only after the index
-            # reservation is what prevents a losing concurrent resume from overwriting the winner's.
-            SessionStore(parent_forge_root, child_name).write(child_state)
             break
 
         return child_name
@@ -1456,6 +1556,18 @@ class SessionManager:
             if not restore_target_state or not replaced_target_state or target_store is None or target_state is None:
                 return
 
+            # Only restore over a path this fork owned. Between deleting the stale
+            # target and claiming the name, another creator can win it; without
+            # this guard the restore would write the stale manifest over that
+            # winner's. wrote_manifest is the ownership token create_exclusive
+            # produced, and the rollback above has already removed our own copy.
+            if not wrote_manifest or target_store.exists():
+                logger.info(
+                    "Not restoring the previous fork target '%s': this fork never owned that manifest",
+                    fork_name,
+                )
+                return
+
             try:
                 target_store.write(target_state)
             except Exception as e:
@@ -1505,7 +1617,12 @@ class SessionManager:
 
                 replaced_target_state = True
 
-            fork_store.write(fork_state)
+            # Both branches reach here with no manifest: a stale target was just
+            # deleted above, and a fresh fork_name has none. create_exclusive keeps
+            # that true under concurrency and makes wrote_manifest an ownership
+            # token for the rollback path. (_restore_previous_target_state below
+            # keeps using write -- restoring a prior manifest is a real overwrite.)
+            fork_store.create_exclusive(fork_state)
             wrote_manifest = True
 
             if warnings_sink is not None:
@@ -1603,14 +1720,21 @@ class SessionManager:
         child_state.forge_root = parent_entry.forge_root or parent.forge_root
 
         child_store = SessionStore(parent_entry.forge_root or parent_worktree_path, child_name)
-        child_store.write(child_state)
-        self.index_store.add_from_state(
-            child_state,
-            project_root,
-            checkout_root=parent_entry.checkout_root,
-            forge_root=parent_entry.forge_root,
-            relative_path=parent_entry.relative_path,
-        )
+        child_store.create_exclusive(child_state)
+        try:
+            self.index_store.add_from_state(
+                child_state,
+                project_root,
+                checkout_root=parent_entry.checkout_root,
+                forge_root=parent_entry.forge_root,
+                relative_path=parent_entry.relative_path,
+            )
+        except Exception:
+            try:
+                child_store.delete()
+            except Exception as rollback_err:
+                logger.warning("Rollback failed (relaunch manifest '%s'): %s", child_name, rollback_err)
+            raise
 
         return parent, child_state
 
@@ -1620,15 +1744,27 @@ class SessionManager:
         return generate_unique_name(existing)
 
     def _generate_resume_name(self, parent_name: str, forge_root: str | None = None) -> str:
-        """Generate a unique name for a resumed session (project-scoped)."""
+        """Generate a unique name for a resumed session (project-scoped).
+
+        Checks the manifest as well as the index: the manifest is what actually
+        reserves a name (see SessionStore.create_exclusive), and an index row can
+        be pruned or lag behind one. Consulting only the index would hand the
+        collision retry the same taken name it just failed on.
+        """
         base_name = f"{parent_name}-resumed"
-        if not self.index_store.session_exists(base_name, forge_root=forge_root):
+        if not self._name_is_taken(base_name, forge_root=forge_root):
             return base_name
 
         from datetime import datetime
 
         suffix = datetime.now().strftime("%H%M%S")
         return f"{parent_name}-resumed-{suffix}"
+
+    def _name_is_taken(self, name: str, *, forge_root: str | None) -> bool:
+        """Whether a session name is claimed by a manifest or an index row."""
+        if forge_root and SessionStore(forge_root, name).exists():
+            return True
+        return self.index_store.session_exists(name, forge_root=forge_root)
 
     def _find_co_resident_sessions(self, worktree_path: str, exclude: str) -> list[str]:
         """Find other sessions living in the same worktree directory.
@@ -1842,8 +1978,24 @@ class SessionManager:
                 exclude_forge_root=entry_forge_root,
             )
 
-            _filtered_claude_session_id = None if _claude_session_id in shared_ids else _claude_session_id
-            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in shared_ids]
+            # An adopted session's native transcript is user-owned, so it is
+            # protected the same way a transcript shared with another session is.
+            # Keyed on provenance rather than on the bound id: `claude_session_id`
+            # can drift off the adoption source once hooks reconcile it, and the
+            # session's other transcripts are Forge's to clean up.
+            _protected_ids = dict(shared_ids)
+            _adopted_ids = _adopted_source_uuids(state, _raw_data)
+            if _adopted_ids:
+                for _adopted_id in _adopted_ids:
+                    _protected_ids.setdefault(_adopted_id, ["adopted native conversation"])
+                logger.info(
+                    "Preserving adopted native transcript(s) %s while deleting session '%s'",
+                    ", ".join(_adopted_ids),
+                    name,
+                )
+
+            _filtered_claude_session_id = None if _claude_session_id in _protected_ids else _claude_session_id
+            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in _protected_ids]
 
             if shared_ids:
                 logger.info(

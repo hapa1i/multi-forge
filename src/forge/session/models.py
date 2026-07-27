@@ -528,9 +528,12 @@ class CodexConfirmed:
         thread_id: the ``codex exec resume`` id, from the stream's ``thread.started``.
         rollout_path: absolute path to the matching ``$CODEX_HOME/sessions/.../
             rollout-*-<thread_id>.jsonl``, when discovered.
-        rollout_source: how ``rollout_path`` was obtained: "discovered_by_thread_id"
-            (filesystem glob) or "session_start_hook" (the hook payload's
-            transcript_path, reported by codex itself); None when no rollout was found.
+        rollout_source: how ``rollout_path`` was obtained -- "discovered_by_thread_id"
+            (filesystem glob), "session_start_hook" (the hook payload's
+            transcript_path, reported by codex itself), "discovered_post_exit"
+            (interactive time+cwd discovery, where the filename is the thread
+            source), or "adopted" (``forge session adopt`` bound a rollout that
+            predates the session); None when no rollout was found.
         auth_method / auth_source / billing_mode: the secret-free auth posture from
             ``CodexPreflight``. ``confirmed.launch`` stays None for Codex sessions
             (it describes the ANTHROPIC key posture of interactive Claude), so this
@@ -550,6 +553,38 @@ class CodexConfirmed:
     billing_mode: str | None = None
     last_run_at: str | None = None
     context_delivery: str | None = None
+
+
+@dataclass
+class AdoptionConfirmed:
+    """Provenance for a session bound to a pre-existing native conversation.
+
+    CLI-owned (like ``LaunchConfirmed`` and ``CodexConfirmed``), written once by
+    ``forge session adopt``. It needs its own field rather than riding
+    ``confirmed_by``: the next Stop hook overwrites ``confirmed_by`` to
+    ``hook:stop`` and rewrites ``claude_session_id`` from its payload, so
+    adoption's origin would be erased after one turn. Plain ``str`` (not
+    ``Literal``) to match the sibling ``*Confirmed`` style and stay fail-open
+    under strict dacite reads.
+
+    Fields:
+        source_runtime: which runtime produced the adopted conversation --
+            "claude_code" (a native transcript) or "codex" (a rollout).
+        adopted_at: ISO8601 timestamp of the adopt command.
+        source_path: absolute path to the native transcript/rollout **as of adopt
+            time**. A breadcrumb, not a live pointer: the native store is
+            user-owned, so this path may disappear without Forge knowing.
+        model_basis: what produced ``intent.launch.direct_model`` -- "explicit"
+            (a ``--model`` flag), "inferred" (read from transcript metadata), or
+            "none" (no basis found, so the field was deliberately left unset).
+            Recorded because a transcript that justified an inference may be gone
+            by the time someone asks why the session resumes on that model.
+    """
+
+    source_runtime: str | None = None
+    adopted_at: str | None = None
+    source_path: str | None = None
+    model_basis: str | None = None
 
 
 @dataclass
@@ -598,6 +633,11 @@ class SessionConfirmed:
 
     # Codex runtime facts (thread_id, rollout, auth posture), CLI-owned, hook-free.
     codex: CodexConfirmed | None = None
+
+    # Adoption provenance, CLI-owned, written once by `forge session adopt`.
+    # Survives the Stop hook's confirmed_by/claude_session_id rewrite, which is
+    # exactly why it is not folded into confirmed_by.
+    adoption: AdoptionConfirmed | None = None
 
     # Context derivation tracking (for resumed or forked sessions)
     derivation: Derivation | None = None
@@ -666,6 +706,12 @@ class SessionIndexEntry:
     parent_session: str | None = None
     # UUID field for reverse lookup (set by SessionStart hook)
     claude_session_id: str | None = None
+    # Mirrors `confirmed.codex.thread_id`. Exists so thread uniqueness can be
+    # enforced under the index write lock -- the only lock shared across session
+    # names -- when adoption binds a pre-existing thread. The ordinary Codex paths
+    # learn their thread after the run, so they reconcile it here rather than
+    # setting it at creation; a stale value would guard an id nobody uses.
+    codex_thread_id: str | None = None
     # Empty string (not None) because strict dacite requires str type match;
     # use entry.root for the resolved path (prefers forge_root, falls back to worktree_path).
     forge_root: str = ""  # Forge project root (where .forge/ lives)

@@ -134,6 +134,10 @@ forge session start [name] \
   [--sidecar|--host-proxy] [--mount <host:container>] [--image <name>] \
   [--no-launch]
 
+# Adopt a conversation you started outside Forge (run from its launch directory)
+forge session adopt [--json]                          # preview unbound conversations here
+forge session adopt <conversation-id> [--name/-n <name>] [--model/-m <model>] [--yes/-y]
+
 # Resume an existing session (default: reattach when safe; --fresh: context assembly)
 forge session resume <name>
 forge session resume <name> --force  # active Claude session: launch a lineage child
@@ -371,6 +375,71 @@ the existing conversation in place after the previous launch has ended.
   inactive. A pre-seeded UUID by itself is not enough evidence.
 - If that resumable session appears active, resume fails unless `--force` is supplied; `--force` launches a new lineage
   child instead of attaching a second process to the active conversation.
+
+### Adopt a conversation you started outside Forge
+
+You started `claude` or `codex` directly, the conversation turned out to matter, and now you want Forge to manage it.
+Adoption binds a Forge session to that existing conversation instead of copying or replaying it. The Claude arm is
+described first; [Adopting a Codex thread](#adopting-a-codex-thread) covers the differences.
+
+```bash
+# Run from the directory you launched the native session in
+forge session adopt                                            # see what is adoptable here
+forge session adopt 470b1a1b-202b-4ead-a3ea-d0dca69243f2 --name auth-spike
+forge session resume auth-spike
+```
+
+Bare `forge session adopt` previews the unbound conversations launched from the current directory — id, when it was last
+active, how many turns you took, and your first message — and names the directory it scanned. Already-adopted
+conversations are omitted. The preview writes nothing and takes no binding flags; add `--json` for a scriptable shape.
+
+You can also pass the id directly: it is the transcript filename without `.jsonl` under
+`~/.claude/projects/<encoded-cwd>/`. Pass the full UUID, not a prefix.
+
+**Why the directory matters:** Claude stores transcripts under an encoding of the launch directory, and that encoding is
+lossy — `api.v2`, `api_v2`, and `api-v2` all collapse to the same folder. Adoption reads the directory recorded inside
+the transcript and refuses to bind one that was launched elsewhere, so a sibling project's conversation cannot be
+adopted by accident.
+
+**What adoption does and does not do:**
+
+- **Does**: bind the conversation to a new Forge session, and record where it came from under `confirmed.adoption`.
+- **Does** (Claude only): copy the transcript into `.forge/artifacts/<name>/transcripts/` for search. Codex sessions
+  record the live rollout path instead, exactly as Codex sessions Forge started itself do.
+- **Does not**: attach hooks, env, policy, or supervision to a client that is already running. Those begin with the next
+  Forge-managed `resume` or `--fresh` child.
+- **Does not**: delete or move your original transcript or rollout — including when you later delete the adopted session
+  or when automatic retention cleanup runs.
+
+**Model pin (Claude only):** Forge infers the model from the transcript's last assistant turn. A conversation with no
+assistant turn yet, or one on a model Forge's catalog does not know, is adopted without a pin and resumes on the current
+direct default. Set one explicitly with `--model`, or later with `forge session resume <name> --model <model>`.
+
+**If the conversation was active in the last 30 minutes**, Forge asks for confirmation: it cannot see whether a native
+client is still attached, and adopting then resuming would put two clients on one conversation. Close the other client
+first, or pass `--yes` if you know it is gone.
+
+A conversation can only be adopted once — a second attempt names the session that already owns it.
+
+#### Adopting a Codex thread
+
+The same command adopts a native `codex` thread. Forge picks the runtime by looking for the id on disk — a Claude
+transcript or a Codex rollout — so you pass the id and nothing else:
+
+```bash
+forge session adopt 019f0b65-b51c-7683-99c7-bb48107f7b83 --name codex-spike
+forge session resume codex-spike --task "keep going"
+```
+
+Get the thread id from `codex resume --list`. Two differences from the Claude arm:
+
+- **No preview.** Bare `forge session adopt` lists Claude conversations only. Codex files rollouts by date rather than
+  by directory, so there is no per-directory listing to show.
+- **No `--model`.** Codex resolves its own model; pin one per turn on `resume` instead.
+
+The directory rule still applies: Codex records the launch directory inside the rollout, and adoption refuses to bind
+one recorded elsewhere. If more than one rollout matches the thread id — or if one of them is unreadable, so Forge
+cannot rule it out — adoption refuses rather than guessing which conversation you meant.
 
 ### Derive a fresh session from an existing one
 

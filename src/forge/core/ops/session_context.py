@@ -25,7 +25,9 @@ from forge.session import (
     compute_effective_intent,
 )
 from forge.session.exceptions import AmbiguousSessionError
+from forge.session.identity import session_name_from_key
 from forge.session.index import IndexStore
+from forge.session.store import get_sessions_dir
 
 _log = logging.getLogger(__name__)
 
@@ -175,7 +177,7 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             return uuid_result[0], uuid_result[1]
 
         # Fall back to scanning session manifests when the index is stale.
-        scan_result = _scan_manifests_for_uuid(session)
+        scan_result = scan_manifests_for_uuid(session)
         if scan_result:
             return scan_result
 
@@ -402,11 +404,179 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
     )
 
 
-def _scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
+class BindingLookupError(SessionContextError):
+    """Raised when the set of bound conversations cannot be established.
+
+    Covers both runtimes: Claude session UUIDs and Codex thread ids.
+    """
+
+
+def _mark_visited(visited: set[tuple[str, str]], root: str, name: str) -> bool:
+    """Record a (project, session) manifest read; return False if already read.
+
+    Resolves ``root`` so the same project reached through a symlink or a relative
+    index entry does not read twice, and -- more importantly -- so two projects
+    that merely share a session *name* stay distinct.
+    """
+    try:
+        resolved = str(Path(root).resolve())
+    except OSError:
+        resolved = root
+    key = (resolved, name)
+    if key in visited:
+        return False
+    visited.add(key)
+    return True
+
+
+def _manifest_read_error(root: str, name: str, error: Exception) -> str:
+    return (
+        f"Could not read the manifest for session '{name}': {error}. "
+        f"Repair or remove {get_sessions_dir(root) / name} before adopting."
+    )
+
+
+def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
+    """Map every bound Claude UUID (lowercased) to the session that owns it.
+
+    Three sources, because no single one is complete:
+
+    - index rows, which span projects but can lag a manifest;
+    - the manifest behind each row, which can carry a binding the row lost;
+    - every manifest directory under ``forge_root``, which is the only way to see
+      a session whose index row was never written. Session creation writes the
+      manifest first (``SessionStore.create_exclusive``), so a process killed
+      between the two leaves exactly that orphan -- and an adoption gated only on
+      the index would then bind the same conversation twice.
+
+    Reads without pruning: ``list_sessions`` self-heals by deleting index rows,
+    which a read-only caller such as the adoption preview must not trigger.
+
+    Fails closed throughout. Neither an unreadable index nor an unreadable manifest
+    can be reported as "nothing is bound" when the caller is using this to decide
+    whether a conversation is free -- a swallowed read is indistinguishable from an
+    absent binding, and would let the same conversation bind twice.
+
+    Raises:
+        BindingLookupError: If the index, or any manifest it names, cannot be read.
+    """
+    index = IndexStore()
+    try:
+        rows = index.read().sessions
+    except Exception as e:
+        raise BindingLookupError(f"Could not read the session index: {e}") from e
+
+    bound: dict[str, str] = {}
+
+    def _record(session_uuid: object, owner: str) -> None:
+        if isinstance(session_uuid, str) and session_uuid:
+            bound.setdefault(session_uuid.lower(), owner)
+
+    # Keyed by (project, name), not by name: session names are project-scoped, so a
+    # same-named session in another project would otherwise mask this project's
+    # orphan manifest and let its conversation bind a second time.
+    visited: set[tuple[str, str]] = set()
+
+    def _read_manifest_uuid(root: str, name: str) -> None:
+        if not _mark_visited(visited, root, name):
+            return
+        try:
+            store = SessionStore(root, name)
+            if store.exists():
+                _record(store.read().confirmed.claude_session_id, name)
+        except Exception as e:
+            raise BindingLookupError(_manifest_read_error(root, name, e)) from e
+
+    for key, entry in rows.items():
+        name = session_name_from_key(key)
+        _record(entry.claude_session_id, name)
+        _read_manifest_uuid(entry.forge_root or entry.worktree_path, name)
+
+    if forge_root:
+        for manifest_dir in _manifest_dirs(forge_root):
+            _read_manifest_uuid(forge_root, manifest_dir.name)
+
+    return bound
+
+
+def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]:
+    """Map every bound Codex thread id (lowercased) to the session that owns it.
+
+    The Codex counterpart to ``collect_bound_uuids``. Only adopted threads carry an
+    index column (``codex_thread_id``); the ordinary Codex paths discover their
+    thread after the run and record it on the manifest alone. So this reads
+    manifests, and the orphan scan under ``forge_root`` is the only way to see a
+    session whose index row was never written.
+
+    Fails closed for the same reason as ``collect_bound_uuids``, and more sharply:
+    with manifests as the sole source, one swallowed read is a thread that looks
+    free.
+
+    Raises:
+        BindingLookupError: If the index, or any manifest it names, cannot be read.
+    """
+    index = IndexStore()
+    try:
+        rows = index.read().sessions
+    except Exception as e:
+        raise BindingLookupError(f"Could not read the session index: {e}") from e
+
+    bound: dict[str, str] = {}
+
+    # See collect_bound_uuids: project-scoped, so a bare name cannot dedupe.
+    visited: set[tuple[str, str]] = set()
+
+    def _record(root: str, name: str) -> None:
+        if not _mark_visited(visited, root, name):
+            return
+        try:
+            store = SessionStore(root, name)
+            if not store.exists():
+                return
+            codex = store.read().confirmed.codex
+        except Exception as e:
+            raise BindingLookupError(_manifest_read_error(root, name, e)) from e
+        if codex is not None and codex.thread_id:
+            bound.setdefault(codex.thread_id.lower(), name)
+
+    for key, entry in rows.items():
+        name = session_name_from_key(key)
+        _record(entry.forge_root or entry.worktree_path, name)
+
+    if forge_root:
+        for manifest_dir in _manifest_dirs(forge_root):
+            _record(forge_root, manifest_dir.name)
+
+    return bound
+
+
+def _manifest_dirs(forge_root: str) -> list[Path]:
+    """Return the per-session directories under a project's ``.forge/sessions/``.
+
+    A missing directory is a project with no sessions yet. Any other error is
+    reported, not flattened to "no sessions": callers use this to decide whether a
+    conversation is free, and an unreadable directory is unknown, not empty.
+
+    Raises:
+        BindingLookupError: If the directory exists but cannot be listed.
+    """
+    sessions_dir = get_sessions_dir(forge_root)
+    try:
+        return sorted(p for p in sessions_dir.iterdir() if p.is_dir())
+    except FileNotFoundError:
+        return []
+    except OSError as e:
+        raise BindingLookupError(f"Could not list sessions under {sessions_dir}: {e}") from e
+
+
+def scan_manifests_for_uuid(session_uuid: str) -> tuple[str, str] | None:
     """Search session manifests for a Claude UUID when the index is stale.
 
     Returns (display_name, forge_root) to preserve project scope for
     subsequent lookups, or None if not found.
+
+    Catches a stale ``claude_session_id`` column on an existing index row -- it
+    enumerates via the index, so a wholly missing row stays invisible here.
     """
     index = IndexStore()
     try:
