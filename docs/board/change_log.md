@@ -50,9 +50,9 @@ surface (resume, fork, transfer, artifacts, search) applies to it.
 - Binding lookups fail closed on the index and on every manifest they read, and are keyed by `(project, name)` because
   session names are project-scoped.
 
-**Verification**: 9028 unit + regression tests (1 environmental skip); 45 session/codex integration tests; two
+**Verification**: 9034 unit + regression tests (1 environmental skip); 45 session/codex integration tests; two
 real-Claude Docker gates — the reattach-identity premise (`test_adopt_binding_contract.py`) and end-to-end discover →
-bind → continue against a conversation Forge never launched (`test_adopt_native_conversation.py`). Three review rounds,
+bind → continue against a conversation Forge never launched (`test_adopt_native_conversation.py`). Four review rounds,
 every finding reproduced before it was fixed. `make pre-commit` clean.
 
 **Deferred**: session creation is still not crash-atomic across manifest and index — a kill between `create_exclusive`
