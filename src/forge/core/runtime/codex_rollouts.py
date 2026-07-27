@@ -59,14 +59,22 @@ def find_rollouts_by_thread_id(thread_id: str, *, home: Path | None = None) -> l
     adoption, which binds a session to whichever it picks -- can reject an
     ambiguous result instead of inheriting ``find_rollout_path``'s newest-wins
     tie-break.
+
+    The glob only tests that the name *ends* with the id, so
+    ``rollout-<ts>-not-the-thread-<wanted>.jsonl`` matches it. Every hit is
+    therefore re-parsed and kept only when the parsed thread id equals the
+    requested one -- the filename grammar, not the glob, decides identity.
     """
     if not thread_id:
         return []
     base = (home if home is not None else codex_home()) / "sessions"
     try:
-        return list(base.glob(f"*/*/*/rollout-*-{thread_id}.jsonl"))
+        candidates = list(base.glob(f"*/*/*/rollout-*-{thread_id}.jsonl"))
     except OSError:
         return []
+    return [
+        p for p in candidates if (parsed := parse_rollout_filename(p)) is not None and parsed.thread_id == thread_id
+    ]
 
 
 def find_rollout_path(thread_id: str, *, home: Path | None = None) -> Path | None:

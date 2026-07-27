@@ -1,7 +1,7 @@
 # Adopt native Claude Code / Codex sessions (`forge session adopt`)
 
-**Lane**: `done/` -- shipped and verified 2026-07-27; execution record in [checklist.md](checklist.md). Standalone (not
-an `epic_global_forge_runtime` member); relates to the session identity model (design.md §3.3/§3.5) and complements
+**Lane**: `doing/` -- accepted and active; execution plan in [checklist.md](checklist.md). Standalone (not an
+`epic_global_forge_runtime` member); relates to the session identity model (design.md §3.3/§3.5) and complements
 [`workspace_scope`](../../proposed/workspace_scope/card.md), whose identity table says a native Claude session is "bound
 to a Forge session **when launched**" -- this card adds binding **after the fact**.
 

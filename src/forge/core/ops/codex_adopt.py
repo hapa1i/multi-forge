@@ -25,7 +25,6 @@ from forge.core.runtime.codex_preflight import (
 )
 from forge.core.runtime.codex_rollouts import (
     find_rollouts_by_thread_id,
-    parse_rollout_filename,
     rollout_head_cwd,
 )
 from forge.core.state import now_iso
@@ -41,6 +40,7 @@ from .context import ExecutionContext
 from .session_adopt import (
     RECENT_ACTIVITY_WINDOW_S,
     AdoptError,
+    conversation_lock,
     normalize_conversation_id,
 )
 from .session_context import BindingLookupError, collect_bound_codex_threads
@@ -105,7 +105,7 @@ def find_adoptable_rollout(thread_id: str, cwd: Path) -> Path:
     Raises:
         AdoptError: On no match, a cwd mismatch, or an ambiguous match in ``cwd``.
     """
-    matches = [p for p in find_rollouts_by_thread_id(thread_id) if parse_rollout_filename(p) is not None]
+    matches = find_rollouts_by_thread_id(thread_id)
     if not matches:
         raise AdoptError(
             f"no Codex rollout for thread '{thread_id}'. Adoption reads "
@@ -226,13 +226,6 @@ def adopt_codex_session(ctx: ExecutionContext, plan: CodexAdoptPlan, *, name: st
         raise AdoptError(f"plan carries a non-canonical thread id: '{plan.thread_id}'")
     rollout_path = find_adoptable_rollout(plan.thread_id, Path(ctx.cwd))
 
-    try:
-        owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
-    except BindingLookupError as e:
-        raise AdoptError(str(e)) from e
-    if owner is not None:
-        raise UuidAlreadyBoundError(plan.thread_id, owner)
-
     timestamp = now_iso()
     codex_confirmed = CodexConfirmed(
         thread_id=plan.thread_id,
@@ -245,30 +238,41 @@ def adopt_codex_session(ctx: ExecutionContext, plan: CodexAdoptPlan, *, name: st
         # stays None because no transfer context was delivered.
     )
 
-    try:
-        state = SessionManager().start_session(
-            name,
-            worktree_path=str(ctx.cwd),
-            direct=True,
-            runtime=CODEX_RUNTIME,
-            codex_confirmed=codex_confirmed,
-            adoption=AdoptionConfirmed(
-                source_runtime=SOURCE_RUNTIME_CODEX,
-                adopted_at=timestamp,
-                source_path=str(rollout_path),
-                model_basis=None,
-            ),
-            confirmed_by="cli:adopt",
-            require_uuid_unbound=True,
-        )
-    except SessionExistsError:
-        # A same-thread adopt that got here first owns the derived name too, so the
-        # name collision fires before the uniqueness check. Report the binding, which
-        # is the contract, rather than a name clash the user did not choose.
-        owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
+    # Scan and commit under one lock. The index write lock alone cannot see a
+    # crashed adopt's orphan manifest, which owns the thread without an index row.
+    with conversation_lock(plan.thread_id):
+        try:
+            owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
+        except BindingLookupError as e:
+            raise AdoptError(str(e)) from e
         if owner is not None:
-            raise UuidAlreadyBoundError(plan.thread_id, owner) from None
-        raise
+            raise UuidAlreadyBoundError(plan.thread_id, owner)
+
+        try:
+            state = SessionManager().start_session(
+                name,
+                worktree_path=str(ctx.cwd),
+                direct=True,
+                runtime=CODEX_RUNTIME,
+                codex_confirmed=codex_confirmed,
+                adoption=AdoptionConfirmed(
+                    source_runtime=SOURCE_RUNTIME_CODEX,
+                    adopted_at=timestamp,
+                    source_path=str(rollout_path),
+                    model_basis=None,
+                ),
+                confirmed_by="cli:adopt",
+                require_uuid_unbound=True,
+            )
+        except SessionExistsError:
+            # A same-thread adopt that got here first owns the derived name too, so
+            # the name collision fires before the uniqueness check. Report the
+            # binding, which is the contract, rather than a name clash the user did
+            # not choose.
+            owner = collect_bound_codex_threads(str(ctx.forge_root)).get(plan.thread_id)
+            if owner is not None:
+                raise UuidAlreadyBoundError(plan.thread_id, owner) from None
+            raise
 
     return CodexAdoptResult(name=state.name, thread_id=plan.thread_id, rollout_path=rollout_path)
 

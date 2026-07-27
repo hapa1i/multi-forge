@@ -405,7 +405,35 @@ def _build_policy_context(state: SessionState) -> PolicyContext:
 
 
 class BindingLookupError(SessionContextError):
-    """Raised when the set of bound Claude UUIDs cannot be established."""
+    """Raised when the set of bound conversations cannot be established.
+
+    Covers both runtimes: Claude session UUIDs and Codex thread ids.
+    """
+
+
+def _mark_visited(visited: set[tuple[str, str]], root: str, name: str) -> bool:
+    """Record a (project, session) manifest read; return False if already read.
+
+    Resolves ``root`` so the same project reached through a symlink or a relative
+    index entry does not read twice, and -- more importantly -- so two projects
+    that merely share a session *name* stay distinct.
+    """
+    try:
+        resolved = str(Path(root).resolve())
+    except OSError:
+        resolved = root
+    key = (resolved, name)
+    if key in visited:
+        return False
+    visited.add(key)
+    return True
+
+
+def _manifest_read_error(root: str, name: str, error: Exception) -> str:
+    return (
+        f"Could not read the manifest for session '{name}': {error}. "
+        f"Repair or remove {get_sessions_dir(root) / name} before adopting."
+    )
 
 
 def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
@@ -444,16 +472,20 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
         if isinstance(session_uuid, str) and session_uuid:
             bound.setdefault(session_uuid.lower(), owner)
 
+    # Keyed by (project, name), not by name: session names are project-scoped, so a
+    # same-named session in another project would otherwise mask this project's
+    # orphan manifest and let its conversation bind a second time.
+    visited: set[tuple[str, str]] = set()
+
     def _read_manifest_uuid(root: str, name: str) -> None:
+        if not _mark_visited(visited, root, name):
+            return
         try:
             store = SessionStore(root, name)
             if store.exists():
                 _record(store.read().confirmed.claude_session_id, name)
         except Exception as e:
-            raise BindingLookupError(
-                f"Could not read the manifest for session '{name}': {e}. "
-                f"Repair or remove {get_sessions_dir(root) / name} before adopting."
-            ) from e
+            raise BindingLookupError(_manifest_read_error(root, name, e)) from e
 
     for key, entry in rows.items():
         name = session_name_from_key(key)
@@ -462,8 +494,7 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
 
     if forge_root:
         for manifest_dir in _manifest_dirs(forge_root):
-            if manifest_dir.name not in bound.values():
-                _read_manifest_uuid(forge_root, manifest_dir.name)
+            _read_manifest_uuid(forge_root, manifest_dir.name)
 
     return bound
 
@@ -492,17 +523,19 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
 
     bound: dict[str, str] = {}
 
+    # See collect_bound_uuids: project-scoped, so a bare name cannot dedupe.
+    visited: set[tuple[str, str]] = set()
+
     def _record(root: str, name: str) -> None:
+        if not _mark_visited(visited, root, name):
+            return
         try:
             store = SessionStore(root, name)
             if not store.exists():
                 return
             codex = store.read().confirmed.codex
         except Exception as e:
-            raise BindingLookupError(
-                f"Could not read the manifest for session '{name}': {e}. "
-                f"Repair or remove {get_sessions_dir(root) / name} before adopting."
-            ) from e
+            raise BindingLookupError(_manifest_read_error(root, name, e)) from e
         if codex is not None and codex.thread_id:
             bound.setdefault(codex.thread_id.lower(), name)
 
@@ -512,8 +545,7 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
 
     if forge_root:
         for manifest_dir in _manifest_dirs(forge_root):
-            if manifest_dir.name not in bound.values():
-                _record(forge_root, manifest_dir.name)
+            _record(forge_root, manifest_dir.name)
 
     return bound
 

@@ -25,37 +25,6 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
-## 2026-07-27
-
-### native_session_adoption: `forge session adopt`
-
-**Goal**: Bind a Forge session to a Claude conversation or Codex thread started outside Forge, so the normal session
-surface (resume, fork, transfer, artifacts, search) applies to it.
-
-**Key changes**:
-
-- New command-core ops `session_adopt.py` (Claude) and `codex_adopt.py` (Codex) behind one CLI leaf. The runtime is
-  chosen by which store holds a matching conversation, never by the shape of the id; a match in both is refused.
-- Bare `forge session adopt` previews unbound Claude conversations launched from the current directory (`--json` for
-  scripting). Both arms verify the conversation's recorded launch directory before binding.
-- A pre-existing conversation is bound by the write that publishes the session, so uniqueness is enforced under the
-  index write lock. The Codex arm needed a `codex_thread_id` index column for this; without it two differently-named
-  adopts of one thread both succeeded (reproduced, then fixed).
-- `SessionStore.create_exclusive` makes the manifest the session-name reservation; an index row cannot reserve, because
-  `list_sessions` prunes rows whose manifest is missing.
-- Adoption inverts transcript ownership, so `delete_session` exempts an adopted session's native transcript from
-  `delete_transcripts` — including the automatic retention sweep that runs on CLI startup.
-- Binding lookups fail closed on the index and on every manifest they read: a swallowed read is indistinguishable from
-  an unbound conversation.
-
-**Verification**: 9019 unit + regression tests (1 environmental skip); 43 session-command integration tests; two
-real-Claude Docker gates — the reattach-identity premise (`test_adopt_binding_contract.py`) and end-to-end discover →
-bind → continue against a conversation Forge never launched (`test_adopt_native_conversation.py`). Three review rounds,
-each finding reproduced before it was fixed. `make pre-commit` clean.
-
-**Deferred**: session creation is still not crash-atomic across manifest and index (orphan manifest on a kill between
-the two). The orphan scan covers the adoption invariant; the general fix needs its own card.
-
 ## 2026-07-26
 
 ### July 2026 model refresh (Opus 5 default, K3, Qwen 3.7, Gemini 3.6 Flash)

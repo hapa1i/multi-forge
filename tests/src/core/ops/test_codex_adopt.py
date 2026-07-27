@@ -137,6 +137,35 @@ class TestRolloutLookup:
 
         assert find_adoptable_rollout(_THREAD, project) == real
 
+    def test_a_thread_id_that_is_only_a_suffix_does_not_match(self, tmp_path: Path) -> None:
+        """The glob matches any name *ending* in the id; identity is the parsed field.
+
+        `rollout-<ts>-not-the-thread-<wanted>.jsonl` is a different thread whose id
+        happens to end with the requested one. Binding it would point the session at
+        someone else's conversation.
+        """
+        project = _make_project(tmp_path)
+        day = tmp_path / "codex" / "sessions" / "2026" / "07" / "27"
+        day.mkdir(parents=True, exist_ok=True)
+        decoy = day / f"rollout-2026-07-27T12-00-00-not-the-thread-{_THREAD}.jsonl"
+        decoy.write_text(
+            json.dumps({"type": "session_meta", "payload": {"id": "other", "cwd": str(project)}}) + "\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(AdoptError, match="no Codex rollout"):
+            find_adoptable_rollout(_THREAD, project)
+
+    def test_a_suffix_match_does_not_route_the_runtime_either(self, tmp_path: Path) -> None:
+        """detect_adoption_runtime shares the lookup, so it shared the false positive."""
+        project = _make_project(tmp_path)
+        day = tmp_path / "codex" / "sessions" / "2026" / "07" / "27"
+        day.mkdir(parents=True, exist_ok=True)
+        (day / f"rollout-2026-07-27T12-00-00-not-the-thread-{_THREAD}.jsonl").write_text("{}\n", encoding="utf-8")
+
+        with pytest.raises(AdoptError, match="no conversation"):
+            detect_adoption_runtime(ExecutionContext.from_cwd(project), _THREAD)
+
 
 class TestRuntimeDetection:
     def test_routes_a_codex_thread_to_the_codex_arm(self, tmp_path: Path) -> None:

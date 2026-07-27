@@ -420,6 +420,38 @@ class IndexStore:
         except Exception as e:
             _log.debug("Index sync for '%s' failed (non-critical): %s", name, e)
 
+    def update_codex_thread(self, name: str, thread_id: str, forge_root: str | None = None) -> None:
+        """Reconcile a session's ``codex_thread_id`` after the manifest changed.
+
+        Codex can re-bind a thread across a resume ("drift"). The manifest records
+        the live id, and this keeps the index column pointing at the same thing --
+        otherwise ``add_session``'s uniqueness check guards an id the session no
+        longer uses, and adoption could publish a second binding for the live one.
+
+        Best-effort, like ``update_uuid``: drift is already a fait accompli by the
+        time this runs, so failing here must not break the resume that observed it.
+        A collision is logged rather than raised for the same reason; the adoption
+        guard still refuses the id, which is the outcome that matters.
+        """
+        try:
+            with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+                index = self.read()
+                key = resolve_key_best_effort(index.sessions, name, forge_root)
+                if key is None:
+                    return
+                for other_key, other in index.sessions.items():
+                    if other_key != key and other.codex_thread_id == thread_id:
+                        _log.warning(
+                            "Codex thread '%s' drifted onto session '%s', which session '%s' already holds",
+                            thread_id,
+                            name,
+                            session_name_from_key(other_key),
+                        )
+                index.sessions[key].codex_thread_id = thread_id
+                self.write(index)
+        except Exception as e:
+            _log.debug("Codex index sync for '%s' failed (non-critical): %s", name, e)
+
     def remove_session(self, name: str, forge_root: str | None = None) -> bool:
         """Remove a session from the index.
 

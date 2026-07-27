@@ -2,9 +2,10 @@
 
 **Card**: [card.md](card.md).
 
-**Lane**: `done/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly (the `todo/` parking step was
-skipped because acceptance and activation happened in the same decision), then `doing/` -> `done/` at closeout on
-2026-07-27.
+**Lane**: `doing/` -- accepted 2026-07-26 and moved `proposed/` -> `doing/` directly (the `todo/` parking step was
+skipped because acceptance and activation happened in the same decision). Moved to `done/` on 2026-07-27 and **moved
+back the same day**: review found the lesson-review step (closeout item 3) is a precondition for the lane move, not
+something a `done/` card may still be waiting on, and found four binding-safety defects alongside it.
 
 **Execution branch**: `feat/native-session-adoption`. Slice 0 shipped the P1 gate
 (`tests/integration/docker/test_adopt_binding_contract.py`) with no `src/` change; Slice 1 the manifest schema
@@ -23,9 +24,31 @@ and §3.5 and `cli_reference.md` synced. Slice 3 shipped the bare-`adopt` discov
 discovery decision. Slice 4 shipped the Codex arm with evidence-based runtime detection, and Slice 4a closed the
 one-thread/one-manifest hole review found in it. Slice 5 shipped the end-to-end Docker gate and the doc sync.
 
-**Card closed 2026-07-27.** One item is deliberately left open rather than ticked: the `impl_notes.md` promotion, which
-the board contract gates on human review. Its four candidates are listed under Slice 5. Carried forward as debt needing
-its own card: session creation is not crash-atomic across manifest and index.
+**Slice 5a -- third review round (2026-07-27).** The card was moved to `done/` prematurely and is back in `doing/`. Four
+defects, all reproduced before fixing:
+
+- **Cross-project name collision hid the current project's orphan manifest.** Both collectors deduped manifest reads by
+  bare session name, but names are project-scoped: an indexed `same` in project A stopped project B's orphan `same` from
+  ever being read, so its conversation looked free. Now keyed by `(resolved root, name)`.
+- **Orphan window still allowed a genuine double-bind.** Slice 4a's index-lock guard cannot see a binding that never
+  reached the index. Reproduced: a scan running before a killed adopt's manifest appeared published a second binding,
+  and the orphan scan could then only refuse the *third* attempt. Fixed with `conversation_lock`, a global per-
+  conversation `flock` spanning the final scan and the commit, applied to both arms. This retires the "orphan scan
+  covers the adoption invariant" claim made in the previous round, which was too strong.
+- **The filename parser was called but its answer discarded.** The rollout glob matches any name *ending* in the id, so
+  `rollout-<ts>-not-the-thread-<wanted>.jsonl` was a candidate; the filter only checked that parsing succeeded. Fixed at
+  the source in `find_rollouts_by_thread_id`, so runtime detection and provenance lookup get exactness too.
+- **Codex thread drift left the index column stale.** Both continuation paths record a re-bound thread id in the
+  manifest; neither updated the index, so the in-lock guard protected an abandoned id. `codex_thread_id` now mirrors the
+  manifest at all four Codex write sites, which also makes the column's contract statable in one line.
+
+Two smaller items from the same review: the dual-runtime refusal now names both matched paths (the card promised that
+diagnostic), and the concurrency regression no longer accepts zero surviving bindings.
+
+**Still open.** The `impl_notes.md` promotion (closeout item 3) needs human review before this card can move to `done/`;
+its four candidates are listed under Slice 5. Carried forward as debt needing its own card: session creation is not
+crash-atomic across manifest and index. `conversation_lock` bounds the *adoption* consequence of that, but the orphan
+manifest itself still survives a kill.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -541,7 +564,9 @@ transaction -- is broader than this card and needs its own.
   this card to that one keeps the same depth under `done/`, so it needs no repoint.
 - [x] `cli_reference.md` session table gains the `adopt` leaf. Verified at line 131 -- already synced during Slice 2 and
   extended for the Codex arm in Slice 4; re-read rather than assumed.
-- [x] Change-log entry with Goal / Key changes / Verification.
+- [ ] Change-log entry with Goal / Key changes / Verification. Drafted and then **withdrawn** when the card returned to
+  `doing/`: `change_log.md` records completed work, so an entry for an open card is a false completion record. Re-add at
+  the real closeout.
 - [ ] Durable lessons proposed for `impl_notes.md` after human review. Candidates, awaiting review:
   1. **`Path(base) / "/abs"` discards `base`.** Hit three times on this card (adoption id, `SessionStore` session name).
      Any caller-supplied path component needs shape validation *before* it is joined, not after.
@@ -552,8 +577,9 @@ transaction -- is broader than this card and needs its own.
      must still be cross-checked against the `cwd` recorded inside the file.
   4. **A swallowed read is not an absent record.** Binding/uniqueness lookups must fail closed on every source they
      consult, not just the first one.
-- [x] Card moved to `done/` (no inbound board links to repoint -- verified by grep across `docs/`; the outbound link to
-  `workspace_scope` keeps the same relative depth).
+- [ ] Card moved to `done/`. Attempted 2026-07-27 and reverted the same day (see Slice 5a): the lesson review above is a
+  precondition, not a parallel task. No inbound board links to repoint -- verified by grep across `docs/`; the outbound
+  link to `workspace_scope` keeps the same relative depth either way.
 
 ## Acceptance-test mapping
 

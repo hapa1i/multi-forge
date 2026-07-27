@@ -55,6 +55,7 @@ from forge.session.codex_handoff import (
     pending_context_path,
     read_receipt,
 )
+from forge.session.index import IndexStore
 from forge.session.models import (
     CodexConfirmed,
     Derivation,
@@ -382,6 +383,7 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_by = "cli:codex-start"
 
     store.update(timeout_s=5.0, mutate=_mutate)
+    _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     if effective_thread_id is None:
         warnings.append(
@@ -520,6 +522,7 @@ def continue_codex_session(
         m.confirmed.codex = codex
 
     store.update(timeout_s=5.0, mutate=_mutate)
+    _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     return CodexSessionResumeResult(
         session=name,
@@ -586,3 +589,14 @@ def _rollback_created_session(
             leftover.unlink(missing_ok=True)
         except OSError:
             logger.debug("Codex start rollback: snapshot cleanup failed (non-critical)", exc_info=True)
+
+
+def _sync_codex_thread_to_index(name: str, thread_id: str | None, forge_root: str | None) -> None:
+    """Keep ``SessionIndexEntry.codex_thread_id`` mirroring the manifest.
+
+    The column is what ``add_session`` checks under the index write lock when
+    adoption binds a pre-existing thread, so a stale value guards an id the session
+    no longer uses. Best-effort by contract (see ``IndexStore.update_codex_thread``).
+    """
+    if thread_id:
+        IndexStore().update_codex_thread(name, thread_id, forge_root)

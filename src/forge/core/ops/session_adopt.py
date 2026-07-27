@@ -17,13 +17,17 @@ import json
 import logging
 import re
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from forge.core.models.direct_model import resolve_direct_model_pin
+from forge.core.paths import get_forge_home
 from forge.core.runtime.codex_rollouts import find_rollouts_by_thread_id
 from forge.core.state import now_iso
+from forge.core.state.lock import FileLockTimeoutError, file_lock
 from forge.core.workqueue import enqueue_index_marker
 from forge.install.project_compat import (
     ProjectCompatibilityError,
@@ -93,6 +97,44 @@ PREVIEW_CHARS = 72
 
 class AdoptError(ForgeOpError):
     """Raised when adoption cannot proceed."""
+
+
+@contextmanager
+def conversation_lock(conversation_id: str) -> Iterator[None]:
+    """Serialize adoptions of one conversation, across processes and projects.
+
+    The index write lock makes a *published* binding unique, but session creation
+    writes the manifest first: a process killed between the two leaves an orphan
+    manifest that already owns the conversation and never reached the index. A
+    second adopt whose scan ran before that manifest appeared then publishes a
+    duplicate binding, and the orphan scan can only refuse the *third* attempt --
+    it cannot un-bind the two that already exist.
+
+    Holding this around the final scan and the commit closes that window: the
+    loser's scan cannot run until the winner's manifest exists, so it sees the
+    orphan and refuses. ``flock`` releases on process death, so a killed adopt
+    frees the lock rather than wedging every later one.
+
+    Global (under ``FORGE_HOME``) rather than per-project, because a conversation
+    is not project-scoped -- the same id can be adopted from any directory.
+
+    ``conversation_id`` must already be canonical: this builds a path from it, and
+    it is the only caller-supplied component of that path.
+
+    Raises:
+        AdoptError: If another adoption of this conversation holds the lock.
+    """
+    if _UUID_RE.match(conversation_id) is None:
+        raise AdoptError(f"refusing to lock on a non-canonical conversation id: '{conversation_id}'")
+
+    lock_path = get_forge_home() / "locks" / f"adopt-{conversation_id}.lock"
+    try:
+        with file_lock(lock_path=lock_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            yield
+    except FileLockTimeoutError as e:
+        raise AdoptError(
+            f"another adoption of conversation '{conversation_id}' is in progress. Wait for it to finish."
+        ) from e
 
 
 @dataclass(frozen=True)
@@ -297,13 +339,18 @@ def detect_adoption_runtime(ctx: ExecutionContext, conversation_id: str) -> str:
     """
     conversation_id = normalize_conversation_id(conversation_id)
 
-    has_claude = get_transcript_path(str(ctx.cwd), conversation_id).is_file()
-    has_codex = bool(find_rollouts_by_thread_id(conversation_id))
+    transcript = get_transcript_path(str(ctx.cwd), conversation_id)
+    rollouts = find_rollouts_by_thread_id(conversation_id)
+    has_claude = transcript.is_file()
+    has_codex = bool(rollouts)
 
     if has_claude and has_codex:
+        # Both paths are named: a dual match means something is wrong with the
+        # files, so the user needs to see which two the refusal is about.
+        listed = ", ".join(str(p) for p in sorted(rollouts))
         raise AdoptError(
-            f"'{conversation_id}' matches both a Claude transcript and a Codex rollout. "
-            "Refusing to guess which conversation to bind."
+            f"'{conversation_id}' matches both a Claude transcript ({transcript}) and a Codex rollout "
+            f"({listed}). Refusing to guess which conversation to bind."
         )
     if has_claude:
         return SOURCE_RUNTIME_CLAUDE
@@ -569,39 +616,46 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
     except ProjectCompatibilityError as e:
         raise AdoptError(str(e)) from e
 
-    summary = _check_still_adoptable(
-        plan.session_uuid, plan.transcript_path, plan.claude_project_root, str(ctx.forge_root)
-    )
-
-    # Re-resolve from the transcript as it is NOW. The double-attach prompt blocks
-    # on a human, and a still-attached native client can add turns on a different
-    # model while it waits -- persisting the planned pin would then produce exactly
-    # the first-resume surprise the pin exists to prevent. An explicit --model is
-    # the user's instruction, so it is never re-derived.
-    model, model_basis = _resolve_model_pin(summary, plan.model if plan.model_basis == MODEL_BASIS_EXPLICIT else None)
-
-    # worktree_path is passed explicitly rather than left to start_session's
-    # `Path.cwd()` default (manager.py:542): the op must not depend on process
-    # cwd. create_worktree stays False -- adoption binds an existing conversation
-    # in place, and a True here would arm _rollback_worktree against a checkout
-    # Forge did not create.
-    try:
-        state = SessionManager().start_session(
-            name,
-            worktree_path=str(ctx.cwd),
-            direct=True,
-            claude_session_id=plan.session_uuid,
-            direct_model=model,
-            require_uuid_unbound=True,
+    # Scan and commit under one lock, for the reason given on conversation_lock:
+    # a crashed adopt's orphan manifest owns the conversation without an index row,
+    # so the index write lock alone cannot see it.
+    with conversation_lock(plan.session_uuid):
+        summary = _check_still_adoptable(
+            plan.session_uuid, plan.transcript_path, plan.claude_project_root, str(ctx.forge_root)
         )
-    except SessionExistsError:
-        # A same-UUID adopt that got here first owns the derived name too, so the
-        # name collision fires before the UUID check. Report the binding, which is
-        # the contract, rather than a name clash the user did not choose.
-        owner = collect_bound_uuids(str(ctx.forge_root)).get(plan.session_uuid)
-        if owner is not None:
-            raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
-        raise
+
+        # Re-resolve from the transcript as it is NOW. The double-attach prompt
+        # blocks on a human, and a still-attached native client can add turns on a
+        # different model while it waits -- persisting the planned pin would then
+        # produce exactly the first-resume surprise the pin exists to prevent. An
+        # explicit --model is the user's instruction, so it is never re-derived.
+        model, model_basis = _resolve_model_pin(
+            summary, plan.model if plan.model_basis == MODEL_BASIS_EXPLICIT else None
+        )
+
+        # worktree_path is passed explicitly rather than left to start_session's
+        # `Path.cwd()` default (manager.py:542): the op must not depend on process
+        # cwd. create_worktree stays False -- adoption binds an existing conversation
+        # in place, and a True here would arm _rollback_worktree against a checkout
+        # Forge did not create.
+        try:
+            state = SessionManager().start_session(
+                name,
+                worktree_path=str(ctx.cwd),
+                direct=True,
+                claude_session_id=plan.session_uuid,
+                direct_model=model,
+                require_uuid_unbound=True,
+            )
+        except SessionExistsError:
+            # A same-UUID adopt that got here first owns the derived name too, so
+            # the name collision fires before the UUID check. Report the binding,
+            # which is the contract, rather than a name clash the user did not
+            # choose.
+            owner = collect_bound_uuids(str(ctx.forge_root)).get(plan.session_uuid)
+            if owner is not None:
+                raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
+            raise
 
     store = SessionStore(str(ctx.forge_root), name)
     paths = get_artifact_paths(ctx.forge_root, name)

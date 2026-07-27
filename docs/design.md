@@ -229,8 +229,17 @@ afterwards. Two properties follow. The id reaches the index row, so `require_uui
 **inside the index write lock**, the only lock shared across session names; the pre-check alone runs under a separate
 acquisition and cannot stop two differently-named adopts of one conversation from both passing it. And no window exists
 in which a published session lacks its binding. The Codex arm needs an index column of its own for this
-(`codex_thread_id`), set only where a pre-existing thread is bound; the ordinary Codex paths discover their thread after
-the run and record it on the manifest alone, which is why the manifest scan above stays the completeness check.
+(`codex_thread_id`), which mirrors `confirmed.codex.thread_id`: the ordinary Codex paths learn their thread only after
+the run, so they reconcile the column rather than set it at creation — including when Codex re-binds a thread across a
+resume ("drift"), where a stale column would guard an id the session no longer uses.
+
+**Adoption also holds a conversation-scoped lock across its final scan and commit** (`conversation_lock`, under
+`FORGE_HOME/locks/`). The index write lock is not sufficient on its own, because session creation writes the manifest
+first: an adopt killed between the two leaves an orphan manifest that owns the conversation and never reached the index.
+A concurrent adopt whose scan ran before that manifest appeared would publish a second binding, and the orphan scan
+could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the loser's scan cannot
+run until the winner's manifest exists. The lock is global rather than per-project because a conversation is not
+project-scoped, and `flock` releases on process death, so a killed adopt frees it.
 
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
@@ -246,7 +255,7 @@ class SessionIndexEntry:
     is_incognito: bool = False
     parent_session: str | None = None
     claude_session_id: str | None = None
-    codex_thread_id: str | None = None   # adopted threads only -- see the uniqueness note above
+    codex_thread_id: str | None = None   # mirrors confirmed.codex.thread_id -- see the uniqueness note above
 ```
 
 `session list --scope` controls filtering: **`workspace`** (default) filters by `project_root` -- shows sessions across

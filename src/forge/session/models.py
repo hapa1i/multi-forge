@@ -706,10 +706,11 @@ class SessionIndexEntry:
     parent_session: str | None = None
     # UUID field for reverse lookup (set by SessionStart hook)
     claude_session_id: str | None = None
-    # Set only where a *pre-existing* Codex thread is bound (`forge session adopt`).
-    # Exists so thread uniqueness can be enforced under the index write lock, the
-    # only lock shared across session names; the ordinary Codex paths discover their
-    # thread after the run and record it on the manifest alone.
+    # Mirrors `confirmed.codex.thread_id`. Exists so thread uniqueness can be
+    # enforced under the index write lock -- the only lock shared across session
+    # names -- when adoption binds a pre-existing thread. The ordinary Codex paths
+    # learn their thread after the run, so they reconcile it here rather than
+    # setting it at creation; a stale value would guard an id nobody uses.
     codex_thread_id: str | None = None
     # Empty string (not None) because strict dacite requires str type match;
     # use entry.root for the resolved path (prefers forge_root, falls back to worktree_path).
