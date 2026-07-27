@@ -21,12 +21,15 @@ from rich.text import Text
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session import _format_relative_time, console
 from forge.cli.session import session as _session_untyped
+from forge.core.ops.codex_adopt import adopt_codex_session, plan_codex_adoption
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session_adopt import (
+    CODEX_RUNTIME,
     MODEL_BASIS_INFERRED,
     MODEL_BASIS_NONE,
     AdoptError,
     adopt_session,
+    detect_adoption_runtime,
     discover_adoptable,
     plan_adoption,
 )
@@ -96,6 +99,16 @@ def adopt(conversation_id: str | None, name: str | None, model: str | None, yes:
             commands=["forge session adopt --json"],
         )
         sys.exit(1)
+
+    try:
+        runtime = detect_adoption_runtime(ctx, conversation_id)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if runtime == CODEX_RUNTIME:
+        _adopt_codex(ctx, conversation_id, name=name, model=model, yes=yes)
+        return
 
     try:
         plan = plan_adoption(ctx, conversation_id, model_override=model)
@@ -248,5 +261,68 @@ def _preview_candidates(ctx: ExecutionContext, *, as_json: bool) -> None:
     print_tip(
         "Adopt one by conversation id:",
         commands=[f"forge session adopt {candidates[0].session_uuid} --name <name>"],
+        console=console,
+    )
+
+
+def _adopt_codex(ctx: ExecutionContext, thread_id: str, *, name: str | None, model: str | None, yes: bool) -> None:
+    """Bind a Forge session to a native Codex thread (card Phase 2)."""
+    if model:
+        print_error_with_tip(
+            "--model does not apply to Codex threads.",
+            "Codex resolves its own model; pin one per turn instead.",
+            commands=["forge session resume <name> --task '<next task>'"],
+        )
+        sys.exit(1)
+
+    try:
+        plan = plan_codex_adoption(ctx, thread_id)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Codex thread '{e.session_uuid}' is already adopted by session '{e.owner}'.",
+            "Resume the existing session instead of adopting it twice.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except AdoptError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if plan.recently_active and not yes:
+        console.print(
+            "[yellow]This thread was active in the last 30 minutes.[/yellow] "
+            "Forge cannot tell whether a native Codex client is still attached to it."
+        )
+        if not click.confirm("Adopt it anyway?", default=False):
+            console.print("[dim]Adoption cancelled.[/dim]")
+            return
+
+    session_name = name or plan.thread_id.split("-")[0]
+
+    try:
+        adopted = adopt_codex_session(ctx, plan, name=session_name)
+    except UuidAlreadyBoundError as e:
+        print_error_with_tip(
+            f"Codex thread '{e.session_uuid}' was adopted by session '{e.owner}' while this command ran.",
+            "Nothing was created here.",
+            commands=[f"forge session resume {e.owner}"],
+        )
+        sys.exit(1)
+    except SessionExistsError as e:
+        print_error_with_tip(
+            f"Session '{e.name}' already exists.",
+            "Choose a different name.",
+            commands=[f"forge session adopt {thread_id} --name <name>"],
+        )
+        sys.exit(1)
+    except (AdoptError, ForgeSessionError) as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    console.print(f"[green]Adopted[/green] Codex thread [bold]{plan.thread_id}[/bold] as '{adopted}'")
+    console.print(Text(f"  Rollout: {plan.rollout_path}", style="dim"))
+    print_tip(
+        "Continue it as a managed session:",
+        commands=[f"forge session resume {adopted} --task '<next task>'"],
         console=console,
     )

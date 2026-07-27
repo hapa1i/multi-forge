@@ -256,17 +256,24 @@ on Claude via `--session-id`; the SessionStart hook then **validates** that UUID
 records** it (`native-relocate` instead reuses the parent's UUID). A third origination path is `forge session adopt`,
 which **binds** an existing native UUID: the conversation already exists, so the CLI neither mints nor discovers, it
 records what the user names and cross-checks the transcript's recorded `cwd` before writing (§3.3 identity is unchanged
-— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session). The conversation id
-must be a canonical UUID: it is the only caller-supplied component of every path adoption reads or writes. Omitting it
-previews the unbound conversations whose recorded `cwd` is the current directory — a read-only CLI scan of one encoded
-project directory, which does not relax §3.10: hooks still resolve sessions by identity and never scan. Adoption also
-inverts transcript ownership, so `SessionManager.delete_session` exempts an adopted session's native transcript from
-`delete_transcripts` (including the `delete_transcripts=True` automatic retention sweep) using the same filter that
-spares transcripts shared with another session. Stop and StopFailure also reconcile `claude_session_id` and
-`transcript_path` from their hook payloads to correct fork-session launches where SessionStart sees an inherited parent
-UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself mean the session ran (a
-`--no-launch` or not-yet-launched start session already carries a pre-seeded UUID); "used"/resumable requires hook
-confirmation or transcript-backed evidence (see Default resume behavior).
+— one manifest per conversation, and reattach behaves exactly as it does for a Forge-born session).
+
+The same command adopts a native **Codex** thread: the runtime is decided by which store holds a matching conversation,
+never by the shape of the id (both runtimes use UUIDs, and their differing versions are an undocumented third-party
+detail), and a match in both is refused rather than guessed. The Codex arm records
+`confirmed.codex.rollout_source="adopted"` and leaves `claude_session_id`/`confirmed.launch` unset; its lookup scans
+every thread-id match and filters by the rollout head's `cwd`, refusing an ambiguous result instead of taking
+`find_rollout_path`'s newest-mtime tie-break. The id must be a canonical UUID: it is the only caller-supplied component
+of every path adoption reads or writes. Omitting it previews the unbound Claude conversations whose recorded `cwd` is
+the current directory — a read-only CLI scan of one encoded project directory, which does not relax §3.10: hooks still
+resolve sessions by identity and never scan. Adoption also inverts transcript ownership, so
+`SessionManager.delete_session` exempts an adopted session's native transcript from `delete_transcripts` (including the
+`delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
+session. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to
+correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a
+non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start
+session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence
+(see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently

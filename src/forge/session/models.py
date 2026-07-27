@@ -528,9 +528,12 @@ class CodexConfirmed:
         thread_id: the ``codex exec resume`` id, from the stream's ``thread.started``.
         rollout_path: absolute path to the matching ``$CODEX_HOME/sessions/.../
             rollout-*-<thread_id>.jsonl``, when discovered.
-        rollout_source: how ``rollout_path`` was obtained: "discovered_by_thread_id"
-            (filesystem glob) or "session_start_hook" (the hook payload's
-            transcript_path, reported by codex itself); None when no rollout was found.
+        rollout_source: how ``rollout_path`` was obtained -- "discovered_by_thread_id"
+            (filesystem glob), "session_start_hook" (the hook payload's
+            transcript_path, reported by codex itself), "discovered_post_exit"
+            (interactive time+cwd discovery, where the filename is the thread
+            source), or "adopted" (``forge session adopt`` bound a rollout that
+            predates the session); None when no rollout was found.
         auth_method / auth_source / billing_mode: the secret-free auth posture from
             ``CodexPreflight``. ``confirmed.launch`` stays None for Codex sessions
             (it describes the ANTHROPIC key posture of interactive Claude), so this

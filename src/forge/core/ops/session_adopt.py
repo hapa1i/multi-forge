@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from forge.core.models.direct_model import resolve_direct_model_pin
+from forge.core.runtime.codex_rollouts import find_rollouts_by_thread_id
 from forge.core.state import now_iso
 from forge.core.workqueue import enqueue_index_marker
 from forge.install.project_compat import (
@@ -54,6 +55,9 @@ MODEL_BASIS_INFERRED = "inferred"
 MODEL_BASIS_NONE = "none"
 
 SOURCE_RUNTIME_CLAUDE = "claude_code"
+
+# The runtime label `intent.launch.runtime` uses for Codex sessions.
+CODEX_RUNTIME = "codex"
 
 # Claude stamps this sentinel instead of a model id on synthetic assistant turns.
 # Measured on 13 of 470 local transcripts; it is not a resolvable model.
@@ -276,6 +280,41 @@ def _user_message_text(message: dict[str, object]) -> str | None:
                 if isinstance(text, str) and text:
                     return text
     return None
+
+
+def detect_adoption_runtime(ctx: ExecutionContext, conversation_id: str) -> str:
+    """Return which runtime owns this id: SOURCE_RUNTIME_CLAUDE or "codex".
+
+    Decided by on-disk evidence, not by the shape of the id. Both runtimes name
+    conversations with UUIDs, and while they currently differ by version (Claude
+    v4, Codex v7 across 470 and 458 local files), that is an undocumented detail
+    of two third-party tools -- and one local Claude transcript is already a v3.
+    Routing on it would silently send an adopt to the wrong arm the first time
+    either changed.
+
+    Raises:
+        AdoptError: If neither runtime has a matching conversation, or both do.
+    """
+    conversation_id = normalize_conversation_id(conversation_id)
+
+    has_claude = get_transcript_path(str(ctx.cwd), conversation_id).is_file()
+    has_codex = bool(find_rollouts_by_thread_id(conversation_id))
+
+    if has_claude and has_codex:
+        raise AdoptError(
+            f"'{conversation_id}' matches both a Claude transcript and a Codex rollout. "
+            "Refusing to guess which conversation to bind."
+        )
+    if has_claude:
+        return SOURCE_RUNTIME_CLAUDE
+    if has_codex:
+        return CODEX_RUNTIME
+
+    raise AdoptError(
+        f"no conversation '{conversation_id}' found for this directory. Claude transcripts are "
+        f"looked up under {get_project_encoded_dir(str(ctx.cwd))}, Codex threads under "
+        "$CODEX_HOME/sessions/. Adopt from the directory the native session was launched from."
+    )
 
 
 def discover_adoptable(ctx: ExecutionContext) -> tuple[Path, list[AdoptCandidate]]:

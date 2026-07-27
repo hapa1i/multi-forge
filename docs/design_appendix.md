@@ -1786,6 +1786,11 @@ All CLI-owned (§3.5):
   `thread_id` the stream missed.
 - `discovered_post_exit`: interactive time+cwd discovery — the rollout **filename** is the thread source (filename
   timestamps are local time, so discovery filters by mtime).
+- `adopted`: `forge session adopt <thread-id>` bound a rollout that predates the session. Unlike the three above, the
+  rollout was not produced by a Forge-launched turn, so `last_run_at` and `context_delivery` stay `None` until the first
+  managed turn. The lookup scans **all** thread-id matches and filters by the rollout head's `cwd`, refusing a no-match,
+  a cwd mismatch, or more than one match — it must not inherit `find_rollout_path`'s newest-mtime tie-break, because
+  adoption binds to whatever it picks.
 
 `confirmed.launch` and `claude_session_id` stay unset (§3.5).
 

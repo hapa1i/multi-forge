@@ -88,11 +88,12 @@ class TestAdoptCli:
         assert "first" in result.output
         assert not (temp_env / ".forge" / "sessions" / "second").exists()
 
-    def test_missing_transcript_rejects_without_creating_state(self, runner: CliRunner, temp_env: Path) -> None:
+    def test_unknown_id_rejects_without_creating_state(self, runner: CliRunner, temp_env: Path) -> None:
+        """Runtime detection runs first, so the error names where both arms looked."""
         result = runner.invoke(main, ["session", "adopt", _UUID])
 
         assert result.exit_code == 1
-        assert "no transcript" in result.output
+        assert "no conversation" in result.output
         assert not (temp_env / ".forge" / "sessions").exists()
 
     def test_recent_transcript_requires_confirmation(self, runner: CliRunner, temp_env: Path) -> None:
@@ -211,3 +212,58 @@ class TestPreviewContract:
 
         assert result.exit_code == 0, result.output
         assert "[red]" in result.output, "the bracket text must survive verbatim"
+
+
+class TestCodexArm:
+    """The CLI routes by on-disk evidence, not by the shape of the id."""
+
+    _THREAD = "019f0b65-b51c-7683-99c7-bb48107f7b83"
+
+    @pytest.fixture(autouse=True)
+    def _codex(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
+        import forge.core.ops.codex_adopt as mod
+
+        class _Preflight:
+            auth_method = "codex_store"
+            auth_source = "chatgpt"
+            billing_mode = "subscription"
+
+        monkeypatch.setattr(mod, "assert_codex_ready", lambda **_: _Preflight())
+
+    def _rollout(self, tmp_path: Path, cwd: Path) -> Path:
+        day = tmp_path / "codex" / "sessions" / "2026" / "06" / "27"
+        day.mkdir(parents=True, exist_ok=True)
+        path = day / f"rollout-2026-06-27T19-24-02-{self._THREAD}.jsonl"
+        path.write_text(
+            json.dumps({"type": "session_meta", "payload": {"id": self._THREAD, "cwd": str(cwd)}}) + "\n",
+            encoding="utf-8",
+        )
+        os.utime(path, (0, 0))
+        return path
+
+    def test_adopts_a_codex_thread(self, runner: CliRunner, temp_env: Path, tmp_path: Path) -> None:
+        rollout = self._rollout(tmp_path, temp_env)
+
+        result = runner.invoke(main, ["session", "adopt", self._THREAD, "--name", "codex-spike"])
+
+        assert result.exit_code == 0, result.output
+        assert "Codex thread" in result.output
+        state = SessionStore(str(temp_env), "codex-spike").read()
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.rollout_path == str(rollout)
+        assert state.confirmed.claude_session_id is None
+
+    def test_model_is_refused_for_codex(self, runner: CliRunner, temp_env: Path, tmp_path: Path) -> None:
+        self._rollout(tmp_path, temp_env)
+
+        result = runner.invoke(main, ["session", "adopt", self._THREAD, "--model", "claude-opus-5"])
+
+        assert result.exit_code == 1
+        assert "does not apply to Codex" in result.output
+
+    def test_unknown_id_names_both_search_locations(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(main, ["session", "adopt", self._THREAD])
+
+        assert result.exit_code == 1
+        assert "CODEX_HOME" in result.output

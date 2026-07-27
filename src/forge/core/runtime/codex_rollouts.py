@@ -49,21 +49,34 @@ def codex_home() -> Path:
     return Path(env_home) if env_home else Path.home() / ".codex"
 
 
+def find_rollouts_by_thread_id(thread_id: str, *, home: Path | None = None) -> list[Path]:
+    """Return every rollout JSONL matching ``thread_id``.
+
+    The glob is depth-bounded to the known ``sessions/YYYY/MM/DD/`` layout; an
+    unreadable home degrades to an empty list.
+
+    Returns all matches rather than one, so callers that must not guess -- notably
+    adoption, which binds a session to whichever it picks -- can reject an
+    ambiguous result instead of inheriting ``find_rollout_path``'s newest-wins
+    tie-break.
+    """
+    if not thread_id:
+        return []
+    base = (home if home is not None else codex_home()) / "sessions"
+    try:
+        return list(base.glob(f"*/*/*/rollout-*-{thread_id}.jsonl"))
+    except OSError:
+        return []
+
+
 def find_rollout_path(thread_id: str, *, home: Path | None = None) -> Path | None:
     """Return the rollout JSONL for ``thread_id``, or None when absent.
 
-    The glob is depth-bounded to the known ``sessions/YYYY/MM/DD/`` layout. A
-    multi-match is uuid-improbable but resolved newest-mtime-wins; an unreadable
-    home degrades to None (best-effort discovery -- callers record provenance
-    only on a hit).
+    A multi-match is uuid-improbable but resolved newest-mtime-wins; callers that
+    cannot tolerate a guess should use ``find_rollouts_by_thread_id`` instead.
+    Best-effort discovery -- callers record provenance only on a hit.
     """
-    if not thread_id:
-        return None
-    base = (home if home is not None else codex_home()) / "sessions"
-    try:
-        matches = list(base.glob(f"*/*/*/rollout-*-{thread_id}.jsonl"))
-    except OSError:
-        return None
+    matches = find_rollouts_by_thread_id(thread_id, home=home)
     if not matches:
         return None
     if len(matches) == 1:
@@ -132,7 +145,7 @@ def find_rollouts_since(
     results = [rollout for _, rollout in qualified]
     if cwd is not None and results:
         target = _canonical_path(cwd)
-        heads = [(rollout, _rollout_head_cwd(rollout.path)) for rollout in results]
+        heads = [(rollout, rollout_head_cwd(rollout.path)) for rollout in results]
         narrowed = [rollout for rollout, head in heads if head is not None and _canonical_path(head) == target]
         if narrowed:
             return narrowed
@@ -144,7 +157,7 @@ def find_rollouts_since(
     return results
 
 
-def _rollout_head_cwd(path: Path) -> str | None:
+def rollout_head_cwd(path: Path) -> str | None:
     """Best-effort ``cwd`` from the rollout's first line (session metadata).
 
     The head shape is not pinned across codex versions, so this searches the first

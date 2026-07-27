@@ -467,6 +467,48 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
     return bound
 
 
+def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]:
+    """Map every bound Codex thread id (lowercased) to the session that owns it.
+
+    The Codex counterpart to ``collect_bound_uuids``. Thread ids have no index
+    column of their own, so this reads manifests only -- which makes the orphan
+    scan under ``forge_root`` the sole defence against a crashed adopt letting the
+    same thread bind twice.
+
+    Raises:
+        BindingLookupError: If the index itself cannot be read.
+    """
+    index = IndexStore()
+    try:
+        rows = index.read().sessions
+    except Exception as e:
+        raise BindingLookupError(f"Could not read the session index: {e}") from e
+
+    bound: dict[str, str] = {}
+
+    def _record(store: SessionStore, name: str) -> None:
+        try:
+            if not store.exists():
+                return
+            codex = store.read().confirmed.codex
+        except Exception:
+            _log.debug("Failed to read manifest for '%s' while collecting Codex threads", name, exc_info=True)
+            return
+        if codex is not None and codex.thread_id:
+            bound.setdefault(codex.thread_id.lower(), name)
+
+    for key, entry in rows.items():
+        name = session_name_from_key(key)
+        _record(SessionStore(entry.forge_root or entry.worktree_path, name), name)
+
+    if forge_root:
+        for manifest_dir in _manifest_dirs(forge_root):
+            if manifest_dir.name not in bound.values():
+                _record(SessionStore(forge_root, manifest_dir.name), manifest_dir.name)
+
+    return bound
+
+
 def _manifest_dirs(forge_root: str) -> list[Path]:
     """Return the per-session directories under a project's ``.forge/sessions/``."""
     try:

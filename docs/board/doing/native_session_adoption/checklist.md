@@ -19,7 +19,8 @@ The Claude arm is usable end to end: bare `adopt` to find a conversation, `adopt
 Claude 2.1.220, P2, P3). Slice 1 shipped `confirmed.AdoptionConfirmed`. Slice 2 shipped `forge session adopt` -- the
 command-core op, the CLI leaf, and the locked index guard that closes the already-bound TOCTOU -- with design.md §3.3
 and §3.5 and `cli_reference.md` synced. Slice 3 shipped the bare-`adopt` discovery preview, completing the settled
-discovery decision. **Cursor: Slice 4** (Codex arm); the Claude arm is complete apart from Slice 5's gates and closeout.
+discovery decision. Slice 4 shipped the Codex arm with evidence-based runtime detection. **Cursor: Slice 5** (gates,
+docs, closeout), plus the crash-atomicity debt recorded above.
 
 **Slice 2 review remediation (2026-07-27).** An external review of `60f010d8..93b2908f` found seven defects; all seven
 were reproduced against source before fixing, and each is closed with a regression or unit test. Two were data-loss
@@ -455,16 +456,36 @@ used by all four creation paths, which is broader than this card. Not attempted 
 
 ## Slice 4 -- Codex arm (card Phase 2)
 
-- [ ] Thread-id lookup scans **all** matching rollouts rather than inheriting `find_rollout_path`'s newest-match
+- [x] Thread-id lookup scans **all** matching rollouts rather than inheriting `find_rollout_path`'s newest-match
   behavior. Assertion: cwd mismatch, no match, and multiple-match-after-cwd-filter each reject with actionable
-  diagnostics instead of silently choosing the newest.
-- [ ] Fresh `assert_codex_ready()` preflight before any state is created.
-- [ ] Manifest with `intent.launch.runtime="codex"` and `confirmed.codex` carrying `rollout_source="adopted"` as a new
+  diagnostics instead of silently choosing the newest. Verified by `TestRolloutLookup` (5 cases). `find_rollout_path`
+  now delegates to a new public `find_rollouts_by_thread_id`, so the newest-wins tie-break lives in one place and
+  adoption opts out of it rather than reimplementing the glob.
+- [x] Fresh `assert_codex_ready()` preflight before any state is created. Verified by
+  `test_an_unready_codex_creates_no_state`.
+- [x] Manifest with `intent.launch.runtime="codex"` and `confirmed.codex` carrying `rollout_source="adopted"` as a new
   module-level constant. Assertion: `claude_session_id` and `confirmed.launch` stay unset; `context_delivery` stays
-  `None`.
-- [ ] `CodexConfirmed.rollout_source` docstring (`session/models.py:531`) gains **both** the missing
-  `discovered_post_exit` and the new `adopted`, and `design_appendix.md` §I.1 gains `adopted`.
-- [ ] Resume dispatch needs no new code. Assertion: `session_runtime(manifest) == "codex"` routes to `run_codex_resume`.
+  `None`. Verified by `test_binds_the_thread_without_claude_fields`.
+- [x] `CodexConfirmed.rollout_source` docstring gains **both** the missing `discovered_post_exit` and the new `adopted`,
+  and `design_appendix.md` §I.1 gains `adopted`.
+- [x] Resume dispatch needs no new code. Assertion: `session_runtime(manifest) == "codex"` routes to `run_codex_resume`.
+  Verified by `test_adopted_session_routes_to_codex_resume_with_no_new_dispatch` against the existing branch at
+  `cli/session_lifecycle.py:1345`.
+
+**Runtime detection is evidence-based, not id-shaped.** Both runtimes name conversations with UUIDs, so
+`forge session adopt <id>` has to decide which arm to use. Measured locally, Codex thread ids are UUIDv7 (458/458) and
+Claude session ids are v4 (470/471, with one v3) -- tempting, but that is an undocumented detail of two third-party
+tools and the lone v3 already breaks the pattern. `detect_adoption_runtime` instead asks the filesystem: a Claude
+transcript in this cwd's encoded directory, or a rollout matching the thread id. A match in both is refused rather than
+guessed, matching the arm's own no-guessing rule.
+
+Two smaller decisions:
+
+- **No artifact copy on the Codex arm.** `confirmed.codex.rollout_path` points at the live rollout, which is how every
+  other Codex session records it; copying would invent a second convention. Search indexing of Codex threads is not part
+  of this card. Verified by `test_the_rollout_is_never_copied_or_moved`.
+- **`--model` is refused for Codex, not ignored.** Codex resolves its own model per turn, so accepting the flag would
+  imply a pin that nothing reads.
 
 ## Slice 5 -- Gates, docs, closeout
 
