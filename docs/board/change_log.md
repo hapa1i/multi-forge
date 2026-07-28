@@ -25,6 +25,36 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-28
+
+### README capability refresh
+
+**Goal**: Make `README.md` advertise what shipped — above all that a read-only `codex exec` can supervise a Claude
+session — and state nothing false.
+
+**Key changes**:
+
+- Four factual errors fixed: the `--into` worktree path (worktrees land at `../<repo-name>-<session-name>`),
+  `forge clean` being dry-run by default, project memory presented as automatic when it is opt-in, and a Quick Start
+  implying `forge proxy create` is required when `--proxy` accepts a template and auto-starts.
+- `Example Workflow` promoted to `## Plan, Execute, Review` with the Codex-supervised fork as its second step, carrying
+  both preconditions that decide whether the lane enforces or fails open: the mandatory plan reload (Codex has no
+  `--resume`) and the cached preflight.
+- Architecture diagram redrawn around consumer lanes, naming each consumer's real runtime support. Review workers are
+  drawn as a separate axis because they are per-invocation `ModelSpec.runtime`, not a frozen lane.
+- New `## Cost and Wire Control`, `## Skills`, and `## Troubleshooting` sections; CLI group table completed from 11 to
+  all 17 groups; pre-OSS upgrade steps relocated to `docs/end-user/README.md`.
+- Stale proxy-template tables corrected in `docs/design_appendix.md` §A.2 (15 of 21 rows listed) and
+  `docs/end-user/proxy.md` (missing `anthropic-passthrough`). Twenty templates are user-facing; `litellm-gemini-test` is
+  test infrastructure.
+
+**Verification**: `make pre-commit-md` clean; all 18 relative links and both fragment anchors resolve; CLI table matches
+`forge --help`; every command and flag shown confirmed against live `--help`. Lane labels, the supervisor throttle
+cache, and the Claude-only `session fork` restriction verified against source.
+
+**Deferred**: the README's Codex-supervisor sequence is verified at code level, not by a live run. It also omits that
+the preflight cache carries a 30-minute TTL relative to the first Write/Edit, not to the fork.
+
 ## 2026-07-27
 
 ### native_session_adoption: `forge session adopt`

@@ -43,6 +43,16 @@ managed session to route dispatcher-backed hooks through that checkout. If uv's 
 current shell, run `export PATH="$(uv tool dir --bin):$PATH"`; `uv tool update-shell` configures future shells. See
 [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
+### Upgrading from Pre-OSS Forge
+
+Existing pre-OSS Forge installs are not supported in-place. If upgrading:
+
+1. If Claude Code was previously patched, run `claude update` or reinstall Claude Code for a pristine binary.
+2. Remove stale Forge state: `rm ~/.forge/installed.json`
+3. Re-enable extensions: `forge extension enable`
+4. If you had `FORGE_CONTEXT_LIMIT` in your shell config, remove it. Use `CLAUDE_CODE_AUTO_COMPACT_WINDOW` for native
+   Claude Code behavior, or `forge config set context_limit=N` for Forge proxy fallback.
+
 ### A. Install extensions
 
 ```bash

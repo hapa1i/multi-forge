@@ -12,84 +12,99 @@
 > **Research Preview** -- Forge is under active development. APIs, commands, and file formats may change without notice
 > between releases. Not recommended for production use.
 
-**Multi-runtime agent toolkit: proxy routing, cost control, session management, and policy enforcement for coding
-agents.**
+**Multi-runtime control plane for coding agents: put one vendor's model to work checking another's.**
 
-Forge sits between you and your coding agent (Claude Code by default, with Codex as an alternate runtime), adding
-persistent sessions, multi-provider model routing, cost visibility with spend caps, and autonomous verification. You run
-`forge session start` instead of `claude`; Forge then routes to your chosen model provider, tracks state across
-sessions, and enforces configured policies.
+Forge runs Claude Code or Codex as a managed session, then dispatches other models around it -- supervising writes
+against an approved plan, curating handoffs across the vendor boundary, reviewing in a multi-model panel, and metering
+what all of it cost. You launch through `forge session start` instead of invoking the runtime directly. Claude sessions
+can route to a chosen provider through a local proxy; both runtimes share Forge's session state and policy model.
 
 ```bash
-# Use Claude with session tracking (no proxy needed)
+# Claude with session tracking (no proxy needed)
 forge session start
 
-# Or run a different runtime entirely -- Codex as an alternate frontend
-forge session start --runtime codex    # interactive TUI; hooks/policy need a one-time Codex trust enrollment
+# Route through a different provider -- --proxy takes a template name and starts it
+forge session start planner --proxy openrouter-openai
 
-# Or route through different model providers (after creating proxies -- see Quick Start)
-forge session start planner --proxy openrouter-openai    # GPT for planning
-forge session start --proxy openrouter-gemini            # Gemini for review
+# Have OpenAI's Codex police a Claude session's edits against the approved plan
+forge session fork planner -n executor -w --supervise --supervisor-runtime codex --no-launch
 ```
 
 ## Why Forge?
 
 Claude Code talks to Anthropic and tracks conversations. Forge adds an operational layer on top:
 
-- **Session Tracking** -- Named sessions that persist artifacts, plans, and transcripts. Works with or without a proxy.
-- **Multi-Model Routing** -- Route to GPT, Gemini, or any model via OpenRouter or LiteLLM through a local proxy.
-- **Cost Control** -- Proxy cost logs and spend caps keep metered API and multi-model workflow usage predictable.
-- **Context Compatibility** -- When routing to models with different context windows, Forge sets the native
-  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` so compaction timing matches the routed model.
-- **Autonomous Loops** -- Verification policies that keep Claude working until tests pass.
-- **Session Resume** -- When context fills up, hand off to a fresh session with structured or AI-curated history.
-- **Policy Engine** -- TDD enforcement, coding standards, and semantic alignment checks.
-- **Multi-Model Review** -- Fan out code reviews to multiple models, get adversarial consensus.
+- **Cross-Vendor Supervision** -- Bind the plan supervisor or memory writer to a different consumer lane, or select a
+  different runtime per review worker. The policy can evaluate every Write/Edit against the approved plan with a
+  read-only `codex exec`; exact repeats may reuse its short-lived verdict cache.
+- **Two Runtimes, One Session Graph** -- Claude sessions fork and resume; Codex sessions resume, and new Codex branches
+  use `forge session start --runtime codex --resume-from <parent>` to carry curated context across the boundary.
+  `forge session adopt` binds a conversation you started outside Forge.
+- **Multi-Model Routing** -- Route to GPT, Gemini, or any model via OpenRouter or LiteLLM through a local proxy. Forge
+  sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW` so compaction timing matches the routed model's context window.
+- **Cost Control** -- `forge telemetry costs show` reports what each proxy actually spent; per-proxy daily and monthly
+  caps reject or warn at the ceiling. Cost is reported or marked unavailable -- never inferred from token counts.
+- **Sessions That Outlive Context** -- Named sessions persist artifacts, plans, and transcripts. When context fills up,
+  hand off to a fresh session with structured or AI-curated history you can edit before it lands.
+- **Policy, Review, and Verification** -- TDD and coding-standard bundles, semantic alignment checks, multi-model review
+  fan-out, and verification loops that keep an agent working until tests pass.
 
 ### Why launch through Forge?
 
 Running `claude` directly bypasses session tracking. When you launch through Forge (`forge session start`), you get:
 
-| Feature                | `claude` directly | `forge session start`                         |
-| ---------------------- | ----------------- | --------------------------------------------- |
-| Session tracking       | No                | Yes -- named sessions, artifacts, transcripts |
-| Session resume         | No                | Yes -- editable handoff to fresh context      |
-| Status line            | No                | Yes -- proxy, session, policy info            |
-| Hook-driven artifacts  | No                | Yes -- plan snapshots, transcript capture     |
-| Policy enforcement     | No                | Yes -- TDD, coding standards, supervisor      |
-| Search across sessions | No                | Yes -- `forge search` indexes transcripts     |
-| Project memory         | No                | Yes -- passported docs auto-updated on exit   |
+| Feature                | `claude` directly | `forge session start`                             |
+| ---------------------- | ----------------- | ------------------------------------------------- |
+| Session tracking       | No                | Yes -- named sessions, artifacts, transcripts     |
+| Session resume         | No                | Yes -- editable handoff to fresh context          |
+| Status line            | No                | Yes -- proxy, session, policy info                |
+| Hook-driven artifacts  | No                | Yes -- plan snapshots, transcript capture         |
+| Policy enforcement     | No                | Yes -- TDD, coding standards, supervisor          |
+| Search across sessions | No                | Yes -- `forge search` indexes transcripts         |
+| Project memory         | No                | Yes -- opt-in; passported docs curated after exit |
+| Adopt an existing chat | n/a               | Yes -- `forge session adopt <conversation-id>`    |
 
-Even without a proxy, `forge session start` gives you session tracking, hooks, and the status line (direct mode is the
-default). The proxy adds multi-model routing on top. (`forge claude start` is also available as a bare launcher with
-proxy routing only, no session state.)
+Already deep into a bare `claude` or `codex` conversation? `forge session adopt` binds it to a managed session instead
+of making you start over -- run it from the directory the conversation was launched in.
 
 ## How it Works
 
-Forge runs a local proxy that translates Claude Code's Anthropic API calls into requests for any LLM provider. Claude
-Code connects to this proxy (via `ANTHROPIC_BASE_URL`), and Forge handles model selection, session state, and policy
-enforcement.
+Forge sits between you and the agent runtime. It owns session state and policy, dispatches auxiliary consumers through
+persisted lane bindings, selects review workers independently per workflow, and optionally routes model traffic through
+a local proxy.
 
+```text
+You  ->  forge session  ->  Claude Code  |  Codex
+              |
+              +-- consumer lanes  -> supervisor       (claude | codex)
+              |                      memory_writer     (claude | codex)
+              |                      shadow_curation   (claude | codex)
+              |                      team_supervisor   (claude)
+              |
+              +-- workflow workers -> panel | analyze | debate | consensus
+              |                      (claude | opt-in codex)
+              |
+              +-- proxy            -> OpenRouter | LiteLLM -> any model
+              +-- state            -> artifacts, policy, telemetry
 ```
-Claude Code  -->  Forge Proxy (local)  -->  OpenRouter / LiteLLM  -->  Any LLM provider
-                       |
-                  Session state, policies, artifacts
-```
 
-**OpenRouter** templates call the OpenRouter API directly -- no LiteLLM needed. One API key gives access to Anthropic,
-OpenAI, Google, Meta, and other models. **LiteLLM** templates route through a
-[LiteLLM](https://github.com/BerriAI/litellm) proxy (remote or local subprocess).
-
-**Direct mode** (the default) skips the proxy and talks to Anthropic directly. `forge session start` gives you session
-tracking, hooks, and all Forge features except multi-model routing. Use `--proxy` to add routing.
+**Claude direct mode** (the default for Claude sessions) skips the proxy and talks to Anthropic directly; you still get
+sessions, hooks, consumer lanes, and the status line. Add `--proxy` for routing. **OpenRouter** templates call the
+OpenRouter API directly -- one API key covers Anthropic, OpenAI, Google, and more. **LiteLLM** templates route through a
+[LiteLLM](https://github.com/BerriAI/litellm) proxy, remote or a local subprocess. Twenty user-facing templates ship;
+see [docs/end-user/proxy.md](docs/end-user/proxy.md).
 
 ## Requirements
 
 - **Platform**: macOS or Linux
-- **Python**: 3.11–3.13 (3.14 blocked on upstream `uvloop` wheels — see #1)
+- **Python**: 3.11-3.13 (3.14 blocked on upstream `uvloop` wheels -- see #1)
 - **Installer**: [`uv`](https://docs.astral.sh/uv/) or [`pipx`](https://pipx.pypa.io/) for the recommended global
   install
-- **Claude Code**: installed and on PATH
+- **Claude Code**: required for the default and other Claude-backed workflows; a Codex-only session or skill path does
+  not require it
+- **Codex** (optional): needed for `--runtime codex` sessions, `forge codex start`, Codex-backed consumer lanes, and the
+  opt-in Codex workflow worker. Check readiness with `forge runtime preflight codex`; proxy-routed `forge codex start`
+  needs codex >= 0.141.0.
 - **Provider auth**: Claude Code login is enough for direct interactive sessions. Proxies and headless workflows need a
   supported API or gateway credential such as `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
   `OPENAI_API_KEY`, or LiteLLM auth.
@@ -101,20 +116,14 @@ tracking, hooks, and all Forge features except multi-model routing. Use `--proxy
 uv tool install multi-forge
 # or: pipx install multi-forge
 
-# Confirm how forge is installed and whether it is globally reachable
-forge extension doctor
-
-# For development on Forge itself (editable install from a local clone):
-git clone https://github.com/hapa1i/multi-forge.git
-cd multi-forge && uv sync
-# When FORGE_DEV is unset, eligible host hooks use an executable recorded or
-# known-location launcher. Install the persistent editable launcher too:
-./scripts/setup.sh --local
-# Make uv's tool bin available in this shell and future shells:
+# Make uv's tool bin available in this shell and future shells
 uv tool update-shell
 export PATH="$(uv tool dir --bin):$PATH"
 
-# Register only runtime hooks at user scope
+# Confirm how forge is installed and whether it is globally reachable
+forge extension doctor
+
+# Register runtime hooks once, at user scope
 forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
 
 # Then, inside a project: install project-owned assets and settings
@@ -123,84 +132,132 @@ forge extension enable
 # Launch Claude with session tracking (no proxy needed)
 forge session start
 
-# Or with multi-model routing via OpenRouter (no LiteLLM):
-forge auth login -c openrouter                        # Store OPENROUTER_API_KEY
-forge proxy create openrouter-anthropic               # Create and start a Claude-family proxy
+# Or with multi-model routing -- --proxy accepts a template name and starts the proxy for you
+forge auth login -c openrouter                        # store OPENROUTER_API_KEY
 forge session start --proxy openrouter-anthropic
-
-# Optional: create default workflow proxies for GPT/Gemini review workers
-forge proxy create openrouter-openai
-forge proxy create openrouter-gemini
-
-# Alternative: LiteLLM-based routing (shared/internal or local):
-# forge auth login -c litellm-remote              # Store API key + base URL
-# forge proxy create litellm-openai              # Connects to shared/internal LiteLLM
-# forge proxy create litellm-openai-local        # Or start local LiteLLM
 ```
 
-Once running, try `/forge:walkthrough` inside Claude Code for a guided tour in a sandboxed test environment.
+Developing on Forge itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for the editable install.
 
-### Upgrading from Pre-OSS Forge
+Once running, try `/forge:smoke-test` (Claude) or `$smoke-test` (Codex) for a read-only health check, or
+`/forge:walkthrough` for a guided tour in a sandboxed test repo.
 
-Existing pre-OSS Forge installs are not supported in-place. If upgrading:
+## Plan, Execute, Review
 
-1. If Claude Code was previously patched, run `claude update` or reinstall Claude Code for a pristine binary.
-2. Remove stale Forge state: `rm ~/.forge/installed.json`
-3. Re-enable extensions: `forge extension enable`
-4. If you had `FORGE_CONTEXT_LIMIT` in your shell config, remove it. Use `CLAUDE_CODE_AUTO_COMPACT_WINDOW` for native
-   Claude Code behavior, or `forge config set context_limit=N` for Forge proxy fallback.
-
-> [!NOTE]
-> **Corrupt state?** If Forge reports that its state is corrupt, it names the offending file and stops -- it never
-> silently runs on bad state. To recover, run `forge clean` to detect and remove corrupt Forge-written state. For a full
-> reset, delete `.forge` (project-local) or `~/.forge` (global) and re-run `forge extension enable`. Forge recreates
-> whatever it needs on the next run. Your own files and `proxy.yaml` config are never touched by `forge clean`.
-
-### Example Workflow: Plan, Execute, Review
-
-With proxies configured, a typical feature workflow looks like:
+A typical feature workflow assigns different model roles to planning, execution, and review. The supervisor is a *lane*,
+not a fixed model -- pin it to `codex` and a second vendor grades the first.
 
 ```bash
-# 1. Start a planning session with a high-reasoning model
+# 1. Plan with a high-reasoning model (--proxy takes a template; Forge starts it)
 forge session start planner --proxy openrouter-openai
-# ... Claude creates a plan, you approve it, /exit
+# ... Claude writes a plan, you approve it, /exit
 
-# 2. Fork the planner into a worktree with plan supervision
-forge session fork planner --name executor --worktree --supervise
-# ... Claude implements the plan; supervisor auto-checks every Write/Edit
+# 2. Execute in a worktree, with the policy evaluating every Write/Edit against
+#    the approved plan through read-only Codex (exact repeats may reuse its cache).
+forge runtime preflight codex                 # cache the readiness the lane reads
+forge session fork planner -n executor -w --supervise --supervisor-runtime codex --no-launch
+forge policy supervisor reload -s executor    # REQUIRED: codex has no --resume, so the
+                                              # approved plan must reach it in-band
+cd ../multi-forge-executor                    # worktrees land at ../<repo-name>-<session-name>
+forge session resume executor
 
-# 3. Context fills up? Resume with AI-curated history (supervisor config carries over)
+# 3. Context filling up? Resume fresh -- supervisor config carries over.
 forge session resume executor --fresh --strategy ai-curated
-# ... keeps working with fresh context
 
-# 4. Fork the planner into the executor's worktree to review
-forge session fork planner --into ../executor-worktree  # Path to executor's worktree
-# ... reviews with full plan context, suggests fixes
+# 4. Review from the planner's perspective, inside the executor's worktree
+forge session fork planner --into ../multi-forge-executor
 
-# 5. Push and create a PR for human review
+# 5. Push and open a PR
 git push origin feature-branch
 ```
 
-This workflow can assign different model roles to planning, execution, and review. The `--supervise` flag wires the
-planner as a semantic supervisor -- every code change is checked against the approved plan. Sessions track artifacts and
-transcripts automatically, so forks and resumes can reuse that context. See the [end-user guide](docs/end-user/) for the
-full tour, or run `/forge:walkthrough` inside Claude Code for an interactive walkthrough.
+Two prerequisites keep the Codex lane enforcing instead of failing open with a warning:
+
+- **The plan reload is mandatory.** Codex has no `--resume`, so it cannot read the planning conversation. With no plan
+  in-band, Forge fails the check open *without spawning Codex* -- it warns, it does not block. Use
+  `forge policy supervisor reload`, or `%policy supervisor reload` from inside the session.
+- **Preflight is cached, never probed during a check.** `codex doctor` is slow, but it is the probe that discovers
+  stored ChatGPT-login auth. The policy hook therefore reads the full result cached by `forge runtime preflight codex`
+  instead of rerunning it. A cold or stale cache fails open and prints a refresh hint.
+
+`forge policy supervisor status` shows the bound `(runtime, backend, model)` lane. When preflight selects stored ChatGPT
+tokens as the auth source, the check is labeled `subscription_quota` rather than Anthropic usage. Full details in
+[docs/end-user/policy.md](docs/end-user/policy.md).
+
+### Codex as a worker runtime
+
+Codex is not only an alternate frontend -- it is a runtime Forge dispatches work to:
+
+- **Other lanes.** `forge session lane set --consumer memory_writer --runtime codex` (also `shadow_curation`) moves that
+  consumer onto `codex exec`. `team_supervisor` has no Codex lane and rejects it.
+- **A whole task, seeded from a Claude parent.**
+  `forge session start impl --runtime codex --resume-from planner --task "Implement the plan."` carries curated context
+  across the vendor boundary; continue with `forge session resume impl --task "Now add tests."`.
+- **Codex TUI through a Forge proxy.** `forge codex start --proxy <id>` -- the proxy owns upstream auth, so no OpenAI
+  login is required or leaked.
+- **Capability matrix.** `forge runtime list` shows what each detected runtime supports.
+
+## Cost and Wire Control
+
+```bash
+forge telemetry costs show --period month --by-model   # authoritative proxy-scoped spend
+forge telemetry activity planner                       # what Forge's automation did in one session
+forge proxy set openrouter-openai costs.caps.per_day=20
+forge proxy set openrouter-openai costs.on_cap_hit=reject   # or 'warn' for a header-only alert
+```
+
+Caps take effect when the proxy next starts, and are enforced *after* each completed request -- one request can cross a
+cap and finish before the next is refused. `forge session start --subprocess-proxy <id>` keeps the interactive session
+on direct Anthropic routing while supervisor, panel, and memory-writer subprocesses run metered through a proxy (it is
+mutually exclusive with `--proxy`). Direct routing does not by itself guarantee subscription billing: the default
+`interactive_anthropic_api_key=inherit` passes a resolvable API key. To force the interactive process to use its Claude
+login, run `forge config set interactive_anthropic_api_key=omit`; see
+[authentication.md](docs/end-user/authentication.md#keeping-a-key-out-of-interactive-sessions-interactive_anthropic_api_key).
+
+A Forge proxy can also be an audit chokepoint. The default wire shape translates Anthropic to OpenAI and **drops
+`thinking` blocks**; the shipped `anthropic-passthrough` template forwards the raw body byte-for-byte and already ships
+`intercept.mode: inspect`, which hashes the system prompt and tool surface and flags drift when either changes
+underneath you. `forge proxy audit show|diff` renders the timeline. Records are redacted before they reach disk --
+hashes, lengths, and counts, never prompt or completion text.
+
+## Skills
+
+Nine skills compile for **both** runtimes -- Claude invokes `/forge:<name>`, Codex invokes `$<name>`: `analyze`,
+`challenge`, `consensus`, `debate`, `panel`, `review`, `review-docs`, `smoke-test`, `understand`. Only
+`/forge:walkthrough` and `/forge:qa` are Claude-only.
+
+The same runners are available from the terminal, and `--check` turns one into an exit-code gate you can script:
+
+```bash
+forge workflow panel src/forge/session/ --code   # fan a review out to several models
+forge workflow debate "Should we rewrite this in Rust?"
+forge workflow panel src/ --code --check         # exit 0 if every worker accepts, else 1
+forge workflow list-models                       # which workers are ready right now
+```
+
+See [docs/end-user/skills.md](docs/end-user/skills.md) and [docs/end-user/workflow.md](docs/end-user/workflow.md).
 
 ## CLI Overview
 
-| Command Group     | Purpose                                      |
-| ----------------- | -------------------------------------------- |
-| `forge claude`    | Bare launch, settings preset management      |
-| `forge session`   | Named sessions, worktrees, resume, fork      |
-| `forge memory`    | Project memory passports, shadow proposals   |
-| `forge proxy`     | Model routing, templates, tier mappings      |
-| `forge auth`      | Credential management (`credentials.yaml`)   |
-| `forge policy`    | Policy enforcement, plan supervision         |
-| `forge workflow`  | Workflow runners (panel, analyze, debate)    |
-| `forge search`    | Transcript search across sessions            |
-| `forge config`    | Runtime preferences (`~/.forge/config.yaml`) |
-| `forge extension` | Enable/sync/disable extensions               |
-| `forge info`      | System health and installation info          |
+| Command Group     | Purpose                                               |
+| ----------------- | ----------------------------------------------------- |
+| `forge session`   | Named sessions, worktrees, resume, fork, adopt, lanes |
+| `forge claude`    | Bare launch, settings preset management               |
+| `forge codex`     | Codex status, proxy-routed TUI launch                 |
+| `forge runtime`   | Runtime inventory and readiness preflight             |
+| `forge proxy`     | Model routing, templates, tier mappings, wire audit   |
+| `forge model`     | Model catalog, backends, local backend lifecycle      |
+| `forge telemetry` | Costs, per-session activity, provider traces          |
+| `forge policy`    | Policy enforcement, plan supervision, shadow audit    |
+| `forge workflow`  | Workflow runners (panel, analyze, debate, consensus)  |
+| `forge memory`    | Project memory passports, shadow proposals            |
+| `forge search`    | Transcript search across sessions                     |
+| `forge auth`      | Credential management (`credentials.yaml`)            |
+| `forge config`    | Runtime preferences (`~/.forge/config.yaml`)          |
+| `forge extension` | Enable/sync/disable extensions                        |
+| `forge clean`     | Preview and remove orphaned Forge state               |
+| `forge logs`      | Log file locations and cleanup                        |
+| `forge info`      | System health and installation info                   |
 
 Run `forge <command> --help` for details on any command.
 
@@ -208,12 +265,28 @@ Run `forge <command> --help` for details on any command.
 
 | Audience            | Location                                             | Contents                                              |
 | ------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
-| **Users**           | [docs/end-user/](docs/end-user/)                     | Tour, guides for sessions, proxies, policies, ...     |
+| **Users**           | [docs/end-user/](docs/end-user/)                     | 13 guides -- start with the Day 1 workflow            |
 | **Developers**      | [docs/developer/](docs/developer/)                   | Setup, coding standards, testing guidelines           |
 | **Architecture**    | [docs/design.md](docs/design.md)                     | Core system narrative, data flow, invariants          |
 | **Workflow design** | [docs/design_workflows.md](docs/design_workflows.md) | Policy, skills, workflow runners, memory architecture |
 | **CLI reference**   | [docs/cli_reference.md](docs/cli_reference.md)       | Terminal and direct-command inventory                 |
 | **Work Board**      | [docs/board/](docs/board/)                           | Cards, checklists, change log, implementation memory  |
+
+Common starting points: [sessions](docs/end-user/session.md), [proxies](docs/end-user/proxy.md),
+[policy and supervision](docs/end-user/policy.md), [model selection](docs/end-user/model_selection.md),
+[transfer context](docs/end-user/transfer.md), and [project memory](docs/end-user/memory.md).
+
+## Troubleshooting
+
+> [!NOTE]
+> **Corrupt state?** If Forge reports that its state is corrupt, it names the offending file and stops -- it never
+> silently runs on bad state. Run `forge clean` to preview what would be removed, then `forge clean --yes` to remove it
+> (add `--scope all` to cover every project). For a full reset, delete `.forge` (project-local) or `~/.forge` (global)
+> and re-run `forge extension enable`. Your own files and `proxy.yaml` config are never touched by `forge clean`.
+
+`forge extension doctor` reports how Forge is installed, whether the launcher is reachable, and the state of the hook
+dispatcher. Upgrading from a pre-OSS Forge install? See
+[docs/end-user/README.md](docs/end-user/README.md#upgrading-from-pre-oss-forge).
 
 ## Contributing
 
