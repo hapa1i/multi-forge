@@ -57,23 +57,31 @@ proxy:
 
 **Proxy templates** (internal, pre-canned configurations):
 
-| Template                  | Use case                                    |
-| ------------------------- | ------------------------------------------- |
-| `openrouter-anthropic`    | Claude models via OpenRouter (direct)       |
-| `openrouter-deepseek`     | DeepSeek models via OpenRouter (direct)     |
-| `openrouter-glm`          | GLM / Z.ai models via OpenRouter (direct)   |
-| `openrouter-kimi`         | Kimi models via OpenRouter (direct)         |
-| `openrouter-minimax`      | MiniMax models via OpenRouter (direct)      |
-| `openrouter-openai`       | GPT models via OpenRouter (direct)          |
-| `openrouter-qwen`         | Qwen models via OpenRouter (direct)         |
-| `openrouter-gemini`       | Gemini models via OpenRouter (direct)       |
-| `openrouter-openai-codex` | OpenAI Codex via OpenRouter (direct)        |
-| `openrouter-gemini-flash` | Gemini Flash via OpenRouter (cheap, direct) |
-| `litellm-openai`          | OpenAI models via remote/shared LiteLLM     |
-| `litellm-gemini`          | Gemini models via remote/shared LiteLLM     |
-| `litellm-anthropic`       | Anthropic models via remote/shared LiteLLM  |
-| `litellm-gemini-local`    | Local LiteLLM + Gemini API key              |
-| `litellm-anthropic-local` | Local LiteLLM + Anthropic API key           |
+| Template                     | Use case                                                       |
+| ---------------------------- | -------------------------------------------------------------- |
+| `openrouter-anthropic`       | Claude models via OpenRouter (direct)                          |
+| `openrouter-deepseek`        | DeepSeek models via OpenRouter (direct)                        |
+| `openrouter-glm`             | GLM / Z.ai models via OpenRouter (direct)                      |
+| `openrouter-kimi`            | Kimi models via OpenRouter (direct)                            |
+| `openrouter-minimax`         | MiniMax models via OpenRouter (direct)                         |
+| `openrouter-openai`          | GPT models via OpenRouter (direct)                             |
+| `openrouter-qwen`            | Qwen models via OpenRouter (direct)                            |
+| `openrouter-gemini`          | Gemini models via OpenRouter (direct)                          |
+| `openrouter-openai-codex`    | OpenAI Codex via OpenRouter (direct)                           |
+| `openrouter-gemini-flash`    | Gemini Flash via OpenRouter (cheap, direct)                    |
+| `litellm-openai`             | OpenAI models via remote/shared LiteLLM                        |
+| `litellm-gemini`             | Gemini models via remote/shared LiteLLM                        |
+| `litellm-anthropic`          | Anthropic models via remote/shared LiteLLM                     |
+| `litellm-gemini-local`       | Local LiteLLM + Gemini API key                                 |
+| `litellm-gemini-flash-local` | Gemini Flash via local LiteLLM + Gemini API key                |
+| `litellm-anthropic-local`    | Local LiteLLM + Anthropic API key                              |
+| `litellm-openai-local`       | Local LiteLLM + OpenAI API key                                 |
+| `litellm-openai-codex-local` | OpenAI Codex models via local LiteLLM + OpenAI API key         |
+| `anthropic-passthrough`      | Raw Anthropic passthrough; signature-safe; inspect enabled     |
+| `codex-responses-local`      | Raw Responses passthrough for `forge codex start --proxy`      |
+| `litellm-gemini-test`        | Internal integration-test dependency; hidden from normal lists |
+
+Twenty-one templates ship; `litellm-gemini-test` is test infrastructure, so twenty are user-facing.
 
 A proxy template is an operational profile:
 

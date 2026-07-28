@@ -57,7 +57,7 @@ require a proxy instance.
 
 ## Proxy templates
 
-Forge provides ready-to-use proxy configurations (internal templates):
+Forge provides ready-to-use built-in proxy templates:
 
 | Template                     | Use case                                        |
 | ---------------------------- | ----------------------------------------------- |
@@ -77,11 +77,13 @@ Forge provides ready-to-use proxy configurations (internal templates):
 | `litellm-gemini`             | Gemini models via remote/shared LiteLLM         |
 | `litellm-openai-local`       | Local LiteLLM + OpenAI API key                  |
 | `litellm-openai-codex-local` | Local LiteLLM + OpenAI Codex models             |
+| `anthropic-passthrough`      | Raw Anthropic passthrough; inspect enabled      |
 | `codex-responses-local`      | Sessionless Codex TUI via Responses passthrough |
 | `litellm-gemini-local`       | Local LiteLLM + Gemini API key                  |
 | `litellm-gemini-flash-local` | Local LiteLLM + Gemini Flash (fast/cheap)       |
 
-`litellm-gemini-test` also exists internally, but it is hidden from normal end-user template lists.
+The table lists all twenty user-facing templates. `litellm-gemini-test` also exists internally, but it is hidden from
+normal end-user template lists.
 
 Built-in templates declare `proxy.backend`, the config field that names the backend owning endpoint and credential
 requirements. If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.backend` set to an
