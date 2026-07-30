@@ -147,23 +147,27 @@ requirement and the reason it cannot ship before the sibling card's schema.
 | D-all      | **Decided**: `--runtime` **composes** with `--all` rather than being rejected. Granularity is preserved per mode -- exact paths for a single scope, filtered per-scope summaries for `--all` (see Plan granularity).                       |
 | D-mismatch | **Decided**: split to [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md), which ships first. The defect is not runtime-specific, so its fix belongs to bare `disable` and this card inherits it.            |
 
-## Constraints (verified against current code)
+## Constraints
 
-- **No deletion-grade attribution exists today.** `InstalledFile` carries
-  `target_path, source_path, checksum, mode, installed_at`; `InstalledSettingsEntry` carries
-  `key_path, value, merge_type, stable_id` (`src/forge/install/models.py:129-165`). Neither relates to a module or
-  runtime. Only `skill_packages` groups by runtime. Selecting Claude command/agent/settings rows by runtime is therefore
-  **impossible** until the sibling card's D1 lands. This is the hard dependency.
+Written against pre-dependency code. Line references and the two **RESOLVED** entries below were re-verified against
+`main` at `4b9ad0ad`; see [checklist.md](checklist.md) "Planning findings" for the current anchor table.
+
+- **RESOLVED (was the hard dependency): deletion-grade attribution now exists.** This card originally recorded that
+  `InstalledFile` and `InstalledSettingsEntry` carried no module or runtime relation, making runtime-scoped selection of
+  Claude command/agent/settings rows impossible. Schema v3 shipped with
+  [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md): both rows now carry a tagged
+  `attribution` (`models.py:158`, `:181`). The dependency is satisfied; the selection mechanism is
+  `ownership.attribution_pair`.
 - `uninstall()` has no subset notion: it iterates `existing.files` wholesale, unmerges all settings entries, removes the
   Codex block, then deletes the tracking row (`installer.py:2389-2464`). Per-runtime removal is new machinery on the
   same boundary validation, not a parameter on the existing loop.
-- **Scope mismatch currently warns and orphans.** `_remove_codex_registration` logs "tracked Codex config ... does not
-  match the scope mapping ...; not modifying it" and **returns** (`installer.py:2466-2481`); `uninstall` then removes
-  the tracking row unconditionally at `installer.py:2464`. So the managed block is left on disk with no tracking that
-  owns it. `design_appendix.md` section C.6's "disable refuses a tracked path that no longer matches the scope mapping"
-  describes refusing to *edit that file*, not refusing the operation. Any claim that this card "preserves existing
-  refusal semantics" would be false. Preserving tracking on mismatch is a **new requirement**, owned by
-  [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) and inherited here once that ships.
+- **RESOLVED: scope mismatch refuses the operation and preserves tracking.** This card originally recorded that
+  `_remove_codex_registration` warned and returned while `uninstall` removed the tracking row anyway, orphaning the
+  managed block. That defect shipped fixed as
+  [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md):
+  `Installer.validate_codex_config_scope` raises `CodexConfigScopeMismatchError` before any removal work. This card
+  inherits the refusal rather than inventing it. The checklist scopes the preflight to removals that actually touch the
+  Codex config (D-preflight-scoped).
 - `disable --all --yes` attempts every tracked scope, aggregates failures, and exits non-zero if any remain
   (`design_appendix.md` section C.4). `--runtime` must compose without weakening that aggregate exit contract.
 - `scripts/setup.sh --uninstall` deletes `$FORGE_HOME` only after a fully successful disable and preserves tracking on
