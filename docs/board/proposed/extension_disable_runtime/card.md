@@ -2,9 +2,9 @@
 
 **Lane**: `proposed/` -- not accepted. Two hard dependencies, in order:
 
-1. [runtime_scoped_extension_modules](../runtime_scoped_extension_modules/card.md) -- D1 schema v3 must **ship**, not
-   just be decided: this card selects tracked rows by runtime, and that attribution does not exist today (see
-   Constraints).
+1. [runtime_scoped_extension_modules](../../doing/runtime_scoped_extension_modules/card.md) -- D1 schema v3 must
+   **ship**, not just be decided: this card selects tracked rows by runtime, and that attribution does not exist today
+   (see Constraints).
 2. [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) -- ships **before** this card, so
    the refusal-preserves-tracking row in the state table below is inherited rather than invented here.
 

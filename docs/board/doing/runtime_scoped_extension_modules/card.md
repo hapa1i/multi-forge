@@ -1,16 +1,16 @@
 # Runtime-scoped extension modules -- `--runtime` governs every runtime-owned surface
 
-**Lane**: `proposed/` -- not accepted, but no decisions remain open. D1 (durable ownership schema) is approved as
-decided; the scope-mismatch orphan is split out to
-[disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md). Ready for promotion to `todo/` on a
-maintainer's word.
+**Lane**: `doing/` -- active on branch `feat/runtime-scoped-extension-modules`; execution plan in
+[checklist.md](checklist.md). No decisions remain open: D1 (durable ownership schema) is approved as decided, and the
+scope-mismatch orphan shipped separately as
+[disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md).
 
 **Type**: ordinary card, not an epic. The board's epic criterion is shared-contract **drift**
 ([board_contract.md](../../../developer/board_contract.md) "Epics"), not member count. Drift is prevented structurally
 here: this card is the sole writer of the ownership schema and lands it whole, and
-[extension_disable_runtime](../extension_disable_runtime/card.md) is a pure reader that cannot start until the schema
-ships. There is one contract, one writer, and a strict ordering -- no coordinator needed. Promote a coordinator if the
-schema has to land in slices consumed before completion.
+[extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) is a pure reader that cannot start until
+the schema ships. There is one contract, one writer, and a strict ordering -- no coordinator needed. Promote a
+coordinator if the schema has to land in slices consumed before completion.
 
 **Origin**: user report, 2026-07-29. Codex support is less mature than Claude Code support, so a user must be able to
 keep their Codex installation untouched. Today `forge extension enable --scope user --runtime claude` still registers
@@ -49,7 +49,7 @@ profile, scope, explicit module flags, and runtime instead of filtering one modu
 touch `$CODEX_HOME`; `--runtime codex` must be sufficient on its own to mean "Codex only".
 
 Non-goal: changing what any module installs, changing scope semantics, or making narrowing destructive. Removal stays
-with `disable` -- see [extension_disable_runtime](../extension_disable_runtime/card.md).
+with `disable` -- see [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md).
 
 ## Design
 

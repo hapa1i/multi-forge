@@ -9,7 +9,7 @@ in [checklist.md](checklist.md). Small and independently shippable.
 
 **Sequencing**: ships **before** [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md), so that
 card's "preflight refusal leaves tracking untouched" contract is inherited rather than invented. It has no dependency on
-[runtime_scoped_extension_modules](../../proposed/runtime_scoped_extension_modules/card.md) and can ship at any time.
+[runtime_scoped_extension_modules](../../doing/runtime_scoped_extension_modules/card.md) and can ship at any time.
 
 **Origin**: found while verifying a constraint for the runtime-disable card, 2026-07-29. `design_appendix.md` section
 C.6 states that "disable refuses a tracked path that no longer matches the scope mapping". The code refuses to *edit
