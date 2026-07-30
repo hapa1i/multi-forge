@@ -2,8 +2,9 @@
 
 **Card**: [card.md](card.md) **Branch**: `feat/runtime-scoped-extension-modules` **Base**: `main` at `0066de5d`
 
-**Current focus**: Phase 1 -- ownership vocabulary and read-path hardening. Phase 1 is the only additive, independently
-merge-safe phase; Phase 2 lands the schema and the module merge together because both change persisted shape.
+**Current focus**: Phase 1 -- ownership vocabulary and persisted-value classification. Phase 1 is the only additive,
+independently merge-safe phase. Phases 2-3 are one atomic merge unit: the schema, module merge, Codex planning seam, and
+selection rule must ship together because each changes the meaning of persisted ownership.
 
 ---
 
@@ -49,13 +50,15 @@ the enable side.
 
 ### F4 -- Accepting version 2 is not the same as being able to parse it
 
-`TrackingStore.read()` (`tracking.py:280-285`) routes v1 through the **frozen** `_LegacyInstalledManifest` (`:58`) plus
+`TrackingStore.read()` (`tracking.py:280-285`) routes v1 through `_LegacyInstalledManifest` (`:58`) plus
 `_upgrade_legacy_manifest` (`:209`), and sends **every other accepted version** into
 `_deserialize_manifest(path, InstalledManifest, data)` -- the live model, with `dacite.Config(strict=True)` (`:126`).
+The v1 root is only partly frozen: `_LegacyInstallation.files` and `.settings_entries` still use the live row classes at
+`:48-49`.
 
 So extending the accepted set to `{1, 2, 3}` does **not** migrate v2. The moment the v3 dataclasses change, v2 files
-fail strict deserialization against them. v3 needs a frozen `_V2InstalledManifest` plus `_upgrade_v2_manifest`,
-mirroring the v1 path that is already in the file as a worked example.
+fail strict deserialization against them, and v1 rows would inherit the new live fields. V3 needs complete frozen v1 and
+v2 DTO graphs plus version-specific upgraders; a historical root that embeds live nested types is not frozen.
 
 ### F5 -- `_NON_FORCEABLE_SKILL_CONFLICT_REASONS` does not enforce anything
 
@@ -76,14 +79,30 @@ Rejected on the card's own invariants: invariant 2 requires every file and setti
 slice shipping v3 without it violates its own invariant by construction. Avoiding that needs two version bumps and two
 user migrations to save one intermediate release. The card's "land D1 whole" is correct.
 
-Only **Phase 1** is independently merge-safe. An earlier draft of this checklist claimed Phases 1-2 both were; that was
-wrong, because the module merge and the schema both change persisted shape and must land together.
+Only **Phase 1** is independently merge-safe. An earlier draft claimed Phases 1-2 both were; that was wrong. The schema,
+module merge, runtime-aware Codex gate, and generic selection in Phases 2-3 form one atomic merge unit: splitting them
+would either break imports or give the merged `hooks` module the wrong runtime behavior.
 
 ---
 
-## Frozen v3 shapes (decided here; overridable before Phase 2 starts)
+## Frozen v3 shapes (decided here)
 
-The card leaves the serialized shape open, and invariants 2 and 6 cannot both be implemented until it is fixed. Decided:
+The card and checklist freeze the same serialized contract; implementation starts from these shapes rather than
+reopening them:
+
+**Installation ownership is one sorted durable relation.**
+
+```text
+Installation:
+  module_owners: [
+    {"module": "hooks", "runtime": "claude_code"},
+    {"module": "hooks", "runtime": "codex"},
+  ]
+```
+
+`module_owners` replaces `modules_enabled` in v3. It is sorted by `(module, runtime)`, contains no duplicate pair, and
+every pair satisfies `MODULE_RUNTIME_OWNERS`. The in-memory representation may optimize lookup, but serialization uses
+this list-of-objects shape. `status --json` exposes the same relation rather than inventing a second ownership encoding.
 
 **Row attribution is a required tagged object, not nullable fields.**
 
@@ -106,25 +125,39 @@ and is not constructible as a runtime-scoped removal target.
 `InstalledSettingsEntry` identity is `(key_path, stable_id)`, matching the canonical key `settings_merge.py:538` already
 computes. Assert the identity choice directly, since "the same row" is otherwise undefined.
 
-**`status --json` v3** (closes the card's Open Question):
+**`status --json` v3**:
 
 - `schema_version: 3`
 - `managed_runtimes: [...]` -- sorted subset of `AGENT_RUNTIME_IDS`, derived from the ownership pair set only, never
   recomputed from `codex_config_path` or `skill_packages`. This is the single documented field the acceptance criterion
   names.
-- `module_owners: [{module, runtime}, ...]` -- mirrors the `skill_packages` list-of-objects idiom at `:1485-1498`.
+- `module_owners: [{module, runtime}, ...]` -- the exact durable relation above.
 - `modules: [...]` -- retained as a sorted unique module-value list so existing readers keep parsing.
-- `unattributed_surfaces: [...]` -- invariant 6's reportable form.
+- `unattributed_surfaces: [...]` -- derived from tagged ledger rows, never stored as a second ledger. File elements are
+  `{surface: "file", target_path, reason}`; settings elements are `{surface: "settings", key_path, stable_id, reason}`.
+  Sort by `surface`, then the declared row identity. Do not expose settings values in this summary.
 
 **Legacy per-row module derivation.** "Claude by construction" fixes the *runtime*, not the *module*. Derive the module
-for a legacy `InstalledFile` from its tracked target path against the module's install root (`commands/`, `agents/`,
-skills roots, and the settings-only modules which have no files). A row whose path matches no module root becomes
-`{"unattributed_reason": "legacy_path_unmapped"}` -- never a guess. Settings rows derive from `key_path` where the
-mapping is unambiguous and are unattributed otherwise.
+for a legacy `InstalledFile` from its tracked target path: `commands/` -> `commands`, `agents/` -> `agents`, and an
+exact `skill_packages[].file_paths` claim -> `skills` for v2. V1 skills use only the existing path-provable Claude
+helper. Settings-only modules have no file roots. A file matching none of these becomes
+`{"unattributed_reason": "legacy_path_unmapped"}` -- never a guess.
+
+Legacy settings mapping is closed, not "where unambiguous": `hooks.*` -> `hooks`; `statusLine` -> `status-line`;
+`permissions.allow`, `permissions.deny`, and `env.*` -> `permissions` because the current caller gates `include_env`
+with `PERMISSIONS` (`installer.py:1871-1879`). Every other key becomes `{"unattributed_reason": "legacy_key_unmapped"}`.
+Fresh writes use propagated planner provenance, never this legacy key/path inference.
+
+**Applied ownership includes successful zero-output modules.** A blocking module/runtime apply path that completes
+without conflict or failure records its pair even when the current package emits no owned rows. This preserves sync
+intent for today's intentionally empty `commands`/`agents` sources and lets a future package add outputs. Resolution
+alone is insufficient: a failed or skipped path records no new pair. Codex hooks remain the special best-effort witness:
+`(hooks, codex)` is present iff `codex_config_path` is present. A narrowing re-enable preserves omitted prior pairs and
+rows rather than treating omission as removal.
 
 ---
 
-## Phase 1 -- Ownership vocabulary and read-path hardening
+## Phase 1 -- Ownership vocabulary and persisted-value classification
 
 Additive, no persisted-shape change, independently merge-safe.
 
@@ -136,72 +169,105 @@ Additive, no persisted-shape change, independently merge-safe.
 - [ ] Add the structural invariant test. **Assertion**: every `InstallModule` member has >=1 owner and every owner is in
   `AGENT_RUNTIME_IDS` -- and the test passes **at this commit**, which is why `CODEX_HOOKS` is declared here rather than
   in Phase 2. No `forge.install` module imports from `forge.cli`.
-- [ ] Harden both `InstallModule(...)` state-reading coercion sites (`installer.py:2348`, `:2365`) against values this
-  Forge does not define. **Assertion**: an unknown module value in `modules_enabled` normalizes instead of raising
-  `ValueError`. Exercise it with a value that is genuinely unknown *now* (a synthetic one), because `"codex-hooks"` is
-  still a valid enum member at this phase and would pass vacuously. The `"codex-hooks"` fixture belongs to Phase 2.
+- [ ] Classify both `InstallModule(...)` state-reading coercion sites (`installer.py:2348`, `:2365`) without weakening
+  durable-state strictness. **Assertion**: a genuinely unknown module value remains corruption with an actionable error;
+  no generic skip/default path is added. The known released `"codex-hooks"` value is normalized only by Phase 2's
+  version-specific v1/v2 migration before either site can see it. This follows `coding_standards.md` section 5: known
+  legacy state may have an explicit migration, while arbitrary unknown durable state must not become an apparently valid
+  default.
 - [ ] Classify the other two coercion sites. **Assertion**: `cli/extensions.py:124` parses `--with`/`--without` *user
   input* and must keep failing on unknown values -- that is D5's native Click error, not a bug. `:207` reads
   `plan.modules`, which this Forge produced, so it cannot see an unknown value. Record the input-validating vs
   state-reading split in a comment at each site.
 
-## Phase 2 -- Schema v3 and the module merge (the card's P0, lands whole)
+## Phase 2 -- Schema v3 and the module merge (the card's P0)
 
-Both change persisted shape, so they land together. Order within the phase matters: the frozen v2 reader must exist
-before the live model changes.
+Phases 2-3 are one atomic merge unit, not independently shippable checkpoints. Order still matters: historical readers
+must be fully frozen and the runtime-aware Codex planning seam must replace the deleted-enum gate before the live model
+or enum changes. Do not commit an import-broken intermediate state.
 
-- [ ] Add a frozen `_V2InstalledManifest` plus `_upgrade_v2_manifest` to `tracking.py`, mirroring
-  `_LegacyInstalledManifest` (`:58`) and `_upgrade_legacy_manifest` (`:209`). **Assertion**: per F4, `read()` dispatches
-  v1 -> legacy type, v2 -> frozen v2 type, v3 -> live model. A v2 fixture never reaches
-  `_deserialize_manifest(..., InstalledManifest, ...)`, whose `dacite.Config(strict=True)` (`:126`) would reject it once
-  the live dataclasses change.
+- [ ] Freeze the complete v1 and v2 wire shapes, including nested rows. **Assertion**: the current `_LegacyInstallation`
+  is not recursively frozen -- its `files` and `settings_entries` annotations at `tracking.py:48-49` use the live
+  `InstalledFile` and `InstalledSettingsEntry` classes. Define historical file, settings-entry, installation,
+  skill-package (v2), and manifest DTOs so neither reader refers to a live v3 row type. Add `_upgrade_v2_manifest`
+  alongside the v1 upgrader. `read()` dispatches v1 -> frozen v1 types, v2 -> frozen v2 types, and v3 -> live types;
+  checked-in fixtures prove both historical versions survive the live attribution change.
+
 - [ ] Bump `TRACKING_VERSION` to `3` (`models.py:268`) and extend the accepted set at `tracking.py:116` to `{1, 2, 3}`.
   **Assertion**: a `version: 4` file still hits `_handle_tracking_version_mismatch` with the "written by newer Forge"
   message. No `strict=False`, no silent entry skipping (`coding_standards.md` section 5).
-- [ ] Replace flat `modules_enabled` with `(module, runtime)` ownership pairs on `Installation`. **Assertion**: written
-  from *applied* state. `modules_enabled` today is written unconditionally from the resolved set (`installer.py:2032`);
-  the pair set must not be.
+
+- [ ] Add `module_owners` to `Installation` using the exact frozen list-of-objects shape above, replacing live-v3
+  `modules_enabled`. **Assertion**: unique and sorted by `(module, runtime)`, written from the defined applied state.
+  `modules_enabled` today is written unconditionally from the resolved set (`installer.py:2032`); v3 must distinguish
+  successful zero-output ownership, preserved prior ownership, and failed/skipped paths.
+
 - [ ] Add the tagged `attribution` field to `InstalledFile` (`models.py:130`) and `InstalledSettingsEntry` (`:151`) per
   the frozen shape above. **Assertion**: exactly one form present, validated on read and before write. This is the
   contract the sibling card consumes -- assert the field directly, not via behavior.
+
 - [ ] Propagate provenance at every construction site. **Assertion**: `settings_merge.py:538` builds
   `InstalledSettingsEntry` and must receive attribution from its caller rather than defaulting; grep for every
   `InstalledFile(` and `InstalledSettingsEntry(` construction and confirm none can produce a row without a valid
   attribution.
+
+- [ ] Replace `_plan_codex`'s deleted-enum gate before deleting the member (`installer.py:1409-1411`). **Assertion**:
+  resolve one shared `RuntimeSelection` for the install plan even when `SKILLS` is absent, then pass it to Codex
+  planning. The gate becomes "`hooks` is effective and `codex` is selected"; `--runtime claude` yields
+  `plan.codex is None`, distinct from a selected Codex path whose presence gate produces `action="unavailable"` at
+  `:1418`. Skill planning consumes the same selection rather than resolving a second runtime set.
+
 - [ ] Delete `InstallModule.CODEX_HOOKS` (`models.py:62`) and its entries in `PROFILE_MODULES` (`:75`) and
   `SETTINGS_ONLY_MODULES` (`:122`); `hooks` absorbs it. **Assertion**: clean break, no hidden alias (D5).
   `_scope_omitted_modules` (`installer.py:200`) omits the merged `hooks` at project/local exactly as it omitted both, so
   Codex hook registration stays user-scope-only.
+
 - [ ] Update every production consumer of the deleted enum and the flat field. A literal `codex-hooks` grep **misses all
-  of these** -- they use the `CODEX_HOOKS` identifier, so both forms must be searched. **Assertion**: all sites
-  migrated, enumerated here so none is discovered mid-phase: - `hook_migration.py` -- **seven** sites, not one: `:192`,
-  `:441`, `:690`, `:822` all test `InstallModule.CODEX_HOOKS.value in installation.modules_enabled`; `:607` and `:765`
-  add it to a module set; `:831` filters it out. It also writes `Installation` directly, so it both consumes and
-  produces v3. - `installer.py:177` -- `_RUNTIME_HOOK_MODULES = {HOOKS, CODEX_HOOKS}`, returned wholesale by
-  `_scope_omitted_modules` at `:203`; collapses to `{HOOKS}`. - `installer.py:1411` -- the Codex planning gate; see the
-  dedicated Phase 3 item. - `extensions.py:436` -- another `modules_enabled` reader. - `hook_dispatcher.py:653` -- reads
-  `modules_enabled` via `any(module != "skills" ...)`; needs the pair set, and its `except Exception` fallback must keep
-  degrading to the sync advice rather than starting to raise. - `models.py:117` -- the `SETTINGS_ONLY_MODULES` comment
-  naming `CODEX_HOOKS`. - Tests: `test_hook_migration.py` (3), `test_models.py` (1).
+  of these** -- both identifiers and field names must be searched. **Assertion**: migrate the complete production
+  inventory:
+
+  - `hook_migration.py`: all thirteen `modules_enabled` reads/writes
+    (`:189,192,440,441,608,667,690,762,785,818,822,827,836`), including all seven `CODEX_HOOKS` sites. It directly
+    writes `Installation`, so it both consumes and produces v3.
+  - `installer.py`: `_RUNTIME_HOOK_MODULES` (`:177`), tracked-skill ownership (`:381`), the Codex gate (`:1411`), the
+    installation write (`:2032`), and both sync coercions (`:2348,2365`).
+  - `extensions.py`: hook ownership (`:435-436`) plus JSON and human status (`:1483,1545`).
+  - `hook_dispatcher.py:653`: use `module_owners`; its `except Exception` fallback must still degrade to sync advice.
+  - `models.py`, `tracking.py`, and tests: v3 live models lose `modules_enabled`; only the explicitly frozen v1/v2 DTOs
+    retain that historical field.
+
+  Finish with `rg -n 'modules_enabled|CODEX_HOOKS' src/forge`: only frozen historical DTO/migration references to
+  `modules_enabled` remain, and no production `CODEX_HOOKS` identifier remains.
+
 - [ ] Implement the derived v1/v2 -> v3 migration: normalize in memory on read, persist on the next successful mutation.
-  **Assertion**: no user action, no reset. v2 skills attribution from `skill_packages[].runtime`; v1 from
-  `_legacy_claude_skill_packages` (`installer.py:316`); per-row module from the path mapping in the frozen-shape
-  section; unmapped rows explicitly unattributed. Assert field-by-field against checked-in v1 and v2 fixtures.
+  **Assertion**: no user action, no reset. v2 skills attribution from `skill_packages[].runtime`; v1 from the logic
+  currently in `_legacy_claude_skill_packages` (`installer.py:316`); per-row module from the closed path/key mapping
+  above; unmapped rows explicitly unattributed. Put the derivation at a dependency-neutral install boundary shared by
+  tracking and installer -- `tracking.py` must not import `installer.py`, which already imports `TrackingStore` at
+  `installer.py:107`. `"codex-hooks"` is the only deleted module value normalized; any other unknown module value is
+  rejected as corrupted durable state. Assert field-by-field against checked-in v1 and v2 fixtures.
+
 - [ ] Key the `(hooks, codex)` pair on `codex_config_path`, never on the module value. **Assertion**: per F3, a
   re-enable that skips the Codex half but preserves `codex_config_path` still writes the pair;
   `test_module_dropped_preserves_tracking` passes unchanged. A *first* install that skips Codex writes neither.
+
 - [ ] Derive sync's managed runtime set from ownership pairs. **Assertion**: per F6, `_managed_skill_runtime_ids`
   (`installer.py:2375`) returns `None` when `SKILLS` is absent, so a hooks-only install currently loses its Codex
   selection across `sync`. Rename/rework it to read the pair set, and keep D4 intact -- `--runtime` is still not a
   `sync` flag; the persisted set stays authoritative.
+
 - [ ] Enforce all six v3 invariants before mutation, with invariant 2 restated per the frozen-shape section.
   **Assertion**: each invariant has a test that violates it and observes a specific rejection. Invariant 3 uses the
   declared row identities (`target_path`; `(key_path, stable_id)`).
+
 - [ ] Record the load-bearing premises in `design_appendix.md` section C.4. **Assertion**: documents the F3 reading of
   invariant 5, and that "Claude by construction" breaks the moment a third Codex-owned module appears -- such a module
   must ship its own migration step.
 
 ## Phase 3 -- Selection rule and module planning outcomes
+
+Completes the atomic Phase 2-3 merge unit. Phase 2 establishes one shared runtime selection and a compilable merged-hook
+planner; this phase applies that selection to every module and exposes the outcomes.
 
 - [ ] Add per-module planning outcomes to `InstallPlan` (`models.py:377`). **Assertion**: per F5, `InstallPlan.modules`
   is a bare `list[str]` with no action or reason, so profile `SKIP`s and explicit-module `CONFLICT`s have nowhere to
@@ -215,14 +281,12 @@ before the live model changes.
   `_NON_FORCEABLE_SKILL_CONFLICT_REASONS`, which at `:634-637` only selects a recovery tip and only iterates
   `plan.skill_packages`. Add an analogous module-level reason set for tip selection, and assert `--force` cannot proceed
   past a wrong-owner module.
-- [ ] Give `_plan_codex` a runtime input (`installer.py:1409-1411`). **This is the seam the card's goal turns on.**
-  **Assertion**: it currently gates entirely on `if InstallModule.CODEX_HOOKS not in modules: return None`, taking only
-  `modules: set[InstallModule]` and no runtime. After the merge `modules` contains `HOOKS` for both runtimes, so without
-  a runtime parameter `--runtime claude` would still plan the Codex block -- exactly today's bug. The gate becomes
-  "`hooks` is effective **and** `codex` is in the selected runtimes", and the signature changes accordingly. Assert
-  `--runtime claude` yields `plan.codex is None`, distinct from the `action="unavailable"` skip at `:1418`.
 - [ ] Wire `--runtime` into module resolution, not just `skill_runtimes=` (`cli/extensions.py:932`, `:957`).
   **Assertion**: stays `click.Choice(["claude", "codex", "all"])`, `multiple=True`, and is not added to `sync` (D4).
+- [ ] Preserve per-surface availability semantics under the shared selection. **Assertion**: explicit unavailable skills
+  remain a blocking `runtime_unavailable` conflict, while a selected Codex hook path remains best-effort and reports
+  `CodexPlan(action="unavailable")`. Automatic selection still includes Claude, already-managed runtimes, and detected
+  Codex; it does not invent new Codex ownership when the binary is absent.
 - [ ] Delete the four-flag recovery tip (`cli/extensions.py:152-160`). **Assertion**: its test asserts the one-flag
   `--runtime codex` form. The tip is the card's evidence that the axis was wrong, so deleting it is an acceptance
   criterion, not cleanup.
@@ -240,8 +304,9 @@ before the live model changes.
   (`cli/extensions.py:1509`). **Assertion**: `managed_runtimes` derives from the ownership pair set only -- one source
   of truth, not recomputed from `codex_config_path` or `skill_packages`.
 - [ ] Render unattributed surfaces. **Assertion**: a v1 row whose ownership is not path-provable appears in
-  `unattributed_surfaces` and is never silently defaulted to Claude; silent attribution is what would let a later
-  `disable --runtime claude` delete a Codex file.
+  `unattributed_surfaces` using the frozen file/settings element shapes and ordering, without settings values, and is
+  never silently defaulted to Claude; silent attribution is what would let a later `disable --runtime claude` delete a
+  Codex file.
 
 ## Phase 5 -- Impact inventory (same change, per the card)
 
@@ -269,34 +334,36 @@ before the live model changes.
 
 Scope is named in every row because auto-detect prefers LOCAL in a git repo (`cli/extensions.py:899`).
 
-| Test                                              | Fixture                                            | Assertion                                                                                            | Test File                                                |
-| ------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `--scope user --runtime claude`                   | clean user scope, codex binary available           | no `$CODEX_HOME` path written, no Codex skill package -- by target-path inspection                   | `tests/src/install/test_runtime_scoped_modules.py`       |
-| `--scope user --runtime codex`                    | clean user scope, **codex binary available**       | Codex skills + hook block; no `.claude/` write, no `~/.claude/settings.json`, no Claude version gate | `tests/src/install/test_runtime_scoped_modules.py`       |
-| `--scope user --runtime all`                      | clean user scope, codex available                  | rendered targets and registered-command golden identical to today; excludes `installed.json`         | `tests/src/install/test_registered_commands_contract.py` |
-| `--scope project --runtime codex`                 | project scope, codex available                     | codex skills only; hooks scope-omitted                                                               | `tests/src/install/test_runtime_scoped_modules.py`       |
-| `--scope project --runtime claude`                | project scope                                      | commands, agents, claude skills, status-line, permissions; hooks scope-omitted                       | `tests/src/install/test_runtime_scoped_modules.py`       |
-| `--scope local --runtime codex`                   | local scope                                        | CONFLICT via `plan.has_conflicts`, not a silent no-op                                                | `tests/src/cli/test_extension_enable.py`                 |
-| bare `--runtime codex` in a repo                  | git checkout, no `--scope`                         | CONFLICT naming `--scope user`, because auto-detect resolves LOCAL                                   | `tests/src/cli/test_extension_enable.py`                 |
-| `--profile minimal --runtime codex`               | any scope                                          | CONFLICT (empty effective set); `minimal` is `{commands}`, Claude-owned                              | `tests/src/cli/test_extension_enable.py`                 |
-| `--runtime codex --with commands`                 | any scope                                          | CONFLICT (explicit, wrong owner) -- distinguishes explicit from profile provenance                   | `tests/src/cli/test_extension_enable.py`                 |
-| `--profile minimal --with skills --runtime codex` | any scope, codex available                         | allowed; installs codex skills                                                                       | `tests/src/cli/test_extension_enable.py`                 |
-| `--force` cannot adopt module conflicts           | wrong-owner `--with commands` plus a file conflict | exits non-zero; `--force` does not proceed past the module conflict                                  | `tests/src/cli/test_extension_enable.py`                 |
-| Profile-sourced drop is a SKIP, not a conflict    | `--scope user --runtime codex`, standard profile   | Claude modules appear as `module_outcomes` SKIP rows with reasons; exit 0                            | `tests/src/install/test_runtime_scoped_modules.py`       |
-| Sync survives the deleted enum                    | checked-in `installed.json` with `"codex-hooks"`   | `sync` succeeds; no `ValueError`                                                                     | `tests/regression/test_bug_sync_deleted_module_value.py` |
-| Hooks-only install keeps Codex across sync        | v3 install with `(hooks, codex)` and no skills     | managed set still includes `codex` after `sync` (F6)                                                 | `tests/src/install/test_runtime_scoped_modules.py`       |
-| v2 -> v3 migration                                | checked-in v2 fixture                              | parsed through the frozen v2 reader, never the live model; asserted field-by-field                   | `tests/src/install/test_tracking_migration.py`           |
-| v1 -> v3 migration                                | checked-in v1 fixture, no `skill_packages`         | path-provable Claude skills only; unmapped rows tagged `legacy_path_unmapped`                        | `tests/src/install/test_tracking_migration.py`           |
-| v4 still rejected                                 | `version: 4`                                       | `_handle_tracking_version_mismatch` names the upgrade path                                           | `tests/src/install/test_tracking.py`                     |
-| Unattributed row is not a removal target          | v1-derived install with an unmapped row            | row is readable and reported; not constructible as a runtime-scoped removal target (invariant 6)     | `tests/src/install/test_tracking_migration.py`           |
-| Duplicate-pair rejection uses declared identity   | two pairs claiming one `target_path`               | rejected before mutation (invariant 3)                                                               | `tests/src/install/test_tracking_migration.py`           |
-| Codex skip, first install                         | codex binary unavailable, no prior install         | no `(hooks, codex)` pair, no `codex_config_path`, skip visibly reported                              | `tests/src/install/test_codex_hooks.py`                  |
-| Codex skip, re-enable                             | prior install with block, codex unavailable        | `(hooks, codex)` pair and `codex_config_path` both preserved (F3)                                    | `tests/src/install/test_codex_hooks.py`                  |
-| Attribution is complete                           | fresh install, all modules                         | every file and settings row carries a valid attribution                                              | `tests/src/install/test_tracking_migration.py`           |
-| Ownership declared for every module               | `InstallModule` enum                               | each member has >=1 owner, all owners in `AGENT_RUNTIME_IDS`                                         | `tests/src/install/test_models.py`                       |
-| `status --json` v3 shape                          | user install managing both runtimes                | `schema_version == 3`; `managed_runtimes` sorted; `module_owners` present                            | `tests/src/cli/test_extension_enable.py`                 |
-| Codex re-trust not forced                         | existing Codex install, re-enable                  | rendered command bytes byte-identical                                                                | `tests/src/install/test_registered_commands_contract.py` |
-| Hook dispatcher diagnosis survives v3             | v3 install, then a corrupt tracking file           | reads the pair set; corrupt file still degrades to sync advice, never raises                         | `tests/src/install/test_hook_dispatcher.py`              |
+| Test                                              | Fixture                                                                           | Assertion                                                                                            | Test File                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `--scope user --runtime claude`                   | clean user scope, codex binary available                                          | no `$CODEX_HOME` path written, no Codex skill package -- by target-path inspection                   | `tests/src/install/test_runtime_scoped_modules.py`       |
+| `--scope user --runtime codex`                    | clean user scope, **codex binary available**                                      | Codex skills + hook block; no `.claude/` write, no `~/.claude/settings.json`, no Claude version gate | `tests/src/install/test_runtime_scoped_modules.py`       |
+| `--scope user --runtime all`                      | clean user scope, codex available                                                 | rendered targets and registered-command golden identical to today; excludes `installed.json`         | `tests/src/install/test_registered_commands_contract.py` |
+| `--scope project --runtime codex`                 | project scope, codex available                                                    | codex skills only; hooks scope-omitted                                                               | `tests/src/install/test_runtime_scoped_modules.py`       |
+| `--scope project --runtime claude`                | project scope                                                                     | commands, agents, claude skills, status-line, permissions; hooks scope-omitted                       | `tests/src/install/test_runtime_scoped_modules.py`       |
+| `--scope local --runtime codex`                   | local scope                                                                       | CONFLICT via `plan.has_conflicts`, not a silent no-op                                                | `tests/src/cli/test_extension_enable.py`                 |
+| bare `--runtime codex` in a repo                  | git checkout, no `--scope`                                                        | CONFLICT naming `--scope user`, because auto-detect resolves LOCAL                                   | `tests/src/cli/test_extension_enable.py`                 |
+| `--profile minimal --runtime codex`               | any scope                                                                         | CONFLICT (empty effective set); `minimal` is `{commands}`, Claude-owned                              | `tests/src/cli/test_extension_enable.py`                 |
+| `--runtime codex --with commands`                 | any scope                                                                         | CONFLICT (explicit, wrong owner) -- distinguishes explicit from profile provenance                   | `tests/src/cli/test_extension_enable.py`                 |
+| `--profile minimal --with skills --runtime codex` | any scope, codex available                                                        | allowed; installs codex skills                                                                       | `tests/src/cli/test_extension_enable.py`                 |
+| `--force` cannot adopt module conflicts           | wrong-owner `--with commands` plus a file conflict                                | exits non-zero; `--force` does not proceed past the module conflict                                  | `tests/src/cli/test_extension_enable.py`                 |
+| Profile-sourced drop is a SKIP, not a conflict    | `--scope user --runtime codex`, standard profile                                  | Claude modules appear as `module_outcomes` SKIP rows with reasons; exit 0                            | `tests/src/install/test_runtime_scoped_modules.py`       |
+| Sync survives the deleted enum                    | checked-in `installed.json` with `"codex-hooks"`                                  | `sync` succeeds; no `ValueError`                                                                     | `tests/regression/test_bug_sync_deleted_module_value.py` |
+| Hooks-only install keeps Codex across sync        | v3 install with `(hooks, codex)` and no skills                                    | managed set still includes `codex` after `sync` (F6)                                                 | `tests/src/install/test_runtime_scoped_modules.py`       |
+| Empty modules preserve sync intent                | Claude `commands`/`agents` sources have no installable rows                       | successful apply records both owner pairs; later sync can discover newly shipped rows                | `tests/src/install/test_runtime_scoped_modules.py`       |
+| v2 -> v3 migration                                | checked-in v2 fixture                                                             | parsed through the frozen v2 reader, never the live model; asserted field-by-field                   | `tests/src/install/test_tracking_migration.py`           |
+| v1 -> v3 migration                                | checked-in v1 fixture, no `skill_packages`                                        | path-provable Claude skills only; unmapped rows tagged `legacy_path_unmapped`                        | `tests/src/install/test_tracking_migration.py`           |
+| Unknown legacy module remains corruption          | v2 fixture with `"future-module"`                                                 | rejected with an actionable tracking error; no silent skip/default                                   | `tests/src/install/test_tracking_migration.py`           |
+| v4 still rejected                                 | `version: 4`                                                                      | `_handle_tracking_version_mismatch` names the upgrade path                                           | `tests/src/install/test_tracking.py`                     |
+| Unattributed row is not a removal target          | v1-derived install with an unmapped row                                           | row is readable and reported; not constructible as a runtime-scoped removal target (invariant 6)     | `tests/src/install/test_tracking_migration.py`           |
+| Duplicate-pair rejection uses declared identity   | two pairs claiming one `target_path`                                              | rejected before mutation (invariant 3)                                                               | `tests/src/install/test_tracking_migration.py`           |
+| Codex skip, first install                         | user `minimal + --with hooks --without commands --runtime all`; codex unavailable | Claude hooks apply; Codex is visibly `unavailable`; no Codex pair/path; exit 0                       | `tests/src/install/test_codex_hooks.py`                  |
+| Codex skip, re-enable                             | bare re-enable of prior dual install, codex unavailable                           | automatic selection retains managed Codex; pair/path preserved and unavailable skip visible          | `tests/src/install/test_codex_hooks.py`                  |
+| Attribution is complete                           | fresh install, all modules                                                        | every file and settings row carries a valid attribution                                              | `tests/src/install/test_tracking_migration.py`           |
+| Ownership declared for every module               | `InstallModule` enum                                                              | each member has >=1 owner, all owners in `AGENT_RUNTIME_IDS`                                         | `tests/src/install/test_models.py`                       |
+| `status --json` v3 shape                          | dual install plus one unattributed legacy row                                     | exact v3 keys; sorted owners/runtimes; tagged surface summary contains no settings value             | `tests/src/cli/test_extension_enable.py`                 |
+| Codex re-trust not forced                         | existing Codex install, re-enable                                                 | rendered command bytes byte-identical                                                                | `tests/src/install/test_registered_commands_contract.py` |
+| Hook dispatcher diagnosis survives v3             | v3 install, then a corrupt tracking file                                          | reads the pair set; corrupt file still degrades to sync advice, never raises                         | `tests/src/install/test_hook_dispatcher.py`              |
 
 **Existing** (extend, do not replace): `tests/src/install/test_models.py`, `test_tracking.py`,
 `test_registered_commands_contract.py`, `test_codex_hooks.py`, `test_installer.py`, `test_hook_dispatcher.py`, and
@@ -321,24 +388,33 @@ status cases to `test_extension_enable.py` unless the surface grows enough to ju
 ## Closeout
 
 - [ ] Every box ticked with verification recorded; no phase ticked on unit tests alone.
+
 - [ ] `docs/board/change_log.md` entry added, recording the clean break and both version bumps.
+
 - [ ] Design docs describe shipped behavior, including the F3 reading of invariant 5 and the load-bearing "Claude by
   construction" premise in `design_appendix.md` section C.4.
+
 - [ ] Both scoped greps are clean. A repo-wide grep cannot pass -- this checklist, `card.md`, and historical board
   entries intentionally contain the term -- and a literal-string grep alone misses every `CODEX_HOOKS` identifier site.
   Run both:
-  `bash     rg -n 'codex-hooks' src/forge src/skills docs/design_appendix.md docs/design.md docs/design_workflows.md \       docs/cli_reference.md docs/end-user README.md CONTRIBUTING.md AGENTS.md     rg -n 'CODEX_HOOKS' src/forge tests/     `
+
+  - `rg -n 'codex-hooks' src/forge src/skills docs/design_appendix.md docs/design.md docs/design_workflows.md docs/cli_reference.md docs/end-user README.md CONTRIBUTING.md AGENTS.md`
+  - `rg -n 'CODEX_HOOKS' src/forge tests/`
+
   **Allowlist** (verified as probe-directory or historical references, none of which name the module value):
   `cli/hooks/codex_transfer.py:37`, `core/runtime/registry.py:198`, `cli/runtime.py:140`,
   `core/ops/codex_enrollment.py:279`, `core/runtime/codex_preflight.py:74` -- all citing
   `scripts/experiments/codex-hooks/` -- plus the dated history line at `src/skills/qa/resources/checklist.md:32`. The
   hook handler names `codex-session-start` / `codex-policy-check` contain `codex-` but not `codex-hooks`.
+
 - [ ] Card moved `doing/` -> `done/` and inbound links repointed:
   `docs/board/proposed/extension_disable_runtime/card.md:5`, `docs/board/done/disable_scope_mismatch_orphan/card.md:12`,
   `docs/board/done/disable_scope_mismatch_orphan/checklist.md:183`.
+
 - [ ] Unblock the sibling: [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) gates on D1
   shipping. Confirm the tagged attribution is sufficient for its removal selection -- specifically that it can build a
   removal set without ever matching an unattributed row.
+
 - [ ] Candidates for `impl_notes.md` after human review: accepting a schema version is not the same as being able to
   parse it, and only a frozen-type read path pins a historical shape (F4); a conflict-reason set that feeds a recovery
   tip is not an enforcement mechanism (F5); the runtime vocabulary belongs in `core/runtime_vocab`, not the CLI (F1);
