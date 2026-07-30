@@ -124,8 +124,8 @@ def isolate_claude_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 def isolate_codex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Force tests to use an isolated CODEX_HOME.
 
-    Without this fixture, installer tests that exercise the codex-hooks
-    module at USER scope (`get_codex_config_path(USER)`) would write the
+    Without this fixture, installer tests that exercise Codex-owned hooks at
+    USER scope (`get_codex_config_path(USER)`) would write the
     Forge-managed hook block into the real ~/.codex/config.toml.
 
     Note: individual tests may override CODEX_HOME explicitly when needed.

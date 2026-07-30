@@ -9,7 +9,8 @@ from typing import Any
 import pytest
 
 from forge.install.exceptions import SettingsConflictError
-from forge.install.models import InstalledSettingsEntry, InstallScope
+from forge.install.models import InstalledSettingsEntry, InstallModule, InstallScope
+from forge.install.ownership import attributed
 from forge.install.settings_merge import (
     backup_settings,
     check_scalar_conflict,
@@ -26,6 +27,15 @@ from forge.install.settings_merge import (
     unmerge,
     write_settings,
 )
+
+HOOK_ATTRIBUTION = attributed(InstallModule.HOOKS, "claude_code")
+PERMISSION_ATTRIBUTION = attributed(InstallModule.PERMISSIONS, "claude_code")
+STATUSLINE_ATTRIBUTION = attributed(InstallModule.STATUSLINE, "claude_code")
+SETTINGS_ATTRIBUTIONS = {
+    InstallModule.HOOKS.value: HOOK_ATTRIBUTION,
+    InstallModule.PERMISSIONS.value: PERMISSION_ATTRIBUTION,
+    InstallModule.STATUSLINE.value: STATUSLINE_ATTRIBUTION,
+}
 
 
 class TestGetSettingsPath:
@@ -146,7 +156,7 @@ class TestMergeHooks:
             "matcher": {"tool_name": "Write"},
         }
 
-        entries = merge_hooks(sample_settings, "PreToolUse", [new_entry])
+        entries = merge_hooks(sample_settings, "PreToolUse", [new_entry], attribution=HOOK_ATTRIBUTION)
 
         assert len(entries) == 1
         assert entries[0].key_path == "hooks.PreToolUse"
@@ -160,7 +170,7 @@ class TestMergeHooks:
             "matcher": {"tool_name": "Bash"},
         }
 
-        entries = merge_hooks(sample_settings, "PreToolUse", [dupe_entry])
+        entries = merge_hooks(sample_settings, "PreToolUse", [dupe_entry], attribution=HOOK_ATTRIBUTION)
 
         assert len(entries) == 0  # Not added (duplicate)
         assert len(sample_settings["hooks"]["PreToolUse"]) == 1  # Still just one
@@ -169,7 +179,7 @@ class TestMergeHooks:
         settings: dict[str, Any] = {}
         new_entry = {"hooks": [{"command": "/new/hook"}]}
 
-        entries = merge_hooks(settings, "PostToolUse", [new_entry])
+        entries = merge_hooks(settings, "PostToolUse", [new_entry], attribution=HOOK_ATTRIBUTION)
 
         assert len(entries) == 1
         assert "PostToolUse" in settings["hooks"]
@@ -179,27 +189,42 @@ class TestMergePermissions:
     """Tests for merge_permissions function."""
 
     def test_adds_new_permissions(self, sample_settings: dict[str, Any]) -> None:
-        entries = merge_permissions(sample_settings, "allow", ["Bash(git:*)", "Read"])
+        entries = merge_permissions(
+            sample_settings,
+            "allow",
+            ["Bash(git:*)", "Read"],
+            attribution=PERMISSION_ATTRIBUTION,
+        )
 
         assert len(entries) == 2
         assert "Bash(git:*)" in sample_settings["permissions"]["allow"]
         assert "Read" in sample_settings["permissions"]["allow"]
 
     def test_dedupes_existing_permissions(self, sample_settings: dict[str, Any]) -> None:
-        entries = merge_permissions(sample_settings, "allow", ["Bash(ls:*)"])
+        entries = merge_permissions(
+            sample_settings,
+            "allow",
+            ["Bash(ls:*)"],
+            attribution=PERMISSION_ATTRIBUTION,
+        )
 
         assert len(entries) == 0  # Already exists
         assert sample_settings["permissions"]["allow"].count("Bash(ls:*)") == 1
 
     def test_stable_id_is_value(self, sample_settings: dict[str, Any]) -> None:
-        entries = merge_permissions(sample_settings, "allow", ["NewPerm"])
+        entries = merge_permissions(
+            sample_settings,
+            "allow",
+            ["NewPerm"],
+            attribution=PERMISSION_ATTRIBUTION,
+        )
 
         assert entries[0].stable_id == "NewPerm"
 
     def test_creates_permission_type_if_missing(self) -> None:
         settings: dict[str, Any] = {}
 
-        merge_permissions(settings, "allow", ["Read"])
+        merge_permissions(settings, "allow", ["Read"], attribution=PERMISSION_ATTRIBUTION)
 
         assert "allow" in settings["permissions"]
         assert "Read" in settings["permissions"]["allow"]
@@ -227,7 +252,7 @@ class TestSetScalar:
     def test_sets_new_value(self) -> None:
         settings: dict[str, Any] = {}
 
-        entry = set_scalar(settings, "statusLine", "/path")
+        entry = set_scalar(settings, "statusLine", "/path", attribution=STATUSLINE_ATTRIBUTION)
 
         assert entry is not None
         assert settings["statusLine"] == "/path"
@@ -237,7 +262,7 @@ class TestSetScalar:
     def test_returns_none_when_same_value(self) -> None:
         settings = {"statusLine": "/same"}
 
-        entry = set_scalar(settings, "statusLine", "/same")
+        entry = set_scalar(settings, "statusLine", "/same", attribution=STATUSLINE_ATTRIBUTION)
 
         assert entry is None  # No change needed
 
@@ -245,7 +270,7 @@ class TestSetScalar:
         settings = {"statusLine": "/current"}
 
         with pytest.raises(SettingsConflictError) as exc_info:
-            set_scalar(settings, "statusLine", "/new")
+            set_scalar(settings, "statusLine", "/new", attribution=STATUSLINE_ATTRIBUTION)
 
         assert exc_info.value.key_path == "statusLine"
         assert exc_info.value.current_value == "/current"
@@ -254,7 +279,13 @@ class TestSetScalar:
     def test_overrides_with_force(self) -> None:
         settings = {"statusLine": "/current"}
 
-        entry = set_scalar(settings, "statusLine", "/new", force=True)
+        entry = set_scalar(
+            settings,
+            "statusLine",
+            "/new",
+            attribution=STATUSLINE_ATTRIBUTION,
+            force=True,
+        )
 
         assert entry is not None
         assert settings["statusLine"] == "/new"
@@ -268,7 +299,7 @@ class TestMerge:
         sample_settings: dict[str, Any],
         forge_settings: dict[str, Any],
     ) -> None:
-        merge(sample_settings, forge_settings)
+        merge(sample_settings, forge_settings, attributions=SETTINGS_ATTRIBUTIONS)
 
         # Check hooks were merged
         assert len(sample_settings["hooks"]["PreToolUse"]) == 2  # original + forge
@@ -282,7 +313,7 @@ class TestMerge:
         sample_settings: dict[str, Any],
         forge_settings: dict[str, Any],
     ) -> None:
-        merge(sample_settings, forge_settings)
+        merge(sample_settings, forge_settings, attributions=SETTINGS_ATTRIBUTIONS)
 
         assert "statusLine" not in sample_settings
 
@@ -291,7 +322,12 @@ class TestMerge:
         sample_settings: dict[str, Any],
         forge_settings: dict[str, Any],
     ) -> None:
-        merge(sample_settings, forge_settings, include_statusline=True)
+        merge(
+            sample_settings,
+            forge_settings,
+            attributions=SETTINGS_ATTRIBUTIONS,
+            include_statusline=True,
+        )
 
         assert sample_settings["statusLine"] == "/path/to/status-line.sh"
 
@@ -299,7 +335,12 @@ class TestMerge:
         settings: dict[str, Any] = {}
         forge_settings = {"env": {"CUSTOM": "1"}}
 
-        entries = merge(settings, forge_settings, include_env=False)
+        entries = merge(
+            settings,
+            forge_settings,
+            attributions=SETTINGS_ATTRIBUTIONS,
+            include_env=False,
+        )
 
         assert settings == {}
         assert entries == []
@@ -308,12 +349,23 @@ class TestMerge:
         settings = {"statusLine": "/existing/path"}
 
         with pytest.raises(SettingsConflictError):
-            merge(settings, forge_settings, include_statusline=True)
+            merge(
+                settings,
+                forge_settings,
+                attributions=SETTINGS_ATTRIBUTIONS,
+                include_statusline=True,
+            )
 
     def test_force_overrides_statusline_conflict(self, forge_settings: dict[str, Any]) -> None:
         settings = {"statusLine": "/existing/path"}
 
-        merge(settings, forge_settings, include_statusline=True, force=True)
+        merge(
+            settings,
+            forge_settings,
+            attributions=SETTINGS_ATTRIBUTIONS,
+            include_statusline=True,
+            force=True,
+        )
 
         assert settings["statusLine"] == "/path/to/status-line.sh"
 
@@ -335,6 +387,7 @@ class TestUnmerge:
                 value=forge_hook,
                 merge_type="append",
                 stable_id='{"hooks":[{"command":"/forge/hook"}]}',
+                attribution=HOOK_ATTRIBUTION,
             )
         ]
 
@@ -355,12 +408,14 @@ class TestUnmerge:
                 value="Bash(git:*)",
                 merge_type="union",
                 stable_id="Bash(git:*)",
+                attribution=PERMISSION_ATTRIBUTION,
             ),
             InstalledSettingsEntry(
                 key_path="permissions.allow",
                 value="Read",
                 merge_type="union",
                 stable_id="Read",
+                attribution=PERMISSION_ATTRIBUTION,
             ),
         ]
 
@@ -376,6 +431,7 @@ class TestUnmerge:
                 value="/forge/path",
                 merge_type="scalar",
                 stable_id="statusLine",
+                attribution=STATUSLINE_ATTRIBUTION,
             )
         ]
 
@@ -401,12 +457,14 @@ class TestUnmerge:
                 value=forge_hook,
                 merge_type="append",
                 stable_id='{"hooks":[{"command":"/forge/hook"}]}',
+                attribution=HOOK_ATTRIBUTION,
             ),
             InstalledSettingsEntry(
                 key_path="permissions.allow",
                 value="ForgePerm",
                 merge_type="union",
                 stable_id="ForgePerm",
+                attribution=PERMISSION_ATTRIBUTION,
             ),
         ]
 

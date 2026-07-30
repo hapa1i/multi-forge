@@ -19,7 +19,7 @@ pre-commit install
 # Register runtime hooks once (user scope). The hooks-only form avoids
 # duplicate command/skill copies when you also enable project-local extensions;
 # `uv run` works even before uv's tool bin is on this shell's PATH:
-uv run forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+uv run forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
 Run tests before submitting:

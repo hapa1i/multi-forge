@@ -15,7 +15,12 @@ Fixed in: src/forge/install/settings_merge.py (action plan Step 1, H4)
 
 import pytest
 
+from forge.install.models import InstallModule
+from forge.install.ownership import attributed
+
 pytestmark = pytest.mark.regression
+
+HOOK_ATTRIBUTION = attributed(InstallModule.HOOKS, "claude_code")
 
 
 def test_same_command_different_matchers_both_preserved() -> None:
@@ -26,7 +31,7 @@ def test_same_command_different_matchers_both_preserved() -> None:
     hook_write = {"matcher": "Write", "hooks": [{"command": "forge hook policy-check"}]}
     hook_edit = {"matcher": "Edit", "hooks": [{"command": "forge hook policy-check"}]}
 
-    merge_hooks(settings, "PreToolUse", [hook_write, hook_edit])
+    merge_hooks(settings, "PreToolUse", [hook_write, hook_edit], attribution=HOOK_ATTRIBUTION)
 
     entries = settings["hooks"]["PreToolUse"]
     assert len(entries) == 2
@@ -41,7 +46,7 @@ def test_identical_entries_still_deduped() -> None:
     settings: dict = {}
     entry = {"matcher": "Write", "hooks": [{"command": "forge hook policy-check"}]}
 
-    merge_hooks(settings, "PreToolUse", [entry, entry])
+    merge_hooks(settings, "PreToolUse", [entry, entry], attribution=HOOK_ATTRIBUTION)
 
     assert len(settings["hooks"]["PreToolUse"]) == 1
 
@@ -66,7 +71,7 @@ def test_merge_into_existing_dedupes_against_prior() -> None:
     }
     settings: dict = {"hooks": {"PreToolUse": [existing_entry]}}
 
-    added = merge_hooks(settings, "PreToolUse", [existing_entry])
+    added = merge_hooks(settings, "PreToolUse", [existing_entry], attribution=HOOK_ATTRIBUTION)
 
     assert len(settings["hooks"]["PreToolUse"]) == 1
     assert len(added) == 0  # Nothing new added

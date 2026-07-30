@@ -17,15 +17,15 @@ forge extension enable --scope user --dry-run
 # Verify installation
 ls -la $CLAUDE_HOME/skills/
 cat $CLAUDE_HOME/settings.json | jq '.hooks'
-cat $FORGE_HOME/installed.json | jq '.installations.user.modules_enabled'
+cat $FORGE_HOME/installed.json | jq '.installations.user.module_owners'
 
 # Confirm statusLine is not user-scoped; runtime hooks and permissions are
 cat $CLAUDE_HOME/settings.json | jq '.statusLine'
 cat $CLAUDE_HOME/settings.json | jq '.permissions'
 ```
 
-- [ ] `modules_enabled` in `installed.json` lists `commands` and `agents` (directories created only if source has
-  installable files)
+- [ ] `module_owners` in `installed.json` contains `(commands, claude_code)` and `(agents, claude_code)` (directories
+  are created only if source has installable files)
 - [ ] All eleven full-profile Claude skills are installed to `$CLAUDE_HOME/skills/`
 - [ ] Runtime hooks configured in `$CLAUDE_HOME/settings.json`
 - [ ] `statusLine` is absent from user scope
@@ -90,11 +90,11 @@ forge extension enable --scope local --runtime claude
 cat .claude/settings.local.json | jq '.statusLine'
 cat .claude/settings.local.json | jq '.hooks'
 LOCAL_KEY="local:$(cd "$FORGE_TEST_REPO" && pwd -P)"
-cat $FORGE_HOME/installed.json | jq --arg key "$LOCAL_KEY" '.installations[$key].modules_enabled'
+cat $FORGE_HOME/installed.json | jq --arg key "$LOCAL_KEY" '.installations[$key].module_owners'
 ```
 
-- [ ] `modules_enabled` for local installation lists `commands` and `agents` (directories created only if source has
-  installable files)
+- [ ] `module_owners` for the local installation contains `(commands, claude_code)` and `(agents, claude_code)`
+  (directories are created only if source has installable files)
 - [ ] `statusLine` configured in `.claude/settings.local.json`
 - [ ] Runtime hooks are absent from `.claude/settings.local.json`
 
@@ -187,7 +187,7 @@ forge extension sync
 
 - [ ] Update completes (or reports already up to date)
 
-### 2.10 Codex Hook Registration (codex-hooks module)
+### 2.10 Codex Hook Registration (`hooks`, Codex Runtime)
 
 <!-- auto -->
 
@@ -195,7 +195,7 @@ forge extension sync
 # Enable with a fake codex binary on PATH + isolated CODEX_HOME
 export CODEX_HOME=$(mktemp -d)
 FAKE_BIN=$(mktemp -d) && printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/codex" && chmod +x "$FAKE_BIN/codex"
-PATH="$FAKE_BIN:$PATH" forge extension enable --scope user --runtime claude --force
+PATH="$FAKE_BIN:$PATH" forge extension enable --scope user --runtime all --force
 
 cat "$CODEX_HOME/config.toml"
 forge extension status --scope user
@@ -217,9 +217,11 @@ test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
 <!-- auto -->
 
 ```bash
-# Re-enable with codex absent from PATH while keeping the installed Claude binary visible.
+# Re-enable only the shared hooks module with codex absent from PATH while keeping
+# the installed Claude binary visible.
 export CODEX_HOME=$(mktemp -d)
-PATH="$HOME/.local/bin:/usr/bin:/bin" forge extension enable --scope user --runtime claude --force
+PATH="$HOME/.local/bin:/usr/bin:/bin" forge extension enable --scope user --profile minimal \
+  --with hooks --without commands --runtime all --force
 test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
 
 # Restore: re-enable normally and clear the env override
@@ -357,7 +359,7 @@ FORGE_HOME="$RESET_FORGE_HOME" PATH="$QA_RUNTIME_BIN:$PATH" \
 rm "$RESET_FORGE_HOME/installed.json"
 rm -rf "$RESET_FORGE_HOME/cache/compiled-skills"
 FORGE_HOME="$RESET_FORGE_HOME" forge extension status --scope project --root "$RESET_ROOT" --json \
-  | jq -e '.schema_version == 2 and .installations == []
+  | jq -e '.schema_version == 3 and .installations == []
       and (.unmanaged_skill_packages | length == 9)
       and all(.unmanaged_skill_packages[];
         .runtime == "codex" and .shape == "partial" and .provenance == "marked"
@@ -409,7 +411,7 @@ mkdir -p "$HOME/.agents/skills/challenge"
 printf 'user-owned duplicate\n' > "$HOME/.agents/skills/challenge/SKILL.md"
 DUPLICATE_BEFORE=$(shasum -a 256 "$HOME/.agents/skills/challenge/SKILL.md" | cut -d' ' -f1)
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.schema_version == 2 and (.installations | type == "array")
+  | jq -e '.schema_version == 3 and (.installations | type == "array")
     and (.unmanaged_skill_packages | type == "array")
     and any(.installations[0].skill_packages[]; .skill == "challenge"
       and .state == "duplicate" and (.duplicate_dirs | length == 1)
@@ -431,7 +433,7 @@ forge extension sync --scope project
 mv .agents/skills/review .agents/skills/review-sibling
 ln -s review-sibling .agents/skills/review
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.schema_version == 2 and (.unmanaged_skill_packages | type == "array")
+  | jq -e '.schema_version == 3 and (.unmanaged_skill_packages | type == "array")
     and any(.installations[0].skill_packages[]; .skill == "review"
       and .state == "invalid-target" and .target_present == false
       and (.recovery | contains("unexpected package entry")))'
@@ -451,7 +453,7 @@ DANGLING_RESOURCE="$(pwd -P)/.agents/skills/understand/resources/docs.md"
 mv "$DANGLING_RESOURCE" /tmp/forge-understand-docs.backup
 ln -s docs-never-exists.md "$DANGLING_RESOURCE"
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e --arg path "$DANGLING_RESOURCE" '.schema_version == 2
+  | jq -e --arg path "$DANGLING_RESOURCE" '.schema_version == 3
     and (.unmanaged_skill_packages | type == "array")
     and any(.installations[0].skill_packages[]; .skill == "understand"
       and .state == "missing" and (.missing_file_paths | index($path)) != null
@@ -494,7 +496,7 @@ for verb in sync disable status; do
 done
 
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
-  | jq -e '.schema_version == 2 and (.installations | length == 1)
+  | jq -e '.schema_version == 3 and (.installations | length == 1)
       and .unmanaged_skill_packages == []
       and (.installations[0].skill_packages | length == 9)
       and all(.installations[0].skill_packages[];
@@ -521,6 +523,6 @@ forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
 - [ ] An incoherent package/file ledger makes status and disable fail before package bytes or tracking are discarded
 - [ ] Sync, disable, and status help name exact `installed.json` scope/path rows as a discovery source
 - [ ] After duplicate cleanup and sync, all nine project Codex packages report healthy `present` state
-- [ ] Every extension status JSON probe validates schema v2 and both top-level arrays
+- [ ] Every extension status JSON probe validates schema v3 and both top-level arrays
 
 ---

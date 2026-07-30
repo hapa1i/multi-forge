@@ -27,7 +27,8 @@ from forge.install.hook_dispatcher import (
     select_forge_binary_for_recording,
     write_runtime_metadata,
 )
-from forge.install.models import Installation
+from forge.install.models import Installation, InstallModule
+from forge.install.ownership import attributed
 from forge.install.project_registry import ProjectRegistryStore
 
 
@@ -788,7 +789,7 @@ def test_doctor_separates_valid_override_from_stale_dispatcher(
     assert diagnosis.dev_override.effective is False
     assert diagnosis.dev_override.advice is not None
     assert "extension enable --scope user" in diagnosis.dev_override.advice
-    assert "--with hooks,codex-hooks --without commands" in diagnosis.dev_override.advice
+    assert "--with hooks --without commands" in diagnosis.dev_override.advice
     assert "extension sync" not in diagnosis.dev_override.advice
 
 
@@ -912,7 +913,7 @@ def test_doctor_advises_enable_when_never_enabled_and_launcher_unrecorded(
     assert diagnosis.status == "current"
     assert diagnosis.advice is not None
     assert "extension enable --scope user" in diagnosis.advice
-    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "--with hooks --without commands" in diagnosis.advice
     assert "extension sync" not in diagnosis.advice
     assert str(custom_forge) in diagnosis.advice
 
@@ -934,7 +935,7 @@ def test_doctor_missing_dispatcher_never_enabled_advises_enable(
     assert diagnosis.status == "missing"
     assert diagnosis.advice is not None
     assert "extension enable --scope user" in diagnosis.advice
-    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "--with hooks --without commands" in diagnosis.advice
     assert "extension sync" not in diagnosis.advice
 
 
@@ -950,7 +951,7 @@ def test_doctor_skills_only_user_install_does_not_advise_ineffective_sync(
             scope="user",
             mode="copy",
             profile="minimal",
-            modules_enabled=["skills"],
+            module_owners=[attributed(InstallModule.SKILLS, "claude_code")],
         ),
     )
     env = _env(tmp_path, _forge_home())
@@ -964,7 +965,7 @@ def test_doctor_skills_only_user_install_does_not_advise_ineffective_sync(
     assert diagnosis.status == "missing"
     assert diagnosis.advice is not None
     assert "extension enable --scope user" in diagnosis.advice
-    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "--with hooks --without commands" in diagnosis.advice
     assert "extension sync" not in diagnosis.advice
 
 
@@ -1006,7 +1007,7 @@ def test_doctor_unrelated_project_install_still_advises_user_enable(
     assert diagnosis.status == "missing"
     assert diagnosis.advice is not None
     assert "extension enable --scope user" in diagnosis.advice
-    assert "--with hooks,codex-hooks --without commands" in diagnosis.advice
+    assert "--with hooks --without commands" in diagnosis.advice
     assert "extension sync" not in diagnosis.advice
 
 
@@ -1393,7 +1394,7 @@ def test_user_enable_reports_legacy_root_without_activating_ambient_dispatch(
             project_path=str(root),
             mode=InstallMode.COPY.value,
             profile=InstallProfile.STANDARD.value,
-            modules_enabled=[InstallModule.HOOKS.value],
+            module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
             installed_at="2026-01-01T00:00:00Z",
             updated_at="2026-01-01T00:00:00Z",
         ),

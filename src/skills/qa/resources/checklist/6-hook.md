@@ -25,9 +25,15 @@ cat $CLAUDE_HOME/settings.json | jq '.hooks'
 <!-- auto -->
 
 ```bash
-# Install runtime hooks only (no commands/skills)
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
-jq -e '.installations.user.modules_enabled == ["codex-hooks", "hooks"]
+# Start clean, then install both runtime-owned halves of hooks (no commands/skills).
+forge extension disable --scope user --yes
+HOOK_RUNTIME_BIN=$(mktemp -d)
+printf '#!/bin/sh\nexit 0\n' > "$HOOK_RUNTIME_BIN/codex"
+chmod +x "$HOOK_RUNTIME_BIN/codex"
+PATH="$HOOK_RUNTIME_BIN:$PATH" forge extension enable --scope user --profile minimal \
+  --with hooks --without commands --runtime all
+jq -e '.installations.user.module_owners
+    == [{"module":"hooks","runtime":"claude_code"},{"module":"hooks","runtime":"codex"}]
   and .installations.user.skill_packages == []' "$FORGE_HOME/installed.json"
 
 # Restore the full Claude package set required by the later live-skill checks.

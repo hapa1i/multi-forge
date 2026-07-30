@@ -54,10 +54,10 @@ For Day 1 install or extension lifecycle changes, verify the global-tool path wi
 then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup. For
 runtime-skill/compiler changes, verify `forge runtime list --json`, `forge extension enable --runtime claude|codex|all`,
 and `forge extension status --json`; also exercise `forge extension sync` and `forge extension disable` when package
-ownership changes. `--runtime` filters only the SKILLS module, sync preserves the installation's tracked runtime set,
-and runtime-package health belongs to `extension status`, not `extension doctor`. Codex skills support user and project
-scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local scope onto the shared project
-target. For installer/GC changes involving untracked runtime packages, verify the schema-v2
+ownership changes. `--runtime` filters every module by its runtime ownership, while sync preserves the installation's
+tracked runtime set and runtime-package health belongs to `extension status`, not `extension doctor`. Codex skills
+support user and project scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local scope
+onto the shared project target. For installer/GC changes involving untracked runtime packages, verify the schema-v3
 `forge extension status --json` object (`installations` plus `unmanaged_skill_packages`), then preview cleanup with
 `forge clean --scope <project|workspace|all> --verbose` before applying the same scope with `--yes`. Cleanup must remain
 fail-closed: unmarked, modified, malformed/newer, or unsafe packages are report-only and must not be removed

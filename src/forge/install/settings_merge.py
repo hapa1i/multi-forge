@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,7 @@ from forge.core.state import atomic_write_text
 from forge.session.claude.paths import get_claude_home
 
 from .exceptions import SettingsConflictError
-from .models import InstalledSettingsEntry, InstallScope
+from .models import InstalledSettingsEntry, InstallScope, ModuleOwner
 
 
 def _get_timestamp() -> str:
@@ -506,6 +507,8 @@ def merge_hooks(
     settings: dict[str, Any],
     hook_type: str,
     entries: list[dict[str, Any]],
+    *,
+    attribution: ModuleOwner,
 ) -> list[InstalledSettingsEntry]:
     """Merge hook entries: append + dedupe by full JSON entry equality.
 
@@ -540,6 +543,7 @@ def merge_hooks(
                     value=entry,
                     merge_type="append",
                     stable_id=canonical,
+                    attribution=attribution,
                 )
             )
 
@@ -550,6 +554,8 @@ def merge_permissions(
     settings: dict[str, Any],
     permission_type: str,
     entries: list[str],
+    *,
+    attribution: ModuleOwner,
 ) -> list[InstalledSettingsEntry]:
     """Merge permission entries: union unique.
 
@@ -576,6 +582,7 @@ def merge_permissions(
                     value=entry,
                     merge_type="union",
                     stable_id=entry,  # Entry value is the stable_id
+                    attribution=attribution,
                 )
             )
 
@@ -585,6 +592,8 @@ def merge_permissions(
 def merge_env(
     settings: dict[str, Any],
     forge_env: dict[str, str],
+    *,
+    attribution: ModuleOwner,
 ) -> list[InstalledSettingsEntry]:
     """Merge env vars: Forge values override on conflicts.
 
@@ -606,6 +615,7 @@ def merge_env(
                 value=value,
                 merge_type="env",
                 stable_id=key,
+                attribution=attribution,
             )
         )
 
@@ -637,6 +647,8 @@ def set_scalar(
     settings: dict[str, Any],
     key: str,
     value: Any,
+    *,
+    attribution: ModuleOwner,
     force: bool = False,
 ) -> InstalledSettingsEntry | None:
     """Set a scalar value.
@@ -666,6 +678,7 @@ def set_scalar(
         value=value,
         merge_type="scalar",
         stable_id=key,
+        attribution=attribution,
     )
 
 
@@ -676,6 +689,7 @@ def merge(
     settings: dict[str, Any],
     forge_settings: dict[str, Any],
     *,
+    attributions: Mapping[str, ModuleOwner],
     force: bool = False,
     include_statusline: bool = False,
     include_hooks: bool = True,
@@ -704,14 +718,35 @@ def merge(
     if include_hooks:
         forge_hooks = forge_settings.get("hooks", {})
         for hook_type, hook_entries in sorted(forge_hooks.items()):
-            entries.extend(merge_hooks(settings, hook_type, hook_entries))
+            entries.extend(
+                merge_hooks(
+                    settings,
+                    hook_type,
+                    hook_entries,
+                    attribution=attributions["hooks"],
+                )
+            )
 
     if include_permissions:
         forge_perms = forge_settings.get("permissions", {})
         if allow := forge_perms.get("allow"):
-            entries.extend(merge_permissions(settings, "allow", allow))
+            entries.extend(
+                merge_permissions(
+                    settings,
+                    "allow",
+                    allow,
+                    attribution=attributions["permissions"],
+                )
+            )
         if deny := forge_perms.get("deny"):
-            entries.extend(merge_permissions(settings, "deny", deny))
+            entries.extend(
+                merge_permissions(
+                    settings,
+                    "deny",
+                    deny,
+                    attribution=attributions["permissions"],
+                )
+            )
 
     # Merge statusLine (only if opted in)
     if include_statusline and "statusLine" in forge_settings:
@@ -719,13 +754,20 @@ def merge(
             settings,
             "statusLine",
             forge_settings["statusLine"],
+            attribution=attributions["status-line"],
             force=force,
         )
         if entry:
             entries.append(entry)
 
     if include_env and (forge_env := forge_settings.get("env")):
-        entries.extend(merge_env(settings, forge_env))
+        entries.extend(
+            merge_env(
+                settings,
+                forge_env,
+                attribution=attributions["permissions"],
+            )
+        )
 
     return entries
 

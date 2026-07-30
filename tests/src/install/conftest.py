@@ -14,6 +14,7 @@ from forge.install.models import (
     InstalledManifest,
     InstalledSettingsEntry,
 )
+from forge.install.ownership import attributed
 from forge.install.tracking import TrackingStore
 
 
@@ -46,7 +47,14 @@ def sample_installation() -> Installation:
         scope="user",
         mode="copy",
         profile="standard",
-        modules_enabled=["commands", "agents", "hooks", "permissions"],
+        module_owners=sorted(
+            [
+                attributed("commands", "claude_code"),
+                attributed("agents", "claude_code"),
+                attributed("hooks", "claude_code"),
+                attributed("permissions", "claude_code"),
+            ]
+        ),
         files=[
             InstalledFile(
                 target_path="/home/user/.claude/commands/test.md",
@@ -54,6 +62,7 @@ def sample_installation() -> Installation:
                 checksum="abc123",
                 mode="copy",
                 installed_at="2024-01-01T00:00:00+00:00",
+                attribution=attributed("commands", "claude_code"),
             )
         ],
         settings_entries=[
@@ -62,12 +71,14 @@ def sample_installation() -> Installation:
                 value={"hooks": [{"command": "/path/to/hook"}]},
                 merge_type="append",
                 stable_id="/path/to/hook",
+                attribution=attributed("hooks", "claude_code"),
             ),
             InstalledSettingsEntry(
                 key_path="permissions.allow",
                 value="Bash(git:*)",
                 merge_type="union",
                 stable_id="Bash(git:*)",
+                attribution=attributed("permissions", "claude_code"),
             ),
         ],
         settings_backup_path="/home/user/.claude/settings.json.forge-backup",

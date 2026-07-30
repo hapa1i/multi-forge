@@ -47,20 +47,21 @@ remain Claude-only because they drive Claude-specific manual-test flows.
 # Automatic: Claude skills, plus Codex skills when codex is detected
 forge extension enable --scope user
 
-# Explicitly select the SKILLS runtime package
+# Explicitly select every Codex-owned extension surface
 forge extension enable --scope user --runtime codex
 
-# Truly Codex-only project skills: no other Claude modules or settings
+# Codex-only project skills (hooks are user-scoped)
 forge extension enable --scope project --profile minimal \
   --with skills --without commands --runtime codex
 ```
 
-`--runtime claude|codex|all` is repeatable and controls only the SKILLS module. It does not filter commands, agents,
-permissions, settings, status line, or hooks selected by the profile. Therefore a standard-profile `--runtime codex`
-still changes its normal Claude surfaces. On a new installation, automatic selection adds Codex only when detected. On
-an existing installation, automatic enable retains all managed runtimes even if a binary temporarily disappears from
-`PATH`; an explicit `--runtime` refreshes the selected runtimes while preserving omitted tracked packages. Sync also
-uses the tracked runtime set. Use `forge extension disable` when you intend to remove managed packages.
+`--runtime claude|codex|all` is repeatable and filters every selected module by its declared runtime owners. A
+standard-profile user install with `--runtime codex` therefore writes Codex skills and the Codex half of `hooks`, but no
+Claude command, agent, settings, or skill surface. Profile-selected modules owned only by an omitted runtime are shown
+as skips; an explicit `--with` for a wrong-owner module is a conflict. On a new installation, automatic selection adds
+Codex only when detected. On an existing installation, automatic enable retains all managed runtimes even if a binary
+temporarily disappears from `PATH`; an explicit `--runtime` refreshes selected runtimes while preserving omitted tracked
+surfaces. Sync uses the durable tracked runtime set. Use `forge extension disable` for removal.
 
 | Runtime     | User scope                                          | Project scope           | Local scope             |
 | ----------- | --------------------------------------------------- | ----------------------- | ----------------------- |
@@ -313,8 +314,9 @@ ls "${CLAUDE_HOME:-$HOME/.claude}/skills/"  # Claude user packages
 ls "$HOME/.agents/skills/"                  # Codex user packages
 ```
 
-Status JSON is a schema-v2 object with `installations` and `unmanaged_skill_packages` arrays. The tracked status states
-remain `present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a recovery. Run
+Status JSON is a schema-v3 object with `installations` and `unmanaged_skill_packages` arrays. Installation rows expose
+`managed_runtimes`, `module_owners`, and identity-only `unattributed_surfaces`. The tracked package states remain
+`present`, `missing`, `duplicate`, and `invalid-target`; each unhealthy package includes a recovery. Run
 `forge extension sync` for missing tracked files. A duplicate managed by another Forge scope names that scope and its
 exact disable command. An unmanaged package is reported separately with provenance and cleanup fields: a verified marked
 Forge orphan names a clean preview/apply/retry sequence, while unmarked, modified, malformed/newer, or unsafe entries
@@ -400,7 +402,7 @@ hooks:
 ```bash
 forge extension disable --scope user
 forge extension enable --scope project
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
 See [design_appendix.md §C.5](../design_appendix.md#c5-multi-scope-installation-skill-resolution) for details.

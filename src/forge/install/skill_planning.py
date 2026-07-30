@@ -28,11 +28,9 @@ from pathlib import Path
 from typing import TypedDict
 
 from forge.core.runtime import get_runtime, list_runtimes
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 
 from .models import PROFILE_RANK, InstallProfile, InstallScope
-
-CLAUDE_CODE_RUNTIME = "claude_code"
-CODEX_RUNTIME = "codex"
 
 # Append-only inventory of package names emitted by Forge before unmanaged
 # package detection existed.  Runtime discovery roots are user-owned surfaces:

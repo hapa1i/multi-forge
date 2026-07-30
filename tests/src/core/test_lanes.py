@@ -62,10 +62,13 @@ def test_lane_runtime_vocab_matches_registry():
     # with the real agent registry plus core_llm -- this guards the duplication.
     from forge.core.runtime_vocab import (
         AGENT_RUNTIME_IDS,
+        CLAUDE_CODE_RUNTIME,
+        CODEX_RUNTIME,
         CORE_LLM_RUNTIME,
         LANE_RUNTIME_IDS,
     )
 
+    assert AGENT_RUNTIME_IDS == (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
     assert set(AGENT_RUNTIME_IDS) == set(RUNTIMES)
     assert LANE_RUNTIME_IDS == {CORE_LLM_RUNTIME} | set(RUNTIMES)
     for runtime_id in LANE_RUNTIME_IDS:

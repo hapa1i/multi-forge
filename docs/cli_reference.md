@@ -28,19 +28,20 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge extension status`          | Show installation status (`--json`)                                                                    |
 | `forge extension doctor`          | Report install, dispatcher/dev override, hook migration, registry, and compatibility status (`--json`) |
 
-`forge extension enable --runtime claude|codex|all` is repeatable. This option selects only outputs of the SKILLS
-module; it does not filter commands, agents, permissions, settings, status line, or hooks selected by the profile. With
-no option, a new enable targets Claude skills and adds Codex when `codex` is detected. Re-enabling an existing
-installation also retains every runtime it already manages, so temporary binary absence cannot make those packages
-stale. An explicit unavailable runtime fails preflight. On an existing installation, an explicit `--runtime` refreshes
-the selected runtimes and preserves tracked packages for omitted runtimes. `forge extension sync` likewise uses the
-installation's tracked runtime set. Use `forge extension disable` to remove managed packages.
+`forge extension enable --runtime claude|codex|all` is repeatable. It filters every profile/module result by declared
+runtime ownership: commands, agents, permissions, and status line are Claude-owned; skills and hooks are owned by both
+Claude and Codex. Profile-selected wrong-owner modules are reported as skips. A wrong-owner module named with `--with`,
+or an explicit runtime selection that leaves no effective module, is a non-forceable conflict. With no option, a new
+enable targets Claude and adds Codex when `codex` is detected. Re-enabling retains every runtime it already manages, so
+temporary binary absence cannot drop ownership. Explicit narrowing refreshes selected surfaces and preserves omitted
+tracked ownership. `forge extension sync` derives its runtime set from the persisted owner pairs. Use
+`forge extension disable` to remove managed surfaces.
 
 Skill targets are `$CLAUDE_HOME/skills` (Claude user), `<root>/.claude/skills` (Claude project/local),
 `$HOME/.agents/skills` (Codex user), and `<root>/.agents/skills` (Codex project). Codex local is unsupported and never
-aliases the shared project target; Codex skills never use `$CODEX_HOME`. A project install containing only the SKILLS
-module with `--runtime codex` can succeed without `.claude/` or the Claude version gate. A standard-profile
-`--runtime codex` is not Codex-only because the other profile modules still plan their normal Claude surfaces.
+aliases the shared project target; Codex skills never use `$CODEX_HOME`. A standard-profile project `--runtime codex`
+installs Codex skills only because hooks are user-scoped. At user scope it installs Codex skills and the Codex hook
+block. Neither form plans a Claude surface or invokes the Claude version gate.
 
 Without an explicit scope, `sync`, `disable`, and `status` walk upward from the current directory. They combine
 `.claude/` ownership sidecars with exact scope/path rows in `~/.forge/installed.json`, so a tracked Codex-only project
@@ -82,20 +83,22 @@ otherwise it resolves `forge` from `runtime.json` and then known user-tool direc
 User-scope `enable`/`sync` may report one cleanup command per tracked legacy root, but never opens, edits, or enrolls
 those roots. Doctor reports `runtime_hooks.cleanup_required` and `legacy_registrations` independently from
 `double_fire_risk`. `forge extension status` remains the installation/tracking view and does not report migration state.
-`forge extension status --json` is a schema-v2 object (a research-preview clean break from the former bare array):
+`forge extension status --json` is a schema-v3 object:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "installations": [],
   "unmanaged_skill_packages": []
 }
 ```
 
-Both arrays are always present, including when a selected scope has no installation row. `installations` retains the
-existing record shape. For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`,
-`file_paths`, `state`, `target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is
-`present`, `missing`, `duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A
+Both arrays are always present, including when a selected scope has no installation row. Each installation includes
+sorted `managed_runtimes`, the durable `module_owners` list, a unique `modules` compatibility summary, and
+`unattributed_surfaces`. The latter exposes only a migrated row's file/settings identity and reason, never its settings
+value. For each tracked runtime skill package, status JSON includes `runtime`, `skill`, `target_dir`, `file_paths`,
+`state`, `target_present`, `missing_file_paths`, `duplicate_dirs`, and `recovery`. Package state is `present`,
+`missing`, `duplicate`, or `invalid-target`; human output mirrors the state and ownership-aware recovery. A
 Forge-managed cross-scope duplicate reports the owning scope's disable command, while an untracked duplicate reports
 remove-or-rename guidance unless its sentinel/tree proof permits the clean workflow above. `unmanaged_skill_packages` is
 separate and uses the fixed fields `runtime`, `skill`, `target_dir`, `target_scopes`, `root_kind`, `shape`,
@@ -106,20 +109,20 @@ human status prints a `Root not scanned` line with its path/runtime/reason inste
 found. The fixed JSON object does not invent a package record for a root with no observable skill name. Missing roots
 remain silently skipped. Symlink install mode remains supported because only tracked leaves are links; a dangling leaf
 is `missing`, not `present`. Runtime-package health belongs to `extension status`; `extension doctor` does not emit
-`skill_packages`. V2 tracking also requires every package path to stay under its package, include `SKILL.md`, and appear
+`skill_packages`. V3 tracking also requires every package path to stay under its package, include `SKILL.md`, and appear
 in the canonical file ledger. Incoherent tracking is reported as corrupt state before status or mutation proceeds.
 
 Status and clean discover current skill names without parsing package contents, then union them with the append-only
 historical name set. If names-only source discovery is unavailable, they retain the historical set and continue;
 installer planning still performs full source validation and checkout Git-eligibility gating before any write.
 
-Blocking file, settings, and runtime-skill conflicts are a no-write boundary; a `codex-hooks` conflict remains a visible
-best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned files and settings
-have been written. If an environmental write fails partway through, the previous tracking row remains authoritative and
-files created earlier in that attempt may be untracked. Repair the underlying error, inspect `forge extension status`,
-and follow its per-package recovery. Use `forge clean` only when status marks the exact package cleanup-eligible;
-otherwise remove or rename it deliberately. `--force` cannot adopt either case. An interrupted update of an already
-tracked package can be repaired by sync.
+Blocking file, settings, module, and runtime-skill conflicts are a no-write boundary; a Codex hook-config conflict
+remains a visible best-effort skip. Apply is not a filesystem transaction: tracking is committed only after all planned
+files and settings have been written. If an environmental write fails partway through, the previous tracking row remains
+authoritative and files created earlier in that attempt may be untracked. Repair the underlying error, inspect
+`forge extension status`, and follow its per-package recovery. Use `forge clean` only when status marks the exact
+package cleanup-eligible; otherwise remove or rename it deliberately. `--force` cannot adopt either case. An interrupted
+update of an already tracked package can be repaired by sync.
 
 ### Session management
 

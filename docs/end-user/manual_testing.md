@@ -94,11 +94,11 @@ cleanup.
 
 ## Runtime-aware extension checks
 
-Use an explicit runtime when validating one skill surface:
+Use an explicit runtime when validating one runtime-owned extension surface:
 
 ```bash
 # Project-scoped Codex skills (safe inside a disposable test repository)
-forge extension enable --scope project --runtime codex --profile minimal --with skills --without commands
+forge extension enable --scope project --runtime codex
 forge extension status --scope project --json
 forge extension sync --scope project
 
@@ -108,24 +108,26 @@ forge extension enable --scope user --profile minimal --with skills --without co
 
 Codex project packages install under `.agents/skills`; Codex user packages install under `$HOME/.agents/skills`. Claude
 packages remain under `.claude/skills` or `$CLAUDE_HOME/skills`. Codex has no local/private skill target, so an explicit
-`--scope local --runtime codex` request must fail rather than write into the shared project directory.
+`--scope local --runtime codex` request must fail rather than write into the shared project directory. At user scope,
+`--runtime codex` also selects the Codex half of `hooks` and filters every Claude-only module; at project scope hooks
+are scope-omitted, leaving Codex skills only.
 
 `forge extension status` reports each tracked runtime package and its health (`present`, `missing`, `duplicate`, or
 `invalid-target`). Use `--json` to assert `runtime`, `skill`, `target_dir`, `state`, `missing_file_paths`,
 `duplicate_dirs`, and `recovery`. Automatic enable on an existing installation and `forge extension sync` preserve its
-recorded runtime set even when a runtime binary is temporarily absent. An explicit `--runtime` refreshes the selected
-runtimes but preserves omitted tracked packages; disable owns removal. Cross-scope Forge-managed duplicates report the
-owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance. User-scope checks
-include valid, present tracked project/local packages outside the current directory chain because a user package would
-be visible from those projects. A package root or descendant directory replaced by a symlink must report
-`invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row. A dangling
-tracked leaf symlink must instead report `missing`, and sync must recreate it.
+recorded runtime set even when a runtime binary is temporarily absent. An explicit `--runtime` refreshes selected
+surfaces but preserves omitted tracked runtime ownership; disable owns removal. Cross-scope Forge-managed duplicates
+report the owning scope's exact disable command, while only untracked duplicates get remove-or-rename guidance.
+User-scope checks include valid, present tracked project/local packages outside the current directory chain because a
+user package would be visible from those projects. A package root or descendant directory replaced by a symlink must
+report `invalid-target`; enable, sync, and disable must refuse it without changing the link target or tracking row. A
+dangling tracked leaf symlink must instead report `missing`, and sync must recreate it.
 
 Run the following failure-path checks only in a disposable Forge home:
 
 - From a subdirectory of a tracked Codex-only project, unscoped sync/disable/status must resolve the exact project row
   even without `.claude/`.
-- A v2 `skill_packages` row with empty, out-of-package, or non-ledger-backed `file_paths` must make status/sync/disable
+- A v3 `skill_packages` row with empty, out-of-package, or non-ledger-backed `file_paths` must make status/sync/disable
   fail before package or tracking mutation.
 - If one target makes `forge extension disable --all --yes` fail, the command must still attempt the remaining rows and
   exit non-zero. `scripts/setup.sh --uninstall` must then preserve `$FORGE_HOME/installed.json`; it must also preserve

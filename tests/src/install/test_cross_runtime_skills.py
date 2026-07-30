@@ -32,6 +32,7 @@ from forge.install.models import (
     InstallProfile,
     InstallScope,
 )
+from forge.install.ownership import attributed
 from forge.install.settings_merge import find_added_files
 from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL, load_skill_sources
 from forge.install.skill_planning import (
@@ -1038,9 +1039,18 @@ def test_explicit_codex_enable_preserves_and_upgrades_legacy_claude_package_trac
     claude_target = Path(next(package.target_dir for package in initial.skill_packages if package.target_dir))
     legacy_payload = json.loads(tracking.path.read_text(encoding="utf-8"))
     legacy_payload["version"] = 1
-    legacy_payload["installations"]["user"].pop("skill_packages")
+    legacy_installation = legacy_payload["installations"]["user"]
+    legacy_installation.pop("skill_packages")
+    legacy_installation.pop("module_owners")
+    legacy_installation["modules_enabled"] = [InstallModule.SKILLS.value]
+    for tracked_file in legacy_installation["files"]:
+        tracked_file.pop("attribution")
+    for settings_entry in legacy_installation["settings_entries"]:
+        settings_entry.pop("attribution")
     tracking.path.write_text(json.dumps(legacy_payload), encoding="utf-8")
-    assert tracking.read().installations["user"].skill_packages == []
+    assert {(package.runtime, package.skill) for package in tracking.read().installations["user"].skill_packages} == {
+        (CLAUDE_CODE_RUNTIME, "portable")
+    }
 
     with (
         patch(
@@ -1208,7 +1218,7 @@ def test_cross_scope_codex_duplicate_keeps_managed_provenance_and_safe_recovery(
     )
     assert json_status.exit_code == 0, json_status.output
     status_payload = json.loads(json_status.output)
-    assert status_payload["schema_version"] == 2
+    assert status_payload["schema_version"] == 3
     json_package = status_payload["installations"][0]["skill_packages"][0]
     assert json_package["state"] == "duplicate"
     assert "forge extension disable --scope user" in json_package["recovery"]
@@ -1266,6 +1276,7 @@ def test_malformed_tracking_cannot_claim_codex_duplicate_provenance(
                 checksum=compute_checksum(duplicate_file),
                 mode="copy",
                 installed_at="2026-07-17T00:00:00+00:00",
+                attribution=attributed(InstallModule.SKILLS, CODEX_RUNTIME),
             )
         ]
         if with_coherent_files
@@ -1281,7 +1292,7 @@ def test_malformed_tracking_cannot_claim_codex_duplicate_provenance(
                     scope="project",
                     mode="copy",
                     profile="standard",
-                    modules_enabled=[InstallModule.SKILLS.value],
+                    module_owners=[attributed(InstallModule.SKILLS, CODEX_RUNTIME)],
                     files=installed_files,
                     skill_packages=[
                         InstalledSkillPackage(
@@ -1301,7 +1312,7 @@ def test_malformed_tracking_cannot_claim_codex_duplicate_provenance(
             scope="project",
             mode="copy",
             profile="standard",
-            modules_enabled=[InstallModule.SKILLS.value],
+            module_owners=[attributed(InstallModule.SKILLS, CODEX_RUNTIME)],
             files=installed_files,
             skill_packages=[
                 InstalledSkillPackage(
@@ -1686,11 +1697,12 @@ def test_invalid_tracked_runtime_blocks_sync_without_dropping_ownership(
     installation = tracking.get_installation("user", None)
     assert installation is not None
     target = Path(installation.skill_packages[0].target_dir) / "SKILL.md"
-    installation.skill_packages[0].runtime = "unknown-runtime"
-    tracking.set_installation("user", installation, None)
+    payload = json.loads(tracking.path.read_text(encoding="utf-8"))
+    payload["installations"]["user"]["skill_packages"][0]["runtime"] = "unknown-runtime"
+    tracking.path.write_text(json.dumps(payload), encoding="utf-8")
     before = tracking.path.read_bytes()
 
-    with (pytest.raises(ForgeInstallError, match="tracked skill package ownership is invalid"),):
+    with pytest.raises(TrackingCorruptedError, match="has no matching skills owner pair"):
         installer.update()
 
     assert target.is_file()
@@ -1791,7 +1803,7 @@ def test_settings_failure_rolls_back_new_codex_package_for_retry(
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
-        "skill_runtimes": (CODEX_RUNTIME,),
+        "skill_runtimes": (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         "_modules_override": {InstallModule.SKILLS, InstallModule.PERMISSIONS},
     }
     package_dir = home / ".agents" / "skills" / "portable"
@@ -1799,7 +1811,7 @@ def test_settings_failure_rolls_back_new_codex_package_for_retry(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
         patch(
@@ -1816,7 +1828,7 @@ def test_settings_failure_rolls_back_new_codex_package_for_retry(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
     ):
@@ -1837,7 +1849,7 @@ def test_settings_ownership_save_failure_restores_settings_sidecars_and_files(
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
-        "skill_runtimes": (CODEX_RUNTIME,),
+        "skill_runtimes": (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         "_modules_override": {InstallModule.SKILLS, InstallModule.PERMISSIONS},
     }
     settings_path = home / ".claude" / "settings.json"
@@ -1858,7 +1870,7 @@ def test_settings_ownership_save_failure_restores_settings_sidecars_and_files(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
         patch(
@@ -1880,7 +1892,7 @@ def test_settings_ownership_save_failure_restores_settings_sidecars_and_files(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
     ):
@@ -1903,7 +1915,7 @@ def test_tracking_commit_failure_restores_settings_sidecars_and_files(
     kwargs: _InstallerSkillKwargs = {
         "profile": InstallProfile.STANDARD,
         "mode": InstallMode.COPY,
-        "skill_runtimes": (CODEX_RUNTIME,),
+        "skill_runtimes": (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         "_modules_override": {InstallModule.SKILLS, InstallModule.PERMISSIONS},
     }
     settings_path = home / ".claude" / "settings.json"
@@ -1918,7 +1930,7 @@ def test_tracking_commit_failure_restores_settings_sidecars_and_files(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
         patch.object(tracking, "set_installation", side_effect=OSError("disk full")),
@@ -1936,7 +1948,7 @@ def test_tracking_commit_failure_restores_settings_sidecars_and_files(
     with (
         patch(
             "forge.install.installer.installed_runtimes",
-            return_value=_runtime_specs(CODEX_RUNTIME),
+            return_value=_runtime_specs(CLAUDE_CODE_RUNTIME, CODEX_RUNTIME),
         ),
         patch("forge.install.installer._ensure_hook_dispatcher"),
     ):
@@ -2405,7 +2417,7 @@ def test_codex_only_project_install_is_detectable_in_status_and_disable_without_
     status = CliRunner().invoke(extensions, ["status", "--json"])
     assert status.exit_code == 0, status.output
     payload = json.loads(status.output)
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["unmanaged_skill_packages"] == []
     installed_package = payload["installations"][0]["skill_packages"][0]
     assert installed_package["runtime"] == CODEX_RUNTIME
@@ -2528,7 +2540,7 @@ def test_minimal_profile_preserves_legacy_claude_anchor_when_commands_are_empty(
     assert expected.is_dir()
 
 
-def test_runtime_option_filters_skills_but_mixed_profile_still_runs_claude_gate(
+def test_runtime_option_filters_all_modules_and_skips_claude_gate(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2560,6 +2572,6 @@ def test_runtime_option_filters_skills_but_mixed_profile_still_runs_claude_gate(
         )
 
     assert result.exit_code == 0, result.output
-    version_check.assert_called_once_with()
+    version_check.assert_not_called()
     assert (project / ".agents" / "skills" / "portable" / "SKILL.md").is_file()
-    assert (project / ".claude" / "settings.json").is_file()
+    assert not (project / ".claude").exists()

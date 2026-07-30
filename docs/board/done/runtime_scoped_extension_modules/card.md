@@ -1,16 +1,15 @@
 # Runtime-scoped extension modules -- `--runtime` governs every runtime-owned surface
 
-**Lane**: `proposed/` -- not accepted, but no decisions remain open. D1 (durable ownership schema) is approved as
-decided; the scope-mismatch orphan is split out to
-[disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md). Ready for promotion to `todo/` on a
-maintainer's word.
+**Lane**: `done/` -- completed on branch `feat/runtime-scoped-extension-modules`; execution record in
+[checklist.md](checklist.md). D1 (durable ownership schema) shipped as decided, and the scope-mismatch orphan shipped
+separately as [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md).
 
 **Type**: ordinary card, not an epic. The board's epic criterion is shared-contract **drift**
 ([board_contract.md](../../../developer/board_contract.md) "Epics"), not member count. Drift is prevented structurally
 here: this card is the sole writer of the ownership schema and lands it whole, and
-[extension_disable_runtime](../extension_disable_runtime/card.md) is a pure reader that cannot start until the schema
-ships. There is one contract, one writer, and a strict ordering -- no coordinator needed. Promote a coordinator if the
-schema has to land in slices consumed before completion.
+[extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) is a pure reader that cannot start until
+the schema ships. There is one contract, one writer, and a strict ordering -- no coordinator needed. Promote a
+coordinator if the schema has to land in slices consumed before completion.
 
 **Origin**: user report, 2026-07-29. Codex support is less mature than Claude Code support, so a user must be able to
 keep their Codex installation untouched. Today `forge extension enable --scope user --runtime claude` still registers
@@ -49,7 +48,7 @@ profile, scope, explicit module flags, and runtime instead of filtering one modu
 touch `$CODEX_HOME`; `--runtime codex` must be sufficient on its own to mean "Codex only".
 
 Non-goal: changing what any module installs, changing scope semantics, or making narrowing destructive. Removal stays
-with `disable` -- see [extension_disable_runtime](../extension_disable_runtime/card.md).
+with `disable` -- see [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md).
 
 ## Design
 
@@ -89,8 +88,9 @@ dropped         = scoped - effective
 - **An explicit runtime selection resolving to an empty `effective` set is a `CONFLICT`**, not a silent no-op. This is
   the `--profile minimal --runtime codex` case (`minimal` is `{commands}`, which is Claude-owned).
 
-New conflict reasons join `_NON_FORCEABLE_SKILL_CONFLICT_REASONS` (`src/forge/cli/extensions.py:79-84`) -- `--force`
-must not adopt them.
+Module outcomes carry their own action and reason. Wrong-owner and empty-effective-set outcomes set
+`InstallPlan.has_conflicts` directly, which is the execution gate; a module-level non-forceable reason set controls the
+recovery tip but is not itself enforcement. `--force` must not adopt these conflicts.
 
 ### Behavior matrix (normative)
 
@@ -131,13 +131,28 @@ Auto-detected scope prefers **local** over user inside a git repo (`src/forge/cl
    by runtime. So "which tracked rows belong to Codex" is currently underivable for every non-skill surface -- which is
    precisely what the sibling card needs.
 
-**Schema v3.** Add `runtime` and `module` attribution to `InstalledFile` and `InstalledSettingsEntry`, and record module
-ownership as `(module, runtime)` pairs instead of a flat `modules_enabled`.
+**Schema v3.** `Installation.module_owners` is a unique list of `{module, runtime}` objects sorted by that pair; it
+replaces live-v3 `modules_enabled`. Every `InstalledFile` and `InstalledSettingsEntry` carries a required tagged
+`attribution`, exactly one of:
 
-**Ownership records applied state, not requested state.** A pair is written only for a surface actually installed. The
-Codex half of `hooks` is best-effort (`design_appendix.md` section C.6): a missing `codex` binary or a config conflict
-degrades to a visible skip, does **not** set `InstallPlan.has_conflicts`, and therefore writes **no** `(hooks, codex)`
-pair. A skipped Codex half must not later read as managed-and-missing. The Claude half stays blocking.
+```text
+{"module": "hooks", "runtime": "claude_code"}
+{"unattributed_reason": "legacy_key_unmapped"}
+```
+
+Nullable module/runtime fields are not valid attribution. The exact wire and status shapes, row identities, legacy
+mapping, and ordering are frozen in [checklist.md](checklist.md) before implementation starts.
+
+**Ownership records applied state, not requested state.** A blocking module/runtime apply path that completes without
+conflict or failure records its pair even if the current package emits no rows. This is applied management intent, not
+mere resolution: it preserves sync coverage for today's intentionally empty `commands` and `agents` sources, while a
+failed or skipped path records no new pair.
+
+The Codex half of `hooks` is best-effort (`design_appendix.md` section C.6): a missing `codex` binary or config conflict
+degrades to a visible skip and does not set `InstallPlan.has_conflicts`. On a first install it writes no
+`(hooks, codex)` pair. On re-enable, an inconclusive or omitted Codex outcome preserves a prior pair when
+`codex_config_path` still witnesses an on-disk managed block; otherwise disable would lose the only cleanup ownership
+record. The Claude half stays blocking.
 
 **Flat `codex-hooks` alone never proves applied ownership.** `modules_enabled` is written from the *resolved* module set
 unconditionally (`installer.py:2031`), while `codex_path` is `None` on the skip branch (`installer.py:2003-2012`). A
@@ -145,38 +160,49 @@ best-effort skip therefore leaves `codex-hooks` in `modules_enabled` with no blo
 `codex_config_path` being set -- migration must key on that, never on the module value.
 
 **Derived migration for all recoverable v1/v2 state.** Normalize in memory on read, persist v3 on the next successful
-mutation, per the shipped v1 precedent (`design_appendix.md` section C.4). No reset is required, so the schema change is
-not itself a user-visible break -- unlike the `codex-hooks` module value, which is.
+mutation, per the shipped v1 precedent (`design_appendix.md` section C.4). Both historical schemas use complete frozen
+DTO graphs, including file and settings rows; they never deserialize through live v3 nested types. No reset is required,
+so the schema change is not itself a user-visible break -- unlike the `codex-hooks` module value, which is. That
+released value is the only deleted module name normalized; any other unknown module remains corrupted durable state.
 
 | Prior state               | Skills attribution                                                                    | `(hooks, codex)`               | Everything else        |
 | ------------------------- | ------------------------------------------------------------------------------------- | ------------------------------ | ---------------------- |
 | v2 (`skill_packages` set) | `skill_packages[].runtime`                                                            | iff `codex_config_path` is set | Claude by construction |
 | v1 (no `skill_packages`)  | `_legacy_claude_skill_packages` -- path-provable Claude-only (`installer.py:315-334`) | iff `codex_config_path` is set | Claude by construction |
 
-"Claude by construction" is sound only because no module other than `skills` and `hooks` has a Codex target today. That
-premise is load-bearing: adding a third Codex-owned module later invalidates the derivation for rows written before it.
+"Claude by construction" determines only the runtime. Legacy module identity is derived from reviewed target roots and
+settings keys: command/agent roots, exact v2 skill-package file claims, path-provable v1 Claude skills, `hooks.*`,
+`statusLine`, `permissions.allow|deny`, and `env.*`. Anything else is explicitly unattributed. The Claude premise is
+sound only because no module other than `skills` and `hooks` has a Codex target today; adding a third Codex-owned module
+later requires its own migration step.
 
 **Unrecoverable state is reported, never claimed.** `_legacy_claude_skill_packages` returns only ownership it can prove
 from tracked paths under the Claude skills root, and returns nothing when the row has no matching files. A surface whose
-ownership cannot be derived gets **no** pair and is surfaced by `forge extension status` as unattributed, rather than
-defaulted to Claude. Silent attribution is what would let a later `disable --runtime claude` delete a Codex file.
+ownership cannot be derived receives an explicit `unattributed_reason` tag and is surfaced by `forge extension status`,
+rather than defaulted to Claude. Silent attribution is what would let a later `disable --runtime claude` delete a Codex
+file.
 
 **v3 invariants** (extending the v2 list in `design_appendix.md` section C.4, all enforced before mutation):
 
 1. Every `(module, runtime)` pair names a module that exists and a runtime that declares that module as an owner.
-2. Every `InstalledFile` and `InstalledSettingsEntry` carries a `(module, runtime)` pair present in the ownership set.
+2. Every `InstalledFile` and `InstalledSettingsEntry` carries exactly one valid attribution form. An attributed pair is
+   present in `module_owners`; an unattributed reason is accepted only from a version-specific legacy migration.
 3. No file or settings row is claimed by two pairs.
 4. Every `skill_packages` row's `(runtime, skill)` has a matching `(skills, runtime)` pair, and the v2 package
    invariants continue to hold unchanged.
 5. `(hooks, codex)` exists if and only if `codex_config_path` is set.
-6. A row carrying an unattributed surface is readable and reportable but is not a valid mutation input for a
-   runtime-scoped removal.
+6. An unattributed row is readable and reportable but cannot be constructed as a runtime-scoped removal target.
+
+**Status JSON v3.** `managed_runtimes` is the single sorted runtime summary derived from `module_owners`;
+`module_owners` exposes the durable relation; `modules` remains a sorted unique compatibility summary; and
+`unattributed_surfaces` reports only row identity plus reason, never settings values. The checklist freezes the element
+shapes and ordering.
 
 ### Decisions (all closed, rationale recorded)
 
 | Id  | Decision                                                                                                                                                                              |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Schema v3: applied ownership, per-row `(module, runtime)` attribution, derived no-reset migration for all recoverable v1/v2 state.                                                    |
+| D1  | Schema v3: applied `module_owners`, tagged per-row attribution, and derived no-reset migration through complete frozen v1/v2 DTO graphs.                                              |
 | D2  | Explicit selection yielding an empty effective module set is a CONFLICT, never a silent no-op.                                                                                        |
 | D3  | `permissions` is Claude-owned (`preset.py:9`).                                                                                                                                        |
 | D4  | `--runtime` is **not** added to `sync`; its persisted `MANAGED` runtime set stays authoritative (`skill_planning.py:206-212`).                                                        |
@@ -218,10 +244,8 @@ tracking-shape assertion the migration necessarily changes. Update it with the s
 
 ## Open Questions
 
-- **Status JSON field shape** for "which runtimes does this installation manage": name, type, ordering, and its relation
-  to the existing `skill_packages` and Codex fields, plus how an unattributed surface (v3 invariant 6) renders. Owned
-  here because the sibling card and `extension status --json` both read it. Checklist-level detail, not
-  promotion-blocking.
+None. The checklist closes the v3 wire shape, status fields, ordering, unattributed representation, row identities,
+legacy derivation, and successful zero-output ownership semantics.
 
 ## Risks
 
@@ -244,11 +268,15 @@ tracking-shape assertion the migration necessarily changes. Update it with the s
   today**. This criterion explicitly excludes `installed.json`, which changes shape under D1.
 - The `codex-hooks` module value is gone from `InstallModule`; `forge extension sync` succeeds against a pre-migration
   `installed.json` fixture containing `"codex-hooks"` in `modules_enabled`, and the v2 -> v3 derivation is asserted
-  field-by-field with no user action.
-- A best-effort Codex hook skip writes no `(hooks, codex)` ownership pair and is visibly reported.
-- Every tracked file and settings row carries runtime attribution sufficient for the sibling card to select by runtime
-  -- asserted directly, since this is the contract that card consumes.
-- `forge extension status --json` reports managed runtimes from one documented field.
+  field-by-field with no user action. V1 and v2 fixtures parse through complete frozen DTOs, never live v3 row classes.
+- A first-install best-effort Codex hook skip writes no `(hooks, codex)` ownership pair and is visibly reported; a
+  re-enable with a witnessed prior block preserves its pair and cleanup path.
+- Every tracked file and settings row carries exactly one valid tagged attribution sufficient for the sibling card to
+  select by runtime without matching unattributed rows.
+- A successfully applied zero-output module retains its ownership pair so sync can discover outputs added by a future
+  package.
+- `forge extension status --json` reports managed runtimes from `managed_runtimes`, exposes `module_owners`, and renders
+  unattributed row identities without settings values.
 - Rendered hook command bytes are unchanged; no existing Codex install is forced through the trust ceremony.
 - Every file in the Impact inventory is updated in the same change, including the six recovery commands and the QA `jq`
   assertion. The changelog records the `codex-hooks` clean break.
@@ -260,4 +288,7 @@ tests cannot reach the wheel-install path this card changes.
 
 ## Closeout
 
-(pending)
+Shipped on 2026-07-30. `--runtime` now filters all runtime-owned modules, tracking and status use schema v3, and v1/v2
+installations migrate without a reset. The clean-wheel lifecycle covers Claude, Codex, and combined selection, including
+preservation of Codex ownership and files across a Claude-only re-enable. The tagged attribution contract unblocks
+[extension_disable_runtime](../../proposed/extension_disable_runtime/card.md).

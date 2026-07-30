@@ -22,6 +22,8 @@ from unittest.mock import patch
 
 import pytest
 
+from forge.core.runtime import get_runtime
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 from forge.install.installer import Installer
 from forge.install.models import InstallScope
 from forge.install.tracking import TrackingStore
@@ -52,10 +54,16 @@ def setup_installer(tmp_path: Path) -> Generator[tuple[Installer, Path], None, N
 
 def _run(installer: Installer, claude_home: Path, method: str = "init", available: bool = True, **kwargs: Any) -> Any:
     src_parent = claude_home.parent / "src"
-    with patch("forge.install.installer.get_forge_source_root", return_value=src_parent.parent):
-        with patch("forge.install.installer.get_target_root", return_value=claude_home):
-            with patch("forge.install.installer._codex_available", return_value=available):
-                return getattr(installer, method)(**kwargs)
+    with (
+        patch("forge.install.installer.get_forge_source_root", return_value=src_parent.parent),
+        patch("forge.install.installer.get_target_root", return_value=claude_home),
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],
+        ),
+        patch("forge.install.installer._codex_available", return_value=available),
+    ):
+        return getattr(installer, method)(**kwargs)
 
 
 def _codex_config() -> Path:

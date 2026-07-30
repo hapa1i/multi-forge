@@ -1017,26 +1017,24 @@ so Forge never maps local scope onto the shared project `.agents/skills/`. Codex
 
 ### C.2 Installable modules + profiles
 
-| Module        | Installs                                            | Notes                                                           |
-| ------------- | --------------------------------------------------- | --------------------------------------------------------------- |
-| `commands`    | Slash commands markdown                             |                                                                 |
-| `agents`      | Subagents markdown                                  |                                                                 |
-| `skills`      | Runtime packages (`SKILL.md` + resources/scripts)   | Compiled from neutral sources or a legacy Claude bridge         |
-| `hooks`       | User-scope settings entries (absolute `forge-hook`) | No hook scripts installed; dispatcher execs `forge hook`        |
-| `status-line` | Project/local `statusLine` setting                  | Invokes `forge status-line`; not installed at user scope        |
-| `permissions` | Forge-required permission entries                   | Merged as unions                                                |
-| `codex-hooks` | User-scope managed hook block in Codex config       | Best-effort; dispatcher bytes require Codex re-trust (see §C.6) |
+| Module        | Runtime owners         | Installs                                                             |
+| ------------- | ---------------------- | -------------------------------------------------------------------- |
+| `commands`    | `claude_code`          | Slash commands markdown                                              |
+| `agents`      | `claude_code`          | Subagents markdown                                                   |
+| `skills`      | `claude_code`, `codex` | Compiled runtime packages (`SKILL.md` + resources/scripts)           |
+| `hooks`       | `claude_code`, `codex` | Claude settings plus the best-effort user Codex block (see §C.6)     |
+| `status-line` | `claude_code`          | Project/local `statusLine` setting invoking `forge status-line`      |
+| `permissions` | `claude_code`          | Forge-required permission and environment entries, merged additively |
 
 Profiles:
 
 - `minimal`: `commands`
-- `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
+- `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
-Scope filtering keeps hooks user-only and status line project/local; `--runtime claude|codex|all` filters only SKILLS.
-Automatic enable adds detected Codex when new and retains managed runtimes when existing; explicit narrowing preserves
-omitted tracked packages. Disable owns removal. Unscoped sync/disable/status use `.claude/` sidecars plus exact
-`installed.json` scope/path rows, including Codex-only projects.
+Scope keeps hooks user-only and status line project/local; `--runtime` filters by the table. Profile drops skip;
+wrong-owner `--with` and empty explicit selections conflict. Enable adds/retains, narrowing preserves, and disable
+removes.
 
 User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
 reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
@@ -1067,12 +1065,14 @@ unknown Forge-looking wrappers are retained and reported.
 
 #### Installed manifest (`~/.forge/installed.json`)
 
-`installed.json` owns extensions; launcher metadata lives elsewhere. Schema v2 adds
-`{runtime, skill, target_dir, file_paths}` under `skill_packages`, backed by the `files` checksum/removal ledger. Rows
-require a unique runtime/skill, absolute target, nonempty sorted paths including `<target_dir>/SKILL.md`, containment,
-ledger coverage, and exclusive ownership. Violations fail reads/writes before mutation. V1 normalizes in memory, then a
-successful mutation writes v2; malformed/unsupported state fails. `cleanup-project` validates first; doctor exposes
-neither tracking degradation nor skill health.
+Schema v3 uses sorted, unique `module_owners: [{module, runtime}]`. Every file/settings row has a backed pair or
+explicit `{unattributed_reason}`; duplicate identities are rejected.
+
+Frozen v1/v2 types normalize in memory and persist v3 on the next successful mutation, without a reset. Only the
+released Codex-hook value migrates; other unknown modules remain corruption. `(hooks, codex)` exists iff
+`codex_config_path` witnesses the block: an unavailable first install records neither, while re-enable preserves that
+witness. V2 skills use package runtime; v1 and other rows use closed path/key maps, leaving the rest unattributed.
+“Claude by construction” is load-bearing: a new Codex-owned module needs its own versioned migration.
 
 `disable --all` attempts every row, aggregates failures, and exits 1 if any remain. `scripts/setup.sh --uninstall`
 deletes `$FORGE_HOME` only after success; failure, or a missing Forge command with `installed.json` present, preserves
@@ -1202,10 +1202,8 @@ SKILLS planning is explicit over scope/runtime/profile/skill:
 | `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
 | `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-`--runtime` filters only SKILLS. Automatic enable adds Codex/retains managed runtimes; narrowing and sync preserve,
-disable removes, and unsupported requests fail before writes. Duplicate scans skip automatic new packages but conflict
-for explicit/managed ones; matches name owner/disable or manual/clean recovery, and `--force` never bypasses either.
-User scope includes visible tracked project/local matches. Blocking plans write nothing; cache output precedes tracking.
+Skills share module selection. Enable adds/retains runtimes; narrowing/sync preserve and disable removes.
+Unsupported/unavailable requests and explicit/managed duplicates conflict; automatic duplicates skip.
 
 Status—not doctor—owns `present`, `missing`, `duplicate`, and `invalid-target`. Directory links are invalid; install
 links are leaf-only and dangling leaves are `missing`. Claude may drift; Codex should have one visible scope.
@@ -1222,13 +1220,14 @@ targets require `all`; project/local use their owner. Repair lost/corrupt tracki
 Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `panel`, `analyze`, `debate`, and
 `consensus`. Only `walkthrough` and `qa` remain Claude-only.
 
-### C.6 Codex hook registration (codex-hooks module)
+### C.6 Codex hook registration (`hooks`, Codex-owned half)
 
 `forge extension enable --scope user` registers Forge's two Codex hooks by appending a marker-delimited managed block
 (`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the user Codex config.
 
-This module is independent of Codex skill packages. `$CODEX_HOME` selects the hook configuration below; Codex skills
-always use `$HOME/.agents/skills` or a project `.agents/skills` target from §C.5:
+Hook registration and skill delivery share runtime selection but have independent availability semantics. `$CODEX_HOME`
+selects the hook configuration below; Codex skills always use `$HOME/.agents/skills` or a project `.agents/skills`
+target from §C.5:
 
 | Forge scope | Codex config target                                        |
 | ----------- | ---------------------------------------------------------- |

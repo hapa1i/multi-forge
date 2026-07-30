@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
+from forge.core.runtime import get_runtime
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 from forge.install.exceptions import ForgeInstallError
 from forge.install.installer import Installer
 from forge.install.models import InstallScope
@@ -50,6 +52,10 @@ def _run(installer: Installer, src: Path, claude_home: Path, method: str = "init
     with (
         patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
         patch("forge.install.installer.get_target_root", return_value=claude_home),
+        patch(
+            "forge.install.installer.installed_runtimes",
+            return_value=[get_runtime(CLAUDE_CODE_RUNTIME), get_runtime(CODEX_RUNTIME)],
+        ),
         patch("forge.install.installer._codex_available", return_value=True),
     ):
         return getattr(installer, method)(**kwargs)

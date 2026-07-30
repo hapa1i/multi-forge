@@ -124,7 +124,7 @@ export PATH="$(uv tool dir --bin):$PATH"
 forge extension doctor
 
 # Register runtime hooks once, at user scope
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks --without commands
 
 # Then, inside a project: install project-owned assets and settings
 forge extension enable

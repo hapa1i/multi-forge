@@ -352,7 +352,7 @@ protocols (`src/forge/cli/hooks/protocols.py`); two pairs ship: **Claude** (`cli
 adapter normalizes each `apply_patch` file operation to the tool names every policy's `applies_to` gates on (Add File →
 `Write`, Update File → `Edit`; deletions skipped; `Bash` passes through), keeping runtime truth in `origin="codex"` +
 `tool_args`; files compose deny > needs_review > warn/allow, and unparseable patches fail open. Enforcement requires a
-registered + trust-enrolled Codex PreToolUse hook: `forge extension enable` registers it (codex-hooks module, §5);
+registered + trust-enrolled Codex PreToolUse hook: `forge extension enable` registers it (Codex-owned `hooks`, §5);
 enrollment remains the user's one-time interactive trust ceremony, which Forge can neither perform nor verify.
 
 ### 1.5 Policy composition
