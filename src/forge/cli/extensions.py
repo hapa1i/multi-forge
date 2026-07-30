@@ -1234,6 +1234,9 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             console.print(f"[dim]No Forge installation for scope '{install_scope.value}'.[/dim]")
             return
 
+        installer = Installer(scope=install_scope, project_root=project_root)
+        installer.validate_codex_config_scope(existing)
+
         console.print(f"[bold]Will disable Forge extensions ({install_scope.value}):[/bold]")
         console.print(f"  Profile:  {existing.profile}")
         console.print(f"  Mode:     {existing.mode}")
@@ -1288,7 +1291,6 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
                 console.print("[dim]Cancelled.[/dim]")
                 return
 
-        installer = Installer(scope=install_scope, project_root=project_root)
         installer.uninstall()
 
         # Remove .forge/ anchor if it's empty (no sessions, artifacts, etc.).

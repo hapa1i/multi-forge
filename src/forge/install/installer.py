@@ -35,6 +35,7 @@ from .codex_hooks import (
     remove_codex_block,
 )
 from .exceptions import (
+    CodexConfigScopeMismatchError,
     ForgeInstallError,
     NoClaudeDirectoryError,
     NoForgeInstallationError,
@@ -2396,6 +2397,8 @@ class Installer:
         if existing is None:
             raise NotInstalledError(self._scope.value)
 
+        self.validate_codex_config_scope(existing)
+
         base_dir = get_target_root(self._scope, self._project_root)
         removals: list[tuple[InstalledFile, Path, Path]] = []
         for file_record in existing.files:
@@ -2463,24 +2466,29 @@ class Installer:
 
         self._tracking.remove_installation(self._scope.value, self._project_path_str)
 
-    def _remove_codex_registration(self, existing: Installation) -> None:
-        """Remove the Forge-managed Codex hook block recorded in tracking.
+    def validate_codex_config_scope(self, existing: Installation) -> None:
+        """Refuse disable when tracked Codex ownership conflicts with the current scope mapping.
 
-        The tracked path must match the current scope mapping (guards against
-        a tampered tracking file, and against a CODEX_HOME that changed since
-        install -- in either case Forge refuses to edit the unexpected file).
+        A mismatch leaves both the managed hook block and its tracking row intact,
+        so the user can restore the original ``CODEX_HOME`` and retry.
         """
         if not existing.codex_config_path:
             return
         tracked = Path(existing.codex_config_path)
         expected = get_codex_config_path(self._scope, self._project_root)
         if tracked.resolve() != expected.resolve():
-            logger.warning(
-                "tracked Codex config %s does not match the scope mapping %s; not modifying it",
-                tracked,
-                expected,
-            )
+            raise CodexConfigScopeMismatchError(str(tracked), str(expected))
+
+    def _remove_codex_registration(self, existing: Installation) -> None:
+        """Remove the Forge-managed Codex hook block recorded in tracking.
+
+        ``validate_codex_config_scope`` runs before any removal work. A mismatch
+        refuses the whole operation and preserves tracking instead of merely
+        skipping the unexpected file.
+        """
+        if not existing.codex_config_path:
             return
+        tracked = Path(existing.codex_config_path)
         result = remove_codex_block(tracked, get_builtin_codex_entries())
         if result.leftover_commands:
             logger.warning(

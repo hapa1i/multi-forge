@@ -111,6 +111,10 @@ To remove the user-scope runtime hooks later:
 forge extension disable --scope user
 ```
 
+If `$CODEX_HOME` has changed since Forge registered the Codex hooks, disable refuses before removing anything and names
+both the tracked and current config paths. Restore the original `$CODEX_HOME` and retry, or remove the managed block
+from the named tracked config by hand; Forge preserves the installation row while refusing the operation.
+
 > **Note:** Explicit `--with hooks` or `--with codex-hooks` at `--scope local` or `--scope project` is rejected. Runtime
 > hooks are user-scoped; project/local installs own statusLine and other project settings.
 

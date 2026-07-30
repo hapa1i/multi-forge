@@ -2081,6 +2081,121 @@ class TestEnableCodexHooks:
         assert "Codex hooks:" in result.output
         assert not self._codex_config().exists()
 
+    def test_disable_scope_mismatch_fails_before_plan_and_prompt(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from unittest.mock import patch
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+        from forge.install.tracking import TrackingStore
+
+        original_codex_home = tmp_path / "original_home"
+        original_codex_home.mkdir()
+        monkeypatch.setenv("CODEX_HOME", str(original_codex_home))
+        self._enable(available=True)
+        tracked_config = self._codex_config()
+        moved_codex_home = tmp_path / "moved_home"
+        moved_codex_home.mkdir()
+        monkeypatch.setenv("CODEX_HOME", str(moved_codex_home))
+        expected_config = moved_codex_home / "config.toml"
+
+        with patch("forge.cli.extensions.click.confirm") as confirm:
+            result = CliRunner().invoke(disable_cmd, ["--scope", "user"])
+
+        assert result.exit_code == 1, result.output
+        assert "Will disable Forge extensions" not in result.output
+        assert "Codex hooks:" not in result.output
+        compact_output = "".join(result.output.split())
+        assert "".join(str(tracked_config).split()) in compact_output
+        assert "".join(str(expected_config).split()) in compact_output
+        confirm.assert_not_called()
+        assert TrackingStore().get_installation("user", None) is not None
+        assert "# >>> forge hooks >>>" in tracked_config.read_text()
+
+    def test_disable_scope_mismatch_with_yes_preserves_tracking_bytes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+        from forge.install.tracking import TrackingStore
+
+        self._enable(available=True)
+        tracked_config = self._codex_config()
+        tracking = TrackingStore()
+        config_before = tracked_config.read_bytes()
+        tracking_before = tracking.path.read_bytes()
+        moved_codex_home = tmp_path / "moved_codex_home"
+        moved_codex_home.mkdir()
+        monkeypatch.setenv("CODEX_HOME", str(moved_codex_home))
+
+        result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--yes"])
+
+        assert result.exit_code == 1, result.output
+        assert tracked_config.read_bytes() == config_before
+        assert tracking.path.read_bytes() == tracking_before
+        assert tracking.get_installation("user", None) is not None
+
+    def test_disable_all_aggregates_scope_mismatch_and_disables_other_scope(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from unittest.mock import patch
+
+        from click.testing import CliRunner
+
+        from forge.install.models import Installation
+        from forge.install.tracking import TrackingStore
+
+        tracking = TrackingStore()
+        tracked_config = tmp_path / "original_codex_home" / "config.toml"
+        tracked_config.parent.mkdir()
+        tracked_config.write_text("# >>> forge hooks >>>\n# <<< forge hooks <<<\n")
+        tracking.set_installation(
+            "user",
+            Installation(
+                scope="user",
+                mode="copy",
+                profile="standard",
+                codex_config_path=str(tracked_config),
+            ),
+            None,
+        )
+
+        project = tmp_path / "project"
+        (project / ".claude").mkdir(parents=True)
+        tracking.set_installation(
+            "project",
+            Installation(
+                scope="project",
+                project_path=str(project),
+                mode="copy",
+                profile="minimal",
+            ),
+            str(project),
+        )
+        moved_codex_home = tmp_path / "moved_codex_home"
+        moved_codex_home.mkdir()
+        monkeypatch.setenv("CODEX_HOME", str(moved_codex_home))
+
+        with patch("forge.cli.extensions._enforce_project_compatibility"):
+            result = CliRunner().invoke(extensions, ["disable", "--all", "--yes"])
+
+        assert result.exit_code == 1, result.output
+        assert "Completed with 1 error(s)." in result.output
+        assert "user (global)" in result.output
+        assert "tracked Codex config" in result.output
+        assert tracking.get_installation("user", None) is not None
+        assert tracking.get_installation("project", str(project)) is None
+        assert tracked_config.read_text() == "# >>> forge hooks >>>\n# <<< forge hooks <<<\n"
+
     def _sync(self, available: bool = True) -> Any:
         from unittest.mock import MagicMock, patch
 

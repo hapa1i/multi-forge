@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ import pytest
 
 from forge.core.paths import get_forge_home
 from forge.install.exceptions import (
+    CodexConfigScopeMismatchError,
     ForgeInstallError,
     NestedClaudeDirectoryError,
     NoClaudeDirectoryError,
@@ -1319,7 +1321,7 @@ class TestInstallerCodexHooks:
     def test_uninstall_refuses_mismatched_tracked_path(
         self, setup_installer: tuple[Installer, Path, Path, Path], tmp_path: Path
     ) -> None:
-        """A tampered tracking path (or changed CODEX_HOME) is never edited."""
+        """A tampered tracking path refuses the operation and preserves ownership."""
         installer, _, claude_home, src = setup_installer
         self._run(installer, src, claude_home)
         victim = tmp_path / "victim.toml"
@@ -1328,8 +1330,76 @@ class TestInstallerCodexHooks:
         assert installation is not None
         installation.codex_config_path = str(victim)
         installer._tracking.set_installation("user", installation, None)
-        self._run(installer, src, claude_home, method="uninstall")
+
+        with pytest.raises(CodexConfigScopeMismatchError) as exc_info:
+            self._run(installer, src, claude_home, method="uninstall")
+
+        error = exc_info.value
+        assert error.tracked_path == str(victim)
+        assert error.expected_path == str(self._codex_config())
+        assert str(victim) in str(error)
+        assert str(self._codex_config()) in str(error)
+        assert "Restore the original CODEX_HOME and retry" in str(error)
+        assert "remove the Forge-managed hook block" in str(error)
         assert victim.read_text() == "# >>> forge hooks >>>\n# <<< forge hooks <<<\n"
+        preserved = installer._tracking.get_installation("user", None)
+        assert preserved is not None
+        assert preserved.codex_config_path == str(victim)
+
+    def test_uninstall_accepts_null_tracked_codex_path(
+        self, setup_installer: tuple[Installer, Path, Path, Path]
+    ) -> None:
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        self._codex_config().unlink()
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None
+        installation.codex_config_path = None
+        installer._tracking.set_installation("user", installation, None)
+
+        self._run(installer, src, claude_home, method="uninstall")
+
+        assert installer._tracking.get_installation("user", None) is None
+
+    def test_codex_scope_validator_preserves_project_root_error(self, tmp_path: Path) -> None:
+        installer = Installer(
+            scope=InstallScope.PROJECT,
+            tracking_store=TrackingStore(tracking_path=tmp_path / "installed.json"),
+        )
+        installation = Installation(
+            scope="project",
+            mode="copy",
+            profile="standard",
+            codex_config_path=str(tmp_path / "config.toml"),
+        )
+
+        with pytest.raises(ValueError, match="project_root required for project scope"):
+            installer.validate_codex_config_scope(installation)
+
+    def test_uninstall_with_leftover_codex_command_still_warns_and_succeeds(
+        self,
+        setup_installer: tuple[Installer, Path, Path, Path],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        config = self._codex_config()
+        manual = (
+            "\n[[hooks.SessionStart]]\n"
+            "[[hooks.SessionStart.hooks]]\n"
+            'type = "command"\n'
+            'command = "forge hook codex-session-start"\n'
+            "timeout = 60\n"
+        )
+        config.write_text(config.read_text() + manual)
+
+        with caplog.at_level(logging.WARNING, logger="forge.install.installer"):
+            self._run(installer, src, claude_home, method="uninstall")
+
+        assert "# >>> forge hooks >>>" not in config.read_text()
+        assert "forge hook codex-session-start" in config.read_text()
+        assert "Forge hook commands remain outside the managed block" in caplog.text
+        assert installer._tracking.get_installation("user", None) is None
 
     def test_module_dropped_preserves_tracking(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
         """Re-enabling without codex-hooks keeps tracking so disable still cleans up."""

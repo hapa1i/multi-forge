@@ -1,7 +1,7 @@
 # `disable` orphans the Codex hook block on a scope mismatch
 
-**Lane**: `doing/` -- bug fix, no open decisions. Branch `fix/disable-scope-mismatch-orphan`; see
-[checklist.md](checklist.md). Small and independently shippable.
+**Lane**: `done/` -- completed and verified 2026-07-30 on branch `fix/disable-scope-mismatch-orphan`; execution record
+in [checklist.md](checklist.md). Small and independently shippable.
 
 **Type**: bug card. Split from [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md)
 (D-mismatch) because the defect is **not** runtime-specific: it affects bare `forge extension disable` today, with no
@@ -122,4 +122,12 @@ path or packaged asset changes.
 
 ## Closeout
 
-(pending)
+Completed 2026-07-30. Single-scope disable now validates the tracked Codex config path before rendering its plan or
+prompt, and `Installer.uninstall()` repeats the same validation before any removal work. A mismatch raises a typed,
+actionable error while leaving managed files, settings, the hook block, and tracking byte-identical. `--all` continues
+with healthy scopes and reports the refusal in its aggregate non-zero result.
+
+Verification: focused install/CLI (`808 passed, 1 skipped`), unit (`8491 passed, 1 skipped, 117 deselected`), regression
+(`550 passed`), installer Docker integration (`20 passed`), and `make pre-commit`.
+
+Known limitation: hook blocks orphaned by older Forge versions remain untracked and require manual discovery/removal.
