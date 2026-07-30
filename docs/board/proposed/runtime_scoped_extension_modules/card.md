@@ -2,7 +2,7 @@
 
 **Lane**: `proposed/` -- not accepted, but no decisions remain open. D1 (durable ownership schema) is approved as
 decided; the scope-mismatch orphan is split out to
-[disable_scope_mismatch_orphan](../disable_scope_mismatch_orphan/card.md). Ready for promotion to `todo/` on a
+[disable_scope_mismatch_orphan](../../doing/disable_scope_mismatch_orphan/card.md). Ready for promotion to `todo/` on a
 maintainer's word.
 
 **Type**: ordinary card, not an epic. The board's epic criterion is shared-contract **drift**
@@ -174,14 +174,14 @@ defaulted to Claude. Silent attribution is what would let a later `disable --run
 
 ### Decisions (all closed, rationale recorded)
 
-| Id  | Decision                                                                                                                                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Schema v3: applied ownership, per-row `(module, runtime)` attribution, derived no-reset migration for all recoverable v1/v2 state.                                            |
-| D2  | Explicit selection yielding an empty effective module set is a CONFLICT, never a silent no-op.                                                                                |
-| D3  | `permissions` is Claude-owned (`preset.py:9`).                                                                                                                                |
-| D4  | `--runtime` is **not** added to `sync`; its persisted `MANAGED` runtime set stays authoritative (`skill_planning.py:206-212`).                                                |
-| D5  | `--with codex-hooks` fails with Click's native unknown-value error; no tombstone module value.                                                                                |
-| D6  | Resolved elsewhere: the scope-mismatch orphan is a standalone defect, carded as [disable_scope_mismatch_orphan](../disable_scope_mismatch_orphan/card.md). Out of scope here. |
+| Id  | Decision                                                                                                                                                                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Schema v3: applied ownership, per-row `(module, runtime)` attribution, derived no-reset migration for all recoverable v1/v2 state.                                                     |
+| D2  | Explicit selection yielding an empty effective module set is a CONFLICT, never a silent no-op.                                                                                         |
+| D3  | `permissions` is Claude-owned (`preset.py:9`).                                                                                                                                         |
+| D4  | `--runtime` is **not** added to `sync`; its persisted `MANAGED` runtime set stays authoritative (`skill_planning.py:206-212`).                                                         |
+| D5  | `--with codex-hooks` fails with Click's native unknown-value error; no tombstone module value.                                                                                         |
+| D6  | Resolved elsewhere: the scope-mismatch orphan is a standalone defect, carded as [disable_scope_mismatch_orphan](../../doing/disable_scope_mismatch_orphan/card.md). Out of scope here. |
 
 ## Constraints (verified against current code)
 
