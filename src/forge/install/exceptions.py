@@ -91,6 +91,24 @@ class NotInstalledError(ForgeInstallError):
         super().__init__(f"no Forge installation found for scope '{scope}'")
 
 
+class CodexConfigScopeMismatchError(ForgeInstallError):
+    """Raised when tracked Codex config ownership conflicts with the current scope mapping.
+
+    Attributes:
+        tracked_path: Config path recorded by the installation.
+        expected_path: Config path selected by the current scope mapping.
+    """
+
+    def __init__(self, tracked_path: str, expected_path: str) -> None:
+        self.tracked_path = tracked_path
+        self.expected_path = expected_path
+        super().__init__(
+            f"tracked Codex config '{tracked_path}' does not match the current scope mapping '{expected_path}'; "
+            "the extension was not disabled and tracking was preserved. Restore the original CODEX_HOME and retry, "
+            f"or remove the Forge-managed hook block from '{tracked_path}' by hand."
+        )
+
+
 class SourceNotFoundError(ForgeInstallError):
     """Raised when source extension files are missing.
 

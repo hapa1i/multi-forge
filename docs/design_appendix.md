@@ -1258,8 +1258,8 @@ Mechanics (`src/forge/install/codex_hooks.py`):
   `InstallPlan.has_conflicts` and never blocks the Claude install.
 - **Event-name validation**: registration event names are validated against the probe-pinned 10-event set at plan time
   (Codex itself loads bogus event names silently).
-- Tracking records `codex_config_path` + `codex_commands` in `~/.forge/installed.json`; `forge extension status` shows
-  the registration; disable refuses a tracked path that no longer matches the scope mapping.
+- Tracking records `codex_config_path` + `codex_commands` in `~/.forge/installed.json`. On path/scope mismatch, disable
+  aborts before removal, preserving tracking and the managed block; status reports the registration.
 
 Registration alone is inert: enable prints a Next-steps block naming the one-time interactive trust ceremony (run
 `codex`, grant trust). Enrollment is unverifiable pre-turn (design.md §3.9), so Forge never claims it.

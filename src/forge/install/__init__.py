@@ -8,6 +8,7 @@ installation of commands, agents, hooks, skills, and settings.
 from __future__ import annotations
 
 from .exceptions import (
+    CodexConfigScopeMismatchError,
     ConflictError,
     FileConflictError,
     ForgeInstallError,
@@ -53,6 +54,7 @@ __all__ = [
     "InstallPlan",
     # Exceptions
     "ForgeInstallError",
+    "CodexConfigScopeMismatchError",
     "ConflictError",
     "FileConflictError",
     "SettingsConflictError",

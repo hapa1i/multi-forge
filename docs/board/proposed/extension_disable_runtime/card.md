@@ -5,8 +5,8 @@
 1. [runtime_scoped_extension_modules](../runtime_scoped_extension_modules/card.md) -- D1 schema v3 must **ship**, not
    just be decided: this card selects tracked rows by runtime, and that attribution does not exist today (see
    Constraints).
-2. [disable_scope_mismatch_orphan](../disable_scope_mismatch_orphan/card.md) -- ships **before** this card, so the
-   refusal-preserves-tracking row in the state table below is inherited rather than invented here.
+2. [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) -- ships **before** this card, so
+   the refusal-preserves-tracking row in the state table below is inherited rather than invented here.
 
 No decisions remain open; D-last and D-mismatch are closed below.
 
@@ -145,7 +145,7 @@ requirement and the reason it cannot ship before the sibling card's schema.
 | D-preview  | Inherit disable's existing plan-then-prompt with `--yes`; introduce no new confirmation shape.                                                                                                                                             |
 | D-profile  | Retain `profile` unchanged as provenance; it is not authoritative for module replay.                                                                                                                                                       |
 | D-all      | **Decided**: `--runtime` **composes** with `--all` rather than being rejected. Granularity is preserved per mode -- exact paths for a single scope, filtered per-scope summaries for `--all` (see Plan granularity).                       |
-| D-mismatch | **Decided**: split to [disable_scope_mismatch_orphan](../disable_scope_mismatch_orphan/card.md), which ships first. The defect is not runtime-specific, so its fix belongs to bare `disable` and this card inherits it.                    |
+| D-mismatch | **Decided**: split to [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md), which ships first. The defect is not runtime-specific, so its fix belongs to bare `disable` and this card inherits it.            |
 
 ## Constraints (verified against current code)
 
@@ -163,7 +163,7 @@ requirement and the reason it cannot ship before the sibling card's schema.
   owns it. `design_appendix.md` section C.6's "disable refuses a tracked path that no longer matches the scope mapping"
   describes refusing to *edit that file*, not refusing the operation. Any claim that this card "preserves existing
   refusal semantics" would be false. Preserving tracking on mismatch is a **new requirement**, owned by
-  [disable_scope_mismatch_orphan](../disable_scope_mismatch_orphan/card.md) and inherited here once that ships.
+  [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) and inherited here once that ships.
 - `disable --all --yes` attempts every tracked scope, aggregates failures, and exits non-zero if any remain
   (`design_appendix.md` section C.4). `--runtime` must compose without weakening that aggregate exit contract.
 - `scripts/setup.sh --uninstall` deletes `$FORGE_HOME` only after a fully successful disable and preserves tracking on

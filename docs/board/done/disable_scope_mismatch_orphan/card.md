@@ -1,14 +1,15 @@
 # `disable` orphans the Codex hook block on a scope mismatch
 
-**Lane**: `proposed/` -- bug fix, no open decisions. Small and independently shippable.
+**Lane**: `done/` -- completed and verified 2026-07-30 on branch `fix/disable-scope-mismatch-orphan`; execution record
+in [checklist.md](checklist.md). Small and independently shippable.
 
-**Type**: bug card. Split from [extension_disable_runtime](../extension_disable_runtime/card.md) (D-mismatch) because
-the defect is **not** runtime-specific: it affects bare `forge extension disable` today, with no `--runtime` flag
-involved. Fixing it inside a feature card would have hidden a live defect behind a new option.
+**Type**: bug card. Split from [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md)
+(D-mismatch) because the defect is **not** runtime-specific: it affects bare `forge extension disable` today, with no
+`--runtime` flag involved. Fixing it inside a feature card would have hidden a live defect behind a new option.
 
-**Sequencing**: ships **before** [extension_disable_runtime](../extension_disable_runtime/card.md), so that card's
-"preflight refusal leaves tracking untouched" contract is inherited rather than invented. It has no dependency on
-[runtime_scoped_extension_modules](../runtime_scoped_extension_modules/card.md) and can ship at any time.
+**Sequencing**: ships **before** [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md), so that
+card's "preflight refusal leaves tracking untouched" contract is inherited rather than invented. It has no dependency on
+[runtime_scoped_extension_modules](../../proposed/runtime_scoped_extension_modules/card.md) and can ship at any time.
 
 **Origin**: found while verifying a constraint for the runtime-disable card, 2026-07-29. `design_appendix.md` section
 C.6 states that "disable refuses a tracked path that no longer matches the scope mapping". The code refuses to *edit
@@ -25,7 +26,7 @@ logs a warning and returns without editing:
 tracked Codex config <path> does not match the scope mapping <expected>; not modifying it
 ```
 
-`src/forge/install/installer.py:2466-2481`. Control then returns to `uninstall()`, which removes the tracking row
+`src/forge/install/installer.py:2477-2483`. Control then returns to `uninstall()`, which removes the tracking row
 unconditionally at `src/forge/install/installer.py:2464`.
 
 The result is an orphan: Forge's managed hook block stays in the user's `config.toml` while the tracking row that owned
@@ -121,4 +122,12 @@ path or packaged asset changes.
 
 ## Closeout
 
-(pending)
+Completed 2026-07-30. Single-scope disable now validates the tracked Codex config path before rendering its plan or
+prompt, and `Installer.uninstall()` repeats the same validation before any removal work. A mismatch raises a typed,
+actionable error while leaving managed files, settings, the hook block, and tracking byte-identical. `--all` continues
+with healthy scopes and reports the refusal in its aggregate non-zero result.
+
+Verification: focused install/CLI (`808 passed, 1 skipped`), unit (`8491 passed, 1 skipped, 117 deselected`), regression
+(`550 passed`), installer Docker integration (`20 passed`), and `make pre-commit`.
+
+Known limitation: hook blocks orphaned by older Forge versions remain untracked and require manual discovery/removal.

@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-30
+
+### Codex disable scope-mismatch refusal
+
+**Goal**: Prevent `forge extension disable` from orphaning an active managed Codex hook block when `$CODEX_HOME` no
+longer maps to the config path recorded at installation.
+
+**Key changes**:
+
+- A typed preflight now refuses the whole operation before removal work, preserves the hook block and tracking row, and
+  names both paths plus recovery. Single-scope disable checks before its plan/prompt; `--all` retains per-scope failure
+  aggregation and continues disabling healthy scopes.
+- The installer keeps the same matching-path, null-path, and user-owned leftover-command behavior.
+
+**Verification**: focused install/CLI (`808 passed, 1 skipped`); unit (`8491 passed, 1 skipped, 117 deselected`);
+regression (`550 passed`); installer Docker integration (`20 passed`); `make pre-commit`.
+
+**Known limitation**: blocks orphaned by an older disable remain untracked and require manual discovery/removal.
+
 ## 2026-07-28
 
 ### README capability refresh
