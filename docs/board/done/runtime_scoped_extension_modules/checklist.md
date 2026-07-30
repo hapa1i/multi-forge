@@ -295,7 +295,7 @@ planner; this phase applies that selection to every module and exposes the outco
   trust ceremony.
 - [x] Confirm narrowing still preserves. **Assertion**: explicit selection still sets `preserved_runtime_ids`
   (`skill_planning.py:103`, `:234`) and emits `MANAGED_RUNTIME_PRESERVATION` (`:82`). Additive-only; removal belongs to
-  [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) and must not land together.
+  [extension_disable_runtime](../../doing/extension_disable_runtime/card.md) and must not land together.
 
 ## Phase 4 -- Status reporting
 
@@ -413,7 +413,7 @@ status cases to `test_extension_enable.py` unless the surface grows enough to ju
   `docs/board/proposed/extension_disable_runtime/card.md:5`, `docs/board/done/disable_scope_mismatch_orphan/card.md:12`,
   `docs/board/done/disable_scope_mismatch_orphan/checklist.md:183`.
 
-- [x] Unblock the sibling: [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) gates on D1
+- [x] Unblock the sibling: [extension_disable_runtime](../../doing/extension_disable_runtime/card.md) gates on D1
   shipping. Confirm the tagged attribution is sufficient for its removal selection -- specifically that it can build a
   removal set without ever matching an unattributed row. `attribution_pair()` returns `None` for the explicit
   unattributed variant, so a pair-based removal set cannot select it.

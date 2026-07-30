@@ -1,6 +1,7 @@
 # `forge extension disable --runtime` -- remove one runtime's extension surfaces
 
-**Lane**: `proposed/` -- not accepted. Both hard dependencies have shipped:
+**Lane**: `doing/` -- active on branch `feat/extension-disable-runtime`; execution plan in [checklist.md](checklist.md).
+Both hard dependencies have shipped:
 
 1. [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) -- shipped D1 schema v3
    supplies the tagged per-row attribution this card needs for runtime-scoped selection (see Constraints).
