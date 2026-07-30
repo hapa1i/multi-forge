@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
+
 # --- Enums ---
 
 
@@ -59,7 +61,17 @@ class InstallModule(str, Enum):
     HOOKS = "hooks"
     STATUSLINE = "status-line"
     PERMISSIONS = "permissions"
-    CODEX_HOOKS = "codex-hooks"
+
+
+# Durable runtime ownership for every live module value.
+MODULE_RUNTIME_OWNERS: dict[InstallModule, frozenset[str]] = {
+    InstallModule.COMMANDS: frozenset({"claude_code"}),
+    InstallModule.AGENTS: frozenset({"claude_code"}),
+    InstallModule.SKILLS: frozenset(AGENT_RUNTIME_IDS),
+    InstallModule.HOOKS: frozenset(AGENT_RUNTIME_IDS),
+    InstallModule.STATUSLINE: frozenset({"claude_code"}),
+    InstallModule.PERMISSIONS: frozenset({"claude_code"}),
+}
 
 
 # Profile -> modules mapping
@@ -72,7 +84,6 @@ PROFILE_MODULES: dict[InstallProfile, set[InstallModule]] = {
         InstallModule.HOOKS,
         InstallModule.PERMISSIONS,
         InstallModule.STATUSLINE,
-        InstallModule.CODEX_HOOKS,
     },
     InstallProfile.FULL: set(InstallModule),
 }
@@ -114,16 +125,33 @@ FILE_MODULES: set[InstallModule] = {
 # Modules that are settings-only (no files to install)
 # HOOKS: All hooks are dispatcher commands (`forge-hook X`) - no files to copy
 # STATUSLINE: Now `forge status-line` command - no scripts to copy
-# CODEX_HOOKS: managed block in Codex config.toml - no files to copy
+# HOOKS also owns the managed block in Codex config.toml.
 SETTINGS_ONLY_MODULES: set[InstallModule] = {
     InstallModule.PERMISSIONS,
     InstallModule.HOOKS,
     InstallModule.STATUSLINE,
-    InstallModule.CODEX_HOOKS,
 }
 
 
 # --- Tracking dataclasses ---
+
+
+@dataclass(frozen=True, order=True)
+class ModuleOwner:
+    """One applied module/runtime ownership pair."""
+
+    module: str
+    runtime: str
+
+
+@dataclass(frozen=True)
+class UnattributedSurface:
+    """A legacy ledger row whose ownership cannot be proved."""
+
+    unattributed_reason: str
+
+
+SurfaceAttribution = ModuleOwner | UnattributedSurface
 
 
 @dataclass
@@ -138,6 +166,7 @@ class InstalledFile:
                   For symlink mode: verify symlink points to expected source.
         mode: "copy" or "symlink".
         installed_at: ISO8601 timestamp when file was installed.
+        attribution: Exact module/runtime owner or an explicit legacy reason.
     """
 
     target_path: str
@@ -145,6 +174,7 @@ class InstalledFile:
     checksum: str
     mode: str
     installed_at: str
+    attribution: SurfaceAttribution
 
 
 @dataclass
@@ -159,12 +189,14 @@ class InstalledSettingsEntry:
                    - For hooks: command path string
                    - For permissions: the entry value itself
                    - For scalars: the key_path
+        attribution: Exact module/runtime owner or an explicit legacy reason.
     """
 
     key_path: str
     value: Any
     merge_type: str
     stable_id: str
+    attribution: SurfaceAttribution
 
 
 @dataclass
@@ -198,14 +230,14 @@ class Installation:
                      Used to track multiple local/project installations.
         mode: InstallMode value ("copy", "symlink").
         profile: InstallProfile value ("minimal", "standard", "full").
-        modules_enabled: List of InstallModule values that were enabled.
+        module_owners: Sorted applied module/runtime ownership relation.
         files: List of InstalledFile records.
         skill_packages: Runtime/package ownership records. InstalledFile remains
                         canonical for checksums and removal.
         settings_entries: List of InstalledSettingsEntry records.
         settings_backup_path: Path to settings backup file (if created).
         codex_config_path: Codex config.toml carrying the Forge-managed hook
-                          block (None when codex-hooks was skipped/unmanaged).
+                          block (None when Codex hooks were skipped/unmanaged).
         codex_commands: Forge hook commands registered in that block.
         installed_at: ISO8601 timestamp when first installed.
         updated_at: ISO8601 timestamp when last updated.
@@ -215,7 +247,7 @@ class Installation:
     mode: str
     profile: str
     project_path: str | None = None
-    modules_enabled: list[str] = field(default_factory=list)
+    module_owners: list[ModuleOwner] = field(default_factory=list)
     files: list[InstalledFile] = field(default_factory=list)
     skill_packages: list[InstalledSkillPackage] = field(default_factory=list)
     settings_entries: list[InstalledSettingsEntry] = field(default_factory=list)
@@ -265,7 +297,7 @@ def parse_installation_key(key: str) -> tuple[str, str | None]:
 
 
 # Tracking manifest version
-TRACKING_VERSION = 2
+TRACKING_VERSION = 3
 
 
 @dataclass
@@ -294,6 +326,8 @@ class FilePlan:
         effective_mode: Per-file copy or symlink behavior selected by planning.
         source_path: Where the file comes from (None for remove).
         reason: Explanation for skip/conflict actions.
+        module: Module that owns the target row.
+        runtime: Runtime that owns the target row.
     """
 
     action: str
@@ -301,6 +335,8 @@ class FilePlan:
     effective_mode: InstallMode
     source_path: str | None = None
     reason: str | None = None
+    module: str = ""
+    runtime: str = ""
 
 
 @dataclass
@@ -324,7 +360,7 @@ class SettingsPlan:
 
 @dataclass
 class CodexPlan:
-    """Plan for the Codex hook registration (codex-hooks module).
+    """Plan for the Codex-owned half of the hooks module.
 
     Codex registration is best-effort: an "unavailable" (no codex binary) or
     "conflict" outcome degrades to a visible skip and never sets
@@ -359,6 +395,15 @@ class SkillPackagePlan:
     recovery: str | None = None
 
 
+@dataclass
+class ModulePlan:
+    """Planning outcome for one module after runtime filtering."""
+
+    module: str
+    action: str
+    reason: str | None = None
+
+
 @dataclass(frozen=True)
 class SkillPackageStatus:
     """Observed state for one tracked runtime-specific skill package."""
@@ -383,6 +428,9 @@ class InstallPlan:
         mode: Installation mode.
         profile: Installation profile.
         modules: List of modules being installed.
+        module_outcomes: Per-module runtime-filter outcomes.
+        selected_runtimes: Runtime ids selected for this plan.
+        preserved_runtime_ids: Existing runtimes omitted by explicit narrowing.
         files: List of file operations.
         settings: List of settings operations.
         skill_packages: Runtime-specific package planning outcomes.
@@ -397,6 +445,9 @@ class InstallPlan:
     mode: str
     profile: str
     modules: list[str] = field(default_factory=list)
+    module_outcomes: list[ModulePlan] = field(default_factory=list)
+    selected_runtimes: list[str] = field(default_factory=list)
+    preserved_runtime_ids: list[str] = field(default_factory=list)
     files: list[FilePlan] = field(default_factory=list)
     settings: list[SettingsPlan] = field(default_factory=list)
     skill_packages: list[SkillPackagePlan] = field(default_factory=list)

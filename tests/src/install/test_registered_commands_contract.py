@@ -7,6 +7,8 @@ from typing import Any
 
 from forge.core.paths import get_forge_home
 from forge.install.codex_hooks import get_builtin_codex_entries
+from forge.install.models import InstallModule
+from forge.install.ownership import attributed
 from forge.install.preset import get_builtin_preset, get_sidecar_hook_settings
 from forge.install.settings_merge import merge_hooks, unmerge
 
@@ -110,6 +112,7 @@ def test_merge_hooks_then_unmerge_preserves_non_forge_sibling() -> None:
         settings,
         "SessionStart",
         deepcopy(get_builtin_preset()["hooks"]["SessionStart"]),
+        attribution=attributed(InstallModule.HOOKS, "claude_code"),
     )
     assert len(tracking) == 1
     assert settings["hooks"]["SessionStart"] == [

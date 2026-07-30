@@ -2,9 +2,8 @@
 
 **Card**: [card.md](card.md) **Branch**: `feat/runtime-scoped-extension-modules` **Base**: `main` at `0066de5d`
 
-**Current focus**: Phase 1 -- ownership vocabulary and persisted-value classification. Phase 1 is the only additive,
-independently merge-safe phase. Phases 2-3 are one atomic merge unit: the schema, module merge, Codex planning seam, and
-selection rule must ship together because each changes the meaning of persisted ownership.
+**Current focus**: Complete -- implementation, migration, documentation, clean-wheel verification, and closeout all
+finished on 2026-07-30.
 
 ---
 
@@ -161,21 +160,21 @@ rows rather than treating omission as removal.
 
 Additive, no persisted-shape change, independently merge-safe.
 
-- [ ] Add `MODULE_RUNTIME_OWNERS: dict[InstallModule, frozenset[str]]` to `src/forge/install/models.py`, declaring
+- [x] Add `MODULE_RUNTIME_OWNERS: dict[InstallModule, frozenset[str]]` to `src/forge/install/models.py`, declaring
   ownership for the enum **as it exists today** -- including `CODEX_HOOKS -> {codex}`. **Assertion**: `codex-hooks` is
   genuinely Codex-owned pre-merge, so this is accurate rather than transitional scaffolding; the table collapses to the
   card's six-row form in Phase 2 when the member is deleted. Owner strings come from `AGENT_RUNTIME_IDS`
   (`core/runtime_vocab.py:23`).
-- [ ] Add the structural invariant test. **Assertion**: every `InstallModule` member has >=1 owner and every owner is in
+- [x] Add the structural invariant test. **Assertion**: every `InstallModule` member has >=1 owner and every owner is in
   `AGENT_RUNTIME_IDS` -- and the test passes **at this commit**, which is why `CODEX_HOOKS` is declared here rather than
   in Phase 2. No `forge.install` module imports from `forge.cli`.
-- [ ] Classify both `InstallModule(...)` state-reading coercion sites (`installer.py:2348`, `:2365`) without weakening
+- [x] Classify both `InstallModule(...)` state-reading coercion sites (`installer.py:2348`, `:2365`) without weakening
   durable-state strictness. **Assertion**: a genuinely unknown module value remains corruption with an actionable error;
   no generic skip/default path is added. The known released `"codex-hooks"` value is normalized only by Phase 2's
   version-specific v1/v2 migration before either site can see it. This follows `coding_standards.md` section 5: known
   legacy state may have an explicit migration, while arbitrary unknown durable state must not become an apparently valid
   default.
-- [ ] Classify the other two coercion sites. **Assertion**: `cli/extensions.py:124` parses `--with`/`--without` *user
+- [x] Classify the other two coercion sites. **Assertion**: `cli/extensions.py:124` parses `--with`/`--without` *user
   input* and must keep failing on unknown values -- that is D5's native Click error, not a bug. `:207` reads
   `plan.modules`, which this Forge produced, so it cannot see an unknown value. Record the input-validating vs
   state-reading split in a comment at each site.
@@ -186,43 +185,43 @@ Phases 2-3 are one atomic merge unit, not independently shippable checkpoints. O
 must be fully frozen and the runtime-aware Codex planning seam must replace the deleted-enum gate before the live model
 or enum changes. Do not commit an import-broken intermediate state.
 
-- [ ] Freeze the complete v1 and v2 wire shapes, including nested rows. **Assertion**: the current `_LegacyInstallation`
+- [x] Freeze the complete v1 and v2 wire shapes, including nested rows. **Assertion**: the current `_LegacyInstallation`
   is not recursively frozen -- its `files` and `settings_entries` annotations at `tracking.py:48-49` use the live
   `InstalledFile` and `InstalledSettingsEntry` classes. Define historical file, settings-entry, installation,
   skill-package (v2), and manifest DTOs so neither reader refers to a live v3 row type. Add `_upgrade_v2_manifest`
   alongside the v1 upgrader. `read()` dispatches v1 -> frozen v1 types, v2 -> frozen v2 types, and v3 -> live types;
   checked-in fixtures prove both historical versions survive the live attribution change.
 
-- [ ] Bump `TRACKING_VERSION` to `3` (`models.py:268`) and extend the accepted set at `tracking.py:116` to `{1, 2, 3}`.
+- [x] Bump `TRACKING_VERSION` to `3` (`models.py:268`) and extend the accepted set at `tracking.py:116` to `{1, 2, 3}`.
   **Assertion**: a `version: 4` file still hits `_handle_tracking_version_mismatch` with the "written by newer Forge"
   message. No `strict=False`, no silent entry skipping (`coding_standards.md` section 5).
 
-- [ ] Add `module_owners` to `Installation` using the exact frozen list-of-objects shape above, replacing live-v3
+- [x] Add `module_owners` to `Installation` using the exact frozen list-of-objects shape above, replacing live-v3
   `modules_enabled`. **Assertion**: unique and sorted by `(module, runtime)`, written from the defined applied state.
   `modules_enabled` today is written unconditionally from the resolved set (`installer.py:2032`); v3 must distinguish
   successful zero-output ownership, preserved prior ownership, and failed/skipped paths.
 
-- [ ] Add the tagged `attribution` field to `InstalledFile` (`models.py:130`) and `InstalledSettingsEntry` (`:151`) per
+- [x] Add the tagged `attribution` field to `InstalledFile` (`models.py:130`) and `InstalledSettingsEntry` (`:151`) per
   the frozen shape above. **Assertion**: exactly one form present, validated on read and before write. This is the
   contract the sibling card consumes -- assert the field directly, not via behavior.
 
-- [ ] Propagate provenance at every construction site. **Assertion**: `settings_merge.py:538` builds
+- [x] Propagate provenance at every construction site. **Assertion**: `settings_merge.py:538` builds
   `InstalledSettingsEntry` and must receive attribution from its caller rather than defaulting; grep for every
   `InstalledFile(` and `InstalledSettingsEntry(` construction and confirm none can produce a row without a valid
   attribution.
 
-- [ ] Replace `_plan_codex`'s deleted-enum gate before deleting the member (`installer.py:1409-1411`). **Assertion**:
+- [x] Replace `_plan_codex`'s deleted-enum gate before deleting the member (`installer.py:1409-1411`). **Assertion**:
   resolve one shared `RuntimeSelection` for the install plan even when `SKILLS` is absent, then pass it to Codex
   planning. The gate becomes "`hooks` is effective and `codex` is selected"; `--runtime claude` yields
   `plan.codex is None`, distinct from a selected Codex path whose presence gate produces `action="unavailable"` at
   `:1418`. Skill planning consumes the same selection rather than resolving a second runtime set.
 
-- [ ] Delete `InstallModule.CODEX_HOOKS` (`models.py:62`) and its entries in `PROFILE_MODULES` (`:75`) and
+- [x] Delete `InstallModule.CODEX_HOOKS` (`models.py:62`) and its entries in `PROFILE_MODULES` (`:75`) and
   `SETTINGS_ONLY_MODULES` (`:122`); `hooks` absorbs it. **Assertion**: clean break, no hidden alias (D5).
   `_scope_omitted_modules` (`installer.py:200`) omits the merged `hooks` at project/local exactly as it omitted both, so
   Codex hook registration stays user-scope-only.
 
-- [ ] Update every production consumer of the deleted enum and the flat field. A literal `codex-hooks` grep **misses all
+- [x] Update every production consumer of the deleted enum and the flat field. A literal `codex-hooks` grep **misses all
   of these** -- both identifiers and field names must be searched. **Assertion**: migrate the complete production
   inventory:
 
@@ -239,7 +238,7 @@ or enum changes. Do not commit an import-broken intermediate state.
   Finish with `rg -n 'modules_enabled|CODEX_HOOKS' src/forge`: only frozen historical DTO/migration references to
   `modules_enabled` remain, and no production `CODEX_HOOKS` identifier remains.
 
-- [ ] Implement the derived v1/v2 -> v3 migration: normalize in memory on read, persist on the next successful mutation.
+- [x] Implement the derived v1/v2 -> v3 migration: normalize in memory on read, persist on the next successful mutation.
   **Assertion**: no user action, no reset. v2 skills attribution from `skill_packages[].runtime`; v1 from the logic
   currently in `_legacy_claude_skill_packages` (`installer.py:316`); per-row module from the closed path/key mapping
   above; unmapped rows explicitly unattributed. Put the derivation at a dependency-neutral install boundary shared by
@@ -247,20 +246,20 @@ or enum changes. Do not commit an import-broken intermediate state.
   `installer.py:107`. `"codex-hooks"` is the only deleted module value normalized; any other unknown module value is
   rejected as corrupted durable state. Assert field-by-field against checked-in v1 and v2 fixtures.
 
-- [ ] Key the `(hooks, codex)` pair on `codex_config_path`, never on the module value. **Assertion**: per F3, a
+- [x] Key the `(hooks, codex)` pair on `codex_config_path`, never on the module value. **Assertion**: per F3, a
   re-enable that skips the Codex half but preserves `codex_config_path` still writes the pair;
   `test_module_dropped_preserves_tracking` passes unchanged. A *first* install that skips Codex writes neither.
 
-- [ ] Derive sync's managed runtime set from ownership pairs. **Assertion**: per F6, `_managed_skill_runtime_ids`
+- [x] Derive sync's managed runtime set from ownership pairs. **Assertion**: per F6, `_managed_skill_runtime_ids`
   (`installer.py:2375`) returns `None` when `SKILLS` is absent, so a hooks-only install currently loses its Codex
   selection across `sync`. Rename/rework it to read the pair set, and keep D4 intact -- `--runtime` is still not a
   `sync` flag; the persisted set stays authoritative.
 
-- [ ] Enforce all six v3 invariants before mutation, with invariant 2 restated per the frozen-shape section.
+- [x] Enforce all six v3 invariants before mutation, with invariant 2 restated per the frozen-shape section.
   **Assertion**: each invariant has a test that violates it and observes a specific rejection. Invariant 3 uses the
   declared row identities (`target_path`; `(key_path, stable_id)`).
 
-- [ ] Record the load-bearing premises in `design_appendix.md` section C.4. **Assertion**: documents the F3 reading of
+- [x] Record the load-bearing premises in `design_appendix.md` section C.4. **Assertion**: documents the F3 reading of
   invariant 5, and that "Claude by construction" breaks the moment a third Codex-owned module appears -- such a module
   must ship its own migration step.
 
@@ -269,65 +268,65 @@ or enum changes. Do not commit an import-broken intermediate state.
 Completes the atomic Phase 2-3 merge unit. Phase 2 establishes one shared runtime selection and a compilable merged-hook
 planner; this phase applies that selection to every module and exposes the outcomes.
 
-- [ ] Add per-module planning outcomes to `InstallPlan` (`models.py:377`). **Assertion**: per F5, `InstallPlan.modules`
+- [x] Add per-module planning outcomes to `InstallPlan` (`models.py:377`). **Assertion**: per F5, `InstallPlan.modules`
   is a bare `list[str]` with no action or reason, so profile `SKIP`s and explicit-module `CONFLICT`s have nowhere to
   live. Add a `module_outcomes` list carrying `(module, action, reason)`, shaped like the existing `SkillPackagePlan`.
-- [ ] Implement the selection rule as a final filter after existing resolution (`_apply_scope_module_policy`,
+- [x] Implement the selection rule as a final filter after existing resolution (`_apply_scope_module_policy`,
   `installer.py:206`, called at `:943` and `:1748`). **Assertion**: implements the card's formula with provenance --
   profile-sourced drops are `SKIP` with a reason, `--with`-named drops are `CONFLICT`, and an explicit runtime selection
   resolving to an empty effective set is a `CONFLICT` (D2), never a silent no-op.
-- [ ] Make module conflicts actually block. **Assertion**: they set `plan.has_conflicts = True` and append to
+- [x] Make module conflicts actually block. **Assertion**: they set `plan.has_conflicts = True` and append to
   `plan.conflicts`, because the gate is `extensions.py:944-947` -- **not** membership in
   `_NON_FORCEABLE_SKILL_CONFLICT_REASONS`, which at `:634-637` only selects a recovery tip and only iterates
   `plan.skill_packages`. Add an analogous module-level reason set for tip selection, and assert `--force` cannot proceed
   past a wrong-owner module.
-- [ ] Wire `--runtime` into module resolution, not just `skill_runtimes=` (`cli/extensions.py:932`, `:957`).
+- [x] Wire `--runtime` into module resolution, not just `skill_runtimes=` (`cli/extensions.py:932`, `:957`).
   **Assertion**: stays `click.Choice(["claude", "codex", "all"])`, `multiple=True`, and is not added to `sync` (D4).
-- [ ] Preserve per-surface availability semantics under the shared selection. **Assertion**: explicit unavailable skills
+- [x] Preserve per-surface availability semantics under the shared selection. **Assertion**: explicit unavailable skills
   remain a blocking `runtime_unavailable` conflict, while a selected Codex hook path remains best-effort and reports
   `CodexPlan(action="unavailable")`. Automatic selection still includes Claude, already-managed runtimes, and detected
   Codex; it does not invent new Codex ownership when the binary is absent.
-- [ ] Delete the four-flag recovery tip (`cli/extensions.py:152-160`). **Assertion**: its test asserts the one-flag
+- [x] Delete the four-flag recovery tip (`cli/extensions.py:152-160`). **Assertion**: its test asserts the one-flag
   `--runtime codex` form. The tip is the card's evidence that the axis was wrong, so deleting it is an acceptance
   criterion, not cleanup.
-- [ ] Preserve rendered hook command bytes. **Assertion**: `tests/src/install/test_registered_commands_contract.py`
+- [x] Preserve rendered hook command bytes. **Assertion**: `tests/src/install/test_registered_commands_contract.py`
   passes unchanged on the `(event, matcher, command, timeout)` contract. Codex `trusted_hash` covers registered command
   bytes plus config location and is not computable by Forge, so any byte change forces existing installs through the
   trust ceremony.
-- [ ] Confirm narrowing still preserves. **Assertion**: explicit selection still sets `preserved_runtime_ids`
+- [x] Confirm narrowing still preserves. **Assertion**: explicit selection still sets `preserved_runtime_ids`
   (`skill_planning.py:103`, `:234`) and emits `MANAGED_RUNTIME_PRESERVATION` (`:82`). Additive-only; removal belongs to
   [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) and must not land together.
 
 ## Phase 4 -- Status reporting
 
-- [ ] Implement the frozen `status --json` v3 shape from the section above, bumping `schema_version` to `3`
+- [x] Implement the frozen `status --json` v3 shape from the section above, bumping `schema_version` to `3`
   (`cli/extensions.py:1509`). **Assertion**: `managed_runtimes` derives from the ownership pair set only -- one source
   of truth, not recomputed from `codex_config_path` or `skill_packages`.
-- [ ] Render unattributed surfaces. **Assertion**: a v1 row whose ownership is not path-provable appears in
+- [x] Render unattributed surfaces. **Assertion**: a v1 row whose ownership is not path-provable appears in
   `unattributed_surfaces` using the frozen file/settings element shapes and ordering, without settings values, and is
   never silently defaulted to Claude; silent attribution is what would let a later `disable --runtime claude` delete a
   Codex file.
 
 ## Phase 5 -- Impact inventory (same change, per the card)
 
-- [ ] Collapse the six recovery commands that spell both modules to `--with hooks`: `README.md:127`,
+- [x] Collapse the six recovery commands that spell both modules to `--with hooks`: `README.md:127`,
   `CONTRIBUTING.md:22`, `docs/end-user/hook.md:97`, `docs/end-user/skills.md:403`, `docs/end-user/README.md:59`,
   `src/skills/qa/resources/checklist/6-hook.md:29`. All six verified at these lines.
-- [ ] Update the QA `jq` tracking assertions **and** the index metadata. **Assertion**: `checklist/6-hook.md:30`
+- [x] Update the QA `jq` tracking assertions **and** the index metadata. **Assertion**: `checklist/6-hook.md:30`
   hard-asserts `.installations.user.modules_enabled == ["codex-hooks", "hooks"]` and moves to the v3 shape;
   `checklist/2-extension.md:20,27,93,96` also read `modules_enabled` (the card's inventory names only `:190`, the
   section heading). Per `testing_guidelines.md` "Updating the QA checklist" step 3, also update
   `<!-- test-count: ~N -->` and `<!-- last-updated: YYYY-MM-DD -->` in `src/skills/qa/resources/checklist.md`.
-- [ ] Update normative design docs: `design.md:1365,1384`; `design_appendix.md:1028,1033,1225`;
+- [x] Update normative design docs: `design.md:1365,1384`; `design_appendix.md:1028,1033,1225`;
   `design_workflows.md:355`; `cli_reference.md:116`. **Assertion**: every "selects only outputs of the SKILLS module"
   disclaimer is gone -- its spread across six docs is the card's third piece of evidence that the axis was mis-scoped.
-- [ ] Update end-user and agent-context docs: `end-user/hook.md:97,118,301,321`; `end-user/skills.md:403`;
+- [x] Update end-user and agent-context docs: `end-user/hook.md:97,118,301,321`; `end-user/skills.md:403`;
   `end-user/README.md:59`; `end-user/manual_testing.md`; `AGENTS.md`. **Assertion**: keep the scope-mismatch paragraph
   at `hook.md:114-116` intact while updating module names around it.
-- [ ] Do **not** rename the unrelated identifiers. **Assertion**: hook handler names `codex-session-start` /
+- [x] Do **not** rename the unrelated identifiers. **Assertion**: hook handler names `codex-session-start` /
   `codex-policy-check` and the probe directory `scripts/experiments/codex-hooks/` (evidence for `design_appendix.md`
   section I.2) are unchanged. Only the module *value* dies.
-- [ ] Add the `docs/board/change_log.md` entry. **Assertion**: phase-completion sized (25-40 lines per
+- [x] Add the `docs/board/change_log.md` entry. **Assertion**: phase-completion sized (25-40 lines per
   `board_contract.md`); records the `codex-hooks` clean break, both version bumps, and that no reset is required.
 
 ## Acceptance tests
@@ -376,25 +375,26 @@ status cases to `test_extension_enable.py` unless the surface grows enough to ju
 
 (record each command and its result; do not tick a phase box on a green unit run alone)
 
-- [ ] `uv run pytest tests/src/install tests/src/cli -q`
-- [ ] `make test-unit`
-- [ ] `make test-regression`
-- [ ] `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v`
-- [ ] Clean-wheel install exercising `enable`/`sync`/`status`/`disable` for `--runtime claude`, `codex`, and `all`, plus
+- [x] `uv run pytest tests/src/install tests/src/cli -q` -- `3311 passed, 1 skipped`.
+- [x] `make test-unit` -- `8526 passed, 1 skipped, 117 deselected`.
+- [x] `make test-regression` -- `551 passed`.
+- [x] `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v` -- `20 passed`.
+- [x] Clean-wheel install exercising `enable`/`sync`/`status`/`disable` for `--runtime claude`, `codex`, and `all`, plus
   Codex-hook preservation across a `--runtime claude` re-enable. **Required, not optional**: the card names it, and unit
-  tests cannot reach the wheel-install path this card changes.
-- [ ] `make pre-commit`
+  tests cannot reach the wheel-install path this card changes. Verified in the Docker wheel lifecycle; `uv build` also
+  produced `multi_forge-0.9.3.tar.gz` and `multi_forge-0.9.3-py3-none-any.whl`.
+- [x] `make pre-commit` -- all hooks passed.
 
 ## Closeout
 
-- [ ] Every box ticked with verification recorded; no phase ticked on unit tests alone.
+- [x] Every box ticked with verification recorded; no phase ticked on unit tests alone.
 
-- [ ] `docs/board/change_log.md` entry added, recording the clean break and both version bumps.
+- [x] `docs/board/change_log.md` entry added, recording the clean break and both version bumps.
 
-- [ ] Design docs describe shipped behavior, including the F3 reading of invariant 5 and the load-bearing "Claude by
+- [x] Design docs describe shipped behavior, including the F3 reading of invariant 5 and the load-bearing "Claude by
   construction" premise in `design_appendix.md` section C.4.
 
-- [ ] Both scoped greps are clean. A repo-wide grep cannot pass -- this checklist, `card.md`, and historical board
+- [x] Both scoped greps are clean. A repo-wide grep cannot pass -- this checklist, `card.md`, and historical board
   entries intentionally contain the term -- and a literal-string grep alone misses every `CODEX_HOOKS` identifier site.
   Run both:
 
@@ -402,20 +402,24 @@ status cases to `test_extension_enable.py` unless the surface grows enough to ju
   - `rg -n 'CODEX_HOOKS' src/forge tests/`
 
   **Allowlist** (verified as probe-directory or historical references, none of which name the module value):
-  `cli/hooks/codex_transfer.py:37`, `core/runtime/registry.py:198`, `cli/runtime.py:140`,
-  `core/ops/codex_enrollment.py:279`, `core/runtime/codex_preflight.py:74` -- all citing
-  `scripts/experiments/codex-hooks/` -- plus the dated history line at `src/skills/qa/resources/checklist.md:32`. The
-  hook handler names `codex-session-start` / `codex-policy-check` contain `codex-` but not `codex-hooks`.
+  `install/tracking.py:63` -- the closed v1/v2 migration literal -- plus `cli/hooks/codex_transfer.py:37`,
+  `core/runtime/registry.py:198`, `cli/runtime.py:140`, `core/ops/codex_enrollment.py:279`,
+  `core/runtime/codex_preflight.py:74` -- all citing `scripts/experiments/codex-hooks/` -- plus the dated history line
+  at `src/skills/qa/resources/checklist.md:33` and the probe-only `CODEX_HOOKS_CAPTURE_DIR` in
+  `tests/fixtures/codex/hooks/README.md:18`. The hook handler names `codex-session-start` / `codex-policy-check` contain
+  `codex-` but not `codex-hooks`.
 
-- [ ] Card moved `doing/` -> `done/` and inbound links repointed:
+- [x] Card moved `doing/` -> `done/` and inbound links repointed:
   `docs/board/proposed/extension_disable_runtime/card.md:5`, `docs/board/done/disable_scope_mismatch_orphan/card.md:12`,
   `docs/board/done/disable_scope_mismatch_orphan/checklist.md:183`.
 
-- [ ] Unblock the sibling: [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) gates on D1
+- [x] Unblock the sibling: [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) gates on D1
   shipping. Confirm the tagged attribution is sufficient for its removal selection -- specifically that it can build a
-  removal set without ever matching an unattributed row.
+  removal set without ever matching an unattributed row. `attribution_pair()` returns `None` for the explicit
+  unattributed variant, so a pair-based removal set cannot select it.
 
-- [ ] Candidates for `impl_notes.md` after human review: accepting a schema version is not the same as being able to
+- [x] Candidates for `impl_notes.md` after human review: accepting a schema version is not the same as being able to
   parse it, and only a frozen-type read path pins a historical shape (F4); a conflict-reason set that feeds a recovery
   tip is not an enforcement mechanism (F5); the runtime vocabulary belongs in `core/runtime_vocab`, not the CLI (F1);
-  and preserve-on-skip makes on-disk witnesses, not run outcomes, the basis of applied ownership (F3).
+  and preserve-on-skip makes on-disk witnesses, not run outcomes, the basis of applied ownership (F3). Candidates are
+  recorded here for human review; none were promoted automatically during implementation.

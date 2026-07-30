@@ -14,7 +14,10 @@ from forge.install.models import (
     InstalledFile,
     InstalledManifest,
     InstalledSkillPackage,
+    ModuleOwner,
+    UnattributedSurface,
 )
+from forge.install.ownership import attributed
 from forge.install.tracking import (
     TrackingStore,
     compute_checksum,
@@ -88,13 +91,36 @@ class TestTrackingStore:
         assert "invalid JSON" in str(exc_info.value)
         assert str(tracking_store.path) in exc_info.value.path
 
-    def test_read_raises_on_invalid_version(self, tracking_store: TrackingStore) -> None:
-        tracking_store.path.write_text(json.dumps({"version": 999}))
+    def test_read_rejects_v4_as_written_by_newer_forge(self, tracking_store: TrackingStore) -> None:
+        tracking_store.path.write_text(json.dumps({"version": 4}))
 
         with pytest.raises(TrackingCorruptedError) as exc_info:
             tracking_store.read()
 
         assert "incompatible version" in str(exc_info.value)
+        assert "written by newer Forge" in str(exc_info.value)
+        assert "Upgrade Forge" in str(exc_info.value)
+
+    @pytest.mark.parametrize("version", [1, 2])
+    def test_read_rejects_unknown_module_values(self, tracking_store: TrackingStore, version: int) -> None:
+        tracking_store.path.write_text(
+            json.dumps(
+                {
+                    "version": version,
+                    "installations": {
+                        "user": {
+                            "scope": "user",
+                            "mode": "copy",
+                            "profile": "standard",
+                            "modules_enabled": ["future-module"],
+                        }
+                    },
+                }
+            )
+        )
+
+        with pytest.raises(TrackingCorruptedError, match=r"unknown module value\(s\).*'future-module'"):
+            tracking_store.read()
 
     def test_read_v1_normalizes_in_memory_without_rewriting(self, tracking_store: TrackingStore) -> None:
         legacy = {
@@ -135,10 +161,14 @@ class TestTrackingStore:
 
         manifest = tracking_store.read()
 
-        assert manifest.version == TRACKING_VERSION == 2
+        assert manifest.version == TRACKING_VERSION == 3
         installation = manifest.installations["user"]
-        assert installation.modules_enabled == ["skills"]
+        assert installation.module_owners == [
+            ModuleOwner(module="hooks", runtime="codex"),
+            ModuleOwner(module="permissions", runtime="claude_code"),
+        ]
         assert installation.files[0].target_path.endswith("/challenge/SKILL.md")
+        assert installation.files[0].attribution == UnattributedSurface(unattributed_reason="legacy_path_unmapped")
         assert installation.settings_entries[0].stable_id == "Read"
         assert installation.settings_backup_path == "/home/user/.claude/settings.json.forge-backup"
         assert installation.codex_config_path == "/home/user/.codex/config.toml"
@@ -346,7 +376,7 @@ class TestTrackingStore:
                     scope="user",
                     mode="copy",
                     profile="standard",
-                    modules_enabled=["skills"],
+                    module_owners=[attributed("skills", "codex")],
                     files=[
                         InstalledFile(
                             target_path=package.file_paths[0],
@@ -354,6 +384,7 @@ class TestTrackingStore:
                             checksum="sentinel-checksum",
                             mode="copy",
                             installed_at="2026-07-17T00:00:00Z",
+                            attribution=attributed("skills", "codex"),
                         ),
                         InstalledFile(
                             target_path=package.file_paths[1],
@@ -361,6 +392,7 @@ class TestTrackingStore:
                             checksum="abc",
                             mode="symlink",
                             installed_at="2026-07-17T00:00:00Z",
+                            attribution=attributed("skills", "codex"),
                         ),
                     ],
                     skill_packages=[package],
@@ -377,7 +409,7 @@ class TestTrackingStore:
     def test_write_always_emits_current_version(self, tracking_store: TrackingStore) -> None:
         tracking_store.write(InstalledManifest(version=1))
 
-        assert json.loads(tracking_store.path.read_text(encoding="utf-8"))["version"] == TRACKING_VERSION == 2
+        assert json.loads(tracking_store.path.read_text(encoding="utf-8"))["version"] == TRACKING_VERSION == 3
 
     def test_get_installation_returns_none_when_empty(self, tracking_store: TrackingStore) -> None:
         result = tracking_store.get_installation("user")

@@ -24,7 +24,7 @@ def test_untracked_pre_marker_user_package_is_visible_but_never_cleanable(tmp_pa
 
     assert status.exit_code == 0, status.output
     payload = json.loads(status.stdout)
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["installations"] == []
     assert len(payload["unmanaged_skill_packages"]) == 1
     unmanaged = payload["unmanaged_skill_packages"][0]

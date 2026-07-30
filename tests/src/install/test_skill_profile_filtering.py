@@ -10,7 +10,6 @@ Verifies that SKILL_PROFILE_REQUIREMENTS gates skills at install time:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,9 +21,11 @@ from forge.install.models import (
     Installation,
     InstalledFile,
     InstalledManifest,
+    InstallModule,
     InstallProfile,
     InstallScope,
 )
+from forge.install.ownership import attributed
 from forge.install.tracking import TrackingStore
 
 
@@ -113,7 +114,12 @@ class TestSkillProfileFiltering:
             scope="user",
             mode="copy",
             profile="full",
-            modules_enabled=["commands", "skills"],
+            module_owners=sorted(
+                [
+                    attributed(InstallModule.COMMANDS, "claude_code"),
+                    attributed(InstallModule.SKILLS, "claude_code"),
+                ]
+            ),
             files=[
                 InstalledFile(
                     target_path=qa_target,
@@ -121,43 +127,14 @@ class TestSkillProfileFiltering:
                     checksum="abc123",
                     mode="copy",
                     installed_at="2024-01-01T00:00:00+00:00",
+                    attribution=attributed(InstallModule.SKILLS, "claude_code"),
                 ),
             ],
             installed_at="2024-01-01T00:00:00+00:00",
             updated_at="2024-01-01T00:00:00+00:00",
         )
         manifest = InstalledManifest(version=TRACKING_VERSION, installations={"user": existing})
-        tracking_path = forge_home / "installed.json"
-        tracking_path.write_text(
-            json.dumps(
-                {
-                    "version": manifest.version,
-                    "installations": {
-                        "user": {
-                            "scope": existing.scope,
-                            "mode": existing.mode,
-                            "profile": existing.profile,
-                            "project_path": existing.project_path,
-                            "modules_enabled": existing.modules_enabled,
-                            "files": [
-                                {
-                                    "target_path": f.target_path,
-                                    "source_path": f.source_path,
-                                    "checksum": f.checksum,
-                                    "mode": f.mode,
-                                    "installed_at": f.installed_at,
-                                }
-                                for f in existing.files
-                            ],
-                            "settings_entries": [],
-                            "settings_backup_path": None,
-                            "installed_at": existing.installed_at,
-                            "updated_at": existing.updated_at,
-                        },
-                    },
-                }
-            )
-        )
+        TrackingStore(tracking_path=forge_home / "installed.json").write(manifest)
 
         with (
             patch("forge.install.installer.get_forge_source_root", return_value=src.parent),
@@ -188,7 +165,12 @@ class TestSkillProfileFiltering:
             scope="user",
             mode="copy",
             profile="full",
-            modules_enabled=["commands", "skills"],
+            module_owners=sorted(
+                [
+                    attributed(InstallModule.COMMANDS, "claude_code"),
+                    attributed(InstallModule.SKILLS, "claude_code"),
+                ]
+            ),
             files=[
                 InstalledFile(
                     target_path=qa_target,
@@ -196,41 +178,14 @@ class TestSkillProfileFiltering:
                     checksum="abc123",
                     mode="copy",
                     installed_at="2024-01-01T00:00:00+00:00",
+                    attribution=attributed(InstallModule.SKILLS, "claude_code"),
                 ),
             ],
             installed_at="2024-01-01T00:00:00+00:00",
             updated_at="2024-01-01T00:00:00+00:00",
         )
-        tracking_path = forge_home / "installed.json"
-        tracking_path.write_text(
-            json.dumps(
-                {
-                    "version": TRACKING_VERSION,
-                    "installations": {
-                        "user": {
-                            "scope": existing.scope,
-                            "mode": existing.mode,
-                            "profile": existing.profile,
-                            "project_path": existing.project_path,
-                            "modules_enabled": existing.modules_enabled,
-                            "files": [
-                                {
-                                    "target_path": f.target_path,
-                                    "source_path": f.source_path,
-                                    "checksum": f.checksum,
-                                    "mode": f.mode,
-                                    "installed_at": f.installed_at,
-                                }
-                                for f in existing.files
-                            ],
-                            "settings_entries": [],
-                            "settings_backup_path": None,
-                            "installed_at": existing.installed_at,
-                            "updated_at": existing.updated_at,
-                        },
-                    },
-                }
-            )
+        TrackingStore(tracking_path=forge_home / "installed.json").write(
+            InstalledManifest(version=TRACKING_VERSION, installations={"user": existing})
         )
 
         with (

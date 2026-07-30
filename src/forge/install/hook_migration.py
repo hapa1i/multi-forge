@@ -41,6 +41,13 @@ from .models import (
     InstallProfile,
     InstallScope,
 )
+from .ownership import (
+    CLAUDE_CODE_RUNTIME,
+    CODEX_RUNTIME,
+    attributed,
+    has_module_owner,
+    module_owner_set,
+)
 from .preset import get_builtin_preset
 from .project_registry import ProjectRegistryStore, project_paths_match
 from .settings_merge import (
@@ -186,10 +193,9 @@ class ProjectHookMigrationPlan:
     @property
     def root_changes(self) -> bool:
         tracked_cleanup = any(
-            InstallModule.HOOKS.value in installation.modules_enabled
+            has_module_owner(installation, InstallModule.HOOKS)
             or any(entry.key_path.startswith("hooks.") for entry in installation.settings_entries)
             or installation.codex_config_path
-            or InstallModule.CODEX_HOOKS.value in installation.modules_enabled
             for _scope, installation in self.tracked_installations
         )
         return any(item.changed for item in self.settings) or self.codex.action == "remove" or tracked_cleanup
@@ -437,8 +443,7 @@ def list_hook_migration_candidates(
         if scope not in {InstallScope.LOCAL.value, InstallScope.PROJECT.value}:
             continue
         has_legacy_tracking = (
-            InstallModule.HOOKS.value in installation.modules_enabled
-            or InstallModule.CODEX_HOOKS.value in installation.modules_enabled
+            has_module_owner(installation, InstallModule.HOOKS)
             or bool(installation.codex_config_path)
             or any(entry.key_path.startswith("hooks.") for entry in installation.settings_entries)
         )
@@ -550,6 +555,11 @@ def _runtime_hook_entries() -> tuple[InstalledSettingsEntry, ...]:
     entries = merge(
         scratch,
         get_builtin_preset(),
+        attributions={
+            InstallModule.HOOKS.value: attributed(InstallModule.HOOKS, CLAUDE_CODE_RUNTIME),
+            InstallModule.STATUSLINE.value: attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
+            InstallModule.PERMISSIONS.value: attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME),
+        },
         include_hooks=True,
         include_permissions=False,
         include_env=False,
@@ -590,6 +600,11 @@ def plan_user_runtime_transition(needs_codex: bool, tracking: TrackingStore | No
     merge(
         merged,
         get_builtin_preset(),
+        attributions={
+            InstallModule.HOOKS.value: attributed(InstallModule.HOOKS, CLAUDE_CODE_RUNTIME),
+            InstallModule.STATUSLINE.value: attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
+            InstallModule.PERMISSIONS.value: attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME),
+        },
         include_hooks=True,
         include_permissions=False,
         include_env=False,
@@ -602,14 +617,14 @@ def plan_user_runtime_transition(needs_codex: bool, tracking: TrackingStore | No
     if needs_codex:
         codex_plan = plan_codex_merge(get_codex_config_path(InstallScope.USER), get_builtin_codex_entries())
 
-    required_modules = {InstallModule.HOOKS.value}
+    required_owners = {(InstallModule.HOOKS.value, CLAUDE_CODE_RUNTIME)}
     if needs_codex:
-        required_modules.add(InstallModule.CODEX_HOOKS.value)
-    existing_modules = set(existing.modules_enabled) if existing is not None else set()
+        required_owners.add((InstallModule.HOOKS.value, CODEX_RUNTIME))
+    existing_owners = module_owner_set(existing) if existing is not None else set()
     planned_entries = _planned_user_tracking_entries(existing, current.result, runtime_entries)
     tracking_change = (
         existing is None
-        or not required_modules.issubset(existing_modules)
+        or not required_owners.issubset(existing_owners)
         or planned_entries != existing.settings_entries
     )
 
@@ -664,7 +679,7 @@ def plan_project_hook_migration(
         installation = tracked_by_scope.get(install_scope.value)
         tracked_entries = tuple(installation.settings_entries) if installation is not None else ()
         reconcile_tracking = installation is not None and (
-            InstallModule.HOOKS.value in installation.modules_enabled
+            has_module_owner(installation, InstallModule.HOOKS, CLAUDE_CODE_RUNTIME)
             or any(entry.key_path.startswith("hooks.") for entry in installation.settings_entries)
         )
         settings_plan = _plan_settings_cleanup(
@@ -687,7 +702,7 @@ def plan_project_hook_migration(
         blockers.append(f"{codex_path}: {codex_plan.reason}")
 
     needs_codex = codex_plan.action == "remove" or any(
-        installation.codex_config_path or InstallModule.CODEX_HOOKS.value in installation.modules_enabled
+        installation.codex_config_path or has_module_owner(installation, InstallModule.HOOKS, CODEX_RUNTIME)
         for _scope, installation in tracked
     )
     user_plan = plan_user_runtime_transition(needs_codex, store)
@@ -759,11 +774,6 @@ def _apply_user_runtime_transition(
     existing = tracking.get_installation(InstallScope.USER.value)
     final_entries = _planned_user_tracking_entries(existing, plan.settings.result, plan.runtime_entries)
 
-    modules = set(existing.modules_enabled) if existing is not None else set()
-    modules.add(InstallModule.HOOKS.value)
-    if plan.needs_codex:
-        modules.add(InstallModule.CODEX_HOOKS.value)
-
     codex_status = read_codex_registration(codex_path, get_builtin_codex_entries())
     codex_config_path: str | None
     codex_commands: list[str]
@@ -777,12 +787,20 @@ def _apply_user_runtime_transition(
         codex_config_path = None
         codex_commands = []
 
+    module_owners = set(existing.module_owners) if existing is not None else set()
+    module_owners.add(attributed(InstallModule.HOOKS, CLAUDE_CODE_RUNTIME))
+    codex_owner = attributed(InstallModule.HOOKS, CODEX_RUNTIME)
+    if codex_config_path is not None:
+        module_owners.add(codex_owner)
+    else:
+        module_owners.discard(codex_owner)
+
     now = now_iso()
     installation = Installation(
         scope=InstallScope.USER.value,
         mode=existing.mode if existing is not None else InstallMode.COPY.value,
         profile=(existing.profile if existing is not None else InstallProfile.STANDARD.value),
-        modules_enabled=sorted(modules),
+        module_owners=sorted(module_owners),
         files=list(existing.files) if existing is not None else [],
         skill_packages=list(existing.skill_packages) if existing is not None else [],
         settings_entries=final_entries,
@@ -815,25 +833,31 @@ def _rewrite_project_tracking(
     changed_paths: list[Path] = []
     settings_by_scope = {settings.scope: settings for settings in plan.settings}
     for scope, installation in plan.tracked_installations:
-        has_hook_tracking = InstallModule.HOOKS.value in installation.modules_enabled or any(
+        has_hook_tracking = has_module_owner(installation, InstallModule.HOOKS, CLAUDE_CODE_RUNTIME) or any(
             entry.key_path.startswith("hooks.") for entry in installation.settings_entries
         )
-        has_codex_tracking = bool(installation.codex_config_path) or (
-            InstallModule.CODEX_HOOKS.value in installation.modules_enabled
+        has_codex_tracking = bool(installation.codex_config_path) or has_module_owner(
+            installation, InstallModule.HOOKS, CODEX_RUNTIME
         )
         if not has_hook_tracking and not (clear_codex and has_codex_tracking):
             continue
         entries = [entry for entry in installation.settings_entries if not entry.key_path.startswith("hooks.")]
-        modules = [module for module in installation.modules_enabled if module != InstallModule.HOOKS.value]
+        module_owners = [
+            owner
+            for owner in installation.module_owners
+            if owner != attributed(InstallModule.HOOKS, CLAUDE_CODE_RUNTIME)
+        ]
         codex_config_path = installation.codex_config_path
         codex_commands = list(installation.codex_commands)
         if clear_codex:
-            modules = [module for module in modules if module != InstallModule.CODEX_HOOKS.value]
+            module_owners = [
+                owner for owner in module_owners if owner != attributed(InstallModule.HOOKS, CODEX_RUNTIME)
+            ]
             codex_config_path = None
             codex_commands = []
         updated = replace(
             installation,
-            modules_enabled=modules,
+            module_owners=module_owners,
             settings_entries=entries,
             settings_backup_path=str(settings_backups.get(scope, installation.settings_backup_path or "")) or None,
             codex_config_path=codex_config_path,

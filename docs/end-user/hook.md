@@ -94,8 +94,12 @@ Install tracked runtime hooks once at user scope, without duplicating project-ow
 permissions, or environment settings:
 
 ```bash
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
+
+The one `hooks` module has Claude and Codex owners. Add `--runtime claude` to register only Claude settings,
+`--runtime codex` for only the Codex config block, or `--runtime all` for both. Without a flag, Forge keeps Claude,
+detected Codex, and any runtime already managed by this installation.
 
 Project/local extension installs still install project-owned settings such as `statusLine`, plus commands, agents,
 skills, and permissions, but they no longer write runtime hook blocks:
@@ -115,8 +119,8 @@ If `$CODEX_HOME` has changed since Forge registered the Codex hooks, disable ref
 both the tracked and current config paths. Restore the original `$CODEX_HOME` and retry, or remove the managed block
 from the named tracked config by hand; Forge preserves the installation row while refusing the operation.
 
-> **Note:** Explicit `--with hooks` or `--with codex-hooks` at `--scope local` or `--scope project` is rejected. Runtime
-> hooks are user-scoped; project/local installs own statusLine and other project settings.
+> **Note:** Explicit `--with hooks` at `--scope local` or `--scope project` is rejected. Runtime hooks are user-scoped;
+> project/local installs own statusLine and other project settings.
 
 > **Sidecar sessions:** host user settings are not mounted into the container. Forge stages the current hook inventory
 > into its container user settings automatically on every launch, using bare `forge hook <name>` commands resolved from
@@ -298,8 +302,8 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
   shell (`Bash`) actions pass through unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
-- **registered by `forge extension enable --scope user`** (codex-hooks module, standard profile): the installer writes a
-  managed block into `$CODEX_HOME/config.toml` and preserves an existing file's mode during atomic merge/remove.
+- **registered by `forge extension enable --scope user`** (Codex-owned half of the `hooks` module): the installer writes
+  a managed block into `$CODEX_HOME/config.toml` and preserves an existing file's mode during atomic merge/remove.
   Project/local installs do not write runtime Codex blocks. Skipped with a notice when `codex` is not installed.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
   prompted) — Codex hooks only fire from trust-enrolled registrations
@@ -318,9 +322,9 @@ first turn ran without the parent context.
 - every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
   resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
   homes capture the thread id of interactive sessions exactly. Non-Forge Codex sessions see zero writes.
-- **registered by `forge extension enable --scope user`** (codex-hooks module, with `codex-policy-check`, as a managed
-  block in the user Codex config) — then complete the one-time trust ceremony (run `codex` interactively and grant
-  trust). To register manually instead, add this to your Codex `config.toml`:
+- **registered by `forge extension enable --scope user`** (Codex-owned half of `hooks`, with `codex-policy-check`, as a
+  managed block in the user Codex config) — then complete the one-time trust ceremony (run `codex` interactively and
+  grant trust). To register manually instead, add this to your Codex `config.toml`:
 
 ```toml
 [[hooks.SessionStart]]

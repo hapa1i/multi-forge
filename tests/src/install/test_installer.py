@@ -39,6 +39,7 @@ from forge.install.models import (
     InstallProfile,
     InstallScope,
 )
+from forge.install.ownership import attributed, module_values
 from forge.install.settings_merge import load_added_settings, read_settings
 from forge.install.tracking import TrackingStore
 
@@ -431,7 +432,7 @@ class TestInstallerInit:
         assert "env" not in settings
         installation = installer._tracking.get_installation("user", None)
         assert installation is not None
-        assert installation.modules_enabled == ["hooks"]
+        assert module_values(installation) == {"hooks"}
         assert {entry.key_path.split(".", 1)[0] for entry in installation.settings_entries} == {"hooks"}
         assert plan.modules == ["hooks"]
         assert {entry.key_path.split(".", 1)[0] for entry in plan.settings} == {"hooks"}
@@ -509,9 +510,8 @@ class TestInstallerScopeModulePolicy:
         assert plan.codex is None
         installation = tracking.get_installation("local", str(project))
         assert installation is not None
-        assert "hooks" not in installation.modules_enabled
-        assert "codex-hooks" not in installation.modules_enabled
-        assert "status-line" in installation.modules_enabled
+        assert "hooks" not in module_values(installation)
+        assert "status-line" in module_values(installation)
 
     def test_local_standard_still_renders_hook_dispatcher_for_lifecycle_compatibility(self, tmp_path: Path) -> None:
         project = tmp_path / "repo"
@@ -560,8 +560,8 @@ class TestInstallerScopeModulePolicy:
         assert "status-line" not in plan.modules
         installation = tracking.get_installation("user", None)
         assert installation is not None
-        assert "hooks" in installation.modules_enabled
-        assert "status-line" not in installation.modules_enabled
+        assert "hooks" in module_values(installation)
+        assert "status-line" not in module_values(installation)
 
     def test_explicit_scope_contradictions_are_rejected(self, tmp_path: Path) -> None:
         project = tmp_path / "repo"
@@ -600,6 +600,7 @@ class TestInstallerScopeModulePolicy:
             value=legacy_hook,
             merge_type="append",
             stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+            attribution=attributed(InstallModule.HOOKS, "claude_code"),
         )
         tracking.set_installation(
             "local",
@@ -607,7 +608,7 @@ class TestInstallerScopeModulePolicy:
                 scope="local",
                 mode="copy",
                 profile="standard",
-                modules_enabled=["hooks"],
+                module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                 settings_entries=[legacy_entry],
                 installed_at="2026-01-01T00:00:00+00:00",
                 updated_at="2026-01-01T00:00:00+00:00",
@@ -624,7 +625,7 @@ class TestInstallerScopeModulePolicy:
         assert load_added_settings(settings_path)["hooks"]["SessionStart"] == [legacy_hook]
         updated = tracking.get_installation("local", str(project))
         assert updated is not None
-        assert updated.modules_enabled == []
+        assert module_values(updated) == {"hooks"}
         assert updated.settings_entries == [legacy_entry]
 
         installer.uninstall()
@@ -655,13 +656,14 @@ class TestInstallerScopeModulePolicy:
                 scope="user",
                 mode="copy",
                 profile="standard",
-                modules_enabled=["hooks"],
+                module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                 settings_entries=[
                     InstalledSettingsEntry(
                         key_path="hooks.SessionStart",
                         value=legacy_hook,
                         merge_type="append",
                         stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+                        attribution=attributed(InstallModule.HOOKS, "claude_code"),
                     )
                 ],
                 installed_at="2026-01-01T00:00:00+00:00",
@@ -719,6 +721,7 @@ class TestInstallerScopeModulePolicy:
             value=legacy_hook,
             merge_type="append",
             stable_id='{"hooks":[{"command":"forge hook session-start","type":"command"}]}',
+            attribution=attributed(InstallModule.HOOKS, "claude_code"),
         )
         tracking.set_installation(
             "user",
@@ -726,7 +729,7 @@ class TestInstallerScopeModulePolicy:
                 scope="user",
                 mode="copy",
                 profile="standard",
-                modules_enabled=["hooks"],
+                module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                 settings_entries=[legacy_entry],
                 installed_at="2026-01-01T00:00:00+00:00",
                 updated_at="2026-01-01T00:00:00+00:00",
@@ -1190,7 +1193,7 @@ class TestValidatePathWithinBoundary:
 
 
 class TestInstallerCodexHooks:
-    """Tests for the codex-hooks module wiring (plan/init/uninstall/update)."""
+    """Tests for Codex-owned hooks wiring (plan/init/uninstall/update)."""
 
     @pytest.fixture
     def setup_installer(self, tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
@@ -1355,6 +1358,9 @@ class TestInstallerCodexHooks:
         installation = installer._tracking.get_installation("user", None)
         assert installation is not None
         installation.codex_config_path = None
+        installation.module_owners = [
+            owner for owner in installation.module_owners if owner != attributed(InstallModule.HOOKS, "codex")
+        ]
         installer._tracking.set_installation("user", installation, None)
 
         self._run(installer, src, claude_home, method="uninstall")
@@ -1402,7 +1408,7 @@ class TestInstallerCodexHooks:
         assert installer._tracking.get_installation("user", None) is None
 
     def test_module_dropped_preserves_tracking(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
-        """Re-enabling without codex-hooks keeps tracking so disable still cleans up."""
+        """Re-enabling without selected Codex hooks keeps tracking for disable."""
         installer, _, claude_home, src = setup_installer
         self._run(installer, src, claude_home)
         self._run(installer, src, claude_home, profile=InstallProfile.MINIMAL)

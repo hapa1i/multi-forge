@@ -44,8 +44,7 @@ from .exceptions import (
 )
 from .hook_dispatcher import install_hook_dispatcher
 from .models import (
-    MODULE_DEPENDENCIES,
-    PROFILE_MODULES,
+    MODULE_RUNTIME_OWNERS,
     SETTINGS_ONLY_MODULES,
     SKILL_PROFILE_REQUIREMENTS,
     CodexPlan,
@@ -59,12 +58,25 @@ from .models import (
     InstallPlan,
     InstallProfile,
     InstallScope,
+    ModuleOwner,
     SettingsPlan,
     SkillPackagePlan,
     SkillPackageStatus,
     make_installation_key,
     parse_installation_key,
 )
+from .module_planning import (
+    apply_scope_module_policy,
+    filter_modules_by_runtime,
+    resolve_modules,
+)
+from .ownership import (
+    attributed,
+    has_module_owner,
+    legacy_claude_skill_packages,
+)
+from .ownership import managed_runtime_ids as owned_runtime_ids
+from .ownership import module_values
 from .settings_merge import (
     backup_settings,
     cleanup_empty_settings,
@@ -96,6 +108,8 @@ from .skill_compiler import (
 from .skill_planning import (
     CLAUDE_CODE_RUNTIME,
     CODEX_RUNTIME,
+    RuntimeSelection,
+    RuntimeSelectionOrigin,
     SkillCandidate,
     SkillPlanAction,
     SkillPlanReason,
@@ -174,8 +188,6 @@ def get_extensions_root() -> Path:
 
 _EXCLUDED_DIR_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 _EXCLUDED_EXTENSIONS = {".pyc", ".pyo"}
-_RUNTIME_HOOK_MODULES = {InstallModule.HOOKS, InstallModule.CODEX_HOOKS}
-_USER_SCOPE_OMITTED_MODULES = {InstallModule.STATUSLINE}
 _CLAUDE_SETTINGS_MODULES = {
     InstallModule.HOOKS,
     InstallModule.STATUSLINE,
@@ -191,44 +203,6 @@ class _SettingsRollbackState:
     settings_content: bytes | None
     settings_mode: int | None
     added_files: tuple[tuple[Path, bytes, int], ...]
-
-
-def _format_modules(modules: set[InstallModule]) -> str:
-    return ", ".join(sorted(module.value for module in modules))
-
-
-def _scope_omitted_modules(scope: InstallScope) -> set[InstallModule]:
-    if scope == InstallScope.USER:
-        return set(_USER_SCOPE_OMITTED_MODULES)
-    return set(_RUNTIME_HOOK_MODULES)
-
-
-def _apply_scope_module_policy(
-    modules: set[InstallModule],
-    *,
-    scope: InstallScope,
-    explicit_modules: set[InstallModule] | None = None,
-) -> set[InstallModule]:
-    """Return modules that are actually writable at *scope*.
-
-    Implicit profile modules are filtered by scope. Explicit `--with` modules
-    that contradict the ownership model are rejected so the CLI does not appear
-    to honor a request while silently dropping it.
-    """
-
-    omitted = _scope_omitted_modules(scope)
-    explicit_conflicts = omitted & (explicit_modules or set())
-    if explicit_conflicts:
-        if scope == InstallScope.USER:
-            raise ForgeInstallError(
-                f"module(s) {_format_modules(explicit_conflicts)} are project/local-scope only; "
-                "statusLine stays project-scoped; install it at project/local scope."
-            )
-        raise ForgeInstallError(
-            f"module(s) {_format_modules(explicit_conflicts)} are user-scope only; "
-            "run 'forge extension enable --scope user' to install runtime hooks."
-        )
-    return modules - omitted
 
 
 def _ensure_hook_dispatcher() -> None:
@@ -267,7 +241,7 @@ def _get_git_tracked_files(repo_root: Path) -> set[Path] | None:
 
 
 def _codex_available() -> bool:
-    """Presence gate for the codex-hooks module (PATH check via the runtime registry)."""
+    """Presence gate for the Codex-owned half of hooks."""
     from forge.core.runtime import get_runtime
 
     return get_runtime("codex").is_installed()
@@ -313,28 +287,6 @@ def _runtime_skill_root(runtime: str, scope: InstallScope, project_root: Path | 
     )
 
 
-def _legacy_claude_skill_packages(
-    installation: Installation | None,
-    scope: InstallScope,
-    project_root: Path | None,
-) -> set[tuple[str, str]]:
-    """Derive only provable v1 Claude package ownership from tracked paths."""
-
-    if installation is None or installation.skill_packages:
-        return set()
-    skills_root = _runtime_skill_root(CLAUDE_CODE_RUNTIME, scope, project_root)
-    result: set[tuple[str, str]] = set()
-    for tracked_file in installation.files:
-        target = Path(tracked_file.target_path)
-        try:
-            relative = target.relative_to(skills_root)
-        except ValueError:
-            continue
-        if len(relative.parts) >= 2:
-            result.add((CLAUDE_CODE_RUNTIME, relative.parts[0]))
-    return result
-
-
 def _codex_scan_roots(project_root: Path | None, *, include_cwd: bool = True) -> tuple[Path, ...]:
     """Codex user/admin roots plus applicable CWD-to-repository project roots."""
 
@@ -378,7 +330,7 @@ def _tracked_codex_package_locations(
         project_root = Path(project_path) if project_path is not None else None
         if scope != InstallScope.USER and (project_root is None or not project_root.is_absolute()):
             continue
-        if InstallModule.SKILLS.value not in installation.modules_enabled:
+        if not has_module_owner(installation, InstallModule.SKILLS):
             continue
         tracked_file_paths = {tracked.target_path for tracked in installation.files}
         for package in installation.skill_packages:
@@ -834,36 +786,6 @@ def find_forge_installation(
     raise NoForgeInstallationError(str(start))
 
 
-def resolve_modules(
-    profile: InstallProfile,
-    with_modules: set[InstallModule] | None = None,
-    without_modules: set[InstallModule] | None = None,
-) -> set[InstallModule]:
-    """Resolve final module set from profile and toggles.
-
-    Args:
-        profile: Base profile.
-        with_modules: Modules to add.
-        without_modules: Modules to remove.
-
-    Returns:
-        Final set of modules to install.
-    """
-    modules = PROFILE_MODULES[profile].copy()
-
-    if with_modules:
-        modules |= with_modules
-
-    if without_modules:
-        modules -= without_modules
-
-    for module in list(modules):
-        if deps := MODULE_DEPENDENCIES.get(module):
-            modules |= deps
-
-    return modules
-
-
 def get_module_source_dir(module: InstallModule) -> str:
     """Get source directory name for a module.
 
@@ -937,28 +859,16 @@ class Installer:
             InstallPlan describing what would be done.
         """
         if _modules_override is not None:
-            modules = _modules_override
+            scoped_modules = _modules_override
         else:
-            modules = resolve_modules(profile, with_modules, without_modules)
-        modules = _apply_scope_module_policy(
-            modules,
+            scoped_modules = resolve_modules(profile, with_modules, without_modules)
+        scoped_modules = apply_scope_module_policy(
+            scoped_modules,
             scope=self._scope,
             explicit_modules=None if _modules_override is not None else with_modules,
         )
-
-        # Sort modules for deterministic output
-        sorted_modules = sorted(m.value for m in modules)
-
-        plan = InstallPlan(
-            scope=self._scope.value,
-            mode=mode.value,
-            profile=profile.value,
-            modules=sorted_modules,
-        )
         self._compiled_skill_packages = {}
 
-        source_root = get_extensions_root()
-        target_root = get_target_root(self._scope, self._project_root)
         manifest = self._tracking.read()
         tracked_installations = [
             (*parse_installation_key(key), installation) for key, installation in manifest.installations.items()
@@ -973,6 +883,41 @@ class Installer:
         )
         if existing is not None:
             _assert_tracked_skill_packages_syncable(existing, self._scope, self._project_root)
+
+        try:
+            selection = select_skill_runtimes(
+                installed_runtime_ids=tuple(runtime.id for runtime in installed_runtimes()),
+                explicit_runtime_ids=skill_runtimes,
+                managed_runtime_ids=_managed_runtime_ids,
+                existing_runtime_ids=owned_runtime_ids(existing) if existing is not None else (),
+            )
+        except ValueError as e:
+            raise ForgeInstallError(f"Invalid runtime selection: {e}") from e
+
+        modules, module_outcomes, module_conflicts = filter_modules_by_runtime(
+            scoped_modules,
+            selection=selection,
+            explicit_modules=None if _modules_override is not None else with_modules,
+        )
+        plan = InstallPlan(
+            scope=self._scope.value,
+            mode=mode.value,
+            profile=profile.value,
+            modules=sorted(module.value for module in modules),
+            module_outcomes=module_outcomes,
+            selected_runtimes=list(selection.runtime_ids),
+            preserved_runtime_ids=list(selection.preserved_runtime_ids),
+            has_conflicts=bool(module_conflicts),
+            conflicts=module_conflicts,
+        )
+
+        source_root = get_extensions_root()
+        target_root = get_target_root(self._scope, self._project_root)
+        claude_modules = (
+            {module for module in modules if CLAUDE_CODE_RUNTIME in MODULE_RUNTIME_OWNERS[module]}
+            if CLAUDE_CODE_RUNTIME in selection.runtime_ids
+            else set()
+        )
 
         # The legacy file-module contract creates the Claude anchor even when a
         # selected source directory currently contains no installable files
@@ -1012,8 +957,7 @@ class Installer:
                 mode=mode,
                 existing=existing,
                 force=force,
-                explicit_runtime_ids=skill_runtimes,
-                managed_runtime_ids=_managed_runtime_ids,
+                selection=selection,
                 tracked_installations=tracked_installations,
                 tracking=manifest,
                 eligible_source_paths=git_eligible,
@@ -1044,6 +988,8 @@ class Installer:
                 target_file = target_dir / rel_path
 
                 file_plan = self._plan_file(source_file, target_file, mode, existing, force)
+                file_plan.module = module.value
+                file_plan.runtime = CLAUDE_CODE_RUNTIME
                 plan.files.append(file_plan)
                 if file_plan.action == "conflict":
                     plan.has_conflicts = True
@@ -1054,7 +1000,7 @@ class Installer:
         # Sort files for deterministic output
         plan.files.sort(key=lambda f: f.target_path)
 
-        settings_plans = self._plan_settings(modules, force)
+        settings_plans = self._plan_settings(claude_modules, force)
         plan.settings.extend(settings_plans)
         for sp in settings_plans:
             if sp.action == "conflict":
@@ -1069,7 +1015,7 @@ class Installer:
         # Codex registration is best-effort: its conflicts degrade to a
         # visible skip and never set plan.has_conflicts (another tool's
         # config must not fail the Claude install).
-        plan.codex = self._plan_codex(modules)
+        plan.codex = self._plan_codex(modules, selection)
 
         return plan
 
@@ -1082,8 +1028,7 @@ class Installer:
         mode: InstallMode,
         existing: Installation | None,
         force: bool,
-        explicit_runtime_ids: tuple[str, ...] | None,
-        managed_runtime_ids: tuple[str, ...] | None,
+        selection: RuntimeSelection,
         tracked_installations: list[tuple[str, str | None, Installation]],
         tracking: InstalledManifest,
         eligible_source_paths: set[Path] | None,
@@ -1139,21 +1084,7 @@ class Installer:
         managed_packages = {
             (package.runtime, package.skill) for package in (existing.skill_packages if existing is not None else [])
         }
-        managed_packages |= _legacy_claude_skill_packages(existing, self._scope, self._project_root)
-        existing_runtime_ids = tuple(
-            runtime
-            for runtime in (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
-            if any(package_runtime == runtime for package_runtime, _skill in managed_packages)
-        )
-        try:
-            selection = select_skill_runtimes(
-                installed_runtime_ids=tuple(runtime.id for runtime in installed_runtimes()),
-                explicit_runtime_ids=explicit_runtime_ids,
-                managed_runtime_ids=managed_runtime_ids,
-                existing_runtime_ids=existing_runtime_ids,
-            )
-        except ValueError as e:
-            raise ForgeInstallError(f"Invalid skill runtime selection: {e}") from e
+        managed_packages |= legacy_claude_skill_packages(existing, self._scope, self._project_root)
         for unavailable_runtime in selection.unavailable_runtime_ids:
             plan.has_conflicts = True
             plan.conflicts.append(
@@ -1211,7 +1142,7 @@ class Installer:
                     recovery=render_unmanaged_conflict_recovery(
                         decision.duplicate_dirs,
                         unmanaged_by_path,
-                        operation="sync" if managed_runtime_ids is not None else "enable",
+                        operation="sync" if selection.origin == RuntimeSelectionOrigin.MANAGED else "enable",
                         project_root=self._project_root,
                     ),
                 )
@@ -1267,6 +1198,8 @@ class Installer:
                     existing,
                     force,
                 )
+                file_plan.module = InstallModule.SKILLS.value
+                file_plan.runtime = decision.runtime
                 file_plans.append(file_plan)
                 plan.files.append(file_plan)
                 if file_plan.action == "conflict":
@@ -1406,9 +1339,13 @@ class Installer:
             reason="file exists and is not Forge-managed",
         )
 
-    def _plan_codex(self, modules: set[InstallModule]) -> CodexPlan | None:
+    def _plan_codex(
+        self,
+        modules: set[InstallModule],
+        selection: RuntimeSelection,
+    ) -> CodexPlan | None:
         """Plan the Codex hook registration for the scope-mapped config.toml."""
-        if InstallModule.CODEX_HOOKS not in modules:
+        if InstallModule.HOOKS not in modules or CODEX_RUNTIME not in selection.runtime_ids:
             return None
         entries = get_builtin_codex_entries()
         commands = [e.command for e in entries]
@@ -1741,14 +1678,14 @@ class Installer:
         if plan.has_conflicts:
             return plan  # Planning conflicts are a hard preflight boundary.
 
-        if _modules_override is not None:
-            modules = _modules_override
-        else:
-            modules = resolve_modules(profile, with_modules, without_modules)
-        modules = _apply_scope_module_policy(
-            modules,
-            scope=self._scope,
-            explicit_modules=None if _modules_override is not None else with_modules,
+        # plan.modules is process-generated from the live enum after all
+        # profile, scope, and runtime filters have run.
+        modules = {InstallModule(module) for module in plan.modules}
+        selected_runtimes = set(plan.selected_runtimes)
+        claude_modules = (
+            {module for module in modules if CLAUDE_CODE_RUNTIME in MODULE_RUNTIME_OWNERS[module]}
+            if CLAUDE_CODE_RUNTIME in selected_runtimes
+            else set()
         )
 
         # Planning treats creation of a missing Claude anchor as a Claude
@@ -1758,7 +1695,7 @@ class Installer:
             get_target_root(self._scope, self._project_root).mkdir(parents=True, exist_ok=True)
 
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
-        if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+        if self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
             # Read both user settings targets before rendering the dispatcher or
             # changing tracking. The later cleanup can then fail only on a new
             # race or an environmental write error, not known malformed input.
@@ -1839,7 +1776,7 @@ class Installer:
 
         backup_path: Path | None = None
         settings_rollback_state: _SettingsRollbackState | None = None
-        if modules & _CLAUDE_SETTINGS_MODULES:
+        if claude_modules & _CLAUDE_SETTINGS_MODULES:
             settings_path = get_settings_path(self._scope, self._project_root)
             try:
                 settings_rollback_state = self._capture_settings_rollback_state(settings_path)
@@ -1854,12 +1791,12 @@ class Installer:
                     settings_rollback_state=settings_rollback_state,
                 )
             removed_entry_ids: set[tuple[str, str]] = set()
-            if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+            if existing is not None and self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
                 old_hook_entries = [entry for entry in existing.settings_entries if entry.key_path.startswith("hooks.")]
                 if old_hook_entries:
                     unmerge(settings, old_hook_entries)
                     removed_entry_ids = {(entry.key_path, entry.stable_id) for entry in old_hook_entries}
-            if self._scope == InstallScope.USER and InstallModule.HOOKS in modules:
+            if self._scope == InstallScope.USER and InstallModule.HOOKS in claude_modules:
                 # T6 migration: stage safe same-file legacy cleanup with the
                 # dispatcher merge so settings.json changes in one atomic write.
                 from .hook_migration import remove_known_legacy_hook_entries
@@ -1868,13 +1805,18 @@ class Installer:
                 if removed_legacy_count:
                     plan.legacy_hook_cleanup_paths.append(str(settings_path))
             forge_settings = self._load_forge_settings()
-            include_permissions = InstallModule.PERMISSIONS in modules
+            include_permissions = InstallModule.PERMISSIONS in claude_modules
             entries = merge(
                 settings,
                 forge_settings,
+                attributions={
+                    InstallModule.HOOKS.value: attributed(InstallModule.HOOKS, CLAUDE_CODE_RUNTIME),
+                    InstallModule.STATUSLINE.value: attributed(InstallModule.STATUSLINE, CLAUDE_CODE_RUNTIME),
+                    InstallModule.PERMISSIONS.value: attributed(InstallModule.PERMISSIONS, CLAUDE_CODE_RUNTIME),
+                },
                 force=force,
-                include_statusline=InstallModule.STATUSLINE in modules,
-                include_hooks=InstallModule.HOOKS in modules,
+                include_statusline=InstallModule.STATUSLINE in claude_modules,
+                include_hooks=InstallModule.HOOKS in claude_modules,
                 include_permissions=include_permissions,
                 include_env=include_permissions,
             )
@@ -1942,6 +1884,13 @@ class Installer:
             if package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value
             for target in package.file_paths
         )
+        if existing is not None and skill_runtimes is not None:
+            preserved_runtimes = set(plan.preserved_runtime_ids)
+            planned_targets.update(
+                record.target_path
+                for record in existing.files
+                if not isinstance(record.attribution, ModuleOwner) or record.attribution.runtime in preserved_runtimes
+            )
 
         # Remove stale tracked files whose source no longer exists (e.g., after renames).
         # A file is stale if it was tracked in the previous installation but isn't in the
@@ -2024,12 +1973,45 @@ class Installer:
             and (package.cache_dir is not None or package.reason == SkillPlanReason.MANAGED_RUNTIME_PRESERVATION.value)
             and package.action in {"install", "update", "skip"}
         ]
+        if existing is not None and plan.preserved_runtime_ids:
+            final_package_keys = {(package.runtime, package.skill) for package in final_skill_packages}
+            final_skill_packages.extend(
+                package
+                for package in existing.skill_packages
+                if package.runtime in plan.preserved_runtime_ids
+                and (package.runtime, package.skill) not in final_package_keys
+            )
+
+        module_owners: set[ModuleOwner] = {
+            attributed(module, runtime)
+            for module in modules
+            for runtime in MODULE_RUNTIME_OWNERS[module]
+            if runtime in selected_runtimes and not (module == InstallModule.HOOKS and runtime == CODEX_RUNTIME)
+        }
+        if existing is not None and plan.preserved_runtime_ids:
+            module_owners.update(
+                owner for owner in existing.module_owners if owner.runtime in plan.preserved_runtime_ids
+            )
+        module_owners.update(
+            file_record.attribution for file_record in final_files if isinstance(file_record.attribution, ModuleOwner)
+        )
+        module_owners.update(
+            settings_record.attribution
+            for settings_record in final_entries
+            if isinstance(settings_record.attribution, ModuleOwner)
+        )
+        module_owners.update(attributed(InstallModule.SKILLS, package.runtime) for package in final_skill_packages)
+        codex_owner = attributed(InstallModule.HOOKS, CODEX_RUNTIME)
+        if codex_path is not None:
+            module_owners.add(codex_owner)
+        else:
+            module_owners.discard(codex_owner)
 
         installation = Installation(
             scope=self._scope.value,
             mode=mode.value,
             profile=profile.value,
-            modules_enabled=[m.value for m in sorted(modules, key=lambda m: m.value)],
+            module_owners=sorted(module_owners),
             files=final_files,
             skill_packages=final_skill_packages,
             settings_entries=final_entries,
@@ -2262,6 +2244,7 @@ class Installer:
             checksum=compute_checksum(source),
             mode=file_plan.effective_mode.value,
             installed_at=now_iso(),
+            attribution=attributed(file_plan.module, file_plan.runtime),
         )
 
     def _tracked_file_boundary(self, installation: Installation, target: Path, operation: str) -> Path:
@@ -2345,8 +2328,10 @@ class Installer:
         if existing is None:
             raise NotInstalledError(self._scope.value)
 
-        existing_modules = {InstallModule(m) for m in existing.modules_enabled}
-        managed_runtime_ids = self._managed_skill_runtime_ids(existing, existing_modules)
+        # Persisted values have already passed TrackingStore's strict ownership
+        # validation; this conversion is not a compatibility/ignore boundary.
+        existing_modules = {InstallModule(module) for module in module_values(existing)}
+        managed_runtime_ids = owned_runtime_ids(existing)
 
         return self.init(
             profile=InstallProfile(existing.profile),
@@ -2362,29 +2347,16 @@ class Installer:
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
         if existing is None:
             raise NotInstalledError(self._scope.value)
-        existing_modules = {InstallModule(module) for module in existing.modules_enabled}
-        managed_runtime_ids = self._managed_skill_runtime_ids(existing, existing_modules)
+        # Persisted values have already passed TrackingStore's strict ownership
+        # validation; this conversion is not a compatibility/ignore boundary.
+        existing_modules = {InstallModule(module) for module in module_values(existing)}
+        managed_runtime_ids = owned_runtime_ids(existing)
         return self.plan(
             profile=InstallProfile(existing.profile),
             mode=InstallMode(existing.mode),
             force=force,
             _modules_override=existing_modules,
             _managed_runtime_ids=managed_runtime_ids,
-        )
-
-    def _managed_skill_runtime_ids(
-        self,
-        existing: Installation,
-        modules: set[InstallModule],
-    ) -> tuple[str, ...] | None:
-        if InstallModule.SKILLS not in modules:
-            return None
-        packages = {(package.runtime, package.skill) for package in existing.skill_packages}
-        packages |= _legacy_claude_skill_packages(existing, self._scope, self._project_root)
-        return tuple(
-            runtime
-            for runtime in (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
-            if any(package_runtime == runtime for package_runtime, _skill in packages)
         )
 
     def uninstall(self) -> None:

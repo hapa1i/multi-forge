@@ -1,14 +1,13 @@
 # `forge extension disable --runtime` -- remove one runtime's extension surfaces
 
-**Lane**: `proposed/` -- not accepted. Two hard dependencies, in order:
+**Lane**: `proposed/` -- not accepted. Both hard dependencies have shipped:
 
-1. [runtime_scoped_extension_modules](../../doing/runtime_scoped_extension_modules/card.md) -- D1 schema v3 must
-   **ship**, not just be decided: this card selects tracked rows by runtime, and that attribution does not exist today
-   (see Constraints).
-2. [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) -- ships **before** this card, so
-   the refusal-preserves-tracking row in the state table below is inherited rather than invented here.
+1. [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) -- shipped D1 schema v3
+   supplies the tagged per-row attribution this card needs for runtime-scoped selection (see Constraints).
+2. [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md) -- the shipped refusal behavior
+   means the refusal-preserves-tracking row in the state table below is inherited rather than invented here.
 
-No decisions remain open; D-last and D-mismatch are closed below.
+No decisions or dependencies remain open; D-last and D-mismatch are closed below.
 
 **Type**: ordinary card. See the sibling card's Type note for the drift argument.
 

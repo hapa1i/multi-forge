@@ -49,14 +49,22 @@ from forge.install.installer import (
 from forge.install.models import (
     FILE_MODULES,
     PROFILE_RANK,
+    Installation,
     InstalledManifest,
     InstallMode,
     InstallModule,
     InstallPlan,
     InstallProfile,
     InstallScope,
+    UnattributedSurface,
     get_gated_skills,
     parse_installation_key,
+)
+from forge.install.ownership import (
+    CLAUDE_CODE_RUNTIME,
+    has_module_owner,
+    managed_runtime_ids,
+    module_values,
 )
 from forge.install.project_compat import (
     ProjectCompatibilityError,
@@ -82,6 +90,8 @@ _NON_FORCEABLE_SKILL_CONFLICT_REASONS = {
     "runtime_unavailable",
     "scope_unsupported",
 }
+_NON_FORCEABLE_MODULE_CONFLICT_REASONS = {"runtime_excluded"}
+_NON_FORCEABLE_PLAN_CONFLICT_PREFIXES = ("Runtime selection:",)
 
 
 def _detect_git_project_root(start: Path | None = None) -> Path | None:
@@ -121,6 +131,8 @@ def _parse_modules(modules_str: str | None) -> set[InstallModule] | None:
     """
     if not modules_str:
         return None
+    # User input is intentionally strict: removed or unknown module names use
+    # the native enum/Click error path rather than a persisted-state migration.
     return {InstallModule(m.strip()) for m in modules_str.split(",")}
 
 
@@ -154,12 +166,9 @@ def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | 
         )
         if version_check.version is None and codex_packages_selected:
             root_option = f" --root {shlex.quote(str(project_root))}" if project_root is not None else ""
-            command = (
-                f"forge extension enable --scope {plan.scope}{root_option} --profile minimal "
-                "--with skills --without commands --runtime codex"
-            )
+            command = f"forge extension enable --scope {plan.scope}{root_option} --runtime codex"
             print_tip(
-                f"Install Claude Code, or install only Codex skills with '{command}'.",
+                f"Install Claude Code, or install only Codex surfaces with '{command}'.",
                 console=console,
             )
         elif version_check.version is None:
@@ -204,6 +213,8 @@ def _warn_if_modules_have_no_files(
     nor tracking has files for an enabled file-bearing module, the install
     is broken — typically a wheel missing bundled extensions.
     """
+    # InstallPlan.modules is produced by this Forge process, not read from
+    # durable or user-provided state, so every value must be a live enum member.
     enabled = {InstallModule(m) for m in plan.modules if InstallModule(m) in FILE_MODULES}
     enabled -= _INTENTIONALLY_EMPTY_MODULES
     if not enabled:
@@ -372,7 +383,7 @@ def _finish_user_scope_hook_migration(plan: InstallPlan, tracking: TrackingStore
     """Consolidate safe user legacy siblings and report root candidates."""
 
     store = tracking or TrackingStore()
-    if InstallModule.HOOKS.value in plan.modules:
+    if InstallModule.HOOKS.value in plan.modules and CLAUDE_CODE_RUNTIME in plan.selected_runtimes:
         cleanup = cleanup_user_legacy_hook_files()
         changed_paths = tuple(
             dict.fromkeys(
@@ -432,8 +443,7 @@ def _print_hook_migration_plan(plan: ProjectHookMigrationPlan) -> None:
                 f"  - {display_path(plan.user.settings.added_path)}: reconcile Forge-owned user settings metadata"
             )
     tracked_root_change = any(
-        InstallModule.HOOKS.value in installation.modules_enabled
-        or InstallModule.CODEX_HOOKS.value in installation.modules_enabled
+        has_module_owner(installation, InstallModule.HOOKS)
         or installation.codex_config_path
         or any(entry.key_path.startswith("hooks.") for entry in installation.settings_entries)
         for _scope, installation in plan.tracked_installations
@@ -541,6 +551,18 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
     console.print(f"  Mode:    {plan.mode}")
     console.print(f"  Profile: {plan.profile}")
     console.print(f"  Modules: {', '.join(plan.modules)}")
+    console.print(f"  Runtimes: {', '.join(plan.selected_runtimes)}")
+
+    if plan.module_outcomes:
+        console.print(f"\n{prefix}[bold]Modules:[/bold]")
+        table = Table(show_header=True, header_style="bold", box=None)
+        table.add_column("ACTION", style="dim")
+        table.add_column("MODULE")
+        table.add_column("REASON", style="dim")
+        for outcome in plan.module_outcomes:
+            style = {"install": "green", "skip": "dim", "conflict": "red"}.get(outcome.action, "")
+            table.add_row(outcome.action, outcome.module, outcome.reason or "", style=style)
+        console.print(table)
 
     if plan.skill_packages:
         console.print(f"\n{prefix}[bold]Skill packages:[/bold]")
@@ -631,14 +653,31 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         console.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
         for c in plan.conflicts:
             console.print(f"  [red]- {c}[/red]")
-        has_policy_conflicts = any(
-            package.action == "conflict" and package.reason in _NON_FORCEABLE_SKILL_CONFLICT_REASONS
-            for package in plan.skill_packages
+        has_policy_conflicts = (
+            any(
+                package.action == "conflict" and package.reason in _NON_FORCEABLE_SKILL_CONFLICT_REASONS
+                for package in plan.skill_packages
+            )
+            or any(
+                outcome.action == "conflict" and outcome.reason in _NON_FORCEABLE_MODULE_CONFLICT_REASONS
+                for outcome in plan.module_outcomes
+            )
+            or any(conflict.startswith(_NON_FORCEABLE_PLAN_CONFLICT_PREFIXES) for conflict in plan.conflicts)
         )
         has_forceable_conflicts = any(file.action == "conflict" for file in plan.files) or any(
             setting.action == "conflict" for setting in plan.settings
         )
-        if has_policy_conflicts and has_forceable_conflicts:
+        has_local_codex_scope_conflict = plan.scope == InstallScope.LOCAL.value and any(
+            package.runtime == "codex" and package.action == "conflict" and package.reason == "scope_unsupported"
+            for package in plan.skill_packages
+        )
+        if has_local_codex_scope_conflict:
+            print_tip(
+                "Codex skill packages do not support local scope; retry with "
+                "forge extension enable --scope user --runtime codex.",
+                console=console,
+            )
+        elif has_policy_conflicts and has_forceable_conflicts:
             print_tip(
                 "Use --force only for file or settings conflicts; resolve runtime, scope, "
                 "and duplicate-scan conflicts manually.",
@@ -817,7 +856,7 @@ def extensions() -> None:
     "--with",
     "-w",
     "with_modules",
-    help="Add modules (comma-separated: commands,agents,skills,hooks,status-line,permissions,codex-hooks)",
+    help="Add modules (comma-separated: commands,agents,skills,hooks,status-line,permissions)",
 )
 @click.option(
     "--without",
@@ -830,7 +869,7 @@ def extensions() -> None:
     "runtimes",
     type=click.Choice(["claude", "codex", "all"]),
     multiple=True,
-    help="Skill runtime target; repeat for multiple targets (default: Claude plus detected Codex)",
+    help="Runtime target for all owned surfaces; repeat for multiple targets (default: Claude plus detected Codex)",
 )
 @click.option("--force", "-f", is_flag=True, help="Override conflicts")
 @click.option("--dry-run", "-n", is_flag=True, help="Show plan without executing")
@@ -863,7 +902,7 @@ def enable_cmd(
         forge extension enable --root /repo/api               # Same (defaults to local)
         forge extension enable --scope user                   # Global ~/.claude
         forge extension enable --profile minimal              # Commands only
-        forge extension enable --runtime codex                # Target skill packages at Codex
+        forge extension enable --runtime codex                # Target Codex-owned surfaces
         forge extension enable --runtime claude --runtime codex
         forge extension enable --dry-run                      # Preview changes
     """
@@ -1318,6 +1357,40 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
         sys.exit(1)
 
 
+def _unattributed_surfaces(installation: Installation) -> list[dict[str, str]]:
+    """Render the identity-only status summary for migrated legacy rows."""
+
+    surfaces: list[dict[str, str]] = []
+    for file_record in installation.files:
+        if isinstance(file_record.attribution, UnattributedSurface):
+            surfaces.append(
+                {
+                    "surface": "file",
+                    "target_path": file_record.target_path,
+                    "reason": file_record.attribution.unattributed_reason,
+                }
+            )
+    for settings_record in installation.settings_entries:
+        if isinstance(settings_record.attribution, UnattributedSurface):
+            surfaces.append(
+                {
+                    "surface": "settings",
+                    "key_path": settings_record.key_path,
+                    "stable_id": settings_record.stable_id,
+                    "reason": settings_record.attribution.unattributed_reason,
+                }
+            )
+    return sorted(
+        surfaces,
+        key=lambda item: (
+            item["surface"],
+            item.get("target_path", ""),
+            item.get("key_path", ""),
+            item.get("stable_id", ""),
+        ),
+    )
+
+
 @extensions.command("status")
 @click.option(
     "--scope",
@@ -1480,7 +1553,12 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                     "scope": s.value,
                     "profile": inst.profile,
                     "mode": inst.mode,
-                    "modules": list(inst.modules_enabled),
+                    "managed_runtimes": list(managed_runtime_ids(inst)),
+                    "module_owners": [
+                        {"module": owner.module, "runtime": owner.runtime} for owner in inst.module_owners
+                    ],
+                    "modules": sorted(module_values(inst)),
+                    "unattributed_surfaces": _unattributed_surfaces(inst),
                     "files_count": len(inst.files),
                     "skill_packages": [
                         {
@@ -1506,7 +1584,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         click.echo(
             json.dumps(
                 {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "installations": installations,
                     "unmanaged_skill_packages": [package.to_dict() for package in unmanaged_packages],
                 },
@@ -1542,12 +1620,23 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
 
         console.print(f"  Profile:   {installation.profile}")
         console.print(f"  Mode:      {installation.mode}")
-        console.print(f"  Modules:   {', '.join(installation.modules_enabled)}")
+        console.print(f"  Runtimes:  {', '.join(managed_runtime_ids(installation))}")
+        console.print(f"  Modules:   {', '.join(sorted(module_values(installation)))}")
         console.print(f"  Files:     {len(installation.files)}")
         console.print(f"  Skills:    {len(installation.skill_packages)} runtime package(s)")
         console.print(f"  Settings:  {len(installation.settings_entries)} entries")
         if installation.codex_config_path:
             console.print(f"  Codex:     hooks registered in {display_path(installation.codex_config_path)}")
+        unattributed_surfaces = _unattributed_surfaces(installation)
+        if unattributed_surfaces:
+            console.print(f"  Legacy:    {len(unattributed_surfaces)} unattributed surface(s)")
+            for surface in unattributed_surfaces:
+                identity = (
+                    surface["target_path"]
+                    if surface["surface"] == "file"
+                    else f"{surface['key_path']} ({surface['stable_id']})"
+                )
+                console.print(f"    - {surface['surface']}: {identity} [{surface['reason']}]")
         console.print(f"  Installed: {installation.installed_at}")
         console.print(f"  Updated:   {installation.updated_at}")
 

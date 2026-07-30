@@ -30,9 +30,7 @@ DISPATCHER_BIN_DIR = "bin"
 RUNTIME_METADATA_FILENAME = "runtime.json"
 RUNTIME_METADATA_VERSION = 1
 FORGE_DEV_VAR = "FORGE_DEV"
-_USER_HOOK_ENABLE_COMMAND = (
-    "forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands"
-)
+_USER_HOOK_ENABLE_COMMAND = "forge extension enable --scope user --profile minimal --with hooks --without commands"
 _USER_HOOK_SYNC_COMMAND = "forge extension sync --scope user"
 
 _STAMP_VERSION_RE = re.compile(r'^FORGE_HOOK_DISPATCHER_VERSION = "([^"]*)"$')
@@ -647,10 +645,11 @@ def _has_user_installation() -> bool:
     existing reset path.
     """
     try:
+        from .ownership import module_values
         from .tracking import TrackingStore
 
         installation = TrackingStore().get_installation("user")
-        return installation is not None and any(module != "skills" for module in installation.modules_enabled)
+        return installation is not None and any(module != "skills" for module in module_values(installation))
     except Exception:  # Diagnosis must never raise; degrade to the sync advice.
         return True
 

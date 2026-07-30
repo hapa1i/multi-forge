@@ -34,6 +34,7 @@ from forge.install.models import (
     InstallProfile,
     InstallScope,
 )
+from forge.install.ownership import attributed, has_module_owner, module_values
 from forge.install.project_registry import (
     EnrollmentSource,
     ProjectRegistryStore,
@@ -76,13 +77,19 @@ def _installation(root: Path, entry: dict[str, object]) -> Installation:
         project_path=str(root),
         mode=InstallMode.COPY.value,
         profile=InstallProfile.STANDARD.value,
-        modules_enabled=[InstallModule.HOOKS.value, InstallModule.STATUSLINE.value],
+        module_owners=sorted(
+            [
+                attributed(InstallModule.HOOKS, "claude_code"),
+                attributed(InstallModule.STATUSLINE, "claude_code"),
+            ]
+        ),
         settings_entries=[
             InstalledSettingsEntry(
                 key_path="hooks.SessionStart",
                 value=entry,
                 merge_type="append",
                 stable_id=json.dumps(entry, sort_keys=True, separators=(",", ":")),
+                attribution=attributed(InstallModule.HOOKS, "claude_code"),
             )
         ],
         installed_at="2026-01-01T00:00:00Z",
@@ -198,6 +205,10 @@ def test_cleanup_v1_preview_is_read_only_then_apply_writes_current(
     settings.write_text(json.dumps({"hooks": {"SessionStart": [entry]}}), encoding="utf-8")
     installation = asdict(_installation(root, entry))
     installation.pop("skill_packages")
+    installation["modules_enabled"] = [InstallModule.HOOKS.value, InstallModule.STATUSLINE.value]
+    installation.pop("module_owners")
+    for settings_entry in installation["settings_entries"]:
+        settings_entry.pop("attribution")
     legacy = {
         "version": 1,
         "installations": {f"project:{root}": installation},
@@ -220,7 +231,7 @@ def test_cleanup_v1_preview_is_read_only_then_apply_writes_current(
     apply_project_hook_migration(root, tracking=tracking)
 
     persisted = json.loads(tracking.path.read_text(encoding="utf-8"))
-    assert persisted["version"] == 2
+    assert persisted["version"] == 3
     assert persisted["installations"][f"project:{root}"]["skill_packages"] == []
 
 
@@ -411,9 +422,12 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
             checksum="unchanged",
             mode=InstallMode.COPY.value,
             installed_at="2026-01-01T00:00:00Z",
+            attribution=attributed(InstallModule.SKILLS, "claude_code"),
         )
     ]
     project_installation.skill_packages = [project_package]
+    project_installation.module_owners.append(attributed(InstallModule.SKILLS, "claude_code"))
+    project_installation.module_owners.sort()
     tracking.set_installation(InstallScope.PROJECT.value, project_installation, str(root))
     added_path = save_added_settings(settings, entries_to_added_structure(project_installation.settings_entries))
     monkeypatch.setattr(
@@ -433,13 +447,13 @@ def test_apply_removes_legacy_before_user_transition_and_enrollment(
     assert ProjectRegistryStore().contains_root(root)
     project_install = tracking.get_installation(InstallScope.PROJECT.value, str(root))
     assert project_install is not None
-    assert InstallModule.HOOKS.value not in project_install.modules_enabled
+    assert not has_module_owner(project_install, InstallModule.HOOKS)
     assert project_install.skill_packages == [project_package]
     assert not [entry for entry in project_install.settings_entries if entry.key_path.startswith("hooks.")]
     assert "hooks" not in load_added_settings(settings)
     user_install = tracking.get_installation(InstallScope.USER.value)
     assert user_install is not None
-    assert InstallModule.HOOKS.value in user_install.modules_enabled
+    assert has_module_owner(user_install, InstallModule.HOOKS, "claude_code")
     assert len([entry for entry in user_install.settings_entries if entry.key_path.startswith("hooks.")]) == len(
         KNOWN_LEGACY_HOOK_SHAPES
     )
@@ -470,6 +484,7 @@ def test_disable_after_migration_does_not_restore_or_re_remove_legacy_hooks(
         value="Read",
         merge_type="union",
         stable_id="Read",
+        attribution=attributed(InstallModule.PERMISSIONS, "claude_code"),
     )
     settings = get_settings_path(InstallScope.PROJECT, root)
     settings.write_text(
@@ -483,7 +498,8 @@ def test_disable_after_migration_does_not_restore_or_re_remove_legacy_hooks(
         encoding="utf-8",
     )
     installation = _installation(root, hook_entry)
-    installation.modules_enabled.append(InstallModule.PERMISSIONS.value)
+    installation.module_owners.append(attributed(InstallModule.PERMISSIONS, "claude_code"))
+    installation.module_owners.sort()
     installation.settings_entries.append(permission_entry)
     tracking = TrackingStore()
     tracking.set_installation(InstallScope.PROJECT.value, installation, str(root))
@@ -563,13 +579,20 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
         value="Read",
         merge_type="union",
         stable_id="Read",
+        attribution=attributed(InstallModule.PERMISSIONS, "claude_code"),
     )
     package_file = tmp_path / ".agents" / "skills" / "challenge" / "SKILL.md"
     user_install = Installation(
         scope=InstallScope.USER.value,
         mode=InstallMode.COPY.value,
         profile=InstallProfile.MINIMAL.value,
-        modules_enabled=[InstallModule.COMMANDS.value, InstallModule.PERMISSIONS.value],
+        module_owners=sorted(
+            [
+                attributed(InstallModule.COMMANDS, "claude_code"),
+                attributed(InstallModule.PERMISSIONS, "claude_code"),
+                attributed(InstallModule.SKILLS, "codex"),
+            ]
+        ),
         files=[
             InstalledFile(
                 target_path=str(user_file),
@@ -577,6 +600,7 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
                 checksum="unchanged",
                 mode=InstallMode.COPY.value,
                 installed_at="2026-01-01T00:00:00Z",
+                attribution=attributed(InstallModule.COMMANDS, "claude_code"),
             ),
             InstalledFile(
                 target_path=str(package_file),
@@ -584,6 +608,7 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
                 checksum="unchanged",
                 mode=InstallMode.COPY.value,
                 installed_at="2026-01-01T00:00:00Z",
+                attribution=attributed(InstallModule.SKILLS, "codex"),
             ),
         ],
         skill_packages=[
@@ -610,10 +635,11 @@ def test_user_runtime_transition_preserves_unrelated_tracked_modules(
 
     updated = tracking.get_installation(InstallScope.USER.value)
     assert updated is not None
-    assert set(updated.modules_enabled) == {
+    assert module_values(updated) == {
         InstallModule.COMMANDS.value,
         InstallModule.PERMISSIONS.value,
         InstallModule.HOOKS.value,
+        InstallModule.SKILLS.value,
     }
     assert updated.files == user_install.files
     assert updated.skill_packages == user_install.skill_packages
@@ -639,7 +665,7 @@ def test_codex_block_moves_to_user_scope_after_project_cleanup(
             project_path=str(root),
             mode=InstallMode.COPY.value,
             profile=InstallProfile.STANDARD.value,
-            modules_enabled=[InstallModule.CODEX_HOOKS.value],
+            module_owners=[attributed(InstallModule.HOOKS, "codex")],
             codex_config_path=str(project_config),
             installed_at="2026-01-01T00:00:00Z",
             updated_at="2026-01-01T00:00:00Z",
@@ -660,10 +686,10 @@ def test_codex_block_moves_to_user_scope_after_project_cleanup(
     updated_project = tracking.get_installation(InstallScope.PROJECT.value, str(root))
     assert updated_project is not None
     assert updated_project.codex_config_path is None
-    assert InstallModule.CODEX_HOOKS.value not in updated_project.modules_enabled
+    assert not has_module_owner(updated_project, InstallModule.HOOKS, "codex")
     updated_user = tracking.get_installation(InstallScope.USER.value)
     assert updated_user is not None
-    assert InstallModule.CODEX_HOOKS.value in updated_user.modules_enabled
+    assert has_module_owner(updated_user, InstallModule.HOOKS, "codex")
     assert any(".config.toml.forge.backup." in path.name for path in result.backup_paths)
     assert result.user_codex_action == "install"
 

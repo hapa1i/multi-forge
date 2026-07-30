@@ -319,7 +319,7 @@ bash "$SCRIPTS/run-in-repo.sh" env \
   HOME="$FORGE_TEST_REPO/.forge/walkthrough/home" \
   forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   > "$FORGE_TEST_REPO/.forge/walkthrough/project-status.json"
-jq -e '.schema_version == 2 and (.installations | length == 1)
+jq -e '.schema_version == 3 and (.installations | length == 1)
   and .unmanaged_skill_packages == [] and .installations[0].scope == "project"
   and (.installations[0].skill_packages | length == 9)
   and all(.installations[0].skill_packages[];

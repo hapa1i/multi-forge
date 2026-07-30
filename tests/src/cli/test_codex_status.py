@@ -22,7 +22,8 @@ from forge.install.codex_hooks import (
 )
 from forge.install.exceptions import NoForgeInstallationError
 from forge.install.hook_dispatcher import render_dispatcher_command
-from forge.install.models import Installation, InstallScope
+from forge.install.models import Installation, InstallModule, InstallScope
+from forge.install.ownership import attributed
 from forge.install.tracking import TrackingStore
 
 _EXPECTED_COMMANDS = {
@@ -120,6 +121,7 @@ def test_status_surfaces_installed_json_tracking(codex_home, monkeypatch):
             scope="user",
             mode="copy",
             profile="standard",
+            module_owners=[attributed(InstallModule.HOOKS, "codex")],
             codex_config_path=str(codex_home / "config.toml"),
             codex_commands=["forge hook codex-session-start"],
         ),

@@ -180,8 +180,8 @@ note, not an omission.
 - [x] `docs/design_appendix.md:1262` and the `installer.py` docstring reflect shipped behavior.
 - [x] Card moved `doing/` -> `done/`, and the five inbound links repointed from `../../doing/...` to `../../done/...`:
   [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md) (3) and
-  [runtime_scoped_extension_modules](../../doing/runtime_scoped_extension_modules/card.md) (2). These were repointed
-  once already when this card moved `proposed/` -> `doing/`; the move to `done/` breaks them again.
+  [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) (2). These were repointed once
+  already when this card moved `proposed/` -> `doing/`; the move to `done/` breaks them again.
 - [x] Consider promoting to `impl_notes.md` after human review: refusing to *edit a file* is not refusing the
   *operation*. A doc sentence and a docstring that both compressed that distinction are what let this defect read as
   intended behavior for as long as it did. Deliberately deferred until human review; no durable note was promoted during

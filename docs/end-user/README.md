@@ -56,7 +56,7 @@ Existing pre-OSS Forge installs are not supported in-place. If upgrading:
 ### A. Install extensions
 
 ```bash
-forge extension enable --scope user --profile minimal --with hooks,codex-hooks --without commands
+forge extension enable --scope user --profile minimal --with hooks --without commands
 ```
 
 If that command reports the current checkout as a legacy cleanup candidate, migrate it before ordinary project setup:

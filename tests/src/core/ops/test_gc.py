@@ -33,8 +33,10 @@ from forge.install.models import (
     InstalledFile,
     InstalledManifest,
     InstalledSkillPackage,
+    InstallModule,
     make_installation_key,
 )
+from forge.install.ownership import attributed
 from forge.install.skill_compiler import FORGE_PACKAGE_SENTINEL
 from forge.install.tracking import TrackingStore, compute_checksum
 from forge.session import IndexStore
@@ -125,6 +127,7 @@ def _claim_project_package(project: Path, package: Path, *, runtime: str = "code
             checksum=compute_checksum(Path(path)),
             mode="copy",
             installed_at="2026-07-22T00:00:00+00:00",
+            attribution=attributed(InstallModule.SKILLS, runtime),
         )
         for path in file_paths
     ]
@@ -133,7 +136,7 @@ def _claim_project_package(project: Path, package: Path, *, runtime: str = "code
         project_path=str(project),
         mode="copy",
         profile="standard",
-        modules_enabled=["skills"],
+        module_owners=[attributed(InstallModule.SKILLS, runtime)],
         files=installed_files,
         skill_packages=[
             InstalledSkillPackage(

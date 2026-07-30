@@ -1361,11 +1361,13 @@ PATH reachability, dispatcher state, and the current process's dev-override stat
 to installing the extensions described below.
 
 Forge extensions live in this repo and are installed via `forge extension enable`. Forge keeps the user/project/local
-scope model and modular profiles (`minimal` / `standard` / `full`). Seven modules (commands, agents, skills, hooks,
-status-line, permissions, codex-hooks) are combined into profiles. Commands, agents, and Claude settings remain Claude
-surfaces. The SKILLS module instead compiles one logical skill into each selected runtime package: Claude user and
-project/local packages go to `$CLAUDE_HOME/skills` and `<root>/.claude/skills`; Codex user and project packages go to
-`$HOME/.agents/skills` and `<root>/.agents/skills`. Codex has no local skill scope and skills never use `$CODEX_HOME`.
+scope model and modular profiles (`minimal` / `standard` / `full`). Six modules (commands, agents, skills, hooks,
+status-line, permissions) are combined into profiles and declare durable runtime owners. Commands, agents, status line,
+and permissions are Claude-owned; skills and hooks are owned by both Claude and Codex. `module_planning.py` owns pure
+profile/scope/runtime policy; `installer.py` owns discovery and writes. The skills module compiles one logical skill
+into each selected runtime package: Claude user and project/local packages go to `$CLAUDE_HOME/skills` and
+`<root>/.claude/skills`; Codex user and project packages go to `$HOME/.agents/skills` and `<root>/.agents/skills`. Codex
+has no local skill scope and skills never use `$CODEX_HOME`.
 
 Portable skills use `forge-skill.yaml` plus `content.md`; typed Claude/Codex adapters bind runtime capabilities and emit
 a complete validated package. A legacy `SKILL.md` package remains a Claude-only compatibility source. The current
@@ -1373,30 +1375,31 @@ portable set is `challenge`, `smoke-test`, `review`, `review-docs`, `understand`
 `consensus`. The workflow frontends do not imply Codex workers by default: worker runtime is selected independently and
 the default worker set remains Claude-backed. `walkthrough` and `qa` remain Claude-only manual-test frontends.
 
-`forge extension enable --runtime claude|codex|all` is repeatable and selects only SKILLS targets; it does not filter
-commands, agents, settings, or hooks from the chosen profile. With no flag, a new enable keeps Claude and adds Codex
-when its binary is detected. Re-enabling an existing installation retains its managed runtimes even when a binary is
-temporarily absent. An explicit runtime selection refreshes those runtimes and preserves tracked packages for omitted
-runtimes; sync uses the complete tracked runtime set. Removal belongs to disable. A pure Codex project skill install can
-therefore avoid both the Claude version gate and `.claude/`, but only when the resolved module set contains no Claude
-mutation.
+`forge extension enable --runtime claude|codex|all` is repeatable and filters every resolved module against its declared
+runtime owners. Profile-selected wrong-owner modules become visible skips; a wrong-owner module named through `--with`
+is a conflict, as is an explicit runtime selection that leaves no effective module. With no flag, a new enable keeps
+Claude and adds Codex when its binary is detected. Re-enabling an existing installation retains its managed runtimes
+even when a binary is temporarily absent. Explicit narrowing refreshes selected surfaces and preserves omitted tracked
+runtime ownership; sync derives its runtime set from the durable ownership relation. Removal belongs to disable.
 
-Settings merge remains additive (hooks append + dedupe, permissions union). The `codex-hooks` module is separate from
-Codex skill delivery: it registers `codex-session-start` and `codex-policy-check` as a marker-delimited managed block in
-the user Codex config (`$CODEX_HOME/config.toml`) while project/local installs write no runtime hook blocks. This hook
-module remains best-effort when Codex is absent or its config conflicts; explicit Codex SKILLS conflicts instead fail
-the whole install preflight. An automatically selected package that Forge already manages also blocks if a new same-name
-Codex duplicate appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all
-valid tracking rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact
-disable command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks
-every valid, present tracked project/local package of the same name, even outside the current directory chain, because a
-new user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only
-after the user's one-time interactive trust ceremony (§3.9). `forge runtime preflight codex --verify-enrollment`
-confirms enrollment by effect with one cheap managed turn. `~/.forge/installed.json` v2 tracks runtime skill packages
-alongside the canonical file ledger for clean sync, status, and disable. A successful project/local enable then
-establishes the Forge project described in §3. Package roots and descendant directory entries must remain real
-directories: status marks a substituted symlink `invalid-target`, and every write, rollback, or removal revalidates the
-directory chain before mutation. Tracked leaf-file symlinks remain valid for symlink install mode.
+Settings merge remains additive (hooks append + dedupe, permissions union). The shared `hooks` module registers Claude
+settings and, when Codex is selected, `codex-session-start` and `codex-policy-check` in a marker-delimited user Codex
+config block (`$CODEX_HOME/config.toml`). Project/local installs write no runtime hook blocks. The Codex half remains
+best-effort when Codex is absent or its config conflicts; explicit Codex skill conflicts instead fail the whole install
+preflight. An automatically selected package that Forge already manages also blocks if a new same-name Codex duplicate
+appears, preventing sync from silently dropping ownership. Duplicate classification cross-references all valid tracking
+rows: a package managed by another Forge scope remains a conflict whose recovery names that scope's exact disable
+command, while only an untracked package receives remove-or-rename guidance. User-scope planning/status checks every
+valid, present tracked project/local package of the same name, even outside the current directory chain, because a new
+user package would be visible inside all of those projects. Registration alone is inert — Codex hooks fire only after
+the user's one-time interactive trust ceremony (§3.9). `forge runtime preflight codex --verify-enrollment` confirms
+enrollment by effect with one cheap managed turn. `~/.forge/installed.json` schema v3 records a sorted `module_owners`
+relation and a required tagged attribution on every file/settings row; v1/v2 migrate in memory through frozen historical
+readers and persist v3 on the next successful mutation, so no reset is required. Runtime skill packages remain backed by
+the canonical file ledger for clean sync, status, and disable. A successful project/local enable then establishes the
+Forge project described in §3. Package roots and descendant directory entries must remain real directories: status marks
+a substituted symlink `invalid-target`, and every write, rollback, or removal revalidates the directory chain before
+mutation. Tracked leaf-file symlinks remain valid for symlink install mode.
 
 Every compiled runtime package also emits a deterministic `.forge-package.json` provenance sentinel. It records schema
 version 1, producer, runtime, skill name, and sorted payload file digests/modes; it contains no timestamps, absolute
@@ -1405,7 +1408,7 @@ regular copy, participates in cache digests, tracking, sync, and disable, and in
 change on upgrade.
 
 Runtime targets are also scanned independently of tracked-package health. The scanner reads one validated tracking
-snapshot, treats only exact canonical package targets in coherent schema-v2 rows as managed, and observes direct
+snapshot, treats only exact canonical package targets in coherent schema-v3 rows as managed, and observes direct
 children whose name is current/historical Forge output or whose real directory carries the sentinel. Unknown unmarked
 directories remain user content. Unmanaged entries are reported separately from the four tracked states, including
 partial and unsafe blockers, malformed/newer markers, modified trees, and Codex visibility collisions. Corrupt or

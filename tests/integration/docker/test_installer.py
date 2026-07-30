@@ -62,12 +62,20 @@ print(get_tracking_path())
     return result.stdout.strip()
 
 
-def _packaged_forge_command(arguments: str) -> str:
+def _packaged_forge_command(
+    arguments: str,
+    *,
+    project_root: str = _PACKAGED_PROJECT_ROOT,
+    home: str = _PACKAGED_HOME,
+) -> str:
     """Run Forge from a target-installed wheel with isolated lifecycle state."""
+    forge_home = f"{home}/.forge"
+    claude_home = f"{home}/.claude"
+    codex_home = f"{home}/.codex"
     return (
-        f"cd {_PACKAGED_PROJECT_ROOT}\n"
-        f"HOME={_PACKAGED_HOME} FORGE_HOME={_PACKAGED_FORGE_HOME} "
-        f"CLAUDE_HOME={_PACKAGED_CLAUDE_HOME} CODEX_HOME={_PACKAGED_CODEX_HOME} "
+        f"cd {project_root}\n"
+        f"HOME={home} FORGE_HOME={forge_home} "
+        f"CLAUDE_HOME={claude_home} CODEX_HOME={codex_home} "
         f"PATH={_PACKAGED_RUNTIME_BIN}:/usr/bin:/bin "
         f"PYTHONPATH={_PACKAGED_SITE_ROOT} "
         f"/forge/.venv/bin/forge {arguments}"
@@ -329,9 +337,9 @@ chmod +x /tmp/forge-codex-skills-bin/codex
         assert target["packages"] == list(_CODEX_PORTABLE_SKILLS)
 
         manifest = synced_container.read_json(_get_tracking_path(synced_container))
-        assert manifest["version"] == 2
+        assert manifest["version"] == 3
         installation = manifest["installations"]["user"]
-        assert installation["modules_enabled"] == ["skills"]
+        assert installation["module_owners"] == [{"module": "skills", "runtime": "codex"}]
         packages = installation["skill_packages"]
         assert [(package["runtime"], package["skill"]) for package in packages] == [
             ("codex", skill) for skill in _CODEX_PORTABLE_SKILLS
@@ -356,7 +364,7 @@ chmod +x /tmp/forge-codex-skills-bin/codex
         )
         assert status.returncode == 0, f"Codex status failed: {status.stderr}"
         payload = json.loads(status.stdout)
-        assert payload["schema_version"] == 2
+        assert payload["schema_version"] == 3
         assert payload["unmanaged_skill_packages"] == []
         assert payload["installations"][0]["scope"] == "user"
         observed_packages = payload["installations"][0]["skill_packages"]
@@ -432,6 +440,130 @@ PY
             "extensions": f"{_PACKAGED_SITE_ROOT}/forge/_extensions",
         }
 
+        matrix_root = f"{_PACKAGED_LIFECYCLE_ROOT}/matrix"
+        for runtime, managed_runtimes in (
+            ("claude", ["claude_code"]),
+            ("codex", ["codex"]),
+            ("all", ["claude_code", "codex"]),
+        ):
+            home = f"{matrix_root}/{runtime}/home"
+            project_root = f"{matrix_root}/{runtime}/project"
+            create_roots = synced_container.exec(f"mkdir -p {home} {project_root}")
+            assert create_roots.returncode == 0, create_roots.stderr
+
+            enable_matrix = synced_container.exec(
+                _packaged_forge_command(
+                    f"extension enable --scope user --profile standard --runtime {runtime}",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert enable_matrix.returncode == 0, (
+                f"Wheel {runtime} enable failed: " f"stdout={enable_matrix.stdout!r} stderr={enable_matrix.stderr!r}"
+            )
+
+            sync_matrix = synced_container.exec(
+                _packaged_forge_command("extension sync --scope user", project_root=project_root, home=home)
+            )
+            assert (
+                sync_matrix.returncode == 0
+            ), f"Wheel {runtime} sync failed: stdout={sync_matrix.stdout!r} stderr={sync_matrix.stderr!r}"
+
+            status_matrix = synced_container.exec(
+                _packaged_forge_command(
+                    "extension status --scope user --json",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert status_matrix.returncode == 0, status_matrix.stderr
+            status_payload = json.loads(status_matrix.stdout)
+            assert status_payload["schema_version"] == 3
+            assert status_payload["installations"][0]["managed_runtimes"] == managed_runtimes
+
+            expects_claude = runtime in {"claude", "all"}
+            expects_codex = runtime in {"codex", "all"}
+            assert (synced_container.exec(f"test -d {home}/.claude").returncode == 0) is expects_claude
+            assert (synced_container.exec(f"test -f {home}/.codex/config.toml").returncode == 0) is expects_codex
+            assert (synced_container.exec(f"test -d {home}/.agents/skills").returncode == 0) is expects_codex
+
+            disable_matrix = synced_container.exec(
+                _packaged_forge_command(
+                    "extension disable --scope user --yes",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert disable_matrix.returncode == 0, (
+                f"Wheel {runtime} disable failed: " f"stdout={disable_matrix.stdout!r} stderr={disable_matrix.stderr!r}"
+            )
+            assert "user" not in synced_container.read_json(f"{home}/.forge/installed.json")["installations"]
+
+        preserve_home = f"{matrix_root}/preserve/home"
+        preserve_project = f"{matrix_root}/preserve/project"
+        create_preserve_roots = synced_container.exec(f"mkdir -p {preserve_home} {preserve_project}")
+        assert create_preserve_roots.returncode == 0, create_preserve_roots.stderr
+
+        enable_all = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable --scope user --profile standard --runtime all",
+                project_root=preserve_project,
+                home=preserve_home,
+            )
+        )
+        assert enable_all.returncode == 0, enable_all.stderr
+        preserve_tracking_path = f"{preserve_home}/.forge/installed.json"
+        before_narrowing = synced_container.read_json(preserve_tracking_path)["installations"]["user"]
+        before_codex_owners = [owner for owner in before_narrowing["module_owners"] if owner["runtime"] == "codex"]
+        before_codex_packages = [
+            package for package in before_narrowing["skill_packages"] if package["runtime"] == "codex"
+        ]
+        assert before_codex_owners == [
+            {"module": "hooks", "runtime": "codex"},
+            {"module": "skills", "runtime": "codex"},
+        ]
+        assert before_codex_packages
+        codex_config_path = f"{preserve_home}/.codex/config.toml"
+        codex_config_before = synced_container.read_file(codex_config_path)
+
+        narrow_to_claude = synced_container.exec(
+            _packaged_forge_command(
+                "extension enable --scope user --profile standard --runtime claude",
+                project_root=preserve_project,
+                home=preserve_home,
+            )
+        )
+        assert narrow_to_claude.returncode == 0, narrow_to_claude.stderr
+        after_narrowing = synced_container.read_json(preserve_tracking_path)["installations"]["user"]
+        assert [
+            owner for owner in after_narrowing["module_owners"] if owner["runtime"] == "codex"
+        ] == before_codex_owners
+        assert [
+            package for package in after_narrowing["skill_packages"] if package["runtime"] == "codex"
+        ] == before_codex_packages
+        assert synced_container.read_file(codex_config_path) == codex_config_before
+
+        preserved_status = synced_container.exec(
+            _packaged_forge_command(
+                "extension status --scope user --json",
+                project_root=preserve_project,
+                home=preserve_home,
+            )
+        )
+        assert preserved_status.returncode == 0, preserved_status.stderr
+        assert json.loads(preserved_status.stdout)["installations"][0]["managed_runtimes"] == [
+            "claude_code",
+            "codex",
+        ]
+        disable_preserved = synced_container.exec(
+            _packaged_forge_command(
+                "extension disable --scope user --yes",
+                project_root=preserve_project,
+                home=preserve_home,
+            )
+        )
+        assert disable_preserved.returncode == 0, disable_preserved.stderr
+
         enable = synced_container.exec(
             _packaged_forge_command(
                 "extension enable "
@@ -472,9 +604,12 @@ PY
         tracking_path = f"{_PACKAGED_FORGE_HOME}/installed.json"
         tracking_key = f"project:{_PACKAGED_PROJECT_ROOT}"
         manifest = synced_container.read_json(tracking_path)
-        assert manifest["version"] == 2
+        assert manifest["version"] == 3
         installation = manifest["installations"][tracking_key]
-        assert installation["modules_enabled"] == ["skills"]
+        assert {(owner["module"], owner["runtime"]) for owner in installation["module_owners"]} == {
+            ("skills", "claude_code"),
+            ("skills", "codex"),
+        }
         packages = installation["skill_packages"]
         observed_packages = sorted((package["runtime"], package["skill"]) for package in packages)
         assert observed_packages == sorted(
@@ -513,7 +648,7 @@ PY
         )
         assert status.returncode == 0, f"Wheel status failed: stdout={status.stdout!r} stderr={status.stderr!r}"
         payload = json.loads(status.stdout)
-        assert payload["schema_version"] == 2
+        assert payload["schema_version"] == 3
         assert payload["unmanaged_skill_packages"] == []
         assert payload["installations"][0]["scope"] == "project"
         status_packages = payload["installations"][0]["skill_packages"]
@@ -720,7 +855,9 @@ from forge.install.models import (
     InstallModule,
     InstallProfile,
     InstallScope,
+    ModuleOwner,
 )
+from forge.install.ownership import attributed
 from forge.install.settings_merge import entries_to_added_structure, save_added_settings, write_settings
 from forge.install.tracking import TrackingStore
 
@@ -749,12 +886,14 @@ hook_tracking = InstalledSettingsEntry(
     value=legacy,
     merge_type="append",
     stable_id=json.dumps(legacy, sort_keys=True, separators=(",", ":")),
+    attribution=attributed(InstallModule.HOOKS, "claude_code"),
 )
 status_tracking = InstalledSettingsEntry(
     key_path="statusLine",
     value=status_line,
     merge_type="scalar",
     stable_id="statusLine",
+    attribution=attributed(InstallModule.STATUSLINE, "claude_code"),
 )
 codex_path = root / ".codex" / "config.toml"
 codex_path.write_text('model = "gpt-5"\\n', encoding="utf-8")
@@ -764,10 +903,10 @@ installation = Installation(
     project_path=str(root),
     mode=InstallMode.COPY.value,
     profile=InstallProfile.STANDARD.value,
-    modules_enabled=[
-        InstallModule.HOOKS.value,
-        InstallModule.STATUSLINE.value,
-        InstallModule.CODEX_HOOKS.value,
+    module_owners=[
+        ModuleOwner(module=InstallModule.HOOKS.value, runtime="claude_code"),
+        ModuleOwner(module=InstallModule.HOOKS.value, runtime="codex"),
+        ModuleOwner(module=InstallModule.STATUSLINE.value, runtime="claude_code"),
     ],
     settings_entries=[hook_tracking, status_tracking],
     codex_config_path=str(codex_path),
@@ -799,6 +938,7 @@ from forge.install.hooks import (
     has_forge_hook_double_fire,
 )
 from forge.install.models import InstallModule, InstallScope
+from forge.install.ownership import has_module_owner
 from forge.install.project_registry import ProjectRegistryStore
 from forge.install.settings_merge import load_added_settings, read_settings
 from forge.install.tracking import TrackingStore
@@ -821,17 +961,17 @@ assert entry.enrollment_source == "backfill"
 tracking = TrackingStore()
 project = tracking.get_installation(InstallScope.PROJECT.value, str(root))
 assert project is not None
-assert InstallModule.HOOKS.value not in project.modules_enabled
-assert InstallModule.CODEX_HOOKS.value not in project.modules_enabled
-assert InstallModule.STATUSLINE.value in project.modules_enabled
+assert not has_module_owner(project, InstallModule.HOOKS, "claude_code")
+assert not has_module_owner(project, InstallModule.HOOKS, "codex")
+assert has_module_owner(project, InstallModule.STATUSLINE, "claude_code")
 assert not any(item.key_path.startswith("hooks.") for item in project.settings_entries)
 added = load_added_settings(root / ".claude" / "settings.json")
 assert "hooks" not in added
 assert "statusLine" in added
 user = tracking.get_installation(InstallScope.USER.value)
 assert user is not None
-assert InstallModule.HOOKS.value in user.modules_enabled
-assert InstallModule.CODEX_HOOKS.value in user.modules_enabled
+assert has_module_owner(user, InstallModule.HOOKS, "claude_code")
+assert has_module_owner(user, InstallModule.HOOKS, "codex")
 project_codex = (root / ".codex" / "config.toml").read_text(encoding="utf-8")
 assert project_codex == 'model = "gpt-5"\\n'
 user_codex = Path("/tmp/codex-home/config.toml").read_text(encoding="utf-8")
@@ -949,7 +1089,7 @@ print('symlinks verified')
 
 
 class TestCodexHooksModule:
-    """codex-hooks module: scope-mapped managed block in Codex config.toml."""
+    """Codex-owned hooks: scope-mapped managed block in Codex config.toml."""
 
     def test_enable_registers_block_and_disable_removes_it(self, synced_container: ContainerLike) -> None:
         """Full cycle with a codex shim on PATH: enable writes the block, disable removes it."""
@@ -990,7 +1130,9 @@ class TestCodexHooksModule:
         synced_container.exec("mkdir -p /tmp/codex-home")
 
         result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home" " uv run forge extension enable --scope user --profile standard"
+            "cd /forge && CODEX_HOME=/tmp/codex-home"
+            " uv run forge extension enable --scope user"
+            " --profile minimal --with hooks --without commands --runtime all"
         )
         assert result.returncode == 0, f"Enable failed: {result.stderr}"
         assert "Codex hooks skipped: codex binary not found on PATH" in result.stdout

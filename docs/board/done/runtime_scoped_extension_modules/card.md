@@ -1,9 +1,8 @@
 # Runtime-scoped extension modules -- `--runtime` governs every runtime-owned surface
 
-**Lane**: `doing/` -- active on branch `feat/runtime-scoped-extension-modules`; execution plan in
-[checklist.md](checklist.md). No decisions remain open: D1 (durable ownership schema) is approved as decided, and the
-scope-mismatch orphan shipped separately as
-[disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md).
+**Lane**: `done/` -- completed on branch `feat/runtime-scoped-extension-modules`; execution record in
+[checklist.md](checklist.md). D1 (durable ownership schema) shipped as decided, and the scope-mismatch orphan shipped
+separately as [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_orphan/card.md).
 
 **Type**: ordinary card, not an epic. The board's epic criterion is shared-contract **drift**
 ([board_contract.md](../../../developer/board_contract.md) "Epics"), not member count. Drift is prevented structurally
@@ -289,4 +288,7 @@ tests cannot reach the wheel-install path this card changes.
 
 ## Closeout
 
-(pending)
+Shipped on 2026-07-30. `--runtime` now filters all runtime-owned modules, tracking and status use schema v3, and v1/v2
+installations migrate without a reset. The clean-wheel lifecycle covers Claude, Codex, and combined selection, including
+preservation of Codex ownership and files across a Claude-only re-enable. The tagged attribution contract unblocks
+[extension_disable_runtime](../../proposed/extension_disable_runtime/card.md).

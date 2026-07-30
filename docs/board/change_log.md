@@ -27,6 +27,39 @@ wc -l docs/board/change_log.md
 
 ## 2026-07-30
 
+### Runtime-scoped extension modules
+
+**Goal**: Make `forge extension enable --runtime` govern every runtime-owned extension surface, so Claude-only selection
+cannot mutate Codex state and Codex-only selection needs no module-level workaround.
+
+**Key changes**:
+
+- The live module vocabulary now has six values. `hooks` owns both Claude and Codex hook surfaces, and the released
+  `codex-hooks` value is accepted only by the v1/v2 migration path.
+- Tracking moved to schema v3 with a sorted `(module, runtime)` ownership relation and required tagged attribution on
+  every file and settings row. Frozen v1/v2 readers derive only path- or key-provable ownership; unprovable rows remain
+  explicitly unattributed and cannot become runtime-scoped removal targets.
+- Module planning now applies the shared runtime selection after profile, dependency, and scope resolution. Profile
+  exclusions are visible skips, explicit wrong-owner requests and empty effective selections are blocking conflicts, and
+  `--force` cannot bypass them.
+- Explicit narrowing remains additive: a Claude-only re-enable preserves existing Codex packages, hook registration,
+  ownership pairs, and disable metadata. Sync derives its runtime set from persisted ownership, including hooks-only and
+  successful zero-output module ownership.
+- `extension status --json` moved to schema v3 and reports `managed_runtimes`, `module_owners`, compatibility `modules`,
+  and identity-only `unattributed_surfaces`. Recovery commands, design docs, end-user docs, and QA checks now describe
+  the runtime-wide selector.
+
+**Verification**: focused install/CLI (`3311 passed, 1 skipped`); unit (`8526 passed, 1 skipped, 117 deselected`);
+regression (`551 passed`); installer Docker integration (`20 passed`), including clean-wheel Claude/Codex/all
+enable-sync-status-disable lifecycles and Claude-only narrowing preservation; wheel and sdist built with `uv build`;
+`make pre-commit`.
+
+**Compatibility**: installed-state schema and status JSON both bump from v2 to v3. Existing v1/v2 tracking migrates in
+memory and persists on the next successful mutation; no reset or manual migration is required.
+
+**Deferred**: runtime-scoped removal remains in `extension_disable_runtime`, which can now consume the tagged ownership
+contract without matching unattributed legacy rows.
+
 ### Codex disable scope-mismatch refusal
 
 **Goal**: Prevent `forge extension disable` from orphaning an active managed Codex hook block when `$CODEX_HOME` no

@@ -16,7 +16,8 @@ from forge.cli.session import (
     _detect_parent_extensions,
     _generate_parent_transfer_context,
 )
-from forge.install.models import Installation
+from forge.install.models import Installation, InstallModule
+from forge.install.ownership import attributed
 from forge.session.launch import _resolve_worktree_extension_root
 from forge.session.models import SessionState, create_session_state
 
@@ -44,7 +45,17 @@ def _make_installation(profile: str = "standard", mode: str = "copy") -> Install
         scope="local",
         mode=mode,
         profile=profile,
-        modules_enabled=["commands", "agents", "skills", "hooks", "status-line", "permissions"],
+        module_owners=sorted(
+            attributed(module, "claude_code")
+            for module in (
+                InstallModule.COMMANDS,
+                InstallModule.AGENTS,
+                InstallModule.SKILLS,
+                InstallModule.HOOKS,
+                InstallModule.STATUSLINE,
+                InstallModule.PERMISSIONS,
+            )
+        ),
     )
 
 

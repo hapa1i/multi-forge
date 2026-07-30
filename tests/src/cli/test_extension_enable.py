@@ -19,7 +19,8 @@ from forge.cli.extensions import console as extensions_console
 from forge.cli.extensions import extensions
 from forge.core.paths import find_git_root, get_forge_home
 from forge.install.exceptions import NoClaudeDirectoryError
-from forge.install.models import InstallScope
+from forge.install.models import InstallModule, InstallScope
+from forge.install.ownership import attributed
 from forge.install.project_registry import ProjectRegistryStore
 
 
@@ -332,7 +333,7 @@ def test_missing_claude_names_full_codex_only_skill_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Bare ``--runtime codex`` still gates while the skills-only recipe does not."""
+    """The one-flag Codex selection is the complete no-Claude recovery."""
     from unittest.mock import patch
 
     from forge.core.runtime import get_runtime
@@ -355,7 +356,7 @@ def test_missing_claude_names_full_codex_only_skill_recovery(
             "reason": "Claude Code not found. Install it first.",
         },
     )()
-    recovery = "forge extension enable --scope user --profile minimal --with skills --without commands --runtime codex"
+    recovery = "forge extension enable --scope user --runtime codex"
 
     with (
         patch(
@@ -373,12 +374,224 @@ def test_missing_claude_names_full_codex_only_skill_recovery(
         )
         installed = CliRunner().invoke(extensions, recovery.split()[2:])
 
-    assert blocked.exit_code == 1, blocked.output
-    assert recovery in " ".join(blocked.output.split())
+    if runtime_args:
+        assert blocked.exit_code == 0, blocked.output
+        assert version_check.call_count == 0
+    else:
+        assert blocked.exit_code == 1, blocked.output
+        assert recovery in " ".join(blocked.output.split())
+        assert version_check.call_count == 1
     assert installed.exit_code == 0, installed.output
-    assert version_check.call_count == 1
     assert not (tmp_path / "claude-home").exists()
     assert (home / ".agents" / "skills" / "smoke-test" / "SKILL.md").is_file()
+
+
+class TestRuntimeScopedModuleSelection:
+    """CLI acceptance rows for the shared runtime/module filter."""
+
+    @staticmethod
+    def _select_codex(monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.runtime import get_runtime
+
+        monkeypatch.setattr(
+            "forge.install.installer.installed_runtimes",
+            lambda: [get_runtime("codex")],
+        )
+        monkeypatch.setattr("forge.install.installer._codex_available", lambda: True)
+
+    def test_local_codex_is_a_conflict_not_a_silent_noop(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project = tmp_path / "project"
+        project.mkdir()
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            [
+                "enable",
+                "--scope",
+                "local",
+                "--root",
+                str(project),
+                "--runtime",
+                "codex",
+                "--force",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 1, result.output
+        output = " ".join(result.output.split())
+        assert "Conflicts detected" in output
+        assert "scope_unsupported" in output
+
+    def test_bare_codex_in_repo_conflicts_and_names_user_scope_recovery(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / ".git").mkdir()
+        monkeypatch.chdir(project)
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            ["enable", "--runtime", "codex", "--dry-run"],
+        )
+
+        assert result.exit_code == 1, result.output
+        output = " ".join(result.output.split())
+        assert "Auto-detected scope: local" in output
+        assert "scope_unsupported" in output
+        assert "forge extension enable --scope user" in output
+
+    def test_minimal_codex_conflicts_when_runtime_filter_empties_profile(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            [
+                "enable",
+                "--scope",
+                "user",
+                "--profile",
+                "minimal",
+                "--runtime",
+                "codex",
+                "--force",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 1, result.output
+        output = " ".join(result.output.split())
+        assert "commands" in output
+        assert "no modules remain after profile, scope, and runtime filtering" in output
+        assert "--force does not override" in output
+        assert "Use --force to override" not in output
+
+    def test_explicit_wrong_owner_module_conflicts(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            [
+                "enable",
+                "--scope",
+                "user",
+                "--runtime",
+                "codex",
+                "--with",
+                "commands",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 1, result.output
+        output = " ".join(result.output.split())
+        assert "Module: commands" in output
+        assert "not owned by selected runtime(s): codex" in output
+
+    def test_minimal_plus_skills_allows_codex(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        self._select_codex(monkeypatch)
+
+        result = CliRunner().invoke(
+            extensions,
+            [
+                "enable",
+                "--scope",
+                "user",
+                "--profile",
+                "minimal",
+                "--with",
+                "skills",
+                "--runtime",
+                "codex",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        output = " ".join(result.output.split())
+        assert "Skill packages:" in output
+        assert "codex" in output
+        assert "Conflicts detected" not in output
+
+    def test_force_cannot_cross_module_conflict_preflight(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from forge.install.models import (
+            FilePlan,
+            InstallMode,
+            InstallPlan,
+            ModulePlan,
+        )
+
+        plan = InstallPlan(
+            scope="user",
+            mode="copy",
+            profile="standard",
+            modules=["hooks", "skills"],
+            module_outcomes=[ModulePlan(module="commands", action="conflict", reason="runtime_excluded")],
+            files=[
+                FilePlan(
+                    action="conflict",
+                    target_path="/managed/conflict.md",
+                    effective_mode=InstallMode.COPY,
+                    reason="file exists and is not Forge-managed",
+                    module="skills",
+                    runtime="codex",
+                )
+            ],
+            has_conflicts=True,
+            conflicts=[
+                "Module: commands - module is not owned by selected runtime(s): codex",
+                "File: /managed/conflict.md - file exists and is not Forge-managed",
+            ],
+        )
+        self._select_codex(monkeypatch)
+
+        with patch("forge.cli.extensions.Installer") as installer_type:
+            installer = installer_type.return_value
+            installer.plan.return_value = plan
+            installer.init.return_value = MagicMock()
+            result = CliRunner().invoke(
+                extensions,
+                [
+                    "enable",
+                    "--scope",
+                    "user",
+                    "--runtime",
+                    "codex",
+                    "--with",
+                    "commands",
+                    "--force",
+                ],
+            )
+
+        assert result.exit_code == 1, result.output
+        installer.init.assert_not_called()
+        output = " ".join(result.output.split())
+        assert "Use --force only for file or settings conflicts" in output
 
 
 class TestEnableProjectRegistry:
@@ -1033,7 +1246,7 @@ def test_status_all_outside_project_skips_unresolved_non_user_scopes(
     assert result.exit_code == 0, result.output
     if as_json:
         assert json.loads(result.output) == {
-            "schema_version": 2,
+            "schema_version": 3,
             "installations": [],
             "unmanaged_skill_packages": [],
         }
@@ -1063,7 +1276,7 @@ def test_status_json_reports_unmanaged_package_without_installation(
     assert result.exit_code == 0, result.output
     assert result.stderr == ""
     payload = json.loads(result.stdout)
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["installations"] == []
     assert len(payload["unmanaged_skill_packages"]) == 1
     unmanaged = payload["unmanaged_skill_packages"][0]
@@ -1081,6 +1294,115 @@ def test_status_json_reports_unmanaged_package_without_installation(
     assert "Unmanaged runtime skill packages" in human.output
     assert "understand" in human.output
     assert "Remove or rename" in human.output
+
+
+def test_status_json_v3_reports_exact_ownership_and_unattributed_shape(
+    tmp_path: Path,
+) -> None:
+    import json
+
+    from forge.install.models import (
+        Installation,
+        InstalledFile,
+        InstalledSettingsEntry,
+    )
+    from forge.install.ownership import unattributed
+    from forge.install.tracking import TrackingStore
+
+    tracking = TrackingStore()
+    tracking.set_installation(
+        "user",
+        Installation(
+            scope="user",
+            mode="copy",
+            profile="standard",
+            module_owners=sorted(
+                [
+                    attributed(InstallModule.SKILLS, "claude_code"),
+                    attributed(InstallModule.SKILLS, "codex"),
+                ]
+            ),
+            files=[
+                InstalledFile(
+                    target_path=str(tmp_path / "opaque.bin"),
+                    source_path="/legacy/opaque.bin",
+                    checksum="abc",
+                    mode="copy",
+                    installed_at="2026-07-30T00:00:00Z",
+                    attribution=unattributed("legacy_path_unmapped"),
+                )
+            ],
+            settings_entries=[
+                InstalledSettingsEntry(
+                    key_path="future.setting",
+                    value="TOP-SECRET-SETTING-VALUE",
+                    merge_type="scalar",
+                    stable_id="future.setting",
+                    attribution=unattributed("legacy_key_unmapped"),
+                )
+            ],
+            installed_at="2026-07-30T00:00:00Z",
+            updated_at="2026-07-30T00:00:01Z",
+        ),
+    )
+
+    result = CliRunner().invoke(
+        extensions,
+        ["status", "--scope", "user", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "TOP-SECRET-SETTING-VALUE" not in result.output
+    payload = json.loads(result.output)
+    assert set(payload) == {
+        "schema_version",
+        "installations",
+        "unmanaged_skill_packages",
+    }
+    assert payload["schema_version"] == 3
+    assert payload["unmanaged_skill_packages"] == []
+    assert len(payload["installations"]) == 1
+    installation = payload["installations"][0]
+    assert set(installation) == {
+        "scope",
+        "profile",
+        "mode",
+        "managed_runtimes",
+        "module_owners",
+        "modules",
+        "unattributed_surfaces",
+        "files_count",
+        "skill_packages",
+        "settings_count",
+        "codex_config_path",
+        "codex_commands",
+        "installed_at",
+        "updated_at",
+    }
+    assert installation["managed_runtimes"] == ["claude_code", "codex"]
+    assert installation["module_owners"] == [
+        {"module": "skills", "runtime": "claude_code"},
+        {"module": "skills", "runtime": "codex"},
+    ]
+    assert installation["modules"] == ["skills"]
+    assert installation["unattributed_surfaces"] == [
+        {
+            "surface": "file",
+            "target_path": str(tmp_path / "opaque.bin"),
+            "reason": "legacy_path_unmapped",
+        },
+        {
+            "surface": "settings",
+            "key_path": "future.setting",
+            "stable_id": "future.setting",
+            "reason": "legacy_key_unmapped",
+        },
+    ]
+
+    human = CliRunner().invoke(extensions, ["status", "--scope", "user"])
+    assert human.exit_code == 0, human.output
+    assert "2 unattributed surface(s)" in human.output
+    assert "TOP-SECRET-SETTING-VALUE" not in human.output
 
 
 def test_status_human_reports_symlinked_runtime_root_without_traversing_it(
@@ -1114,7 +1436,7 @@ def test_status_human_reports_symlinked_runtime_root_without_traversing_it(
 
     assert machine.exit_code == 0, machine.output
     assert json.loads(machine.stdout) == {
-        "schema_version": 2,
+        "schema_version": 3,
         "installations": [],
         "unmanaged_skill_packages": [],
     }
@@ -1314,7 +1636,7 @@ class TestCleanupProject:
                 project_path=str(root),
                 mode=InstallMode.COPY.value,
                 profile=InstallProfile.STANDARD.value,
-                modules_enabled=[InstallModule.HOOKS.value],
+                module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                 installed_at="2026-01-01T00:00:00Z",
                 updated_at="2026-01-01T00:00:00Z",
             ),
@@ -1390,7 +1712,7 @@ class TestCleanupProject:
                     project_path=str(root),
                     mode=InstallMode.COPY.value,
                     profile=InstallProfile.STANDARD.value,
-                    modules_enabled=[InstallModule.HOOKS.value],
+                    module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                     installed_at="2026-01-01T00:00:00Z",
                     updated_at="2026-01-01T00:00:00Z",
                 ),
@@ -1476,7 +1798,7 @@ class TestCleanupProject:
                 project_path=str(unrelated),
                 mode=InstallMode.COPY.value,
                 profile=InstallProfile.STANDARD.value,
-                modules_enabled=[InstallModule.HOOKS.value],
+                module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
                 installed_at="2026-01-01T00:00:00Z",
                 updated_at="2026-01-01T00:00:00Z",
             ),
@@ -1998,7 +2320,7 @@ class TestExtensionDoctorRuntimeHooks:
 
 
 class TestEnableCodexHooks:
-    """Tests for the codex-hooks module surfaces on enable/status/disable."""
+    """Tests for Codex-owned hooks on enable/status/disable."""
 
     @staticmethod
     def _codex_config() -> Path:
@@ -2021,7 +2343,18 @@ class TestEnableCodexHooks:
             runner = CliRunner()
             return runner.invoke(
                 enable_cmd,
-                ["--scope", "user", "--profile", "minimal", "--with", "codex-hooks"],
+                [
+                    "--scope",
+                    "user",
+                    "--profile",
+                    "minimal",
+                    "--with",
+                    "hooks",
+                    "--without",
+                    "commands",
+                    "--runtime",
+                    "all",
+                ],
             )
 
     def test_enable_registers_and_prints_ceremony_next_steps(self) -> None:
@@ -2032,11 +2365,17 @@ class TestEnableCodexHooks:
         assert "# >>> forge hooks >>>" in self._codex_config().read_text()
 
     def test_enable_without_codex_binary_skips_visibly(self) -> None:
+        from forge.install.tracking import TrackingStore
+
         result = self._enable(available=False)
         assert result.exit_code == 0, result.output
         assert "Codex hooks skipped: codex binary not found on PATH" in result.output
         assert "Next steps (Codex hooks):" not in result.output
         assert not self._codex_config().exists()
+        installation = TrackingStore().get_installation("user")
+        assert installation is not None
+        assert attributed(InstallModule.HOOKS, "claude_code") in installation.module_owners
+        assert attributed(InstallModule.HOOKS, "codex") not in installation.module_owners
 
     def test_status_shows_codex_registration(self) -> None:
         from click.testing import CliRunner
@@ -2060,7 +2399,7 @@ class TestEnableCodexHooks:
         result = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert data["schema_version"] == 2
+        assert data["schema_version"] == 3
         assert data["unmanaged_skill_packages"] == []
         installation = data["installations"][0]
         assert installation["codex_config_path"] == str(self._codex_config())
@@ -2164,6 +2503,7 @@ class TestEnableCodexHooks:
                 scope="user",
                 mode="copy",
                 profile="standard",
+                module_owners=[attributed(InstallModule.HOOKS, "codex")],
                 codex_config_path=str(tracked_config),
             ),
             None,
@@ -2239,10 +2579,15 @@ class TestEnableCodexHooks:
         from click.testing import CliRunner
 
         from forge.cli.extensions import status_cmd
+        from forge.install.tracking import TrackingStore
 
         self._enable(available=True)
         result = self._enable(available=False)
         assert result.exit_code == 0, result.output
+        assert "Codex hooks skipped: codex binary not found on PATH" in result.output
         status = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
         data = json.loads(status.output)
         assert data["installations"][0]["codex_config_path"] == str(self._codex_config())
+        installation = TrackingStore().get_installation("user")
+        assert installation is not None
+        assert attributed(InstallModule.HOOKS, "codex") in installation.module_owners

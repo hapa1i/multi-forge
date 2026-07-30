@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
 from forge.install.models import (
     FILE_MODULES,
     MODULE_DEPENDENCIES,
+    MODULE_RUNTIME_OWNERS,
     PROFILE_MODULES,
     SETTINGS_ONLY_MODULES,
     TRACKING_VERSION,
@@ -21,6 +23,7 @@ from forge.install.models import (
     InstallScope,
     SettingsPlan,
 )
+from forge.install.ownership import attributed
 
 
 class TestEnums:
@@ -63,7 +66,6 @@ class TestProfileModules:
             InstallModule.HOOKS,
             InstallModule.PERMISSIONS,
             InstallModule.STATUSLINE,
-            InstallModule.CODEX_HOOKS,
         }
         assert PROFILE_MODULES[InstallProfile.STANDARD] == expected
 
@@ -88,6 +90,18 @@ class TestModuleDependencies:
 
     def test_no_forced_dependencies(self) -> None:
         assert MODULE_DEPENDENCIES == {}
+
+
+class TestModuleRuntimeOwners:
+    """Tests for the install-module runtime ownership vocabulary."""
+
+    def test_every_module_declares_only_known_runtime_owners(self) -> None:
+        assert set(MODULE_RUNTIME_OWNERS) == set(InstallModule)
+        assert all(MODULE_RUNTIME_OWNERS[module] for module in InstallModule)
+        assert {runtime for owners in MODULE_RUNTIME_OWNERS.values() for runtime in owners} <= set(AGENT_RUNTIME_IDS)
+
+    def test_hooks_declares_both_runtime_owners(self) -> None:
+        assert MODULE_RUNTIME_OWNERS[InstallModule.HOOKS] == set(AGENT_RUNTIME_IDS)
 
 
 class TestModuleCategories:
@@ -123,6 +137,7 @@ class TestInstalledFile:
             checksum="abc123",
             mode="copy",
             installed_at="2024-01-01T00:00:00+00:00",
+            attribution=attributed(InstallModule.COMMANDS, "claude_code"),
         )
         assert f.target_path == "/target/path"
         assert f.source_path == "/source/path"
@@ -139,6 +154,7 @@ class TestInstalledSettingsEntry:
             value={"hooks": []},
             merge_type="append",
             stable_id="/path/to/command",
+            attribution=attributed(InstallModule.HOOKS, "claude_code"),
         )
         assert entry.key_path == "hooks.PreToolUse"
         assert entry.merge_type == "append"
@@ -157,7 +173,7 @@ class TestInstallation:
         assert inst.scope == "user"
         assert inst.mode == "copy"
         assert inst.profile == "standard"
-        assert inst.modules_enabled == []
+        assert inst.module_owners == []
         assert inst.files == []
         assert inst.settings_entries == []
 
