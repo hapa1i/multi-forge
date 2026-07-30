@@ -100,9 +100,11 @@ instead of inventing a fixture.
 ## Phase 2 -- Wire both call sites
 
 - [ ] Call the validator in `uninstall()` between the `existing is None` check (`installer.py:2396-2397`) and the
-  `base_dir` / `removals` computation (`:2399-2400`). **Assertion**: on mismatch it raises before the first filesystem
-  read or write -- no tracked file, settings entry, backup, or tracking row is touched. Verified by comparing
-  tracking-row bytes before and after the raise.
+  `base_dir` / `removals` computation (`:2399-2400`). **Assertion**: on mismatch it raises before the first
+  managed-state mutation (`target.unlink()` at `:2420`) and before the first tracked payload / settings read
+  (`find_backup_files` at `:2408`). Not "before the first filesystem read" -- tracking is already read at `:2395`, and
+  `Path.resolve()` in the validator itself issues `readlink` syscalls. Verified by comparing tracked-file bytes, the
+  settings file, backup files, and the tracking row before and after the raise.
 - [ ] Call the validator in `disable_cmd` before the removal plan is rendered (`cli/extensions.py:1236`). **Assertion**:
   on mismatch the command prints the error and exits 1 with no removal table in the output and without reaching
   `click.confirm` at `:1287`.
