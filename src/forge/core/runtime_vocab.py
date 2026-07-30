@@ -20,9 +20,17 @@ from __future__ import annotations
 CORE_LLM_RUNTIME = "core_llm"
 
 # Agent runtime ids; kept in sync with ``RUNTIMES`` keys in core.runtime.registry.
-AGENT_RUNTIME_IDS: tuple[str, ...] = ("claude_code", "codex")
+CLAUDE_CODE_RUNTIME = "claude_code"
+CODEX_RUNTIME = "codex"
+AGENT_RUNTIME_IDS: tuple[str, ...] = (CLAUDE_CODE_RUNTIME, CODEX_RUNTIME)
 
 # Every runtime a Lane can carry -- the axis reachable_via pins are matched against.
 LANE_RUNTIME_IDS = frozenset(AGENT_RUNTIME_IDS) | {CORE_LLM_RUNTIME}
 
-__all__ = ["AGENT_RUNTIME_IDS", "CORE_LLM_RUNTIME", "LANE_RUNTIME_IDS"]
+__all__ = [
+    "AGENT_RUNTIME_IDS",
+    "CLAUDE_CODE_RUNTIME",
+    "CODEX_RUNTIME",
+    "CORE_LLM_RUNTIME",
+    "LANE_RUNTIME_IDS",
+]

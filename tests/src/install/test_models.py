@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
+from dataclasses import FrozenInstanceError
+
+import pytest
+
+from forge.core.runtime_vocab import (
+    AGENT_RUNTIME_IDS,
+    CLAUDE_CODE_RUNTIME,
+    CODEX_RUNTIME,
+)
 from forge.install.models import (
     FILE_MODULES,
     MODULE_DEPENDENCIES,
@@ -224,10 +232,13 @@ class TestFilePlan:
             target_path="/target",
             effective_mode=InstallMode.COPY,
             source_path="/source",
+            module=InstallModule.COMMANDS.value,
+            runtime=CLAUDE_CODE_RUNTIME,
         )
         assert plan.action == "install"
         assert plan.effective_mode == InstallMode.COPY
         assert plan.reason is None
+        assert plan.module == InstallModule.COMMANDS.value
 
     def test_file_plan_with_reason(self) -> None:
         plan = FilePlan(
@@ -235,8 +246,47 @@ class TestFilePlan:
             target_path="/target",
             effective_mode=InstallMode.SYMLINK,
             reason="file exists",
+            module=InstallModule.SKILLS.value,
+            runtime=CODEX_RUNTIME,
         )
         assert plan.reason == "file exists"
+
+    def test_file_plan_requires_provenance(self) -> None:
+        with pytest.raises(TypeError, match="module.*runtime"):
+            FilePlan(  # type: ignore[call-arg]
+                action="install",
+                target_path="/target",
+                effective_mode=InstallMode.COPY,
+            )
+
+    @pytest.mark.parametrize(
+        ("module", "runtime", "message"),
+        [
+            ("", "", "unknown file-plan module"),
+            (InstallModule.COMMANDS.value, CODEX_RUNTIME, "cannot be owned"),
+        ],
+    )
+    def test_file_plan_rejects_invalid_provenance(self, module: str, runtime: str, message: str) -> None:
+        with pytest.raises(ValueError, match=message):
+            FilePlan(
+                action="install",
+                target_path="/target",
+                effective_mode=InstallMode.COPY,
+                module=module,
+                runtime=runtime,
+            )
+
+    def test_file_plan_is_immutable(self) -> None:
+        plan = FilePlan(
+            action="install",
+            target_path="/target",
+            effective_mode=InstallMode.COPY,
+            module=InstallModule.COMMANDS.value,
+            runtime=CLAUDE_CODE_RUNTIME,
+        )
+
+        with pytest.raises(FrozenInstanceError):
+            setattr(plan, "runtime", CODEX_RUNTIME)
 
 
 class TestSettingsPlan:

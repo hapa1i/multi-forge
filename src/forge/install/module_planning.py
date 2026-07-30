@@ -8,6 +8,7 @@ from .models import (
     MODULE_RUNTIME_OWNERS,
     PROFILE_MODULES,
     InstallModule,
+    InstallPlan,
     InstallProfile,
     InstallScope,
     ModulePlan,
@@ -97,3 +98,28 @@ def filter_modules_by_runtime(
             f"Runtime selection: {selected_names} - no modules remain after profile, scope, and runtime filtering"
         )
     return effective, outcomes, conflicts
+
+
+def validate_file_plan_ownership(plan: InstallPlan) -> None:
+    """Reject file provenance outside the plan's resolved module/runtime set."""
+
+    resolved_modules: set[InstallModule] = set()
+    for module_value in plan.modules:
+        try:
+            resolved_modules.add(InstallModule(module_value))
+        except ValueError as e:
+            raise ForgeInstallError(f"Install plan contains unknown module {module_value!r}") from e
+
+    selected_runtimes = set(plan.selected_runtimes)
+    allowed_pairs = {
+        (module.value, runtime)
+        for module in resolved_modules
+        for runtime in MODULE_RUNTIME_OWNERS[module] & selected_runtimes
+    }
+    for file_plan in plan.files:
+        pair = (file_plan.module, file_plan.runtime)
+        if pair not in allowed_pairs:
+            raise ForgeInstallError(
+                f"File plan '{file_plan.target_path}' has ownership {pair!r} outside the resolved "
+                "module/runtime set; refusing before filesystem mutation"
+            )

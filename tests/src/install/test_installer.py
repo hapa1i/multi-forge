@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from forge.core.paths import get_forge_home
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME, CODEX_RUNTIME
 from forge.install.exceptions import (
     CodexConfigScopeMismatchError,
     ForgeInstallError,
@@ -32,10 +33,12 @@ from forge.install.installer import (
     validate_path_within_boundary,
 )
 from forge.install.models import (
+    FilePlan,
     Installation,
     InstalledSettingsEntry,
     InstallMode,
     InstallModule,
+    InstallPlan,
     InstallProfile,
     InstallScope,
 )
@@ -331,6 +334,39 @@ class TestInstallerInit:
                 installer.init(profile=InstallProfile.MINIMAL)
 
         assert (claude_home / "commands" / "test.md").exists()
+
+    def test_init_rejects_file_ownership_outside_resolved_plan_before_writes(
+        self,
+        setup_installer: tuple[Installer, Path, Path, Path],
+    ) -> None:
+        installer, forge_home, claude_home, src = setup_installer
+        target = claude_home / "commands" / "test.md"
+        invalid_plan = InstallPlan(
+            scope=InstallScope.USER.value,
+            mode=InstallMode.COPY.value,
+            profile=InstallProfile.MINIMAL.value,
+            modules=[InstallModule.COMMANDS.value],
+            selected_runtimes=[CLAUDE_CODE_RUNTIME],
+            files=[
+                FilePlan(
+                    action="install",
+                    target_path=str(target),
+                    effective_mode=InstallMode.COPY,
+                    source_path=str(src / "commands" / "test.md"),
+                    module=InstallModule.SKILLS.value,
+                    runtime=CODEX_RUNTIME,
+                )
+            ],
+        )
+
+        with (
+            patch.object(installer, "plan", return_value=invalid_plan),
+            pytest.raises(ForgeInstallError, match="outside the resolved module/runtime set"),
+        ):
+            installer.init(profile=InstallProfile.MINIMAL)
+
+        assert not target.exists()
+        assert not (forge_home / "installed.json").exists()
 
     def test_init_is_idempotent(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
         installer, forge_home, claude_home, src = setup_installer

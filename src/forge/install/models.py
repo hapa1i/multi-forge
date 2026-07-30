@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from forge.core.runtime_vocab import AGENT_RUNTIME_IDS
+from forge.core.runtime_vocab import AGENT_RUNTIME_IDS, CLAUDE_CODE_RUNTIME
 
 # --- Enums ---
 
@@ -65,12 +65,12 @@ class InstallModule(str, Enum):
 
 # Durable runtime ownership for every live module value.
 MODULE_RUNTIME_OWNERS: dict[InstallModule, frozenset[str]] = {
-    InstallModule.COMMANDS: frozenset({"claude_code"}),
-    InstallModule.AGENTS: frozenset({"claude_code"}),
+    InstallModule.COMMANDS: frozenset({CLAUDE_CODE_RUNTIME}),
+    InstallModule.AGENTS: frozenset({CLAUDE_CODE_RUNTIME}),
     InstallModule.SKILLS: frozenset(AGENT_RUNTIME_IDS),
     InstallModule.HOOKS: frozenset(AGENT_RUNTIME_IDS),
-    InstallModule.STATUSLINE: frozenset({"claude_code"}),
-    InstallModule.PERMISSIONS: frozenset({"claude_code"}),
+    InstallModule.STATUSLINE: frozenset({CLAUDE_CODE_RUNTIME}),
+    InstallModule.PERMISSIONS: frozenset({CLAUDE_CODE_RUNTIME}),
 }
 
 
@@ -316,7 +316,7 @@ class InstalledManifest:
 # --- Plan dataclasses (for --dry-run) ---
 
 
-@dataclass
+@dataclass(frozen=True)
 class FilePlan:
     """Plan for a single file operation.
 
@@ -335,8 +335,18 @@ class FilePlan:
     effective_mode: InstallMode
     source_path: str | None = None
     reason: str | None = None
-    module: str = ""
-    runtime: str = ""
+    module: str = field(kw_only=True)
+    runtime: str = field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        """Reject ownership that cannot become a valid tracked-file attribution."""
+
+        try:
+            module = InstallModule(self.module)
+        except ValueError as e:
+            raise ValueError(f"unknown file-plan module: {self.module!r}") from e
+        if self.runtime not in MODULE_RUNTIME_OWNERS[module]:
+            raise ValueError(f"module {self.module!r} cannot be owned by runtime {self.runtime!r}")
 
 
 @dataclass

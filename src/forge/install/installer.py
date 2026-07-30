@@ -15,6 +15,7 @@ import subprocess
 from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, NoReturn
@@ -69,6 +70,7 @@ from .module_planning import (
     apply_scope_module_policy,
     filter_modules_by_runtime,
     resolve_modules,
+    validate_file_plan_ownership,
 )
 from .ownership import (
     attributed,
@@ -987,9 +989,15 @@ class Installer:
                 rel_path = source_file.relative_to(source_dir)
                 target_file = target_dir / rel_path
 
-                file_plan = self._plan_file(source_file, target_file, mode, existing, force)
-                file_plan.module = module.value
-                file_plan.runtime = CLAUDE_CODE_RUNTIME
+                file_plan = self._plan_file(
+                    source_file,
+                    target_file,
+                    mode,
+                    existing,
+                    force,
+                    module=module,
+                    runtime=CLAUDE_CODE_RUNTIME,
+                )
                 plan.files.append(file_plan)
                 if file_plan.action == "conflict":
                     plan.has_conflicts = True
@@ -1197,9 +1205,8 @@ class Installer:
                     effective_mode,
                     existing,
                     force,
+                    runtime=decision.runtime,
                 )
-                file_plan.module = InstallModule.SKILLS.value
-                file_plan.runtime = decision.runtime
                 file_plans.append(file_plan)
                 plan.files.append(file_plan)
                 if file_plan.action == "conflict":
@@ -1270,11 +1277,14 @@ class Installer:
         mode: InstallMode,
         existing: Installation | None,
         force: bool,
+        *,
+        runtime: str,
     ) -> FilePlan:
         """Plan compiled bytes against a future cache path without materializing it."""
 
+        make_plan = partial(FilePlan, module=InstallModule.SKILLS.value, runtime=runtime)
         if not target.exists() and not target.is_symlink():
-            return FilePlan(
+            return make_plan(
                 action="install",
                 target_path=str(target),
                 effective_mode=mode,
@@ -1290,14 +1300,14 @@ class Installer:
             if mode == InstallMode.SYMLINK:
                 if target.is_symlink() and target.resolve(strict=False) == source.resolve(strict=False):
                     if not source.is_file() or source.is_symlink():
-                        return FilePlan(
+                        return make_plan(
                             action="update",
                             target_path=str(target),
                             effective_mode=mode,
                             source_path=str(source),
                             reason="compiled cache missing or invalid",
                         )
-                    return FilePlan(
+                    return make_plan(
                         action="skip",
                         target_path=str(target),
                         effective_mode=mode,
@@ -1309,14 +1319,14 @@ class Installer:
                 source_checksum = hashlib.sha256(package_file.content).hexdigest()
                 target_mode = stat.S_IMODE(target.stat().st_mode)
                 if source_checksum == target_checksum and target_mode == package_file.mode:
-                    return FilePlan(
+                    return make_plan(
                         action="skip",
                         target_path=str(target),
                         effective_mode=mode,
                         source_path=str(source),
                         reason="file unchanged",
                     )
-            return FilePlan(
+            return make_plan(
                 action="update",
                 target_path=str(target),
                 effective_mode=mode,
@@ -1324,14 +1334,14 @@ class Installer:
             )
 
         if force:
-            return FilePlan(
+            return make_plan(
                 action="install",
                 target_path=str(target),
                 effective_mode=mode,
                 source_path=str(source),
                 reason="force overwrite",
             )
-        return FilePlan(
+        return make_plan(
             action="conflict",
             target_path=str(target),
             effective_mode=mode,
@@ -1411,6 +1421,9 @@ class Installer:
         mode: InstallMode,
         existing: Installation | None,
         force: bool,
+        *,
+        module: InstallModule,
+        runtime: str,
     ) -> FilePlan:
         """Plan a single file operation.
 
@@ -1424,8 +1437,9 @@ class Installer:
         Returns:
             FilePlan for this file.
         """
+        make_plan = partial(FilePlan, module=module.value, runtime=runtime)
         if not target.exists() and not target.is_symlink():
-            return FilePlan(
+            return make_plan(
                 action="install",
                 target_path=str(target),
                 effective_mode=mode,
@@ -1439,7 +1453,7 @@ class Installer:
         if is_managed:
             if mode == InstallMode.SYMLINK:
                 if target.is_symlink() and target.resolve() == source.resolve():
-                    return FilePlan(
+                    return make_plan(
                         action="skip",
                         target_path=str(target),
                         effective_mode=mode,
@@ -1451,7 +1465,7 @@ class Installer:
                     source_checksum = compute_checksum(source)
                     target_checksum = compute_checksum(target)
                     if source_checksum == target_checksum:
-                        return FilePlan(
+                        return make_plan(
                             action="skip",
                             target_path=str(target),
                             effective_mode=mode,
@@ -1459,7 +1473,7 @@ class Installer:
                             reason="file unchanged",
                         )
 
-            return FilePlan(
+            return make_plan(
                 action="update",
                 target_path=str(target),
                 effective_mode=mode,
@@ -1467,7 +1481,7 @@ class Installer:
             )
 
         if force:
-            return FilePlan(
+            return make_plan(
                 action="install",
                 target_path=str(target),
                 effective_mode=mode,
@@ -1475,7 +1489,7 @@ class Installer:
                 reason="force overwrite",
             )
 
-        return FilePlan(
+        return make_plan(
             action="conflict",
             target_path=str(target),
             effective_mode=mode,
@@ -1675,6 +1689,7 @@ class Installer:
             _managed_runtime_ids=_managed_runtime_ids,
         )
 
+        validate_file_plan_ownership(plan)
         if plan.has_conflicts:
             return plan  # Planning conflicts are a hard preflight boundary.
 

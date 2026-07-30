@@ -98,7 +98,7 @@ Use an explicit runtime when validating one runtime-owned extension surface:
 
 ```bash
 # Project-scoped Codex skills (safe inside a disposable test repository)
-forge extension enable --scope project --runtime codex --profile minimal --with skills --without commands
+forge extension enable --scope project --runtime codex
 forge extension status --scope project --json
 forge extension sync --scope project
 

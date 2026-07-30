@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+from forge.core.runtime_vocab import CLAUDE_CODE_RUNTIME
+from forge.core.runtime_vocab import CODEX_RUNTIME as CODEX_RUNTIME
 from forge.session.claude.paths import get_claude_home
 
 from .models import (
@@ -20,9 +22,6 @@ from .models import (
     SurfaceAttribution,
     UnattributedSurface,
 )
-
-CLAUDE_CODE_RUNTIME = "claude_code"
-CODEX_RUNTIME = "codex"
 
 LEGACY_UNATTRIBUTED_REASONS = frozenset(
     {
