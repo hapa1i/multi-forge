@@ -2771,7 +2771,7 @@ class TestEnableCodexHooks:
 
         assert result.exit_code == 1, result.output
         assert str(config) in " ".join(result.output.split())
-        assert "partial, duplicated, or unbalanced" in result.output
+        assert "partial, duplicated, or unbalanced" in " ".join(result.output.split())
         confirm.assert_not_called()
         assert config.read_bytes() == config_before
         assert TrackingStore().path.read_bytes() == tracking_before
