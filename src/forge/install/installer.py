@@ -22,7 +22,7 @@ from typing import Any, NoReturn
 
 from forge.core.paths import find_git_root
 from forge.core.runtime import installed_runtimes
-from forge.core.state import StateError, atomic_write_bytes, now_iso
+from forge.core.state import StateError, now_iso
 
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
@@ -79,6 +79,7 @@ from .ownership import (
 )
 from .ownership import managed_runtime_ids as owned_runtime_ids
 from .ownership import module_values
+from .runtime_removal import RuntimeRemovalExecutor, RuntimeRemovalPlan
 from .settings_merge import (
     backup_settings,
     cleanup_empty_settings,
@@ -97,6 +98,11 @@ from .settings_merge import (
     smart_unmerge,
     unmerge,
     write_settings,
+)
+from .settings_rollback import SettingsRollbackState as _SettingsRollbackState
+from .settings_rollback import (
+    capture_settings_rollback_state,
+    restore_settings_rollback_state,
 )
 from .skill_cache import compiled_skill_cache_dir, materialize_compiled_skill
 from .skill_compiler import (
@@ -195,16 +201,6 @@ _CLAUDE_SETTINGS_MODULES = {
     InstallModule.STATUSLINE,
     InstallModule.PERMISSIONS,
 }
-
-
-@dataclass(frozen=True)
-class _SettingsRollbackState:
-    """Exact pre-apply settings and ownership-sidecar state."""
-
-    settings_path: Path
-    settings_content: bytes | None
-    settings_mode: int | None
-    added_files: tuple[tuple[Path, bytes, int], ...]
 
 
 def _ensure_hook_dispatcher() -> None:
@@ -891,7 +887,7 @@ class Installer:
                 installed_runtime_ids=tuple(runtime.id for runtime in installed_runtimes()),
                 explicit_runtime_ids=skill_runtimes,
                 managed_runtime_ids=_managed_runtime_ids,
-                existing_runtime_ids=owned_runtime_ids(existing) if existing is not None else (),
+                existing_runtime_ids=(owned_runtime_ids(existing) if existing is not None else ()),
             )
         except ValueError as e:
             raise ForgeInstallError(f"Invalid runtime selection: {e}") from e
@@ -1144,13 +1140,13 @@ class Installer:
                     runtime=decision.runtime,
                     skill=decision.skill,
                     action=decision.action.value,
-                    target_dir=str(decision.target_dir) if decision.target_dir is not None else None,
+                    target_dir=(str(decision.target_dir) if decision.target_dir is not None else None),
                     reason=decision.reason.value,
                     duplicate_dirs=[str(path) for path in decision.duplicate_dirs],
                     recovery=render_unmanaged_conflict_recovery(
                         decision.duplicate_dirs,
                         unmanaged_by_path,
-                        operation="sync" if selection.origin == RuntimeSelectionOrigin.MANAGED else "enable",
+                        operation=("sync" if selection.origin == RuntimeSelectionOrigin.MANAGED else "enable"),
                         project_root=self._project_root,
                     ),
                 )
@@ -1229,7 +1225,7 @@ class Installer:
                 target_dir=str(decision.target_dir),
                 cache_dir=str(cache_dir),
                 file_paths=sorted(file_plan.target_path for file_plan in file_plans),
-                reason="files unchanged" if package_action == "skip" else decision.reason.value,
+                reason=("files unchanged" if package_action == "skip" else decision.reason.value),
             )
             plan.skill_packages.append(package_plan)
             self._compiled_skill_packages[(decision.runtime, decision.skill)] = compiled
@@ -1794,7 +1790,7 @@ class Installer:
         if claude_modules & _CLAUDE_SETTINGS_MODULES:
             settings_path = get_settings_path(self._scope, self._project_root)
             try:
-                settings_rollback_state = self._capture_settings_rollback_state(settings_path)
+                settings_rollback_state = capture_settings_rollback_state(settings_path)
                 backup_path = backup_settings(settings_path)
                 settings = read_settings(settings_path)
             except OSError as e:
@@ -1876,7 +1872,7 @@ class Installer:
             if final_entries:
                 settings_path = get_settings_path(self._scope, self._project_root)
                 try:
-                    settings_rollback_state = self._capture_settings_rollback_state(settings_path)
+                    settings_rollback_state = capture_settings_rollback_state(settings_path)
                     save_added_settings(settings_path, entries_to_added_structure(final_entries))
                 except OSError as e:
                     self._raise_post_file_failure(
@@ -2067,7 +2063,7 @@ class Installer:
             unrecorded_targets=unrecorded_targets,
         )
         if settings_rollback_state is not None:
-            rollback_failures.extend(self._restore_settings_rollback_state(settings_rollback_state))
+            rollback_failures.extend(restore_settings_rollback_state(settings_rollback_state))
         rollback_note = (
             f" Could not roll back: {', '.join(rollback_failures)}; remove only those generated files before retry."
             if rollback_failures
@@ -2079,63 +2075,6 @@ class Installer:
             )
         )
         raise ForgeInstallError(f"{message}: {cause}.{rollback_note}") from cause
-
-    @staticmethod
-    def _capture_settings_rollback_state(settings_path: Path) -> _SettingsRollbackState:
-        """Capture settings and all ownership sidecars before an apply mutation."""
-
-        if settings_path.is_file():
-            settings_content = settings_path.read_bytes()
-            settings_mode = stat.S_IMODE(settings_path.stat().st_mode)
-        else:
-            settings_content = None
-            settings_mode = None
-        added_files = tuple(
-            (path, path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in find_added_files(settings_path)
-        )
-        return _SettingsRollbackState(
-            settings_path=settings_path,
-            settings_content=settings_content,
-            settings_mode=settings_mode,
-            added_files=added_files,
-        )
-
-    @staticmethod
-    def _restore_settings_rollback_state(state: _SettingsRollbackState) -> list[str]:
-        """Best-effort restore of settings and ownership sidecars after apply failure."""
-
-        failures: list[str] = []
-        try:
-            if state.settings_content is None:
-                state.settings_path.unlink(missing_ok=True)
-            else:
-                atomic_write_bytes(
-                    state.settings_path,
-                    state.settings_content,
-                    mode=state.settings_mode,
-                )
-        except OSError:
-            failures.append(str(state.settings_path))
-
-        prior_added_paths = {path for path, _content, _mode in state.added_files}
-        try:
-            current_added_files = find_added_files(state.settings_path)
-        except OSError:
-            failures.append(f"{state.settings_path} ownership sidecars")
-            current_added_files = []
-        for path in current_added_files:
-            if path in prior_added_paths:
-                continue
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                failures.append(str(path))
-        for path, content, mode in state.added_files:
-            try:
-                atomic_write_bytes(path, content, mode=mode)
-            except OSError:
-                failures.append(str(path))
-        return failures
 
     def _rollback_newly_created_files(
         self,
@@ -2372,6 +2311,38 @@ class Installer:
             force=force,
             _modules_override=existing_modules,
             _managed_runtime_ids=managed_runtime_ids,
+        )
+
+    def plan_runtime_removal(self, runtime_ids: tuple[str, ...]) -> RuntimeRemovalPlan:
+        """Plan removal of the tracked surfaces owned by ``runtime_ids``."""
+
+        return self._runtime_removal_executor().plan(runtime_ids)
+
+    def validate_runtime_removal(self, plan: RuntimeRemovalPlan) -> None:
+        """Run every knowable runtime-removal safety check without mutation."""
+
+        self._runtime_removal_executor().validate(plan)
+
+    def uninstall_runtimes(
+        self,
+        runtime_ids: tuple[str, ...],
+        *,
+        expected_plan: RuntimeRemovalPlan | None = None,
+    ) -> RuntimeRemovalPlan:
+        """Remove selected runtime surfaces and reconcile tracking after faults."""
+
+        return self._runtime_removal_executor().uninstall(runtime_ids, expected_plan=expected_plan)
+
+    def _runtime_removal_executor(self) -> RuntimeRemovalExecutor:
+        return RuntimeRemovalExecutor(
+            scope=self._scope,
+            project_root=self._project_root,
+            project_path=self._project_path_str,
+            tracking=self._tracking,
+            get_target_root=get_target_root,
+            validate_path_within_boundary=validate_path_within_boundary,
+            tracked_file_boundary=self._tracked_file_boundary,
+            validate_codex_config_scope=self.validate_codex_config_scope,
         )
 
     def uninstall(self) -> None:

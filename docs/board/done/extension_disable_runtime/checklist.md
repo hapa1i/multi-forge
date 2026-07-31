@@ -2,8 +2,8 @@
 
 **Card**: [card.md](card.md) **Branch**: `feat/extension-disable-runtime` **Base**: `main` at `4b9ad0ad`
 
-**Current focus**: Phase 1 -- the removal-set derivation, which is pure, testable without the CLI, and the input every
-later phase depends on.
+**Current focus**: Complete -- implementation, documentation, clean-wheel lifecycle coverage, and closeout verification
+are recorded below.
 
 **Authority**: the decisions in this file are **firm**, not provisional. `card.md`'s two stale Constraints have been
 reconciled in place and marked RESOLVED with shipping evidence, so there is one execution contract: the card owns intent
@@ -199,116 +199,116 @@ State this honestly rather than promising a guarantee the code cannot make:
 
 No CLI, no filesystem. This is the contract every later phase reads.
 
-- [ ] Add a removal-set builder returning the files, settings entries, skill packages, ownership pairs, Codex-block
+- [x] Add a removal-set builder returning the files, settings entries, skill packages, ownership pairs, Codex-block
   flag, and **surviving settings entries** for a given `Installation` plus selected runtime ids. **Assertion**:
   selection is the intersection of `MODULE_RUNTIME_OWNERS` with what tracking claims -- never the ownership map alone.
   Nothing untracked is adopted; `forge clean` still owns proven orphans.
-- [ ] Select rows via `ownership.attribution_pair` (`ownership.py:83`). **Assertion**: a `None` result (unattributed) is
+- [x] Select rows via `ownership.attribution_pair` (`ownership.py:83`). **Assertion**: a `None` result (unattributed) is
   never a removal target, asserted directly against a migrated-v1 fixture. Per F3 this is builder policy -- the test
   must fail if the builder includes such a row, because `TrackingStore.write()` will not catch it.
-- [ ] Return selected and surviving settings entries for the smart-unmerge/sidecar subtransaction (D-settings-sidecar).
+- [x] Return selected and surviving settings entries for the smart-unmerge/sidecar subtransaction (D-settings-sidecar).
   **Assertion**: `entries_to_added_structure` consumes the selected set for smart-unmerge and the survivor set for
   durable ownership, so Phase 2 does not recompute either from a different source.
-- [ ] Make `--runtime claude` cover all five Claude surfaces plus Claude skill packages. **Assertion**: commands,
+- [x] Make `--runtime claude` cover all five Claude surfaces plus Claude skill packages. **Assertion**: commands,
   agents, `hooks`, `statusLine`, and `permissions` settings entries, and Claude skill packages -- each asserted
   separately so a missing surface fails its own test. Under-removal is a named card risk.
-- [ ] Produce a post-removal `Installation` satisfying every v3 invariant. **Assertion**: rows dropped with their pairs
+- [x] Produce a post-removal `Installation` satisfying every v3 invariant. **Assertion**: rows dropped with their pairs
   (inv 2), packages with `(skills, runtime)` (inv 4), `codex_config_path` + `codex_commands` cleared exactly when
   `(hooks, codex)` is dropped (inv 5). Feed the result through `_validate_current_manifest` in the test. Per F2 this
   proves internal coherence only.
-- [ ] Report retained unattributed rows. **Assertion**: count and reasons, so the CLI can tell a legacy user what
+- [x] Report retained unattributed rows. **Assertion**: count and reasons, so the CLI can tell a legacy user what
   remains.
-- [ ] Detect full coverage, including repeated flags (D-full-coverage). **Assertion**: `--runtime all`, last-runtime,
+- [x] Detect full coverage, including repeated flags (D-full-coverage). **Assertion**: `--runtime all`, last-runtime,
   and `--runtime claude --runtime codex` on a dual install all report full coverage.
 
 ## Phase 2 -- Installer removal path
 
-- [ ] Add the runtime-scoped removal entry point, reusing `uninstall()`'s boundary validation. **Assertion**:
+- [x] Add the runtime-scoped removal entry point, reusing `uninstall()`'s boundary validation. **Assertion**:
   `_tracked_file_boundary` + `validate_path_within_boundary` run on the filtered subset, so the `invalid-target` refusal
   for a symlink-replaced package root still applies (`design_appendix.md` section C.5).
-- [ ] Keep every runtime-spelled request on the runtime-scoped engine, including full coverage (D-full-coverage).
+- [x] Keep every runtime-spelled request on the runtime-scoped engine, including full coverage (D-full-coverage).
   **Assertion**: full mode selects attributed plus unattributed rows, deletes the row on success, and still uses the
   Codex/failure rules below; it does not call `uninstall()` wholesale. Bare disable stays unchanged.
-- [ ] Smart-unmerge only the selected settings entries and reconcile `.forge-added` (F4, D-settings-sidecar).
+- [x] Smart-unmerge only the selected settings entries and reconcile `.forge-added` (F4, D-settings-sidecar).
   **Assertion**: call `smart_unmerge(current, backup, entries_to_added_structure(selected_entries))` -- **not**
   `settings_merge.unmerge`, which deletes tracked env keys without comparing (`:818-825`). With survivors, the newest
   `.forge-added` contains exactly their ownership and `settings_backup_path` is retained. With zero survivors, all
   ownership sidecars are removed and the field is cleared; backup-history files remain.
-- [ ] Make settings plus ownership sidecars a reversible subtransaction (D-settings-sidecar). **Assertion**: capture
+- [x] Make settings plus ownership sidecars a reversible subtransaction (D-settings-sidecar). **Assertion**: capture
   exact bytes/modes before either write; failure of the settings write or sidecar update restores both. Successful
   rollback retains all selected settings rows; incomplete rollback exits non-zero naming every divergent path and never
   drops those rows.
-- [ ] Scope the Codex preflight to the removal set (D-preflight-scoped). **Assertion**: `validate_codex_config_scope`
+- [x] Scope the Codex preflight to the removal set (D-preflight-scoped). **Assertion**: `validate_codex_config_scope`
   runs iff the Codex block is being removed.
-- [ ] Classify and revalidate Codex marker state (D-codex-outcomes). **Assertion**: absent file or absent block clears
+- [x] Classify and revalidate Codex marker state (D-codex-outcomes). **Assertion**: absent file or absent block clears
   stale ownership; exactly one balanced block is removed; partial/duplicate markers and unreadable or concurrently
   changed state refuse while retaining ownership. Outside-marker commands are preserved and warning-only. Per F5,
   neither `removed` nor `leftover_commands` alone is the classifier.
-- [ ] Do not re-render the surviving runtime's hook bytes. **Assertion**:
+- [x] Do not re-render the surviving runtime's hook bytes. **Assertion**:
   `tests/src/install/test_registered_commands_contract.py` passes unchanged. Codex `trusted_hash` covers command bytes
   and config location, so a re-render forces a needless ceremony on the runtime that was kept.
-- [ ] Preserve Codex config boundaries. **Assertion**: bytes outside the markers survive; a whitespace-only remainder
+- [x] Preserve Codex config boundaries. **Assertion**: bytes outside the markers survive; a whitespace-only remainder
   deletes the file (`design_appendix.md` section C.6).
-- [ ] Implement the failure taxonomy above, including reconciliation-write failure. **Assertion**: each boundary behaves
+- [x] Implement the failure taxonomy above, including reconciliation-write failure. **Assertion**: each boundary behaves
   as tabled; mutation precedes the tracking write (F2, application order); reconciliation-write failure restores the
   settings subtransaction, exits non-zero naming the tracking path and any rollback failure, and neither retries nor
   partially writes tracking.
 
 ## Phase 3 -- CLI surface
 
-- [ ] Add `--runtime` to `disable_cmd` (`extensions.py:1205-1220`), spelled as on `enable`. **Assertion**:
+- [x] Add `--runtime` to `disable_cmd` (`extensions.py:1205-1220`), spelled as on `enable`. **Assertion**:
   `click.Choice(["claude", "codex", "all"])`, repeatable, resolved through `_parse_skill_runtimes` (`:139`) so the two
   verbs cannot drift. Composes with `--scope` and `--all`.
-- [ ] Filter the four existing plan tables (`:1279-1327`) rather than adding a render path. **Assertion**: skill
+- [x] Filter the four existing plan tables (`:1279-1327`) rather than adding a render path. **Assertion**: skill
   packages, files, settings, and the Codex block line each narrow; the confirmation position and `--yes` bypass at
   `:1329` are retained (D-preview). Wording changes only when individual runtime flags imply full removal and in
   runtime-filtered batch mode; an explicit single-scope `--runtime all` keeps the existing prompt golden.
-- [ ] Show retained unattributed rows in the plan (D-unattributed). **Assertion**: count and reason, so a legacy user is
+- [x] Show retained unattributed rows in the plan (D-unattributed). **Assertion**: count and reason, so a legacy user is
   not told the runtime is gone while residue remains.
-- [ ] State the re-trust consequence before the prompt. **Assertion**: shown whenever the Codex block is in the removal
+- [x] State the re-trust consequence before the prompt. **Assertion**: shown whenever the Codex block is in the removal
   set; worded as a consequence, never as a claim that trust was verified.
-- [ ] Add full-uninstall wording when individual runtime flags cover the whole row. **Assertion**: last-runtime and
+- [x] Add full-uninstall wording when individual runtime flags cover the whole row. **Assertion**: last-runtime and
   repeated `claude` + `codex` selections say this removes the whole installation for that scope; neither may read like a
   partial removal.
-- [ ] Report the no-op case with the resolved scope (D-autodetect-unchanged). **Assertion**: exit 0, nothing touched,
+- [x] Report the no-op case with the resolved scope (D-autodetect-unchanged). **Assertion**: exit 0, nothing touched,
   message names the resolved scope and points at `--scope` -- because auto-detect picked the nearest install without
   considering runtimes.
-- [ ] Compose with `--all` and add the DISPOSITION column (D-all-disposition). **Assertion**: each scope row shows
+- [x] Compose with `--all` and add the DISPOSITION column (D-all-disposition). **Assertion**: each scope row shows
   `no-op` / `partial` / `full`; counts alone cannot distinguish them. The prompt and per-scope/final completion messages
   name the selected runtime operation rather than saying every installation was disabled when rows remain.
   Full-disposition counts include unattributed rows being removed; partial/no-op rows with legacy residue get a scoped
   count-and-reason note before confirmation. `_uninstall_all_installations` (`:695`) still aggregates failures and exits
   non-zero if any scope fails. Bare `scripts/setup.sh --uninstall` passes no runtime filter and retains its
   complete-removal contract.
-- [ ] Route recovery output through `forge.cli.output`. **Assertion**: no hand-rolled `Tip:` or `[red]Error:[/red]`; the
+- [x] Route recovery output through `forge.cli.output`. **Assertion**: no hand-rolled `Tip:` or `[red]Error:[/red]`; the
   two style-guard tests stay green.
 
 ## Phase 4 -- Sync and status coherence
 
-- [ ] Assert sync does not resurrect. **Assertion**: per F1, `disable --runtime codex --yes` then `sync` leaves Codex
+- [x] Assert sync does not resurrect. **Assertion**: per F1, `disable --runtime codex --yes` then `sync` leaves Codex
   absent -- asserted on **post-sync target paths**, not tracking contents.
-- [ ] Assert `status --json` after a partial disable. **Assertion**: the shipped v3 status already emits
+- [x] Assert `status --json` after a partial disable. **Assertion**: the shipped v3 status already emits
   `managed_runtimes`, `module_owners`, `modules`, and `unattributed_surfaces`, so this is assertion work: surviving
   runtime only, no dangling rows, no `skill_packages` row without files, `codex_config_path` cleared, `profile`
   retained.
-- [ ] Confirm `profile` stays provenance (D-profile). **Assertion**: disable does not rewrite `profile`; replay comes
+- [x] Confirm `profile` stays provenance (D-profile). **Assertion**: disable does not rewrite `profile`; replay comes
   from `module_owners` (`installer.py:2348`). Residual: `profile` still gates minimum-profile skill filtering, so a
   partially disabled row keeps its gate.
 
 ## Phase 5 -- Docs
 
-- [ ] `docs/end-user/skills.md` -- `:55-64` documents `--runtime` selection and ends "Use `forge extension disable` for
+- [x] `docs/end-user/skills.md` -- `:55-64` documents `--runtime` selection and ends "Use `forge extension disable` for
   removal", which becomes incomplete once the flag exists. `:74` documents shared unscoped resolution for
   `sync`/`disable`/`status` and must stay true under D-autodetect-unchanged.
-- [ ] `docs/end-user/hook.md` -- the re-trust consequence of removing the Codex block, next to the scope-mismatch
+- [x] `docs/end-user/hook.md` -- the re-trust consequence of removing the Codex block, next to the scope-mismatch
   paragraph; distinguish stale-absent ownership, unsafe markers, and preserved manual outside-marker commands.
-- [ ] `docs/cli_reference.md` Installation table -- the flag, last-runtime behavior, `--all` disposition/completion
+- [x] `docs/cli_reference.md` Installation table -- the flag, last-runtime behavior, `--all` disposition/completion
   contract, and the reconciliation-write exception.
-- [ ] `docs/design_appendix.md` sections C.3-C.6 -- runtime-scoped removal, coherent-row requirements, the reversible
+- [x] `docs/design_appendix.md` sections C.3-C.6 -- runtime-scoped removal, coherent-row requirements, the reversible
   settings/sidecar subtransaction including zero survivors and the legacy/no-sidecar safety exception, unattributed-row
   retention, and Codex marker outcomes.
-- [ ] `docs/board/change_log.md` -- feature-completion sized (15-25 lines).
-- [ ] QA: extend `src/skills/qa/resources/checklist/18-disable.md`; update `<!-- test-count: -->` and
+- [x] `docs/board/change_log.md` -- feature-completion sized (15-25 lines).
+- [x] QA: extend `src/skills/qa/resources/checklist/18-disable.md`; update `<!-- test-count: -->` and
   `<!-- last-updated: -->` in `checklist.md` if the checkbox count changes.
 
 ## Acceptance tests
@@ -336,6 +336,7 @@ asserts across the boundary.
 | Codex malformed markers refuse                | partial/duplicate markers on dual and Codex-only installs       | partial and full modes name file; ownership, config path, and all preflighted surfaces remain untouched | `tests/src/install/test_disable_runtime.py`              |
 | Manual Codex siblings remain user-owned       | balanced block plus outside-marker Forge commands               | block removed; manual commands preserved and warned; managed ownership cleared                          | `tests/src/install/test_disable_runtime.py`              |
 | Preflight refusal preserves everything        | `--runtime codex`, drifted `CODEX_HOME`                         | raises; tracking and files untouched                                                                    | `tests/src/install/test_disable_runtime.py`              |
+| Codex leaf symlink refuses                    | tracked config replaced by a symlink                            | symlink, target, files, settings, and tracking remain untouched                                         | `tests/src/install/test_disable_runtime.py`              |
 | Claude removal ignores Codex drift            | `--runtime claude`, drifted `CODEX_HOME`                        | succeeds; Codex ownership and config path retained (D-preflight-scoped)                                 | `tests/src/install/test_disable_runtime.py`              |
 | Fault after file removal                      | injected file-removal fault                                     | committed row matches files actually removed and passes `_validate_current_manifest`                    | `tests/src/install/test_disable_runtime.py`              |
 | Reconciliation-write fault restores settings  | injected tracking failure after files, settings, and Codex work | old row remains atomically; settings/sidecars restored; removed files/block remain safe over-claims     | `tests/src/install/test_disable_runtime.py`              |
@@ -380,25 +381,26 @@ legacy/no-sidecar `unmerge` fallback, per the card.
 
 (record each command and its result; do not tick a phase on a green unit run alone)
 
-- [ ] `uv run pytest tests/src/install tests/src/cli -q`
-- [ ] `make test-unit`
-- [ ] `make test-regression`
-- [ ] `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v`
-- [ ] Clean-wheel: enable -> partial disable -> status -> sync for each runtime, asserting non-resurrection.
+- [x] `uv run pytest tests/src/install tests/src/cli -q` -- `3369 passed, 1 skipped`.
+- [x] `make test-unit` -- `8584 passed, 1 skipped, 117 deselected`.
+- [x] `make test-regression` -- `551 passed`.
+- [x] `./scripts/test-integration.sh tests/integration/docker/test_installer.py -v` -- `21 passed`.
+- [x] Clean-wheel: enable -> partial disable -> status -> sync for each runtime, asserting non-resurrection.
   **Required**: `testing_guidelines.md` names installer changes as an integration trigger.
-- [ ] `make pre-commit`
+- [x] `make pre-commit` -- all hooks passed.
 
 ## Closeout
 
-- [ ] Every box ticked with verification recorded.
-- [ ] `docs/board/change_log.md` entry added.
-- [ ] `cli_reference.md`, `design_appendix.md` sections C.3-C.6, `end-user/hook.md`, and `end-user/skills.md` describe
+- [x] Every box ticked with verification recorded.
+- [x] `docs/board/change_log.md` entry added.
+- [x] `cli_reference.md`, `design_appendix.md` sections C.3-C.6, `end-user/hook.md`, and `end-user/skills.md` describe
   shipped behavior.
-- [ ] Card moved `doing/` -> `done/` and inbound links repointed from `../../doing/extension_disable_runtime/...`:
+- [x] Card moved `doing/` -> `done/` and inbound links repointed from `../../doing/extension_disable_runtime/...`:
   `done/runtime_scoped_extension_modules/card.md` (3), its `checklist.md` (2),
   `done/disable_scope_mismatch_orphan/card.md` (2), its `checklist.md` (1).
-- [ ] Candidates for `impl_notes.md` after human review: schema validation proves manifest coherence and never
+- [x] Candidates for `impl_notes.md` after human review: schema validation proves manifest coherence and never
   filesystem truth, so removal correctness needs application order plus filesystem assertions (F2); settings removal is
   a reversible three-way `smart_unmerge` plus ownership-sidecar transition whose zero-survivor state must relinquish
   ownership (F4); and an unprovable ownership row must be retained rather than guessed, which is why a runtime-scoped
-  removal is deliberately less complete than a full one (F3).
+  removal is deliberately less complete than a full one (F3). Candidates are recorded here for human review; none were
+  promoted automatically during implementation.

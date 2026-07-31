@@ -7,7 +7,7 @@ separately as [disable_scope_mismatch_orphan](../../done/disable_scope_mismatch_
 **Type**: ordinary card, not an epic. The board's epic criterion is shared-contract **drift**
 ([board_contract.md](../../../developer/board_contract.md) "Epics"), not member count. Drift is prevented structurally
 here: this card is the sole writer of the ownership schema and lands it whole, and
-[extension_disable_runtime](../../doing/extension_disable_runtime/card.md) is a pure reader that cannot start until the
+[extension_disable_runtime](../../done/extension_disable_runtime/card.md) is a pure reader that cannot start until the
 schema ships. There is one contract, one writer, and a strict ordering -- no coordinator needed. Promote a coordinator
 if the schema has to land in slices consumed before completion.
 
@@ -48,7 +48,7 @@ profile, scope, explicit module flags, and runtime instead of filtering one modu
 touch `$CODEX_HOME`; `--runtime codex` must be sufficient on its own to mean "Codex only".
 
 Non-goal: changing what any module installs, changing scope semantics, or making narrowing destructive. Removal stays
-with `disable` -- see [extension_disable_runtime](../../doing/extension_disable_runtime/card.md).
+with `disable` -- see [extension_disable_runtime](../../done/extension_disable_runtime/card.md).
 
 ## Design
 
@@ -291,4 +291,4 @@ tests cannot reach the wheel-install path this card changes.
 Shipped on 2026-07-30. `--runtime` now filters all runtime-owned modules, tracking and status use schema v3, and v1/v2
 installations migrate without a reset. The clean-wheel lifecycle covers Claude, Codex, and combined selection, including
 preservation of Codex ownership and files across a Claude-only re-enable. The tagged attribution contract unblocks
-[extension_disable_runtime](../../doing/extension_disable_runtime/card.md).
+[extension_disable_runtime](../../done/extension_disable_runtime/card.md).

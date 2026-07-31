@@ -1,7 +1,7 @@
 # `forge extension disable --runtime` -- remove one runtime's extension surfaces
 
-**Lane**: `doing/` -- active on branch `feat/extension-disable-runtime`; execution plan in [checklist.md](checklist.md).
-Both hard dependencies have shipped:
+**Lane**: `done/` -- completed on branch `feat/extension-disable-runtime`; execution record in
+[checklist.md](checklist.md). Both hard dependencies have shipped:
 
 1. [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) -- shipped D1 schema v3
    supplies the tagged per-row attribution this card needs for runtime-scoped selection (see Constraints).
@@ -225,8 +225,8 @@ None. The checklist fixes the D-last wording contract and the `--all` dispositio
   in terms of the selected runtime rather than claiming every installation was removed, aggregates failures across
   scopes, discloses retained unattributed residue per scope, and exits non-zero if any scope fails.
 - Disabling a runtime the installation does not manage exits 0 with an explicit no-op message.
-- A missing Codex managed block clears stale ownership; partial/duplicate markers refuse before mutation; a balanced
-  block is removed while outside-marker manual commands remain user-owned and warning-only.
+- A missing Codex managed block clears stale ownership; partial/duplicate markers and a leaf symlink refuse before
+  mutation; a balanced block is removed while outside-marker manual commands remain user-owned and warning-only.
 - `cli_reference.md` Installation table, `design_appendix.md` sections C.3-C.6, `docs/end-user/hook.md`,
   `docs/end-user/skills.md`, and the changelog record the flag, the D-last behavior, and the re-trust consequence.
 
@@ -236,4 +236,7 @@ None. The checklist fixes the D-last wording contract and the `--all` dispositio
 
 ## Closeout
 
-(pending)
+Shipped on 2026-07-31. Runtime-scoped disable now removes the selected runtime's attributed surfaces, preserves the
+other runtime byte-for-byte, and updates tracking so sync cannot resurrect removed ownership. The clean-wheel lifecycle
+covers both removal directions through status and sync; failure-path tests cover preflight refusal, partial
+reconciliation, settings/sidecar rollback, unsafe Codex config targets, and tracking-write failure.

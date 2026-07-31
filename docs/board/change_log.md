@@ -25,6 +25,31 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-07-31
+
+### Runtime-scoped extension disable
+
+**Goal**: Let users remove one runtime's managed extension surfaces without disabling or rewriting the runtime they
+keep.
+
+**Key changes**:
+
+- `forge extension disable` now accepts repeatable `--runtime claude|codex|all` for one scope or `--all`. Plans narrow
+  to the selected ownership, disclose Codex re-trust and retained legacy residue, and batch summaries distinguish
+  `no-op`, `partial`, and `full`.
+- Removal intersects schema-v3 attribution with tracked ownership, preserves unattributed rows during partial removal,
+  and drops the selected owner pairs so a later sync cannot resurrect the runtime.
+- Claude settings and every ownership sidecar form a reversible smart-unmerge transaction. Codex removal classifies and
+  revalidates marker state, preserves manual outside-marker commands, and refuses malformed or changed blocks.
+- Partial I/O failures reconcile the row to completed removals. A tracking-write failure restores settings ownership
+  before reporting the remaining safe over-claim and retry path.
+- End-user, CLI, design, and QA guidance now cover runtime removal, full-coverage behavior, failure recovery, and trust
+  consequences.
+
+**Verification**: focused install/CLI (`3366 passed, 1 skipped`); unit (`8581 passed, 1 skipped, 117 deselected`);
+regression (`551 passed`); installer Docker integration (`21 passed`), including clean-wheel partial-disable, status,
+and non-resurrection sync checks for both runtime directions; `make pre-commit`.
+
 ## 2026-07-30
 
 ### Runtime-scoped extension modules

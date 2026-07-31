@@ -1544,6 +1544,227 @@ class TestDisableNoInstallMessage:
         assert "forge init" not in result.output
 
 
+def test_disable_runtime_noop_names_autodetected_scope_and_scope_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.models import Installation
+    from forge.install.tracking import TrackingStore
+
+    project = tmp_path / "project"
+    (project / ".claude").mkdir(parents=True)
+    tracking = TrackingStore()
+    installation = Installation(
+        scope="local",
+        project_path=str(project),
+        mode="copy",
+        profile="standard",
+        module_owners=[attributed(InstallModule.HOOKS, "claude_code")],
+    )
+    tracking.set_installation("local", installation, str(project))
+    monkeypatch.chdir(project)
+
+    result = CliRunner().invoke(extensions, ["disable", "--runtime", "codex"])
+
+    assert result.exit_code == 0, result.output
+    assert "Auto-detected scope: local" in result.output
+    assert "Resolved scope 'local' does not manage the selected codex runtime" in result.output
+    assert "Use --scope" in result.output
+    assert tracking.get_installation("local", str(project)) == installation
+
+
+def test_disable_runtime_plan_reports_retained_unattributed_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.models import Installation, InstalledFile
+    from forge.install.ownership import unattributed
+    from forge.install.tracking import TrackingStore
+
+    project = tmp_path / "project"
+    (project / ".claude").mkdir(parents=True)
+    tracking = TrackingStore()
+    installation = Installation(
+        scope="local",
+        project_path=str(project),
+        mode="copy",
+        profile="standard",
+        module_owners=[
+            attributed(InstallModule.SKILLS, "claude_code"),
+            attributed(InstallModule.SKILLS, "codex"),
+        ],
+        files=[
+            InstalledFile(
+                target_path=str(project / "legacy" / "unknown"),
+                source_path=str(project / "source" / "unknown"),
+                checksum="legacy",
+                mode="copy",
+                installed_at="2026-01-01T00:00:00Z",
+                attribution=unattributed("legacy_path_unmapped"),
+            )
+        ],
+    )
+    tracking.set_installation("local", installation, str(project))
+    monkeypatch.chdir(project)
+
+    result = CliRunner().invoke(
+        extensions,
+        ["disable", "--runtime", "claude"],
+        input="n\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Retaining 1 legacy unattributed surface(s)" in result.output
+    assert "legacy_path_unmapped" in result.output
+    assert "Proceed with runtime disable?" in result.output
+
+
+def test_disable_all_runtime_summary_distinguishes_noop_partial_and_full(
+    tmp_path: Path,
+) -> None:
+    import re
+
+    from forge.install.models import Installation, InstalledFile
+    from forge.install.ownership import unattributed
+    from forge.install.tracking import TrackingStore
+
+    tracking = TrackingStore()
+    partial_root = tmp_path / "partial"
+    full_root = tmp_path / "full"
+    for root in (partial_root, full_root):
+        root.mkdir()
+    tracking.set_installation(
+        "user",
+        Installation(
+            scope="user",
+            mode="copy",
+            profile="standard",
+            module_owners=[attributed(InstallModule.SKILLS, "claude_code")],
+        ),
+        None,
+    )
+    tracking.set_installation(
+        "project",
+        Installation(
+            scope="project",
+            project_path=str(partial_root),
+            mode="copy",
+            profile="standard",
+            module_owners=[
+                attributed(InstallModule.SKILLS, "claude_code"),
+                attributed(InstallModule.SKILLS, "codex"),
+            ],
+            files=[
+                InstalledFile(
+                    target_path=str(partial_root / "legacy-partial"),
+                    source_path=str(partial_root / "source-partial"),
+                    checksum="legacy",
+                    mode="copy",
+                    installed_at="2026-01-01T00:00:00Z",
+                    attribution=unattributed("legacy_path_unmapped"),
+                )
+            ],
+        ),
+        str(partial_root),
+    )
+    tracking.set_installation(
+        "local",
+        Installation(
+            scope="local",
+            project_path=str(full_root),
+            mode="copy",
+            profile="standard",
+            module_owners=[attributed(InstallModule.SKILLS, "codex")],
+            files=[
+                InstalledFile(
+                    target_path=str(full_root / "legacy-full"),
+                    source_path=str(full_root / "source-full"),
+                    checksum="legacy",
+                    mode="copy",
+                    installed_at="2026-01-01T00:00:00Z",
+                    attribution=unattributed("legacy_v1_unprovable"),
+                )
+            ],
+        ),
+        str(full_root),
+    )
+
+    result = CliRunner().invoke(
+        extensions,
+        ["disable", "--all", "--runtime", "codex"],
+        input="n\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "DISPOSITION" in result.output
+    assert re.search(r"user\s+\(global\)\s+standard\s+no-op\s+0\s+0", result.output)
+    assert re.search(r"project\s+.*standard\s+partial\s+0\s+0", result.output)
+    assert re.search(r"local\s+.*standard\s+full\s+1\s+0", result.output)
+    assert "legacy_path_unmapped" in result.output
+    assert "legacy_v1_unprovable" not in result.output
+    assert "Remove selected codex runtime surfaces across these scopes?" in result.output
+
+
+def test_disable_all_runtime_aggregates_failure_and_processes_healthy_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge.install.models import Installation, InstalledFile
+    from forge.install.tracking import TrackingStore
+
+    tracking = TrackingStore()
+    failed_root = tmp_path / "failed"
+    healthy_root = tmp_path / "healthy"
+    targets: dict[str, Path] = {}
+    for root in (failed_root, healthy_root):
+        target = root / ".claude" / "commands" / "review.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("managed\n", encoding="utf-8")
+        targets[root.name] = target
+        tracking.set_installation(
+            "project",
+            Installation(
+                scope="project",
+                project_path=str(root),
+                mode="copy",
+                profile="minimal",
+                module_owners=[attributed(InstallModule.COMMANDS, "claude_code")],
+                files=[
+                    InstalledFile(
+                        target_path=str(target),
+                        source_path=str(root / "source" / "review.md"),
+                        checksum="checksum",
+                        mode="copy",
+                        installed_at="2026-01-01T00:00:00Z",
+                        attribution=attributed(InstallModule.COMMANDS, "claude_code"),
+                    )
+                ],
+            ),
+            str(root),
+        )
+    real_unlink = Path.unlink
+
+    def fail_one_target(path: Path, missing_ok: bool = False) -> None:
+        if path == targets["failed"]:
+            raise OSError("injected batch removal fault")
+        real_unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", fail_one_target)
+
+    result = CliRunner().invoke(
+        extensions,
+        ["disable", "--all", "--runtime", "claude", "--yes"],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "Completed with 1 error(s)." in result.output
+    assert "injected batch removal fault" in result.output
+    assert tracking.get_installation("project", str(failed_root)) is not None
+    assert tracking.get_installation("project", str(healthy_root)) is None
+    assert targets["failed"].exists()
+    assert not targets["healthy"].exists()
+
+
 class TestCleanupProject:
     def test_user_enable_aborts_on_corrupt_tracking_before_user_write(
         self,
@@ -2418,6 +2639,161 @@ class TestEnableCodexHooks:
         result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--yes"])
         assert result.exit_code == 0, result.output
         assert "Codex hooks:" in result.output
+        assert not self._codex_config().exists()
+
+    def test_disable_runtime_codex_renders_exact_plan_and_retrust_consequence(self) -> None:
+        import os
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+        from forge.install.tracking import TrackingStore
+
+        self._enable(available=True)
+        claude_settings = Path(os.environ["CLAUDE_HOME"]) / "settings.json"
+        settings_before = claude_settings.read_bytes()
+
+        result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--runtime", "codex", "--yes"])
+
+        assert result.exit_code == 0, result.output
+        assert "selected codex runtime surfaces" in result.output
+        assert "Codex hooks:" in result.output
+        assert "Settings:" not in result.output
+        assert "one-time interactive trust ceremony" in result.output
+        assert "Forge cannot verify trust" in result.output
+        assert claude_settings.read_bytes() == settings_before
+        assert not self._codex_config().exists()
+        surviving = TrackingStore().get_installation("user", None)
+        assert surviving is not None
+        assert surviving.codex_config_path is None
+        assert {owner.runtime for owner in surviving.module_owners} == {"claude_code"}
+
+    def test_status_json_after_partial_runtime_disable_is_coherent(self) -> None:
+        import json
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd, status_cmd
+
+        self._enable(available=True)
+        disabled = CliRunner().invoke(
+            disable_cmd,
+            ["--scope", "user", "--runtime", "codex", "--yes"],
+        )
+        assert disabled.exit_code == 0, disabled.output
+
+        result = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        installation = payload["installations"][0]
+        assert installation["managed_runtimes"] == ["claude_code"]
+        assert all(owner["runtime"] == "claude_code" for owner in installation["module_owners"])
+        assert installation["codex_config_path"] is None
+        assert installation["profile"] == "minimal"
+
+    def test_individual_runtime_flags_that_cover_row_prompt_as_full_disable(self) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+
+        self._enable(available=True)
+        repeated = CliRunner().invoke(
+            disable_cmd,
+            ["--scope", "user", "--runtime", "claude", "--runtime", "codex"],
+            input="n\n",
+        )
+
+        assert repeated.exit_code == 0, repeated.output
+        assert "removes the whole Forge installation" in repeated.output
+        assert "Proceed with full disable?" in repeated.output
+
+        removed_claude = CliRunner().invoke(
+            disable_cmd,
+            ["--scope", "user", "--runtime", "claude", "--yes"],
+        )
+        assert removed_claude.exit_code == 0, removed_claude.output
+        last_runtime = CliRunner().invoke(
+            disable_cmd,
+            ["--scope", "user", "--runtime", "codex"],
+            input="n\n",
+        )
+        assert last_runtime.exit_code == 0, last_runtime.output
+        assert "removes the whole Forge installation" in last_runtime.output
+        assert "Proceed with full disable?" in last_runtime.output
+
+    def test_explicit_runtime_all_keeps_existing_prompt_and_plan_tables(self) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+
+        self._enable(available=True)
+        bare = CliRunner().invoke(disable_cmd, ["--scope", "user"], input="n\n")
+        runtime_all = CliRunner().invoke(
+            disable_cmd,
+            ["--scope", "user", "--runtime", "all"],
+            input="n\n",
+        )
+
+        assert bare.exit_code == 0, bare.output
+        assert runtime_all.exit_code == 0, runtime_all.output
+        for expected in ("Will disable Forge extensions (user):", "Settings:", "Codex hooks:", "Proceed with disable?"):
+            assert expected in bare.output
+            assert expected in runtime_all.output
+        assert "Proceed with full disable?" not in runtime_all.output
+
+    def test_runtime_codex_malformed_markers_refuse_before_prompt(self) -> None:
+        from unittest.mock import patch
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+        from forge.install.tracking import TrackingStore
+
+        self._enable(available=True)
+        config = self._codex_config()
+        config.write_text(config.read_text(encoding="utf-8") + "\n# >>> forge hooks >>>\n", encoding="utf-8")
+        tracking_before = TrackingStore().path.read_bytes()
+        config_before = config.read_bytes()
+
+        with patch("forge.cli.extensions.click.confirm") as confirm:
+            result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--runtime", "codex"])
+
+        assert result.exit_code == 1, result.output
+        assert str(config) in " ".join(result.output.split())
+        assert "partial, duplicated, or unbalanced" in result.output
+        confirm.assert_not_called()
+        assert config.read_bytes() == config_before
+        assert TrackingStore().path.read_bytes() == tracking_before
+
+    def test_runtime_tracking_write_fault_names_prior_mutation_and_restored_settings(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+        from forge.install.tracking import TrackingStore
+
+        self._enable(available=True)
+        tracking = TrackingStore()
+        settings_path = Path(os.environ["CLAUDE_HOME"]) / "settings.json"
+        settings_before = settings_path.read_bytes()
+        tracking_before = tracking.path.read_bytes()
+
+        with patch.object(TrackingStore, "remove_installation", side_effect=OSError("injected tracking fault")):
+            result = CliRunner().invoke(
+                disable_cmd,
+                ["--scope", "user", "--runtime", "all", "--yes"],
+            )
+
+        assert result.exit_code == 1, result.output
+        normalized = " ".join(result.output.split())
+        assert str(tracking.path) in normalized
+        assert "already changed the filesystem" in normalized
+        assert "settings and ownership sidecars were restored" in normalized
+        assert settings_path.read_bytes() == settings_before
+        assert tracking.path.read_bytes() == tracking_before
         assert not self._codex_config().exists()
 
     def test_disable_scope_mismatch_fails_before_plan_and_prompt(

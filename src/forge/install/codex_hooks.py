@@ -21,6 +21,7 @@ Forge versions -- changing them silently invalidates existing enrollment.
 from __future__ import annotations
 
 import shutil
+import stat
 import tomllib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -465,6 +466,140 @@ class CodexRemovePlan:
     config_path: str
     reason: str | None = None
     leftover_commands: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CodexRuntimeRemovePlan:
+    """Runtime-disable marker decision with an apply-time content snapshot."""
+
+    action: str
+    config_path: str
+    reason: str | None = None
+    leftover_commands: tuple[str, ...] = ()
+    expected_content: str | None = None
+
+
+def _runtime_remove_leftovers(text: str) -> tuple[str, ...]:
+    """Return user-owned Forge commands when the remaining TOML is readable."""
+
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return ()
+    return _collect_forge_commands(parsed)
+
+
+def plan_codex_runtime_remove(
+    config_path: Path,
+    entries: tuple[CodexHookEntry, ...],
+) -> CodexRuntimeRemovePlan:
+    """Classify a tracked Codex block for runtime-scoped disable.
+
+    Manual Forge commands outside the markers are user-owned and never make
+    this plan conflict. Marker ambiguity and unreadable state fail closed.
+    """
+
+    validate_codex_events(entries)
+    path_str = str(config_path)
+    try:
+        path_mode = config_path.lstat().st_mode
+    except FileNotFoundError:
+        return CodexRuntimeRemovePlan(action="clear", config_path=path_str, reason="config absent")
+    except OSError as e:
+        return CodexRuntimeRemovePlan(action="conflict", config_path=path_str, reason=f"cannot inspect: {e}")
+    if stat.S_ISLNK(path_mode):
+        return CodexRuntimeRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason="tracked config is a symbolic link",
+        )
+    if not stat.S_ISREG(path_mode):
+        return CodexRuntimeRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason="tracked config is not a readable regular file",
+        )
+
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as e:
+        return CodexRuntimeRemovePlan(action="conflict", config_path=path_str, reason=f"cannot read: {e}")
+
+    marker_lines = [line.rstrip("\r\n") for line in text.splitlines(keepends=True)]
+    begin_positions = [index for index, line in enumerate(marker_lines) if line == CODEX_BLOCK_BEGIN]
+    end_positions = [index for index, line in enumerate(marker_lines) if line == CODEX_BLOCK_END]
+    if not begin_positions and not end_positions:
+        return CodexRuntimeRemovePlan(
+            action="clear",
+            config_path=path_str,
+            reason="managed block absent",
+            leftover_commands=_runtime_remove_leftovers(text),
+            expected_content=text,
+        )
+    if len(begin_positions) != 1 or len(end_positions) != 1 or begin_positions[0] >= end_positions[0]:
+        return CodexRuntimeRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason="Forge hook markers are partial, duplicated, or unbalanced; repair the managed block before retrying",
+            expected_content=text,
+        )
+
+    split = _split_block(text)
+    if split is None:  # Defensive: the exact marker counts above proved a block.
+        return CodexRuntimeRemovePlan(
+            action="conflict",
+            config_path=path_str,
+            reason="Forge hook markers could not be classified safely",
+            expected_content=text,
+        )
+    remainder = split[0] + split[2]
+    return CodexRuntimeRemovePlan(
+        action="remove",
+        config_path=path_str,
+        leftover_commands=_runtime_remove_leftovers(remainder),
+        expected_content=text,
+    )
+
+
+def apply_codex_runtime_remove(
+    plan: CodexRuntimeRemovePlan,
+    entries: tuple[CodexHookEntry, ...],
+) -> CodexRemoveResult:
+    """Apply a runtime-disable plan after exact marker-state revalidation."""
+
+    config_path = Path(plan.config_path)
+    current = plan_codex_runtime_remove(config_path, entries)
+    if current.action == "conflict":
+        raise ForgeInstallError(f"cannot remove tracked Codex hooks from {config_path}: {current.reason}")
+    if current.action != plan.action or current.expected_content != plan.expected_content:
+        raise ForgeInstallError(
+            f"tracked Codex config changed after removal was planned: {config_path}; "
+            "no Codex hook ownership was removed"
+        )
+    if current.action == "clear":
+        return CodexRemoveResult(removed=False, leftover_commands=current.leftover_commands)
+
+    text = current.expected_content
+    if text is None:  # Defensive: a remove plan always snapshots file content.
+        raise ForgeInstallError(f"tracked Codex config changed after removal was planned: {config_path}")
+    split = _split_block(text)
+    if split is None:  # Defensive: revalidation above proved one balanced block.
+        raise ForgeInstallError(f"tracked Codex config has no managed block to remove: {config_path}")
+    before, _, after = split
+    if before.endswith("\n\n"):
+        before = before[:-1]
+    new_text = before + after
+
+    if not new_text.strip():
+        config_path.unlink()
+        return CodexRemoveResult(
+            removed=True,
+            deleted_file=True,
+            leftover_commands=current.leftover_commands,
+        )
+
+    atomic_write_text(config_path, new_text, preserve_existing_mode=True)
+    return CodexRemoveResult(removed=True, leftover_commands=current.leftover_commands)
 
 
 def plan_codex_remove(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexRemovePlan:

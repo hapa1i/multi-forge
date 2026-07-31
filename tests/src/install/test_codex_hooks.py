@@ -14,6 +14,7 @@ from forge.install.codex_hooks import (
     CODEX_HOOK_EVENTS,
     CodexHookEntry,
     apply_codex_merge,
+    apply_codex_runtime_remove,
     backup_codex_config,
     codex_registration_key,
     codex_registration_keys,
@@ -21,6 +22,7 @@ from forge.install.codex_hooks import (
     get_codex_config_path,
     plan_codex_merge,
     plan_codex_remove,
+    plan_codex_runtime_remove,
     read_codex_registration,
     remove_codex_block,
     render_codex_block,
@@ -382,6 +384,112 @@ class TestRemoveBlock:
         assert not result.removed
         assert result.leftover_commands == ("forge hook codex-session-start",)
         assert config.read_text() == manual
+
+
+class TestRuntimeRemoveBlock:
+    def test_absent_file_and_absent_block_clear_stale_ownership(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        absent = plan_codex_runtime_remove(config, _entries())
+        assert absent.action == "clear"
+        assert absent.reason == "config absent"
+
+        config.write_text(USER_CONTENT, encoding="utf-8")
+        no_block = plan_codex_runtime_remove(config, _entries())
+        assert no_block.action == "clear"
+        assert no_block.reason == "managed block absent"
+        result = apply_codex_runtime_remove(no_block, _entries())
+        assert not result.removed
+        assert config.read_text(encoding="utf-8") == USER_CONTENT
+
+    @pytest.mark.parametrize(
+        "markers",
+        [
+            f"{CODEX_BLOCK_BEGIN}\n",
+            f"{CODEX_BLOCK_END}\n",
+            f"{CODEX_BLOCK_BEGIN}\n{CODEX_BLOCK_BEGIN}\n{CODEX_BLOCK_END}\n",
+            f"{CODEX_BLOCK_BEGIN}\n{CODEX_BLOCK_END}\n{CODEX_BLOCK_END}\n",
+            f"{CODEX_BLOCK_END}\n{CODEX_BLOCK_BEGIN}\n",
+        ],
+    )
+    def test_partial_duplicate_and_unbalanced_markers_conflict(self, tmp_path: Path, markers: str) -> None:
+        config = tmp_path / "config.toml"
+        config.write_text(markers, encoding="utf-8")
+
+        plan = plan_codex_runtime_remove(config, _entries())
+
+        assert plan.action == "conflict"
+        assert "partial, duplicated, or unbalanced" in (plan.reason or "")
+
+    def test_balanced_block_preserves_outside_bytes_and_manual_commands(self, tmp_path: Path) -> None:
+        manual = (
+            "\n[[hooks.Stop]]\n" "[[hooks.Stop.hooks]]\n" 'type = "command"\n' 'command = "forge-hook custom-handler"\n'
+        )
+        config = tmp_path / "config.toml"
+        config.write_text(USER_CONTENT, encoding="utf-8")
+        _install(config)
+        config.write_text(config.read_text(encoding="utf-8") + manual, encoding="utf-8")
+        expected = USER_CONTENT + manual
+
+        plan = plan_codex_runtime_remove(config, _entries())
+        result = apply_codex_runtime_remove(plan, _entries())
+
+        assert plan.action == "remove"
+        assert result.removed
+        assert result.leftover_commands == ("forge-hook custom-handler",)
+        assert config.read_text(encoding="utf-8") == expected
+
+    def test_whitespace_only_remainder_deletes_file(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        _install(config)
+        plan = plan_codex_runtime_remove(config, _entries())
+
+        result = apply_codex_runtime_remove(plan, _entries())
+
+        assert result.removed
+        assert result.deleted_file
+        assert not config.exists()
+
+    def test_leaf_symlink_conflicts_without_touching_target(self, tmp_path: Path) -> None:
+        target = tmp_path / "tracked-config.toml"
+        target.write_text(USER_CONTENT, encoding="utf-8")
+        _install(target)
+        expected = target.read_bytes()
+        config = tmp_path / "config.toml"
+        config.symlink_to(target)
+
+        plan = plan_codex_runtime_remove(config, _entries())
+
+        assert plan.action == "conflict"
+        assert plan.reason == "tracked config is a symbolic link"
+        assert config.is_symlink()
+        assert target.read_bytes() == expected
+
+    def test_apply_refuses_content_changed_after_plan(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        _install(config)
+        plan = plan_codex_runtime_remove(config, _entries())
+        config.write_text('model = "changed"\n' + config.read_text(encoding="utf-8"), encoding="utf-8")
+
+        with pytest.raises(ForgeInstallError, match="changed after removal was planned"):
+            apply_codex_runtime_remove(plan, _entries())
+
+        assert CODEX_BLOCK_BEGIN in config.read_text(encoding="utf-8")
+
+    def test_apply_refuses_same_content_leaf_symlink_replacement(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        _install(config)
+        plan = plan_codex_runtime_remove(config, _entries())
+        expected = config.read_bytes()
+        target = tmp_path / "replacement-config.toml"
+        target.write_bytes(expected)
+        config.unlink()
+        config.symlink_to(target)
+
+        with pytest.raises(ForgeInstallError, match="symbolic link"):
+            apply_codex_runtime_remove(plan, _entries())
+
+        assert config.is_symlink()
+        assert target.read_bytes() == expected
 
 
 class TestReadRegistration:
