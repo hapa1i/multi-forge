@@ -505,6 +505,36 @@ def _check_plan_invariants(ctx: ExecutionContext, plan: AdoptPlan) -> None:
         raise AdoptError(f"plan transcript path {plan.transcript_path} is not the canonical path for its conversation")
 
 
+def _validate_adoption_artifact_destination(
+    *,
+    forge_root: Path,
+    source: Path,
+    destination: Path,
+) -> None:
+    """Reject artifact aliases and symlink escapes before copying user data."""
+
+    canonical_artifact_root = forge_root.resolve() / ".forge" / "artifacts"
+    try:
+        resolved_destination = destination.resolve(strict=False)
+    except OSError as e:
+        raise AdoptError(f"cannot safely resolve adoption artifact destination '{destination}': {e}") from e
+
+    if not resolved_destination.is_relative_to(canonical_artifact_root):
+        raise AdoptError(
+            f"adoption artifact destination '{destination}' resolves outside the canonical artifact directory "
+            f"'{canonical_artifact_root}'"
+        )
+
+    if not (destination.exists() or destination.is_symlink()):
+        return
+    try:
+        aliases_source = source.samefile(destination)
+    except OSError as e:
+        raise AdoptError(f"cannot safely compare adoption artifact destination '{destination}': {e}") from e
+    if aliases_source:
+        raise AdoptError(f"adoption artifact destination '{destination}' aliases the native transcript")
+
+
 def _check_still_adoptable(
     session_uuid: str, transcript_path: Path, claude_project_root: str, forge_root: str
 ) -> TranscriptSummary:
@@ -609,6 +639,15 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
         raise AdoptError("not inside a Forge project")
 
     _check_plan_invariants(ctx, plan)
+    store = SessionStore(str(ctx.forge_root), name)
+    paths = get_artifact_paths(ctx.forge_root, name)
+    dst_abs = paths.transcripts_abs / f"{plan.session_uuid}.jsonl"
+    dst_rel = paths.transcripts_rel / f"{plan.session_uuid}.jsonl"
+    _validate_adoption_artifact_destination(
+        forge_root=ctx.forge_root,
+        source=plan.transcript_path,
+        destination=dst_abs,
+    )
 
     # Compatibility is re-enforced, not just re-read: the prompt between planning
     # and here blocks on a human, long enough for .forge/project.toml to change.
@@ -671,13 +710,18 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                 raise UuidAlreadyBoundError(plan.session_uuid, owner) from None
             raise
 
-    store = SessionStore(str(ctx.forge_root), name)
-    paths = get_artifact_paths(ctx.forge_root, name)
-    dst_abs = paths.transcripts_abs / f"{plan.session_uuid}.jsonl"
-    dst_rel = paths.transcripts_rel / f"{plan.session_uuid}.jsonl"
-
+    artifact_created = False
     try:
-        safe_copy_file(plan.transcript_path, dst_abs, overwrite=True)
+        # Revalidate after publishing the binding: another process could replace
+        # an artifact parent with a symlink between preflight and this copy.
+        _validate_adoption_artifact_destination(
+            forge_root=ctx.forge_root,
+            source=plan.transcript_path,
+            destination=dst_abs,
+        )
+        destination_existed = dst_abs.exists() or dst_abs.is_symlink()
+        copied = safe_copy_file(plan.transcript_path, dst_abs, overwrite=True)
+        artifact_created = copied and not destination_existed
 
         def _mutate(m: object) -> None:
             from forge.session.models import SessionState
@@ -706,7 +750,12 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
 
         store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        _rollback_adoption(name, ctx=ctx, store=store, artifact_abs=dst_abs)
+        _rollback_adoption(
+            name,
+            ctx=ctx,
+            store=store,
+            artifact_abs=dst_abs if artifact_created else None,
+        )
         raise AdoptError(f"could not capture the transcript for '{plan.session_uuid}': {e}") from e
 
     # Search indexing goes through the same deferred marker the Stop hook uses.
@@ -735,7 +784,7 @@ def _rollback_adoption(
     *,
     ctx: ExecutionContext,
     store: SessionStore,
-    artifact_abs: Path,
+    artifact_abs: Path | None,
 ) -> None:
     """Undo adoption's own writes, and only those.
 
@@ -750,10 +799,11 @@ def _rollback_adoption(
 
     Best-effort throughout: a failed unwind must not mask the original error.
     """
-    try:
-        artifact_abs.unlink(missing_ok=True)
-    except OSError as e:
-        _log.warning("Adopt rollback failed (artifact copy): %s", e)
+    if artifact_abs is not None:
+        try:
+            artifact_abs.unlink(missing_ok=True)
+        except OSError as e:
+            _log.warning("Adopt rollback failed (artifact copy): %s", e)
 
     try:
         IndexStore().remove_session(name, forge_root=str(ctx.forge_root))
