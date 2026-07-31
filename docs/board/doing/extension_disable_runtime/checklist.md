@@ -75,24 +75,28 @@ not inherited from the sibling card's invariant numbering.
 
 ### F4 -- Settings removal is `smart_unmerge` over a sidecar, not `unmerge`
 
-`uninstall()` calls `smart_unmerge(current, backup, added)` (`installer.py:2429`), a three-way comparison that restores
-the backup value when `current == added` and **leaves user modifications alone** (`settings_merge.py:252-272`). The
-separate `unmerge` (`:775`) is not on this path and does not compare -- it deletes tracked env keys outright
-(`:818-825`).
+When the newest ownership sidecar is non-empty, `uninstall()` calls `smart_unmerge(current, backup, added)`
+(`installer.py:2428-2430`), a three-way comparison that restores the backup value when `current == added` and **leaves
+user modifications alone** (`settings_merge.py:252-272`). The fallback `unmerge` (`:775`) does not compare -- it deletes
+tracked env keys outright (`:818-825`) -- and is not safe as the primary partial-removal path.
 
 The three-way inputs come from durable sidecars: `find_backup_files` / `find_added_files` (`installer.py:2398-2399`),
 where `added` is the `.forge-added` payload that **enable** rewrites from the surviving entry set on every install
 (`entries_to_added_structure(final_entries)` + `save_added_settings`, `installer.py:1863-1864`).
 
-**Consequence.** A partial disable that removes Claude settings entries must rewrite `.forge-added` to the surviving
-entries, exactly as enable does. If it does not, a later full disable smart-unmerges against stale ownership and can
-remove settings the user reintroduced after the partial disable. This is the most likely silent-data-loss path in the
-card, and it has no representation in the state-transition table.
+**Consequence.** A partial disable that removes Claude settings entries must smart-unmerge using only the selected
+entries, then reconcile `.forge-added` to the surviving entries. If it leaves stale ownership, a later full disable can
+remove settings the user reintroduced after the partial disable. If no settings entries survive, there is no remaining
+Claude-settings ownership: remove the `.forge-added` sidecars and clear `settings_backup_path` in tracking while keeping
+the `.forge-backup` files as untracked history.
 
-### F5 -- `remove_codex_block` conflates "absent" with "malformed"
+### F5 -- Codex marker state, not `CodexRemoveResult` alone, decides safety
 
-It returns `removed=False` for a missing config file, and also `removed=False, leftover_commands=...` when the strict
-plan rejects the file (`codex_hooks.py:515+`). One signal, two very different situations. Decided below.
+`remove_codex_block` returns `removed=False` for a missing file, an existing file with no block, and malformed markers
+(`codex_hooks.py:515-539`). `leftover_commands` is also not a discriminator: balanced-block removal can succeed while
+manual Forge commands outside the markers remain, and those commands are user-owned, warning-only state
+(`CodexRemoveResult`, `:447-457`). Runtime disable therefore needs an explicit pre-mutation marker-state decision and
+apply-time revalidation; it cannot infer ownership disposition from `removed` plus file existence.
 
 ### F6 -- Scope auto-detection is not runtime-aware
 
@@ -109,35 +113,44 @@ bare `disable`, or the last-runtime case) removes them. Guessing that an unattri
 delete a Codex file under `--runtime claude`. Per F3 this is builder policy, so it needs a direct test, not an appeal to
 schema validation.
 
-**D-settings-sidecar.** A partial disable rewrites `.forge-added` to the surviving settings entries via the same
-`entries_to_added_structure` + `save_added_settings` path enable uses, in the same mutation step that unmerges. Field
-transitions:
+**D-settings-sidecar.** Treat the settings file plus all `.forge-added` files as one reversible subtransaction. Capture
+their exact pre-step bytes/modes, smart-unmerge with `entries_to_added_structure(selected_settings_entries)`, then
+update ownership from `surviving_settings_entries`. Field transitions:
 
-| Field                  | Partial disable (runtime remains)                                      | Full removal      |
-| ---------------------- | ---------------------------------------------------------------------- | ----------------- |
-| `.forge-added`         | rewritten to surviving entries                                         | existing behavior |
-| `settings_backup_path` | **retained** -- still the pre-Forge baseline for the surviving runtime | existing behavior |
-| `settings_entries`     | removed runtime's rows dropped                                         | existing behavior |
+| Surviving settings entries | `.forge-added`                                      | `settings_backup_path`                          | Tracking rows                  |
+| -------------------------- | --------------------------------------------------- | ----------------------------------------------- | ------------------------------ |
+| One or more                | newest payload rewritten to exactly those survivors | retained as their pre-Forge comparison baseline | selected settings rows dropped |
+| Zero                       | all ownership sidecars removed                      | cleared                                         | all settings rows absent       |
+| Settings not selected      | untouched                                           | untouched                                       | untouched                      |
 
-`settings_backup_path` is not rewritten: it records the state before Forge touched the file at all, which is still the
-correct baseline while any Forge-managed settings survive.
+`.forge-backup` files remain as history in every case. If either the settings write or ownership-sidecar update fails,
+restore both surfaces exactly. A successful rollback means the settings step did not happen; an incomplete rollback is a
+distinct manual-recovery failure that names every divergent path and retains the pre-step settings ownership in
+tracking.
 
-**D-codex-outcomes.** Split F5's single signal by cause:
+**D-codex-outcomes.** Decide from marker state before mutation and revalidate immediately before apply:
 
-| `remove_codex_block` outcome           | Action                                                                            |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| Removed the block                      | Drop `(hooks, codex)`, clear `codex_config_path` and `codex_commands`             |
-| Config file absent                     | Same -- there is nothing to own; clearing stale ownership is the truthful outcome |
-| Malformed / partial markers, leftovers | **Refuse**: retain ownership and config path, exit non-zero, name the file        |
+| Tracked config state                                      | Action                                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| File absent                                               | Clear stale `(hooks, codex)` ownership and config fields                                                |
+| Existing file, no Forge markers                           | Preserve the file; clear the same stale ownership                                                       |
+| Exactly one balanced managed block                        | Remove only the block; preserve all outside bytes; clear ownership                                      |
+| Partial, duplicate, or otherwise unbalanced Forge markers | **Refuse before mutation**; retain ownership and config path; exit non-zero naming the file             |
+| Unreadable file or state changed between plan and apply   | **Refuse**; retain ownership and config path; reconcile any earlier independent removals before exiting |
 
-Clearing ownership for an absent file is safe because no block exists; refusing on malformed markers is required because
-Forge cannot prove what it would be abandoning.
+Forge commands outside managed markers, whether or not a balanced block is present, are manual/user-owned: preserve and
+warn, but do not retain ownership of an absent or removed managed block. This intentionally differs from migration's
+stricter `plan_codex_remove`, where a manual sibling blocks a cross-scope move.
 
-**D-last-delegates.** When the selection covers every managed runtime -- `--runtime all`, a `--runtime <r>` that is the
-last managed runtime, or repeated flags that collectively cover all of them (`--runtime claude --runtime codex`) --
-dispatch to the **existing** `uninstall()`. This makes the card's "`--runtime all` matches today's `disable`" criterion
-true by construction, keeps unattributed rows removed in the full case, and leaves the last-runtime prompt as the only
-new wording.
+**D-full-coverage.** Every invocation that spells `--runtime` uses the runtime-scoped removal engine, including
+`--runtime all`, a last managed runtime, and repeated flags that collectively cover all runtimes
+(`--runtime claude --runtime codex`). Full mode includes unattributed rows and deletes the installation row on success,
+while retaining D-codex-outcomes and the failure taxonomy below. It reuses the existing uninstall primitives and
+rendering, but does **not** dispatch wholesale to `uninstall()` because that path ignores `removed=False` and does not
+reconcile a mid-removal fault. Bare `disable` remains on the existing path. Successful outcome and UI equivalence for
+`--runtime all` are acceptance-tested on current sidecar-backed v3 state. Partial failures and legacy/no-sidecar
+settings fallback are explicitly excluded: runtime-spelled removal uses the safe three-way comparison instead of bare
+disable's blind `unmerge`.
 
 **D-preflight-scoped.** Call `validate_codex_config_scope` only when the removal set includes the Codex managed block. A
 Claude-only removal proceeds on an install whose Codex path drifted; nothing it touches depends on that mapping.
@@ -150,20 +163,22 @@ no-op message names the resolved scope and points at `--scope`.
 **D-all-disposition.** The `--all` summary gains a **DISPOSITION** column (`no-op` / `partial` / `full`), not just a
 filtered caption. Counts alone cannot distinguish the three: a hooks-and-settings-only removal shows `0` files and `0`
 packages while still mutating config and possibly deleting the row. This supersedes the caption-only approach in this
-checklist's first draft.
+checklist's first draft. Counts come from each scope's actual removal set: full rows include unattributed surfaces;
+partial/no-op rows exclude them and emit a scoped retained-residue note with count and reasons before the prompt.
 
 ---
 
 ## Failure taxonomy (per durable mutation boundary)
 
-The card's "failure after partial removal" covers only a file-removal fault. Each boundary needs defined behavior:
+Run every knowable safety check -- tracked file boundaries, settings/sidecar readability and boundaries, Codex scope,
+and Codex marker state -- before the first mutation. Apply-time races and I/O failures still need defined behavior:
 
-| Boundary                                  | On failure                                                                                |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| File removal                              | Stop; reconcile tracking to the files actually removed; exit non-zero naming the retry    |
-| Settings unmerge + `.forge-added` rewrite | Stop; sidecar rewrite and settings write must both land or the step is reported as failed |
-| Codex block removal                       | Per D-codex-outcomes; on refusal nothing else in the Codex half is cleared                |
-| Reconciliation write itself               | See below -- the one case with no clean guarantee                                         |
+| Boundary                                    | On failure                                                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| File removal                                | Stop; reconcile tracking to the files actually removed; exit non-zero naming the retry                                                         |
+| Settings + `.forge-added` subtransaction    | Restore both exact pre-step states; keep their tracking rows; reconcile earlier file removals; incomplete rollback names manual-recovery paths |
+| Codex apply-time revalidation/block removal | Retain Codex ownership; reconcile earlier independent removals; exit non-zero naming the config                                                |
+| Reconciliation write itself                 | See below -- the one case where the truthful new row cannot be guaranteed                                                                      |
 
 **Reconciliation-write failure.** `TrackingStore.write()` is atomic (`tracking.py:679+`), so the file is never malformed
 -- but atomicity does not guarantee the *new* row lands. If the reconciliation write fails, the filesystem has been
@@ -172,10 +187,13 @@ mutated while tracking still describes the pre-removal state, so tracking over-c
 State this honestly rather than promising a guarantee the code cannot make:
 
 - Exit non-zero with an error naming the tracking path and the fact that removal already happened.
-- Do **not** retry-loop or fall back to a partial write. Over-claiming is recoverable by re-running disable; an
-  under-claiming row is not, because it silently abandons surfaces.
-- `forge extension status` is the recovery surface: an over-claiming row surfaces as missing tracked files, which status
-  already reports.
+- If the settings subtransaction landed, restore its captured settings and ownership-sidecar state before returning so
+  the old tracking row never points at a newer, under-claiming sidecar. Report any rollback failure explicitly.
+- Do **not** retry-loop or fall back to a partial tracking write. The remaining old-row over-claim for removed files or
+  a removed Codex block is recoverable by repairing the tracking path and re-running the same disable; an under-claiming
+  row would silently abandon surfaces.
+- `forge extension status` is the read-only recovery surface for the old row's missing tracked files/block. If settings
+  rollback was incomplete, the error's named paths require inspection before retry.
 
 ## Phase 1 -- Removal-set derivation (pure)
 
@@ -188,8 +206,9 @@ No CLI, no filesystem. This is the contract every later phase reads.
 - [ ] Select rows via `ownership.attribution_pair` (`ownership.py:83`). **Assertion**: a `None` result (unattributed) is
   never a removal target, asserted directly against a migrated-v1 fixture. Per F3 this is builder policy -- the test
   must fail if the builder includes such a row, because `TrackingStore.write()` will not catch it.
-- [ ] Return the surviving settings entries for the sidecar rewrite (D-settings-sidecar). **Assertion**: the survivor
-  set is what `entries_to_added_structure` consumes, so Phase 2 does not recompute it from a different source.
+- [ ] Return selected and surviving settings entries for the smart-unmerge/sidecar subtransaction (D-settings-sidecar).
+  **Assertion**: `entries_to_added_structure` consumes the selected set for smart-unmerge and the survivor set for
+  durable ownership, so Phase 2 does not recompute either from a different source.
 - [ ] Make `--runtime claude` cover all five Claude surfaces plus Claude skill packages. **Assertion**: commands,
   agents, `hooks`, `statusLine`, and `permissions` settings entries, and Claude skill packages -- each asserted
   separately so a missing surface fails its own test. Under-removal is a named card risk.
@@ -199,7 +218,7 @@ No CLI, no filesystem. This is the contract every later phase reads.
   proves internal coherence only.
 - [ ] Report retained unattributed rows. **Assertion**: count and reasons, so the CLI can tell a legacy user what
   remains.
-- [ ] Detect full coverage, including repeated flags (D-last-delegates). **Assertion**: `--runtime all`, last-runtime,
+- [ ] Detect full coverage, including repeated flags (D-full-coverage). **Assertion**: `--runtime all`, last-runtime,
   and `--runtime claude --runtime codex` on a dual install all report full coverage.
 
 ## Phase 2 -- Installer removal path
@@ -207,28 +226,33 @@ No CLI, no filesystem. This is the contract every later phase reads.
 - [ ] Add the runtime-scoped removal entry point, reusing `uninstall()`'s boundary validation. **Assertion**:
   `_tracked_file_boundary` + `validate_path_within_boundary` run on the filtered subset, so the `invalid-target` refusal
   for a symlink-replaced package root still applies (`design_appendix.md` section C.5).
-- [ ] Dispatch full-coverage cases to the existing `uninstall()` (D-last-delegates). **Assertion**: the full path is the
-  existing code, not a filtered path that happens to select everything.
-- [ ] Use `smart_unmerge(current, backup, added)` and rewrite `.forge-added` (F4, D-settings-sidecar). **Assertion**:
-  the same three-way call as `installer.py:2429` -- **not** `settings_merge.unmerge`, which deletes tracked env keys
-  without comparing (`:818-825`). After a partial disable, `.forge-added` holds exactly the surviving entries. Assert by
-  round-trip: partial disable, user re-adds a setting, full disable, setting survives.
-- [ ] Retain `settings_backup_path` on partial removal (D-settings-sidecar). **Assertion**: unchanged; it is the
-  pre-Forge baseline and stays correct while any Forge settings survive.
+- [ ] Keep every runtime-spelled request on the runtime-scoped engine, including full coverage (D-full-coverage).
+  **Assertion**: full mode selects attributed plus unattributed rows, deletes the row on success, and still uses the
+  Codex/failure rules below; it does not call `uninstall()` wholesale. Bare disable stays unchanged.
+- [ ] Smart-unmerge only the selected settings entries and reconcile `.forge-added` (F4, D-settings-sidecar).
+  **Assertion**: call `smart_unmerge(current, backup, entries_to_added_structure(selected_entries))` -- **not**
+  `settings_merge.unmerge`, which deletes tracked env keys without comparing (`:818-825`). With survivors, the newest
+  `.forge-added` contains exactly their ownership and `settings_backup_path` is retained. With zero survivors, all
+  ownership sidecars are removed and the field is cleared; backup-history files remain.
+- [ ] Make settings plus ownership sidecars a reversible subtransaction (D-settings-sidecar). **Assertion**: capture
+  exact bytes/modes before either write; failure of the settings write or sidecar update restores both. Successful
+  rollback retains all selected settings rows; incomplete rollback exits non-zero naming every divergent path and never
+  drops those rows.
 - [ ] Scope the Codex preflight to the removal set (D-preflight-scoped). **Assertion**: `validate_codex_config_scope`
   runs iff the Codex block is being removed.
-- [ ] Handle all three `remove_codex_block` outcomes (D-codex-outcomes). **Assertion**: removed and absent both clear
-  ownership; malformed/leftover refuses, retains ownership and config path, exits non-zero naming the file. Per F5 these
-  share one `removed=False` signal, so the branch must inspect file existence and `leftover_commands`, not just the
-  flag.
+- [ ] Classify and revalidate Codex marker state (D-codex-outcomes). **Assertion**: absent file or absent block clears
+  stale ownership; exactly one balanced block is removed; partial/duplicate markers and unreadable or concurrently
+  changed state refuse while retaining ownership. Outside-marker commands are preserved and warning-only. Per F5,
+  neither `removed` nor `leftover_commands` alone is the classifier.
 - [ ] Do not re-render the surviving runtime's hook bytes. **Assertion**:
   `tests/src/install/test_registered_commands_contract.py` passes unchanged. Codex `trusted_hash` covers command bytes
   and config location, so a re-render forces a needless ceremony on the runtime that was kept.
 - [ ] Preserve Codex config boundaries. **Assertion**: bytes outside the markers survive; a whitespace-only remainder
   deletes the file (`design_appendix.md` section C.6).
 - [ ] Implement the failure taxonomy above, including reconciliation-write failure. **Assertion**: each boundary behaves
-  as tabled; mutation precedes the tracking write (F2, application order); reconciliation-write failure exits non-zero
-  naming the tracking path and neither retries nor partially writes.
+  as tabled; mutation precedes the tracking write (F2, application order); reconciliation-write failure restores the
+  settings subtransaction, exits non-zero naming the tracking path and any rollback failure, and neither retries nor
+  partially writes tracking.
 
 ## Phase 3 -- CLI surface
 
@@ -236,21 +260,26 @@ No CLI, no filesystem. This is the contract every later phase reads.
   `click.Choice(["claude", "codex", "all"])`, repeatable, resolved through `_parse_skill_runtimes` (`:139`) so the two
   verbs cannot drift. Composes with `--scope` and `--all`.
 - [ ] Filter the four existing plan tables (`:1279-1327`) rather than adding a render path. **Assertion**: skill
-  packages, files, settings, and the Codex block line each narrow; the prompt at `:1329` and its `--yes` bypass are
-  untouched (D-preview).
+  packages, files, settings, and the Codex block line each narrow; the confirmation position and `--yes` bypass at
+  `:1329` are retained (D-preview). Wording changes only when individual runtime flags imply full removal and in
+  runtime-filtered batch mode; an explicit single-scope `--runtime all` keeps the existing prompt golden.
 - [ ] Show retained unattributed rows in the plan (D-unattributed). **Assertion**: count and reason, so a legacy user is
   not told the runtime is gone while residue remains.
 - [ ] State the re-trust consequence before the prompt. **Assertion**: shown whenever the Codex block is in the removal
   set; worded as a consequence, never as a claim that trust was verified.
-- [ ] Add the full-uninstall prompt wording for the last-runtime case. **Assertion**: says this removes the whole
-  installation for that scope; must not read like a partial removal.
+- [ ] Add full-uninstall wording when individual runtime flags cover the whole row. **Assertion**: last-runtime and
+  repeated `claude` + `codex` selections say this removes the whole installation for that scope; neither may read like a
+  partial removal.
 - [ ] Report the no-op case with the resolved scope (D-autodetect-unchanged). **Assertion**: exit 0, nothing touched,
   message names the resolved scope and points at `--scope` -- because auto-detect picked the nearest install without
   considering runtimes.
 - [ ] Compose with `--all` and add the DISPOSITION column (D-all-disposition). **Assertion**: each scope row shows
-  `no-op` / `partial` / `full`; counts alone cannot distinguish them. `_uninstall_all_installations` (`:695`) still
-  aggregates failures and exits non-zero if any scope fails, and `scripts/setup.sh --uninstall` must not read a
-  partial-by-design disable as complete.
+  `no-op` / `partial` / `full`; counts alone cannot distinguish them. The prompt and per-scope/final completion messages
+  name the selected runtime operation rather than saying every installation was disabled when rows remain.
+  Full-disposition counts include unattributed rows being removed; partial/no-op rows with legacy residue get a scoped
+  count-and-reason note before confirmation. `_uninstall_all_installations` (`:695`) still aggregates failures and exits
+  non-zero if any scope fails. Bare `scripts/setup.sh --uninstall` passes no runtime filter and retains its
+  complete-removal contract.
 - [ ] Route recovery output through `forge.cli.output`. **Assertion**: no hand-rolled `Tip:` or `[red]Error:[/red]`; the
   two style-guard tests stay green.
 
@@ -272,10 +301,12 @@ No CLI, no filesystem. This is the contract every later phase reads.
   removal", which becomes incomplete once the flag exists. `:74` documents shared unscoped resolution for
   `sync`/`disable`/`status` and must stay true under D-autodetect-unchanged.
 - [ ] `docs/end-user/hook.md` -- the re-trust consequence of removing the Codex block, next to the scope-mismatch
-  paragraph.
-- [ ] `docs/cli_reference.md` Installation table -- the flag, last-runtime behavior, `--all` composition.
-- [ ] `docs/design_appendix.md` section C.4 -- runtime-scoped removal, the coherent-row requirement, the `.forge-added`
-  rewrite on partial disable, and unattributed-row retention.
+  paragraph; distinguish stale-absent ownership, unsafe markers, and preserved manual outside-marker commands.
+- [ ] `docs/cli_reference.md` Installation table -- the flag, last-runtime behavior, `--all` disposition/completion
+  contract, and the reconciliation-write exception.
+- [ ] `docs/design_appendix.md` sections C.3-C.6 -- runtime-scoped removal, coherent-row requirements, the reversible
+  settings/sidecar subtransaction including zero survivors and the legacy/no-sidecar safety exception, unattributed-row
+  retention, and Codex marker outcomes.
 - [ ] `docs/board/change_log.md` -- feature-completion sized (15-25 lines).
 - [ ] QA: extend `src/skills/qa/resources/checklist/18-disable.md`; update `<!-- test-count: -->` and
   `<!-- last-updated: -->` in `checklist.md` if the checkbox count changes.
@@ -287,39 +318,49 @@ asserts across the boundary.
 
 ### Installer state
 
-| Test                                       | Fixture                                                    | Assertion                                                                            | Test File                                                |
-| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| Codex removal leaves Claude byte-identical | dual install                                               | five Claude surfaces + packages byte-unchanged; registered-command golden intact     | `tests/src/install/test_disable_runtime.py`              |
-| Claude removal is symmetric                | dual install                                               | five Claude surfaces **and** packages gone; Codex skills + block byte-unchanged      | `tests/src/install/test_disable_runtime.py`              |
-| Success, runtime remains                   | dual install                                               | row retained; removed runtime's rows, packages, pairs dropped; codex fields cleared  | `tests/src/install/test_disable_runtime.py`              |
-| Full coverage delegates                    | last-runtime, `--runtime all`, repeated flags              | all three take the `uninstall()` path; row deleted                                   | `tests/src/install/test_disable_runtime.py`              |
-| `.forge-added` rewritten                   | partial disable, user re-adds a setting, then full disable | the re-added setting survives the full disable (F4)                                  | `tests/src/install/test_settings_merge.py`               |
-| `settings_backup_path` retained            | partial disable                                            | unchanged after partial removal                                                      | `tests/src/install/test_disable_runtime.py`              |
-| User edits survive smart unmerge           | user modified a Forge-set scalar                           | modification preserved, not reverted to backup (`settings_merge.py:252-272`)         | `tests/src/install/test_settings_merge.py`               |
-| Codex block absent clears ownership        | tracked path, file deleted out of band                     | `(hooks, codex)` and config path cleared; exit 0                                     | `tests/src/install/test_disable_runtime.py`              |
-| Codex malformed markers refuse             | partial/leftover markers                                   | ownership and config path retained; non-zero; file named                             | `tests/src/install/test_disable_runtime.py`              |
-| Preflight refusal preserves everything     | `--runtime codex`, drifted `CODEX_HOME`                    | refuses; tracking and files untouched                                                | `tests/src/install/test_disable_runtime.py`              |
-| Claude removal ignores Codex drift         | `--runtime claude`, drifted `CODEX_HOME`                   | succeeds; Codex ownership and config path retained (D-preflight-scoped)              | `tests/src/install/test_disable_runtime.py`              |
-| Fault after file removal                   | injected file-removal fault                                | committed row matches files actually removed and passes `_validate_current_manifest` | `tests/src/install/test_disable_runtime.py`              |
-| Fault during reconciliation write          | injected tracking-write failure                            | filesystem mutated, tracking retains pre-removal row, no partial write               | `tests/src/install/test_disable_runtime.py`              |
-| Unattributed rows retained                 | migrated v1 install, `--runtime claude`                    | unattributed rows survive (F3 -- builder policy, so assert the builder output)       | `tests/src/install/test_disable_runtime.py`              |
-| Full removal clears unattributed rows      | same fixture, `--runtime all`                              | everything removed including unattributed rows; row deleted                          | `tests/src/install/test_disable_runtime.py`              |
-| Codex config boundaries preserved          | config with unrelated content                              | non-marker bytes survive; whitespace-only remainder deletes the file                 | `tests/src/install/test_codex_hooks.py`                  |
-| Surviving runtime not re-trusted           | `--runtime claude` on a dual install                       | Codex command bytes unchanged, and the reverse case                                  | `tests/src/install/test_registered_commands_contract.py` |
+| Test                                          | Fixture                                                         | Assertion                                                                                               | Test File                                                |
+| --------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Codex removal leaves Claude byte-identical    | dual install                                                    | five Claude surfaces + packages byte-unchanged; registered-command golden intact                        | `tests/src/install/test_disable_runtime.py`              |
+| Claude removal is symmetric                   | dual install                                                    | five Claude surfaces **and** packages gone; Codex skills + block byte-unchanged                         | `tests/src/install/test_disable_runtime.py`              |
+| Success, runtime remains                      | dual install                                                    | row retained; removed runtime's rows, packages, pairs dropped; Codex fields cleared                     | `tests/src/install/test_disable_runtime.py`              |
+| Full coverage uses safe full mode             | last-runtime, `--runtime all`, repeated flags                   | all include unattributed rows, enforce Codex preflight, and delete the row on success                   | `tests/src/install/test_disable_runtime.py`              |
+| Unselected settings ownership is unchanged    | dual install, remove Codex                                      | settings, `.forge-added`, and `settings_backup_path` remain byte/value-identical                        | `tests/src/install/test_disable_runtime.py`              |
+| Zero settings survivors clear ownership       | dual install, remove Claude                                     | all `.forge-added` files removed; `settings_backup_path` cleared; `.forge-backup` history kept          | `tests/src/install/test_disable_runtime.py`              |
+| User re-add survives later full disable       | remove Claude, user re-adds a setting, then remove Codex        | re-added setting survives and the Codex-only row causes no Claude-settings rewrite                      | `tests/src/install/test_disable_runtime.py`              |
+| User edits survive smart unmerge              | user modified a Forge-set scalar                                | modification preserved, not reverted to backup (`settings_merge.py:252-272`)                            | `tests/src/install/test_settings_merge.py`               |
+| Legacy no-sidecar edits survive               | migrated row, no `.forge-added`, modified scalar/env            | `--runtime all` preserves edits while removing tracked state and the row                                | `tests/src/install/test_disable_runtime.py`              |
+| Settings-write fault rolls back both surfaces | injected settings write failure                                 | settings and every `.forge-added` file remain byte/mode-identical; settings tracking retained           | `tests/src/install/test_disable_runtime.py`              |
+| Sidecar-write fault rolls back both surfaces  | settings write lands, injected sidecar failure                  | same exact rollback; earlier removed files alone are reconciled                                         | `tests/src/install/test_disable_runtime.py`              |
+| Incomplete settings rollback is explicit      | injected apply failure plus rollback failure                    | selected settings ownership retained; exception names every divergent settings/sidecar path             | `tests/src/install/test_disable_runtime.py`              |
+| Codex stale absence clears ownership          | file absent, then existing file with no markers                 | both cases preserve unrelated bytes and clear `(hooks, codex)` plus config fields                       | `tests/src/install/test_disable_runtime.py`              |
+| Codex malformed markers refuse                | partial/duplicate markers on dual and Codex-only installs       | partial and full modes name file; ownership, config path, and all preflighted surfaces remain untouched | `tests/src/install/test_disable_runtime.py`              |
+| Manual Codex siblings remain user-owned       | balanced block plus outside-marker Forge commands               | block removed; manual commands preserved and warned; managed ownership cleared                          | `tests/src/install/test_disable_runtime.py`              |
+| Preflight refusal preserves everything        | `--runtime codex`, drifted `CODEX_HOME`                         | raises; tracking and files untouched                                                                    | `tests/src/install/test_disable_runtime.py`              |
+| Claude removal ignores Codex drift            | `--runtime claude`, drifted `CODEX_HOME`                        | succeeds; Codex ownership and config path retained (D-preflight-scoped)                                 | `tests/src/install/test_disable_runtime.py`              |
+| Fault after file removal                      | injected file-removal fault                                     | committed row matches files actually removed and passes `_validate_current_manifest`                    | `tests/src/install/test_disable_runtime.py`              |
+| Reconciliation-write fault restores settings  | injected tracking failure after files, settings, and Codex work | old row remains atomically; settings/sidecars restored; removed files/block remain safe over-claims     | `tests/src/install/test_disable_runtime.py`              |
+| Unattributed rows retained                    | migrated v1 install, `--runtime claude`                         | unattributed rows survive (F3 -- builder policy, so assert the builder output)                          | `tests/src/install/test_disable_runtime.py`              |
+| Full removal clears unattributed rows         | same fixture, `--runtime all`                                   | everything removed including unattributed rows; row deleted                                             | `tests/src/install/test_disable_runtime.py`              |
+| Codex config boundaries preserved             | config with unrelated content                                   | non-marker bytes survive; whitespace-only remainder deletes the file                                    | `tests/src/install/test_codex_hooks.py`                  |
+| Surviving runtime not re-trusted              | `--runtime claude` on a dual install                            | Codex command bytes unchanged, and the reverse case                                                     | `tests/src/install/test_registered_commands_contract.py` |
 
 ### CLI rendering and exit
 
-| Test                                    | Fixture                                                | Assertion                                                              | Test File                                |
-| --------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------- |
-| Codex plan is exact                     | dual install, user scope                               | tables list exactly Codex packages + block; re-trust notice present    | `tests/src/cli/test_extension_enable.py` |
-| Last-runtime prompt says full uninstall | single-runtime install                                 | prompt wording names full removal of the scope                         | `tests/src/cli/test_extension_enable.py` |
-| Retained rows shown in plan             | migrated v1 install, `--runtime claude`                | count and reason rendered before the prompt                            | `tests/src/cli/test_extension_enable.py` |
-| No-op names the resolved scope          | Claude-only local install, `--runtime codex`, unscoped | exit 0, message names the scope and `--scope` (D-autodetect-unchanged) | `tests/src/cli/test_extension_enable.py` |
-| Mid-removal fault exit contract         | fault injected                                         | exits non-zero and names the retry                                     | `tests/src/cli/test_extension_enable.py` |
-| `--all` disposition column              | scopes hitting no-op, partial, and full                | each row's disposition is correct even at `0` files / `0` packages     | `tests/src/cli/test_extension_enable.py` |
-| `--all --runtime codex` aggregates      | two scopes, one failing                                | healthy scope disabled, failure named, exit non-zero                   | `tests/src/cli/test_extension_enable.py` |
-| `--runtime all` equals today's disable  | dual install                                           | plan tables, prompt wording, exit code match existing disable tests    | `tests/src/cli/test_extension_enable.py` |
-| `status --json` after partial disable   | dual install, `--runtime codex` applied                | surviving runtime only; no dangling rows; `codex_config_path` cleared  | `tests/src/cli/test_extension_enable.py` |
+| Test                                      | Fixture                                                | Assertion                                                                    | Test File                                |
+| ----------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------- |
+| Codex plan is exact                       | dual install, user scope                               | tables list exactly Codex packages + block; re-trust notice present          | `tests/src/cli/test_extension_enable.py` |
+| Implicit-full prompt says full uninstall  | last-runtime and repeated-runtime full coverage        | prompt wording names full removal of the scope                               | `tests/src/cli/test_extension_enable.py` |
+| Retained rows shown in plan               | migrated v1 install, `--runtime claude`                | count and reason rendered before the prompt                                  | `tests/src/cli/test_extension_enable.py` |
+| No-op names the resolved scope            | Claude-only local install, `--runtime codex`, unscoped | exit 0, message names the scope and `--scope` (D-autodetect-unchanged)       | `tests/src/cli/test_extension_enable.py` |
+| Mutation fault exit contract              | injected file fault                                    | exits non-zero and names the retry                                           | `tests/src/cli/test_extension_enable.py` |
+| Tracking-write fault is honest            | injected reconciliation failure                        | exits non-zero; names tracking path, prior mutations, and settings rollback  | `tests/src/cli/test_extension_enable.py` |
+| Codex refusal names recovery              | malformed marker fixture                               | exits non-zero, names config, leaves tracking and all preflighted state      | `tests/src/cli/test_extension_enable.py` |
+| `--all` disposition column                | scopes hitting no-op, partial, and full                | each row's disposition is correct even at `0` files / `0` packages           | `tests/src/cli/test_extension_enable.py` |
+| `--all` legacy residue is honest          | migrated rows hitting partial and full                 | partial note retains count/reasons; full counts include unattributed removal | `tests/src/cli/test_extension_enable.py` |
+| `--all` completion names selected runtime | same mixed scopes, successful apply                    | no row/final message claims every installation was removed                   | `tests/src/cli/test_extension_enable.py` |
+| `--all --runtime codex` aggregates        | two scopes, one failing                                | healthy scope processed, failure named, exit non-zero                        | `tests/src/cli/test_extension_enable.py` |
+| `--runtime all` equals today's disable    | sidecar-backed v3 dual install                         | end state, plan tables, prompt wording, and exit code match existing disable | `tests/src/cli/test_extension_enable.py` |
+| `status --json` after partial disable     | dual install, `--runtime codex` applied                | surviving runtime only; no dangling rows; `codex_config_path` cleared        | `tests/src/cli/test_extension_enable.py` |
 
 ### Integration
 
@@ -332,8 +373,8 @@ asserts across the boundary.
 `test_registered_commands_contract.py`, `tests/integration/docker/test_installer.py`. **New**:
 `tests/src/install/test_disable_runtime.py`.
 
-`--runtime all` equivalence explicitly **excludes** the tracking representation (v3 shape) and the partial-failure path
-(no pre-existing behavior to match), per the card.
+`--runtime all` equivalence explicitly **excludes** the tracking representation, partial-failure path, and
+legacy/no-sidecar `unmerge` fallback, per the card.
 
 ## Verification log
 
@@ -351,13 +392,13 @@ asserts across the boundary.
 
 - [ ] Every box ticked with verification recorded.
 - [ ] `docs/board/change_log.md` entry added.
-- [ ] `cli_reference.md`, `design_appendix.md` section C.4, `end-user/hook.md`, and `end-user/skills.md` describe
+- [ ] `cli_reference.md`, `design_appendix.md` sections C.3-C.6, `end-user/hook.md`, and `end-user/skills.md` describe
   shipped behavior.
 - [ ] Card moved `doing/` -> `done/` and inbound links repointed from `../../doing/extension_disable_runtime/...`:
   `done/runtime_scoped_extension_modules/card.md` (3), its `checklist.md` (2),
   `done/disable_scope_mismatch_orphan/card.md` (2), its `checklist.md` (1).
 - [ ] Candidates for `impl_notes.md` after human review: schema validation proves manifest coherence and never
   filesystem truth, so removal correctness needs application order plus filesystem assertions (F2); settings removal is
-  a three-way `smart_unmerge` against a `.forge-added` sidecar that any partial removal must rewrite, or a later full
-  disable acts on stale ownership (F4); and an unprovable ownership row must be retained rather than guessed, which is
-  why a runtime-scoped removal is deliberately less complete than a full one (F3).
+  a reversible three-way `smart_unmerge` plus ownership-sidecar transition whose zero-survivor state must relinquish
+  ownership (F4); and an unprovable ownership row must be retained rather than guessed, which is why a runtime-scoped
+  removal is deliberately less complete than a full one (F3).
