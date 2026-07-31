@@ -61,7 +61,8 @@ onto the shared project target. For installer/GC changes involving untracked run
 `forge extension status --json` object (`installations` plus `unmanaged_skill_packages`), then preview cleanup with
 `forge clean --scope <project|workspace|all> --verbose` before applying the same scope with `--yes`. Cleanup must remain
 fail-closed: unmarked, modified, malformed/newer, or unsafe packages are report-only and must not be removed
-automatically.
+automatically. For Codex-hook disable changes, also verify behavior after `$CODEX_HOME` changes: disable must name both
+config paths and preserve the managed block and tracking row without mutating either.
 
 For auth, proxy, and workflow changes, test the no-`.env` path explicitly: credentials should resolve from environment
 variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
@@ -98,6 +99,12 @@ is removed, and `forge telemetry costs show` remains the authoritative proxy-sco
 launch-strategy changes, verify `forge session resume <parent> --fresh --strategy rewind --drop-last N` and
 `forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N`; `rewind` is not a
 `forge session transfer regenerate` strategy.
+
+For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
+Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
+managed session. Bare preview lists Claude conversations only and `--model` is Claude-only; runtime selection must come
+from on-disk evidence, ambiguous or unverifiable matches must fail closed, and deleting the Forge session must preserve
+the original transcript or rollout.
 
 For Codex-runtime session changes, start with `forge runtime preflight codex`, then verify the relevant launch path:
 `forge session start <name> --runtime codex --resume-from <parent> --task "..."`,
