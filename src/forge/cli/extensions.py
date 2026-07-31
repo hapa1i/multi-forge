@@ -160,6 +160,17 @@ def _runtime_selection_display(runtime_ids: tuple[str, ...] | None) -> str:
     return " + ".join(public_names[runtime_id] for runtime_id in runtime_ids)
 
 
+def _print_codex_retrust_tip() -> None:
+    """Disclose the trust consequence whenever disable removes a Codex block."""
+
+    print_tip(
+        "Removing a managed Codex hook block changes its registration bytes. "
+        "Re-enabling Codex hooks later requires the one-time interactive trust ceremony; "
+        "Forge cannot verify trust.",
+        console=console,
+    )
+
+
 def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | None = None) -> None:
     """Apply the Claude CLI gate only when the plan mutates Claude surfaces."""
 
@@ -732,6 +743,12 @@ def _uninstall_all_installations(
             )
             runtime_plans[(scope, project_path)] = installer.plan_runtime_removal(runtime_ids)
 
+    removes_codex_block = (
+        any(plan.remove_codex_block for plan in runtime_plans.values())
+        if runtime_ids is not None
+        else any(installation.codex_config_path is not None for _, _, installation in installations)
+    )
+
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
     table.add_column("SCOPE", style="cyan")
     table.add_column("PROJECT PATH")
@@ -779,13 +796,11 @@ def _uninstall_all_installations(
                 f"[yellow]{scope} ({location}) retains {plan.retained_unattributed_count} "
                 f"legacy unattributed surface(s): {reasons}.[/yellow]"
             )
-        if any(plan.remove_codex_block for plan in runtime_plans.values()):
-            print_tip(
-                "Removing a managed Codex hook block changes its registration bytes. "
-                "Re-enabling Codex hooks later requires the one-time interactive trust ceremony; "
-                "Forge cannot verify trust.",
-                console=console,
-            )
+
+    if removes_codex_block:
+        _print_codex_retrust_tip()
+
+    if runtime_ids is not None or removes_codex_block:
         console.print()
 
     if not yes:
@@ -1468,13 +1483,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, runtimes: tuple[str, ...
                 raise ForgeInstallError("tracked Codex ownership has no config path")
             console.print("\n[bold]Codex hooks:[/bold]")
             console.print(f"  [red]remove[/red] managed block in {display_path(codex_config_path)}")
-            if removal_plan is not None:
-                print_tip(
-                    "Removing this managed block changes Codex hook registration bytes. "
-                    "Re-enabling Codex hooks later requires the one-time interactive trust ceremony; "
-                    "Forge cannot verify trust.",
-                    console=console,
-                )
+            _print_codex_retrust_tip()
 
         if not yes:
             if removal_plan is not None and removal_plan.full_coverage and "all" not in runtimes:
@@ -1784,7 +1793,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
             console.print(f"  [dim]Not enabled at {display_path(location)}[/dim]")
             continue
 
-        console.print(f"  Profile:   {installation.profile}")
+        console.print(f"  Profile:   {installation.profile} (installed)")
         console.print(f"  Mode:      {installation.mode}")
         console.print(f"  Runtimes:  {', '.join(managed_runtime_ids(installation))}")
         console.print(f"  Modules:   {', '.join(sorted(module_values(installation)))}")

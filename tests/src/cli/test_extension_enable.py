@@ -1153,7 +1153,12 @@ class TestScopeAllConflict:
             (
                 "user",
                 None,
-                Installation(scope="user", mode="copy", profile="standard"),
+                Installation(
+                    scope="user",
+                    mode="copy",
+                    profile="standard",
+                    codex_config_path=str(tmp_path / "codex" / "config.toml"),
+                ),
             ),
             (
                 "project",
@@ -1183,6 +1188,8 @@ class TestScopeAllConflict:
         assert result.exit_code == 1, result.output
         assert "Completed with 1 error(s)." in result.output
         assert "permission denied" in result.output
+        assert "one-time interactive trust ceremony" in result.output
+        assert "Forge cannot verify trust" in result.output
         assert installer_class.call_args_list == [
             call(scope=InstallScope.USER, project_root=None),
             call(scope=InstallScope.PROJECT, project_root=tmp_path),
@@ -2606,6 +2613,7 @@ class TestEnableCodexHooks:
         self._enable(available=True)
         result = CliRunner().invoke(status_cmd, ["--scope", "user"])
         assert result.exit_code == 0, result.output
+        assert "Profile:   minimal (installed)" in result.output
         assert "Codex:" in result.output
         assert "hooks registered in" in result.output
 
@@ -2639,6 +2647,8 @@ class TestEnableCodexHooks:
         result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--yes"])
         assert result.exit_code == 0, result.output
         assert "Codex hooks:" in result.output
+        assert "one-time interactive trust ceremony" in result.output
+        assert "Forge cannot verify trust" in result.output
         assert not self._codex_config().exists()
 
     def test_disable_runtime_codex_renders_exact_plan_and_retrust_consequence(self) -> None:

@@ -438,6 +438,15 @@ class TestRuntimeRemoveBlock:
         assert result.leftover_commands == ("forge-hook custom-handler",)
         assert config.read_text(encoding="utf-8") == expected
 
+    def test_crlf_block_is_classified_for_removal(self, tmp_path: Path) -> None:
+        config = tmp_path / "config.toml"
+        config.write_bytes(render_codex_block(_entries()).replace("\n", "\r\n").encode())
+
+        plan = plan_codex_runtime_remove(config, _entries())
+
+        assert plan.action == "remove"
+        assert "could not be classified safely" not in (plan.reason or "")
+
     def test_whitespace_only_remainder_deletes_file(self, tmp_path: Path) -> None:
         config = tmp_path / "config.toml"
         _install(config)

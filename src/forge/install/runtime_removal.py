@@ -287,6 +287,9 @@ class RuntimeRemovalExecutor:
         preflight = self._preflight(existing, plan)
         removed_file_paths: set[str] = set()
         dirs_to_clean: set[tuple[Path, Path]] = set()
+        # SKILL.md is the package identity, so remove it last. While any sibling
+        # remains, fault reconciliation retains the package row; once SKILL.md is
+        # gone, every other tracked package file has already been removed.
         ordered_files = sorted(
             preflight.files,
             key=lambda removal: Path(removal[0].target_path).name == "SKILL.md",

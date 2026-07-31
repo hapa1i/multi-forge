@@ -31,8 +31,7 @@ def capture_settings_rollback_state(settings_path: Path) -> SettingsRollbackStat
         settings_content = None
         settings_mode = None
     added_files = tuple(
-        (path, path.read_bytes(), stat.S_IMODE(path.stat().st_mode))
-        for path in find_added_files(settings_path)
+        (path, path.read_bytes(), stat.S_IMODE(path.stat().st_mode)) for path in find_added_files(settings_path)
     )
     return SettingsRollbackState(
         settings_path=settings_path,

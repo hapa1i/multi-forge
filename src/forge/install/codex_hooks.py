@@ -156,6 +156,16 @@ def render_codex_block(entries: tuple[CodexHookEntry, ...]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _managed_block_markers(text: str) -> tuple[list[str], list[int], list[int]]:
+    """Return config lines and exact managed-marker positions."""
+
+    lines = text.splitlines(keepends=True)
+    normalized = [line.rstrip("\r\n") for line in lines]
+    begin_positions = [index for index, line in enumerate(normalized) if line == CODEX_BLOCK_BEGIN]
+    end_positions = [index for index, line in enumerate(normalized) if line == CODEX_BLOCK_END]
+    return lines, begin_positions, end_positions
+
+
 def _split_block(text: str) -> tuple[str, str, str] | None:
     """Split config text into (before, block, after) around the managed block.
 
@@ -165,18 +175,11 @@ def _split_block(text: str) -> tuple[str, str, str] | None:
         ForgeInstallError: If a BEGIN marker exists without an END marker
             (a half-deleted block; merging blind would duplicate entries).
     """
-    lines = text.splitlines(keepends=True)
-    begin_idx: int | None = None
-    end_idx: int | None = None
-    for i, line in enumerate(lines):
-        stripped = line.rstrip("\n")
-        if begin_idx is None and stripped == CODEX_BLOCK_BEGIN:
-            begin_idx = i
-        elif begin_idx is not None and stripped == CODEX_BLOCK_END:
-            end_idx = i
-            break
-    if begin_idx is None:
+    lines, begin_positions, end_positions = _managed_block_markers(text)
+    if not begin_positions:
         return None
+    begin_idx = begin_positions[0]
+    end_idx = next((index for index in end_positions if index > begin_idx), None)
     if end_idx is None:
         raise ForgeInstallError(
             f"Codex config has a '{CODEX_BLOCK_BEGIN}' marker without a closing "
@@ -525,9 +528,7 @@ def plan_codex_runtime_remove(
     except (OSError, UnicodeError) as e:
         return CodexRuntimeRemovePlan(action="conflict", config_path=path_str, reason=f"cannot read: {e}")
 
-    marker_lines = [line.rstrip("\r\n") for line in text.splitlines(keepends=True)]
-    begin_positions = [index for index, line in enumerate(marker_lines) if line == CODEX_BLOCK_BEGIN]
-    end_positions = [index for index, line in enumerate(marker_lines) if line == CODEX_BLOCK_END]
+    _lines, begin_positions, end_positions = _managed_block_markers(text)
     if not begin_positions and not end_positions:
         return CodexRuntimeRemovePlan(
             action="clear",
