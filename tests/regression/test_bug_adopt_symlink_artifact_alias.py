@@ -63,6 +63,21 @@ def test_symlinked_artifact_parent_cannot_alias_native_transcript(tmp_path: Path
     assert native.read_bytes() == original
 
 
+def test_symlinked_artifact_root_can_relocate_capture(tmp_path: Path) -> None:
+    project, native = _project_with_native_transcript(tmp_path)
+    relocated_artifacts = tmp_path / "relocated-artifacts"
+    relocated_artifacts.mkdir()
+    (project / ".forge" / "artifacts").symlink_to(relocated_artifacts, target_is_directory=True)
+
+    ctx = ExecutionContext.from_cwd(project)
+    result = adopt_session(ctx, plan_adoption(ctx, _UUID), name="adopted")
+
+    copied = relocated_artifacts / "adopted" / "transcripts" / f"{_UUID}.jsonl"
+    assert result.artifact_rel == f".forge/artifacts/adopted/transcripts/{_UUID}.jsonl"
+    assert copied.read_bytes() == native.read_bytes()
+    assert native.is_file()
+
+
 def test_rollback_does_not_unlink_a_preexisting_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

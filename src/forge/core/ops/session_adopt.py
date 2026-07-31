@@ -513,8 +513,9 @@ def _validate_adoption_artifact_destination(
 ) -> None:
     """Reject artifact aliases and symlink escapes before copying user data."""
 
-    canonical_artifact_root = forge_root.resolve() / ".forge" / "artifacts"
+    artifact_root = forge_root.resolve() / ".forge" / "artifacts"
     try:
+        canonical_artifact_root = artifact_root.resolve(strict=False)
         resolved_destination = destination.resolve(strict=False)
     except OSError as e:
         raise AdoptError(f"cannot safely resolve adoption artifact destination '{destination}': {e}") from e
