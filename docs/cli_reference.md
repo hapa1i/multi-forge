@@ -24,7 +24,7 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge extension enable`          | Install Forge extensions and selected runtime skill packages; project/local success enrolls the root   |
 | `forge extension sync`            | Update existing installation to current version                                                        |
 | `forge extension cleanup-project` | Preview/apply one legacy project-hook migration (`--root`, `--yes`)                                    |
-| `forge extension disable`         | Remove Forge installation cleanly                                                                      |
+| `forge extension disable`         | Remove a whole installation or selected runtime ownership (`--runtime`, `--all`)                       |
 | `forge extension status`          | Show installation status (`--json`)                                                                    |
 | `forge extension doctor`          | Report install, dispatcher/dev override, hook migration, registry, and compatibility status (`--json`) |
 
@@ -34,8 +34,14 @@ Claude and Codex. Profile-selected wrong-owner modules are reported as skips. A 
 or an explicit runtime selection that leaves no effective module, is a non-forceable conflict. With no option, a new
 enable targets Claude and adds Codex when `codex` is detected. Re-enabling retains every runtime it already manages, so
 temporary binary absence cannot drop ownership. Explicit narrowing refreshes selected surfaces and preserves omitted
-tracked ownership. `forge extension sync` derives its runtime set from the persisted owner pairs. Use
-`forge extension disable` to remove managed surfaces.
+tracked ownership. `forge extension sync` derives its runtime set from the persisted owner pairs.
+
+`forge extension disable --runtime claude|codex|all` uses the same repeatable selector and composes with `--scope` or
+`--all`. Claude selection removes its commands, agents, skills, hook/settings, status-line, and permission ownership;
+Codex selection removes its skill packages and managed hook block. The other runtime and unrelated user content remain
+unchanged. Selecting the last managed runtime, `all`, or both individual runtimes removes the whole row. A partial
+removal reports but retains legacy file/settings rows whose runtime cannot be proved. With no `--runtime`, disable keeps
+the existing whole-installation path.
 
 Skill targets are `$CLAUDE_HOME/skills` (Claude user), `<root>/.claude/skills` (Claude project/local),
 `$HOME/.agents/skills` (Codex user), and `<root>/.agents/skills` (Codex project). Codex local is unsupported and never
@@ -70,6 +76,18 @@ command retains backups and prints the exact retry command for the temporary hoo
 command exit non-zero even when other scopes were removed. The setup-script uninstaller treats that exit as terminal and
 preserves `$FORGE_HOME`, including `installed.json`, for repair and retry; it also refuses to remove that state when the
 Forge command is unavailable.
+
+With `disable --all --runtime ...`, the summary reports each scope as `no-op`, `partial`, or `full` and counts only the
+surfaces selected there. Completion describes the selected runtime operation rather than claiming every installation was
+removed. Unscoped runtime removal still resolves the nearest tracked scope first; a row that does not manage the
+requested runtime is an exit-0 no-op naming that scope and the `--scope` override.
+
+Runtime-spelled removal validates every target before mutation, then reconciles tracking after a file, settings, or
+Codex apply failure. Claude settings and every `.forge-added` ownership sidecar are one reversible transition; user
+changes are compared against the tracked added values, including legacy rows with no sidecar. If the final atomic
+tracking write itself fails after filesystem work, the old row remains and may over-claim removed files or the Codex
+block. The command exits non-zero, names `installed.json`, restores the settings transition when possible, and directs
+the user to repair the tracking path and rerun the same disable.
 
 Doctor reports `FORGE_DEV` under `hook_dispatcher.dev_override` as
 `{present: bool, value: string|null, target: string|null, valid: bool, effective: bool, advice: string|null}`. `valid`

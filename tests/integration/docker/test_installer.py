@@ -395,6 +395,49 @@ chmod +x /tmp/forge-codex-skills-bin/codex
         after_disable = synced_container.read_json(_get_tracking_path(synced_container))
         assert "user" not in after_disable["installations"]
 
+    def test_runtime_disable_then_sync_does_not_resurrect_codex(
+        self,
+        synced_container: ContainerLike,
+    ) -> None:
+        setup = synced_container.exec("""
+rm -rf ~/.agents ~/.claude ~/.forge /tmp/forge-runtime-disable-bin
+mkdir -p /tmp/forge-runtime-disable-bin
+printf '#!/bin/sh\nprintf "codex-cli 0.144.0\\n"\n' > /tmp/forge-runtime-disable-bin/codex
+chmod +x /tmp/forge-runtime-disable-bin/codex
+""")
+        assert setup.returncode == 0, setup.stderr
+
+        enable = synced_container.exec(
+            "cd /forge\n"
+            "PATH=/tmp/forge-runtime-disable-bin:$PATH "
+            "/forge/.venv/bin/forge extension enable --scope user "
+            "--profile minimal --with skills --without commands --runtime all"
+        )
+        assert enable.returncode == 0, f"Enable failed: stdout={enable.stdout!r} stderr={enable.stderr!r}"
+        assert _read_codex_skill_root(synced_container, None)["packages"] == list(_CODEX_PORTABLE_SKILLS)
+
+        disable = synced_container.exec(
+            "cd /forge\n"
+            f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge "
+            "extension disable --scope user --runtime codex --yes"
+        )
+        assert disable.returncode == 0, f"Runtime disable failed: stdout={disable.stdout!r} stderr={disable.stderr!r}"
+        assert _read_codex_skill_root(synced_container, None)["packages"] == []
+
+        sync = synced_container.exec(
+            "cd /forge\n" f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge extension sync --scope user"
+        )
+        assert sync.returncode == 0, f"Sync failed: stdout={sync.stdout!r} stderr={sync.stderr!r}"
+        assert _read_codex_skill_root(synced_container, None)["packages"] == []
+
+        status = synced_container.exec(
+            "cd /forge\n" f"PATH={_PATH_WITHOUT_CODEX} /forge/.venv/bin/forge extension status --scope user --json"
+        )
+        assert status.returncode == 0, status.stderr
+        payload = json.loads(status.stdout)
+        assert payload["installations"][0]["managed_runtimes"] == ["claude_code"]
+        assert all(package["runtime"] == "claude_code" for package in payload["installations"][0]["skill_packages"])
+
     def test_built_wheel_installs_both_runtime_outputs_and_completes_lifecycle(
         self,
         synced_container: ContainerLike,
@@ -498,6 +541,70 @@ PY
                 f"Wheel {runtime} disable failed: " f"stdout={disable_matrix.stdout!r} stderr={disable_matrix.stderr!r}"
             )
             assert "user" not in synced_container.read_json(f"{home}/.forge/installed.json")["installations"]
+
+        partial_root = f"{matrix_root}/partial"
+        for removed_runtime, surviving_runtime, removed_root in (
+            ("codex", "claude_code", ".agents/skills"),
+            ("claude", "codex", ".claude/skills"),
+        ):
+            home = f"{partial_root}/{removed_runtime}/home"
+            project_root = f"{partial_root}/{removed_runtime}/project"
+            create_roots = synced_container.exec(f"mkdir -p {home} {project_root}")
+            assert create_roots.returncode == 0, create_roots.stderr
+            enable_partial = synced_container.exec(
+                _packaged_forge_command(
+                    "extension enable --scope user --profile standard --runtime all",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert enable_partial.returncode == 0, enable_partial.stderr
+
+            disable_partial = synced_container.exec(
+                _packaged_forge_command(
+                    f"extension disable --scope user --runtime {removed_runtime} --yes",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert disable_partial.returncode == 0, (
+                f"Wheel partial {removed_runtime} disable failed: "
+                f"stdout={disable_partial.stdout!r} stderr={disable_partial.stderr!r}"
+            )
+            sync_partial = synced_container.exec(
+                _packaged_forge_command(
+                    "extension sync --scope user",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert sync_partial.returncode == 0, sync_partial.stderr
+
+            status_partial = synced_container.exec(
+                _packaged_forge_command(
+                    "extension status --scope user --json",
+                    project_root=project_root,
+                    home=home,
+                )
+            )
+            assert status_partial.returncode == 0, status_partial.stderr
+            partial_payload = json.loads(status_partial.stdout)["installations"][0]
+            assert partial_payload["managed_runtimes"] == [surviving_runtime]
+            assert all(package["runtime"] == surviving_runtime for package in partial_payload["skill_packages"])
+            assert all(package["target_present"] is True for package in partial_payload["skill_packages"])
+
+            removed_targets = synced_container.exec(f"""
+HOME={home} /forge/.venv/bin/python - <<'PY'
+from pathlib import Path
+
+root = Path({f"{home}/{removed_root}"!r})
+assert root.is_dir()
+assert not any(path.is_dir() for path in root.iterdir())
+PY
+""")
+            assert removed_targets.returncode == 0, removed_targets.stderr
+            if removed_runtime == "codex":
+                assert synced_container.exec(f"test ! -e {home}/.codex/config.toml").returncode == 0
 
         preserve_home = f"{matrix_root}/preserve/home"
         preserve_project = f"{matrix_root}/preserve/project"

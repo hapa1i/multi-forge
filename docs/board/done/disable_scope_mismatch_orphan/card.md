@@ -3,11 +3,11 @@
 **Lane**: `done/` -- completed and verified 2026-07-30 on branch `fix/disable-scope-mismatch-orphan`; execution record
 in [checklist.md](checklist.md). Small and independently shippable.
 
-**Type**: bug card. Split from [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md)
-(D-mismatch) because the defect is **not** runtime-specific: it affects bare `forge extension disable` today, with no
-`--runtime` flag involved. Fixing it inside a feature card would have hidden a live defect behind a new option.
+**Type**: bug card. Split from [extension_disable_runtime](../../done/extension_disable_runtime/card.md) (D-mismatch)
+because the defect is **not** runtime-specific: it affects bare `forge extension disable` today, with no `--runtime`
+flag involved. Fixing it inside a feature card would have hidden a live defect behind a new option.
 
-**Sequencing**: ships **before** [extension_disable_runtime](../../proposed/extension_disable_runtime/card.md), so that
+**Sequencing**: ships **before** [extension_disable_runtime](../../done/extension_disable_runtime/card.md), so that
 card's "preflight refusal leaves tracking untouched" contract is inherited rather than invented. It has no dependency on
 [runtime_scoped_extension_modules](../../done/runtime_scoped_extension_modules/card.md) and can ship at any time.
 

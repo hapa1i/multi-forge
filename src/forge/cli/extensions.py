@@ -72,6 +72,7 @@ from forge.install.project_compat import (
     format_project_compatibility_recovery,
 )
 from forge.install.project_registry import EnrollmentSource, ProjectRegistryStore
+from forge.install.runtime_removal import RuntimeRemovalPlan
 from forge.install.skill_compiler import discover_skill_source_names
 from forge.install.tracking import TrackingStore
 from forge.install.unmanaged import (
@@ -148,6 +149,26 @@ def _parse_skill_runtimes(values: tuple[str, ...]) -> tuple[str, ...] | None:
         else:
             selected.add(_SKILL_RUNTIME_IDS[value])
     return tuple(runtime for runtime in _SKILL_RUNTIME_IDS.values() if runtime in selected)
+
+
+def _runtime_selection_display(runtime_ids: tuple[str, ...] | None) -> str:
+    """Render stable runtime ids with the public CLI spellings."""
+
+    if runtime_ids is None:
+        raise ValueError("runtime selection display requires at least one runtime")
+    public_names = {runtime_id: name for name, runtime_id in _SKILL_RUNTIME_IDS.items()}
+    return " + ".join(public_names[runtime_id] for runtime_id in runtime_ids)
+
+
+def _print_codex_retrust_tip() -> None:
+    """Disclose the trust consequence whenever disable removes a Codex block."""
+
+    print_tip(
+        "Removing a managed Codex hook block changes its registration bytes. "
+        "Re-enabling Codex hooks later requires the one-time interactive trust ceremony; "
+        "Forge cannot verify trust.",
+        console=console,
+    )
 
 
 def _enforce_claude_version_if_required(plan: InstallPlan, project_root: Path | None = None) -> None:
@@ -692,12 +713,17 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
             print_tip("Use --force to override, or resolve conflicts manually.", console=console)
 
 
-def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
+def _uninstall_all_installations(
+    tracking: TrackingStore,
+    yes: bool,
+    runtime_ids: tuple[str, ...] | None = None,
+) -> None:
     """Uninstall all tracked installations.
 
     Args:
         tracking: TrackingStore instance.
         yes: If True, skip confirmation prompt.
+        runtime_ids: Optional runtime ownership filter.
     """
     installations = tracking.list_installations()
 
@@ -707,10 +733,28 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
 
     console.print(f"[bold]Found {len(installations)} Forge installation(s):[/bold]\n")
 
+    runtime_plans: dict[tuple[str, str | None], RuntimeRemovalPlan] = {}
+    if runtime_ids is not None:
+        for scope, project_path, _installation in installations:
+            installer = Installer(
+                scope=InstallScope(scope),
+                project_root=Path(project_path) if project_path else None,
+                tracking_store=tracking,
+            )
+            runtime_plans[(scope, project_path)] = installer.plan_runtime_removal(runtime_ids)
+
+    removes_codex_block = (
+        any(plan.remove_codex_block for plan in runtime_plans.values())
+        if runtime_ids is not None
+        else any(installation.codex_config_path is not None for _, _, installation in installations)
+    )
+
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
     table.add_column("SCOPE", style="cyan")
     table.add_column("PROJECT PATH")
     table.add_column("PROFILE")
+    if runtime_ids is not None:
+        table.add_column("DISPOSITION")
     table.add_column("FILES")
     table.add_column("SKILL PACKAGES")
 
@@ -719,39 +763,95 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
         path_display = project_path or "(global)"
         if len(path_display) > 40:
             path_display = "…" + path_display[-37:]
-        table.add_row(
-            scope_display,
-            path_display,
-            installation.profile,
-            str(len(installation.files)),
-            str(len(installation.skill_packages)),
-        )
+        if runtime_ids is None:
+            table.add_row(
+                scope_display,
+                path_display,
+                installation.profile,
+                str(len(installation.files)),
+                str(len(installation.skill_packages)),
+            )
+        else:
+            plan = runtime_plans[(scope, project_path)]
+            table.add_row(
+                scope_display,
+                path_display,
+                installation.profile,
+                plan.disposition,
+                str(len(plan.files)),
+                str(len(plan.skill_packages)),
+            )
 
     console.print(table)
     console.print()
 
+    if runtime_ids is not None:
+        for scope, project_path, _installation in installations:
+            plan = runtime_plans[(scope, project_path)]
+            if not plan.retained_unattributed_count:
+                continue
+            location = display_path(project_path) if project_path else "global"
+            reasons = ", ".join(plan.retained_unattributed_reasons)
+            console.print(
+                f"[yellow]{scope} ({location}) retains {plan.retained_unattributed_count} "
+                f"legacy unattributed surface(s): {reasons}.[/yellow]"
+            )
+
+    if removes_codex_block:
+        _print_codex_retrust_tip()
+
+    if runtime_ids is not None or removes_codex_block:
+        console.print()
+
     if not yes:
-        if not click.confirm("Disable ALL of these?"):
+        prompt = (
+            "Disable ALL of these?"
+            if runtime_ids is None
+            else f"Remove selected {_runtime_selection_display(runtime_ids)} runtime surfaces across these scopes?"
+        )
+        if not click.confirm(prompt):
             console.print("[dim]Cancelled.[/dim]")
             return
 
     errors = []
     for scope, project_path, _installation in installations:
         try:
-            console.print(f"\n[bold]Disabling {scope}[/bold]", end="")
+            operation_plan = runtime_plans.get((scope, project_path))
+            if operation_plan is not None and operation_plan.disposition == "no-op":
+                console.print(f"\n[bold]Skipping {scope}[/bold]", end="")
+            elif runtime_ids is not None:
+                console.print(f"\n[bold]Removing selected runtime surfaces from {scope}[/bold]", end="")
+            else:
+                console.print(f"\n[bold]Disabling {scope}[/bold]", end="")
             if project_path:
                 console.print(f" [dim]({display_path(project_path)})[/dim]")
             else:
                 console.print()
+
+            if operation_plan is not None and operation_plan.disposition == "no-op":
+                console.print("  [dim]No selected runtime surfaces are managed in this scope.[/dim]")
+                continue
 
             install_scope = InstallScope(scope)
             project_root = Path(project_path) if project_path else None
 
             _enforce_project_compatibility(project_root)
 
-            installer = Installer(scope=install_scope, project_root=project_root)
-            installer.uninstall()
-            console.print("  [green]✓ Done[/green]")
+            if runtime_ids is None:
+                installer = Installer(scope=install_scope, project_root=project_root)
+                installer.uninstall()
+                console.print("  [green]✓ Done[/green]")
+            else:
+                installer = Installer(
+                    scope=install_scope,
+                    project_root=project_root,
+                    tracking_store=tracking,
+                )
+                installer.uninstall_runtimes(runtime_ids, expected_plan=operation_plan)
+                if operation_plan is not None and operation_plan.full_coverage:
+                    console.print("  [green]✓ Installation disabled[/green]")
+                else:
+                    console.print("  [green]✓ Selected runtime surfaces disabled[/green]")
 
         except Exception as e:
             # ``--all`` is a batch boundary: one filesystem, settings, or
@@ -767,7 +867,13 @@ def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
             console.print(f"  [red]- {scope} ({display_path(path) if path else 'global'}): {err}[/red]")
         raise click.exceptions.Exit(1)
     else:
-        console.print(f"[green]All {len(installations)} installation(s) disabled.[/green]")
+        if runtime_ids is None:
+            console.print(f"[green]All {len(installations)} installation(s) disabled.[/green]")
+        else:
+            console.print(
+                f"[green]Selected {_runtime_selection_display(runtime_ids)} runtime removal processed "
+                f"{len(installations)} tracked scope(s).[/green]"
+            )
 
 
 def _can_resolve_project_root(scope: InstallScope, *, anchor: Path | None = None) -> bool:
@@ -1216,8 +1322,15 @@ def cleanup_project_cmd(path: str | None, yes: bool) -> None:
     is_flag=True,
     help="Disable ALL tracked installations",
 )
+@click.option(
+    "--runtime",
+    "runtimes",
+    type=click.Choice(["claude", "codex", "all"]),
+    multiple=True,
+    help="Remove surfaces owned by this runtime; repeat for multiple runtimes",
+)
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
+def disable_cmd(scope: str | None, uninstall_all: bool, runtimes: tuple[str, ...], yes: bool) -> None:
     """Disable Forge extensions.
 
     Removes only files and settings entries that were added by Forge.
@@ -1240,15 +1353,17 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
     Examples:
         forge extension disable                   # Auto-detect scope
         forge extension disable --scope local     # Disable local scope
+        forge extension disable --runtime codex   # Remove Codex-owned surfaces
         forge extension disable --all --yes       # Disable everything
     """
     if uninstall_all and scope is not None:
         raise click.UsageError("--all and --scope are mutually exclusive.")
     try:
         tracking = TrackingStore()
+        runtime_ids = _parse_skill_runtimes(runtimes)
 
         if uninstall_all:
-            _uninstall_all_installations(tracking, yes)
+            _uninstall_all_installations(tracking, yes, runtime_ids)
             return
 
         if scope is None:
@@ -1273,21 +1388,55 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             console.print(f"[dim]No Forge installation for scope '{install_scope.value}'.[/dim]")
             return
 
-        installer = Installer(scope=install_scope, project_root=project_root)
-        installer.validate_codex_config_scope(existing)
+        if runtime_ids is None:
+            installer = Installer(scope=install_scope, project_root=project_root)
+            installer.validate_codex_config_scope(existing)
+            removal_plan = None
+            display_skill_packages = tuple(existing.skill_packages)
+            display_files = tuple(existing.files)
+            display_settings_entries = tuple(existing.settings_entries)
+            display_codex_block = existing.codex_config_path is not None
+        else:
+            installer = Installer(
+                scope=install_scope,
+                project_root=project_root,
+                tracking_store=tracking,
+            )
+            removal_plan = installer.plan_runtime_removal(runtime_ids)
+            if removal_plan.disposition == "no-op":
+                runtime_display = _runtime_selection_display(runtime_ids)
+                console.print(
+                    f"[dim]Resolved scope '{install_scope.value}' does not manage the selected {runtime_display} "
+                    "runtime; nothing was changed. Use --scope to choose another tracked installation.[/dim]"
+                )
+                return
+            installer.validate_runtime_removal(removal_plan)
+            display_skill_packages = removal_plan.skill_packages
+            display_files = removal_plan.files
+            display_settings_entries = removal_plan.settings_entries
+            display_codex_block = removal_plan.remove_codex_block
 
-        console.print(f"[bold]Will disable Forge extensions ({install_scope.value}):[/bold]")
+        if removal_plan is not None and removal_plan.full_coverage and "all" not in runtimes:
+            console.print(f"[bold]Will fully disable Forge extensions ({install_scope.value}):[/bold]")
+            console.print("  This runtime selection removes the whole Forge installation for the resolved scope.")
+        elif removal_plan is not None and not removal_plan.full_coverage:
+            console.print(
+                f"[bold]Will disable selected {_runtime_selection_display(runtime_ids)} runtime surfaces "
+                f"({install_scope.value}):[/bold]"
+            )
+        else:
+            console.print(f"[bold]Will disable Forge extensions ({install_scope.value}):[/bold]")
         console.print(f"  Profile:  {existing.profile}")
         console.print(f"  Mode:     {existing.mode}")
         console.print()
 
-        if existing.skill_packages:
+        if display_skill_packages:
             table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
             table.add_column("ACTION", style="red")
             table.add_column("RUNTIME")
             table.add_column("SKILL")
             table.add_column("TARGET")
-            for package in existing.skill_packages:
+            for package in display_skill_packages:
                 table.add_row(
                     "remove",
                     package.runtime,
@@ -1298,11 +1447,11 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             console.print(table)
             console.print()
 
-        if existing.files:
+        if display_files:
             table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
             table.add_column("ACTION", style="red")
             table.add_column("PATH")
-            for f in existing.files:
+            for f in display_files:
                 # Truncate long paths for display
                 path_str = str(f.target_path)
                 if len(path_str) > 60:
@@ -1312,29 +1461,49 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
             console.print(table)
             console.print()
 
-        if existing.settings_entries:
+        if display_settings_entries:
             table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
             table.add_column("ACTION", style="red")
             table.add_column("KEY")
-            for entry in existing.settings_entries:
+            for entry in display_settings_entries:
                 table.add_row("unmerge", entry.key_path)
             console.print("[bold]Settings:[/bold]")
             console.print(table)
 
-        if existing.codex_config_path:
+        if removal_plan is not None and removal_plan.retained_unattributed_count:
+            reasons = ", ".join(removal_plan.retained_unattributed_reasons)
+            console.print(
+                f"\n[yellow]Retaining {removal_plan.retained_unattributed_count} legacy unattributed "
+                f"surface(s): {reasons}.[/yellow]"
+            )
+
+        if display_codex_block:
+            codex_config_path = existing.codex_config_path
+            if codex_config_path is None:
+                raise ForgeInstallError("tracked Codex ownership has no config path")
             console.print("\n[bold]Codex hooks:[/bold]")
-            console.print(f"  [red]remove[/red] managed block in {display_path(existing.codex_config_path)}")
+            console.print(f"  [red]remove[/red] managed block in {display_path(codex_config_path)}")
+            _print_codex_retrust_tip()
 
         if not yes:
-            if not click.confirm("\nProceed with disable?"):
+            if removal_plan is not None and removal_plan.full_coverage and "all" not in runtimes:
+                prompt = "\nProceed with full disable?"
+            elif removal_plan is not None and "all" not in runtimes:
+                prompt = "\nProceed with runtime disable?"
+            else:
+                prompt = "\nProceed with disable?"
+            if not click.confirm(prompt):
                 console.print("[dim]Cancelled.[/dim]")
                 return
 
-        installer.uninstall()
+        if runtime_ids is None:
+            installer.uninstall()
+        else:
+            installer.uninstall_runtimes(runtime_ids, expected_plan=removal_plan)
 
         # Remove .forge/ anchor if it's empty (no sessions, artifacts, etc.).
         # .claude/ is NOT removed — it may contain user-authored content.
-        if project_root is not None:
+        if project_root is not None and (removal_plan is None or removal_plan.full_coverage):
             forge_dir = project_root / ".forge"
             if forge_dir.is_dir():
                 try:
@@ -1343,7 +1512,13 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
                 except OSError:
                     pass  # Non-empty: sessions/artifacts still present
 
-        console.print("\n[green]Extensions disabled.[/green]")
+        if removal_plan is not None and not removal_plan.full_coverage:
+            console.print(
+                f"\n[green]Selected {_runtime_selection_display(runtime_ids)} runtime surfaces disabled "
+                f"for scope '{install_scope.value}'.[/green]"
+            )
+        else:
+            console.print("\n[green]Extensions disabled.[/green]")
 
     except NoForgeInstallationError as e:
         print_error(f"{e}")
@@ -1618,7 +1793,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
             console.print(f"  [dim]Not enabled at {display_path(location)}[/dim]")
             continue
 
-        console.print(f"  Profile:   {installation.profile}")
+        console.print(f"  Profile:   {installation.profile} (installed)")
         console.print(f"  Mode:      {installation.mode}")
         console.print(f"  Runtimes:  {', '.join(managed_runtime_ids(installation))}")
         console.print(f"  Modules:   {', '.join(sorted(module_values(installation)))}")

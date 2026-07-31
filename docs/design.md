@@ -291,11 +291,13 @@ the current directory — a read-only CLI scan of one encoded project directory,
 resolve sessions by identity and never scan. Adoption also inverts transcript ownership, so
 `SessionManager.delete_session` exempts an adopted session's native transcript from `delete_transcripts` (including the
 `delete_transcripts=True` automatic retention sweep) using the same filter that spares transcripts shared with another
-session. Stop and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to
-correct fork-session launches where SessionStart sees an inherited parent UUID. Because the start path pre-seeds, a
-non-null `claude_session_id` does **not** by itself mean the session ran (a `--no-launch` or not-yet-launched start
-session already carries a pre-seeded UUID); "used"/resumable requires hook confirmation or transcript-backed evidence
-(see Default resume behavior).
+session. Adoption resolves the `.forge/artifacts` root before enforcing destination containment, so relocating that root
+with a symlink is supported; a descendant destination that escapes the resolved root or aliases the native transcript is
+refused, and rollback only unlinks an artifact created by the current copy attempt. Stop and StopFailure also reconcile
+`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
+sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
+mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
+"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior).
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child when the session has resumable evidence (hook confirmation or transcript-backed state) and is not currently

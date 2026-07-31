@@ -109,15 +109,30 @@ forge extension enable                           # Auto-detect scope
 forge extension enable --scope local             # Local install → .claude/settings.local.json
 ```
 
-To remove the user-scope runtime hooks later:
+To remove both user-scope runtime hooks later:
 
 ```bash
 forge extension disable --scope user
 ```
 
-If `$CODEX_HOME` has changed since Forge registered the Codex hooks, disable refuses before removing anything and names
-both the tracked and current config paths. Restore the original `$CODEX_HOME` and retry, or remove the managed block
-from the named tracked config by hand; Forge preserves the installation row while refusing the operation.
+To remove one runtime while preserving the other:
+
+```bash
+forge extension disable --scope user --runtime codex
+forge extension disable --scope user --runtime claude
+```
+
+Removing Codex deletes only the balanced Forge marker block and preserves every byte outside it, including manual
+Forge-looking registrations. Those outside-marker commands are user-owned and produce a warning; they do not keep
+managed ownership alive. A missing config or an existing config with no Forge markers clears stale tracking without
+deleting the file. Partial, duplicated, or unbalanced markers are unsafe: disable refuses before mutation and names the
+config to repair. Removing the block changes the trusted registration bytes, so a later re-enable requires the one-time
+interactive trust ceremony again; Forge cannot verify that trust.
+
+If `$CODEX_HOME` has changed since Forge registered the Codex hooks, a removal that selects Codex refuses before
+removing anything and names both the tracked and current config paths. Restore the original `$CODEX_HOME` and retry, or
+remove the managed block from the named tracked config by hand; Forge preserves the installation row while refusing the
+operation. A Claude-only runtime removal does not inspect the Codex path and can proceed while that mismatch exists.
 
 > **Note:** Explicit `--with hooks` at `--scope local` or `--scope project` is rejected. Runtime hooks are user-scoped;
 > project/local installs own statusLine and other project settings.

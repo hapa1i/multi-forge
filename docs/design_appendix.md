@@ -1002,8 +1002,8 @@ and a current, executable installed dispatcher. `runtime_hooks` keeps `scopes` a
 
 ### C.1 Scope model
 
-`RuntimeSpec.skill_scopes` is separate from general `install_scopes`: a runtime can participate in project setup without
-having a safe skill directory for every Forge scope.
+`RuntimeSpec.skill_scopes` is separate from `install_scopes`; project participation does not imply a safe skill target
+at every Forge scope.
 
 | Scope     | Claude skill target      | Codex skill target       | Claude settings                      |
 | --------- | ------------------------ | ------------------------ | ------------------------------------ |
@@ -1011,9 +1011,8 @@ having a safe skill directory for every Forge scope.
 | `project` | `<root>/.claude/skills/` | `<root>/.agents/skills/` | `<root>/.claude/settings.json`       |
 | `local`   | `<root>/.claude/skills/` | Unsupported              | `<root>/.claude/settings.local.json` |
 
-Claude declares user/project/local skill scopes. Codex declares user/project only: it has no private local-only target,
-so Forge never maps local scope onto the shared project `.agents/skills/`. Codex skill discovery never uses
-`$CODEX_HOME`; that variable remains the Codex configuration/session home.
+Claude supports all three skill scopes. Codex supports user/project only, so local never aliases project
+`.agents/skills/`; `$CODEX_HOME` remains its configuration/session home, not a skill root.
 
 ### C.2 Installable modules + profiles
 
@@ -1032,18 +1031,16 @@ Profiles:
 - `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
-Scope keeps hooks user-only and status line project/local; `--runtime` filters by the table. Profile drops skip;
-wrong-owner `--with` and empty explicit selections conflict. Enable adds/retains, narrowing preserves, and disable
+Scope keeps hooks user-only and status line project/local; `--runtime` filters by owner. Profile drops skip, while a
+wrong-owner `--with` or empty explicit selection conflicts. Enable adds/retains, narrowing preserves, and disable
 removes.
 
-User-scope enable/sync also consolidates exact known-released direct-hook siblings in the two user settings files and
-reports tracked project/local migration candidates from `installed.json`. Candidate discovery does not read the
-candidate checkout, mutate its tracking row, or read/write `projects.json`; it cannot change ambient dispatcher
-eligibility in another root.
+User enable/sync consolidates exact released direct hooks in both user settings files and reports tracked migration
+candidates. Discovery is read-only: no candidate checkout, tracking row, `projects.json`, or ambient dispatcher state is
+touched.
 
-**Sidecar exception.** Sidecars launch Claude and stage canonical hooks plus `apiKeyHelper` in the Forge-owned
-`.forge/sidecar-home`; this runtime injection adds no install row. They mount the workspace (so project Claude skills
-remain visible), but no host user skill directory, and have no Codex skill target.
+**Sidecar exception.** Sidecars stage canonical hooks plus `apiKeyHelper` in `.forge/sidecar-home` without an install
+row. They mount project skills, not host-user or Codex skill targets.
 
 ### C.3 Settings merge rules
 
@@ -1055,32 +1052,39 @@ remain visible), but no host user skill directory, and have no Codex skill targe
 | `statusLine`        | Scalar merge; conflict fails unless `--force`                          |
 | `model`             | Never touched                                                          |
 
-Changed settings files are backed up first as `.settings[.local].json.forge.backup.<timestamp>`. Legacy cleanup removes
-an untracked Claude wrapper only when, after normalizing the direct `forge hook <handler>` executable spelling, its
-event, matcher, timeout, handler, and wrapper fields exactly match the frozen additive released-shape inventory. Tracked
-removal instead requires the current full canonical value to match the tracked entry. Mixed, modified, malformed, or
-unknown Forge-looking wrappers are retained and reported.
+Changed settings are backed up as `.settings[.local].json.forge.backup.<timestamp>`. Legacy cleanup removes only a
+normalized, exact released wrapper; tracked removal requires the full current canonical value. Other Forge-looking
+wrappers remain and are reported.
+
+Runtime disable smart-unmerges selected tracked values against the pre-Forge backup. Settings and all `.forge-added`
+sidecars form one reversible, byte/mode-snapshotted transition. Survivors rewrite the newest sidecar and retain its
+baseline; no survivors removes all sidecars and clears `settings_backup_path`, not backup history. Legacy/no-sidecar
+removal still compares values, preserving user edits. Failure restores both surfaces and names incomplete paths.
 
 ### C.4 Durable install/project files
 
 #### Installed manifest (`~/.forge/installed.json`)
 
-Schema v3 uses sorted, unique `module_owners: [{module, runtime}]`. Every file/settings row has a backed pair or
-explicit `{unattributed_reason}`; duplicate identities are rejected.
+Schema v3 has sorted unique `module_owners: [{module, runtime}]`; each file/settings row has a backed pair or explicit
+`{unattributed_reason}`, and duplicate identities are invalid.
 
-Frozen v1/v2 types normalize in memory and persist v3 on the next successful mutation, without a reset. Only the
-released Codex-hook value migrates; other unknown modules remain corruption. `(hooks, codex)` exists iff
-`codex_config_path` witnesses the block: an unavailable first install records neither, while re-enable preserves that
-witness. V2 skills use package runtime; v1 and other rows use closed path/key maps, leaving the rest unattributed.
-“Claude by construction” is load-bearing: a new Codex-owned module needs its own versioned migration.
+Frozen v1/v2 rows normalize in memory and persist v3 on the next mutation. Only the released Codex-hook value migrates;
+other unknown modules remain corruption. `(hooks, codex)` exists iff `codex_config_path` witnesses the block. V2 skills
+use package runtime; older rows use closed path/key maps, leaving unknowns unattributed. A new Codex-owned module needs
+a versioned migration.
 
-`disable --all` attempts every row, aggregates failures, and exits 1 if any remain. `scripts/setup.sh --uninstall`
-deletes `$FORGE_HOME` only after success; failure, or a missing Forge command with `installed.json` present, preserves
-tracking and aborts.
+Runtime removal intersects requested ids and `MODULE_RUNTIME_OWNERS` with persisted owners; it never adopts untracked
+surfaces. Attributed file, settings, package, and owner rows drop together. Removing Codex hooks clears both Codex
+fields; dropping owner pairs prevents sync resurrection. Partial removal retains visible unattributed rows; full
+coverage includes them and deletes the row. `profile` stays historical.
 
-For legacy migration, `cleanup-project` reads only the selected canonical project/local row, validates the newest
-`.forge-added` payload, then removes only hook ownership; unrelated fields survive. Stale/v1 rows without recoverable
-roots remain report-only.
+All file, settings/sidecar, Codex-scope, and marker checks preflight before mutation; filesystem work precedes atomic
+tracking. Later failure commits a coherent completed subset. A failed reconciliation leaves the old safe over-claim;
+landed settings restore first, and errors name tracking plus incomplete rollback paths.
+
+`disable --all` aggregates every row and exits 1 on any failure. Setup uninstall deletes `$FORGE_HOME` only after
+success and preserves tracking when teardown cannot run. Legacy `cleanup-project` validates one canonical row and newest
+sidecar, removes only hook ownership, and leaves stale/unrecoverable rows report-only.
 
 #### Runtime metadata (`~/.forge/runtime.json`)
 
@@ -1190,10 +1194,9 @@ not a bypass; sidecars need a satisfying image. `forge extension doctor` remains
 
 ### C.5 Multi-scope installation (skill resolution)
 
-Sources are neutral (`forge-skill.yaml` + `content.md`) or legacy (`SKILL.md`). Real checkout roots admit only
-Git-tracked/unignored paths; links need eligible targets, and unavailable Git state blocks planning.
-`allow_implicit_invocation` owns invocation; executables use their entry point. Validation rejects unsafe inputs. Codex
-emits family `openai`, no exact model, and ignores Claude sessions.
+Sources are neutral (`forge-skill.yaml` + `content.md`) or legacy (`SKILL.md`). Checkouts admit only tracked/unignored
+paths; links need eligible targets and unavailable Git state blocks planning. `allow_implicit_invocation` owns
+invocation; executables use their entry point. Codex emits family `openai`, no exact model, and ignores Claude sessions.
 
 SKILLS planning is explicit over scope/runtime/profile/skill:
 
@@ -1202,66 +1205,52 @@ SKILLS planning is explicit over scope/runtime/profile/skill:
 | `claude_code` | `$CLAUDE_HOME/skills/<skill>`  | `<root>/.claude/skills/<skill>` | `<root>/.claude/skills/<skill>`   |
 | `codex`       | `$HOME/.agents/skills/<skill>` | `<root>/.agents/skills/<skill>` | Unsupported; never shared/project |
 
-Skills share module selection. Enable adds/retains runtimes; narrowing/sync preserve and disable removes.
-Unsupported/unavailable requests and explicit/managed duplicates conflict; automatic duplicates skip.
+Skills share module selection. Enable adds/retains; narrowing/sync preserve. Disable drops only selected packages,
+files, and `(skills, runtime)`, so sync cannot resurrect them. Unsupported/unavailable or explicit/managed duplicates
+conflict; automatic duplicates skip.
 
 Status—not doctor—owns `present`, `missing`, `duplicate`, and `invalid-target`. Directory links are invalid; install
 links are leaf-only and dangling leaves are `missing`. Claude may drift; Codex should have one visible scope.
 
-Unmanaged discovery unions names-only current discovery with append-only history, scans direct children with `lstat`,
-and compares one tracking snapshot. Name failure falls back to history; full validation is installer-only. Status
-reports provenance/shape/collisions, ignores unknown names, and treats ancestor/admin roots as visibility-only. Unsafe
-roots are not traversed: human status emits a root issue, JSON invents no package, and clean omits them.
-
-Cleanup requires a strict marker/exact tree: files match digest/mode; live links stay inside cache; dangling reset links
-reconstruct one cache package. Clean rescans, fingerprints, anchors, and revalidates before deleting the child. User
-targets require `all`; project/local use their owner. Repair lost/corrupt tracking, then rescan.
+Unmanaged discovery unions current names with append-only history, scans direct children using `lstat`, and compares one
+tracking snapshot. Status reports provenance/shape/collisions; unsafe roots are not traversed or invented in JSON/clean.
+Cleanup requires a strict marker and exact digest/mode/link tree, then rescans and revalidates before child deletion.
+User targets require `all`; project/local use their owner. Lost/corrupt tracking is repaired before rescanning.
 
 Portable: `challenge`, `smoke-test`, `review`, `review-docs`, `understand`, `panel`, `analyze`, `debate`, and
 `consensus`. Only `walkthrough` and `qa` remain Claude-only.
 
 ### C.6 Codex hook registration (`hooks`, Codex-owned half)
 
-`forge extension enable --scope user` registers Forge's two Codex hooks by appending a marker-delimited managed block
-(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the user Codex config.
-
-Hook registration and skill delivery share runtime selection but have independent availability semantics. `$CODEX_HOME`
-selects the hook configuration below; Codex skills always use `$HOME/.agents/skills` or a project `.agents/skills`
-target from §C.5:
+User enable registers two Codex hooks in a marker-delimited block (`# >>> forge hooks >>>` … `# <<< forge hooks <<<`).
+Hooks and skills share runtime selection but not availability. `$CODEX_HOME` selects only this config; skills use §C.5:
 
 | Forge scope | Codex config target                                        |
 | ----------- | ---------------------------------------------------------- |
 | `user`      | `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) |
 
-Project/local extension installs do not write Codex hook blocks. Codex trust hashes the registered command bytes, so the
-dispatcher cutover (`<forge-home>/bin/forge-hook codex-*`) requires a one-time re-trust when an existing installation is
-updated.
+Project/local installs write no block. Codex hashes command bytes, so changing the dispatcher registration requires
+one-time re-trust.
 
-For a selected legacy root, `cleanup-project` strict-validates the project config and tracked path before mutation. A
-balanced managed block is backed up and removed while unrelated TOML bytes are preserved; a missing tracked block clears
-stale ownership, while partial markers or a matching Forge registration outside the block are retained and block the
-migration. The user managed block is then installed/updated only because a project Codex block or ownership row was
-migrated. Forge prints the re-trust ceremony whenever those user command bytes/location change and never claims trust
-was verified.
+Legacy `cleanup-project` validates config and tracked path first. It backs up/removes one balanced block while
+preserving outside TOML; absence clears stale ownership, while partial markers or matching manual registration block
+migration. It installs the user block only after migrating project Codex state and prints, but never claims, re-trust.
 
 Mechanics (`src/forge/install/codex_hooks.py`):
 
-- **Managed-block only** — codex-cli owns `config.toml`. Forge appends or replaces only its block, validates with
-  `tomllib`, backs up, then atomically writes while preserving the existing mode. Disable removes only that block; a
-  whitespace-only remainder deletes the file.
-- **Trust-byte stability**: the rendered entry bytes are golden-pinned — Codex's `trusted_hash` covers the registration
-  definition, so changing a command string or entry shape silently invalidates existing enrollment.
-- **Dedupe vs manual registrations**: all Forge commands already registered outside the markers → skip (manual
-  registration kept, untracked); a partial manual registration → conflict (installing would double-register).
-- **Best-effort module**: a missing `codex` binary or a config conflict degrades to a visible skip — it never sets
-  `InstallPlan.has_conflicts` and never blocks the Claude install.
-- **Event-name validation**: registration event names are validated against the probe-pinned 10-event set at plan time
-  (Codex itself loads bogus event names silently).
-- Tracking records `codex_config_path` + `codex_commands` in `~/.forge/installed.json`. On path/scope mismatch, disable
-  aborts before removal, preserving tracking and the managed block; status reports the registration.
+- **Managed block:** append/replace only Forge's block; validate, back up, and atomically preserve mode. Disable removes
+  only that block and deletes a whitespace-only file.
+- **Stable trust bytes:** golden-pinned entry bytes define Codex enrollment.
+- **Manual dedupe:** all commands outside markers skips untracked; a partial set conflicts.
+- **Best effort:** missing Codex or config conflict visibly skips without blocking Claude.
+- **Validation/tracking:** validate the 10 event names; record config path plus commands. Scope mismatch aborts before
+  removal and retains both.
 
-Registration alone is inert: enable prints a Next-steps block naming the one-time interactive trust ceremony (run
-`codex`, grant trust). Enrollment is unverifiable pre-turn (design.md §3.9), so Forge never claims it.
+Runtime removal classifies before mutation and revalidates exact content at apply. Absence/marker-free state clears
+stale ownership without deleting content; one balanced block preserves outside bytes. Partial/duplicate markers, leaf
+symlinks, unreadable state, or concurrent change refuse and retain ownership. Outside-marker commands remain user-owned
+and warning-only. Successful removal changes trust bytes, so later enable requires re-trust. Registration is inert and
+enrollment unverifiable pre-turn; Forge prints the ceremony but never claims trust.
 
 ---
 

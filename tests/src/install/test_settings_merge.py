@@ -24,6 +24,7 @@ from forge.install.settings_merge import (
     restore_settings_backup,
     scalar_already_set,
     set_scalar,
+    smart_unmerge,
     unmerge,
     write_settings,
 )
@@ -473,6 +474,26 @@ class TestUnmerge:
         # User entries preserved
         assert len(settings["hooks"]["PreToolUse"]) == 1
         assert settings["permissions"]["allow"] == ["UserPerm"]
+
+
+class TestSmartUnmerge:
+    def test_preserves_user_modified_scalar_and_env_values(self) -> None:
+        current = {
+            "statusLine": "user replacement",
+            "env": {"FORGE_MODE": "user replacement"},
+        }
+        backup = {
+            "statusLine": "original status",
+            "env": {"FORGE_MODE": "original mode"},
+        }
+        added = {
+            "statusLine": "forge status-line",
+            "env": {"FORGE_MODE": "managed"},
+        }
+
+        result = smart_unmerge(current, backup, added)
+
+        assert result == current
 
 
 class TestHooksAlreadyPresent:

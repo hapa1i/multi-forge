@@ -78,7 +78,7 @@ cat ~/.forge/installed.json | jq '.installations | keys'
 - [ ] Local scope re-installed
 - [ ] User, local, and project installations are tracked
 
-### 18.4 Disable and Restore Project Codex Packages
+### 18.4 Remove and Restore One Project Runtime
 
 <!-- auto -->
 
@@ -88,22 +88,36 @@ cat ~/.forge/installed.json | jq '.installations | keys'
 cd "$FORGE_TEST_REPO"
 PROJECT_KEY="project:$(pwd -P)"
 
-forge extension disable --scope project --yes
-! find .agents/skills -name SKILL.md -print -quit 2>/dev/null | grep -q .
-jq -e --arg key "$PROJECT_KEY" '.installations[$key] == null' "$FORGE_HOME/installed.json"
-test -f "$CLAUDE_HOME/skills/review/SKILL.md"
+# Start from a dual-runtime project package set.
+PATH="/tmp/forge-qa-runtime-bin:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
+  --profile minimal --with skills --without commands --runtime all
 
-# Restore the project package set so complete uninstall must clean both runtime surfaces.
+# Remove only Codex. Claude packages and the project tracking row must survive.
+forge extension disable --scope project --runtime codex --yes
+! find .agents/skills -name SKILL.md -print -quit 2>/dev/null | grep -q .
+test -f .claude/skills/review/SKILL.md
+jq -e --arg key "$PROJECT_KEY" '
+  .installations[$key] != null
+  and ([.installations[$key].module_owners[].runtime] | unique == ["claude_code"])
+' "$FORGE_HOME/installed.json"
+
+# Sync must not resurrect the removed runtime.
+forge extension sync --scope project
+! find .agents/skills -name SKILL.md -print -quit 2>/dev/null | grep -q .
+
+# Restore Codex while preserving Claude, so complete uninstall still covers both runtime surfaces.
 PATH="/tmp/forge-qa-runtime-bin:$PATH" forge extension enable --scope project --root "$FORGE_TEST_REPO" \
   --profile minimal --with skills --without commands --runtime codex
 forge extension status --scope project --root "$FORGE_TEST_REPO" --json \
   | jq -e '.schema_version == 3 and .unmanaged_skill_packages == []
-      and (.installations[0].skill_packages | length == 9)
-      and all(.installations[0].skill_packages[]; .runtime == "codex" and .state == "present")'
+      and .installations[0].managed_runtimes == ["claude_code", "codex"]
+      and any(.installations[0].skill_packages[]; .runtime == "claude_code" and .state == "present")
+      and any(.installations[0].skill_packages[]; .runtime == "codex" and .state == "present")'
 ```
 
-- [ ] Project disable removes all tracked `.agents/skills` packages and its tracking row
-- [ ] Disabling project Codex packages leaves the Claude user installation intact
-- [ ] Re-enable restores exactly nine healthy project Codex packages for complete-uninstall coverage
+- [ ] Runtime disable removes tracked project `.agents/skills` packages but retains the project row
+- [ ] Project Claude packages remain present and tracked
+- [ ] Sync does not resurrect Codex packages
+- [ ] Re-enable restores healthy Claude and Codex project packages for complete-uninstall coverage
 
 ---

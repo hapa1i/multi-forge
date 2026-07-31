@@ -53,6 +53,9 @@ forge extension enable --scope user --runtime codex
 # Codex-only project skills (hooks are user-scoped)
 forge extension enable --scope project --profile minimal \
   --with skills --without commands --runtime codex
+
+# Give back only the Codex-owned surfaces in the resolved scope
+forge extension disable --scope user --runtime codex
 ```
 
 `--runtime claude|codex|all` is repeatable and filters every selected module by its declared runtime owners. A
@@ -61,7 +64,13 @@ Claude command, agent, settings, or skill surface. Profile-selected modules owne
 as skips; an explicit `--with` for a wrong-owner module is a conflict. On a new installation, automatic selection adds
 Codex only when detected. On an existing installation, automatic enable retains all managed runtimes even if a binary
 temporarily disappears from `PATH`; an explicit `--runtime` refreshes selected runtimes while preserving omitted tracked
-surfaces. Sync uses the durable tracked runtime set. Use `forge extension disable` for removal.
+surfaces. Sync uses the durable tracked runtime set.
+
+Removal uses the same repeatable spelling: `forge extension disable --runtime claude|codex|all`. It removes only
+surfaces attributed to the selected runtime and drops that runtime's owner pairs so a later sync cannot restore them.
+Removing the last managed runtime, selecting `all`, or selecting both runtimes is a full disable for the resolved scope.
+A partial removal retains legacy rows whose runtime cannot be proved and reports their count and reasons. Without
+`--runtime`, disable keeps its existing whole-installation behavior.
 
 | Runtime     | User scope                                          | Project scope           | Local scope             |
 | ----------- | --------------------------------------------------- | ----------------------- | ----------------------- |
@@ -73,7 +82,8 @@ Codex local request instead of writing personal state into the shared project `.
 
 From inside a project, unscoped `forge extension sync`, `disable`, and `status` use both `.claude/` ownership sidecars
 and exact scope/path rows in `~/.forge/installed.json`. A tracked Codex-only project therefore remains detectable even
-when it has no `.claude/` directory.
+when it has no `.claude/` directory. Runtime selection does not change that nearest-scope resolution: if the resolved
+row does not manage the requested runtime, disable exits successfully with a no-op message and points to `--scope`.
 
 ---
 
