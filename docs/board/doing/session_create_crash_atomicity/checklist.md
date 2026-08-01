@@ -2,9 +2,10 @@
 
 **Card**: [card.md](card.md). Branch: `fix/session-create-crash-atomicity`.
 
-**Current focus**: closeout, pending a third review pass. Two adversarial rounds have run; the second found three more
-defects (F8, F9, F10) plus two CIT tests the earlier verification never ran. All are fixed and regression-covered. The
-D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
+**Current focus**: closeout -- PR open, awaiting merge and the lane move. Three adversarial rounds have run; the third
+found F11 (`fork --force` reaching the delete/create window through its own path) and cleared the two open questions
+about the newest code. All findings are fixed and regression-covered. The D1/D2/D3 decisions and findings F1-F11
+recorded below are what shipped.
 
 ## Phase 0 -- Ground and ratify (complete 2026-08-01)
 
@@ -119,6 +120,34 @@ D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
   green" claim never covered them. One seeded a row-only collision (now residue), the other injected at
   `add_from_state`; both now use a live session and `create_session_txn` respectively. The CIT tier is part of this
   card's verification from here on.
+
+### Third review-round findings (2026-08-01, reproduced before fixing)
+
+- **F11 (HIGH) -- `fork --force` reached the same window through a path the audit missed.** After `delete_session` freed
+  the stale target, fork cleared whatever manifest remained with an unconditional `stale_store.delete()` guarded only by
+  `exists()`. A creator that claimed the freed name in between lost its manifest; fork's own transaction then read the
+  survivor's row as crash residue, pruned it, and published over it -- fork silently destroying a live session and
+  taking its name. Reproduced: `replacement row=True manifest=True` before fork, `manifest destroyed` after. Fix: route
+  the cleanup through `delete_session_txn` with `expect_manifest_absent=True`, so a rowed manifest is recognised as
+  foreign under the lock rather than after a probe; fork raises `SessionExistsError` instead of stealing the name. Same
+  class as F9, and the same root cause as F8 -- a filesystem observation standing in for a fact about what the operation
+  did.
+- **Probe/callback path agreement -- verified, no change.** `create_session_txn` probes
+  `get_manifest_path(Path(effective_forge_root), name)` while each callback writes through a `SessionStore` that
+  resolves its own root, and three call sites pass `forge_root=entry.forge_root` while building the store from
+  `entry.forge_root or <fallback>`. A divergence would key the row under one root and the manifest under another, and
+  would make `published` read False after a successful write -- reintroducing the orphan. Checked by asserting
+  `manifest_path.is_file()` after every successful callback and running the whole suite against it: 9293 tests, no
+  divergence. `SessionIndexEntry.forge_root` is `str = ""` and `_build_entry` always populates it, and `is_file()`
+  follows symlinks, so the fallbacks agree in practice. The same derivation already backs the four pre-existing prune
+  sites (`index.py:195`, `:213`, `:269`, `:283`), so passing the path explicitly was declined as diff churn that would
+  fix only half the coupling -- `scoped_key` is derived from the same root either way.
+- **Index-lock hold time across the manifest delete -- verified within the card's constraint.** `delete_manifest` runs
+  `shutil.rmtree` on the session directory inside the global index lock. That directory is bounded: manifest, its lock,
+  and up to three codex handoff files -- 4-20KB and 2-3 files on real installs here, ~0.13ms to remove, the same order
+  as the manifest write creation already holds the lock for. Transcripts (`.forge/artifacts/`), the search index and the
+  worktree live outside it and worktree cleanup runs before the lock is taken. Pinned in the `delete_session_txn`
+  docstring so a future writer does not start stashing bulk under the session directory.
 
 ### Decisions
 
@@ -243,9 +272,9 @@ D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
   "killed between the two leaves a manifest with no index row" clause is gone. `session/__init__.py`'s example now shows
   `create_session_txn`; `collect_bound_uuids` / `collect_bound_codex_threads` docstrings updated (the Codex one
   documents why it reads the row column).
-- [x] Integration tier: `test_session_lifecycle.py` **21 passed**; adoption Docker gates run while warm --
-  `test_adopt_binding_contract.py` + `test_adopt_native_conversation.py` **2 passed**.
-- [x] Unit + regression: `tests/src` + `tests/regression` **9173 passed, 1 skipped**. Component-integration tier
+- [x] Integration tier: `test_session_lifecycle.py` + `test_adopt_binding_contract.py` **22 passed** (Docker), rerun
+  after the F11 fix.
+- [x] Unit + regression: `tests/src` + `tests/regression` **9176 passed, 1 skipped**. Component-integration tier
   (`pytest tests/src -m integration`) **117 passed** -- this is the tier `-m "not integration"` deselects, and the
   earlier rounds never ran it; it is mandatory for this card from here on. `make pre-commit` clean.
 - [x] Mutation check in place of a blind pass, proving each new guard is load-bearing: reverting the F2 row-column read,
@@ -255,10 +284,12 @@ D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
   `test_bug_fork_force_target_recovery` and `test_bug_resume_autoname_context_retry` injected at `add_from_state`, and
   the latter modelled a "winner" as a row-only write, which is now the residue shape) and one was a real defect in this
   work (F4, D2's `write` callback -- see the D2 correction).
-- [x] Two adversarial review rounds, every finding reproduced before fixing (house rule). Round one: F5/F6 HIGH, F7
-  MEDIUM. Round two: F8/F9 HIGH, F10 LOW, plus two CIT tests the earlier verification had never run. Each fix carries
-  its own mutation check -- reverting the ownership probe, the in-lock manifest delete, the deterministic delete flag,
-  or the `BaseException` compensation each fails its own tests and nothing else's.
+- [x] Three adversarial review rounds, every finding reproduced before fixing (house rule). Round one: F5/F6 HIGH, F7
+  MEDIUM. Round two: F8/F9 HIGH, F10 LOW, plus two CIT tests the earlier verification had never run. Round three: F11
+  HIGH (`fork --force`), plus two open questions on the newest code closed with evidence rather than argument -- see
+  "Third review-round findings". Each fix carries its own mutation check -- reverting the ownership probe, the in-lock
+  manifest delete, the deterministic delete flag, the `BaseException` compensation, or the fork guard (M12) each fails
+  its own tests and nothing else's.
 
 ## Acceptance tests
 
@@ -281,6 +312,8 @@ D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
 | Interrupt after the manifest lands           | `create_exclusive` succeeds, then `KeyboardInterrupt`         | row survives; no manifest-only orphan                                          | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
 | Compensation write fails                     | index write raises during compensation                        | callback's `SessionExistsError` still surfaces; row is prunable                | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
 | Delete/create coordination                   | replacement published during a delete's cleanup window        | delete declines; replacement's row and manifest survive                        | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Fork declines a reclaimed target name        | replacement published during `fork --force` stale cleanup     | fork raises `SessionExistsError`; replacement's row and manifest survive (F11) | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Fork force still replaces and reclaims       | ordinary stale target; pre-existing orphan manifest (no row)  | both replaced by the new fork -- the F11 guard stays inert when nobody races   | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
 | Lifecycle end-to-end                         | Docker session start/fork/resume/delete                       | suite green                                                                    | `tests/integration/docker/test_session_lifecycle.py`                                    |
 
 ## Blockers / deferred decisions
@@ -295,8 +328,10 @@ findings F1 (four pre-check sites, not one), F2 (`collect_bound_codex_threads` n
 - [ ] Final checklist items ticked with verification recorded.
 - [x] Compact `docs/board/change_log.md` entry added under 2026-08-01 (Goal / Key changes / Verification, including the
   review-round record).
-- [ ] Propose durable lessons via `.forge/memory/shadow_impl_notes.md`; human review promotes to
-  `docs/board/impl_notes.md`.
+- [x] Propose durable lessons via `.forge/memory/shadow_impl_notes.md` ("Two-write atomicity and provable ownership");
+  human review promotes to `docs/board/impl_notes.md`. Separately, the `native_session_adoption` note in `impl_notes.md`
+  claimed creation writes the manifest first -- corrected in place per that file's own "rewrite notes when they become
+  obsolete" rule, keeping the `flock` rationale, which never depended on write order.
 - [x] design.md §3.2 and `session/__init__.py` verified against shipped behavior: transaction ordering, the two
   reservations, the crash-residue table, delete coordination, and the adoption paragraph's stale manifest-first claim.
 - [ ] Move the card `doing/ -> done/`; repoint inbound links, including a forward link from the

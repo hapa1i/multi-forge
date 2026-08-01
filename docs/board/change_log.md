@@ -60,19 +60,26 @@ lists, which still owns its name and its conversation binding.
   declines outright once a replacement owns the name. The ownership signal is derived from what the delete does --
   manifest absent at entry, or provably inside the worktree being removed -- not from a filesystem probe, which a
   replacement can flip.
+- `fork --force` reaches the same window through its own path and now uses the same primitive. After freeing the stale
+  target it cleared the name with an unconditional `delete()`, so a creator that claimed the freed name lost its
+  manifest and then its row to fork's own residue prune -- fork destroying a live session and taking its name. It now
+  declines with `SessionExistsError` instead.
 - design.md §3.2, `session/__init__.py`, and the `create_exclusive` / binding-scan docstrings describe the shipped
   ordering, including the delete-coordination contract. Repair of pre-existing orphans is split out to
   `proposed/session_orphan_manifest_repair`, because index identity fields cannot be derived from a manifest.
 
-**Verification**: `tests/src` + `tests/regression` 9169 passed, 1 skipped; new
-`tests/regression/test_bug_session_create_crash_atomicity.py` (30 tests) covers compensation and crash-residue as
-separate families, interrupt-after-durable-manifest, compensation-write failure, delete/create coordination, a
-`threading.Barrier` double create, the pruner race guard, per-path compensation through the real transaction, and the
-explicit-name retry. Every guard carries a mutation check confirming it is load-bearing. Docker
-`test_session_lifecycle.py` 21 passed; adoption gates 2 passed. `make pre-commit` clean.
+**Verification**: `tests/src` + `tests/regression` 9176 passed, 1 skipped, plus the component-integration tier
+(`pytest tests/src -m integration`) 117 passed -- that tier is deselected by `-m "not integration"` and hid two
+model-drift failures through two review rounds, so it is part of this card's gate. New
+`tests/regression/test_bug_session_create_crash_atomicity.py` (37 tests) covers compensation and crash-residue as
+separate families, interrupt-after-durable-manifest, compensation-write failure, delete/create coordination, the fork
+stale-target schedule, a `threading.Barrier` double create, the pruner race guard, per-path compensation through the
+real transaction, and the explicit-name retry. Every guard carries a mutation check confirming it is load-bearing.
+Docker `test_session_lifecycle.py` + `test_adopt_binding_contract.py` 22 passed. `make pre-commit` clean.
 
-**Review**: one adversarial round found three defects in the first implementation (two HIGH, one MEDIUM), all reproduced
-before fixing; see the card checklist's "Review-round findings".
+**Review**: three adversarial rounds found seven defects in the implementation (five HIGH, one MEDIUM, one LOW), all
+reproduced before fixing; see the card checklist's review-round sections. Six of the seven were the same root error --
+a filesystem probe standing in for a fact about what the operation did.
 
 ## 2026-07-31
 
