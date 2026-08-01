@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 from pathlib import Path
+from typing import Callable
 
 import dacite
 
@@ -347,30 +348,155 @@ class IndexStore:
                 raise SessionExistsError(name)
 
             if require_uuid_unbound:
-                for existing_key, existing in index.sessions.items():
-                    for wanted, held in (
-                        (claude_session_id, existing.claude_session_id),
-                        (codex_thread_id, existing.codex_thread_id),
-                    ):
-                        if wanted and held == wanted:
-                            raise UuidAlreadyBoundError(wanted, session_name_from_key(existing_key))
+                self._require_conversation_unbound(
+                    index,
+                    claude_session_id=claude_session_id,
+                    codex_thread_id=codex_thread_id,
+                )
 
-            entry = SessionIndexEntry(
+            entry = self._build_entry(
                 worktree_path=worktree_path,
                 project_root=project_root,
-                last_accessed_at=now_iso(),
                 is_fork=is_fork,
                 is_incognito=is_incognito,
                 parent_session=parent_session,
                 claude_session_id=claude_session_id,
                 codex_thread_id=codex_thread_id,
                 forge_root=effective_forge_root,
-                checkout_root=checkout_root or worktree_path,
-                relative_path=relative_path or ".",
+                checkout_root=checkout_root,
+                relative_path=relative_path,
             )
 
             index.sessions[scoped_key] = entry
             self.write(index)
+            return entry
+
+    def create_session_txn(
+        self,
+        state: SessionState,
+        project_root: str,
+        *,
+        checkout_root: str | None = None,
+        forge_root: str | None = None,
+        relative_path: str | None = None,
+        require_uuid_unbound: bool = False,
+        write_manifest: Callable[[], None],
+    ) -> SessionIndexEntry:
+        """Publish a session's index row and manifest under one index-lock acquisition.
+
+        The creation transaction for every path that mints a session. Writes the
+        **row first**, then calls ``write_manifest`` while still holding the lock,
+        so a process killed mid-creation leaves at most a bare row -- which is
+        prunable -- instead of a manifest with no row, which is not (nothing lists
+        it, yet it still owns its name and its conversation binding).
+
+        Lock order is **index -> manifest**, never the reverse. ``write_manifest``
+        takes the per-session manifest lock, so any caller holding a manifest lock
+        while reaching this method would deadlock. Do no work but the manifest
+        write inside the callback: this is the global index lock, shared by every
+        session-creating command in every project.
+
+        ``file_lock_for_target`` is not reentrant (``flock`` scopes locks to the
+        open file description, and each acquisition opens a fresh fd), so neither
+        the callback nor the compensation path may call a locking ``IndexStore``
+        method. Compensation drops the row in memory and rewrites the index.
+
+        Args:
+            state: Session state to publish. Supplies the name and conversation ids.
+            project_root: Absolute path to the main repository.
+            checkout_root: Git checkout root (``--show-toplevel``).
+            forge_root: Forge project root; falls back to ``state.forge_root``.
+            relative_path: forge_root relative to checkout_root.
+            require_uuid_unbound: Re-check conversation uniqueness inside this
+                lock. See ``add_session`` for why adoption needs it.
+            write_manifest: Callable that writes the manifest. Runs after the row
+                is durable; its exception propagates unchanged after compensation.
+
+        Returns:
+            The published SessionIndexEntry.
+
+        Raises:
+            InvalidSessionNameError: If the session name is invalid.
+            SessionExistsError: If a live session already holds this name.
+            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
+        """
+        name = state.name
+        validate_name(name)
+
+        worktree_path = state.worktree.path if state.worktree else project_root
+        # Mirrors add_from_state -> add_session: caller's forge_root, then the
+        # manifest's, then the worktree.
+        effective_forge_root = forge_root or state.forge_root or worktree_path
+        codex_thread_id = state.confirmed.codex.thread_id if state.confirmed.codex else None
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            scoped_key = make_scoped_key(name, effective_forge_root)
+
+            existing = index.sessions.get(scoped_key)
+            if existing is not None:
+                if self._manifest_exists_for_row(scoped_key, existing):
+                    raise SessionExistsError(name)
+                # Row without a manifest. Two things produce it: a killed
+                # transaction, and a delete that has removed the manifest -- or the
+                # worktree holding it -- but has not yet removed its row. Reclaiming
+                # the name is right for both: the residue reserves nothing, and the
+                # session being deleted is on its way out. What makes it safe is not
+                # an assumption that only crashes get here, but that the delete side
+                # ends in delete_session_txn, which declines once a replacement owns
+                # the name and so cannot take this one with it.
+                # Deliberately narrower than the list_sessions prune, which also
+                # drops rows whose worktree vanished: the manifest is the durable
+                # reservation, so a live manifest must still collide here.
+                del index.sessions[scoped_key]
+
+            if require_uuid_unbound:
+                # After the prune above, so residue never blocks rebinding its own
+                # conversation.
+                self._require_conversation_unbound(
+                    index,
+                    claude_session_id=state.confirmed.claude_session_id,
+                    codex_thread_id=codex_thread_id,
+                )
+
+            entry = self._build_entry(
+                worktree_path=worktree_path,
+                project_root=project_root,
+                is_fork=state.is_fork,
+                is_incognito=state.is_incognito,
+                parent_session=state.parent_session,
+                claude_session_id=state.confirmed.claude_session_id,
+                codex_thread_id=codex_thread_id,
+                forge_root=effective_forge_root,
+                checkout_root=checkout_root,
+                relative_path=relative_path,
+            )
+
+            # Sampled before the callback, because "a manifest is there" is not the
+            # same fact as "this transaction put it there". A pre-existing orphan
+            # owns the path in exactly the case create_exclusive rejects, and
+            # reading that as ours would leave our row indexing somebody else's
+            # session.
+            manifest_path = get_manifest_path(Path(effective_forge_root), name)
+            manifest_existed_before = manifest_path.is_file()
+
+            index.sessions[scoped_key] = entry
+            self.write(index)
+
+            try:
+                write_manifest()
+            except BaseException:
+                # A raised callback does not prove the manifest is absent either:
+                # once atomic_write_json reaches os.replace it is durable, and a
+                # signal arriving after that -- during the directory fsync, or the
+                # manifest lock release -- still unwinds through here. Keep the row
+                # only when both halves prove this transaction published: nothing
+                # was there before, and something is there now.
+                published = not manifest_existed_before and manifest_path.is_file()
+                if not published:
+                    self._compensate_locked(index, scoped_key)
+                raise
+
             return entry
 
     def update_session(
@@ -478,6 +604,79 @@ class IndexStore:
             self.write(index)
             return True
 
+    def delete_session_txn(
+        self,
+        name: str,
+        forge_root: str | None = None,
+        *,
+        expect_manifest_absent: bool,
+        delete_manifest: Callable[[], None],
+    ) -> bool:
+        """Remove a session's row and manifest under one index-lock acquisition.
+
+        The deletion counterpart to ``create_session_txn``, and it exists for the
+        same reason: the two removals must not be separable by a concurrent
+        creator. Deletion drops the manifest -- or the worktree containing it --
+        long before it reaches here, so for the whole cleanup the name reads as
+        crash residue to ``create_session_txn``, which prunes the row and publishes
+        a replacement. Verifying ownership and then deleting outside the lock would
+        let a replacement land in between and lose its manifest.
+
+        ``expect_manifest_absent`` must be a fact about what the caller *did*, not
+        a probe of what it *sees*: a probe taken after the window opened may
+        already be looking at the replacement's manifest and mistake it for the
+        caller's own. Timestamps cannot substitute -- ``now_iso`` has second
+        granularity, so a replacement created in the same second is
+        indistinguishable by ``created_at``.
+
+        **Known residual: a second concurrent delete of the same name.** False
+        disables the ownership check entirely, which is right for a delete whose
+        manifest is still its own -- it never opened a window, so no creator could
+        have reclaimed the name. It is wrong when *another* delete of the same name
+        opened one: the second deleter sampled its flag while the manifest was
+        still present, so it arrives with False and removes a replacement's row and
+        manifest. Closing this needs a per-session identity the deleter can carry
+        into the lock and compare, which the row does not have today -- see
+        ``docs/board/proposed/session_delete_generation_token``. Reaching it takes
+        two concurrent deletes of one name plus a recreate landing between them.
+
+        Args:
+            name: Session display name.
+            forge_root: Scope to this project. Strict resolution when None.
+            expect_manifest_absent: True when this delete has already destroyed the
+                manifest, or there never was one -- so a manifest present now can
+                only belong to a creator that reclaimed the name.
+            delete_manifest: Removes the manifest. Runs inside the lock, after the
+                row is gone. Keep it to that: this is the global index lock. The
+                session directory is bounded and small -- manifest, its lock, and
+                up to three codex handoff files -- so removing it measures in the
+                same fraction of a millisecond as the manifest write creation
+                holds the lock for. Transcripts (``.forge/artifacts/``), the search
+                index, and the worktree all live outside it and must stay outside.
+
+        Returns:
+            True if the caller still owned the name; the row and manifest are gone.
+            False if a replacement owns it, in which case nothing was removed.
+        """
+        validate_name(name)
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is not None:
+                if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
+                    return False
+                del index.sessions[key]
+                self.write(index)
+            # No row and no way for a replacement to exist without one: publication
+            # writes the row first, and a transaction mid-flight would be blocked on
+            # this lock. Anything left at the path is the caller's own, or a
+            # pre-existing orphan it is entitled to clear.
+
+            delete_manifest()
+            return True
+
     def session_exists(self, name: str, forge_root: str | None = None) -> bool:
         """Check if a session exists in the index.
 
@@ -499,6 +698,43 @@ class IndexStore:
         with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
             index = self.read()
             return resolve_key_strict(index.sessions, name, forge_root) is not None
+
+    def live_session_exists(self, name: str, forge_root: str | None = None) -> bool:
+        """Check whether a session has **both** an index row and its manifest.
+
+        The name-collision pre-check for creation paths. ``session_exists`` answers
+        the row question alone, which since row-first creation includes residue
+        from a killed transaction -- a name that ``create_session_txn`` will prune
+        and reuse. Rejecting on that would refuse a direct retry of a session the
+        user never got.
+
+        Callers use this only to fail fast before expensive setup (worktree
+        creation). It is not authoritative: the answer can go stale the moment the
+        lock is released, and ``create_session_txn`` re-decides under its own lock.
+
+        Args:
+            name: Session display name.
+            forge_root: Scope to this project. Strict resolution when None.
+
+        Returns:
+            True only if a row exists and its manifest is on disk.
+
+        Raises:
+            AmbiguousSessionError: If forge_root is None and name exists in multiple projects.
+        """
+        try:
+            validate_name(name)
+        except InvalidSessionNameError:
+            return False
+
+        # One stat, unlike list_sessions' probe over every row -- cheap enough to
+        # keep inside the lock, which keeps row and manifest a consistent pair.
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None:
+                return False
+            return self._manifest_exists_for_row(key, index.sessions[key])
 
     def add_from_state(
         self,
@@ -600,3 +836,77 @@ class IndexStore:
 
             self.write(index)
             return entry
+
+    def _manifest_exists_for_row(self, scoped_key: str, entry: SessionIndexEntry) -> bool:
+        """Whether the manifest backing an index row is on disk."""
+        store_root = Path(entry.forge_root or entry.worktree_path)
+        return get_manifest_path(store_root, session_name_from_key(scoped_key)).is_file()
+
+    def _compensate_locked(self, index: SessionIndex, scoped_key: str) -> None:
+        """Drop a transaction's own row, inside the lock it already holds.
+
+        Never raises. The caller is unwinding the manifest callback's exception and
+        has promised to re-raise it unchanged, so a failure here must not replace
+        it -- the row it could not remove is prunable, and every reader self-heals
+        it. Cannot call ``remove_session``: ``file_lock_for_target`` is not
+        reentrant, so re-entering it would deadlock against this transaction.
+        """
+        index.sessions.pop(scoped_key, None)
+        try:
+            self.write(index)
+        except BaseException as e:
+            # BaseException, to keep the never-raises guarantee literally true. It
+            # costs a Ctrl-C landing in this narrow window, which is the right
+            # trade: the caller's exception still propagates and unwinds, whereas
+            # replacing it would lose the reason creation failed.
+            _log.warning(
+                "Could not remove the index row for '%s' after its manifest write failed; "
+                "a stale row remains and will be pruned on the next read: %s",
+                session_name_from_key(scoped_key),
+                e,
+            )
+
+    def _require_conversation_unbound(
+        self,
+        index: SessionIndex,
+        *,
+        claude_session_id: str | None,
+        codex_thread_id: str | None,
+    ) -> None:
+        """Raise if either conversation id is already held by a row. Caller holds the lock."""
+        for existing_key, existing in index.sessions.items():
+            for wanted, held in (
+                (claude_session_id, existing.claude_session_id),
+                (codex_thread_id, existing.codex_thread_id),
+            ):
+                if wanted and held == wanted:
+                    raise UuidAlreadyBoundError(wanted, session_name_from_key(existing_key))
+
+    @staticmethod
+    def _build_entry(
+        *,
+        worktree_path: str,
+        project_root: str,
+        is_fork: bool,
+        is_incognito: bool,
+        parent_session: str | None,
+        claude_session_id: str | None,
+        codex_thread_id: str | None,
+        forge_root: str,
+        checkout_root: str | None,
+        relative_path: str | None,
+    ) -> SessionIndexEntry:
+        """Build a row, owning the identity fallbacks shared by both creation paths."""
+        return SessionIndexEntry(
+            worktree_path=worktree_path,
+            project_root=project_root,
+            last_accessed_at=now_iso(),
+            is_fork=is_fork,
+            is_incognito=is_incognito,
+            parent_session=parent_session,
+            claude_session_id=claude_session_id,
+            codex_thread_id=codex_thread_id,
+            forge_root=forge_root,
+            checkout_root=checkout_root or worktree_path,
+            relative_path=relative_path or ".",
+        )

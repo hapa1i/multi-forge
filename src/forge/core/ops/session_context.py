@@ -441,13 +441,14 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
 
     Three sources, because no single one is complete:
 
-    - index rows, which span projects but can lag a manifest;
+    - index rows, which span projects but can lag a manifest -- and, since
+      ``create_session_txn`` publishes the row first, can also lead one;
     - the manifest behind each row, which can carry a binding the row lost;
     - every manifest directory under ``forge_root``, which is the only way to see
-      a session whose index row was never written. Session creation writes the
-      manifest first (``SessionStore.create_exclusive``), so a process killed
-      between the two leaves exactly that orphan -- and an adoption gated only on
-      the index would then bind the same conversation twice.
+      a session whose index row was never written. Creation no longer produces
+      that orphan, but ones left by crashes before row-first creation shipped, or
+      by older Forge versions, persist -- and an adoption gated only on the index
+      would bind their conversation a second time.
 
     Reads without pruning: ``list_sessions`` self-heals by deleting index rows,
     which a read-only caller such as the adoption preview must not trigger.
@@ -504,12 +505,19 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
 
     The Codex counterpart to ``collect_bound_uuids``. Only adopted threads carry an
     index column (``codex_thread_id``); the ordinary Codex paths discover their
-    thread after the run and record it on the manifest alone. So this reads
-    manifests, and the orphan scan under ``forge_root`` is the only way to see a
-    session whose index row was never written.
+    thread after the run and record it on the manifest alone. So manifests are the
+    primary source, and the orphan scan under ``forge_root`` is the only way to see
+    a session whose index row was never written.
+
+    The column is read too, for the same reason ``collect_bound_uuids`` reads its
+    row: ``create_session_txn`` publishes the row before the manifest, so during
+    that window the manifest cannot answer. Reading only manifests would report an
+    in-flight adopted thread as free -- the one direction this must never err in.
+    A column that has drifted from its manifest simply leaves both ids bound, which
+    is the safe surplus.
 
     Fails closed for the same reason as ``collect_bound_uuids``, and more sharply:
-    with manifests as the sole source, one swallowed read is a thread that looks
+    with manifests as the primary source, one swallowed read is a thread that looks
     free.
 
     Raises:
@@ -522,6 +530,10 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
         raise BindingLookupError(f"Could not read the session index: {e}") from e
 
     bound: dict[str, str] = {}
+
+    def _record_thread(thread_id: object, owner: str) -> None:
+        if isinstance(thread_id, str) and thread_id:
+            bound.setdefault(thread_id.lower(), owner)
 
     # See collect_bound_uuids: project-scoped, so a bare name cannot dedupe.
     visited: set[tuple[str, str]] = set()
@@ -537,10 +549,11 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
         except Exception as e:
             raise BindingLookupError(_manifest_read_error(root, name, e)) from e
         if codex is not None and codex.thread_id:
-            bound.setdefault(codex.thread_id.lower(), name)
+            _record_thread(codex.thread_id, name)
 
     for key, entry in rows.items():
         name = session_name_from_key(key)
+        _record_thread(entry.codex_thread_id, name)
         _record(entry.forge_root or entry.worktree_path, name)
 
     if forge_root:

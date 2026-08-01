@@ -33,14 +33,17 @@ Quick Start:
         proxy_base_url="http://localhost:8084",
     )
 
-    # Create the manifest -- the manifest itself is the name reservation, so
-    # creation uses create_exclusive; write() is for intended overwrites only.
+    # Publish it: one transaction writes the index row, then the manifest, under
+    # the index lock. Row first, so a crash leaves a prunable row rather than a
+    # manifest nothing lists. create_exclusive, not write -- the manifest is the
+    # durable name reservation; write() is for intended overwrites only.
     store = SessionStore("/path/to/worktree", "my-session")
-    store.create_exclusive(state)
-
-    # Add to global index
     index = IndexStore()
-    index.add_from_state(state, "/path/to/project")
+    index.create_session_txn(
+        state,
+        "/path/to/project",
+        write_manifest=lambda: store.create_exclusive(state),
+    )
 """
 
 from __future__ import annotations

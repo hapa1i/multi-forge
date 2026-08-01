@@ -604,29 +604,26 @@ class TestDiscovery:
         with pytest.raises(AdoptError, match="not inside a Forge project"):
             discover_adoptable(ExecutionContext.from_cwd(bare))
 
-    def test_orphan_manifest_from_a_crashed_adopt_blocks_a_second_bind(self, tmp_path: Path) -> None:
-        """Creation writes the manifest first, so a crash before the index leaves an orphan.
+    def test_a_pre_existing_orphan_manifest_blocks_a_second_bind(self, tmp_path: Path) -> None:
+        """A manifest with no index row still owns its conversation.
 
-        Every binding check used to enumerate through the index, which cannot see
-        that orphan -- so the conversation looked free and bound twice.
+        Creation no longer produces this shape: `create_session_txn` writes the row
+        first, so a crash leaves a prunable row instead. Orphans written by older
+        Forge versions -- or by a crash before that change -- persist, and every
+        binding check that enumerates only the index cannot see them, so the
+        conversation would look free and bind twice.
         """
         project = _make_project(tmp_path)
         ctx = ExecutionContext.from_cwd(project)
         _write_transcript(project)
 
-        def _die(self, *args, **kwargs):
-            raise KeyboardInterrupt("hard exit before the index row was written")
-
-        original = IndexStore.add_from_state
-        IndexStore.add_from_state = _die  # type: ignore[method-assign]
-        try:
-            with pytest.raises(KeyboardInterrupt):
-                adopt_session(ctx, plan_adoption(ctx, _UUID), name="crashed")
-        finally:
-            IndexStore.add_from_state = original  # type: ignore[method-assign]
+        adopt_session(ctx, plan_adoption(ctx, _UUID), name="crashed")
+        # Drop the row and keep the manifest: the orphan shape this test is about,
+        # seeded directly now that no crash in the current code path produces one.
+        IndexStore().remove_session("crashed", forge_root=str(project))
 
         assert SessionStore(str(project), "crashed").exists(), "the orphan manifest this test is about"
-        assert IndexStore().read().sessions == {}, "and it never reached the index"
+        assert IndexStore().read().sessions == {}, "and it is not in the index"
 
         with pytest.raises(UuidAlreadyBoundError) as excinfo:
             plan_adoption(ctx, _UUID)

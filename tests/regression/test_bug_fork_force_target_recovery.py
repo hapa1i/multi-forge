@@ -104,14 +104,16 @@ def test_force_worktree_fork_rolls_back_created_git_state_on_commit_failure(
     repo_root = get_repo_root(repo)
     expected_worktree = resolve_worktree_path(repo_root, "child")
 
-    original_add = index_store.add_from_state
+    # Inject at the commit transaction: since session_create_crash_atomicity the
+    # row and manifest are written by create_session_txn, not add_from_state.
+    original_txn = index_store.create_session_txn
 
-    def fail_add(state, *args, **kwargs):
+    def fail_commit(state, *args, **kwargs):
         if state.name == "child":
             raise RuntimeError("boom")
-        return original_add(state, *args, **kwargs)
+        return original_txn(state, *args, **kwargs)
 
-    index_store.add_from_state = fail_add  # type: ignore[method-assign]
+    index_store.create_session_txn = fail_commit  # type: ignore[method-assign]
 
     with pytest.raises(RuntimeError, match="boom"):
         manager.fork_session("parent", "child", create_worktree=True)

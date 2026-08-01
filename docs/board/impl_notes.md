@@ -40,10 +40,12 @@ wc -l docs/board/impl_notes.md
 
 - **A lock only excludes what it encloses.** Uniqueness needs its guard at the narrowest scope covering *every* writer.
   The index write lock is the only lock shared across session names, so a cross-session id must live in the index row --
-  but that is not sufficient on its own, because session creation writes the manifest first and a killed create owns the
-  conversation without ever reaching the index. Adoption holds a global per-conversation `flock` across its final scan
-  and commit, with the index column as the second line. A pre-check plus a later write under a *different* lock is not
-  exclusion at any ordering.
+  but that is not sufficient on its own. Adoption holds a global per-conversation `flock` across its final scan and
+  commit, with the index column as the second line. A pre-check plus a later write under a *different* lock is not
+  exclusion at any ordering. (When this shipped, the gap was that creation wrote the manifest first, so a killed create
+  owned a conversation without ever reaching the index. `session_create_crash_atomicity` closed that ordering in
+  2026-08-01; the `flock` stays, because pre-existing orphans persist and the exclusion argument never depended on the
+  write order.)
 - **Session names are project-scoped, so a bare name is never an identity key.** This recurs: an unscoped rollback
   `remove_session` resolved by name prefix across projects, and a manifest-read dedup keyed on name let another
   project's session hide this project's orphan binding. Key on `(resolved forge_root, name)`, or scope the lookup.

@@ -205,23 +205,66 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
 
-**The manifest is the session-name reservation.** Every path that mints a session (`start_session`, fork, resume-child,
-relaunch) claims its name with `SessionStore.create_exclusive`, which tests and writes under that manifest's own lock.
-Name pre-checks run outside any lock, so two concurrent creates of one name both reach the commit phase; the loser is
-rejected by the create, before it can touch the winner's manifest. An index row cannot serve as the reservation instead:
-`list_sessions` prunes rows whose manifest is missing, so a row written ahead of its manifest can be pruned out from
-under its own creator. A successful `create_exclusive` is therefore an ownership token -- it is what makes it safe for a
-rollback to delete the manifest at that path. `write` remains for intended overwrites (rollback restores, deliberate
+**Creation is one transaction; the manifest is the durable reservation.** Every path that mints a session
+(`start_session`, fork, resume-child, relaunch) commits through `IndexStore.create_session_txn`, which holds the index
+write lock across both durable writes: uniqueness checks, then the index row, then `SessionStore.create_exclusive` for
+the manifest, then release. If the manifest write raises, the transaction removes its row inside the lock it already
+holds and re-raises unchanged. Lock order is index -> manifest and never the reverse; `file_lock_for_target` is not
+reentrant, so nothing inside the transaction may call a locking `IndexStore` method.
+
+Two reservations, at different timescales. The manifest is the reservation that survives the process: `create_exclusive`
+tests and writes under that manifest's own lock, so a successful call is an ownership token, and an index row alone
+reserves nothing because `list_sessions` prunes rows whose manifest is missing. During creation, the held index lock is
+the reservation -- which is what makes writing the row first safe. `write` remains for intended overwrites (deliberate
 stale fork-target replacement).
 
-Manifest-first creation is not atomic with index publication: a process killed between the two leaves a manifest with no
-index row. Such an orphan is inert for listing but still owns its name, and any check that enumerates sessions through
-the index cannot see it. Reads that decide whether a **conversation** is already bound must therefore also scan manifest
-directories under the project root — `collect_bound_uuids(forge_root)` and `collect_bound_codex_threads(forge_root)`,
-which additionally read without pruning and fail closed on the index *and* on every manifest they touch, so a read-only
-caller neither mutates the index nor reports "unbound" because a read failed. An unreadable manifest raises
-`BindingLookupError` naming the directory to repair: a swallowed read is indistinguishable from an absent binding, which
-is what would let one conversation bind twice.
+Row-first makes the crash residue prunable rather than durable:
+
+| Killed                   | Residue                | Healing                                                             |
+| ------------------------ | ---------------------- | ------------------------------------------------------------------- |
+| before the row write     | nothing                | none needed                                                         |
+| between row and manifest | index row, no manifest | pruned by `list_sessions`/`get_session`, or by the next transaction |
+| after the manifest write | both present           | none needed                                                         |
+
+Creation can no longer produce a manifest with no index row. A residue row is not a name reservation: the next same-name
+transaction sees row-present + manifest-absent, prunes it, and proceeds -- so a direct retry succeeds with no
+intervening `session list` or `session delete`. Creation pre-checks use `live_session_exists` (row **and** manifest) so
+they fail fast on a real collision without rejecting a residue; `_name_is_taken` keeps the cheaper row-only check, where
+skipping a residue name costs an auto-name suffix rather than an error.
+
+**Deletion is the other producer of row-without-manifest, and is coordinated with creation.** `delete_session` removes
+the manifest -- or the worktree containing it, for a nested project -- before it removes the row, and its transcript
+phase runs in between, so the name reads as residue for as long as that takes. A concurrent creation may therefore
+reclaim the name and publish a whole new session mid-delete; that is allowed, since the session being deleted is on its
+way out. What must not happen is the delete then removing the replacement's row and manifest, so its terminal removal
+goes through `IndexStore.delete_session_txn`, which removes the row **and** runs the manifest delete inside one index-
+lock acquisition, and declines outright when a manifest exists at a name whose manifest that delete had already
+destroyed. Verifying ownership and then deleting outside the lock would let a replacement land in between. The "already
+destroyed" fact is derived from what the delete did -- the manifest was absent when it started, or it lives inside the
+worktree being removed -- never from a probe taken later, which may already be looking at the replacement. Timestamps
+cannot substitute either: `now_iso` has second granularity, so a same-second replacement is indistinguishable by
+`created_at`. `fork --force` frees a stale target the same way and so declines the same way, raising
+`SessionExistsError` rather than replacing a session that claimed the name during its cleanup.
+
+An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
+`os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably
+not there. Compensation itself never raises: it is unwinding the callback's exception, which the caller must receive
+unchanged, and a row it fails to remove is prunable.
+
+Locked readers never observe the in-flight state -- `list_sessions` and `get_session` take the index lock -- and their
+unlocked filesystem probes are safe because every prune delete is re-verified under a re-acquired lock, which spares a
+row republished in the meantime. Readers that deliberately skip the lock *can* see a row before its manifest, so the
+binding scans read the row's conversation columns as well as the manifest, leaving an in-flight conversation reported as
+bound: the safe direction for a uniqueness check.
+
+Orphan manifests with no row still exist -- written by crashes before row-first creation shipped, or by older Forge
+versions -- and still own their name and conversation binding invisibly to any index-driven check. Reads that decide
+whether a **conversation** is already bound therefore also scan manifest directories under the project root —
+`collect_bound_uuids(forge_root)` and `collect_bound_codex_threads(forge_root)`, which additionally read without pruning
+and fail closed on the index *and* on every manifest they touch, so a read-only caller neither mutates the index nor
+reports "unbound" because a read failed. An unreadable manifest raises `BindingLookupError` naming the directory to
+repair: a swallowed read is indistinguishable from an absent binding, which is what would let one conversation bind
+twice. Repairing pre-existing orphans is not yet implemented (`docs/board/proposed/session_orphan_manifest_repair`).
 
 **A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
 `start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it
@@ -234,12 +277,13 @@ the run, so they reconcile the column rather than set it at creation — includi
 resume ("drift"), where a stale column would guard an id the session no longer uses.
 
 **Adoption also holds a conversation-scoped lock across its final scan and commit** (`conversation_lock`, under
-`FORGE_HOME/locks/`). The index write lock is not sufficient on its own, because session creation writes the manifest
-first: an adopt killed between the two leaves an orphan manifest that owns the conversation and never reached the index.
-A concurrent adopt whose scan ran before that manifest appeared would publish a second binding, and the orphan scan
-could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the loser's scan cannot
-run until the winner's manifest exists. The lock is global rather than per-project because a conversation is not
-project-scoped, and `flock` releases on process death, so a killed adopt frees it.
+`FORGE_HOME/locks/`). The index write lock is not sufficient on its own: the binding scans read manifest directories
+without holding it, so a scan that ran before a competing adopt's manifest appeared would publish a second binding, and
+the orphan scan could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the
+loser's scan cannot run until the winner has published. This mattered most when creation wrote the manifest first and a
+kill left an orphan owning the conversation; creation is now row-first, so that particular orphan is no longer produced,
+but orphans predating the change persist and the scans still cover them. The lock is global rather than per-project
+because a conversation is not project-scoped, and `flock` releases on process death, so a killed adopt frees it.
 
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 

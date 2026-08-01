@@ -11,7 +11,13 @@ winner indexed with no state.
 Fix: reserve the index name before writing the manifest, matching the ordering
 `create_child_session` already documents in its `SessionExistsError` handler.
 
-Affected: src/forge/session/manager.py
+Updated by session_create_crash_atomicity: both writes now share one index-lock
+acquisition (`IndexStore.create_session_txn`), so the loser is stopped by the
+row check *inside* that lock and never reaches the manifest at all. The pre-check
+this test has to force stale is now `live_session_exists`. The assertions are
+unchanged -- they are what the bug was about.
+
+Affected: src/forge/session/manager.py, src/forge/session/index.py
 """
 
 from __future__ import annotations
@@ -38,24 +44,24 @@ def test_losing_a_name_race_leaves_the_winners_manifest_intact(tmp_path: Path, m
     winner = SessionStore(str(project), "shared").read()
 
     # start_session guards the name twice before committing: the index
-    # (manager.py:498) and the manifest file (manager.py:599). A loser that read
-    # both before the winner wrote anything passes both, which is the window this
-    # bug lives in. Both stale reads are forced here; everything after them is the
-    # real code path.
-    real_index_exists = manager.index_store.session_exists
+    # (live_session_exists) and the manifest file (store.exists()). A loser that
+    # read both before the winner wrote anything passes both, which is the window
+    # this bug lives in. Both stale reads are forced here; everything after them
+    # is the real code path, ending in create_session_txn's under-lock row check.
+    real_live_exists = manager.index_store.live_session_exists
     monkeypatch.setattr(
         manager.index_store,
-        "session_exists",
-        lambda name, **kw: False if name == "shared" else real_index_exists(name, **kw),
+        "live_session_exists",
+        lambda name, **kw: False if name == "shared" else real_live_exists(name, **kw),
     )
 
     real_store_exists = SessionStore.exists
     seen: dict[str, int] = {"shared": 0}
 
     def _first_look_misses(self: SessionStore) -> bool:
-        """Miss only the pre-check, not the rollback's own `store.exists()`.
+        """Miss only the pre-check, not any later `store.exists()`.
 
-        Patching every call would make the buggy ordering skip its manifest
+        Patching every call would make a buggy ordering skip its manifest
         delete and pass this test for the wrong reason.
         """
         if self._session_name == "shared":
