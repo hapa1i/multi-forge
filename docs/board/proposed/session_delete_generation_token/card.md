@@ -1,8 +1,9 @@
 # Give a session row an identity a deleter can carry into the lock
 
-**Status**: Proposed. Split out of [`session_create_crash_atomicity`](../../doing/session_create_crash_atomicity/card.md)
-on 2026-08-01, during that card's third review round. That card made deletion decline once a replacement owns the name;
-this one closes the residual case its ownership signal cannot express.
+**Status**: Proposed. Split out of
+[`session_create_crash_atomicity`](../../doing/session_create_crash_atomicity/card.md) on 2026-08-01, during that card's
+third review round. That card made deletion decline once a replacement owns the name; this one closes the residual case
+its ownership signal cannot express.
 
 ## Problem
 
@@ -12,8 +13,8 @@ found under the index lock can only belong to a creator that reclaimed the name,
 check is skipped -- correct for a delete whose manifest is still its own, because such a delete never opened a window
 for a creator to reclaim the name.
 
-The gap is a **second concurrent delete of the same name**. It sampled its flag while the manifest was still present,
-so it arrives with False; but the *first* delete opened the window, a creator reclaimed the name, and the second delete
+The gap is a **second concurrent delete of the same name**. It sampled its flag while the manifest was still present, so
+it arrives with False; but the *first* delete opened the window, a creator reclaimed the name, and the second delete
 removes the replacement's row and manifest with the check disabled.
 
 Reproduced 2026-08-01 (`delete_session` for the winner, a `start_session` recreate, then the loser's terminal removal
@@ -40,8 +41,8 @@ question: "is the row under this lock the same session I sampled?". No field on 
 
 1. **A generation / instance id on the row.** Creation mints an opaque unique id; the deleter samples it at entry and
    `delete_session_txn` declines when the id under the lock differs. Complete and easy to reason about. It is a
-   durable-state schema change: `SessionIndex` version bump plus a reset or migration path, per
-   `coding_standards.md` §5 "Forge-owned durable state".
+   durable-state schema change: `SessionIndex` version bump plus a reset or migration path, per `coding_standards.md` §5
+   "Forge-owned durable state".
 2. **Manifest file identity (`st_dev`/`st_ino` plus `st_ctime_ns`).** No schema change: `atomic_write_json` publishes
    through `os.replace`, so a replacement always lands on a new inode. Cheaper, but it answers a filesystem question
    about a file rather than an index question about a session, and it needs care where the manifest is legitimately
