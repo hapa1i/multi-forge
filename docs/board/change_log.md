@@ -25,6 +25,62 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-01
+
+### Crash-atomic session creation
+
+**Goal**: Stop a process killed mid-creation from leaving a session manifest with no index row -- an orphan nothing
+lists, which still owns its name and its conversation binding.
+
+**Key changes**:
+
+- `IndexStore.create_session_txn` holds the index lock across both durable writes, **row first**, then the manifest via
+  a caller-supplied callback, with in-lock compensation if the callback raises. All five creation sites use it
+  (`start_session`, `_persist_resume_child`, `fork_session`, `relaunch_session`, `_restore_previous_target_state`),
+  which collapses their per-site rollback blocks: the manifest write is now the last durable action, so a failure cannot
+  leave one behind.
+- A crash now leaves a prunable row. The transaction self-heals it: row-present + manifest-absent under the held lock
+  can only be residue, so it is pruned and creation proceeds -- a direct same-name retry succeeds with no intervening
+  `session list` or `session delete`. The prune runs before the `require_uuid_unbound` scan, so residue never blocks
+  rebinding its own conversation.
+- New `IndexStore.live_session_exists` (row **and** manifest) replaces the row-only pre-check at all four sites that
+  hard-failed on it; `_name_is_taken` keeps the row-only check, where a residue name costs an auto-name suffix.
+- `collect_bound_codex_threads` now reads the `codex_thread_id` column as well as manifests. Reading only manifests
+  would report an in-flight adopted thread as free once the row precedes its manifest.
+- `_restore_previous_target_state` restores with `create_exclusive`, not `write`: its old unlocked `exists()` guard
+  meant the write never overwrote anything, and keeping `write` let a failed fork clobber a concurrent winner.
+- Compensation keeps the row only on proof that *this* transaction published the manifest: nothing at the path before
+  the callback, something there after. Neither half alone is enough -- an exception does not mean the write failed
+  (`atomic_write_json` makes it durable at `os.replace`, and a signal can arrive later), and a manifest being present
+  does not mean it is ours (a pre-existing orphan owns the path in exactly the case `create_exclusive` rejects).
+  Compensation also never raises, for `BaseException` too, so it cannot replace the error it is unwinding.
+- Deletion is coordinated with creation rather than assumed away. `delete_session` removes the manifest (or the worktree
+  holding it) before its row, so mid-delete the name reads as residue and a concurrent create can reclaim it.
+  `IndexStore.delete_session_txn` now removes the row and runs the manifest delete inside one index-lock scope, and
+  declines outright once a replacement owns the name. The ownership signal is derived from what the delete does --
+  manifest absent at entry, or provably inside the worktree being removed -- not from a filesystem probe, which a
+  replacement can flip.
+- `fork --force` reaches the same window through its own path and now uses the same primitive. After freeing the stale
+  target it cleared the name with an unconditional `delete()`, so a creator that claimed the freed name lost its
+  manifest and then its row to fork's own residue prune -- fork destroying a live session and taking its name. It now
+  declines with `SessionExistsError` instead.
+- design.md §3.2, `session/__init__.py`, and the `create_exclusive` / binding-scan docstrings describe the shipped
+  ordering, including the delete-coordination contract. Repair of pre-existing orphans is split out to
+  `proposed/session_orphan_manifest_repair`, because index identity fields cannot be derived from a manifest.
+
+**Verification**: `tests/src` + `tests/regression` 9176 passed, 1 skipped, plus the component-integration tier
+(`pytest tests/src -m integration`) 117 passed -- that tier is deselected by `-m "not integration"` and hid two
+model-drift failures through two review rounds, so it is part of this card's gate. New
+`tests/regression/test_bug_session_create_crash_atomicity.py` (37 tests) covers compensation and crash-residue as
+separate families, interrupt-after-durable-manifest, compensation-write failure, delete/create coordination, the fork
+stale-target schedule, a `threading.Barrier` double create, the pruner race guard, per-path compensation through the
+real transaction, and the explicit-name retry. Every guard carries a mutation check confirming it is load-bearing.
+Docker `test_session_lifecycle.py` + `test_adopt_binding_contract.py` 22 passed. `make pre-commit` clean.
+
+**Review**: three adversarial rounds found seven defects in the implementation (five HIGH, one MEDIUM, one LOW), all
+reproduced before fixing; see the card checklist's review-round sections. Six of the seven were the same root error -- a
+filesystem probe standing in for a fact about what the operation did.
+
 ## 2026-07-31
 
 ### Runtime-scoped extension disable

@@ -112,15 +112,11 @@ from forge.session.worktree.create import get_repo_root
 index_store = IndexStore()
 manager = SessionManager(index_store=index_store)
 
-# Pre-create an index entry so add_from_state fails with SessionExistsError
-index_store.add_session(
-    name='collision',
-    worktree_path='/workspace',
-    project_root='/workspace',
-    is_fork=False,
-    is_incognito=False,
-    parent_session=None,
-)
+# Pre-create a LIVE session so the commit transaction rejects the name. A bare
+# index row is crash residue since session_create_crash_atomicity: the
+# transaction prunes it and the create succeeds, so it no longer models a
+# collision.
+manager.start_session(name='collision', worktree_path='/workspace')
 
 repo_root = get_repo_root(Path('/workspace'))
 expected_worktree = resolve_worktree_path(repo_root, 'collision')
@@ -661,14 +657,16 @@ manager.start_session(name='parent-session', worktree_path='/workspace')
 repo_root = get_repo_root(Path('/workspace'))
 expected_worktree = resolve_worktree_path(repo_root, 'fork-session')
 
-original_add = index_store.add_from_state
+# Inject at the commit transaction: since session_create_crash_atomicity the row
+# and manifest are published by create_session_txn, not add_from_state.
+original_txn = index_store.create_session_txn
 
-def fail_add(state, *args, **kwargs):
+def fail_commit(state, *args, **kwargs):
     if state.name == 'fork-session':
         raise RuntimeError('boom')
-    return original_add(state, *args, **kwargs)
+    return original_txn(state, *args, **kwargs)
 
-index_store.add_from_state = fail_add
+index_store.create_session_txn = fail_commit
 
 error = None
 try:
