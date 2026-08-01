@@ -33,6 +33,7 @@ from forge.core.ops.session_context import (
     collect_bound_codex_threads,
     collect_bound_uuids,
 )
+from forge.core.state.lock import FileLockTimeoutError
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session import index as index_mod
 from forge.session.exceptions import (
@@ -115,6 +116,64 @@ class TestCompensation:
 
         assert excinfo.value is boom, "the callback's exception must surface unchanged"
         assert index.read().sessions == {}, "compensation must remove the row it wrote"
+
+    def test_a_pre_existing_orphan_manifest_does_not_count_as_our_publication(self, tmp_path: Path) -> None:
+        """Review finding: manifest presence is not proof of ownership.
+
+        `create_exclusive` rejects the callback precisely because somebody else's
+        manifest already owns the path. Probing "is a manifest there?" after the
+        failure sees that orphan and reads it as ours, leaving our row indexing a
+        session we did not create.
+        """
+        project = _project(tmp_path)
+        index = IndexStore()
+
+        orphan = _state("contested", project)
+        orphan.confirmed.claude_session_id = "winner-id"
+        SessionStore(str(project), "contested").create_exclusive(orphan)
+        assert index.read().sessions == {}, "an orphan manifest: no row of its own"
+
+        mine = _state("contested", project)
+        store = SessionStore(str(project), "contested")
+
+        with pytest.raises(SessionExistsError):
+            index.create_session_txn(
+                mine,
+                str(project),
+                forge_root=str(project),
+                write_manifest=lambda: store.create_exclusive(mine),
+            )
+
+        assert index.read().sessions == {}, "no row may point at the orphan's manifest"
+        assert store.read().confirmed.claude_session_id == "winner-id", "the orphan is untouched"
+
+    def test_a_failed_compensation_raising_basexception_still_preserves_the_callback_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The never-raises guarantee must hold for BaseException too."""
+        project = _project(tmp_path)
+        index = IndexStore()
+        real_write = IndexStore.write
+        seen: list[int] = []
+
+        def _flaky_write(self: IndexStore, payload: object) -> None:
+            seen.append(1)
+            if len(seen) == 2:
+                raise KeyboardInterrupt("interrupt during compensation")
+            real_write(self, payload)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(IndexStore, "write", _flaky_write)
+
+        def _fail() -> None:
+            raise SessionExistsError("doomed")
+
+        with pytest.raises(SessionExistsError):
+            index.create_session_txn(
+                _state("doomed", project),
+                str(project),
+                forge_root=str(project),
+                write_manifest=_fail,
+            )
 
     def test_compensation_never_reacquires_the_index_lock(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -549,18 +608,23 @@ class TestDeleteCreateCoordination:
 
         entry = index.get_session("victim", forge_root=str(project))
         forge_root = entry.forge_root or entry.worktree_path
-        SessionStore(forge_root, "victim").delete()  # what worktree cleanup does
-        manifest_gone = not SessionStore(forge_root, "victim").exists()
+        store = SessionStore(forge_root, "victim")
+        store.delete()  # what worktree cleanup does to a nested project
 
         replacement = manager.start_session(
             "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
         )
 
-        proceeded = index.remove_session_if_unclaimed(
-            "victim", forge_root=forge_root, expect_manifest_absent=manifest_gone
+        deleted: list[int] = []
+        proceeded = index.delete_session_txn(
+            "victim",
+            forge_root=forge_root,
+            expect_manifest_absent=True,
+            delete_manifest=lambda: deleted.append(1),
         )
 
         assert proceeded is False, "the deleter must recognise it no longer owns the name"
+        assert deleted == [], "and must not reach its manifest delete"
         survivor = SessionStore(forge_root, "victim")
         assert survivor.exists(), "the replacement's manifest must survive"
         assert survivor.read().confirmed.claude_session_id == replacement.confirmed.claude_session_id
@@ -575,10 +639,63 @@ class TestDeleteCreateCoordination:
 
         entry = index.get_session("solo", forge_root=str(project))
         forge_root = entry.forge_root or entry.worktree_path
-        SessionStore(forge_root, "solo").delete()
+        store = SessionStore(forge_root, "solo")
+        store.delete()
 
-        assert index.remove_session_if_unclaimed("solo", forge_root=forge_root, expect_manifest_absent=True) is True
+        assert (
+            index.delete_session_txn(
+                "solo",
+                forge_root=forge_root,
+                expect_manifest_absent=True,
+                delete_manifest=lambda: None,
+            )
+            is True
+        )
         assert index.read().sessions == {}
+
+    def test_manifest_delete_runs_inside_the_index_lock(self, tmp_path: Path) -> None:
+        """No creator may publish between the ownership check and the manifest delete.
+
+        Review finding: with the delete outside the lock, a replacement landing in
+        that gap kept its row and lost its manifest.
+        """
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("victim", worktree_path=str(project), direct=True)
+        entry = index.get_session("victim", forge_root=str(project))
+        forge_root = entry.forge_root or entry.worktree_path
+        SessionStore(forge_root, "victim").delete()
+
+        blocked: list[str] = []
+
+        def _try_to_publish_from_inside() -> None:
+            # A creator needs the index lock, which this callback is running under,
+            # so it cannot get in. Prove it by observing the timeout rather than a
+            # successful publication.
+            def _racer() -> None:
+                try:
+                    SessionManager().start_session("victim", worktree_path=str(project), direct=True)
+                    blocked.append("published")
+                except FileLockTimeoutError:
+                    blocked.append("blocked")
+                except BaseException as e:  # noqa: BLE001 - surfaced in the assertion
+                    blocked.append(type(e).__name__)
+
+            racer = threading.Thread(target=_racer)
+            racer.start()
+            racer.join(timeout=30)
+
+        assert (
+            index.delete_session_txn(
+                "victim",
+                forge_root=forge_root,
+                expect_manifest_absent=True,
+                delete_manifest=_try_to_publish_from_inside,
+            )
+            is True
+        )
+        assert blocked == ["blocked"], f"a concurrent create must not slip in, got {blocked}"
 
     def test_ordinary_delete_with_its_manifest_still_present_proceeds(self, tmp_path: Path) -> None:
         """Non-worktree deletion never opens the window, so the guard is inert."""
@@ -641,6 +758,50 @@ class TestDeleteCreateCoordination:
         assert survivor.exists(), "delete_session must not remove the replacement's manifest"
         assert survivor.read().confirmed.claude_session_id == "n" * 8
         assert index.live_session_exists("victim", forge_root=str(project)), "nor its row"
+
+    def test_delete_session_spares_a_session_published_inside_worktree_cleanup(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The earliest schedule: the replacement lands before any probe could run.
+
+        Review finding: an `expect_manifest_absent` sampled by observing the
+        filesystem was already looking at the replacement's manifest here, read it
+        as this delete's own, and destroyed both halves of the new session. The
+        flag has to be derived from what the delete does, not from what it sees.
+        """
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
+
+        store = SessionStore(str(project), "victim")
+        state = store.read()
+        assert state.worktree is not None
+        state.worktree.is_worktree = True
+        store.write(state)
+
+        published: dict[str, str] = {}
+
+        class _Result:
+            errors: list[str] = []
+
+        def _cleanup_then_publish(**kwargs: object) -> _Result:
+            SessionStore(str(project), "victim").delete()
+            replacement = manager.start_session(
+                "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
+            )
+            published["uuid"] = replacement.confirmed.claude_session_id or ""
+            return _Result()
+
+        monkeypatch.setattr("forge.session.worktree.cleanup_worktree", _cleanup_then_publish)
+
+        manager.delete_session("victim", forge_root=str(project), force=True)
+
+        assert published.get("uuid") == "n" * 8
+        survivor = SessionStore(str(project), "victim")
+        assert survivor.exists(), "the replacement's manifest must survive"
+        assert survivor.read().confirmed.claude_session_id == "n" * 8
+        assert index.live_session_exists("victim", forge_root=str(project)), "and its row"
 
 
 class TestConcurrentCreate:

@@ -472,19 +472,28 @@ class IndexStore:
                 relative_path=relative_path,
             )
 
+            # Sampled before the callback, because "a manifest is there" is not the
+            # same fact as "this transaction put it there". A pre-existing orphan
+            # owns the path in exactly the case create_exclusive rejects, and
+            # reading that as ours would leave our row indexing somebody else's
+            # session.
+            manifest_path = get_manifest_path(Path(effective_forge_root), name)
+            manifest_existed_before = manifest_path.is_file()
+
             index.sessions[scoped_key] = entry
             self.write(index)
 
             try:
                 write_manifest()
             except BaseException:
-                # A raised callback does NOT prove the manifest is absent. Once
-                # atomic_write_json reaches os.replace the manifest is durable, and
-                # a signal arriving after that -- during the directory fsync, or the
-                # manifest lock release -- still unwinds through here. Dropping the
-                # row then would manufacture the manifest-only orphan this
-                # transaction exists to prevent, so compensate only on proof.
-                if not self._manifest_exists_for_row(scoped_key, entry):
+                # A raised callback does not prove the manifest is absent either:
+                # once atomic_write_json reaches os.replace it is durable, and a
+                # signal arriving after that -- during the directory fsync, or the
+                # manifest lock release -- still unwinds through here. Keep the row
+                # only when both halves prove this transaction published: nothing
+                # was there before, and something is there now.
+                published = not manifest_existed_before and manifest_path.is_file()
+                if not published:
                     self._compensate_locked(index, scoped_key)
                 raise
 
@@ -595,44 +604,43 @@ class IndexStore:
             self.write(index)
             return True
 
-    def remove_session_if_unclaimed(
+    def delete_session_txn(
         self,
         name: str,
         forge_root: str | None = None,
         *,
         expect_manifest_absent: bool,
+        delete_manifest: Callable[[], None],
     ) -> bool:
-        """Remove a row only while the caller still owns the name it is deleting.
+        """Remove a session's row and manifest under one index-lock acquisition.
 
-        Deletion drops the manifest -- or the worktree containing it -- before it
-        drops the row, so in between, the name looks exactly like crash residue to
-        ``create_session_txn``, which will prune the row and publish a replacement.
-        Removing the row unconditionally after that would delete the replacement's
-        row, and the caller's follow-up manifest delete would take its manifest
-        too, destroying a session that was created successfully.
+        The deletion counterpart to ``create_session_txn``, and it exists for the
+        same reason: the two removals must not be separable by a concurrent
+        creator. Deletion drops the manifest -- or the worktree containing it --
+        long before it reaches here, so for the whole cleanup the name reads as
+        crash residue to ``create_session_txn``, which prunes the row and publishes
+        a replacement. Verifying ownership and then deleting outside the lock would
+        let a replacement land in between and lose its manifest.
 
-        ``expect_manifest_absent`` is what makes a replacement detectable, and it
-        must be sampled by the caller *before* the slow cleanup, not here: it
-        records whether this delete already destroyed the manifest. If it did, then
-        a manifest at that path can only belong to somebody else. Timestamps cannot
-        stand in for it -- ``now_iso`` has second granularity, so a replacement
-        created in the same second as the original is indistinguishable by
-        ``created_at``.
-
-        The check runs under the index lock, which excludes creation transactions,
-        so the manifest state it observes cannot change underneath the decision.
+        ``expect_manifest_absent`` must be a fact about what the caller *did*, not
+        a probe of what it *sees*: a probe taken after the window opened may
+        already be looking at the replacement's manifest and mistake it for the
+        caller's own. Timestamps cannot substitute -- ``now_iso`` has second
+        granularity, so a replacement created in the same second is
+        indistinguishable by ``created_at``.
 
         Args:
             name: Session display name.
             forge_root: Scope to this project. Strict resolution when None.
-            expect_manifest_absent: True when the caller has already removed the
-                manifest (or there never was one), so any manifest found now is a
-                replacement's.
+            expect_manifest_absent: True when this delete has already destroyed the
+                manifest, or there never was one -- so a manifest present now can
+                only belong to a creator that reclaimed the name.
+            delete_manifest: Removes the manifest. Runs inside the lock, after the
+                row is gone. Keep it to that: this is the global index lock.
 
         Returns:
-            True if the caller still owns the name -- the row is removed and it is
-            safe to delete the manifest. False if a replacement owns the name, in
-            which case nothing was removed and the caller must stop deleting.
+            True if the caller still owned the name; the row and manifest are gone.
+            False if a replacement owns it, in which case nothing was removed.
         """
         validate_name(name)
 
@@ -640,16 +648,17 @@ class IndexStore:
             index = self.read()
 
             key = resolve_key_strict(index.sessions, name, forge_root)
-            if key is None:
-                # No row means no replacement: publication writes the row first, and
-                # a transaction mid-flight would be holding this lock.
-                return True
+            if key is not None:
+                if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
+                    return False
+                del index.sessions[key]
+                self.write(index)
+            # No row and no way for a replacement to exist without one: publication
+            # writes the row first, and a transaction mid-flight would be blocked on
+            # this lock. Anything left at the path is the caller's own, or a
+            # pre-existing orphan it is entitled to clear.
 
-            if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
-                return False
-
-            del index.sessions[key]
-            self.write(index)
+            delete_manifest()
             return True
 
     def session_exists(self, name: str, forge_root: str | None = None) -> bool:
@@ -829,7 +838,11 @@ class IndexStore:
         index.sessions.pop(scoped_key, None)
         try:
             self.write(index)
-        except Exception as e:
+        except BaseException as e:
+            # BaseException, to keep the never-raises guarantee literally true. It
+            # costs a Ctrl-C landing in this narrow window, which is the right
+            # trade: the caller's exception still propagates and unwinds, whereas
+            # replacing it would lose the reason creation failed.
             _log.warning(
                 "Could not remove the index row for '%s' after its manifest write failed; "
                 "a stale row remains and will be pruned on the next read: %s",

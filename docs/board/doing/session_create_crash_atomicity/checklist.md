@@ -2,8 +2,9 @@
 
 **Card**: [card.md](card.md). Branch: `fix/session-create-crash-atomicity`.
 
-**Current focus**: closeout. Phases 0-4 are complete, including one adversarial review round whose three defects (F5,
-F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1-F7 recorded below are what shipped.
+**Current focus**: closeout, pending a third review pass. Two adversarial rounds have run; the second found three more
+defects (F8, F9, F10) plus two CIT tests the earlier verification never ran. All are fixed and regression-covered. The
+D1/D2/D3 decisions and findings F1-F10 recorded below are what shipped.
 
 ## Phase 0 -- Ground and ratify (complete 2026-08-01)
 
@@ -80,7 +81,9 @@ F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1
   once a manifest exists at a name whose manifest this delete had already destroyed. `delete_session` samples that flag
   right after worktree cleanup -- sampling it at the removal would see the replacement's manifest and read it as its
   own. `created_at` cannot serve as the discriminator: `now_iso` has second granularity, so a same-second replacement is
-  indistinguishable (verified -- the first attempt at this fix failed for exactly that reason).
+  indistinguishable (verified -- the first attempt at this fix failed for exactly that reason). **This fix was itself
+  incomplete; see F9.** Sampling the flag after cleanup still left two losing schedules, and verifying ownership outside
+  the lock that guards the manifest delete left a third.
 - **F7 (MEDIUM) -- a failed compensation write masked the callback's exception.** `self.write(index)` raising replaced
   the `SessionExistsError` the contract promises to surface unchanged. Reproduced: `OSError` in place of it. Fix:
   `_compensate_locked` swallows and logs its own failure; the row it could not remove is prunable and self-heals.
@@ -89,6 +92,33 @@ F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1
   manifest. `TestPerPathResidue` stubbed `create_session_txn` out entirely, so it proved only that callers write nothing
   themselves: it now fails the *manifest callback* inside the real transaction, exercising the row write and
   compensation each path depends on.
+
+### Second review-round findings (2026-08-01, all reproduced before fixing)
+
+- **F8 (HIGH) -- manifest presence was mistaken for transaction ownership.** F5's fix probed "is a manifest there?"
+  after the callback failed, but a pre-existing orphan owns the path in exactly the case `create_exclusive` rejects. The
+  probe read the orphan as ours and kept the row, leaving it indexing somebody else's session. Reproduced: the failed
+  child's row had `claude_session_id=None` while the manifest it indexed held `winner-id`. Fix: probe **before** the
+  callback too, and keep the row only when both halves prove this transaction published -- nothing there before,
+  something there now. This is also the pre-seeded-orphan test the Phase 1 assertion always specified; the original test
+  raised `SessionExistsError` without creating a manifest and so could not detect foreign ownership.
+- **F9 (HIGH) -- `expect_manifest_absent` was an observation, not an ownership token.** Two schedules defeated it. A
+  replacement publishing *before* the flag was sampled flipped it to False, and the delete then destroyed both halves of
+  the new session. A replacement publishing *after* `remove_session_if_unclaimed` released the lock lost its manifest to
+  the caller's follow-up delete, leaving its row orphaned. Both reproduced through `delete_session`. Fix: the helper
+  became `delete_session_txn`, which removes the row **and** runs the manifest delete inside one lock scope, and the
+  flag became deterministic -- `_manifest_absent_at_start` (sampled before any destructive work) or
+  `_manifest_destroyed_by_cleanup` (pure path containment, computed before the worktree removal). Both are facts about
+  what the delete does, so no publication schedule can flip them.
+- **F10 (LOW) -- the never-raises guarantee was not literal.** `_compensate_locked` caught only `Exception`, so a
+  `BaseException` from the compensation write still replaced the callback's error. Reproduced with `KeyboardInterrupt`,
+  which escaped and aborted the whole pytest session. Fix: catch `BaseException`, accepting that a Ctrl-C landing in
+  that window is dropped in favour of the caller learning why creation failed.
+- **Coverage gaps, accepted.** Two more model-drift tests were still failing in the CIT tier
+  (`tests/src/session/test_manager_integration.py`), which `-m "not integration"` deselects -- so the earlier "all
+  green" claim never covered them. One seeded a row-only collision (now residue), the other injected at
+  `add_from_state`; both now use a live session and `create_session_txn` respectively. The CIT tier is part of this
+  card's verification from here on.
 
 ### Decisions
 
@@ -215,8 +245,9 @@ F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1
   documents why it reads the row column).
 - [x] Integration tier: `test_session_lifecycle.py` **21 passed**; adoption Docker gates run while warm --
   `test_adopt_binding_contract.py` + `test_adopt_native_conversation.py` **2 passed**.
-- [x] Unit + regression: `tests/src` + `tests/regression` **9161 passed, 1 skipped** (117 deselected integration).
-  `make pre-commit` clean.
+- [x] Unit + regression: `tests/src` + `tests/regression` **9173 passed, 1 skipped**. Component-integration tier
+  (`pytest tests/src -m integration`) **117 passed** -- this is the tier `-m "not integration"` deselects, and the
+  earlier rounds never ran it; it is mandatory for this card from here on. `make pre-commit` clean.
 - [x] Mutation check in place of a blind pass, proving each new guard is load-bearing: reverting the F2 row-column read,
   the stale-row self-heal, `live_session_exists`, and the in-lock compensation each fails its own tests and nothing
   else's. Four findings were reproduced before fixing, per the house rule -- three were test-model drift
@@ -224,10 +255,10 @@ F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1
   `test_bug_fork_force_target_recovery` and `test_bug_resume_autoname_context_retry` injected at `add_from_state`, and
   the latter modelled a "winner" as a row-only write, which is now the residue shape) and one was a real defect in this
   work (F4, D2's `write` callback -- see the D2 correction).
-- [x] One adversarial review round, findings reproduced before fixing (house rule). Three defects found and fixed --
-  F5/F6 HIGH, F7 MEDIUM, recorded under "Review-round findings" -- plus two accepted test-quality findings. Each fix
-  carries its own mutation check: reverting the conditional compensation, the non-raising compensation, or the
-  unclaimed-name check fails its own tests and nothing else's.
+- [x] Two adversarial review rounds, every finding reproduced before fixing (house rule). Round one: F5/F6 HIGH, F7
+  MEDIUM. Round two: F8/F9 HIGH, F10 LOW, plus two CIT tests the earlier verification had never run. Each fix carries
+  its own mutation check -- reverting the ownership probe, the in-lock manifest delete, the deterministic delete flag,
+  or the `BaseException` compensation each fails its own tests and nothing else's.
 
 ## Acceptance tests
 

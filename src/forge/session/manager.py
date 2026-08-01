@@ -1889,6 +1889,12 @@ class SessionManager:
                     "branch": wt.get("branch"),
                 }
 
+        # Sampled before any destructive work, while a manifest at this path can
+        # still only be this session's own. Once cleanup starts, the name reads as
+        # crash residue and any later probe may be looking at a replacement.
+        _manifest_absent_at_start = not store.exists()
+        _manifest_destroyed_by_cleanup = False
+
         # Worktree cleanup decision: determine BEFORE any destructive work whether
         # we'll remove the worktree. This lets the dirty preflight block everything
         # (transcripts + worktree + index removal) atomically.
@@ -1923,6 +1929,12 @@ class SessionManager:
             worktree_path = Path(_worktree_info["path"])
             branch = _worktree_info["branch"] if delete_branch else None
 
+            # Pure path logic, evaluated before the removal: for a nested project
+            # the manifest lives inside the worktree, so cleanup takes it too. This
+            # is a fact about what this delete does, which is why it is safe where
+            # a later store.exists() probe is not.
+            _manifest_destroyed_by_cleanup = store.manifest_path.is_relative_to(worktree_path.resolve())
+
             cleanup_result = cleanup_worktree(
                 worktree_path=worktree_path,
                 branch=branch,
@@ -1932,14 +1944,6 @@ class SessionManager:
 
             if cleanup_result.errors:
                 raise ForgeSessionError(cleanup_result.errors[0])
-
-        # Sampled here, not at the removal below: for a nested project the cleanup
-        # above took the manifest with the worktree, and from this point the name
-        # reads as crash residue to any concurrent create_session_txn. Once this is
-        # True, a manifest at that path can only be a replacement's -- so the check
-        # has to be made before the transcript work, which is what keeps the window
-        # open long enough to matter.
-        _manifest_gone_before_removal = not store.exists()
 
         if delete_transcripts and _claude_session_id:
             if state:
@@ -2058,10 +2062,18 @@ class SessionManager:
         # create_session_txn may have reclaimed the name and published a whole new
         # session. Removing the row and manifest unconditionally would then delete
         # that session instead of this one.
-        still_ours = self.index_store.remove_session_if_unclaimed(
+        def _delete_manifest() -> None:
+            # Runs inside the index lock, after the row is gone. Outside it, a
+            # replacement could publish between the ownership check and this
+            # delete and lose its manifest to it.
+            if store.exists():
+                store.delete()
+
+        still_ours = self.index_store.delete_session_txn(
             name,
             forge_root=entry_forge_root,
-            expect_manifest_absent=_manifest_gone_before_removal,
+            expect_manifest_absent=_manifest_absent_at_start or _manifest_destroyed_by_cleanup,
+            delete_manifest=_delete_manifest,
         )
         if not still_ours:
             logger.info(
@@ -2070,10 +2082,6 @@ class SessionManager:
                 name,
             )
             return
-
-        # Delete manifest file (only if worktree still exists or wasn't a worktree)
-        if store.exists():
-            store.delete()
 
         try:
             from .active import ActiveSessionStore

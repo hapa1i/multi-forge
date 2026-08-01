@@ -49,14 +49,17 @@ lists, which still owns its name and its conversation binding.
   would report an in-flight adopted thread as free once the row precedes its manifest.
 - `_restore_previous_target_state` restores with `create_exclusive`, not `write`: its old unlocked `exists()` guard
   meant the write never overwrote anything, and keeping `write` let a failed fork clobber a concurrent winner.
-- Compensation is evidence-based, not unconditional. An exception from the manifest callback does not prove the manifest
-  is absent -- `atomic_write_json` makes it durable at `os.replace`, so a signal arriving afterwards still unwinds
-  through the transaction -- and dropping the row there recreated the very orphan this card removes. It also no longer
-  raises: a failed compensation write used to mask the callback's exception.
+- Compensation keeps the row only on proof that *this* transaction published the manifest: nothing at the path before
+  the callback, something there after. Neither half alone is enough -- an exception does not mean the write failed
+  (`atomic_write_json` makes it durable at `os.replace`, and a signal can arrive later), and a manifest being present
+  does not mean it is ours (a pre-existing orphan owns the path in exactly the case `create_exclusive` rejects).
+  Compensation also never raises, for `BaseException` too, so it cannot replace the error it is unwinding.
 - Deletion is coordinated with creation rather than assumed away. `delete_session` removes the manifest (or the worktree
-  holding it) before its row, so mid-delete the name reads as residue and a concurrent create can reclaim it. Its
-  terminal removal now goes through `IndexStore.remove_session_if_unclaimed`, which declines once a replacement owns the
-  name; without it, an unrelated delete destroyed a session that had just been created successfully.
+  holding it) before its row, so mid-delete the name reads as residue and a concurrent create can reclaim it.
+  `IndexStore.delete_session_txn` now removes the row and runs the manifest delete inside one index-lock scope, and
+  declines outright once a replacement owns the name. The ownership signal is derived from what the delete does --
+  manifest absent at entry, or provably inside the worktree being removed -- not from a filesystem probe, which a
+  replacement can flip.
 - design.md §3.2, `session/__init__.py`, and the `create_exclusive` / binding-scan docstrings describe the shipped
   ordering, including the delete-coordination contract. Repair of pre-existing orphans is split out to
   `proposed/session_orphan_manifest_repair`, because index identity fields cannot be derived from a manifest.

@@ -69,9 +69,12 @@ the outcome; the slug keeps the change log's recorded phrasing of the debt.
 **Retry contract (the stale-row reservation gap, resolved).** A bare row would otherwise still block a direct same-name
 retry: `session_exists` is a pure row check (`session/index.py:481`), `start_session` pre-checks it and raises
 (`session/manager.py:541`), and `_name_is_taken` (`:1763`) counts row-or-manifest as taken. The transaction closes this
-itself: under its held lock, row-present + manifest-absent can only be crash residue -- a live creator would be holding
-the same lock -- so the transaction prunes the stale row and proceeds. An explicit same-name retry therefore succeeds
-immediately, with no intervening `session list` or `session delete`. No pre-check may hard-fail on a row-only state.
+itself: under its held lock, row-present + manifest-absent is not a reservation, so the transaction prunes the stale row
+and proceeds. An explicit same-name retry therefore succeeds immediately, with no intervening `session list` or
+`session delete`. No pre-check may hard-fail on a row-only state. **Corrected by the review round (finding F6)**: this
+paragraph originally claimed that state "can only be crash residue -- a live creator would be holding the same lock".
+That is false. An in-flight `delete_session` produces it too, holding no index lock for the duration, so the reclaim is
+safe only because deletion now ends in `delete_session_txn`, which declines once a replacement owns the name.
 **Corrected by Phase 0 (finding F1)**: there are four such pre-checks, not one -- `:541` (`start_session`), `:831`
 (resume child) and `:1696` (`relaunch_session`) all raise `SessionExistsError` off a pure row check, and `:1077`
 (`winner_owns`) ORs one with a manifest probe. D1 resolves all four via a new `live_session_exists` (row **and**

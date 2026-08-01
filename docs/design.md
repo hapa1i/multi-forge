@@ -273,12 +273,13 @@ the run, so they reconcile the column rather than set it at creation — includi
 resume ("drift"), where a stale column would guard an id the session no longer uses.
 
 **Adoption also holds a conversation-scoped lock across its final scan and commit** (`conversation_lock`, under
-`FORGE_HOME/locks/`). The index write lock is not sufficient on its own, because session creation writes the manifest
-first: an adopt killed between the two leaves an orphan manifest that owns the conversation and never reached the index.
-A concurrent adopt whose scan ran before that manifest appeared would publish a second binding, and the orphan scan
-could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the loser's scan cannot
-run until the winner's manifest exists. The lock is global rather than per-project because a conversation is not
-project-scoped, and `flock` releases on process death, so a killed adopt frees it.
+`FORGE_HOME/locks/`). The index write lock is not sufficient on its own: the binding scans read manifest directories
+without holding it, so a scan that ran before a competing adopt's manifest appeared would publish a second binding, and
+the orphan scan could then only refuse the *third* attempt. Serializing scan-and-commit per conversation means the
+loser's scan cannot run until the winner has published. This mattered most when creation wrote the manifest first and a
+kill left an orphan owning the conversation; creation is now row-first, so that particular orphan is no longer produced,
+but orphans predating the change persist and the scans still cover them. The lock is global rather than per-project
+because a conversation is not project-scoped, and `flock` releases on process death, so a killed adopt frees it.
 
 **Global session index entry schema** (`~/.forge/sessions/index.json`):
 
