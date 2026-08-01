@@ -78,8 +78,8 @@ real transaction, and the explicit-name retry. Every guard carries a mutation ch
 Docker `test_session_lifecycle.py` + `test_adopt_binding_contract.py` 22 passed. `make pre-commit` clean.
 
 **Review**: three adversarial rounds found seven defects in the implementation (five HIGH, one MEDIUM, one LOW), all
-reproduced before fixing; see the card checklist's review-round sections. Six of the seven were the same root error --
-a filesystem probe standing in for a fact about what the operation did.
+reproduced before fixing; see the card checklist's review-round sections. Six of the seven were the same root error -- a
+filesystem probe standing in for a fact about what the operation did.
 
 ## 2026-07-31
 
