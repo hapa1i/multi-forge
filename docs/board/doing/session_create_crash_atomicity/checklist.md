@@ -1,10 +1,9 @@
 # Checklist -- session_create_crash_atomicity
 
-**Card**: [card.md](card.md). Activation: create the execution branch, `git mv` this directory to
-`docs/board/doing/session_create_crash_atomicity/`, and update this header per `board_contract.md`.
+**Card**: [card.md](card.md). Branch: `fix/session-create-crash-atomicity`.
 
-**Current focus**: not started. Phase 0 ratification comes first -- do not write the transaction before the lock-nesting
-audit and the D1/D2 decisions are recorded here.
+**Current focus**: Phase 0 -- ground and ratify. Do not write the transaction before the lock-nesting and raw-reader
+audits and the D1/D2/D3 decisions are recorded here.
 
 ## Phase 0 -- Ground and ratify
 

@@ -1,6 +1,7 @@
 # Crash-atomic session creation (manifest + index)
 
-**Lane**: `todo/` -- accepted 2026-08-01. Standalone. Discharges the open debt recorded at closeout of
+**Lane**: `doing/` -- accepted 2026-08-01, active since 2026-08-01; execution plan in [checklist.md](checklist.md).
+Standalone. Discharges the open debt recorded at closeout of
 [`native_session_adoption`](../../done/native_session_adoption/card.md): its
 [checklist](../../done/native_session_adoption/checklist.md) carries the fix recommendation under "Open debt -- creation
 is still not crash-atomic".
