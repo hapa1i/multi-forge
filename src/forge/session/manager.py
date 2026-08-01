@@ -1018,8 +1018,9 @@ class SessionManager:
     ) -> str:
         """Write child session to disk and index (shared by native and transfer).
 
-        Race protection: if an auto-generated name collides at add_from_state
-        (concurrent resume), retry once with a fresh timestamp suffix.
+        Race protection: if an auto-generated name collides in the commit
+        transaction (concurrent resume) -- from either its index-side row check or
+        its manifest callback -- retry once with a fresh timestamp suffix.
 
         Returns the final persisted child name, which may differ from the
         original auto-generated name after a retry.
@@ -1932,6 +1933,14 @@ class SessionManager:
             if cleanup_result.errors:
                 raise ForgeSessionError(cleanup_result.errors[0])
 
+        # Sampled here, not at the removal below: for a nested project the cleanup
+        # above took the manifest with the worktree, and from this point the name
+        # reads as crash residue to any concurrent create_session_txn. Once this is
+        # True, a manifest at that path can only be a replacement's -- so the check
+        # has to be made before the transcript work, which is what keeps the window
+        # open long enough to matter.
+        _manifest_gone_before_removal = not store.exists()
+
         if delete_transcripts and _claude_session_id:
             if state:
                 _artifact_ids = _tracked_transcript_session_ids(state)
@@ -2043,7 +2052,24 @@ class SessionManager:
                 except OSError as exc:
                     logger.warning("Failed to remove rewind transcript %s: %s", _rewind_path, exc)
 
-        self.index_store.remove_session(name, forge_root=entry_forge_root)
+        # Everything above may have removed the manifest -- worktree cleanup takes
+        # it with the worktree for a nested project -- while this row still stands.
+        # That state is indistinguishable from crash residue, so a concurrent
+        # create_session_txn may have reclaimed the name and published a whole new
+        # session. Removing the row and manifest unconditionally would then delete
+        # that session instead of this one.
+        still_ours = self.index_store.remove_session_if_unclaimed(
+            name,
+            forge_root=entry_forge_root,
+            expect_manifest_absent=_manifest_gone_before_removal,
+        )
+        if not still_ours:
+            logger.info(
+                "Session '%s' was recreated while this delete was cleaning up; "
+                "leaving the new session's index entry and manifest in place",
+                name,
+            )
+            return
 
         # Delete manifest file (only if worktree still exists or wasn't a worktree)
         if store.exists():

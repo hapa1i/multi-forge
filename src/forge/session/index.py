@@ -437,10 +437,14 @@ class IndexStore:
             if existing is not None:
                 if self._manifest_exists_for_row(scoped_key, existing):
                     raise SessionExistsError(name)
-                # Row without a manifest, seen while holding the lock that every
-                # creator must hold to publish one: this can only be residue from a
-                # killed transaction. Drop it so a direct same-name retry succeeds
-                # without an intervening 'session list' or 'session delete'.
+                # Row without a manifest. Two things produce it: a killed
+                # transaction, and a delete that has removed the manifest -- or the
+                # worktree holding it -- but has not yet removed its row. Reclaiming
+                # the name is right for both: the residue reserves nothing, and the
+                # session being deleted is on its way out. What makes it safe is not
+                # an assumption that only crashes get here, but that the delete side
+                # ends in remove_session_if_unclaimed, which declines once a
+                # replacement owns the name and so cannot take this one with it.
                 # Deliberately narrower than the list_sessions prune, which also
                 # drops rows whose worktree vanished: the manifest is the durable
                 # reservation, so a live manifest must still collide here.
@@ -474,12 +478,14 @@ class IndexStore:
             try:
                 write_manifest()
             except BaseException:
-                # BaseException, not Exception: a Ctrl-C between the two writes can
-                # still unwind cleanly, and leaving residue when we could remove it
-                # is worse than the narrower catch. A signal that kills the process
-                # outright is the crash model the self-heal above covers.
-                index.sessions.pop(scoped_key, None)
-                self.write(index)
+                # A raised callback does NOT prove the manifest is absent. Once
+                # atomic_write_json reaches os.replace the manifest is durable, and
+                # a signal arriving after that -- during the directory fsync, or the
+                # manifest lock release -- still unwinds through here. Dropping the
+                # row then would manufacture the manifest-only orphan this
+                # transaction exists to prevent, so compensate only on proof.
+                if not self._manifest_exists_for_row(scoped_key, entry):
+                    self._compensate_locked(index, scoped_key)
                 raise
 
             return entry
@@ -583,6 +589,63 @@ class IndexStore:
 
             key = resolve_key_strict(index.sessions, name, forge_root)
             if key is None:
+                return False
+
+            del index.sessions[key]
+            self.write(index)
+            return True
+
+    def remove_session_if_unclaimed(
+        self,
+        name: str,
+        forge_root: str | None = None,
+        *,
+        expect_manifest_absent: bool,
+    ) -> bool:
+        """Remove a row only while the caller still owns the name it is deleting.
+
+        Deletion drops the manifest -- or the worktree containing it -- before it
+        drops the row, so in between, the name looks exactly like crash residue to
+        ``create_session_txn``, which will prune the row and publish a replacement.
+        Removing the row unconditionally after that would delete the replacement's
+        row, and the caller's follow-up manifest delete would take its manifest
+        too, destroying a session that was created successfully.
+
+        ``expect_manifest_absent`` is what makes a replacement detectable, and it
+        must be sampled by the caller *before* the slow cleanup, not here: it
+        records whether this delete already destroyed the manifest. If it did, then
+        a manifest at that path can only belong to somebody else. Timestamps cannot
+        stand in for it -- ``now_iso`` has second granularity, so a replacement
+        created in the same second as the original is indistinguishable by
+        ``created_at``.
+
+        The check runs under the index lock, which excludes creation transactions,
+        so the manifest state it observes cannot change underneath the decision.
+
+        Args:
+            name: Session display name.
+            forge_root: Scope to this project. Strict resolution when None.
+            expect_manifest_absent: True when the caller has already removed the
+                manifest (or there never was one), so any manifest found now is a
+                replacement's.
+
+        Returns:
+            True if the caller still owns the name -- the row is removed and it is
+            safe to delete the manifest. False if a replacement owns the name, in
+            which case nothing was removed and the caller must stop deleting.
+        """
+        validate_name(name)
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None:
+                # No row means no replacement: publication writes the row first, and
+                # a transaction mid-flight would be holding this lock.
+                return True
+
+            if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
                 return False
 
             del index.sessions[key]
@@ -753,6 +816,26 @@ class IndexStore:
         """Whether the manifest backing an index row is on disk."""
         store_root = Path(entry.forge_root or entry.worktree_path)
         return get_manifest_path(store_root, session_name_from_key(scoped_key)).is_file()
+
+    def _compensate_locked(self, index: SessionIndex, scoped_key: str) -> None:
+        """Drop a transaction's own row, inside the lock it already holds.
+
+        Never raises. The caller is unwinding the manifest callback's exception and
+        has promised to re-raise it unchanged, so a failure here must not replace
+        it -- the row it could not remove is prunable, and every reader self-heals
+        it. Cannot call ``remove_session``: ``file_lock_for_target`` is not
+        reentrant, so re-entering it would deadlock against this transaction.
+        """
+        index.sessions.pop(scoped_key, None)
+        try:
+            self.write(index)
+        except Exception as e:
+            _log.warning(
+                "Could not remove the index row for '%s' after its manifest write failed; "
+                "a stale row remains and will be pruned on the next read: %s",
+                session_name_from_key(scoped_key),
+                e,
+            )
 
     def _require_conversation_unbound(
         self,

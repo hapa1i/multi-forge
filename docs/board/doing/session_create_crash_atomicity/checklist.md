@@ -2,8 +2,8 @@
 
 **Card**: [card.md](card.md). Branch: `fix/session-create-crash-atomicity`.
 
-**Current focus**: closeout. Phases 0-4 are complete except the adversarial review round; the D1/D2/D3 decisions and the
-F1-F4 findings recorded below are what shipped.
+**Current focus**: closeout. Phases 0-4 are complete, including one adversarial review round whose three defects (F5,
+F6, F7) are fixed and regression-covered. The D1/D2/D3 decisions and findings F1-F7 recorded below are what shipped.
 
 ## Phase 0 -- Ground and ratify (complete 2026-08-01)
 
@@ -64,6 +64,32 @@ F1-F4 findings recorded below are what shipped.
   manifest order is safe by construction (distinct lock files), and the only deadlock shape is a true ABBA, which the
   lock-nesting audit rules out.
 
+### Review-round findings (2026-08-01, all reproduced before fixing)
+
+- **F5 (HIGH) -- an exception did not prove the manifest was absent.** `atomic_write_json` makes the manifest durable at
+  `os.replace` (`core/state/io.py:146`); a signal arriving during the directory fsync or the manifest lock release still
+  unwinds through the transaction's `except`. The original unconditional compensation then dropped the row, producing
+  exactly the manifest-only orphan this card exists to prevent. Reproduced: `row_survives=False manifest_survives=True`.
+  Fix: compensate only when `_manifest_exists_for_row` proves the manifest did not land. The `BaseException` catch was
+  the right instinct for the wrong reason -- it needed evidence, not a wider net.
+- **F6 (HIGH) -- row-without-manifest is not exclusively crash residue.** `delete_session` removes the manifest (or the
+  worktree containing it, `manager.py:1925`) before its row (`:2046`), with the transcript phase in between holding the
+  window open. A concurrent `create_session_txn` read that as residue, pruned the row and published a full session; the
+  deleter then removed the *replacement's* row and manifest. Reproduced end-to-end: a successfully created session
+  destroyed by an unrelated delete. Fix: `IndexStore.remove_session_if_unclaimed`, which under the index lock declines
+  once a manifest exists at a name whose manifest this delete had already destroyed. `delete_session` samples that flag
+  right after worktree cleanup -- sampling it at the removal would see the replacement's manifest and read it as its
+  own. `created_at` cannot serve as the discriminator: `now_iso` has second granularity, so a same-second replacement is
+  indistinguishable (verified -- the first attempt at this fix failed for exactly that reason).
+- **F7 (MEDIUM) -- a failed compensation write masked the callback's exception.** `self.write(index)` raising replaced
+  the `SessionExistsError` the contract promises to surface unchanged. Reproduced: `OSError` in place of it. Fix:
+  `_compensate_locked` swallows and logs its own failure; the row it could not remove is prunable and self-heals.
+- **Test-quality findings, accepted.** The concurrency claim rested on a forced-stale-pre-check test with a pre-existing
+  winner, not two creators: added a `threading.Barrier` double-create asserting one winner, one row, and an unclobbered
+  manifest. `TestPerPathResidue` stubbed `create_session_txn` out entirely, so it proved only that callers write nothing
+  themselves: it now fails the *manifest callback* inside the real transaction, exercising the row write and
+  compensation each path depends on.
+
 ### Decisions
 
 - **D1 -- transaction API shape.** Callback form on `IndexStore`:
@@ -79,8 +105,8 @@ F1-F4 findings recorded below are what shipped.
 
   Rationale: a callback makes the "no work but the two writes inside the lock" constraint reviewable at each call site
   and lets tests assert ordering with a spy, where a context manager invites arbitrary work in the `with` body. The
-  transaction stays manifest-agnostic -- it invokes an opaque callable -- so a caller needing overwrite semantics can
-  pass `write` instead of `create_exclusive` without the transaction knowing (this is what makes D2 cheap).
+  transaction stays manifest-agnostic in its *signature* -- it invokes an opaque callable -- though F5 later forced it
+  to probe the manifest path anyway, because an exception from that callable cannot prove the manifest is absent.
 
   - **Exception boundary**: `InvalidSessionNameError`, index-side `SessionExistsError`, and `UuidAlreadyBoundError`
     raise *before* the callback runs; the callback's own exception propagates unchanged after in-lock compensation.
@@ -163,8 +189,9 @@ F1-F4 findings recorded below are what shipped.
   each path leaves no orphan and a direct **explicit-name** retry succeeds; the auto-name retry loop still consumes at
   most one retry (both claims continue to feed one collision path).
 - [x] `fork_session` (`:1625`): conversion preserving the stale-target replace ordering (delete-then-create sequence
-  ahead of the commit) and converting `_restore_previous_target_state` (`:1580`) per D2 -- transaction with a `write`
-  callback, still best-effort with a logged warning. Assertion: fork suites,
+  ahead of the commit) and converting `_restore_previous_target_state` (`:1580`) per D2 -- transaction with a
+  `create_exclusive` callback (see the D2 correction under F4; the original `write` reading was wrong), still
+  best-effort with a logged warning. Assertion: fork suites,
   `tests/regression/test_bug_fork_restore_clobbers_winner.py`, and the stale `fork --worktree --force` regressions
   green; a mid-commit failure still restores the previous target per the existing contract; a restore that races a new
   owner of the name declines via the transaction's uniqueness check rather than the `:1564` probe.
@@ -197,25 +224,33 @@ F1-F4 findings recorded below are what shipped.
   `test_bug_fork_force_target_recovery` and `test_bug_resume_autoname_context_retry` injected at `add_from_state`, and
   the latter modelled a "winner" as a row-only write, which is now the residue shape) and one was a real defect in this
   work (F4, D2's `write` callback -- see the D2 correction).
-- [ ] One adversarial review round (not yet run; the mutation check above is verification, not review).
+- [x] One adversarial review round, findings reproduced before fixing (house rule). Three defects found and fixed --
+  F5/F6 HIGH, F7 MEDIUM, recorded under "Review-round findings" -- plus two accepted test-quality findings. Each fix
+  carries its own mutation check: reverting the conditional compensation, the non-raising compensation, or the
+  unclaimed-name check fails its own tests and nothing else's.
 
 ## Acceptance tests
 
-| Test                                         | Fixture                                                       | Assertion                                                               | Test File                                                                               |
-| -------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Crash residue self-heals                     | seeded row-without-manifest (accepted crash model)            | `list_sessions` and `get_session` each prune it                         | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
-| Direct same-name retry                       | seeded residue, then `start_session` with the same name       | retry succeeds with no prior `session list` / `session delete`          | same                                                                                    |
-| Compensation on callback failure             | pre-seeded orphan manifest raises `SessionExistsError`        | no row persisted; exception surfaced unchanged; single lock acquisition | same                                                                                    |
-| Stale-snapshot pruner spares republished row | pruner snapshot pre-transaction; transaction republishes name | under-lock re-check spares the row; test fails if re-check bypassed     | same                                                                                    |
-| Same-name concurrent create                  | barrier-gated double `start_session`                          | one winner; loser `SessionExistsError`; loser leaves no orphan          | `tests/regression/test_bug_start_session_name_race.py`                                  |
-| Adoption double-bind unchanged               | interleaved adopts of one thread                              | one binding, one `UuidAlreadyBoundError`                                | `tests/regression/test_bug_codex_adopt_double_bind.py`                                  |
-| Fork-restore and autoname contracts          | existing fixtures                                             | green unchanged                                                         | `test_bug_fork_restore_clobbers_winner.py`, `test_bug_resume_autoname_context_retry.py` |
-| Per-path residue + compensation              | both families in each of the four paths                       | no orphan from any path; path-specific rollback still fires             | new unit tests beside each path's suite                                                 |
-| `live_session_exists` ignores a bare row     | seeded row-without-manifest                                   | False for the residue; True for a healthy session                       | `tests/src/session/test_index.py`                                                       |
-| Codex scan stays conservative in-flight      | seeded row with `codex_thread_id`, manifest absent            | thread reports **bound**, not free (F2)                                 | `tests/src/core/ops/test_session_context.py`                                            |
-| Explicit-name retry on resume and relaunch   | seeded residue, then same explicit `child_name`               | retry succeeds; pre-check does not reject the residue (F1)              | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
-| Fork restore declines to a live winner       | restore races a new owner of the name                         | transaction uniqueness check declines; winner's manifest untouched      | `tests/regression/test_bug_fork_restore_clobbers_winner.py`                             |
-| Lifecycle end-to-end                         | Docker session start/fork/resume/delete                       | suite green                                                             | `tests/integration/docker/test_session_lifecycle.py`                                    |
+| Test                                         | Fixture                                                       | Assertion                                                                      | Test File                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Crash residue self-heals                     | seeded row-without-manifest (accepted crash model)            | `list_sessions` and `get_session` each prune it                                | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Direct same-name retry                       | seeded residue, then `start_session` with the same name       | retry succeeds with no prior `session list` / `session delete`                 | same                                                                                    |
+| Compensation on callback failure             | pre-seeded orphan manifest raises `SessionExistsError`        | no row persisted; exception surfaced unchanged; single lock acquisition        | same                                                                                    |
+| Stale-snapshot pruner spares republished row | pruner snapshot pre-transaction; transaction republishes name | under-lock re-check spares the row; test fails if re-check bypassed            | same                                                                                    |
+| Same-name concurrent create                  | two threads, barrier-gated `start_session`                    | one winner; loser `SessionExistsError`; one row; winner's manifest unclobbered | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Stale-precheck loser (forced)                | winner pre-seeded, pre-checks forced stale                    | loser rejected under the lock; winner's manifest intact                        | `tests/regression/test_bug_start_session_name_race.py`                                  |
+| Adoption double-bind unchanged               | interleaved adopts of one thread                              | one binding, one `UuidAlreadyBoundError`                                       | `tests/regression/test_bug_codex_adopt_double_bind.py`                                  |
+| Fork-restore and autoname contracts          | existing fixtures                                             | green unchanged                                                                | `test_bug_fork_restore_clobbers_winner.py`, `test_bug_resume_autoname_context_retry.py` |
+| Per-path compensation                        | manifest callback fails inside the real transaction, per path | no row and no manifest from any path; worktree rollback still fires            | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Per-path residue retry                       | seeded residue, explicit same name, per path                  | retry succeeds; pre-check does not reject the residue (F1)                     | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| `live_session_exists` ignores a bare row     | seeded row-without-manifest                                   | False for the residue; True for a healthy session                              | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Codex scan stays conservative in-flight      | seeded row with `codex_thread_id`, manifest absent            | thread reports **bound**, not free (F2)                                        | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Explicit-name retry on resume and relaunch   | seeded residue, then same explicit `child_name`               | retry succeeds; pre-check does not reject the residue (F1)                     | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Fork restore declines to a live winner       | restore races a new owner of the name                         | transaction uniqueness check declines; winner's manifest untouched             | `tests/regression/test_bug_fork_restore_clobbers_winner.py`                             |
+| Interrupt after the manifest lands           | `create_exclusive` succeeds, then `KeyboardInterrupt`         | row survives; no manifest-only orphan                                          | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Compensation write fails                     | index write raises during compensation                        | callback's `SessionExistsError` still surfaces; row is prunable                | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Delete/create coordination                   | replacement published during a delete's cleanup window        | delete declines; replacement's row and manifest survive                        | `tests/regression/test_bug_session_create_crash_atomicity.py`                           |
+| Lifecycle end-to-end                         | Docker session start/fork/resume/delete                       | suite green                                                                    | `tests/integration/docker/test_session_lifecycle.py`                                    |
 
 ## Blockers / deferred decisions
 

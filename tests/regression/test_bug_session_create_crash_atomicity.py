@@ -22,13 +22,17 @@ src/forge/core/ops/session_context.py
 from __future__ import annotations
 
 import subprocess
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
 import pytest
 
-from forge.core.ops.session_context import collect_bound_codex_threads, collect_bound_uuids
+from forge.core.ops.session_context import (
+    collect_bound_codex_threads,
+    collect_bound_uuids,
+)
 from forge.session import SessionManager, SessionStore, create_session_state
 from forge.session import index as index_mod
 from forge.session.exceptions import (
@@ -373,10 +377,23 @@ class TestPerPathResidue:
 
     @staticmethod
     def _fail_commit(index: IndexStore, monkeypatch: pytest.MonkeyPatch) -> None:
-        def _boom(*args: object, **kwargs: object) -> None:
+        """Fail the *manifest callback*, driving the real transaction.
+
+        Replacing `create_session_txn` outright would prove only that the caller
+        writes nothing on its own; routing through the real transaction exercises
+        the uniqueness checks, the row write, and the compensation path that each
+        creation site now depends on instead of its own rollback block.
+        """
+        real = index.create_session_txn
+
+        def _boom() -> None:
             raise RuntimeError("commit failed")
 
-        monkeypatch.setattr(index, "create_session_txn", _boom)
+        def _with_failing_manifest(state: SessionState, project_root: str, **kwargs: object) -> object:
+            kwargs["write_manifest"] = _boom
+            return real(state, project_root, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(index, "create_session_txn", _with_failing_manifest)
 
     def test_start_session_leaves_no_orphan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         project = _project(tmp_path)
@@ -428,6 +445,242 @@ class TestPerPathResidue:
 
         assert not SessionStore(str(project), "doomed").exists()
         assert "doomed" not in {name for name, _ in index.list_sessions()}
+
+
+class TestInterruptAfterTheManifestLands:
+    """A raised callback does not prove the manifest is absent.
+
+    Review finding: `atomic_write_json` makes the manifest durable at `os.replace`
+    (`core/state/io.py:146`); a signal arriving during the directory fsync or the
+    manifest lock release still unwinds through the transaction's except clause.
+    Compensating unconditionally there produced the exact manifest-only orphan
+    this card exists to prevent.
+    """
+
+    def test_signal_after_the_manifest_is_durable_leaves_no_orphan(self, tmp_path: Path) -> None:
+        project = _project(tmp_path)
+        index = IndexStore()
+        state = _state("interrupted", project)
+        store = SessionStore(str(project), "interrupted")
+
+        def _write_then_interrupt() -> None:
+            store.create_exclusive(state)
+            raise KeyboardInterrupt("signal after os.replace")
+
+        with pytest.raises(KeyboardInterrupt):
+            index.create_session_txn(
+                state,
+                str(project),
+                forge_root=str(project),
+                write_manifest=_write_then_interrupt,
+            )
+
+        assert store.exists(), "the manifest is durable once os.replace returned"
+        assert index.read().sessions, "so its row must survive -- a bare manifest is the orphan"
+
+    def test_failure_before_the_manifest_still_compensates(self, tmp_path: Path) -> None:
+        """The companion case: no manifest landed, so the row must go."""
+        project = _project(tmp_path)
+        index = IndexStore()
+
+        def _fail_first() -> None:
+            raise KeyboardInterrupt("signal before the write")
+
+        with pytest.raises(KeyboardInterrupt):
+            index.create_session_txn(
+                _state("interrupted", project),
+                str(project),
+                forge_root=str(project),
+                write_manifest=_fail_first,
+            )
+
+        assert not SessionStore(str(project), "interrupted").exists()
+        assert index.read().sessions == {}, "nothing landed, so nothing may be left published"
+
+
+class TestCompensationFailure:
+    """Compensation must not replace the error it is unwinding."""
+
+    def test_a_failed_compensation_write_preserves_the_callback_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project = _project(tmp_path)
+        index = IndexStore()
+        real_write = IndexStore.write
+        seen: list[int] = []
+
+        def _flaky_write(self: IndexStore, payload: object) -> None:
+            seen.append(1)
+            if len(seen) == 2:  # the compensation write
+                raise OSError("disk full during compensation")
+            real_write(self, payload)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(IndexStore, "write", _flaky_write)
+
+        def _fail() -> None:
+            raise SessionExistsError("doomed")
+
+        with pytest.raises(SessionExistsError):
+            index.create_session_txn(
+                _state("doomed", project),
+                str(project),
+                forge_root=str(project),
+                write_manifest=_fail,
+            )
+
+        monkeypatch.undo()
+        assert index.list_sessions() == [], "the row it could not remove is prunable"
+
+
+class TestDeleteCreateCoordination:
+    """Row-without-manifest is also produced by an in-flight delete, not only a crash.
+
+    Review finding: `delete_session` removes the manifest -- or the worktree
+    holding it -- before its row, and the transcript cleanup in between keeps that
+    window open. A concurrent creator reclaims the name and publishes; the deleter
+    must then not remove the replacement's row and manifest.
+    """
+
+    def test_delete_declines_once_a_replacement_owns_the_name(self, tmp_path: Path) -> None:
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
+
+        entry = index.get_session("victim", forge_root=str(project))
+        forge_root = entry.forge_root or entry.worktree_path
+        SessionStore(forge_root, "victim").delete()  # what worktree cleanup does
+        manifest_gone = not SessionStore(forge_root, "victim").exists()
+
+        replacement = manager.start_session(
+            "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
+        )
+
+        proceeded = index.remove_session_if_unclaimed(
+            "victim", forge_root=forge_root, expect_manifest_absent=manifest_gone
+        )
+
+        assert proceeded is False, "the deleter must recognise it no longer owns the name"
+        survivor = SessionStore(forge_root, "victim")
+        assert survivor.exists(), "the replacement's manifest must survive"
+        assert survivor.read().confirmed.claude_session_id == replacement.confirmed.claude_session_id
+        assert index.live_session_exists("victim", forge_root=forge_root), "and its row must survive"
+
+    def test_delete_proceeds_when_nothing_reclaimed_the_name(self, tmp_path: Path) -> None:
+        """Companion: the guard must not block ordinary deletion."""
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("solo", worktree_path=str(project), direct=True)
+
+        entry = index.get_session("solo", forge_root=str(project))
+        forge_root = entry.forge_root or entry.worktree_path
+        SessionStore(forge_root, "solo").delete()
+
+        assert index.remove_session_if_unclaimed("solo", forge_root=forge_root, expect_manifest_absent=True) is True
+        assert index.read().sessions == {}
+
+    def test_ordinary_delete_with_its_manifest_still_present_proceeds(self, tmp_path: Path) -> None:
+        """Non-worktree deletion never opens the window, so the guard is inert."""
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("plain", worktree_path=str(project), direct=True)
+
+        manager.delete_session("plain", forge_root=str(project), delete_worktree=False)
+
+        assert index.read().sessions == {}
+        assert not SessionStore(str(project), "plain").exists()
+
+    def test_delete_session_spares_a_session_published_during_its_cleanup(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """End-to-end through `delete_session`, with the real early-removal path.
+
+        `cleanup_worktree` is stubbed to do what it does to a nested project --
+        take the manifest with the worktree -- and then a replacement is published
+        while the delete is still in its transcript phase.
+        """
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("victim", worktree_path=str(project), direct=True, claude_session_id="o" * 8)
+
+        # Mark the session as owning a worktree so delete_session takes the cleanup arm.
+        store = SessionStore(str(project), "victim")
+        state = store.read()
+        assert state.worktree is not None
+        state.worktree.is_worktree = True
+        store.write(state)
+
+        published: dict[str, str] = {}
+
+        class _Result:
+            errors: list[str] = []
+
+        def _cleanup_takes_the_manifest(**kwargs: object) -> _Result:
+            SessionStore(str(project), "victim").delete()
+            return _Result()
+
+        def _publish_during_transcript_phase(*args: object, **kwargs: object) -> list[str]:
+            # Stands in for the slow transcript work that keeps the window open.
+            if "uuid" not in published:
+                replacement = manager.start_session(
+                    "victim", worktree_path=str(project), direct=True, claude_session_id="n" * 8
+                )
+                published["uuid"] = replacement.confirmed.claude_session_id or ""
+            return []
+
+        monkeypatch.setattr("forge.session.worktree.cleanup_worktree", _cleanup_takes_the_manifest)
+        monkeypatch.setattr(SessionManager, "_find_shared_transcript_sessions", _publish_during_transcript_phase)
+
+        manager.delete_session("victim", forge_root=str(project), force=True)
+
+        assert published.get("uuid") == "n" * 8, "the replacement must actually have been published"
+        survivor = SessionStore(str(project), "victim")
+        assert survivor.exists(), "delete_session must not remove the replacement's manifest"
+        assert survivor.read().confirmed.claude_session_id == "n" * 8
+        assert index.live_session_exists("victim", forge_root=str(project)), "nor its row"
+
+
+class TestConcurrentCreate:
+    """Two real creators racing one name, gated on a barrier."""
+
+    def test_barrier_gated_double_create_has_one_winner_and_no_orphan(self, tmp_path: Path) -> None:
+        project = _project(tmp_path)
+        barrier = threading.Barrier(2)
+        results: list[tuple[str, object]] = []
+        lock = threading.Lock()
+
+        def _create(uuid: str) -> None:
+            manager = SessionManager()  # separate stores, as separate processes would have
+            barrier.wait(timeout=10)
+            try:
+                manager.start_session("contested", worktree_path=str(project), direct=True, claude_session_id=uuid)
+                outcome: tuple[str, object] = ("won", uuid)
+            except SessionExistsError as e:
+                outcome = ("lost", e)
+            except BaseException as e:  # surface anything unexpected in the assertions
+                outcome = ("error", e)
+            with lock:
+                results.append(outcome)
+
+        threads = [threading.Thread(target=_create, args=("a" * 8,)), threading.Thread(target=_create, args=("b" * 8,))]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+        outcomes = sorted(kind for kind, _ in results)
+        assert outcomes == ["lost", "won"], f"expected exactly one winner, got {results}"
+
+        index = IndexStore()
+        store = SessionStore(str(project), "contested")
+        assert store.exists(), "the winner's manifest must be on disk"
+        assert len(index.read().sessions) == 1, "and exactly one row must be published"
+        winner_uuid = next(uuid for kind, uuid in results if kind == "won")
+        assert store.read().confirmed.claude_session_id == winner_uuid, "the loser must not have clobbered it"
+        assert index.live_session_exists("contested", forge_root=str(project))
 
 
 class TestExplicitRetryPerPath:

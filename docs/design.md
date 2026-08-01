@@ -227,11 +227,25 @@ Row-first makes the crash residue prunable rather than durable:
 | after the manifest write | both present           | none needed                                                         |
 
 Creation can no longer produce a manifest with no index row. A residue row is not a name reservation: the next same-name
-transaction sees row-present + manifest-absent while holding the lock every creator must hold to publish one, prunes it,
-and proceeds -- so a direct retry succeeds with no intervening `session list` or `session delete`. Creation pre-checks
-use `live_session_exists` (row **and** manifest) so they fail fast on a real collision without rejecting a residue;
-`_name_is_taken` keeps the cheaper row-only check, where skipping a residue name costs an auto-name suffix rather than
-an error.
+transaction sees row-present + manifest-absent, prunes it, and proceeds -- so a direct retry succeeds with no
+intervening `session list` or `session delete`. Creation pre-checks use `live_session_exists` (row **and** manifest) so
+they fail fast on a real collision without rejecting a residue; `_name_is_taken` keeps the cheaper row-only check, where
+skipping a residue name costs an auto-name suffix rather than an error.
+
+**Deletion is the other producer of row-without-manifest, and is coordinated with creation.** `delete_session` removes
+the manifest -- or the worktree containing it, for a nested project -- before it removes the row, and its transcript
+phase runs in between, so the name reads as residue for as long as that takes. A concurrent creation may therefore
+reclaim the name and publish a whole new session mid-delete; that is allowed, since the session being deleted is on its
+way out. What must not happen is the delete then removing the replacement's row and manifest, so its terminal removal
+goes through `IndexStore.remove_session_if_unclaimed`, which declines under the index lock when a manifest exists at a
+name whose manifest that delete had already destroyed. The "already destroyed" flag is sampled before the transcript
+phase, not at the removal; timestamps cannot substitute for it, because `now_iso` has second granularity and a
+same-second replacement is indistinguishable by `created_at`.
+
+An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
+`os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably
+not there. Compensation itself never raises: it is unwinding the callback's exception, which the caller must receive
+unchanged, and a row it fails to remove is prunable.
 
 Locked readers never observe the in-flight state -- `list_sessions` and `get_session` take the index lock -- and their
 unlocked filesystem probes are safe because every prune delete is re-verified under a re-acquired lock, which spares a
