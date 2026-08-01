@@ -293,9 +293,11 @@ findings F1 (four pre-check sites, not one), F2 (`collect_bound_codex_threads` n
 ## Closeout
 
 - [ ] Final checklist items ticked with verification recorded.
-- [ ] Compact `docs/board/change_log.md` entry (Goal / Key changes / Verification).
+- [x] Compact `docs/board/change_log.md` entry added under 2026-08-01 (Goal / Key changes / Verification, including the
+  review-round record).
 - [ ] Propose durable lessons via `.forge/memory/shadow_impl_notes.md`; human review promotes to
   `docs/board/impl_notes.md`.
-- [ ] Verify design.md §3.2 and `session/__init__.py` reflect shipped behavior.
+- [x] design.md §3.2 and `session/__init__.py` verified against shipped behavior: transaction ordering, the two
+  reservations, the crash-residue table, delete coordination, and the adoption paragraph's stale manifest-first claim.
 - [ ] Move the card `doing/ -> done/`; repoint inbound links, including a forward link from the
   `native_session_adoption` done checklist's open-debt note to this card's done path.
