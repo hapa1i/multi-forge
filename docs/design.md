@@ -237,10 +237,14 @@ the manifest -- or the worktree containing it, for a nested project -- before it
 phase runs in between, so the name reads as residue for as long as that takes. A concurrent creation may therefore
 reclaim the name and publish a whole new session mid-delete; that is allowed, since the session being deleted is on its
 way out. What must not happen is the delete then removing the replacement's row and manifest, so its terminal removal
-goes through `IndexStore.remove_session_if_unclaimed`, which declines under the index lock when a manifest exists at a
-name whose manifest that delete had already destroyed. The "already destroyed" flag is sampled before the transcript
-phase, not at the removal; timestamps cannot substitute for it, because `now_iso` has second granularity and a
-same-second replacement is indistinguishable by `created_at`.
+goes through `IndexStore.delete_session_txn`, which removes the row **and** runs the manifest delete inside one index-
+lock acquisition, and declines outright when a manifest exists at a name whose manifest that delete had already
+destroyed. Verifying ownership and then deleting outside the lock would let a replacement land in between. The "already
+destroyed" fact is derived from what the delete did -- the manifest was absent when it started, or it lives inside the
+worktree being removed -- never from a probe taken later, which may already be looking at the replacement. Timestamps
+cannot substitute either: `now_iso` has second granularity, so a same-second replacement is indistinguishable by
+`created_at`. `fork --force` frees a stale target the same way and so declines the same way, raising
+`SessionExistsError` rather than replacing a session that claimed the name during its cleanup.
 
 An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
 `os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably

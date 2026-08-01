@@ -443,8 +443,8 @@ class IndexStore:
                 # the name is right for both: the residue reserves nothing, and the
                 # session being deleted is on its way out. What makes it safe is not
                 # an assumption that only crashes get here, but that the delete side
-                # ends in remove_session_if_unclaimed, which declines once a
-                # replacement owns the name and so cannot take this one with it.
+                # ends in delete_session_txn, which declines once a replacement owns
+                # the name and so cannot take this one with it.
                 # Deliberately narrower than the list_sessions prune, which also
                 # drops rows whose worktree vanished: the manifest is the durable
                 # reservation, so a live manifest must still collide here.
@@ -628,6 +628,17 @@ class IndexStore:
         caller's own. Timestamps cannot substitute -- ``now_iso`` has second
         granularity, so a replacement created in the same second is
         indistinguishable by ``created_at``.
+
+        **Known residual: a second concurrent delete of the same name.** False
+        disables the ownership check entirely, which is right for a delete whose
+        manifest is still its own -- it never opened a window, so no creator could
+        have reclaimed the name. It is wrong when *another* delete of the same name
+        opened one: the second deleter sampled its flag while the manifest was
+        still present, so it arrives with False and removes a replacement's row and
+        manifest. Closing this needs a per-session identity the deleter can carry
+        into the lock and compare, which the row does not have today -- see
+        ``docs/board/proposed/session_delete_generation_token``. Reaching it takes
+        two concurrent deletes of one name plus a recreate landing between them.
 
         Args:
             name: Session display name.

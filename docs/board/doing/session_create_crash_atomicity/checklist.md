@@ -149,6 +149,32 @@ recorded below are what shipped.
   worktree live outside it and worktree cleanup runs before the lock is taken. Pinned in the `delete_session_txn`
   docstring so a future writer does not start stashing bulk under the session directory.
 
+### PR review findings (2026-08-01, PR #118)
+
+- **Stale `remove_session_if_unclaimed` symbol (fixed).** F9 renamed the delete-side transaction to
+  `delete_session_txn`, but two live references kept the old name: `docs/design.md` (normative architecture naming a
+  method that does not exist) and the `index.py` comment carrying the reclaim-safety rationale -- the one a future
+  reader greps when auditing why residue may be pruned. Both repointed; the design.md paragraph was also stale on *how*
+  the flag is derived (it said "sampled before the transcript phase") and now describes the shipped two-part derivation
+  and the `fork --force` arm. Card and checklist mentions are historical narrative and stay.
+- **Residual: a second concurrent delete of the same name (documented, filed).** `expect_manifest_absent=False` disables
+  the ownership check, which is right for a delete whose manifest is still its own -- it never opened a window -- but
+  wrong when *another* delete of the same name opened one. The second deleter sampled its flag while the manifest was
+  present, so it arrives with False and removes a replacement's row and manifest. Reproduced: `still_ours=True`,
+  replacement destroyed. Not fixed here: closing it needs a per-session identity the deleter can carry into the lock,
+  which is a durable-state schema change, and a partial discriminator (conversation ids are `None` for a fresh
+  replacement) would leave the residual harder to reason about rather than smaller. Named in `delete_session_txn`'s
+  docstring and filed as
+  [`proposed/session_delete_generation_token`](../../proposed/session_delete_generation_token/card.md) with the
+  mechanisms and their trade-offs.
+- **One-sided resolve in the containment fact -- premise checked, does not hold.** The concern was that
+  `store.manifest_path.is_relative_to(worktree_path.resolve())` resolves only the worktree side, so a symlinked spelling
+  would read as not-contained and silently disable the ownership check. `SessionStore.__init__` resolves its
+  `forge_root` (`store.py:146`), so the manifest side is already resolved. Verified across four spellings -- both roots
+  through the symlink, each side mixed, and a `/tmp -> /private/tmp` prefix -- all read `is_relative_to = True`. No code
+  change, but the reviewer's point about the assumption being invisible at the call site stands: the invariant is now
+  stated where the fact is computed, so nobody removes the one `resolve()` that is doing work.
+
 ### Decisions
 
 - **D1 -- transaction API shape.** Callback form on `IndexStore`:

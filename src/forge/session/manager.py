@@ -1954,6 +1954,12 @@ class SessionManager:
             # the manifest lives inside the worktree, so cleanup takes it too. This
             # is a fact about what this delete does, which is why it is safe where
             # a later store.exists() probe is not.
+            #
+            # is_relative_to is lexical, so both sides must be resolved or a
+            # symlinked spelling of either root reads as "not contained" and
+            # silently disables the ownership check below. The left side is
+            # resolved by SessionStore, which resolves its forge_root (store.py);
+            # the right side is resolved here. Do not drop either.
             _manifest_destroyed_by_cleanup = store.manifest_path.is_relative_to(worktree_path.resolve())
 
             cleanup_result = cleanup_worktree(
