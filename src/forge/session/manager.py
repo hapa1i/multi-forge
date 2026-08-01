@@ -1600,9 +1600,30 @@ class SessionManager:
                 except SessionNotFoundError:
                     pass
 
+                # delete_session has already removed the stale target's row and
+                # manifest, so anything still here is either a pre-existing orphan
+                # (no row) or a session that claimed the freed name in the
+                # meantime. Deleting unconditionally destroys the latter, which is
+                # the F9 failure via fork: expect_manifest_absent=True makes a
+                # rowed manifest foreign, and the delete happens under the index
+                # lock rather than after an exists() probe.
                 stale_store = SessionStore(effective_fork_root, fork_name)
-                if stale_store.exists():
+
+                def _delete_stale_manifest() -> None:
                     stale_store.delete()
+
+                reclaimed = not self.index_store.delete_session_txn(
+                    fork_name,
+                    forge_root=effective_fork_root,
+                    expect_manifest_absent=True,
+                    delete_manifest=_delete_stale_manifest,
+                )
+                if reclaimed:
+                    logger.info(
+                        "Not replacing fork target '%s': another session claimed the name during cleanup",
+                        fork_name,
+                    )
+                    raise SessionExistsError(fork_name)
 
                 try:
                     from .active import ActiveSessionStore

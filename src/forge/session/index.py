@@ -636,7 +636,12 @@ class IndexStore:
                 manifest, or there never was one -- so a manifest present now can
                 only belong to a creator that reclaimed the name.
             delete_manifest: Removes the manifest. Runs inside the lock, after the
-                row is gone. Keep it to that: this is the global index lock.
+                row is gone. Keep it to that: this is the global index lock. The
+                session directory is bounded and small -- manifest, its lock, and
+                up to three codex handoff files -- so removing it measures in the
+                same fraction of a millisecond as the manifest write creation
+                holds the lock for. Transcripts (``.forge/artifacts/``), the search
+                index, and the worktree all live outside it and must stay outside.
 
         Returns:
             True if the caller still owned the name; the row and manifest are gone.

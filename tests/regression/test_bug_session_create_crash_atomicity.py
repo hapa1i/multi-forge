@@ -25,7 +25,7 @@ import subprocess
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import pytest
 
@@ -62,6 +62,17 @@ def _state(name: str, project: Path) -> SessionState:
     state = create_session_state(name, worktree_path=str(project))
     state.forge_root = str(project)
     return state
+
+
+def _mark(store: SessionStore, uuid: str) -> None:
+    """Tag a manifest so a replacement is distinguishable from it.
+
+    `created_at` cannot serve: `now_iso` has second granularity, so two sessions
+    minted in the same second have byte-identical manifests.
+    """
+    state = store.read()
+    state.confirmed.claude_session_id = uuid
+    store.write(state)
 
 
 def _seed_residue(index: IndexStore, state: SessionState, project: Path) -> None:
@@ -802,6 +813,83 @@ class TestDeleteCreateCoordination:
         assert survivor.exists(), "the replacement's manifest must survive"
         assert survivor.read().confirmed.claude_session_id == "n" * 8
         assert index.live_session_exists("victim", forge_root=str(project)), "and its row"
+
+
+class TestForkStaleTargetReplacement:
+    """`fork --force` reaches the same delete/create window through its own path.
+
+    Review finding: after `delete_session` frees the stale target, fork cleared
+    whatever manifest was left at the name with an unconditional
+    `stale_store.delete()`. A creator that claimed the freed name in between lost
+    its manifest, and fork's own transaction then read the survivor's row as crash
+    residue, pruned it, and published over it -- fork silently destroying a live
+    session and taking its name.
+    """
+
+    def test_fork_declines_when_a_replacement_claims_the_freed_name(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("parent", worktree_path=str(project), direct=True)
+        manager.fork_session("parent", "target")
+
+        published: dict[str, str] = {}
+        real_delete = SessionManager.delete_session
+
+        def _publish_after_the_stale_delete(inner: SessionManager, name: str, **kwargs: Any) -> object:
+            result = real_delete(inner, name, **kwargs)
+            if name == "target" and "uuid" not in published:
+                replacement = SessionManager(index_store=index).start_session(
+                    "target", worktree_path=str(project), direct=True, claude_session_id="n" * 8
+                )
+                published["uuid"] = replacement.confirmed.claude_session_id or ""
+            return result
+
+        monkeypatch.setattr(SessionManager, "delete_session", _publish_after_the_stale_delete)
+
+        with pytest.raises(SessionExistsError):
+            manager.fork_session("parent", "target", force=True)
+
+        assert published.get("uuid") == "n" * 8, "the replacement must actually have been published"
+        survivor = SessionStore(str(project), "target")
+        assert survivor.exists(), "fork must not destroy the replacement's manifest"
+        assert survivor.read().confirmed.claude_session_id == "n" * 8
+        assert index.live_session_exists("target", forge_root=str(project)), "nor prune its row"
+
+    def test_fork_force_still_replaces_an_ordinary_stale_target(self, tmp_path: Path) -> None:
+        """Companion: with nobody racing, `--force` must still swap the target."""
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("parent", worktree_path=str(project), direct=True)
+        manager.fork_session("parent", "target")
+        _mark(SessionStore(str(project), "target"), "s" * 8)
+
+        manager.fork_session("parent", "target", force=True)
+
+        replaced = SessionStore(str(project), "target")
+        assert replaced.exists()
+        assert replaced.read().confirmed.claude_session_id != "s" * 8, "the stale target must be gone"
+        assert index.live_session_exists("target", forge_root=str(project))
+
+    def test_fork_force_still_clears_a_pre_existing_orphan_manifest(self, tmp_path: Path) -> None:
+        """A manifest with no row predates the window and stays fork's to clear."""
+        project = _project(tmp_path)
+        index = IndexStore()
+        manager = SessionManager(index_store=index)
+        manager.start_session("parent", worktree_path=str(project), direct=True)
+        manager.fork_session("parent", "target")
+        _mark(SessionStore(str(project), "target"), "o" * 8)
+        index.remove_session("target", forge_root=str(project))
+
+        manager.fork_session("parent", "target", force=True)
+
+        replaced = SessionStore(str(project), "target")
+        assert replaced.exists()
+        assert replaced.read().confirmed.claude_session_id != "o" * 8, "the orphan must be reclaimed"
+        assert index.live_session_exists("target", forge_root=str(project))
 
 
 class TestConcurrentCreate:
