@@ -538,7 +538,11 @@ class SessionManager:
         _early_forge_root = find_forge_root(_early_search)
         _early_fr_str = str(_early_forge_root) if _early_forge_root else None
 
-        if self.index_store.session_exists(name, forge_root=_early_fr_str):
+        # live_session_exists, not session_exists: a bare row is crash residue that
+        # create_session_txn prunes and reuses, so rejecting on it would refuse a
+        # direct retry. This check only fails fast before worktree creation; the
+        # transaction is what actually decides the name.
+        if self.index_store.live_session_exists(name, forge_root=_early_fr_str):
             raise SessionExistsError(name)
 
         created_worktree = False
@@ -720,50 +724,30 @@ class SessionManager:
         # Commit phase: write Forge state only after external worktree creation succeeded.
         store = SessionStore(forge_root_str, name)
 
-        wrote_manifest = False
-        added_to_index = False
-
         try:
-            # create_exclusive, not write: the session_exists checks above run
-            # outside any lock, so two concurrent creates of one name both reach
-            # here. The loser must fail without touching the winner's manifest,
-            # and wrote_manifest must mean "this call owns it" for the rollback
-            # below to be safe.
-            store.create_exclusive(state)
-            wrote_manifest = True
-
-            self.index_store.add_from_state(
+            # One transaction, row then manifest, under the index lock. The
+            # live_session_exists check above runs outside any lock, so two
+            # concurrent creates of one name both reach here; the transaction
+            # picks the winner and the loser gets SessionExistsError without
+            # touching the winner's state.
+            self.index_store.create_session_txn(
                 state,
                 str(project_root),
                 checkout_root=checkout_root_str,
                 forge_root=forge_root_str,
                 relative_path=relative_path_str,
                 require_uuid_unbound=require_uuid_unbound,
+                write_manifest=lambda: store.create_exclusive(state),
             )
-            added_to_index = True
 
             return state
 
         except Exception:
-            # Best-effort rollback for partial state.
-            try:
-                if added_to_index:
-                    # Scoped: an unscoped remove resolves by name across projects,
-                    # so a same-named session elsewhere makes this either ambiguous
-                    # or a delete of the wrong project's entry.
-                    self.index_store.remove_session(name, forge_root=forge_root_str)
-            except Exception as rollback_err:
-                logger.warning("Rollback failed (index entry): %s", rollback_err)
-
-            try:
-                # wrote_manifest is an ownership token (create_exclusive succeeded),
-                # so this can never delete a manifest another create owns.
-                if wrote_manifest and store.exists():
-                    store.delete()
-            except Exception as rollback_err:
-                logger.warning("Rollback failed (manifest delete): %s", rollback_err)
-
-            # If we created a worktree, remove it (and branch) best-effort.
+            # Only the worktree is left to unwind. The manifest write is the last
+            # durable action in the transaction, so it either succeeded (and this
+            # block never runs) or never happened; and the transaction removes its
+            # own row before re-raising. Adding work after the transaction would
+            # reintroduce the need for a manifest rollback here.
             _rollback_worktree(resolved_worktree_path=worktree_path)
 
             raise
@@ -828,7 +812,9 @@ class SessionManager:
 
         assert child_name is not None  # narrowing: either provided or generated
 
-        if self.index_store.session_exists(child_name, forge_root=parent_forge_root):
+        # See start_session: row-only residue must reach the transaction, not be
+        # rejected here.
+        if self.index_store.live_session_exists(child_name, forge_root=parent_forge_root):
             raise SessionExistsError(child_name)
 
         project_root = Path(self.resolve_project_root(parent_entry.worktree_path))
@@ -1042,31 +1028,20 @@ class SessionManager:
         for attempt in range(2):
             child_store = SessionStore(parent_forge_root, child_name)
             try:
-                # Claim the name by creating its manifest. With a deterministic auto-name
-                # (<parent>-resumed), a concurrent resume can be racing for the same one;
-                # create_exclusive makes the winner's manifest unclobberable and tells this
-                # loser it never owned the name. Earlier this reserved the index row first,
-                # but list_sessions prunes index rows whose manifest is missing, so that
-                # reservation could be pruned out from under its own creator.
-                child_store.create_exclusive(child_state)
-
-                # Publish it. Both claims can report the collision -- the manifest here,
-                # the index inside add_session's lock -- so both must feed one retry.
-                try:
-                    self.index_store.add_from_state(
-                        child_state,
-                        str(project_root),
-                        checkout_root=parent_entry.checkout_root,
-                        forge_root=parent_entry.forge_root,
-                        relative_path=parent_entry.relative_path,
-                    )
-                except Exception:
-                    # Safe to unwind precisely because create_exclusive proved we own it.
-                    try:
-                        child_store.delete()
-                    except Exception as rollback_err:
-                        logger.warning("Rollback failed (child manifest '%s'): %s", child_name, rollback_err)
-                    raise
+                # Claim and publish under one index lock, row then manifest. With a
+                # deterministic auto-name (<parent>-resumed), a concurrent resume can be
+                # racing for the same one; the transaction picks the winner and tells this
+                # loser it never owned the name. Both claims can still report the collision
+                # -- the index row check and create_exclusive -- and both surface as
+                # SessionExistsError, so both feed the one retry below.
+                self.index_store.create_session_txn(
+                    child_state,
+                    str(project_root),
+                    checkout_root=parent_entry.checkout_root,
+                    forge_root=parent_entry.forge_root,
+                    relative_path=parent_entry.relative_path,
+                    write_manifest=lambda: child_store.create_exclusive(child_state),
+                )
             except SessionExistsError:
                 # Only the curated transfer snapshot (children/<child>.md, written by
                 # assemble_transfer_context before this call) may be an orphan to reclaim,
@@ -1074,7 +1049,9 @@ class SessionManager:
                 if not name_was_auto or attempt > 0:
                     raise
 
-                winner_owns = child_store.exists() or self.index_store.session_exists(
+                # live_session_exists: a bare row is residue, not a live owner, and
+                # treating it as one would suppress the snapshot reclaim below.
+                winner_owns = child_store.exists() or self.index_store.live_session_exists(
                     child_name, forge_root=parent_entry.forge_root
                 )
                 derivation = child_state.confirmed.derivation
@@ -1549,43 +1526,61 @@ class SessionManager:
         fork_store = SessionStore(fork_forge_root or fork_worktree_path, fork_name)
         restore_target_state = replace_stale_target_state and not create_worktree
         replaced_target_state = False
-        wrote_manifest = False
-        added_to_index = False
 
         def _restore_previous_target_state() -> None:
             if not restore_target_state or not replaced_target_state or target_store is None or target_state is None:
                 return
 
-            # Only restore over a path this fork owned. Between deleting the stale
-            # target and claiming the name, another creator can win it; without
-            # this guard the restore would write the stale manifest over that
-            # winner's. wrote_manifest is the ownership token create_exclusive
-            # produced, and the rollback above has already removed our own copy.
-            if not wrote_manifest or target_store.exists():
+            # Bound before the closure below: narrowing from the guard above does
+            # not reach into a lambda over enclosing-scope names.
+            restore_store, restore_state = target_store, target_state
+
+            # create_exclusive, not write: a manifest sitting at this path is not
+            # the one this fork deleted -- it belongs to whoever claimed the name
+            # in the window -- and putting the stale target back over it is the bug
+            # test_bug_fork_restore_clobbers_winner guards. The old code spelled
+            # this as an unlocked `target_store.exists()` probe guarding a `write`,
+            # which meant the write never actually overwrote anything;
+            # create_exclusive makes that same decision under the manifest lock.
+            def _restore_manifest() -> None:
+                restore_store.create_exclusive(restore_state)
+
+            def _log_declined() -> None:
                 logger.info(
-                    "Not restoring the previous fork target '%s': this fork never owned that manifest",
+                    "Not restoring the previous fork target '%s': another session owns that name now",
                     fork_name,
                 )
-                return
-
-            try:
-                target_store.write(target_state)
-            except Exception as e:
-                logger.warning("Failed to restore fork target manifest '%s': %s", fork_name, e)
 
             if target_entry is None:
+                # The replaced target was itself a manifest with no index row. Put
+                # it back as it was: a failed fork must not double as a cleanup of
+                # state the user never asked us to touch.
+                try:
+                    _restore_manifest()
+                except SessionExistsError:
+                    _log_declined()
+                except Exception as e:
+                    logger.warning("Failed to restore fork target manifest '%s': %s", fork_name, e)
                 return
 
+            # Restore through the transaction, so its uniqueness check is what
+            # decides whether another creator won the name while this fork held it.
+            # Before the two writes shared a lock this was a `wrote_manifest` token;
+            # that no longer distinguishes "someone else owns the name" from "the
+            # index write failed", because the manifest is now written second.
             try:
-                self.index_store.add_from_state(
-                    target_state,
+                self.index_store.create_session_txn(
+                    restore_state,
                     target_entry.project_root,
                     checkout_root=target_entry.checkout_root,
                     forge_root=target_entry.forge_root,
                     relative_path=target_entry.relative_path,
+                    write_manifest=_restore_manifest,
                 )
+            except SessionExistsError:
+                _log_declined()
             except Exception as e:
-                logger.warning("Failed to restore fork target index entry '%s': %s", fork_name, e)
+                logger.warning("Failed to restore fork target '%s': %s", fork_name, e)
 
         try:
             # Stale session cleanup: only clear the actual target namespace after
@@ -1617,41 +1612,28 @@ class SessionManager:
 
                 replaced_target_state = True
 
-            # Both branches reach here with no manifest: a stale target was just
-            # deleted above, and a fresh fork_name has none. create_exclusive keeps
-            # that true under concurrency and makes wrote_manifest an ownership
-            # token for the rollback path. (_restore_previous_target_state below
-            # keeps using write -- restoring a prior manifest is a real overwrite.)
-            fork_store.create_exclusive(fork_state)
-            wrote_manifest = True
-
             if warnings_sink is not None:
                 warnings_sink.extend(inh_warnings)
 
-            self.index_store.add_from_state(
+            # Both branches reach here with no manifest: a stale target was just
+            # deleted above, and a fresh fork_name has none. create_exclusive keeps
+            # that true under concurrency, and the transaction's row check makes
+            # the loser fail before it can touch the winner's manifest.
+            self.index_store.create_session_txn(
                 fork_state,
                 project_root,
                 checkout_root=fork_checkout_root,
                 forge_root=fork_forge_root,
                 relative_path=fork_relative_path,
+                write_manifest=lambda: fork_store.create_exclusive(fork_state),
             )
-            added_to_index = True
 
             return parent, fork_state
 
         except Exception:
-            try:
-                if added_to_index:
-                    self.index_store.remove_session(fork_name, forge_root=fork_forge_root)
-            except Exception as rollback_err:
-                logger.warning("Fork rollback failed (index entry): %s", rollback_err)
-
-            try:
-                if wrote_manifest and fork_store.exists():
-                    fork_store.delete()
-            except Exception as rollback_err:
-                logger.warning("Fork rollback failed (manifest delete): %s", rollback_err)
-
+            # No index or manifest cleanup: the transaction removes its own row and
+            # the manifest write is its last durable action, so a failure here means
+            # neither survived.
             if create_worktree:
                 _rollback_created_worktree()
             else:
@@ -1693,7 +1675,9 @@ class SessionManager:
         if child_name is None:
             child_name = self._generate_relaunch_name(parent_name, forge_root=parent_forge_root)
 
-        if self.index_store.session_exists(child_name, forge_root=parent_forge_root):
+        # See start_session: row-only residue must reach the transaction, not be
+        # rejected here.
+        if self.index_store.live_session_exists(child_name, forge_root=parent_forge_root):
             raise SessionExistsError(child_name)
 
         parent_worktree_path = parent_entry.worktree_path
@@ -1720,21 +1704,16 @@ class SessionManager:
         child_state.forge_root = parent_entry.forge_root or parent.forge_root
 
         child_store = SessionStore(parent_entry.forge_root or parent_worktree_path, child_name)
-        child_store.create_exclusive(child_state)
-        try:
-            self.index_store.add_from_state(
-                child_state,
-                project_root,
-                checkout_root=parent_entry.checkout_root,
-                forge_root=parent_entry.forge_root,
-                relative_path=parent_entry.relative_path,
-            )
-        except Exception:
-            try:
-                child_store.delete()
-            except Exception as rollback_err:
-                logger.warning("Rollback failed (relaunch manifest '%s'): %s", child_name, rollback_err)
-            raise
+        # No rollback block: the transaction removes its own row, and the manifest
+        # write is its last durable action, so a failure leaves neither behind.
+        self.index_store.create_session_txn(
+            child_state,
+            project_root,
+            checkout_root=parent_entry.checkout_root,
+            forge_root=parent_entry.forge_root,
+            relative_path=parent_entry.relative_path,
+            write_manifest=lambda: child_store.create_exclusive(child_state),
+        )
 
         return parent, child_state
 

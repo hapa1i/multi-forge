@@ -2,8 +2,8 @@
 
 **Card**: [card.md](card.md). Branch: `fix/session-create-crash-atomicity`.
 
-**Current focus**: Phase 1 -- transaction primitive. Phase 0 is complete; its audits and the D1/D2/D3 decisions are
-recorded below and are binding on Phases 1-2.
+**Current focus**: closeout. Phases 0-4 are complete except the adversarial review round; the D1/D2/D3 decisions and the
+F1-F4 findings recorded below are what shipped.
 
 ## Phase 0 -- Ground and ratify (complete 2026-08-01)
 
@@ -101,9 +101,16 @@ recorded below and are binding on Phases 1-2.
   the transaction. Rationale: its crash window is identical, and the guard it relies on today (`:1564`
   `not wrote_manifest or target_store.exists()`) is an unlocked TOCTOU probe that the index lock enforces properly -- if
   a new creator won the name, the transaction's own uniqueness check raises and the restore declines, which is the
-  existing intent made atomic. The callback keeps `write` (the card's deliberate-overwrite reading) rather than
-  `create_exclusive`, so the conversion cannot change restore semantics; D1's opaque-callable shape admits it. The site
-  stays best-effort: wrap the transaction call and log a warning on failure, matching `:1574`/`:1588`.
+  existing intent made atomic. The site stays best-effort: wrap the transaction call and log a warning on failure,
+  matching `:1574`/`:1588`.
+
+  - **Corrected during Phase 2 (F4).** D2 originally kept `write` in the callback, reasoning that a concurrent creator
+    must publish its row first and so cannot own an unrowed manifest. `test_bug_fork_restore_clobbers_winner` disproved
+    it: the winner it models writes a manifest only, and with `write` the restore put the stale target straight over it.
+    The callback uses `create_exclusive`. That is not a semantic change -- the old `:1564` guard returned early whenever
+    `target_store.exists()`, so the `write` never actually overwrote anything; `create_exclusive` makes the same
+    decision under the manifest lock instead of an unlocked probe. The `target_entry is None` branch (a replaced target
+    that was itself an orphan manifest) restores the manifest alone and declines the same way.
 
 - **D3 -- existing-orphan repair: split (ratified).** Confirmed by `index.py:503`'s own docstring: `add_from_state`
   cannot derive `project_root` / `checkout_root` / `relative_path` from a `SessionState`, so repair owes an identity-
@@ -112,7 +119,7 @@ recorded below and are binding on Phases 1-2.
 
 ## Phase 1 -- Transaction primitive (`IndexStore`)
 
-- [ ] Implement the transaction: lock -> uniqueness checks -> row write -> manifest callback -> in-lock compensation on
+- [x] Implement the transaction: lock -> uniqueness checks -> row write -> manifest callback -> in-lock compensation on
   callback failure. Assertions:
   - a callback failure (injected `SessionExistsError` from a pre-existing orphan manifest) leaves no index row and
     re-raises the callback's exception unchanged;
@@ -121,47 +128,47 @@ recorded below and are binding on Phases 1-2.
   - index-side `SessionExistsError` and `UuidAlreadyBoundError` raise before the manifest callback ever runs;
   - stale-row self-heal (card's retry contract): row present + manifest absent under the held lock is pruned and
     creation proceeds.
-- [ ] Crash-residue family, kept distinct from compensation: seed a row-without-manifest residue (write the row, skip
+- [x] Crash-residue family, kept distinct from compensation: seed a row-without-manifest residue (write the row, skip
   the callback, release via a test seam). This is the accepted crash model -- an injected exception exercises
   compensation, which a killed process bypasses, so both families are required and neither substitutes for the other.
   Assertions: `list_sessions` and `get_session` each prune the residue; a direct same-name `start_session` retry
   succeeds with no intervening `session list` or `session delete`.
-- [ ] Stale-snapshot pruner spares a republished row: a pruner that flagged name K from a pre-transaction snapshot must
+- [x] Stale-snapshot pruner spares a republished row: a pruner that flagged name K from a pre-transaction snapshot must
   re-verify under the re-acquired lock (`list_sessions` prune pass, `get_session` phase 3) and spare K once a new
   transaction has published row + manifest. Assertions: with the under-lock re-check bypassed the test fails (proves the
   guard is load-bearing); locked readers block for the duration of the transaction and never observe
   row-without-manifest.
-- [ ] `IndexStore.live_session_exists(name, forge_root)` (per D1/F1): row **and** manifest present, strict resolution
+- [x] `IndexStore.live_session_exists(name, forge_root)` (per D1/F1): row **and** manifest present, strict resolution
   like `session_exists`. Assertions: returns False for a seeded row-without-manifest; returns True for a healthy
   session; raises `AmbiguousSessionError` on an unscoped duplicate name exactly as `session_exists` does.
-- [ ] `collect_bound_codex_threads` records `entry.codex_thread_id` from the row before reading the manifest (per F2),
+- [x] `collect_bound_codex_threads` records `entry.codex_thread_id` from the row before reading the manifest (per F2),
   mirroring `collect_bound_uuids:492`. Assertions: a seeded row carrying a `codex_thread_id` with no manifest reports
   the thread as **bound**; `collect_bound_uuids` behavior is unchanged; the fail-closed manifest-read contract still
   raises `BindingLookupError` on an unreadable (as opposed to absent) manifest.
-- [ ] Docstrings: `create_exclusive` (`session/store.py:248`) gains the in-flight-lock clause; the transaction documents
+- [x] Docstrings: `create_exclusive` (`session/store.py:248`) gains the in-flight-lock clause; the transaction documents
   the index -> manifest lock order, the non-reentrancy of `file_lock_for_target` (F3) and the resulting "compensate
   in-memory, never `remove_session`" rule, and the "no work but the two writes inside" constraint.
 
 ## Phase 2 -- Convert the four creation paths
 
-- [ ] `start_session` (`session/manager.py:726-769`): two writes -> transaction; drop the `added_to_index` bookkeeping;
+- [x] `start_session` (`session/manager.py:726-769`): two writes -> transaction; drop the `added_to_index` bookkeeping;
   keep `wrote_manifest` meaningful and `_rollback_worktree` outside the lock. Convert the `:541` pre-check to
   `live_session_exists` (D1/F1). Assertions: `test_bug_start_session_name_race.py` green unchanged; injected kill leaves
   no orphan manifest; a failing index-side check still triggers worktree rollback; a seeded residue does **not** cause
   the pre-check to reject before a worktree is created.
-- [ ] `_persist_resume_child` (`:1051`) and `relaunch_session` (`:1723`): same conversion; relaunch's inline try/except
+- [x] `_persist_resume_child` (`:1051`) and `relaunch_session` (`:1723`): same conversion; relaunch's inline try/except
   rollback collapses into the transaction. Convert the `:831` and `:1696` pre-checks and `:1077`'s `winner_owns` to
   `live_session_exists` (D1/F1) -- without this the direct-retry assertion below cannot pass. Assertion: resume-child
   and relaunch unit suites plus `tests/regression/test_bug_resume_autoname_context_retry.py` green; seeded residue in
   each path leaves no orphan and a direct **explicit-name** retry succeeds; the auto-name retry loop still consumes at
   most one retry (both claims continue to feed one collision path).
-- [ ] `fork_session` (`:1625`): conversion preserving the stale-target replace ordering (delete-then-create sequence
+- [x] `fork_session` (`:1625`): conversion preserving the stale-target replace ordering (delete-then-create sequence
   ahead of the commit) and converting `_restore_previous_target_state` (`:1580`) per D2 -- transaction with a `write`
   callback, still best-effort with a logged warning. Assertion: fork suites,
   `tests/regression/test_bug_fork_restore_clobbers_winner.py`, and the stale `fork --worktree --force` regressions
   green; a mid-commit failure still restores the previous target per the existing contract; a restore that races a new
   owner of the name declines via the transaction's uniqueness check rather than the `:1564` probe.
-- [ ] Adoption arms unchanged at call level (both flow through `start_session` with `require_uuid_unbound=True`).
+- [x] Adoption arms unchanged at call level (both flow through `start_session` with `require_uuid_unbound=True`).
   Assertion: `test_bug_codex_adopt_double_bind.py` and the adopt binding/retention regressions green unchanged.
 
 ## Phase 3 -- Existing-orphan repair (default: split; gated on D3)
@@ -173,16 +180,24 @@ recorded below and are binding on Phases 1-2.
 
 ## Phase 4 -- Docs sync and verification
 
-- [ ] design.md §3.2: rewrite the reservation paragraph (manifest = durable reservation; held index lock = in-flight
-  reservation; the crash-residue table; the direct-retry contract) and drop the "killed between the two leaves a
-  manifest with no index row" clause. Update the `session/__init__.py` docstring example, and the `collect_bound_uuids`
-  / `collect_bound_codex_threads` docstrings, whose orphan-scan rationale ("Session creation writes the manifest first")
-  narrows to pre-existing orphans.
-- [ ] Integration tier (mandatory -- session start/resume/fork touched):
-  `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py`; include the adoption Docker gates
-  (`test_adopt_binding_contract.py`, `test_adopt_native_conversation.py`) if the environment is already warm.
-- [ ] `make test-unit`, `make test-regression`, `make pre-commit`.
-- [ ] One adversarial review round; reproduce every finding before fixing it (house rule for this code area).
+- [x] design.md §3.2 rewritten: creation-is-one-transaction paragraph, the two reservations (durable manifest vs
+  in-flight index lock), the crash-residue table, the direct-retry and pre-check contract, the locked-reader/prune
+  re-check guarantee, and the orphan paragraph narrowed to pre-existing orphans with a pointer to the repair card. The
+  "killed between the two leaves a manifest with no index row" clause is gone. `session/__init__.py`'s example now shows
+  `create_session_txn`; `collect_bound_uuids` / `collect_bound_codex_threads` docstrings updated (the Codex one
+  documents why it reads the row column).
+- [x] Integration tier: `test_session_lifecycle.py` **21 passed**; adoption Docker gates run while warm --
+  `test_adopt_binding_contract.py` + `test_adopt_native_conversation.py` **2 passed**.
+- [x] Unit + regression: `tests/src` + `tests/regression` **9161 passed, 1 skipped** (117 deselected integration).
+  `make pre-commit` clean.
+- [x] Mutation check in place of a blind pass, proving each new guard is load-bearing: reverting the F2 row-column read,
+  the stale-row self-heal, `live_session_exists`, and the in-lock compensation each fails its own tests and nothing
+  else's. Four findings were reproduced before fixing, per the house rule -- three were test-model drift
+  (`test_bug_start_session_name_race` had its stub consumed by a call the new path no longer makes;
+  `test_bug_fork_force_target_recovery` and `test_bug_resume_autoname_context_retry` injected at `add_from_state`, and
+  the latter modelled a "winner" as a row-only write, which is now the residue shape) and one was a real defect in this
+  work (F4, D2's `write` callback -- see the D2 correction).
+- [ ] One adversarial review round (not yet run; the mutation check above is verification, not review).
 
 ## Acceptance tests
 

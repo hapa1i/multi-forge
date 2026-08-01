@@ -248,14 +248,21 @@ class SessionStore:
     def create_exclusive(self, manifest: SessionState) -> None:
         """Write the manifest for a **new** session, failing if one already exists.
 
-        The creation primitive for every path that mints a session. Name
-        uniqueness cannot be established by a pre-check: the global index's
-        authoritative check lives inside its own lock, and `list_sessions` prunes
-        index entries whose manifest is missing, so an index row is not a durable
-        reservation. Testing and writing under this manifest's own lock makes the
-        manifest itself the reservation, and makes `SessionExistsError` mean "the
-        caller does not own this name" rather than "the caller may have clobbered
-        someone else's state".
+        The manifest half of every path that mints a session. Name uniqueness
+        cannot be established by a pre-check: the global index's authoritative
+        check lives inside its own lock, and `list_sessions` prunes index entries
+        whose manifest is missing, so an index row is not a durable reservation.
+        Testing and writing under this manifest's own lock makes the manifest
+        itself the reservation, and makes `SessionExistsError` mean "the caller
+        does not own this name" rather than "the caller may have clobbered someone
+        else's state".
+
+        That is still true, and is now the *durable* half of a two-part story:
+        creation calls this from inside `IndexStore.create_session_txn`, which
+        holds the index lock across both writes. During creation the held index
+        lock is the reservation; the manifest remains the reservation that survives
+        the process. Call this only from that transaction, or from a path that
+        genuinely owns its name without publishing a row.
 
         Use `write` instead when overwriting an existing manifest is intended
         (rollback restores, deliberate stale-target replacement).

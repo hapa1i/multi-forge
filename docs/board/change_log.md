@@ -25,6 +25,40 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-01
+
+### Crash-atomic session creation
+
+**Goal**: Stop a process killed mid-creation from leaving a session manifest with no index row -- an orphan nothing
+lists, which still owns its name and its conversation binding.
+
+**Key changes**:
+
+- `IndexStore.create_session_txn` holds the index lock across both durable writes, **row first**, then the manifest via
+  a caller-supplied callback, with in-lock compensation if the callback raises. All five creation sites use it
+  (`start_session`, `_persist_resume_child`, `fork_session`, `relaunch_session`, `_restore_previous_target_state`),
+  which collapses their per-site rollback blocks: the manifest write is now the last durable action, so a failure cannot
+  leave one behind.
+- A crash now leaves a prunable row. The transaction self-heals it: row-present + manifest-absent under the held lock
+  can only be residue, so it is pruned and creation proceeds -- a direct same-name retry succeeds with no intervening
+  `session list` or `session delete`. The prune runs before the `require_uuid_unbound` scan, so residue never blocks
+  rebinding its own conversation.
+- New `IndexStore.live_session_exists` (row **and** manifest) replaces the row-only pre-check at all four sites that
+  hard-failed on it; `_name_is_taken` keeps the row-only check, where a residue name costs an auto-name suffix.
+- `collect_bound_codex_threads` now reads the `codex_thread_id` column as well as manifests. Reading only manifests
+  would report an in-flight adopted thread as free once the row precedes its manifest.
+- `_restore_previous_target_state` restores with `create_exclusive`, not `write`: its old unlocked `exists()` guard
+  meant the write never overwrote anything, and keeping `write` let a failed fork clobber a concurrent winner.
+- design.md §3.2, `session/__init__.py`, and the `create_exclusive` / binding-scan docstrings describe the shipped
+  ordering. Repair of pre-existing orphans is split out to `proposed/session_orphan_manifest_repair`, because index
+  identity fields cannot be derived from a manifest.
+
+**Verification**: `tests/src` + `tests/regression` 9161 passed, 1 skipped; new
+`tests/regression/test_bug_session_create_crash_atomicity.py` (22 tests) covers compensation and crash-residue as
+separate families, the pruner race guard, per-path residue, and the explicit-name retry. Mutation check confirms each
+new guard is load-bearing. Docker `test_session_lifecycle.py` 21 passed; adoption gates 2 passed. `make pre-commit`
+clean.
+
 ## 2026-07-31
 
 ### Runtime-scoped extension disable

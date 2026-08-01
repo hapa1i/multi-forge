@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 from pathlib import Path
+from typing import Callable
 
 import dacite
 
@@ -347,30 +348,140 @@ class IndexStore:
                 raise SessionExistsError(name)
 
             if require_uuid_unbound:
-                for existing_key, existing in index.sessions.items():
-                    for wanted, held in (
-                        (claude_session_id, existing.claude_session_id),
-                        (codex_thread_id, existing.codex_thread_id),
-                    ):
-                        if wanted and held == wanted:
-                            raise UuidAlreadyBoundError(wanted, session_name_from_key(existing_key))
+                self._require_conversation_unbound(
+                    index,
+                    claude_session_id=claude_session_id,
+                    codex_thread_id=codex_thread_id,
+                )
 
-            entry = SessionIndexEntry(
+            entry = self._build_entry(
                 worktree_path=worktree_path,
                 project_root=project_root,
-                last_accessed_at=now_iso(),
                 is_fork=is_fork,
                 is_incognito=is_incognito,
                 parent_session=parent_session,
                 claude_session_id=claude_session_id,
                 codex_thread_id=codex_thread_id,
                 forge_root=effective_forge_root,
-                checkout_root=checkout_root or worktree_path,
-                relative_path=relative_path or ".",
+                checkout_root=checkout_root,
+                relative_path=relative_path,
             )
 
             index.sessions[scoped_key] = entry
             self.write(index)
+            return entry
+
+    def create_session_txn(
+        self,
+        state: SessionState,
+        project_root: str,
+        *,
+        checkout_root: str | None = None,
+        forge_root: str | None = None,
+        relative_path: str | None = None,
+        require_uuid_unbound: bool = False,
+        write_manifest: Callable[[], None],
+    ) -> SessionIndexEntry:
+        """Publish a session's index row and manifest under one index-lock acquisition.
+
+        The creation transaction for every path that mints a session. Writes the
+        **row first**, then calls ``write_manifest`` while still holding the lock,
+        so a process killed mid-creation leaves at most a bare row -- which is
+        prunable -- instead of a manifest with no row, which is not (nothing lists
+        it, yet it still owns its name and its conversation binding).
+
+        Lock order is **index -> manifest**, never the reverse. ``write_manifest``
+        takes the per-session manifest lock, so any caller holding a manifest lock
+        while reaching this method would deadlock. Do no work but the manifest
+        write inside the callback: this is the global index lock, shared by every
+        session-creating command in every project.
+
+        ``file_lock_for_target`` is not reentrant (``flock`` scopes locks to the
+        open file description, and each acquisition opens a fresh fd), so neither
+        the callback nor the compensation path may call a locking ``IndexStore``
+        method. Compensation drops the row in memory and rewrites the index.
+
+        Args:
+            state: Session state to publish. Supplies the name and conversation ids.
+            project_root: Absolute path to the main repository.
+            checkout_root: Git checkout root (``--show-toplevel``).
+            forge_root: Forge project root; falls back to ``state.forge_root``.
+            relative_path: forge_root relative to checkout_root.
+            require_uuid_unbound: Re-check conversation uniqueness inside this
+                lock. See ``add_session`` for why adoption needs it.
+            write_manifest: Callable that writes the manifest. Runs after the row
+                is durable; its exception propagates unchanged after compensation.
+
+        Returns:
+            The published SessionIndexEntry.
+
+        Raises:
+            InvalidSessionNameError: If the session name is invalid.
+            SessionExistsError: If a live session already holds this name.
+            UuidAlreadyBoundError: If require_uuid_unbound and the conversation is taken.
+        """
+        name = state.name
+        validate_name(name)
+
+        worktree_path = state.worktree.path if state.worktree else project_root
+        # Mirrors add_from_state -> add_session: caller's forge_root, then the
+        # manifest's, then the worktree.
+        effective_forge_root = forge_root or state.forge_root or worktree_path
+        codex_thread_id = state.confirmed.codex.thread_id if state.confirmed.codex else None
+
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            scoped_key = make_scoped_key(name, effective_forge_root)
+
+            existing = index.sessions.get(scoped_key)
+            if existing is not None:
+                if self._manifest_exists_for_row(scoped_key, existing):
+                    raise SessionExistsError(name)
+                # Row without a manifest, seen while holding the lock that every
+                # creator must hold to publish one: this can only be residue from a
+                # killed transaction. Drop it so a direct same-name retry succeeds
+                # without an intervening 'session list' or 'session delete'.
+                # Deliberately narrower than the list_sessions prune, which also
+                # drops rows whose worktree vanished: the manifest is the durable
+                # reservation, so a live manifest must still collide here.
+                del index.sessions[scoped_key]
+
+            if require_uuid_unbound:
+                # After the prune above, so residue never blocks rebinding its own
+                # conversation.
+                self._require_conversation_unbound(
+                    index,
+                    claude_session_id=state.confirmed.claude_session_id,
+                    codex_thread_id=codex_thread_id,
+                )
+
+            entry = self._build_entry(
+                worktree_path=worktree_path,
+                project_root=project_root,
+                is_fork=state.is_fork,
+                is_incognito=state.is_incognito,
+                parent_session=state.parent_session,
+                claude_session_id=state.confirmed.claude_session_id,
+                codex_thread_id=codex_thread_id,
+                forge_root=effective_forge_root,
+                checkout_root=checkout_root,
+                relative_path=relative_path,
+            )
+
+            index.sessions[scoped_key] = entry
+            self.write(index)
+
+            try:
+                write_manifest()
+            except BaseException:
+                # BaseException, not Exception: a Ctrl-C between the two writes can
+                # still unwind cleanly, and leaving residue when we could remove it
+                # is worse than the narrower catch. A signal that kills the process
+                # outright is the crash model the self-heal above covers.
+                index.sessions.pop(scoped_key, None)
+                self.write(index)
+                raise
+
             return entry
 
     def update_session(
@@ -500,6 +611,43 @@ class IndexStore:
             index = self.read()
             return resolve_key_strict(index.sessions, name, forge_root) is not None
 
+    def live_session_exists(self, name: str, forge_root: str | None = None) -> bool:
+        """Check whether a session has **both** an index row and its manifest.
+
+        The name-collision pre-check for creation paths. ``session_exists`` answers
+        the row question alone, which since row-first creation includes residue
+        from a killed transaction -- a name that ``create_session_txn`` will prune
+        and reuse. Rejecting on that would refuse a direct retry of a session the
+        user never got.
+
+        Callers use this only to fail fast before expensive setup (worktree
+        creation). It is not authoritative: the answer can go stale the moment the
+        lock is released, and ``create_session_txn`` re-decides under its own lock.
+
+        Args:
+            name: Session display name.
+            forge_root: Scope to this project. Strict resolution when None.
+
+        Returns:
+            True only if a row exists and its manifest is on disk.
+
+        Raises:
+            AmbiguousSessionError: If forge_root is None and name exists in multiple projects.
+        """
+        try:
+            validate_name(name)
+        except InvalidSessionNameError:
+            return False
+
+        # One stat, unlike list_sessions' probe over every row -- cheap enough to
+        # keep inside the lock, which keeps row and manifest a consistent pair.
+        with file_lock_for_target(target_path=self._index_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            index = self.read()
+            key = resolve_key_strict(index.sessions, name, forge_root)
+            if key is None:
+                return False
+            return self._manifest_exists_for_row(key, index.sessions[key])
+
     def add_from_state(
         self,
         state: SessionState,
@@ -600,3 +748,53 @@ class IndexStore:
 
             self.write(index)
             return entry
+
+    def _manifest_exists_for_row(self, scoped_key: str, entry: SessionIndexEntry) -> bool:
+        """Whether the manifest backing an index row is on disk."""
+        store_root = Path(entry.forge_root or entry.worktree_path)
+        return get_manifest_path(store_root, session_name_from_key(scoped_key)).is_file()
+
+    def _require_conversation_unbound(
+        self,
+        index: SessionIndex,
+        *,
+        claude_session_id: str | None,
+        codex_thread_id: str | None,
+    ) -> None:
+        """Raise if either conversation id is already held by a row. Caller holds the lock."""
+        for existing_key, existing in index.sessions.items():
+            for wanted, held in (
+                (claude_session_id, existing.claude_session_id),
+                (codex_thread_id, existing.codex_thread_id),
+            ):
+                if wanted and held == wanted:
+                    raise UuidAlreadyBoundError(wanted, session_name_from_key(existing_key))
+
+    @staticmethod
+    def _build_entry(
+        *,
+        worktree_path: str,
+        project_root: str,
+        is_fork: bool,
+        is_incognito: bool,
+        parent_session: str | None,
+        claude_session_id: str | None,
+        codex_thread_id: str | None,
+        forge_root: str,
+        checkout_root: str | None,
+        relative_path: str | None,
+    ) -> SessionIndexEntry:
+        """Build a row, owning the identity fallbacks shared by both creation paths."""
+        return SessionIndexEntry(
+            worktree_path=worktree_path,
+            project_root=project_root,
+            last_accessed_at=now_iso(),
+            is_fork=is_fork,
+            is_incognito=is_incognito,
+            parent_session=parent_session,
+            claude_session_id=claude_session_id,
+            codex_thread_id=codex_thread_id,
+            forge_root=forge_root,
+            checkout_root=checkout_root or worktree_path,
+            relative_path=relative_path or ".",
+        )

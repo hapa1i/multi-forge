@@ -13,6 +13,31 @@ from forge.session.prev_sessions import child_path, child_path_rel
 pytestmark = pytest.mark.regression
 
 
+def _seed_winner(manager: SessionManager, project: Path, name: str = "parent-resumed") -> None:
+    """Publish a competing session the way a real creator does: manifest AND row.
+
+    Since session_create_crash_atomicity a row alone is crash residue, and
+    `create_session_txn` prunes and reuses it -- so a row-only seed models the
+    residue case, not a winner, and the loser would take the name instead of
+    retrying.
+    """
+    winner = create_session_state(name, worktree_path=str(project))
+    winner.forge_root = str(project)
+    winner.parent_session = "parent"
+    SessionStore(str(project), name).create_exclusive(winner)
+    manager.index_store.add_session(
+        name=name,
+        worktree_path=str(project),
+        project_root=str(project),
+        forge_root=str(project),
+        checkout_root=str(project),
+        relative_path=".",
+        is_incognito=False,
+        is_fork=False,
+        parent_session="parent",
+    )
+
+
 def test_resume_autoname_retry_updates_context_file(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
@@ -35,28 +60,18 @@ def test_resume_autoname_retry_updates_context_file(tmp_path: Path) -> None:
         relative_path=".",
     )
 
-    original_add = manager.index_store.add_from_state
+    original_txn = manager.index_store.create_session_txn
     failed_once = False
 
     def fail_base_name_once(state, *args, **kwargs):
         nonlocal failed_once
         if state.name == "parent-resumed" and not failed_once:
             failed_once = True
-            manager.index_store.add_session(
-                name="parent-resumed",
-                worktree_path=str(project),
-                project_root=str(project),
-                forge_root=str(project),
-                checkout_root=str(project),
-                relative_path=".",
-                is_incognito=False,
-                is_fork=False,
-                parent_session="parent",
-            )
+            _seed_winner(manager, project)
             raise SessionExistsError("parent-resumed")
-        return original_add(state, *args, **kwargs)
+        return original_txn(state, *args, **kwargs)
 
-    manager.index_store.add_from_state = fail_base_name_once  # type: ignore[method-assign]
+    manager.index_store.create_session_txn = fail_base_name_once  # type: ignore[method-assign]
 
     child, handoff = manager.resume_session("parent")
 
@@ -87,7 +102,7 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     The prior version pre-seeded `parent-resumed` in the index BEFORE resume_session, so
     _generate_resume_name picked a fresh suffix and the collision -- and the entire
     `except SessionExistsError` fix branch -- never ran (it passed with the fix reverted). This
-    version injects the winner mid-`add_from_state` (like the first test) so the loser actually hits
+    version injects the winner mid-commit (like the first test) so the loser actually hits
     the branch, and covers the case the first test does not: a winner that ran `forge session transfer edit`
     has content != generated.md, and winner_owns must preserve it (the fix short-circuits the
     orphan-unlink before any byte-compare).
@@ -112,7 +127,7 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     winner_snapshot = child_path(project, "parent", "parent-resumed")
     curated = "WINNER-CURATED (user-edited via forge session transfer edit)\n"
 
-    original_add = manager.index_store.add_from_state
+    original_txn = manager.index_store.create_session_txn
     failed_once = False
 
     def fail_base_name_once(state, *args, **kwargs):
@@ -120,23 +135,13 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
         if state.name == "parent-resumed" and not failed_once:
             failed_once = True
             # The winner wins the name AND has curated its snapshot (content != generated.md).
-            manager.index_store.add_session(
-                name="parent-resumed",
-                worktree_path=str(project),
-                project_root=str(project),
-                forge_root=str(project),
-                checkout_root=str(project),
-                relative_path=".",
-                is_incognito=False,
-                is_fork=False,
-                parent_session="parent",
-            )
+            _seed_winner(manager, project)
             winner_snapshot.parent.mkdir(parents=True, exist_ok=True)
             winner_snapshot.write_text(curated)
             raise SessionExistsError("parent-resumed")
-        return original_add(state, *args, **kwargs)
+        return original_txn(state, *args, **kwargs)
 
-    manager.index_store.add_from_state = fail_base_name_once  # type: ignore[method-assign]
+    manager.index_store.create_session_txn = fail_base_name_once  # type: ignore[method-assign]
 
     child, _ = manager.resume_session("parent")
 
