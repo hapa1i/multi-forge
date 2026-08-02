@@ -57,6 +57,7 @@ from forge.core.run_id import (
 from forge.core.telemetry.downstream import mint_downstream_event_id
 from forge.core.tiers import detect_tier_word
 from forge.core.usage.vocabulary import Confidence, Reporter
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
 from forge.proxy.converters import (
@@ -74,15 +75,14 @@ from forge.proxy.data_models import (
 )
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
+from forge.proxy.passthrough_ingress import handle_anthropic_passthrough
 from forge.proxy.ports import (
     NoAvailablePortError,
 )
-from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.ports import (
     find_available_loopback_port as _find_available_loopback_port,
 )
 from forge.proxy.provider_trace_logger import record_provider_trace
-from forge.proxy.passthrough_ingress import handle_anthropic_passthrough
 from forge.proxy.reasoning import resolve_reasoning_effort
 from forge.proxy.responses_ingress import (
     advertise_responses_ingress,

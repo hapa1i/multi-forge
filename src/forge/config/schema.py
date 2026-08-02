@@ -26,7 +26,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
-from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE, VALID_WIRE_SHAPES
+from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
+    DEFAULT_WIRE_SHAPE,
+    VALID_WIRE_SHAPES,
+)
 
 logger = logging.getLogger(__name__)
 

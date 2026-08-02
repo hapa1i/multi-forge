@@ -55,9 +55,9 @@ from forge.core.auth.template_secrets import (
     resolve_env_or_credential_with_source,
 )
 from forge.core.runtime.codex_rollouts import codex_home
-from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
 from forge.core.usage.ledger import BillingMode
+from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
 
 logger = logging.getLogger(__name__)
 

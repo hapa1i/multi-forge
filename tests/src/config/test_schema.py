@@ -33,10 +33,7 @@ class TestOpenAIModelsCatalogConformance:
         assert openai_aliases, "catalog lost its openai/ alias namespace -- update this conformance test"
 
         unrecognized = sorted(
-            name
-            for alias in openai_aliases
-            for name in (alias, catalog.aliases[alias])
-            if not is_openai_model(name)
+            name for alias in openai_aliases for name in (alias, catalog.aliases[alias]) if not is_openai_model(name)
         )
         assert not unrecognized, f"catalog OpenAI models missing from OPENAI_MODELS: {unrecognized}"
 

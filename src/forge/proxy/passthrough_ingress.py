@@ -174,7 +174,9 @@ async def handle_anthropic_passthrough(raw_request: Request, request_id: str, *,
     model = str(raw_body.get("model") or "unknown")
     # Prefer the request's explicit tier (from the model name) over the proxy default,
     # so tier_overrides.<tier> (e.g. reasoning_effort) match an explicit opus request.
-    resolved_tier = server._tier_from_model_name(model) or getattr(server.config.proxy, "default_tier", None) or "sonnet"
+    resolved_tier = (
+        server._tier_from_model_name(model) or getattr(server.config.proxy, "default_tier", None) or "sonnet"
+    )
     req_headers = dict(raw_request.headers)
 
     # Spend-cap check — same cross-request accumulation as the translated path, so caps
