@@ -479,7 +479,8 @@ killed between `create_exclusive` and `add_from_state` still leaves a manifest w
 `session list`, yet still owning its name. The review's recommendation is to hold the index lock across both writes so
 the crash windows become "prunable row" or "both present". That is the right shape -- nothing nests manifest->index
 today, so index->manifest introduces no deadlock -- but it restructures `IndexStore.add_session` into a transaction form
-used by all four creation paths, which is broader than this card. Not attempted here; carry as its own card.
+used by all four creation paths, which is broader than this card. Not attempted here; carry as its own card. Discharged
+2026-08-01 by [`session_create_crash_atomicity`](../session_create_crash_atomicity/card.md).
 
 ## Slice 4 -- Codex arm (card Phase 2)
 
@@ -544,7 +545,8 @@ bindings. Handing the whole `CodexConfirmed` to `start_session` also removes the
 **Not fixed here, still open debt:** session creation remains non-atomic across manifest and index (a kill between
 `create_exclusive` and `add_from_state` leaves an orphan manifest). The orphan manifest scan in
 `collect_bound_codex_threads` covers the adoption invariant against it, but the general fix -- an index-lock-spanning
-transaction -- is broader than this card and needs its own.
+transaction -- is broader than this card and needs its own. Discharged 2026-08-01 by
+[`session_create_crash_atomicity`](../session_create_crash_atomicity/card.md).
 
 ## Slice 5 -- Gates, docs, closeout
 

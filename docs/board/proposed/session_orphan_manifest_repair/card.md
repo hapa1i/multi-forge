@@ -1,8 +1,8 @@
 # Repair manifest-only session orphans (surface + re-index)
 
-**Status**: Proposed. Split out of
-[`session_create_crash_atomicity`](../../doing/session_create_crash_atomicity/card.md) D3 on 2026-08-01, per that card's
-Phase 0 ratification. That card stops **new** orphans being created; this one handles the ones already on disk.
+**Status**: Proposed. Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md)
+D3 on 2026-08-01, per that card's Phase 0 ratification. That card stops **new** orphans being created; this one handles
+the ones already on disk.
 
 **References**: `session_create_crash_atomicity` card.md §"Design decisions owed" item 3 (the paragraph this card is
 seeded from) and its Phase 0 decisions block.

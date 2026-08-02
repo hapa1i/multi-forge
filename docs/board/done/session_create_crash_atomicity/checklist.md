@@ -351,7 +351,7 @@ findings F1 (four pre-check sites, not one), F2 (`collect_bound_codex_threads` n
 
 ## Closeout
 
-- [ ] Final checklist items ticked with verification recorded.
+- [x] Final checklist items ticked with verification recorded (this section; all phase items were ticked pre-merge).
 - [x] Compact `docs/board/change_log.md` entry added under 2026-08-01 (Goal / Key changes / Verification, including the
   review-round record).
 - [x] Propose durable lessons via `.forge/memory/shadow_impl_notes.md` ("Two-write atomicity and provable ownership");
@@ -360,5 +360,9 @@ findings F1 (four pre-check sites, not one), F2 (`collect_bound_codex_threads` n
   obsolete" rule, keeping the `flock` rationale, which never depended on write order.
 - [x] design.md §3.2 and `session/__init__.py` verified against shipped behavior: transaction ordering, the two
   reservations, the crash-residue table, delete coordination, and the adoption paragraph's stale manifest-first claim.
-- [ ] Move the card `doing/ -> done/`; repoint inbound links, including a forward link from the
-  `native_session_adoption` done checklist's open-debt note to this card's done path.
+- [x] Move the card `doing/ -> done/`; repoint inbound links, including a forward link from the
+  `native_session_adoption` done checklist's open-debt note to this card's done path. Done 2026-08-02 via `git mv`;
+  repointed the two inbound `../../doing/` links (`proposed/session_orphan_manifest_repair`,
+  `proposed/session_delete_generation_token`) and added forward links to both open-debt notes in the adoption checklist.
+  Also removed the stale `todo/session_create_crash_atomicity/` duplicate left behind when the card was copied (not
+  `git mv`'d) into `doing/`. Verified with a board-wide `rg` for stale lane paths and `make pre-commit-md`.

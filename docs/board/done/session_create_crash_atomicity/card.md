@@ -1,6 +1,7 @@
 # Crash-atomic session creation (manifest + index)
 
-**Lane**: `todo/` -- accepted 2026-08-01. Standalone. Discharges the open debt recorded at closeout of
+**Lane**: `done/` -- shipped and verified 2026-08-01 (PR #118, merged as `d24dc033`); execution record in
+[checklist.md](checklist.md). Standalone. Discharges the open debt recorded at closeout of
 [`native_session_adoption`](../../done/native_session_adoption/card.md): its
 [checklist](../../done/native_session_adoption/checklist.md) carries the fix recommendation under "Open debt -- creation
 is still not crash-atomic".
@@ -68,10 +69,16 @@ the outcome; the slug keeps the change log's recorded phrasing of the debt.
 **Retry contract (the stale-row reservation gap, resolved).** A bare row would otherwise still block a direct same-name
 retry: `session_exists` is a pure row check (`session/index.py:481`), `start_session` pre-checks it and raises
 (`session/manager.py:541`), and `_name_is_taken` (`:1763`) counts row-or-manifest as taken. The transaction closes this
-itself: under its held lock, row-present + manifest-absent can only be crash residue -- a live creator would be holding
-the same lock -- so the transaction prunes the stale row and proceeds. An explicit same-name retry therefore succeeds
-immediately, with no intervening `session list` or `session delete`. The `start_session` pre-check must not hard-fail on
-a row-only state (part of D1: drop it and let the transaction raise, or make it manifest-aware). `_name_is_taken`'s
+itself: under its held lock, row-present + manifest-absent is not a reservation, so the transaction prunes the stale row
+and proceeds. An explicit same-name retry therefore succeeds immediately, with no intervening `session list` or
+`session delete`. No pre-check may hard-fail on a row-only state. **Corrected by the review round (finding F6)**: this
+paragraph originally claimed that state "can only be crash residue -- a live creator would be holding the same lock".
+That is false. An in-flight `delete_session` produces it too, holding no index lock for the duration, so the reclaim is
+safe only because deletion now ends in `delete_session_txn`, which declines once a replacement owns the name.
+**Corrected by Phase 0 (finding F1)**: there are four such pre-checks, not one -- `:541` (`start_session`), `:831`
+(resume child) and `:1696` (`relaunch_session`) all raise `SessionExistsError` off a pure row check, and `:1077`
+(`winner_owns`) ORs one with a manifest probe. D1 resolves all four via a new `live_session_exists` (row **and**
+manifest), which keeps the cheap fail-fast that avoids building a worktree only to roll it back. `_name_is_taken`'s
 conservative answer stays acceptable for auto-naming: skipping a stale name costs a suffix, not an error.
 
 **Why row-first, and why it is safe now.** Manifest-first under the lock fixes nothing: `flock` dies with the process,
@@ -111,7 +118,9 @@ both gain the second clause, not be contradicted.
    `session/index.py:503`); the manifest retains only `forge_root` and worktree metadata. A real repair contract owes
    identity reconstruction (recompute via the same helpers creation uses), missing-worktree behavior, UUID/thread
    collision handling against live rows, and malformed/legacy-manifest policy. That is its own card: Phase 3 files it in
-   `proposed/` seeded from this paragraph, unless Phase 0 explicitly reverses the split.
+   `proposed/` seeded from this paragraph, unless Phase 0 explicitly reverses the split. **Ratified 2026-08-01**: split
+   confirmed; filed as
+   [`proposed/session_orphan_manifest_repair`](../../proposed/session_orphan_manifest_repair/card.md).
 
 ## Constraints (must not break)
 
@@ -126,10 +135,13 @@ both gain the second clause, not be contradicted.
   four `codex_thread_id` mirror sites and `SessionStore.update` `_mutate` callbacks -- and pin it with a comment on the
   transaction, because a single manifest->index caller would deadlock against it.
 - Raw `IndexStore.read()` consumers -- readers that deliberately skip the lock -- can observe the published row before
-  its manifest exists. The known sites are the fail-closed binding scans (`collect_bound_uuids` /
-  `collect_bound_codex_threads`, `core/ops/session_context.py:465` / `:520`), where the early row is *conservative*: the
-  conversation reads as bound while its publication completes, the safe direction for uniqueness. Phase 0 must enumerate
-  every raw-read site and record why each tolerates the temporary row; any that cannot must take the lock.
+  its manifest exists. **Corrected by Phase 0 (finding F2)**: the two fail-closed binding scans are *not* symmetric.
+  `collect_bound_uuids` (`core/ops/session_context.py:465`) is conservative as assumed -- it records
+  `entry.claude_session_id` off the row (`:492`), so the conversation reads as bound while publication completes. But
+  `collect_bound_codex_threads` (`:520`) never reads the `codex_thread_id` column; it opens the manifest and returns
+  early when it is absent, so an in-flight Codex row would report its thread *free* -- the permissive direction. Phase 1
+  adds the row-column read. The other raw-read sites (`core/ops/gc.py:695`, `cli/proxy.py:1036`) tolerate the temporary
+  row; the full enumeration and each site's direction of error are recorded in the checklist.
 - Existing regressions stay green: `tests/regression/test_bug_start_session_name_race.py`,
   `tests/regression/test_bug_codex_adopt_double_bind.py`, `tests/regression/test_bug_fork_restore_clobbers_winner.py`
   and `tests/regression/test_bug_resume_autoname_context_retry.py` (both exercise contracts adjacent to collision

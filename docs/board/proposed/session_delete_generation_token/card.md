@@ -1,9 +1,8 @@
 # Give a session row an identity a deleter can carry into the lock
 
-**Status**: Proposed. Split out of
-[`session_create_crash_atomicity`](../../doing/session_create_crash_atomicity/card.md) on 2026-08-01, during that card's
-third review round. That card made deletion decline once a replacement owns the name; this one closes the residual case
-its ownership signal cannot express.
+**Status**: Proposed. Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md)
+on 2026-08-01, during that card's third review round. That card made deletion decline once a replacement owns the name;
+this one closes the residual case its ownership signal cannot express.
 
 ## Problem
 
