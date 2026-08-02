@@ -2,18 +2,20 @@
 
 **Card**: [card.md](card.md). Branch: `feat/session-orphan-manifest-repair`.
 
-**Current focus**: Phase 0 -- decision ratification, review round 1 incorporated (2026-08-02). The reviewer declined to
-ratify the original D1-D5; every correction was verified against source (findings F1-F6 below) and the decision set is
-rewritten: D1/D2 now follow the per-shape worktree-placement model, D3 is resolved, D4 splits corrupt from unreadable,
-D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 starts before that.
+**Current focus**: Phase 1/2 execution. D1-D6 ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides).
+Phase 0 history: the reviewer declined to ratify the original D1-D5; every correction was verified against source
+(findings F1-F6 below) and the decision set is rewritten: D1/D2 now follow the per-shape worktree-placement model, D3 is
+resolved, D4 splits corrupt from unreadable, D6 is new.
 
 ## Phase 0 -- Ground and ratify
 
-- [ ] Re-verify card anchors against `main` at Phase 0 close and restamp card.md on drift. Pre-verified 2026-08-02:
-  post-PR-#118 drift only -- `add_from_state` is `index.py:739` (card cites `:503`), `_validate_data` is `store.py:356`
-  (card cites `:349`), `collect_bound_codex_threads` is `session_context.py:503`. Unchanged: `create_session_txn`
-  `index.py:374`, `collect_bound_uuids` `session_context.py:439`, `_manifest_dirs` `:566`, `_detect_corrupt_state`
-  `gc.py:702`, `resolve_project_root` `manager.py:436`, identity derivation `manager.py:664-692`.
+- [x] Re-verify card anchors against `main` at Phase 0 close and restamp card.md on drift. Verified 2026-08-02 (no
+  further drift since the pre-verification below; card restamp not needed -- the F2/F4 corrections were applied
+  directly). Pre-verified 2026-08-02: post-PR-#118 drift only -- `add_from_state` is `index.py:739` (card cites `:503`),
+  `_validate_data` is `store.py:356` (card cites `:349`), `collect_bound_codex_threads` is `session_context.py:503`.
+  Unchanged: `create_session_txn` `index.py:374`, `collect_bound_uuids` `session_context.py:439`, `_manifest_dirs`
+  `:566`, `_detect_corrupt_state` `gc.py:702`, `resolve_project_root` `manager.py:436`, identity derivation
+  `manager.py:664-692`.
 - [x] **Verified premise (2026-08-02): the card's self-deleting-row claim holds.** The `list_sessions` prune predicate
   is `not worktree.exists() or not manifest_path.is_file()` (`index.py:198`, re-checked under the re-acquired lock
   before deletion), so a repaired row whose `worktree_path` does not exist is pruned on the next list even though its
@@ -22,8 +24,8 @@ D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 star
 - [x] Confirm the transaction's in-lock uniqueness coverage. **Resolved 2026-08-02 (F5)**: no work owed --
   `create_session_txn(require_uuid_unbound=True)` already re-checks both `claude_session_id` and `codex_thread_id` via
   `_require_conversation_unbound` inside the index lock (`index.py:453-460`).
-- [ ] Ratify D1-D6 (review round 2). Record each decision inline with rationale; card.md corrections from F2/F4 are
-  applied in this commit.
+- [x] Ratify D1-D6 (review round 2). **Ratified 2026-08-02**: D2 confirmed as-is by the reviewer; no overrides to the
+  revised set. Card.md corrections from F2/F4 were applied in this commit.
 
 ### Phase 0 findings (review round 1, 2026-08-02 -- each verified against source before recording)
 
@@ -57,7 +59,7 @@ D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 star
 
 ### Decisions (revised after review round 1 -- ratify in round 2)
 
-- [ ] **D1 -- identity source is the recorded worktree metadata, applied per session shape; the manifest's location
+- [x] **D1 -- identity source is the recorded worktree metadata, applied per session shape; the manifest's location
   supplies only `forge_root`.** Four shapes exist (F1): *ordinary* (manifest inside its own checkout), *nested-project
   worktree* (forge_root remapped into the linked worktree, manifest inside it), *root-level worktree* (manifest under
   the main checkout, `worktree.path` records the linked worktree), and *`--into` guest* (manifest at the target
@@ -67,7 +69,7 @@ D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 star
   `manager.py:664-669`, `relative_to`-else-`"."` `:678-692`); `forge_root` is the scanned manifest's location.
   Assertion: a repaired row's identity fields equal what creation derives for that shape -- pinned per-shape, including
   that a root-level worktree repair records the *linked* worktree, never the main checkout.
-- [ ] **D2 -- a missing recorded worktree is report-only for worktree-backed shapes; location re-derivation is allowed
+- [x] **D2 -- a missing recorded worktree is report-only for worktree-backed shapes; location re-derivation is allowed
   only for the ordinary shape.** When the recorded `worktree.path` does not exist: `is_worktree=True` (root-level,
   nested, or guest) classifies `missing-worktree`, report-only -- a repaired row would be re-pruned immediately
   (`index.py:198`) and no trustworthy relocation exists; the report names both outs (recreate the worktree, or
@@ -80,13 +82,13 @@ D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 star
   under the index lock (`index.py:453-460`); a scoped-name collision surfaces as the transaction's index-side
   `SessionExistsError`. Report classification `collision` names both the orphan manifest dir and the live holder; repair
   skips the item and continues; exit 1 when any refusal remains (mirrors `forge clean --yes` exit semantics).
-- [ ] **D4 -- corrupt belongs to `forge clean`; unreadable belongs to neither; repair never deletes.** Three-way split:
+- [x] **D4 -- corrupt belongs to `forge clean`; unreadable belongs to neither; repair never deletes.** Three-way split:
   `corrupt` (`StateCorruptedError` on strict read) is never repaired or removed by repair, and the report points at
   `forge clean` (`_detect_corrupt_state`, `gc.py:702`, removes exactly this class). `unreadable` (transient read errors
   -- the `StateUnreadableError`/`OSError` family) is report-only with check-permissions/retry guidance and is **not**
   pointed at clean, which deliberately ignores it (F3). Assertion: the two surfaces never disagree -- no manifest is
   both clean-removable and repairable, and no unreadable manifest is claimed by either.
-- [ ] **D5 -- explicit, preview-default surface: `forge session repair`** (bare = report; `--yes` = apply; `--json` on
+- [x] **D5 -- explicit, preview-default surface: `forge session repair`** (bare = report; `--yes` = apply; `--json` on
   both), resolving the card's coupled open questions as *explicit* discovery + *explicit* repair. The command is a
   project-state mutator, so it applies the project-compatibility contract: `--yes` fails closed via
   `enforce_project_compatibility` before side effects; the bare report still runs and marks what apply would refuse
@@ -95,7 +97,7 @@ D6 is new. Awaiting ratification of the revised D1-D6; nothing past Phase 0 star
   concern -- and classification needs manifest reads that must not make a hot read path fragile); a `forge clean`
   category (clean's verb is *remove*, repair *adds*; coordination lives at D4's ownership split instead). No `%`
   direct-command mirror in v1 (deferred below).
-- [ ] **D6 -- apply-time identity is a content hash, not conversation ids (F6).** The scan records each classified
+- [x] **D6 -- apply-time identity is a content hash, not conversation ids (F6).** The scan records each classified
   manifest's SHA-256; the transaction callback re-reads the manifest and compares bytes instead of writing
   (`create_exclusive` is never called -- the manifest already exists). Any mismatch -- vanished (a concurrent
   `session delete` resolved the orphan) or rewritten -- fails the callback, compensation removes the row, and the item
