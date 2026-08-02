@@ -646,13 +646,18 @@ class IndexStore:
             expect_manifest_absent: True when this delete has already destroyed the
                 manifest, or there never was one -- so a manifest present now can
                 only belong to a creator that reclaimed the name.
-            delete_manifest: Removes the manifest. Runs inside the lock, after the
-                row is gone. Keep it to that: this is the global index lock. The
-                session directory is bounded and small -- manifest, its lock, and
-                up to three codex handoff files -- so removing it measures in the
-                same fraction of a millisecond as the manifest write creation
-                holds the lock for. Transcripts (``.forge/artifacts/``), the search
-                index, and the worktree all live outside it and must stay outside.
+            delete_manifest: Removes the manifest under its own lock. Runs inside
+                the index lock, before the row is removed, so a manifest-lock
+                failure leaves the complete session published rather than
+                producing an orphan manifest. Keep it to the bounded session
+                directory -- manifest, its lock, and up to three Codex handoff
+                files. Transcripts (``.forge/artifacts/``), the search index, and
+                the worktree all live outside it and must stay outside. A
+                ``SessionStore.delete`` callback may wait up to
+                ``CLI_LOCK_TIMEOUT_S`` for a live manifest lock while this global
+                index lock remains held; that matches creation's lock order and
+                prefers completing a user-requested delete over a shorter
+                contention failure.
 
         Returns:
             True if the caller still owned the name; the row and manifest are gone.
@@ -667,14 +672,24 @@ class IndexStore:
             if key is not None:
                 if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
                     return False
-                del index.sessions[key]
-                self.write(index)
-            # No row and no way for a replacement to exist without one: publication
-            # writes the row first, and a transaction mid-flight would be blocked on
-            # this lock. Anything left at the path is the caller's own, or a
-            # pre-existing orphan it is entitled to clear.
+
+            # The held index lock excludes a replacement that is only partway
+            # through publication. Under the single-deleter contract above, a
+            # surviving row is still the caller's: either its manifest never went
+            # absent, or the guard ruled out a completed replacement. Without a
+            # row, row-first publication means no replacement can own the path;
+            # anything left is caller-owned residue or a pre-existing orphan that
+            # this transaction is entitled to clear.
 
             delete_manifest()
+            if key is not None:
+                # Manifest first: its deletion takes the manifest lock and can
+                # time out. Until it succeeds, keep the row so a failed delete does
+                # not manufacture the manifest-only orphan this transaction exists
+                # to prevent. A failure after the manifest disappears leaves only a
+                # prunable row, the safe residue direction.
+                del index.sessions[key]
+                self.write(index)
             return True
 
     def session_exists(self, name: str, forge_root: str | None = None) -> bool:

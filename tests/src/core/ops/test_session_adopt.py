@@ -7,6 +7,7 @@ create, so several tests here assert on what adoption must **not** touch.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -22,12 +23,15 @@ from forge.core.ops.session_adopt import (
     MODEL_BASIS_INFERRED,
     MODEL_BASIS_NONE,
     AdoptError,
+    _rollback_adoption,
     adopt_session,
     discover_adoptable,
     plan_adoption,
     summarize_transcript,
 )
+from forge.core.state.lock import FileLockTimeoutError
 from forge.session import SessionStore, UuidAlreadyBoundError
+from forge.session import index as index_mod
 from forge.session.claude.paths import get_transcript_path
 from forge.session.index import IndexStore
 
@@ -443,6 +447,70 @@ class TestConcurrencyAndRollback:
         # And the failure is recoverable: a re-run succeeds.
         result = adopt_session(ctx, plan_adoption(ctx, _UUID), name="doomed")
         assert result.session_uuid == _UUID
+
+    def test_rollback_holds_the_index_lock_through_manifest_delete(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A same-name creator cannot publish between rollback's two removals."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        source = _write_transcript(project)
+        adopt_session(ctx, plan_adoption(ctx, _UUID), name="doomed")
+        store = SessionStore(str(project), "doomed")
+        real_delete = store.delete
+        blocked: list[str] = []
+
+        # Keep the mutation check cheap: before rollback used delete_session_txn,
+        # this nested index acquisition succeeded because remove_session had
+        # already released the lock.
+        monkeypatch.setattr(index_mod, "CLI_LOCK_TIMEOUT_S", 0.05)
+
+        def _delete_while_probing_the_index() -> bool:
+            try:
+                IndexStore().session_exists("doomed", forge_root=str(project))
+            except FileLockTimeoutError:
+                blocked.append("blocked")
+            return real_delete()
+
+        monkeypatch.setattr(store, "delete", _delete_while_probing_the_index)
+
+        _rollback_adoption(
+            "doomed",
+            ctx=ctx,
+            store=store,
+            artifact_abs=None,
+        )
+
+        assert blocked == ["blocked"], "rollback must hold the index lock while deleting the manifest"
+        assert IndexStore().read().sessions == {}
+        assert not store.exists()
+        assert source.exists(), "rollback must preserve the user-owned native transcript"
+
+    def test_rollback_reports_a_replacement_owner(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The transaction's defensive False outcome must not disappear silently."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        store = SessionStore(str(project), "doomed")
+
+        def _decline(_index: IndexStore, _name: str, **_kwargs: object) -> bool:
+            return False
+
+        monkeypatch.setattr(IndexStore, "delete_session_txn", _decline)
+
+        with caplog.at_level(logging.WARNING, logger="forge.core.ops.session_adopt"):
+            _rollback_adoption(
+                "doomed",
+                ctx=ctx,
+                store=store,
+                artifact_abs=None,
+            )
+
+        assert "Adopt rollback skipped session state for 'doomed': name is now owned by a replacement" in caplog.text
 
     def test_threaded_adopts_of_one_uuid_bind_once(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Claude-arm counterpart of the Codex interleaved-adopt regression.
