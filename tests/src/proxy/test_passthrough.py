@@ -1027,3 +1027,37 @@ def test_passthrough_does_not_import_server():
     src = Path(passthrough.__file__).read_text()
     assert "from forge.proxy.server import" not in src
     assert "import forge.proxy.server" not in src
+
+
+@pytest.mark.asyncio
+async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_runtime_ready):
+    """A1 characterization: forwarded body identical; cost then metrics on completion.
+
+    Pinned before extracting the handler to passthrough_ingress.py so the move is
+    provably behavior-preserving on the money path (the accounting closure and the
+    exact upstream body are the passthrough handler's load-bearing contract).
+    """
+    server = proxy_runtime_ready
+
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+
+    order: list[str] = []
+    monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: order.append("cost") or 0)
+    monkeypatch.setattr(server.proxy_metrics, "record_request", lambda **kw: order.append("metrics"))
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 50,
+        "messages": [{"role": "user", "content": "hi"}],
+        # Field the translated path would drop: must reach the upstream untouched.
+        "thinking": {"type": "enabled", "budget_tokens": 512},
+    }
+    resp = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_ord"), "req_ord")
+
+    assert resp.status_code == 200
+    assert order == ["cost", "metrics"]
+    assert _UsageResponseClient.captured["json"] == raw_body
+    assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"
+    assert resp.headers["X-Resolved-Tier"] == "opus"
