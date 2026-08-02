@@ -35,6 +35,7 @@ from forge.config.loader import (
     write_proxy_instance_config,
 )
 from forge.config.schema import (
+    PROXY_BLOCK_FIELDS,
     BackendDependency,
     ProxyInstanceConfig,
     TierModels,
@@ -44,6 +45,7 @@ from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
 from forge.core.state import now_iso
+from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH, PASSTHROUGH_WIRE_SHAPES
 from forge.proxy.ports import (
     NoAvailablePortError,
 )
@@ -253,12 +255,11 @@ def create_proxy_file(
         model_alternatives=provider.model_alternatives,
         default_tier=cfg.proxy.default_tier or "sonnet",
         provider_settings=provider_settings,
-        wire_shape=cfg.proxy.wire_shape,
-        intercept=cfg.proxy.intercept,
-        audit=cfg.proxy.audit,
-        provider_trace=cfg.proxy.provider_trace,
-        logging=cfg.proxy.logging,
         created_at=now_iso(),
+        # Every shared block copies from the template via one declaration. This
+        # closes the drop class that previously lost provider_trace/logging here,
+        # and newly carries template-declared costs (spend caps) into the proxy.
+        **{name: getattr(cfg.proxy, name) for name in PROXY_BLOCK_FIELDS},
     )
 
     return write_proxy_instance_config(proxy_id, proxy_config)
@@ -1030,7 +1031,7 @@ def assert_proxy_responses_capable(
     wire_shape_str = wire_shape if isinstance(wire_shape, str) else "unknown"
     capabilities = data.get("capabilities")
     responses_ingress = capabilities.get("responses_ingress") if isinstance(capabilities, dict) else None
-    if wire_shape_str != "openai_responses_passthrough" or responses_ingress is not True:
+    if wire_shape_str != OPENAI_RESPONSES_PASSTHROUGH or responses_ingress is not True:
         raise ProxyNotResponsesCapableError(wire_shape_str)
 
     return _default_model_from_root(data), wire_shape_str
@@ -1043,7 +1044,7 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     success or the error message on failure. Retries once on failure.
     """
     # Responses passthrough proxies serve /v1/responses, not /v1/messages.
-    if _proxy_wire_shape(base_url=base_url, timeout_s=timeout_s) == "openai_responses_passthrough":
+    if _proxy_wire_shape(base_url=base_url, timeout_s=timeout_s) == OPENAI_RESPONSES_PASSTHROUGH:
         return _smoke_test_responses(base_url=base_url, timeout_s=timeout_s)
 
     url = f"{base_url.rstrip('/')}/v1/messages"
@@ -1110,10 +1111,7 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
         logger.debug("Could not resolve proxy smoke-test model from GET /: %s", e)
         return fallback
 
-    if not isinstance(data, dict) or data.get("wire_shape") not in (
-        "anthropic_passthrough",
-        "openai_responses_passthrough",
-    ):
+    if not isinstance(data, dict) or data.get("wire_shape") not in PASSTHROUGH_WIRE_SHAPES:
         return fallback
 
     routing = data.get("routing")

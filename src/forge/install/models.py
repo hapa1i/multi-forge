@@ -43,8 +43,8 @@ class InstallProfile(str, Enum):
     """Predefined installation profiles.
 
     - MINIMAL: commands only
-    - STANDARD: commands, agents, hooks, permissions (default)
-    - FULL: all modules including status-line
+    - STANDARD: commands, agents, skills, hooks, permissions, status-line (default)
+    - FULL: all modules (currently same as STANDARD; reserved for future heavy modules)
     """
 
     MINIMAL = "minimal"

@@ -21,10 +21,16 @@ Usage:
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
+from forge.core.wire_shapes import (
+    ANTHROPIC_PASSTHROUGH,
+    DEFAULT_WIRE_SHAPE,
+    VALID_WIRE_SHAPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,7 @@ OPENAI_MODELS = [
     "gpt-5.2-pro",
     "gpt-5.3-codex",
     "gpt-5.5",
+    "gpt-5.5-pro",
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.4-nano",
@@ -270,7 +277,6 @@ def _coerce_cost_config(value: Any) -> CostConfig:
 # --- Intercept / audit config (Phase 2 audit proxy) ---
 
 _VALID_INTERCEPT_MODES = ("passthrough", "inspect", "override")
-_VALID_WIRE_SHAPES = ("openai_translated", "anthropic_passthrough", "openai_responses_passthrough")
 _VALID_GUARD_ACTIONS = ("warn", "block", "strip")
 _DEFAULT_REDACT_HEADERS = (
     "authorization",
@@ -618,12 +624,53 @@ def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) 
     Enforced on BOTH the running-proxy (ProxyInstanceConfig) and template (ProxyConfig) paths
     so 'forge proxy template edit' fails at edit time, not late at 'forge proxy create'.
     """
-    if intercept.mode == "override" and wire_shape != "anthropic_passthrough":
+    if intercept.mode == "override" and wire_shape != ANTHROPIC_PASSTHROUGH:
         raise ValueError(
             "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
             "(override applies to the raw passthrough body only). "
             "Set wire_shape: anthropic_passthrough, or use intercept.mode: inspect."
         )
+
+
+def _coerce_wire_shape(value: Any) -> str:
+    if value not in VALID_WIRE_SHAPES:
+        raise ValueError(f"Invalid wire_shape: {value!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})")
+    return value
+
+
+# Shared per-proxy config blocks: this one declaration drives both dataclasses'
+# block coercion (ProxyConfig + ProxyInstanceConfig __post_init__) and every
+# enumeration of the blocks in loader.py (both hops) and proxy_orchestrator.py
+# (template -> proxy.yaml creation). Closes the silent-drop class where a block
+# added to the dataclasses but not every hop loads in unit tests yet never
+# reaches the running proxy (this shipped for provider_trace).
+PROXY_BLOCK_COERCERS: dict[str, Callable[[Any], Any]] = {
+    "costs": _coerce_cost_config,
+    "wire_shape": _coerce_wire_shape,
+    "intercept": _coerce_intercept_config,
+    "audit": _coerce_audit_config,
+    "provider_trace": _coerce_provider_trace_config,
+    "logging": _coerce_logging_config,
+}
+PROXY_BLOCK_FIELDS: tuple[str, ...] = tuple(PROXY_BLOCK_COERCERS)
+
+# Shared non-block fields both proxy dataclasses carry; each loader hop transports
+# these explicitly (loader.py hop 1 and hop 2). Any OTHER field added to both
+# dataclasses must join PROXY_BLOCK_COERCERS, or both hops silently drop it to its
+# default -- tests/src/config/test_proxy_block_wiring.py enforces the exact-set
+# equality, making the intersection the closed contract rather than a convention.
+PROXY_SHARED_NON_BLOCK_FIELDS: frozenset[str] = frozenset({"backend", "default_tier", "family"})
+
+
+def _coerce_proxy_blocks(cfg: Any) -> None:
+    """Coerce the shared per-proxy blocks in place, then cross-validate.
+
+    The cross-field check needs the validated wire_shape and the coerced
+    intercept, so it runs after the loop.
+    """
+    for name, coercer in PROXY_BLOCK_COERCERS.items():
+        setattr(cfg, name, coercer(getattr(cfg, name)))
+    _validate_wire_shape_intercept(cfg.wire_shape, cfg.intercept)
 
 
 _VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})
@@ -661,26 +708,17 @@ class ProxyConfig:
     host: str = "127.0.0.1"
     tool_prefixes_to_ignore: list[str] = field(default_factory=list)
     costs: CostConfig = field(default_factory=CostConfig)
-    wire_shape: str = "openai_translated"
+    wire_shape: str = DEFAULT_WIRE_SHAPE
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     def __post_init__(self) -> None:
-        # Templates carry wire_shape/intercept/audit/provider_trace/logging/costs/default_tier/
-        # tier_overrides too; coerce + validate here so an invalid combo is rejected at
-        # 'forge proxy template edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
-        self.intercept = _coerce_intercept_config(self.intercept)
-        self.audit = _coerce_audit_config(self.audit)
-        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
-        self.logging = _coerce_logging_config(self.logging)
-        self.costs = _coerce_cost_config(self.costs)
-        if self.wire_shape not in _VALID_WIRE_SHAPES:
-            raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
-            )
-        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        # Templates carry the shared per-proxy blocks plus default_tier/tier_overrides;
+        # coerce + validate here so an invalid combo is rejected at 'forge proxy template
+        # edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
+        _coerce_proxy_blocks(self)
         _validate_default_tier(self.default_tier)
         # Per-provider overrides: the constraint check skips tiers with no model, so empty/partial
         # providers no-op and only a concrete unsupported override (its tier's model set) is
@@ -750,7 +788,7 @@ class ProxyInstanceConfig:
     auto_cache_min_tokens: int = 1024
 
     costs: CostConfig = field(default_factory=CostConfig)
-    wire_shape: str = "openai_translated"
+    wire_shape: str = DEFAULT_WIRE_SHAPE
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
@@ -787,17 +825,7 @@ class ProxyInstanceConfig:
 
         _validate_default_tier(self.default_tier)
 
-        self.costs = _coerce_cost_config(self.costs)
-
-        if self.wire_shape not in _VALID_WIRE_SHAPES:
-            raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
-            )
-        self.intercept = _coerce_intercept_config(self.intercept)
-        self.audit = _coerce_audit_config(self.audit)
-        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
-        self.logging = _coerce_logging_config(self.logging)
-        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        _coerce_proxy_blocks(self)
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)
 

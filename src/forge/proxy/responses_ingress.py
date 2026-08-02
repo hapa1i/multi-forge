@@ -22,6 +22,12 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
+from forge.core.wire_shapes import (
+    DEFAULT_WIRE_SHAPE,
+    OPENAI_RESPONSES_PASSTHROUGH,
+    PASSTHROUGH_WIRE_SHAPES,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +39,11 @@ def build_intercept_capability_section(wire_shape: str, intercept_mode: str, aud
     passthrough cannot inspect or override bodies, so its can_inspect is uniformly
     false even when intercept.mode is inspect/override.
     """
-    is_responses_pt = wire_shape == "openai_responses_passthrough"
+    is_responses_pt = wire_shape == OPENAI_RESPONSES_PASSTHROUGH
     return {
         "mode": intercept_mode,
         "wire_shape": wire_shape,
-        "thinking_blocks_preserved": wire_shape in ("anthropic_passthrough", "openai_responses_passthrough"),
+        "thinking_blocks_preserved": wire_shape in PASSTHROUGH_WIRE_SHAPES,
         "can_inspect": {
             "system_prompt": (not is_responses_pt) and intercept_mode in ("inspect", "override"),
             "drift_detection": (not is_responses_pt) and intercept_mode in ("inspect", "override"),
@@ -54,7 +60,7 @@ def advertise_responses_ingress(wire_shape: str, source_id: str) -> bool:
     declares the capability -- the same conjunction the /v1/responses route
     enforces, so the advertisement cannot promise an ingress the route then 501s.
     """
-    if wire_shape != "openai_responses_passthrough" or not source_id:
+    if wire_shape != OPENAI_RESPONSES_PASSTHROUGH or not source_id:
         return False
     from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 
@@ -96,10 +102,10 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         )
 
     # Capability gate = the runtime guard the codex preflight mirrors.
-    wire_shape = getattr(config.proxy, "wire_shape", "openai_translated")
+    wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
     backend_id = getattr(config.proxy, "backend", "") or ""
     source = None
-    if wire_shape == "openai_responses_passthrough" and backend_id:
+    if wire_shape == OPENAI_RESPONSES_PASSTHROUGH and backend_id:
         try:
             source = get_model_source(backend_id)
         except ModelSourceNotFoundError:

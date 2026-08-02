@@ -1027,3 +1027,69 @@ def test_passthrough_does_not_import_server():
     src = Path(passthrough.__file__).read_text()
     assert "from forge.proxy.server import" not in src
     assert "import forge.proxy.server" not in src
+
+
+@pytest.mark.asyncio
+async def test_passthrough_accounting_order_and_wire_bytes(monkeypatch, proxy_runtime_ready):
+    """A1 characterization: forwarded body identical; cost then metrics on completion.
+
+    Pinned before extracting the handler to passthrough_ingress.py so the move is
+    provably behavior-preserving on the money path (the accounting closure and the
+    exact upstream body are the passthrough handler's load-bearing contract).
+    """
+    server = proxy_runtime_ready
+
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+
+    order: list[str] = []
+    monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: order.append("cost") or 0)
+    monkeypatch.setattr(server.proxy_metrics, "record_request", lambda **kw: order.append("metrics"))
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 50,
+        "messages": [{"role": "user", "content": "hi"}],
+        # Field the translated path would drop: must reach the upstream untouched.
+        "thinking": {"type": "enabled", "budget_tokens": 512},
+    }
+    resp = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_ord"), "req_ord")
+
+    assert resp.status_code == 200
+    assert order == ["cost", "metrics"]
+    assert _UsageResponseClient.captured["json"] == raw_body
+    assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"
+    assert resp.headers["X-Resolved-Tier"] == "opus"
+
+
+@pytest.mark.asyncio
+async def test_passthrough_streaming_accounting_order(monkeypatch, proxy_runtime_ready):
+    """A1 characterization (streaming): cost -> metrics -> trace at stream end.
+
+    The relay's _on_end runs the accounting closure (cost, then metrics) BEFORE
+    mirroring the provider trace; the non-streaming path records no trace at all
+    (the mirror lives only in the streaming _on_end). Handler-level so the whole
+    extracted ingress -> forward -> relay chain is pinned, not just the relay.
+    """
+    server = proxy_runtime_ready
+
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+
+    order: list[str] = []
+    monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: order.append("cost") or 0)
+    monkeypatch.setattr(server.proxy_metrics, "record_request", lambda **kw: order.append("metrics"))
+    monkeypatch.setattr(passthrough, "record_provider_trace", lambda **kw: order.append("trace"))
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 50,
+        "stream": True,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    resp = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_sord"), "req_sord")
+    _ = [chunk async for chunk in resp.body_iterator]  # drain -> _on_end fires in finally
+
+    assert order == ["cost", "metrics", "trace"]

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Load .env early before any config access
 load_dotenv()
 
-from forge.install.cli import info_cmd  # noqa: E402
+from forge.cli.info import info_cmd  # noqa: E402
 
 from .auth import auth  # noqa: E402
 from .claude import claude  # noqa: E402

@@ -1,7 +1,6 @@
-"""CLI command for forge info (global installation information).
+"""CLI command for forge info (global system dashboard).
 
-The info command remains at top-level for quick diagnostics.
-Other installation lifecycle commands have moved to the `forge extension` group.
+Top-level read-only diagnostics spanning install, proxy, and session state.
 """
 
 from __future__ import annotations
@@ -11,13 +10,9 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.core.paths import display_path
-
-from .tracking import TrackingStore
+from forge.install.tracking import TrackingStore
 
 console = Console()
-
-
-# --- Info Command ---
 
 
 @click.command("info")
@@ -53,7 +48,8 @@ def _gather_info_data(max_sessions: int) -> dict:
     import shutil
     import subprocess
 
-    from .models import parse_installation_key
+    from forge.install.models import parse_installation_key
+    from forge.install.version import get_claude_runtime_version
 
     data: dict = {}
 
@@ -73,18 +69,8 @@ def _gather_info_data(max_sessions: int) -> dict:
     claude_path = shutil.which("claude")
     data["claude_code"] = {
         "path": claude_path,
-        "version": None,
+        "version": get_claude_runtime_version() if claude_path else None,
     }
-    if claude_path:
-        try:
-            result = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                version_str = result.stdout.strip()
-                if " (Claude Code)" in version_str:
-                    version_str = version_str.replace(" (Claude Code)", "")
-                data["claude_code"]["version"] = version_str
-        except Exception:
-            pass
 
     # Python/uv versions
     try:

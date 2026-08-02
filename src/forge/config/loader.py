@@ -34,6 +34,7 @@ from forge.backend.sources import (
 )
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
+    PROXY_BLOCK_FIELDS,
     ForgeConfig,
     ProviderConfig,
     ProxyConfig,
@@ -459,14 +460,11 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
             provider_settings=data_map.get("provider_settings", {}),
             prompt_caching=data_map.get("prompt_caching", "passthrough"),
             auto_cache_min_tokens=data_map.get("auto_cache_min_tokens", 1024),
-            costs=data_map.get("costs", {}),
-            wire_shape=data_map.get("wire_shape", "openai_translated"),
-            intercept=data_map.get("intercept", {}),
-            audit=data_map.get("audit", {}),
-            provider_trace=data_map.get("provider_trace", {}),
-            logging=data_map.get("logging", {}),
             created_at=data_map.get("created_at"),
             updated_at=data_map.get("updated_at"),
+            # Shared blocks flow through the PROXY_BLOCK_FIELDS declaration; absent
+            # keys fall to the dataclass defaults (the single source of defaults).
+            **{name: data_map[name] for name in PROXY_BLOCK_FIELDS if name in data_map},
         )
     except (AttributeError, KeyError, TypeError) as e:
         # Normalize malformed-shape failures into ValueError so every caller's
@@ -551,12 +549,7 @@ def _proxy_instance_to_forge_config(
         active_template=proxy_config.template,
         default_tier=proxy_config.default_tier,
         default_port=proxy_config.port,
-        costs=proxy_config.costs,
-        wire_shape=proxy_config.wire_shape,
-        intercept=proxy_config.intercept,
-        audit=proxy_config.audit,
-        provider_trace=proxy_config.provider_trace,
-        logging=proxy_config.logging,
+        **{name: getattr(proxy_config, name) for name in PROXY_BLOCK_FIELDS},
     )
 
     if proxy_config.provider == "openrouter":
