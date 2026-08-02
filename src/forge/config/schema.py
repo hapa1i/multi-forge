@@ -21,6 +21,7 @@ Usage:
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -626,6 +627,40 @@ def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) 
         )
 
 
+def _coerce_wire_shape(value: Any) -> str:
+    if value not in VALID_WIRE_SHAPES:
+        raise ValueError(f"Invalid wire_shape: {value!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})")
+    return value
+
+
+# Shared per-proxy config blocks: this one declaration drives both dataclasses'
+# block coercion (ProxyConfig + ProxyInstanceConfig __post_init__) and every
+# enumeration of the blocks in loader.py (both hops) and proxy_orchestrator.py
+# (template -> proxy.yaml creation). Closes the silent-drop class where a block
+# added to the dataclasses but not every hop loads in unit tests yet never
+# reaches the running proxy (this shipped for provider_trace).
+PROXY_BLOCK_COERCERS: dict[str, Callable[[Any], Any]] = {
+    "costs": _coerce_cost_config,
+    "wire_shape": _coerce_wire_shape,
+    "intercept": _coerce_intercept_config,
+    "audit": _coerce_audit_config,
+    "provider_trace": _coerce_provider_trace_config,
+    "logging": _coerce_logging_config,
+}
+PROXY_BLOCK_FIELDS: tuple[str, ...] = tuple(PROXY_BLOCK_COERCERS)
+
+
+def _coerce_proxy_blocks(cfg: Any) -> None:
+    """Coerce the shared per-proxy blocks in place, then cross-validate.
+
+    The cross-field check needs the validated wire_shape and the coerced
+    intercept, so it runs after the loop.
+    """
+    for name, coercer in PROXY_BLOCK_COERCERS.items():
+        setattr(cfg, name, coercer(getattr(cfg, name)))
+    _validate_wire_shape_intercept(cfg.wire_shape, cfg.intercept)
+
+
 _VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})
 
 
@@ -668,19 +703,10 @@ class ProxyConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     def __post_init__(self) -> None:
-        # Templates carry wire_shape/intercept/audit/provider_trace/logging/costs/default_tier/
-        # tier_overrides too; coerce + validate here so an invalid combo is rejected at
-        # 'forge proxy template edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
-        self.intercept = _coerce_intercept_config(self.intercept)
-        self.audit = _coerce_audit_config(self.audit)
-        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
-        self.logging = _coerce_logging_config(self.logging)
-        self.costs = _coerce_cost_config(self.costs)
-        if self.wire_shape not in VALID_WIRE_SHAPES:
-            raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})"
-            )
-        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        # Templates carry the shared per-proxy blocks plus default_tier/tier_overrides;
+        # coerce + validate here so an invalid combo is rejected at 'forge proxy template
+        # edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
+        _coerce_proxy_blocks(self)
         _validate_default_tier(self.default_tier)
         # Per-provider overrides: the constraint check skips tiers with no model, so empty/partial
         # providers no-op and only a concrete unsupported override (its tier's model set) is
@@ -787,17 +813,7 @@ class ProxyInstanceConfig:
 
         _validate_default_tier(self.default_tier)
 
-        self.costs = _coerce_cost_config(self.costs)
-
-        if self.wire_shape not in VALID_WIRE_SHAPES:
-            raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})"
-            )
-        self.intercept = _coerce_intercept_config(self.intercept)
-        self.audit = _coerce_audit_config(self.audit)
-        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
-        self.logging = _coerce_logging_config(self.logging)
-        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        _coerce_proxy_blocks(self)
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)
 

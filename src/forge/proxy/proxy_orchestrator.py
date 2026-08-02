@@ -35,6 +35,7 @@ from forge.config.loader import (
     write_proxy_instance_config,
 )
 from forge.config.schema import (
+    PROXY_BLOCK_FIELDS,
     BackendDependency,
     ProxyInstanceConfig,
     TierModels,
@@ -254,12 +255,11 @@ def create_proxy_file(
         model_alternatives=provider.model_alternatives,
         default_tier=cfg.proxy.default_tier or "sonnet",
         provider_settings=provider_settings,
-        wire_shape=cfg.proxy.wire_shape,
-        intercept=cfg.proxy.intercept,
-        audit=cfg.proxy.audit,
-        provider_trace=cfg.proxy.provider_trace,
-        logging=cfg.proxy.logging,
         created_at=now_iso(),
+        # Every shared block copies from the template via one declaration. This
+        # closes the drop class that previously lost provider_trace/logging here,
+        # and newly carries template-declared costs (spend caps) into the proxy.
+        **{name: getattr(cfg.proxy, name) for name in PROXY_BLOCK_FIELDS},
     )
 
     return write_proxy_instance_config(proxy_id, proxy_config)
