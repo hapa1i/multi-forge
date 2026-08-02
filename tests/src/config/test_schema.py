@@ -15,6 +15,32 @@ from forge.config.schema import (
 )
 
 
+class TestOpenAIModelsCatalogConformance:
+    """OPENAI_MODELS must cover every catalog model in the openai/ alias namespace.
+
+    The allowlist is strict (no prefix heuristics), so a new OpenAI model added to
+    model_catalog.yaml but not to OPENAI_MODELS silently misclassifies in the
+    proxy's model-name detection (data_models._is_openai). The reverse direction is
+    deliberately NOT enforced: the allowlist keeps retired OpenAI names (gpt-4o,
+    o1, ...) the proxy should still recognize after the catalog drops them.
+    """
+
+    def test_every_catalog_openai_alias_is_recognized(self):
+        from forge.core.models.catalog import load_model_catalog
+
+        catalog = load_model_catalog()
+        openai_aliases = [alias for alias in catalog.aliases if alias.startswith("openai/")]
+        assert openai_aliases, "catalog lost its openai/ alias namespace -- update this conformance test"
+
+        unrecognized = sorted(
+            name
+            for alias in openai_aliases
+            for name in (alias, catalog.aliases[alias])
+            if not is_openai_model(name)
+        )
+        assert not unrecognized, f"catalog OpenAI models missing from OPENAI_MODELS: {unrecognized}"
+
+
 class TestIsOpenAIModel:
     """Tests for is_openai_model helper function.
 
