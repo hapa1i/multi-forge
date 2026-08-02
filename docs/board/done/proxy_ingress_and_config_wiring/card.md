@@ -1,7 +1,8 @@
 # proxy_ingress_and_config_wiring -- server.py passthrough extraction + config/install field wiring
 
-**Lane**: `doing/` -- single-card execution (decision 2026-08-02: no member-card split; all verified-valid slices ship
-from this card on one branch). Behavior-preserving extraction and shared-field wiring.
+**Lane**: `done/` (2026-08-02) -- single-card execution (decision 2026-08-02: no member-card split; all verified-valid
+slices shipped from this card on branch `refactor/proxy-ingress-config-wiring`). Behavior-preserving extraction and
+shared-field wiring.
 
 **Origin**: full-codebase refactor audit, 2026-07-05 (`/refactor_audit whole repo --full`; areas proxy-pkg,
 install-config-backend). Anchors re-verified 2026-07-26 (`fbc736b5`) and again 2026-08-02 (`34362ce2`); the previously
@@ -161,4 +162,11 @@ after the move; (d) `make test-unit` green per slice, relevant proxy integration
 
 ## Closeout
 
-(pending)
+Completed 2026-08-02 on `refactor/proxy-ingress-config-wiring`. All five slices shipped (B1 `core/wire_shapes.py` leaf,
+B3 `forge info` -> `cli/info.py` + version-parse dedup, B2 `PROXY_BLOCK_COERCERS` registry, B4 `OPENAI_MODELS`
+conformance test, A1 `proxy/passthrough_ingress.py` extraction). Three bugs surfaced by the card's own guards:
+template-`costs` drop in `create_proxy_file`, `gpt-5.5-pro` allowlist drift, and a pre-existing
+`proxy_server_local_openai` fixture that never routed `litellm_local`. Post-review hardening added the bidirectional
+shared-field drift guard and the streaming accounting-order characterization (see `checklist.md`). Verification: full
+unit suite green, proxy integration gate 12/12, `make pre-commit` clean. Change-log entry recorded; design.md §6 map
+updated with `core/wire_shapes.py`.

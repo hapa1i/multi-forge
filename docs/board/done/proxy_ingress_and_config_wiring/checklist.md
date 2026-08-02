@@ -56,6 +56,11 @@ Single-card execution (decision 2026-08-02). Order: B1 -> B3 -> B2 -> B4 -> A1. 
   caps silently reverted at 'forge proxy create' (same class as the provider_trace/logging drop previously fixed there).
   Regression: `tests/regression/test_bug_create_proxy_file_costs_drop.py`. Full unit 8,653 + regression 594 passed.
   Committed.
+- [x] **Post-review hardening (2026-08-02)**: the drift guard was one-way (registered fields exist on both dataclasses)
+  and could not see a shared field added WITHOUT registering -- both hops would silently default it, the exact failure
+  class B2 claims to close. Added `PROXY_SHARED_NON_BLOCK_FIELDS` beside the registry in `config/schema.py` and
+  `test_every_shared_field_is_registered_or_explicitly_transported`: the dataclass intersection must exactly equal
+  registry + explicitly-transported, with staleness/overlap checks on the exemption set.
 
 | Test              | Fixture                                                                                         | Assertion                                                                             | Test File                             |
 | ----------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
@@ -94,9 +99,15 @@ Single-card execution (decision 2026-08-02). Order: B1 -> B3 -> B2 -> B4 -> A1. 
 
 | Test             | Fixture                                 | Assertion                                                                                     | Test File          |
 | ---------------- | --------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------ |
-| Characterization | fake upstream, passthrough proxy config | wire bytes unchanged; cost -> trace -> metrics ordering identical pre/post move               | `tests/src/proxy/` |
+| Characterization | fake upstream, passthrough proxy config | wire bytes unchanged; accounting ordering identical pre/post move (actual orders below)       | `tests/src/proxy/` |
 | Existing suites  | --                                      | passthrough/server/audit/cost suites green unchanged                                          | existing           |
 | Integration      | Docker LiteLLM                          | `./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py` green | integration        |
+
+**Ordering correction (post-review, 2026-08-02)**: this table originally claimed `cost -> trace -> metrics`; the code's
+actual order is `cost -> metrics -> trace` for streaming (the relay's `_on_end` runs the accounting closure before the
+provider-trace mirror), and the non-streaming path records **no** trace (the mirror lives only in the streaming
+`_on_end`). The non-streaming characterization pins `cost -> metrics`; the added handler-level streaming test
+`test_passthrough_streaming_accounting_order` drains the SSE relay and pins `cost -> metrics -> trace`.
 
 ## Closeout
 
