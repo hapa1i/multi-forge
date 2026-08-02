@@ -9,6 +9,7 @@ the provider_trace bug class) and force coverage to grow with the registry.
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 import pytest
 
@@ -18,7 +19,7 @@ from forge.config.loader import (
 )
 from forge.config.schema import PROXY_BLOCK_FIELDS, ProxyConfig, ProxyInstanceConfig
 
-_VALID_PROXY = {
+_VALID_PROXY: dict[str, Any] = {
     "proxy_format": 1,
     "template": "openrouter-anthropic",
     "template_digest": "sha256:test",
