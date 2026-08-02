@@ -27,6 +27,31 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-02
 
+### Proxy ingress + config wiring refactor (proxy_ingress_and_config_wiring)
+
+**Goal**: Close the silent-drop bug class in per-proxy config wiring, single-source the wire-shape vocabulary, and
+extract the anthropic passthrough ingress from `server.py` -- one card, five slices (B1, B3, B2, B4, A1).
+
+**Key changes**:
+
+- `core/wire_shapes.py` vocabulary leaf (shapes, `VALID_WIRE_SHAPES`, `PASSTHROUGH_WIRE_SHAPES`, default); all
+  code-literal sites repointed, including env.py's half-centralized local constants.
+- `PROXY_BLOCK_COERCERS`/`PROXY_BLOCK_FIELDS` registry in `config/schema.py` now drives both `__post_init__` coercion
+  sequences, both loader hops, and `create_proxy_file` -- adding a block field is one registry entry, and
+  `tests/src/config/test_proxy_block_wiring.py` forces live-read coverage to grow with it.
+- `forge info` moved to `cli/info.py` (`install/cli.py` deleted); claude-version parse deduped through
+  `install/version.py::get_claude_runtime_version`.
+- `proxy/passthrough_ingress.py` extraction mirroring `responses_ingress.py`'s lazy-import pattern; a characterization
+  test pinned cost->metrics order and wire-byte fidelity before the move (server.py 2361 -> 2088 lines).
+- Three bugs found by the card's guards: `create_proxy_file` dropped template-declared `costs` (regression:
+  `tests/regression/test_bug_create_proxy_file_costs_drop.py`); `gpt-5.5-pro` missing from `OPENAI_MODELS`; the
+  `proxy_server_local_openai` integration fixture never routed `litellm_local` (template-only start, no
+  `FORGE_PROXY_ID`), so it 500'd without `LITELLM_BASE_URL` set -- pre-existing on `main`, fixed by registering the
+  proxy with its isolated upstream.
+
+**Verification**: Full unit suite 8,655 passed; integration gate 12 passed (`test_proxy_local_litellm_e2e.py` +
+`test_session_routing_e2e.py`); `make pre-commit` clean.
+
 ### Session orphan manifest repair (`forge session repair`)
 
 **Goal**: Surface and re-index manifest-only session orphans -- invisible to `session list` yet still owning their name

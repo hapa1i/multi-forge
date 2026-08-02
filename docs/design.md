@@ -1558,6 +1558,7 @@ multi-forge/
 │   │   │   ├── paths.py # Cross-cutting path helpers, including git-root discovery
 │   │   │   ├── transcript.py # Shared Claude transcript parsing primitives
 │   │   │   ├── tiers.py # Shared tier-word detection primitives
+│   │   │   ├── wire_shapes.py # Wire-shape vocabulary leaf (shapes, validity, default)
 │   │   │   └── state/   # File-based state helpers
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system

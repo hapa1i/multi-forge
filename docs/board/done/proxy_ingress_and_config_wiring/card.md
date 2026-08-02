@@ -65,7 +65,7 @@ resume `wf_dfc2d14a-03c` is same-session-only and dead):
    uses the same class of server-module singletons/helpers the Responses ingress already reads via documented lazy
    import (`import forge.proxy.server as server` -- `config`, `cost_tracker`, `audit_logger`, `proxy_metrics`,
    `_forge_run_ids`, `_forge_session_command`, `_backend_instance_id`, `record_provider_trace`). The lazy-import pattern
-   also avoids the server<->ingress cycle (server imports the ingress at load to register routes). The extraction
+   also avoids the server\<->ingress cycle (server imports the ingress at load to register routes). The extraction
    mirrors an existing, shipped dependency shape.
 2. **Does field-registry indirection obscure the two-posture validation?** No, because the registry scope is narrower
    than the original card assumed: the strict `_coerce_*` helpers are already shared, and the strict-vs-warn-degrade
@@ -105,23 +105,23 @@ loader into `core/reactive/env.py` and `session/model_pin.py` -- the exact eager
 
 ## Target shape
 
-| Slice | Concern                      | Target                                                                     | Copies today                                                                                                   |
-| ----- | ---------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| B1    | Wire-shape vocabulary        | `core/wire_shapes.py` leaf (all 3 shapes + validity tuple)                 | schema.py:273; loader.py:463; env.py:65-66; responses_ingress.py x6; server.py x3; model_pin.py:18; proxy_orchestrator.py x4; codex_preflight.py:515 |
-| B3    | `forge info` home + parse    | command implementation in `cli/`; parse via `install/version.py`           | install/cli.py:26 (home), :80-85 (drifted parse copy)                                                          |
-| B2    | Per-proxy block field wiring | one shared block-field declaration driving both loader hops + both coercion loops | loader.py:455-470/:547-560; schema.py two `__post_init__` coercion sequences                             |
-| B4    | `OPENAI_MODELS` conformance  | conformance test against `model_catalog.yaml` (no single-sourcing)         | schema.py:38-94 vs core/data/model_catalog.yaml                                                                |
-| A1    | Passthrough ingress          | new `proxy/passthrough_ingress.py` mirroring `responses_ingress.py`        | server.py:753 + :810 (~226 lines)                                                                              |
+| Slice | Concern                      | Target                                                                            | Copies today                                                                                                                                         |
+| ----- | ---------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1    | Wire-shape vocabulary        | `core/wire_shapes.py` leaf (all 3 shapes + validity tuple)                        | schema.py:273; loader.py:463; env.py:65-66; responses_ingress.py x6; server.py x3; model_pin.py:18; proxy_orchestrator.py x4; codex_preflight.py:515 |
+| B3    | `forge info` home + parse    | command implementation in `cli/`; parse via `install/version.py`                  | install/cli.py:26 (home), :80-85 (drifted parse copy)                                                                                                |
+| B2    | Per-proxy block field wiring | one shared block-field declaration driving both loader hops + both coercion loops | loader.py:455-470/:547-560; schema.py two `__post_init__` coercion sequences                                                                         |
+| B4    | `OPENAI_MODELS` conformance  | conformance test against `model_catalog.yaml` (no single-sourcing)                | schema.py:38-94 vs core/data/model_catalog.yaml                                                                                                      |
+| A1    | Passthrough ingress          | new `proxy/passthrough_ingress.py` mirroring `responses_ingress.py`               | server.py:753 + :810 (~226 lines)                                                                                                                    |
 
 ## Phased plan
 
-| Slice | Scope                                                                                                  | Exit signal                                                                                                                                                      |
-| ----- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1    | `core/wire_shapes.py` leaf; repoint every code-literal site (env.py's half-centralization folds in).   | one wire-shape vocabulary; `rg` for the string literals returns the leaf + docstrings/error-text only                                                            |
-| B3    | Move `forge info` implementation to `cli/`; drop the inline parse for `install/version.py`.            | `forge info` implementation lives in `cli/`; output identical except the version token fix; one claude-version parse in src/                                     |
-| B2    | Shared block-field declaration drives both loader hops + both coercion loops.                          | a new block reaches `config.proxy` through one wiring point; a live-read test (not schema-only) proves it; per-dataclass unique validations untouched            |
-| B4    | Conformance test: `OPENAI_MODELS` entries cross-checked against the catalog.                           | drift between allowlist and catalog fails a test instead of passing silently                                                                                     |
-| A1    | Extract `passthrough_ingress.py` mirroring `responses_ingress.py`. Characterization test **first**.    | passthrough characterization (wire bytes + cost/trace/metrics ordering) green before and after the move; the module reads as the structural peer of `responses_ingress.py` |
+| Slice | Scope                                                                                                | Exit signal                                                                                                                                                                |
+| ----- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1    | `core/wire_shapes.py` leaf; repoint every code-literal site (env.py's half-centralization folds in). | one wire-shape vocabulary; `rg` for the string literals returns the leaf + docstrings/error-text only                                                                      |
+| B3    | Move `forge info` implementation to `cli/`; drop the inline parse for `install/version.py`.          | `forge info` implementation lives in `cli/`; output identical except the version token fix; one claude-version parse in src/                                               |
+| B2    | Shared block-field declaration drives both loader hops + both coercion loops.                        | a new block reaches `config.proxy` through one wiring point; a live-read test (not schema-only) proves it; per-dataclass unique validations untouched                      |
+| B4    | Conformance test: `OPENAI_MODELS` entries cross-checked against the catalog.                         | drift between allowlist and catalog fails a test instead of passing silently                                                                                               |
+| A1    | Extract `passthrough_ingress.py` mirroring `responses_ingress.py`. Characterization test **first**.  | passthrough characterization (wire bytes + cost/trace/metrics ordering) green before and after the move; the module reads as the structural peer of `responses_ingress.py` |
 
 Order: B1 -> B3 -> B2 -> B4 -> A1 (lowest risk first; the money/wire caution zone last, behind its characterization
 test).
