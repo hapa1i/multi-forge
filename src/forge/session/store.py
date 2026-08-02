@@ -17,6 +17,7 @@ IndexStore.add_session). The directory name IS the session name.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import shutil
@@ -31,6 +32,7 @@ from forge.core.state.lock import file_lock_for_target
 from forge.core.typing_helpers import unwrap_optional
 
 from .exceptions import (
+    ManifestChangedError,
     ManifestCorruptedError,
     ManifestUnreadableError,
     ManifestValidationError,
@@ -352,6 +354,51 @@ class SessionStore:
             mutate(manifest)
             self._write_unlocked(manifest)
             return manifest
+
+    def update_if_unchanged(
+        self,
+        expected_sha256: str,
+        *,
+        timeout_s: float,
+        mutate: Callable[[SessionState], None] | None = None,
+    ) -> None:
+        """Verify the manifest is byte-identical to a scanned copy, then optionally mutate.
+
+        The manifest half of orphan repair (core/ops/session_repair.py). The
+        manifest already exists, so the creation transaction's callback proves
+        identity instead of writing: conversation ids cannot do that (a Codex
+        session before its first turn carries neither id), so the proof is a
+        content hash captured at scan time. Runs under the manifest lock; safe
+        inside ``create_session_txn``'s callback (index -> manifest order).
+
+        Args:
+            expected_sha256: Hex digest of the manifest bytes at scan time.
+            timeout_s: How long to wait for the manifest lock.
+            mutate: Optional in-place correction applied only after the hash
+                matches (the moved-checkout worktree-path fix, checklist D2).
+                None verifies without writing.
+
+        Raises:
+            SessionFileNotFoundError: If the manifest is gone.
+            ManifestUnreadableError: If the read itself failed (transient).
+            ManifestChangedError: If the bytes differ from ``expected_sha256``.
+        """
+        with file_lock_for_target(target_path=self._manifest_path, timeout_s=timeout_s):
+            try:
+                raw = self._manifest_path.read_bytes()
+            except FileNotFoundError:
+                raise SessionFileNotFoundError(str(self._manifest_path))
+            except OSError as e:
+                raise ManifestUnreadableError(str(self._manifest_path), f"read error: {e}")
+            if hashlib.sha256(raw).hexdigest() != expected_sha256:
+                raise ManifestChangedError(str(self._manifest_path))
+            if mutate is None:
+                return
+            # Bytes match the scanned copy, so this parse succeeds exactly as the
+            # scan's parse did.
+            manifest = self.read()
+            mutate(manifest)
+            self._write_unlocked(manifest)
 
     def _validate_data(self, data: dict[str, Any]) -> None:
         """Validate required fields for schema v1.

@@ -181,6 +181,9 @@ forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--kee
 # Clean (age-based bulk delete; previews by default, --yes to delete)
 forge session clean --older-than DAYS [--yes] [--force] [--keep-transcripts] [--delete-worktree] [--delete-branch]
 
+# Repair (re-index orphaned session manifests; previews by default, --yes to apply)
+forge session repair [--yes] [--json]
+
 # Incognito (same options as start, auto-deletes on exit)
 forge session incognito [name] [--proxy <proxy_id>] [--no-proxy]
   [--worktree/-w] [--branch/-b] [--system-prompt/-s] [--system-prompt-file/-S]
@@ -226,6 +229,23 @@ forge config set session_retention_days=90    # Auto-clean sessions > 90 days on
 
 Auto-cleanup runs opportunistically on each `forge` command (same pattern as log retention). It never deletes worktrees
 or branches automatically.
+
+### Repairing invisible sessions
+
+A session can end up with its manifest on disk but no entry in the session index — a crash during creation on an older
+Forge, or a deleted worktree whose session recorded it. Such an orphan never appears in `forge session list`, yet its
+name stays taken and its conversation stays bound. From the project root:
+
+```bash
+forge session repair          # Report orphaned manifests and what repair would do
+forge session repair --yes    # Re-index the repairable ones
+```
+
+Repair never deletes anything. The preview labels each orphan: `repairable` orphans are re-indexed by `--yes`;
+`missing-worktree` means the session's checkout is gone — recreate it or `forge session delete <name>`; `collision`
+means the conversation now belongs to a live session and is refused; `corrupt` manifests are `forge clean`'s job. With
+`--yes`, the command exits 1 if any repair was refused or failed. A `.forge/project.toml` version pin refuses `--yes`
+the same way other session mutations are refused.
 
 ---
 

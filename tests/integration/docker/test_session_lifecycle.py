@@ -196,6 +196,40 @@ print('removed_from_index')
         # Session should not appear in output (pruned on access)
         assert "test-session" not in result.stdout, f"Orphaned session should be pruned: {result.stdout}"
 
+    def test_repair_reindexes_orphaned_manifest(self, forge_workspace: ContainerLike) -> None:
+        """Round-trip: drop a session's index row, then `session repair --yes` restores it."""
+        forge_workspace.exec("forge extension enable --scope user --profile minimal")
+        forge_workspace.exec("cd /workspace && forge session start repair-me")
+
+        # Remove the row but keep the manifest: the orphan state repair targets.
+        drop = forge_workspace.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+path = Path.home() / '.forge' / 'sessions' / 'index.json'
+index = json.loads(path.read_text())
+index['sessions'] = {k: v for k, v in index['sessions'].items() if k.split('|', 1)[0] != 'repair-me'}
+path.write_text(json.dumps(index))
+print('row_dropped')
+"
+        """)
+        assert "row_dropped" in drop.stdout, f"Row drop failed: {drop.stderr}"
+
+        hidden = forge_workspace.exec("cd /workspace && forge session list")
+        assert "repair-me" not in hidden.stdout, f"Orphan should be invisible: {hidden.stdout}"
+
+        preview = forge_workspace.exec("cd /workspace && forge session repair")
+        assert preview.returncode == 0, f"Repair preview failed: {preview.stderr}"
+        assert (
+            "repair-me" in preview.stdout and "repairable" in preview.stdout
+        ), f"Preview should classify the orphan: {preview.stdout}"
+
+        applied = forge_workspace.exec("cd /workspace && forge session repair --yes")
+        assert applied.returncode == 0, f"Repair apply failed: {applied.stderr}"
+
+        restored = forge_workspace.exec("cd /workspace && forge session list")
+        assert "repair-me" in restored.stdout, f"Repaired session should be listed: {restored.stdout}"
+
 
 class TestIntentVsConfirmed:
     """Tests for intent vs confirmed state divergence."""

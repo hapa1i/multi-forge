@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -13,6 +14,7 @@ import pytest
 from forge.core.state import FileLockTimeoutError, now_iso
 from forge.session.exceptions import (
     InvalidSessionNameError,
+    ManifestChangedError,
     ManifestCorruptedError,
     ManifestValidationError,
     SessionFileNotFoundError,
@@ -360,6 +362,52 @@ class TestSessionStoreUpdate:
             if proc.is_alive():
                 proc.terminate()
                 proc.join(timeout=2.0)
+
+
+class TestSessionStoreUpdateIfUnchanged:
+    """Test SessionStore.update_if_unchanged() (repair's hash-verified write)."""
+
+    def _write_and_hash(self, store: SessionStore, manifest: SessionState) -> str:
+        store.write(manifest)
+        return hashlib.sha256(store.manifest_path.read_bytes()).hexdigest()
+
+    def test_matching_hash_without_mutate_is_noop(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        digest = self._write_and_hash(store, sample_manifest)
+        before = store.manifest_path.read_bytes()
+
+        store.update_if_unchanged(digest, timeout_s=5.0)
+
+        assert store.manifest_path.read_bytes() == before
+
+    def test_matching_hash_persists_mutation(self, store: SessionStore, sample_manifest: SessionState) -> None:
+        digest = self._write_and_hash(store, sample_manifest)
+
+        def _set_uuid(m: SessionState) -> None:
+            m.confirmed.claude_session_id = "mutated-uuid"
+
+        store.update_if_unchanged(digest, timeout_s=5.0, mutate=_set_uuid)
+
+        assert store.read().confirmed.claude_session_id == "mutated-uuid"
+
+    def test_hash_mismatch_raises_and_leaves_manifest_alone(
+        self, store: SessionStore, sample_manifest: SessionState
+    ) -> None:
+        self._write_and_hash(store, sample_manifest)
+        before = store.manifest_path.read_bytes()
+        stale = hashlib.sha256(b"different bytes").hexdigest()
+
+        def _set_uuid(m: SessionState) -> None:
+            m.confirmed.claude_session_id = "must-not-land"
+
+        with pytest.raises(ManifestChangedError):
+            store.update_if_unchanged(stale, timeout_s=5.0, mutate=_set_uuid)
+
+        assert store.manifest_path.read_bytes() == before
+
+    def test_missing_manifest_raises_not_found(self, store: SessionStore) -> None:
+        digest = hashlib.sha256(b"anything").hexdigest()
+        with pytest.raises(SessionFileNotFoundError):
+            store.update_if_unchanged(digest, timeout_s=5.0)
 
 
 class TestSessionStoreRead:

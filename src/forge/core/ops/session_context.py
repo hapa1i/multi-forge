@@ -494,7 +494,7 @@ def collect_bound_uuids(forge_root: str | None = None) -> dict[str, str]:
         _read_manifest_uuid(entry.forge_root or entry.worktree_path, name)
 
     if forge_root:
-        for manifest_dir in _manifest_dirs(forge_root):
+        for manifest_dir in manifest_dirs(forge_root):
             _read_manifest_uuid(forge_root, manifest_dir.name)
 
     return bound
@@ -557,13 +557,13 @@ def collect_bound_codex_threads(forge_root: str | None = None) -> dict[str, str]
         _record(entry.forge_root or entry.worktree_path, name)
 
     if forge_root:
-        for manifest_dir in _manifest_dirs(forge_root):
+        for manifest_dir in manifest_dirs(forge_root):
             _record(forge_root, manifest_dir.name)
 
     return bound
 
 
-def _manifest_dirs(forge_root: str) -> list[Path]:
+def manifest_dirs(forge_root: str) -> list[Path]:
     """Return the per-session directories under a project's ``.forge/sessions/``.
 
     A missing directory is a project with no sessions yet. Any other error is
