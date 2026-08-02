@@ -654,6 +654,13 @@ PROXY_BLOCK_COERCERS: dict[str, Callable[[Any], Any]] = {
 }
 PROXY_BLOCK_FIELDS: tuple[str, ...] = tuple(PROXY_BLOCK_COERCERS)
 
+# Shared non-block fields both proxy dataclasses carry; each loader hop transports
+# these explicitly (loader.py hop 1 and hop 2). Any OTHER field added to both
+# dataclasses must join PROXY_BLOCK_COERCERS, or both hops silently drop it to its
+# default -- tests/src/config/test_proxy_block_wiring.py enforces the exact-set
+# equality, making the intersection the closed contract rather than a convention.
+PROXY_SHARED_NON_BLOCK_FIELDS: frozenset[str] = frozenset({"backend", "default_tier", "family"})
+
 
 def _coerce_proxy_blocks(cfg: Any) -> None:
     """Coerce the shared per-proxy blocks in place, then cross-validate.

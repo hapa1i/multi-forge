@@ -17,7 +17,12 @@ from forge.config.loader import (
     _proxy_instance_to_forge_config,
     load_proxy_instance_config_from_dict,
 )
-from forge.config.schema import PROXY_BLOCK_FIELDS, ProxyConfig, ProxyInstanceConfig
+from forge.config.schema import (
+    PROXY_BLOCK_FIELDS,
+    PROXY_SHARED_NON_BLOCK_FIELDS,
+    ProxyConfig,
+    ProxyInstanceConfig,
+)
 
 _VALID_PROXY: dict[str, Any] = {
     "proxy_format": 1,
@@ -87,6 +92,37 @@ def test_registry_names_are_fields_on_both_dataclasses(cls) -> None:
     field_names = {f.name for f in dataclasses.fields(cls)}
     missing = set(PROXY_BLOCK_FIELDS) - field_names
     assert not missing, f"{cls.__name__} lacks registered block field(s): {sorted(missing)}"
+
+
+def _unregistered_shared_fields(shared: set[str]) -> set[str]:
+    return shared - set(PROXY_BLOCK_FIELDS) - PROXY_SHARED_NON_BLOCK_FIELDS
+
+
+def test_every_shared_field_is_registered_or_explicitly_transported() -> None:
+    """Bidirectional drift guard: the dataclass intersection is a closed set.
+
+    The registered->fields check above cannot see a field added to BOTH
+    dataclasses but omitted from the registry -- both loader hops would silently
+    drop it to its default (the provider_trace bug class B2 exists to close).
+    """
+    shared = {f.name for f in dataclasses.fields(ProxyConfig)} & {
+        f.name for f in dataclasses.fields(ProxyInstanceConfig)
+    }
+    unregistered = _unregistered_shared_fields(shared)
+    assert not unregistered, (
+        f"Shared proxy field(s) {sorted(unregistered)} are not in PROXY_BLOCK_COERCERS: "
+        "register a coercer (both loader hops then transport the field), or add it to "
+        "PROXY_SHARED_NON_BLOCK_FIELDS only if each hop already passes it explicitly."
+    )
+    # The exemption set may not go stale (names both dataclasses no longer share)
+    # or shadow registry entries (a field must have exactly one transport story).
+    assert PROXY_SHARED_NON_BLOCK_FIELDS <= shared
+    assert not PROXY_SHARED_NON_BLOCK_FIELDS & set(PROXY_BLOCK_FIELDS)
+
+
+def test_unregistered_shared_field_is_flagged() -> None:
+    """The guard's set logic reports exactly the unaccounted-for member."""
+    assert _unregistered_shared_fields({"costs", "backend", "new_block"}) == {"new_block"}
 
 
 def test_invalid_wire_shape_message_unchanged() -> None:
