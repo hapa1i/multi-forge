@@ -133,6 +133,7 @@ def _register_proxy_for_test(
     template: str,
     port: int,
     forge_home: Path,
+    upstream_base_url: str | None = None,
 ) -> None:
     """Create proxy.yaml and registry entries for strict proxy startup."""
     from forge.proxy.proxies import ProxyEntry, ProxyRegistryStore
@@ -145,6 +146,7 @@ def _register_proxy_for_test(
             template=template,
             base_url=base_url,
             port=port,
+            upstream_base_url=upstream_base_url,
         )
         store = ProxyRegistryStore(registry_path=forge_home / "proxies" / "index.json")
         registry = store.read()
@@ -714,6 +716,18 @@ def proxy_server_local_openai(
         pytest.fail("OPENAI_API_KEY not set (required for litellm-openai-local proxy tests)")
 
     port = allocate_ephemeral_port()
+    proxy_id = f"itest-openai-local-{port}"
+    # Register proxy.yaml with the isolated upstream so provider detection routes
+    # litellm_local. Model-prefix detection alone says litellm_remote for openai/*
+    # models, and the local override only fires when FORGE_PROXY_ID resolves a
+    # proxy.yaml whose upstream_base_url is local (client_factory).
+    _register_proxy_for_test(
+        proxy_id=proxy_id,
+        template="litellm-openai-local",
+        port=port,
+        forge_home=module_forge_home,
+        upstream_base_url=local_litellm_openai,
+    )
     env = os.environ.copy()
     env["FORGE_HOME"] = str(module_forge_home)
     env["LITELLM_LOCAL_BASE_URL"] = local_litellm_openai
@@ -725,6 +739,7 @@ def proxy_server_local_openai(
         forge_home=module_forge_home,
         env=env,
         cwd=cwd,
+        proxy_id=proxy_id,
     )
     proxy_base_url = f"http://localhost:{port}"
 
