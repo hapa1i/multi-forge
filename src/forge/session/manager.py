@@ -2090,8 +2090,8 @@ class SessionManager:
         # session. Removing the row and manifest unconditionally would then delete
         # that session instead of this one.
         def _delete_manifest() -> None:
-            # Runs inside the index lock, after the row is gone. Outside it, a
-            # replacement could publish between the ownership check and this
+            # Runs inside the index lock, before the row is removed. Outside it,
+            # a replacement could publish between the ownership check and this
             # delete and lose its manifest to it.
             if store.exists():
                 store.delete()

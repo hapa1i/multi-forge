@@ -234,6 +234,12 @@ class SessionStore:
         Acquires the same file lock as update() to prevent CLI write + hook
         update lost-update races (D10).
 
+        This is an unconditional low-level write: if the manifest disappears
+        while this call waits for its lock, it recreates the directory and
+        manifest. Production mutations of a published session must use ``update``
+        so terminal deletion remains authoritative. Creation and restoration must
+        use ``IndexStore.create_session_txn`` with ``create_exclusive``.
+
         Args:
             manifest: The manifest to write.
 
@@ -264,8 +270,10 @@ class SessionStore:
         the process. Call this only from that transaction, or from a path that
         genuinely owns its name without publishing a row.
 
-        Use `write` instead when overwriting an existing manifest is intended
-        (rollback restores, deliberate stale-target replacement).
+        Do not fall back to ``write`` for a production overwrite or restoration:
+        it can recreate a manifest after terminal deletion. Existing published
+        sessions mutate through ``update``; creation and restoration use the outer
+        index transaction.
 
         Raises:
             SessionExistsError: If the manifest already exists.
@@ -308,17 +316,31 @@ class SessionStore:
     def delete(self) -> bool:
         """Delete the session directory and its contents.
 
-        Uses shutil.rmtree since the session directory is entirely session-owned.
-        Leaves the parent sessions/ directory in place even if empty (D12).
+        Serializes with ``update`` on the manifest lock. The manifest is unlinked
+        before recursive cleanup because the lock file lives inside the directory
+        being removed: an updater that opens the old or a replacement lock inode
+        during cleanup must read the missing manifest and fail instead of
+        resurrecting a deleted session. Creation is separately serialized by the
+        outer index transaction; unconditional ``write`` is not a supported
+        production mutation of a published session.
+
+        Uses shutil.rmtree since the rest of the session directory is entirely
+        session-owned. Leaves the parent sessions/ directory in place even if
+        empty (D12).
 
         Returns:
             True if directory was removed, False if it didn't exist.
         """
         session_dir = self.session_dir
-        if session_dir.is_dir():
+        if not session_dir.is_dir():
+            return False
+
+        with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            if not session_dir.is_dir():
+                return False
+            self._manifest_path.unlink(missing_ok=True)
             shutil.rmtree(session_dir, ignore_errors=True)
             return True
-        return False
 
     def update_last_accessed(self) -> SessionState:
         """Update last_accessed_at timestamp and return updated manifest."""
