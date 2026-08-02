@@ -2,7 +2,8 @@
 
 **Card**: [card.md](card.md). Branch: `feat/session-orphan-manifest-repair`.
 
-**Current focus**: Phase 1/2 execution. D1-D6 ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides).
+**Current focus**: Phases 1-3 implemented and verified 2026-08-02; awaiting review/merge, then closeout. D1-D6
+ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides).
 Phase 0 history: the reviewer declined to ratify the original D1-D5; every correction was verified against source
 (findings F1-F6 below) and the decision set is rewritten: D1/D2 now follow the per-shape worktree-placement model, D3 is
 resolved, D4 splits corrupt from unreadable, D6 is new.
@@ -105,45 +106,63 @@ resolved, D4 splits corrupt from unreadable, D6 is new.
 
 ## Phase 1 -- Discovery (read-only)
 
-- [ ] New command-core op `core/ops/session_repair.py`: `scan_repairable_orphans(forge_root)` reusing the
+- [x] New command-core op `core/ops/session_repair.py`: `scan_repairable_orphans(forge_root)` reusing the
   `_manifest_dirs` walk (`session_context.py:566`) -- the card's constraint: reuse the existing scan shape, do not add a
   second walker. Returns typed per-manifest classifications: `repairable`, `missing-worktree`, `collision`, `corrupt`,
   `unreadable`, plus residual `unrepairable` for anything the D1/D2 rules cannot place (e.g. a manifest with no worktree
   block); manifest dirs with a live row are healthy sessions and are excluded. Each `repairable` entry carries its D6
   content hash and the D1-derived identity fields. Pure op per design.md §3.12: no Click, no printing, typed exceptions.
-- [ ] The scan mutates nothing: no index write, no prune, no manifest write. Pinned by a test asserting index bytes and
-  manifest mtimes are unchanged after a scan over every classification.
-- [ ] `collect_bound_uuids` / `collect_bound_codex_threads` are untouched; their read-only, fail-closed, no-prune
-  contract survives (existing adoption/binding regressions stay green).
-- [ ] CLI leaf `forge session repair` (report mode): renders classifications through `forge.cli.output` helpers,
+  *Shipped 2026-08-02: `_manifest_dirs` renamed public (`manifest_dirs`); 15 scan tests in
+  `tests/src/core/ops/test_session_repair.py` cover all six classifications and all four shapes.*
+- [x] The scan mutates nothing: no index write, no prune, no manifest write. Pinned by a test asserting index bytes and
+  manifest mtimes are unchanged after a scan over every classification. *`test_scan_is_read_only` seeds every
+  classification and asserts index bytes + manifest `st_mtime_ns` unchanged.*
+- [x] `collect_bound_uuids` / `collect_bound_codex_threads` are untouched; their read-only, fail-closed, no-prune
+  contract survives (existing adoption/binding regressions stay green). *Full unit suite green (8,626 passed); the only
+  session_context.py change is the `manifest_dirs` rename with both callers updated.*
+- [x] CLI leaf `forge session repair` (report mode): renders classifications through `forge.cli.output` helpers,
   `--json` emits the typed result; outside a Forge project it fails through `handle_session_error`; an incompatible
   project pin is marked in the report as apply-refused (D5). Scope is the current `forge_root` only (per-project by
-  design; see deferred).
+  design; see deferred). *`cli/session_repair.py`, registered from `cli/session.py`. Deviation from the letter of this
+  item, matching sibling commands: outside-a-project is not a session error, so it fails through
+  `print_error_with_tip` on `err_console` (exit 1), while scan-level index/listing failures route through
+  `handle_session_error`/`print_error`. A malformed pin raises from `check_project_compatibility`; preview catches it
+  and reports the reason instead of dying (apply stays fail-closed via `enforce_project_compatibility`).*
 
 ## Phase 2 -- Repair (apply)
 
-- [ ] `--yes` enforces project compatibility fail-closed before any write (`enforce_project_compatibility` on the
+- [x] `--yes` enforces project compatibility fail-closed before any write (`enforce_project_compatibility` on the
   scanned `forge_root`), per the impl_notes posture: explicit CLI mutations fail closed before side effects.
-- [ ] Apply: for each `repairable` orphan, re-index through `create_session_txn` with the D1 identity fields and the D6
+  *`repair_orphans` calls it before touching any record; `test_incompatible_pin_fails_closed` +
+  `test_incompatible_pin_preview_warns_apply_fails`.*
+- [x] Apply: for each `repairable` orphan, re-index through `create_session_txn` with the D1 identity fields and the D6
   revalidating callback. A hash mismatch or vanished manifest fails the callback, the transaction compensates the row
-  away, and the item reports without aborting the batch -- no bare row survives a lost race.
-- [ ] Refusals are per-item: eligible orphans repair; refused items report with their classification; exit 1 if any
+  away, and the item reports without aborting the batch -- no bare row survives a lost race. *The callback is
+  `SessionStore.update_if_unchanged` (new; hash-verify under the manifest lock, optional D2 path correction).
+  Compensation pinned by `test_changed_manifest_compensates_row`; the pre-txn hash/read re-check refusals by
+  `test_tampered_manifest_refused_before_txn` and `test_manifest_deleted_between_scan_and_apply_refused`.*
+- [x] Refusals are per-item: eligible orphans repair; refused items report with their classification; exit 1 if any
   refusal or failure remains. A repaired session is fully live: `session list` shows it, `session show <name>` resolves
-  it, and the row survives a subsequent `list_sessions` prune pass.
-- [ ] Non-destructive invariants hold: repair never deletes a manifest, never modifies an existing row, never rebinds a
-  conversation already bound to a live row.
+  it, and the row survives a subsequent `list_sessions` prune pass. *Prune survival asserted in
+  `test_repair_publishes_row`; exit semantics in the CLI tests; end-to-end list round-trip in the Docker test.*
+- [x] Non-destructive invariants hold: repair never deletes a manifest, never modifies an existing row, never rebinds a
+  conversation already bound to a live row. *Collision/uuid-race/name-claimed tests assert no row written and the live
+  holder untouched; the only manifest write is the hash-gated D2 path correction.*
 
 ## Phase 3 -- Docs, verification, closeout
 
-- [ ] design.md §3.2: replace the "Repairing pre-existing orphans is not yet implemented" sentence (`design.md:267`)
+- [x] design.md §3.2: replace the "Repairing pre-existing orphans is not yet implemented" sentence (`design.md:267`)
   with the shipped repair surface, including the F2 producer (worktree-vanished prune) so the orphan population is
-  described as live, not only historical.
-- [ ] cli_reference.md §1 session table gains `forge session repair`; `docs/end-user/session.md` gains the recovery flow
-  (naming the run-from-forge-root requirement, F4).
-- [ ] Targeted integration run -- session lifecycle is touched, so the integration tier is mandatory per
+  described as live, not only historical. *The F2 producer paragraph was already added to §3.2 at activation; the
+  replacement paragraph now describes classifications, D1 identity, and the D6 callback.*
+- [x] cli_reference.md §1 session table gains `forge session repair`; `docs/end-user/session.md` gains the recovery flow
+  (naming the run-from-forge-root requirement, F4). *End-user section "Repairing invisible sessions" + cheat-sheet
+  entry; report guidance names the Forge root for `session delete` (F4).*
+- [x] Targeted integration run -- session lifecycle is touched, so the integration tier is mandatory per
   testing_guidelines: `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py` plus repair
-  coverage.
-- [ ] `make pre-commit` clean.
+  coverage. *22 passed 2026-08-02, including the new `test_repair_reindexes_orphaned_manifest` round-trip (drop row,
+  preview classifies, `--yes` re-indexes, `session list` shows it).*
+- [x] `make pre-commit` clean. *Clean 2026-08-02 (second run after formatter re-stage, per repo convention).*
 
 ## Acceptance tests
 
