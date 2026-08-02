@@ -71,7 +71,7 @@ def repair(yes: bool, as_json: bool) -> None:
     try:
         report = scan_repairable_orphans(forge_root)
     except ForgeSessionError as e:
-        handle_session_error(e, console=console)
+        handle_session_error(e)
         return
     except BindingLookupError as e:
         print_error(str(e), console=err_console)
@@ -95,7 +95,7 @@ def repair(yes: bool, as_json: bool) -> None:
         except ProjectCompatibilityError as e:
             apply_error = str(e)
         except ForgeSessionError as e:
-            handle_session_error(e, console=console)
+            handle_session_error(e)
             return
 
     if as_json:

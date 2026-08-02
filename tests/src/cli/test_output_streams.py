@@ -435,3 +435,36 @@ def test_supervisor_evaluate_json_failure_keeps_stdout_clean(tmp_path: Path) -> 
     assert result.exit_code != 0
     assert result.stdout.strip() == ""
     assert "mutually exclusive" in result.stderr
+
+
+def test_session_repair_json_on_stdout_with_clean_stderr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`session repair --json` keeps the payload jq-safe with a seeded orphan."""
+    from forge.session import SessionStore, create_session_state
+
+    root = tmp_path / "proj"
+    (root / ".forge").mkdir(parents=True)
+    SessionStore(str(root), "orphan").write(create_session_state("orphan", worktree_path=str(root)))
+    monkeypatch.chdir(root)
+
+    result = CliRunner().invoke(main, ["session", "repair", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)  # raises if stdout is not pure JSON
+    assert payload["records"][0]["name"] == "orphan"
+    assert result.stderr == ""
+
+
+def test_session_repair_json_failure_keeps_stdout_clean(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review round 3: a corrupt index must error on stderr, never into the JSON stream."""
+    from forge.session import IndexStore
+
+    root = tmp_path / "proj"
+    (root / ".forge").mkdir(parents=True)
+    monkeypatch.chdir(root)
+    index_path = IndexStore().index_path
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text("{ not json")
+
+    result = CliRunner().invoke(main, ["session", "repair", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "Error:" in result.stderr

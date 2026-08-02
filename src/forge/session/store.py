@@ -196,7 +196,10 @@ class SessionStore:
 
         Raises:
             SessionFileNotFoundError: If manifest doesn't exist.
-            ManifestCorruptedError: If manifest content cannot be parsed.
+            ManifestCorruptedError: If manifest content cannot be parsed, or if the
+                manifest names a different session than its directory (the module
+                invariant "the directory name IS the session name", which write
+                enforces, so a mismatch on disk is corruption).
             ManifestUnreadableError: If the read itself failed (OSError; transient, not corruption).
             ManifestValidationError: If manifest is missing required fields.
         """
@@ -213,6 +216,9 @@ class SessionStore:
             # NOT content corruption -- so forge clean must never delete it. See ManifestUnreadableError.
             raise ManifestUnreadableError(str(self._manifest_path), f"read error: {e}")
 
+        if not isinstance(data, dict):
+            raise ManifestCorruptedError(str(self._manifest_path), f"expected a JSON object, got {type(data).__name__}")
+
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         strip_removed_supervisor_runtime(data, session_name=self._session_name)
         self._validate_data(data)
@@ -225,6 +231,12 @@ class SessionStore:
             )
         except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
             raise ManifestCorruptedError(str(self._manifest_path), f"deserialization error: {e}")
+
+        if manifest.name != self._session_name:
+            raise ManifestCorruptedError(
+                str(self._manifest_path),
+                f"manifest names session '{manifest.name}' but lives in directory '{self._session_name}'",
+            )
 
         return manifest
 

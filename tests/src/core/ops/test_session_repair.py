@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,7 +19,7 @@ from forge.install.project_compat import ProjectCompatibilityError
 from forge.session import IndexStore, SessionManager, SessionStore, create_session_state
 from forge.session.exceptions import ManifestChangedError
 from forge.session.identity import make_scoped_key
-from forge.session.models import CodexConfirmed, SessionState
+from forge.session.models import CodexConfirmed, SessionState, session_state_to_dict
 from forge.session.store import CLI_LOCK_TIMEOUT_S, get_manifest_path
 
 
@@ -156,6 +157,55 @@ class TestScan:
         assert rec.collision_holder is not None
         assert "live-one" in rec.collision_holder
 
+    def test_collision_when_row_column_lags_live_manifest(self, project: Path) -> None:
+        """Review round 3 CRITICAL: a live manifest binding not yet reconciled
+        into its row column must still block the orphan (columns lag manifests)."""
+        state = seed_orphan(project, "live-lagging")
+        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        store = SessionStore(str(project), "live-lagging")
+        live = store.read()
+        live.confirmed.claude_session_id = "uuid-lag"
+        store.write(live)
+        assert IndexStore().read().sessions[make_scoped_key("live-lagging", str(project))].claude_session_id is None
+
+        seed_orphan(project, "orphan", claude_id="uuid-lag")
+        report = scan_repairable_orphans(project)
+
+        assert len(report.records) == 1
+        rec = report.records[0]
+        assert rec.classification == "collision"
+        assert rec.collision_holder is not None
+        assert "live-lagging" in rec.collision_holder
+
+    def test_collision_when_thread_lives_only_on_live_manifest(self, project: Path) -> None:
+        """Ordinary Codex sessions record their thread on the manifest alone."""
+        state = seed_orphan(project, "live-codex-lag")
+        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+        store = SessionStore(str(project), "live-codex-lag")
+        live = store.read()
+        live.confirmed.codex = CodexConfirmed(thread_id="thread-lag")
+        store.write(live)
+
+        seed_orphan(project, "orphan", thread_id="thread-lag")
+        report = scan_repairable_orphans(project)
+
+        rec = report.records[0]
+        assert rec.classification == "collision"
+        assert rec.collision_holder is not None
+        assert "live-codex-lag" in rec.collision_holder
+
+    def test_sibling_orphans_sharing_conversation(self, project: Path) -> None:
+        """Two orphans claiming one conversation: directory order wins, the later
+        one classifies collision so apply can never double-bind."""
+        seed_orphan(project, "a-first", claude_id="uuid-shared")
+        seed_orphan(project, "b-second", claude_id="uuid-shared")
+
+        report = scan_repairable_orphans(project)
+        by_name = {r.name: r for r in report.records}
+        assert by_name["a-first"].classification == "repairable"
+        assert by_name["b-second"].classification == "collision"
+        assert by_name["b-second"].collision_holder == "a-first"
+
     def test_codex_thread_collision(self, project: Path) -> None:
         seed_live(project, "live-codex", thread_id="thread-taken")
         seed_orphan(project, "orphan", thread_id="thread-taken")
@@ -174,6 +224,32 @@ class TestScan:
 
         rec = report.records[0]
         assert rec.classification == "corrupt"
+
+    def test_non_dict_manifest_is_corrupt(self, project: Path) -> None:
+        """Review round 3: valid JSON with the wrong top-level shape must classify
+        corrupt, not crash the scan with a raw AttributeError."""
+        path = get_manifest_path(project, "listy")
+        path.parent.mkdir(parents=True)
+        path.write_text("[]")
+        report = scan_repairable_orphans(project)
+
+        rec = report.records[0]
+        assert rec.classification == "corrupt"
+
+    def test_dir_name_mismatch_is_corrupt(self, project: Path) -> None:
+        """Review round 3: a manifest naming a different session than its directory
+        violates the store invariant; classify corrupt, never 'repair' it into a
+        row for the wrong name."""
+        state = create_session_state("other-name", worktree_path=str(project))
+        path = get_manifest_path(project, "mismatch")
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(session_state_to_dict(state)))
+
+        report = scan_repairable_orphans(project)
+        rec = report.records[0]
+        assert rec.name == "mismatch"
+        assert rec.classification == "corrupt"
+        assert "other-name" in rec.detail
 
     def test_unreadable_manifest(self, project: Path) -> None:
         path = get_manifest_path(project, "locked")
@@ -210,19 +286,27 @@ class TestScan:
         broken = get_manifest_path(project, "broken")
         broken.parent.mkdir(parents=True)
         broken.write_text("{ not json")
+        locked = get_manifest_path(project, "locked")
+        locked.parent.mkdir(parents=True)
+        locked.write_text("{}")
+        locked.chmod(0o000)
 
         index_path = IndexStore().index_path
         index_before = index_path.read_bytes()
         manifests = sorted((project / ".forge" / "sessions").glob("*/forge.session.json"))
         mtimes_before = [m.stat().st_mtime_ns for m in manifests]
 
-        report = scan_repairable_orphans(project)
+        try:
+            report = scan_repairable_orphans(project)
+        finally:
+            locked.chmod(0o644)
 
         assert {r.classification for r in report.records} == {
             "repairable",
             "missing-worktree",
             "collision",
             "corrupt",
+            "unreadable",
             "unrepairable",
         }
         assert index_path.read_bytes() == index_before
@@ -329,6 +413,25 @@ class TestApply:
         assert state.worktree.path == str(project)
         entry = IndexStore().read().sessions[make_scoped_key("moved", str(project))]
         assert entry.worktree_path == str(project)
+
+    def test_moved_repair_relocates_forge_root_not_claude_namespace(self, project: Path, tmp_path: Path) -> None:
+        """Review round 3: a manager-shaped manifest (forge_root wired, launch CWD
+        recorded) relocates forge_root with the move, while the Claude namespace
+        pointer stays -- the conversation transcripts did not move."""
+        gone = tmp_path / "old-location"
+        state = create_session_state("moved-full", worktree_path=str(gone))
+        state.forge_root = str(gone)
+        state.confirmed.claude_project_root = str(gone)
+        SessionStore(str(project), "moved-full").write(state)
+
+        result = repair_orphans(project, self._scan(project).records)
+
+        assert result.repaired == ("moved-full",)
+        repaired = SessionStore(str(project), "moved-full").read()
+        assert repaired.forge_root == str(project)
+        assert repaired.worktree is not None
+        assert repaired.worktree.path == str(project)
+        assert repaired.confirmed.claude_project_root == str(gone)
 
     def test_collision_refused_without_write(self, project: Path) -> None:
         seed_live(project, "live-one", claude_id="uuid-taken")
@@ -440,6 +543,10 @@ class TestApply:
         locked.parent.mkdir(parents=True)
         locked.write_text("{}")
         locked.chmod(0o000)
+        mismatch_state = create_session_state("other-name", worktree_path=str(project))
+        mismatch = get_manifest_path(project, "mismatch")
+        mismatch.parent.mkdir(parents=True)
+        mismatch.write_text(json.dumps(session_state_to_dict(mismatch_state)))
 
         try:
             clean_category = _detect_corrupt_state({project})
@@ -447,9 +554,37 @@ class TestApply:
         finally:
             locked.chmod(0o644)
 
-        assert clean_category.items == [str(broken)]
+        assert sorted(clean_category.items) == sorted([str(broken), str(mismatch)])
         by_name = {r.name: r.classification for r in report.records}
-        assert by_name == {"fixable": "repairable", "broken": "corrupt", "locked": "unreadable"}
+        assert by_name == {
+            "fixable": "repairable",
+            "broken": "corrupt",
+            "mismatch": "corrupt",
+            "locked": "unreadable",
+        }
+
+    def test_idless_codex_orphan_replaced_between_scan_and_apply(self, project: Path) -> None:
+        """Acceptance D6 fixture: a manifest with neither conversation id can only
+        be identified by content hash; a replacement between scan and apply is
+        refused and publishes nothing."""
+        state = create_session_state("codex-idless", worktree_path=str(project), runtime="codex")
+        SessionStore(str(project), "codex-idless").write(state)
+        records = self._scan(project).records
+        assert records[0].classification == "repairable"
+        assert records[0].claude_session_id is None
+        assert records[0].codex_thread_id is None
+
+        replacement = create_session_state(
+            "codex-idless", worktree_path=str(project), worktree_branch="replaced", runtime="codex"
+        )
+        SessionStore(str(project), "codex-idless").write(replacement)
+
+        result = repair_orphans(project, records)
+
+        assert result.repaired == ()
+        assert len(result.refused) == 1
+        assert "changed since it was scanned" in result.refused[0].reason
+        assert make_scoped_key("codex-idless", str(project)) not in IndexStore().read().sessions
 
     def test_changed_manifest_compensates_row(self, project: Path) -> None:
         """D6 backstop: a stale-hash callback unwinds the row the txn just wrote."""

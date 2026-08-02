@@ -266,13 +266,17 @@ reports "unbound" because a read failed. An unreadable manifest raises `BindingL
 repair: a swallowed read is indistinguishable from an absent binding, which is what would let one conversation bind
 twice. `forge session repair` surfaces and re-indexes these orphans (preview by default, `--yes` to apply), scoped to
 the current Forge root. The scan classifies each unindexed manifest — `repairable`, `missing-worktree` (report-only: a
-republished row would be pruned on the next `session list`), `collision` (conversation bound to a live row), `corrupt`
-(owned by `forge clean`), `unreadable`, or `unrepairable` — and identity for a repaired row derives from the manifest's
-**recorded** worktree metadata, not its on-disk location, so a root-level worktree session repairs to its linked
-worktree rather than the main checkout that stores its manifest. Apply goes through `create_session_txn` with
-`require_uuid_unbound=True` and a callback that verifies the manifest is byte-identical to the scanned copy
-(`SessionStore.update_if_unchanged`), so a raced manifest compensates the row away instead of indexing somebody else's
-session.
+republished row would be pruned on the next `session list`), `collision`, `corrupt` (owned by `forge clean`),
+`unreadable`, or `unrepairable` — and identity for a repaired row derives from the manifest's **recorded** worktree
+metadata, not its on-disk location, so a root-level worktree session repairs to its linked worktree rather than the main
+checkout that stores its manifest. Collision detection uses the same binding scans adoption uses (rows **and** the
+manifest behind each row, fail-closed; columns lag or lead manifests), invoked without the per-root orphan walk so the
+manifests under classification are not counted as live holders. A moved ordinary checkout is re-derived from its actual
+location: apply corrects the recorded `worktree.path` and `forge_root` on disk, and leaves
+`confirmed.claude_project_root` alone — it points at Claude Code's conversation namespace, which a checkout move does
+not relocate. Apply goes through `create_session_txn` with `require_uuid_unbound=True` and a callback that verifies the
+manifest is byte-identical to the scanned copy (`SessionStore.update_if_unchanged`), so a raced manifest compensates the
+row away instead of indexing somebody else's session.
 
 **A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
 `start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it

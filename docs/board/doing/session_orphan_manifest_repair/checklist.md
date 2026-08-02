@@ -2,11 +2,11 @@
 
 **Card**: [card.md](card.md). Branch: `feat/session-orphan-manifest-repair`.
 
-**Current focus**: Phases 1-3 implemented and verified 2026-08-02; awaiting review/merge, then closeout. D1-D6
-ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides).
-Phase 0 history: the reviewer declined to ratify the original D1-D5; every correction was verified against source
-(findings F1-F6 below) and the decision set is rewritten: D1/D2 now follow the per-shape worktree-placement model, D3 is
-resolved, D4 splits corrupt from unreadable, D6 is new.
+**Current focus**: Phases 1-3 implemented; review round 3 findings F7-F11 fixed and verified 2026-08-02. Awaiting
+re-review/merge, then closeout. D1-D6 ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides). Phase 0
+history: the reviewer declined to ratify the original D1-D5; every correction was verified against source (findings
+F1-F6 below) and the decision set is rewritten: D1/D2 now follow the per-shape worktree-placement model, D3 is resolved,
+D4 splits corrupt from unreadable, D6 is new.
 
 ## Phase 0 -- Ground and ratify
 
@@ -112,8 +112,9 @@ resolved, D4 splits corrupt from unreadable, D6 is new.
   `unreadable`, plus residual `unrepairable` for anything the D1/D2 rules cannot place (e.g. a manifest with no worktree
   block); manifest dirs with a live row are healthy sessions and are excluded. Each `repairable` entry carries its D6
   content hash and the D1-derived identity fields. Pure op per design.md §3.12: no Click, no printing, typed exceptions.
-  *Shipped 2026-08-02: `_manifest_dirs` renamed public (`manifest_dirs`); 15 scan tests in
-  `tests/src/core/ops/test_session_repair.py` cover all six classifications and all four shapes.*
+  *Shipped 2026-08-02: `_manifest_dirs` renamed public (`manifest_dirs`); scan tests in
+  `tests/src/core/ops/test_session_repair.py` cover all six classifications and all four shapes. Round 3 (F7) replaced
+  the column-only holder maps with the three-source binding scans.*
 - [x] The scan mutates nothing: no index write, no prune, no manifest write. Pinned by a test asserting index bytes and
   manifest mtimes are unchanged after a scan over every classification. *`test_scan_is_read_only` seeds every
   classification and asserts index bytes + manifest `st_mtime_ns` unchanged.*
@@ -124,10 +125,10 @@ resolved, D4 splits corrupt from unreadable, D6 is new.
   `--json` emits the typed result; outside a Forge project it fails through `handle_session_error`; an incompatible
   project pin is marked in the report as apply-refused (D5). Scope is the current `forge_root` only (per-project by
   design; see deferred). *`cli/session_repair.py`, registered from `cli/session.py`. Deviation from the letter of this
-  item, matching sibling commands: outside-a-project is not a session error, so it fails through
-  `print_error_with_tip` on `err_console` (exit 1), while scan-level index/listing failures route through
-  `handle_session_error`/`print_error`. A malformed pin raises from `check_project_compatibility`; preview catches it
-  and reports the reason instead of dying (apply stays fail-closed via `enforce_project_compatibility`).*
+  item, matching sibling commands: outside-a-project is not a session error, so it fails through `print_error_with_tip`
+  on `err_console` (exit 1), while scan-level index/listing failures route through `handle_session_error`/`print_error`.
+  A malformed pin raises from `check_project_compatibility`; preview catches it and reports the reason instead of dying
+  (apply stays fail-closed via `enforce_project_compatibility`).*
 
 ## Phase 2 -- Repair (apply)
 
@@ -148,6 +149,47 @@ resolved, D4 splits corrupt from unreadable, D6 is new.
 - [x] Non-destructive invariants hold: repair never deletes a manifest, never modifies an existing row, never rebinds a
   conversation already bound to a live row. *Collision/uuid-race/name-claimed tests assert no row written and the live
   holder untouched; the only manifest write is the hash-gated D2 path correction.*
+
+## Phase 2.5 -- Review round 3 fixes (2026-08-02, all verified against source before fixing)
+
+- [x] **F7 (critical) -- collision detection was column-only; D3's no-double-binding invariant was violated.** A live
+  manifest binding not yet reconciled into its row column (`index.py:807` syncs lazily; `collect_bound_uuids` documents
+  that rows "can lag a manifest -- and ... can also lead one") let an orphan sharing that conversation classify
+  `repairable` and publish a second binding. Fix: the scan now builds holders from `collect_bound_uuids()` /
+  `collect_bound_codex_threads()` called **without** a `forge_root` -- rows plus the manifest behind each row,
+  fail-closed, and no per-root orphan walk so the manifests under classification are not counted as live holders.
+  Sibling orphans sharing one conversation resolve deterministically (directory-order first stays repairable, later ones
+  classify `collision`). The in-lock column check remains the final race arbiter. Tests:
+  `test_collision_when_row_column_lags_live_manifest`, `test_collision_when_thread_lives_only_on_live_manifest`,
+  `test_sibling_orphans_sharing_conversation`.
+- [x] **F8 -- moved ordinary repair left `state.forge_root` stale; `confirmed.claude_project_root` semantics were
+  undefined.** Resume consumes both (`claude_session.py:408`). Fix: the D6 mutation now also relocates `forge_root` (and
+  the in-memory copy the row is built from); `claude_project_root` is **deliberately preserved** -- per
+  `models.py:645-649` it records Claude Code's conversation namespace (`~/.claude/projects/<encoded-cwd>/`), which a
+  checkout move does not relocate. The moved-ordinary identity now records the derived `checkout_root` as
+  `worktree.path` (the field's contract), not the forge root. Test:
+  `test_moved_repair_relocates_forge_root_not_claude_namespace` (manager-shaped fixture: `forge_root` wired, launch CWD
+  recorded).
+- [x] **F9 -- a manifest naming a different session than its directory produced a false repair.** The scan named records
+  from the directory but apply indexed `state.name`, publishing a row whose manifest path does not exist (the next list
+  prunes it -- exactly D2's forbidden outcome). Fix at the invariant's owner: `SessionStore.read()` now raises
+  `ManifestCorruptedError` on directory/name mismatch (write already enforced it; store.py:14 "The directory name IS the
+  session name"), so repair classifies it `corrupt` and `forge clean` removes it -- shared D4 ownership. Tests:
+  `test_dir_name_mismatch_is_corrupt`, `test_read_rejects_directory_name_mismatch`, ownership-disjoint test extended.
+  Fallout: two store tests seeded `name: "test"` under `test-session/`; fixture data corrected.
+- [x] **F10 -- valid JSON with a non-object top level (`[]`) crashed the scan with a raw `AttributeError`.**
+  `SessionStore.read()` assumed a mapping before validation. Fix: explicit `isinstance(data, dict)` check raising
+  `ManifestCorruptedError`, so the scan classifies `corrupt` and `forge clean` gains the same detection. Tests:
+  `test_non_dict_manifest_is_corrupt`, `test_read_rejects_non_dict_json`.
+- [x] **F11 -- typed scan/apply errors routed to stdout.** `handle_session_error(e, console=console)` forwarded the
+  stdout console into the corrupt/unreadable handlers, so `repair --json` with a corrupt index emitted Rich error text
+  on stdout. Fix: bare `handle_session_error(e)` (defaults to the stderr console), matching `session_manage`. Repair
+  added to the stream-contract guard: `test_session_repair_json_on_stdout_with_clean_stderr`,
+  `test_session_repair_json_failure_keeps_stdout_clean` in `tests/src/cli/test_output_streams.py`.
+- [x] Coverage claims corrected: `test_scan_is_read_only` now seeds `unreadable` too (previously claimed "every
+  classification" while omitting it), and the D6 acceptance fixture (id-less Codex orphan replaced between scan and
+  apply) now runs through the full `repair_orphans` path (`test_idless_codex_orphan_replaced_between_scan_and_apply`) in
+  addition to the direct txn-compensation test.
 
 ## Phase 3 -- Docs, verification, closeout
 

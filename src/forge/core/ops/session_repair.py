@@ -17,9 +17,18 @@ Classification and identity follow the ratified decisions on the board card
 - A missing recorded worktree is report-only for worktree-backed shapes
   (``is_worktree=True``); only the ordinary shape may re-derive from the
   actual location -- its manifest travels inside its own checkout by
-  construction -- correcting the stale recorded path (D2).
-- Collisions refuse, not bind: ``create_session_txn(require_uuid_unbound=True)``
-  re-checks both conversation ids under the index lock (D3).
+  construction -- correcting the stale recorded ``worktree.path`` and
+  ``forge_root`` on disk. ``confirmed.claude_project_root`` is never touched:
+  it points at Claude Code's conversation namespace, which a checkout move
+  does not relocate (D2).
+- Collisions refuse, not bind (D3). Live bindings are gathered with the same
+  three-source, fail-closed semantics the adoption scans use
+  (``collect_bound_uuids`` / ``collect_bound_codex_threads`` without the
+  per-root orphan walk: index columns can lag or lead the manifest behind the
+  row, so both are read). Sibling orphans sharing one conversation resolve
+  deterministically: the first in directory order stays repairable, later ones
+  classify ``collision``. ``create_session_txn(require_uuid_unbound=True)``
+  re-checks the columns under the index lock as the final race arbiter.
 - Corrupt manifests belong to ``forge clean``; unreadable ones to neither and
   are never deleted by either surface (D4).
 - Apply verifies the manifest is byte-identical to the scanned copy instead of
@@ -39,10 +48,14 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
-from forge.core.ops.session_context import manifest_dirs
+from forge.core.ops.session_context import (
+    collect_bound_codex_threads,
+    collect_bound_uuids,
+    manifest_dirs,
+)
 from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.project_compat import enforce_project_compatibility
-from forge.session import IndexStore, SessionManager
+from forge.session import IndexStore, SessionManager, SessionState
 from forge.session.exceptions import (
     ForgeSessionError,
     ManifestChangedError,
@@ -50,7 +63,7 @@ from forge.session.exceptions import (
     SessionFileNotFoundError,
     UuidAlreadyBoundError,
 )
-from forge.session.identity import make_scoped_key, session_name_from_key
+from forge.session.identity import make_scoped_key
 from forge.session.store import CLI_LOCK_TIMEOUT_S, SessionStore, get_manifest_path
 from forge.session.worktree import get_repo_root
 
@@ -131,23 +144,30 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
     (row present) are excluded; a bare row without a manifest is prunable
     residue and is not this surface's concern.
 
+    Collision detection is fail-closed: live bindings come from the index rows
+    **and** the manifest behind each row (columns lag or lead manifests), via
+    the adoption scans called without a ``forge_root`` so this project's
+    orphans -- the very manifests being classified -- are not counted as live
+    holders. An unreadable row manifest aborts the scan rather than letting a
+    conversation look free.
+
     Raises:
         IndexCorruptedError / IndexUnreadableError: If the index cannot be read.
-        BindingLookupError: If the sessions directory cannot be listed.
+        BindingLookupError: If the sessions directory cannot be listed, or a
+            live row's manifest cannot be read.
     """
     root = Path(forge_root).resolve()
     root_str = str(root)
     index_store = IndexStore()
     rows = index_store.read().sessions
 
-    uuid_holders: dict[str, str] = {}
-    thread_holders: dict[str, str] = {}
-    for key, entry in rows.items():
-        holder = f"{session_name_from_key(key)} ({entry.root})"
-        if entry.claude_session_id:
-            uuid_holders.setdefault(entry.claude_session_id, holder)
-        if entry.codex_thread_id:
-            thread_holders.setdefault(entry.codex_thread_id, holder)
+    uuid_holders = collect_bound_uuids()
+    thread_holders = collect_bound_codex_threads()
+    # Sibling orphans sharing one conversation: first in directory order wins,
+    # later claimants classify collision (the txn column check would refuse the
+    # second apply anyway; classifying at scan makes the preview say so).
+    orphan_uuid_claims: dict[str, str] = {}
+    orphan_thread_claims: dict[str, str] = {}
 
     manager = SessionManager(index_store=index_store)
     records: list[OrphanRecord] = []
@@ -193,20 +213,26 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
         thread_id = codex.thread_id if codex else None
         ids = {"claude_session_id": claude_id, "codex_thread_id": thread_id}
 
+        uuid_key = claude_id.lower() if claude_id else None
+        thread_key = thread_id.lower() if thread_id else None
         bound_holder: str | None = None
-        if claude_id and claude_id in uuid_holders:
-            bound_holder = uuid_holders[claude_id]
-        elif thread_id and thread_id in thread_holders:
-            bound_holder = thread_holders[thread_id]
+        if uuid_key:
+            bound_holder = uuid_holders.get(uuid_key) or orphan_uuid_claims.get(uuid_key)
+        if bound_holder is None and thread_key:
+            bound_holder = thread_holders.get(thread_key) or orphan_thread_claims.get(thread_key)
         if bound_holder:
             record(
                 "collision",
-                f"conversation already bound to live session {bound_holder}",
+                f"conversation already bound to session {bound_holder}",
                 collision_holder=bound_holder,
                 manifest_sha256=digest,
                 **ids,
             )
             continue
+        if uuid_key:
+            orphan_uuid_claims[uuid_key] = name
+        if thread_key:
+            orphan_thread_claims[thread_key] = name
 
         worktree = state.worktree
         if worktree is None:
@@ -234,8 +260,15 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
             # Ordinary shape: the manifest lives inside its own checkout, so the
             # checkout provably moved here and the recorded absolute path went
             # stale with the move (D2). Re-derive from the actual location and
-            # correct the recorded path at apply.
-            identity = replace(_derive_identity(root, root, manager), corrected_worktree_path=root_str)
+            # correct the recorded path at apply. Worktree.path's contract is
+            # the checkout root, not the forge_root, so a nested .forge/ still
+            # records the enclosing checkout.
+            derived = _derive_identity(root, root, manager)
+            identity = replace(
+                derived,
+                worktree_path=derived.checkout_root,
+                corrected_worktree_path=derived.checkout_root,
+            )
             record(
                 "repairable",
                 f"checkout moved; stale recorded path {worktree.path} will be corrected",
@@ -304,16 +337,23 @@ def repair_orphans(
             continue
 
         corrected = identity.corrected_worktree_path
-        if corrected and state.worktree:
-            # The row must carry the corrected path; the callback persists the
-            # same correction to the manifest after the hash proof (D6).
-            state.worktree.path = corrected
+        if corrected:
+            # The row must carry the corrected identity; the callback persists
+            # the same correction to the manifest after the hash proof (D6).
+            if state.worktree:
+                state.worktree.path = corrected
+            state.forge_root = root_str
 
         def write_manifest(s: SessionStore = store, r: OrphanRecord = rec, fix: str | None = corrected) -> None:
-            def _correct(manifest_state: object) -> None:
-                worktree = getattr(manifest_state, "worktree", None)
-                if worktree is not None and fix is not None:
-                    worktree.path = fix
+            def _correct(manifest_state: SessionState) -> None:
+                # Relocate the recorded checkout and forge root. The Claude
+                # namespace pointer (confirmed.claude_project_root) is
+                # deliberately untouched: it records where Claude Code keeps
+                # the conversation (~/.claude/projects/<encoded-cwd>/), which
+                # a filesystem move of the checkout does not change.
+                if manifest_state.worktree is not None and fix is not None:
+                    manifest_state.worktree.path = fix
+                manifest_state.forge_root = root_str
 
             assert r.manifest_sha256 is not None
             s.update_if_unchanged(

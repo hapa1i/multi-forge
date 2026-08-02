@@ -413,6 +413,26 @@ class TestSessionStoreUpdateIfUnchanged:
 class TestSessionStoreRead:
     """Test SessionStore.read()."""
 
+    def test_read_rejects_non_dict_json(self, store: SessionStore) -> None:
+        """Valid JSON with a non-object top level is corruption, not a crash."""
+        store.manifest_path.parent.mkdir(parents=True)
+        store.manifest_path.write_text("[]")
+
+        with pytest.raises(ManifestCorruptedError, match="expected a JSON object"):
+            store.read()
+
+    def test_read_rejects_directory_name_mismatch(self, temp_worktree: Path) -> None:
+        """The directory name IS the session name; a manifest naming another
+        session is corruption (write already enforces this)."""
+        SessionStore(str(temp_worktree), "real-name").write(create_session_state("real-name"))
+        real = SessionStore(str(temp_worktree), "real-name").manifest_path
+        moved_dir = real.parent.parent / "stolen-name"
+        moved_dir.mkdir()
+        (moved_dir / real.name).write_text(real.read_text())
+
+        with pytest.raises(ManifestCorruptedError, match="stolen-name"):
+            SessionStore(str(temp_worktree), "stolen-name").read()
+
     def test_read_roundtrip(self, store: SessionStore, sample_manifest: SessionState) -> None:
         """read() should return equivalent manifest after write."""
         store.write(sample_manifest)
@@ -522,7 +542,7 @@ class TestSessionStoreRead:
 
         data = {
             "schema_version": 1,
-            "name": "test",
+            "name": "test-session",
             "created_at": now_iso(),
             "last_accessed_at": now_iso(),
             "intent": {},
@@ -551,7 +571,7 @@ class TestSessionStoreRead:
         store.manifest_path.parent.mkdir(parents=True)
         data = {
             "schema_version": 1,
-            "name": "test",
+            "name": "test-session",
             "created_at": now_iso(),
             "last_accessed_at": now_iso(),
             "intent": {},  # No proxy - allowed in v2
@@ -561,7 +581,7 @@ class TestSessionStoreRead:
 
         # Should not raise - proxy is optional in v2
         manifest = store.read()
-        assert manifest.name == "test"
+        assert manifest.name == "test-session"
         assert manifest.intent.proxy is None
 
     def test_read_incomplete_proxy(self, store: SessionStore) -> None:
