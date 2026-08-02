@@ -33,6 +33,7 @@ from forge.backend.sources import (
     resolve_backend_instance,
 )
 from forge.config.dataclass_utils import dict_to_dataclass
+from forge.core.wire_shapes import DEFAULT_WIRE_SHAPE
 from forge.config.schema import (
     ForgeConfig,
     ProviderConfig,
@@ -460,7 +461,7 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
             prompt_caching=data_map.get("prompt_caching", "passthrough"),
             auto_cache_min_tokens=data_map.get("auto_cache_min_tokens", 1024),
             costs=data_map.get("costs", {}),
-            wire_shape=data_map.get("wire_shape", "openai_translated"),
+            wire_shape=data_map.get("wire_shape", DEFAULT_WIRE_SHAPE),
             intercept=data_map.get("intercept", {}),
             audit=data_map.get("audit", {}),
             provider_trace=data_map.get("provider_trace", {}),

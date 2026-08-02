@@ -24,6 +24,7 @@ from forge.core.run_id import (
     mint_run_id,
     sanitize_label,
 )
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,6 @@ FORGE_SIDECAR_HOST_FORGE_ROOT_VAR = "FORGE_SIDECAR_HOST_FORGE_ROOT"
 FORGE_SIDECAR_HOST_WORKTREE_PATH_VAR = "FORGE_SIDECAR_HOST_WORKTREE_PATH"
 FORGE_LAUNCH_MODE_VAR = "FORGE_LAUNCH_MODE"
 FORGE_TEMPLATE_VAR = "FORGE_TEMPLATE"
-
-ANTHROPIC_PASSTHROUGH_WIRE_SHAPE = "anthropic_passthrough"
-OPENAI_TRANSLATED_WIRE_SHAPE = "openai_translated"
 
 # --bare (Claude Code >= 2.1.81) disables OAuth/keychain auth, requiring
 # ANTHROPIC_API_KEY in the environment. Only safe when the key is present.
@@ -306,7 +304,7 @@ def apply_attribution_header_policy(env: dict[str, str]) -> None:
     scrub any inherited/global value so auto mode can classify when Anthropic's
     classifier is available through the route.
     """
-    if not env.get("ANTHROPIC_BASE_URL") or _proxy_wire_shape_for_env(env) == ANTHROPIC_PASSTHROUGH_WIRE_SHAPE:
+    if not env.get("ANTHROPIC_BASE_URL") or _proxy_wire_shape_for_env(env) == ANTHROPIC_PASSTHROUGH:
         env.pop(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, None)
         return
 
@@ -348,8 +346,8 @@ def _template_wire_shape(template: str) -> str | None:
         proxy = data.get("proxy")
         if not isinstance(proxy, dict):
             return None
-        wire_shape = proxy.get("wire_shape", OPENAI_TRANSLATED_WIRE_SHAPE)
-        return str(wire_shape) if wire_shape else OPENAI_TRANSLATED_WIRE_SHAPE
+        wire_shape = proxy.get("wire_shape", DEFAULT_WIRE_SHAPE)
+        return str(wire_shape) if wire_shape else DEFAULT_WIRE_SHAPE
     except Exception as e:
         logger.debug("Could not resolve template wire_shape for template=%s: %s", template, e)
         return None

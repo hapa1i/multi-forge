@@ -55,6 +55,7 @@ from forge.core.auth.template_secrets import (
     resolve_env_or_credential_with_source,
 )
 from forge.core.runtime.codex_rollouts import codex_home
+from forge.core.wire_shapes import OPENAI_RESPONSES_PASSTHROUGH
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
 from forge.core.usage.ledger import BillingMode
 
@@ -512,7 +513,7 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
     # proxy_supported requires BOTH the responses passthrough wire shape AND a
     # source that declares responses_ingress -- the exact conjunction the proxy
     # /v1/responses route enforces (fail closed on an unknown/empty source).
-    if config.wire_shape == "openai_responses_passthrough":
+    if config.wire_shape == OPENAI_RESPONSES_PASSTHROUGH:
         from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 
         source_id = getattr(config, "backend", "") or ""

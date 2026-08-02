@@ -78,6 +78,7 @@ from forge.proxy.metrics import proxy_metrics
 from forge.proxy.ports import (
     NoAvailablePortError,
 )
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE
 from forge.proxy.ports import (
     find_available_loopback_port as _find_available_loopback_port,
 )
@@ -596,7 +597,7 @@ def _inspect_route() -> dict[str, Any]:
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
         "backend": _backend_instance_id() or "",
-        "wire_shape": getattr(config.proxy, "wire_shape", "openai_translated"),
+        "wire_shape": getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE),
     }
 
 
@@ -1861,7 +1862,7 @@ async def root(request: Request):
 
     # Intercept preflight: report mode + what Forge can inspect for this route so a
     # launcher can say "inspect active (signature-safe)" vs "inspect active (lossy)".
-    _wire_shape = getattr(config.proxy, "wire_shape", "openai_translated")
+    _wire_shape = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE)
     _intercept_cfg = getattr(config.proxy, "intercept", None)
     _intercept_mode = _intercept_cfg.mode if _intercept_cfg is not None else "passthrough"
     _audit_cfg = getattr(config.proxy, "audit", None)
@@ -1946,7 +1947,7 @@ async def log_requests_middleware(request: Request, call_next):
     ):
         try:
             _ensure_runtime_state()
-            is_passthrough = getattr(config.proxy, "wire_shape", "openai_translated") == "anthropic_passthrough"
+            is_passthrough = getattr(config.proxy, "wire_shape", DEFAULT_WIRE_SHAPE) == ANTHROPIC_PASSTHROUGH
         except Exception as e:
             logger.error("[%s] passthrough preflight failed: %s", request_id, e)
             is_passthrough = False

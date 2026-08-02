@@ -8,6 +8,7 @@ from forge.core.models.direct_model import (
     apply_direct_model_env,
     resolve_direct_model_pin,
 )
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH
 
 
 def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
@@ -15,7 +16,7 @@ def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPi
     # Passthrough forwards the client model unchanged, so any resolvable Claude pin
     # reaches the API as-is; the alternatives/tier-default check does not apply here.
     # (resolve_direct_model_pin already rejected non-Claude/unknown models upstream.)
-    if proxy_cfg.wire_shape == "anthropic_passthrough":
+    if proxy_cfg.wire_shape == ANTHROPIC_PASSTHROUGH:
         return True
     alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
     if pin.canonical_model in alt_models:

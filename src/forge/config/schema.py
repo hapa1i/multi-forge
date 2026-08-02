@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
+from forge.core.wire_shapes import ANTHROPIC_PASSTHROUGH, DEFAULT_WIRE_SHAPE, VALID_WIRE_SHAPES
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +271,6 @@ def _coerce_cost_config(value: Any) -> CostConfig:
 # --- Intercept / audit config (Phase 2 audit proxy) ---
 
 _VALID_INTERCEPT_MODES = ("passthrough", "inspect", "override")
-_VALID_WIRE_SHAPES = ("openai_translated", "anthropic_passthrough", "openai_responses_passthrough")
 _VALID_GUARD_ACTIONS = ("warn", "block", "strip")
 _DEFAULT_REDACT_HEADERS = (
     "authorization",
@@ -618,7 +618,7 @@ def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) 
     Enforced on BOTH the running-proxy (ProxyInstanceConfig) and template (ProxyConfig) paths
     so 'forge proxy template edit' fails at edit time, not late at 'forge proxy create'.
     """
-    if intercept.mode == "override" and wire_shape != "anthropic_passthrough":
+    if intercept.mode == "override" and wire_shape != ANTHROPIC_PASSTHROUGH:
         raise ValueError(
             "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
             "(override applies to the raw passthrough body only). "
@@ -661,7 +661,7 @@ class ProxyConfig:
     host: str = "127.0.0.1"
     tool_prefixes_to_ignore: list[str] = field(default_factory=list)
     costs: CostConfig = field(default_factory=CostConfig)
-    wire_shape: str = "openai_translated"
+    wire_shape: str = DEFAULT_WIRE_SHAPE
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
@@ -676,9 +676,9 @@ class ProxyConfig:
         self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
         self.logging = _coerce_logging_config(self.logging)
         self.costs = _coerce_cost_config(self.costs)
-        if self.wire_shape not in _VALID_WIRE_SHAPES:
+        if self.wire_shape not in VALID_WIRE_SHAPES:
             raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
+                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})"
             )
         _validate_wire_shape_intercept(self.wire_shape, self.intercept)
         _validate_default_tier(self.default_tier)
@@ -750,7 +750,7 @@ class ProxyInstanceConfig:
     auto_cache_min_tokens: int = 1024
 
     costs: CostConfig = field(default_factory=CostConfig)
-    wire_shape: str = "openai_translated"
+    wire_shape: str = DEFAULT_WIRE_SHAPE
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
@@ -789,9 +789,9 @@ class ProxyInstanceConfig:
 
         self.costs = _coerce_cost_config(self.costs)
 
-        if self.wire_shape not in _VALID_WIRE_SHAPES:
+        if self.wire_shape not in VALID_WIRE_SHAPES:
             raise ValueError(
-                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
+                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(VALID_WIRE_SHAPES)})"
             )
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
