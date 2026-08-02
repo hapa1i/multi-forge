@@ -1,8 +1,9 @@
 # Repair manifest-only session orphans (surface + re-index)
 
-**Status**: Proposed. Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md)
-D3 on 2026-08-01, per that card's Phase 0 ratification. That card stops **new** orphans being created; this one handles
-the ones already on disk.
+**Lane**: `doing/` -- accepted 2026-08-02, active since 2026-08-02; execution plan in [checklist.md](checklist.md).
+Split out of [`session_create_crash_atomicity`](../../done/session_create_crash_atomicity/card.md) D3 on 2026-08-01, per
+that card's Phase 0 ratification. That card stops **new** orphans being created; this one handles the ones already on
+disk.
 
 **References**: `session_create_crash_atomicity` card.md §"Design decisions owed" item 3 (the paragraph this card is
 seeded from) and its Phase 0 decisions block.
@@ -11,10 +12,18 @@ seeded from) and its Phase 0 decisions block.
 
 A session manifest with no index row is invisible to `session list`, still owns its name (`create_exclusive` raises
 `SessionExistsError`; `_name_is_taken` consults the manifest), and still owns its conversation binding. Recovery today
-is `session delete <name>` from inside the owning project -- and nothing tells the user the orphan exists.
+is `session delete <name>` run from the owning Forge project root exactly -- the orphan-directory branch resolves
+`Path.cwd()` directly (`cli/session_manage.py:390`), so a descendant directory finds nothing -- and nothing tells the
+user the orphan exists. *(Corrected 2026-08-02, checklist F4: the original wording claimed "from inside the owning
+project", which overstates the implementation.)*
 
-`session_create_crash_atomicity` closes the window that produces these, but does not remove existing ones. Orphans
-persist from crashes before that change ships and from older Forge versions.
+`session_create_crash_atomicity` closes the crash window, but orphans are **not only historical** *(correction
+2026-08-02, checklist F2)*: the `list_sessions` prune drops any row whose recorded worktree vanished even though the
+manifest is durable (`index.py:198`; the creation transaction's residue reclaim is deliberately narrower --
+`index.py:448-450`). A root-level worktree session keeps its manifest under the **main** checkout's `.forge/` while
+recording the linked worktree (`manager.py:627-641`, `models.py:34-42`), so deleting that worktree orphans the manifest
+on the next `session list`. Orphans therefore persist from pre-fix crashes, from older Forge versions, and from ordinary
+worktree deletion going forward.
 
 ## Why this is not `add_from_state`
 

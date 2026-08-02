@@ -119,8 +119,7 @@ both gain the second clause, not be contradicted.
    identity reconstruction (recompute via the same helpers creation uses), missing-worktree behavior, UUID/thread
    collision handling against live rows, and malformed/legacy-manifest policy. That is its own card: Phase 3 files it in
    `proposed/` seeded from this paragraph, unless Phase 0 explicitly reverses the split. **Ratified 2026-08-01**: split
-   confirmed; filed as
-   [`proposed/session_orphan_manifest_repair`](../../proposed/session_orphan_manifest_repair/card.md).
+   confirmed; filed as [`doing/session_orphan_manifest_repair`](../../doing/session_orphan_manifest_repair/card.md).
 
 ## Constraints (must not break)
 

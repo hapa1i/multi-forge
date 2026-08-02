@@ -114,6 +114,22 @@ class ManifestUnreadableError(ForgeSessionError, StateUnreadableError):
         Exception.__init__(self, f"manifest at '{path}': {reason}")
 
 
+class ManifestChangedError(ForgeSessionError):
+    """Raised when manifest bytes differ from what a repair scan classified.
+
+    The repair apply's transaction callback verifies the manifest is
+    byte-identical to the scanned copy instead of writing one (checklist D6:
+    conversation ids cannot identify a manifest -- a Codex session before its
+    first turn carries neither id). A mismatch means the orphan changed or was
+    replaced between scan and apply; the creation transaction compensates the
+    row away and the item is reported, never repaired blind.
+    """
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        super().__init__(f"session manifest changed since it was scanned: {path}")
+
+
 class IndexUnreadableError(ForgeSessionError, StateUnreadableError):
     """Raised when the index exists but the read failed (OSError), not corruption."""
 
