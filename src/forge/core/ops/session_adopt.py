@@ -815,11 +815,15 @@ def _rollback_adoption(
         # Keep the row and manifest removal under the same index lock as ordinary
         # deletion. Otherwise a same-name creator can publish between the two and
         # lose its manifest to this rollback.
-        IndexStore().delete_session_txn(
+        removed = IndexStore().delete_session_txn(
             name,
             forge_root=str(ctx.forge_root),
             expect_manifest_absent=False,
             delete_manifest=_delete_manifest,
         )
+        if not removed:
+            # Defensive today: False requires expect_manifest_absent=True. Keep
+            # the replacement-owner outcome visible if that coupling changes.
+            _log.warning("Adopt rollback skipped session state for '%s': name is now owned by a replacement", name)
     except Exception as e:
         _log.warning("Adopt rollback failed (session state): %s", e)

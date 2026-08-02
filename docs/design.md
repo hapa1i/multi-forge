@@ -215,8 +215,9 @@ reentrant, so nothing inside the transaction may call a locking `IndexStore` met
 Two reservations, at different timescales. The manifest is the reservation that survives the process: `create_exclusive`
 tests and writes under that manifest's own lock, so a successful call is an ownership token, and an index row alone
 reserves nothing because `list_sessions` prunes rows whose manifest is missing. During creation, the held index lock is
-the reservation -- which is what makes writing the row first safe. `write` remains for intended overwrites (deliberate
-stale fork-target replacement).
+the reservation -- which is what makes writing the row first safe. `write` remains an unconditional low-level primitive
+for storage tests and controlled bootstrap paths; because it recreates a missing manifest, production mutations of a
+published session use `update`, while creation and restoration use `create_session_txn` plus `create_exclusive`.
 
 Row-first makes the crash residue prunable rather than durable:
 
@@ -247,9 +248,12 @@ cannot substitute either: `now_iso` has second granularity, so a same-second rep
 `SessionExistsError` rather than replacing a session that claimed the name during its cleanup.
 
 The terminal transaction deletes the manifest before its row while holding the index lock, and `SessionStore.delete`
-takes the same manifest lock as write/update. This preserves index -> manifest lock order, prevents an in-flight hook
-update from recreating a manifest after the row is gone, and means manifest-lock failure leaves the still-complete
-session published. Once the manifest is absent, any later failure leaves only a prunable row.
+takes the same manifest lock as `update`. This preserves index -> manifest lock order, prevents an in-flight hook update
+from recreating a manifest after the row is gone, and means manifest-lock failure leaves the still-complete session
+published. Creation is protected separately by the outer index transaction; unconditional `write` is not a supported
+production mutation of a published session. Deletion may wait up to the five-second CLI manifest-lock timeout while it
+holds the global index lock, preferring a completed user-requested delete over a shorter contention failure. Once the
+manifest is absent, any later failure leaves only a prunable row.
 
 An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
 `os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably

@@ -234,6 +234,12 @@ class SessionStore:
         Acquires the same file lock as update() to prevent CLI write + hook
         update lost-update races (D10).
 
+        This is an unconditional low-level write: if the manifest disappears
+        while this call waits for its lock, it recreates the directory and
+        manifest. Production mutations of a published session must use ``update``
+        so terminal deletion remains authoritative. Creation and restoration must
+        use ``IndexStore.create_session_txn`` with ``create_exclusive``.
+
         Args:
             manifest: The manifest to write.
 
@@ -264,8 +270,10 @@ class SessionStore:
         the process. Call this only from that transaction, or from a path that
         genuinely owns its name without publishing a row.
 
-        Use `write` instead when overwriting an existing manifest is intended
-        (rollback restores, deliberate stale-target replacement).
+        Do not fall back to ``write`` for a production overwrite or restoration:
+        it can recreate a manifest after terminal deletion. Existing published
+        sessions mutate through ``update``; creation and restoration use the outer
+        index transaction.
 
         Raises:
             SessionExistsError: If the manifest already exists.
@@ -308,11 +316,13 @@ class SessionStore:
     def delete(self) -> bool:
         """Delete the session directory and its contents.
 
-        Serializes with ``write`` / ``create_exclusive`` / ``update`` on the
-        manifest lock. The manifest is unlinked before recursive cleanup because
-        the lock file lives inside the directory being removed: a waiter that
-        opens a replacement lock inode during cleanup must see no manifest and
-        fail its read instead of resurrecting a deleted session.
+        Serializes with ``update`` on the manifest lock. The manifest is unlinked
+        before recursive cleanup because the lock file lives inside the directory
+        being removed: an updater that opens the old or a replacement lock inode
+        during cleanup must read the missing manifest and fail instead of
+        resurrecting a deleted session. Creation is separately serialized by the
+        outer index transaction; unconditional ``write`` is not a supported
+        production mutation of a published session.
 
         Uses shutil.rmtree since the rest of the session directory is entirely
         session-owned. Leaves the parent sessions/ directory in place even if

@@ -7,6 +7,7 @@ create, so several tests here assert on what adoption must **not** touch.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -484,6 +485,32 @@ class TestConcurrencyAndRollback:
         assert IndexStore().read().sessions == {}
         assert not store.exists()
         assert source.exists(), "rollback must preserve the user-owned native transcript"
+
+    def test_rollback_reports_a_replacement_owner(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The transaction's defensive False outcome must not disappear silently."""
+        project = _make_project(tmp_path)
+        ctx = ExecutionContext.from_cwd(project)
+        store = SessionStore(str(project), "doomed")
+
+        def _decline(_index: IndexStore, _name: str, **_kwargs: object) -> bool:
+            return False
+
+        monkeypatch.setattr(IndexStore, "delete_session_txn", _decline)
+
+        with caplog.at_level(logging.WARNING, logger="forge.core.ops.session_adopt"):
+            _rollback_adoption(
+                "doomed",
+                ctx=ctx,
+                store=store,
+                artifact_abs=None,
+            )
+
+        assert "Adopt rollback skipped session state for 'doomed': name is now owned by a replacement" in caplog.text
 
     def test_threaded_adopts_of_one_uuid_bind_once(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Claude-arm counterpart of the Codex interleaved-adopt regression.

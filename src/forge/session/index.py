@@ -652,7 +652,12 @@ class IndexStore:
                 producing an orphan manifest. Keep it to the bounded session
                 directory -- manifest, its lock, and up to three Codex handoff
                 files. Transcripts (``.forge/artifacts/``), the search index, and
-                the worktree all live outside it and must stay outside.
+                the worktree all live outside it and must stay outside. A
+                ``SessionStore.delete`` callback may wait up to
+                ``CLI_LOCK_TIMEOUT_S`` for a live manifest lock while this global
+                index lock remains held; that matches creation's lock order and
+                prefers completing a user-requested delete over a shorter
+                contention failure.
 
         Returns:
             True if the caller still owned the name; the row and manifest are gone.
@@ -667,10 +672,14 @@ class IndexStore:
             if key is not None:
                 if expect_manifest_absent and self._manifest_exists_for_row(key, index.sessions[key]):
                     return False
-            # No row and no way for a replacement to exist without one: publication
-            # writes the row first, and a transaction mid-flight would be blocked on
-            # this lock. Anything left at the path is the caller's own, or a
-            # pre-existing orphan it is entitled to clear.
+
+            # The held index lock excludes a replacement that is only partway
+            # through publication. Under the single-deleter contract above, a
+            # surviving row is still the caller's: either its manifest never went
+            # absent, or the guard ruled out a completed replacement. Without a
+            # row, row-first publication means no replacement can own the path;
+            # anything left is caller-owned residue or a pre-existing orphan that
+            # this transaction is entitled to clear.
 
             delete_manifest()
             if key is not None:

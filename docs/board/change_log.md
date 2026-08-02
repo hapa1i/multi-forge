@@ -37,10 +37,13 @@ wc -l docs/board/change_log.md
   index row, and only then cleans up the session directory. A manifest-lock failure leaves the complete session intact;
   a later cleanup failure leaves only a prunable index row.
 - Adoption rollback uses the same terminal transaction, closing its gap between index-row removal and manifest cleanup.
+- The public storage contract now distinguishes read-first `update`, transaction-owned `create_exclusive`, and
+  unconditional low-level `write`; deletion's possible five-second global-index contention is explicit. The deletion
+  schedule has its own regression file, and adoption rollback reports the defensive replacement-owner outcome.
 
-**Verification**: `make test-unit` (8586 passed, 1 skipped), `make test-regression` (593 passed), component integration
-(`pytest tests/src -m integration`, 117 passed), Docker session/adoption integration (22 passed), and `make pre-commit`
-clean.
+**Verification**: focused session/adoption coverage (130 passed), `make test-unit` (8587 passed, 1 skipped),
+`make test-regression` (593 passed), component integration (`pytest tests/src -m integration`, 117 passed), Docker
+session/adoption integration (22 passed), and `make pre-commit` clean.
 
 ## 2026-08-01
 
