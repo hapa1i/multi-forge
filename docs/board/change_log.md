@@ -27,6 +27,34 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-02
 
+### Session orphan manifest repair (`forge session repair`)
+
+**Goal**: Surface and re-index manifest-only session orphans -- invisible to `session list` yet still owning their name
+and conversation binding -- covering both crash-era residue and the live producer (the `list_sessions` prune dropping
+worktree-vanished rows).
+
+**Key changes**:
+
+- New preview-default `forge session repair` (`--yes` to apply, `--json`), scoped to the current Forge root. Six
+  classifications: `repairable`, `missing-worktree` (report-only -- never publish a row the prune immediately deletes),
+  `collision`, `corrupt` (owned by `forge clean`), `unreadable` (owned by neither), `unrepairable`. Per-item apply
+  refusals; exit 1 on any refusal or failure.
+- Apply publishes through `create_session_txn(require_uuid_unbound=True)` with a hash-verified callback
+  (`SessionStore.update_if_unchanged`): apply-time identity is a content hash -- total over id-less manifests -- and a
+  raced manifest fails the callback so compensation removes the row.
+- Row identity derives from the manifest's **recorded** worktree metadata per session shape (ordinary, nested-project
+  worktree, root-level worktree, `--into` guest); a moved ordinary checkout re-derives from its actual location,
+  correcting `worktree.path` and `forge_root` on disk while preserving `confirmed.claude_project_root` (Claude's
+  conversation namespace does not move with the checkout).
+- Collision detection uses the three-source binding scans (`collect_bound_uuids`/`collect_bound_codex_threads` without
+  the per-root orphan walk); review round 3 found column-only maps allowed a second binding when a row lagged its
+  manifest.
+- `SessionStore.read()` now rejects non-object JSON and directory/name mismatches as `ManifestCorruptedError`, giving
+  repair and `forge clean` the same D4 ownership of both shapes.
+
+**Verification**: unit suite 8,639 passed; CIT tier (`-m integration`) 117 passed; Docker `test_session_lifecycle.py` 22
+passed including an end-to-end repair round-trip; `make pre-commit` clean. PR #120.
+
 ### Serialize session manifest deletion
 
 **Goal**: Prevent an in-flight manifest update from recreating a deleted session after its index row is removed.

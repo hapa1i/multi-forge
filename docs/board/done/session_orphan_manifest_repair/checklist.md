@@ -245,10 +245,22 @@ design call; repair handles the state either way.
 
 ## Closeout
 
-- [ ] Final checklist items ticked with verification recorded.
-- [ ] Compact `docs/board/change_log.md` entry (Goal / Key changes / Verification).
-- [ ] Durable lessons proposed via `.forge/memory/shadow_impl_notes.md`; human review promotes to
-  `docs/board/impl_notes.md`.
-- [ ] design.md, cli_reference.md, and end-user docs verified against shipped behavior.
-- [ ] Move the card `doing/ -> done/`; repoint inbound links (`design.md:267`'s lane path and the three
-  `done/session_create_crash_atomicity` links repointed to `doing/` at activation need the done-lane repoint again).
+Shipped in PR #120, merged to `main` 2026-08-02 as `2fe4848a`.
+
+- [x] Final checklist items ticked with verification recorded. *Phases 0-3 plus review-round-3 fixes F7-F11, each with
+  its verifying test named inline.*
+- [x] Compact `docs/board/change_log.md` entry (Goal / Key changes / Verification). *Added at closeout, newest-first.*
+- [x] Durable lessons proposed via `.forge/memory/shadow_impl_notes.md`; human review promotes to
+  `docs/board/impl_notes.md`. *Five proposals appended at closeout.*
+- [x] design.md, cli_reference.md, and end-user docs verified against shipped behavior. *design.md §3.2 describes the
+  shipped scan/apply semantics (including round-3 collision and relocation rules), cli_reference.md session table has
+  the command, end-user session.md has "Repairing invisible sessions".*
+- [x] Move the card `doing/ -> done/`; repoint inbound links. *`git mv` at closeout; the four
+  `done/session_create_crash_atomicity` links (card.md:122, checklist.md:48/:229/:289) repointed to `../../done/`.
+  design.md no longer links the card path -- the activation-era pointer was replaced by the shipped-surface paragraph in
+  Phase 3, so no design.md repoint is owed.*
+
+Verification at closeout: `uv run pytest tests/src -m "not integration"` (8,640 deselection-side green earlier same day:
+8,639 passed), `uv run pytest tests/src -m integration` (117 passed -- the CIT tier `-m "not integration"` deselects;
+run per impl_notes), `./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py` (22 passed,
+includes the end-to-end repair round-trip), `make pre-commit` clean.

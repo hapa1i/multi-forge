@@ -45,7 +45,7 @@ recorded below are what shipped.
     `session_fork.py:1050` are `SessionStore.read()` (manifest), not index reads.
 - [x] Decide D1 and D2 -- recorded under "Decisions" below.
 - [x] Ratify D3's default split -- **split confirmed**; follow-up card filed at
-  [`doing/session_orphan_manifest_repair`](../../doing/session_orphan_manifest_repair/card.md).
+  [`done/session_orphan_manifest_repair`](../../done/session_orphan_manifest_repair/card.md).
 
 ### Phase 0 findings (card corrections)
 
@@ -226,7 +226,7 @@ recorded below are what shipped.
 - **D3 -- existing-orphan repair: split (ratified).** Confirmed by `index.py:503`'s own docstring: `add_from_state`
   cannot derive `project_root` / `checkout_root` / `relative_path` from a `SessionState`, so repair owes an identity-
   reconstruction contract that does not belong in this card. Filed as
-  [`doing/session_orphan_manifest_repair`](../../doing/session_orphan_manifest_repair/card.md).
+  [`done/session_orphan_manifest_repair`](../../done/session_orphan_manifest_repair/card.md).
 
 ## Phase 1 -- Transaction primitive (`IndexStore`)
 
@@ -286,7 +286,7 @@ recorded below are what shipped.
 ## Phase 3 -- Existing-orphan repair (default: split; gated on D3)
 
 - [x] Default path taken (Phase 0 ratified the split). Follow-up card filed at
-  [`doing/session_orphan_manifest_repair`](../../doing/session_orphan_manifest_repair/card.md), seeded from card D3:
+  [`done/session_orphan_manifest_repair`](../../done/session_orphan_manifest_repair/card.md), seeded from card D3:
   identity reconstruction, missing-worktree behavior, UUID/thread collision handling, legacy-manifest policy, plus a
   discovery-surface question the card D3 paragraph did not name. No repair code ships in this card.
 
