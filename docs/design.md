@@ -264,7 +264,7 @@ whether a **conversation** is already bound therefore also scan manifest directo
 and fail closed on the index *and* on every manifest they touch, so a read-only caller neither mutates the index nor
 reports "unbound" because a read failed. An unreadable manifest raises `BindingLookupError` naming the directory to
 repair: a swallowed read is indistinguishable from an absent binding, which is what would let one conversation bind
-twice. Repairing pre-existing orphans is not yet implemented (`docs/board/proposed/session_orphan_manifest_repair`).
+twice. Repairing pre-existing orphans is not yet implemented (`docs/board/doing/session_orphan_manifest_repair`).
 
 **A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
 `start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it
