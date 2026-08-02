@@ -246,6 +246,11 @@ cannot substitute either: `now_iso` has second granularity, so a same-second rep
 `created_at`. `fork --force` frees a stale target the same way and so declines the same way, raising
 `SessionExistsError` rather than replacing a session that claimed the name during its cleanup.
 
+The terminal transaction deletes the manifest before its row while holding the index lock, and `SessionStore.delete`
+takes the same manifest lock as write/update. This preserves index -> manifest lock order, prevents an in-flight hook
+update from recreating a manifest after the row is gone, and means manifest-lock failure leaves the still-complete
+session published. Once the manifest is absent, any later failure leaves only a prunable row.
+
 An exception from the manifest callback does not prove the manifest is absent -- `atomic_write_json` makes it durable at
 `os.replace`, and a signal can arrive after that -- so compensation removes the row only when the manifest is provably
 not there. Compensation itself never raises: it is unwinding the callback's exception, which the caller must receive

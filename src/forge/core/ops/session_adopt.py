@@ -806,14 +806,20 @@ def _rollback_adoption(
         except OSError as e:
             _log.warning("Adopt rollback failed (artifact copy): %s", e)
 
-    try:
-        IndexStore().remove_session(name, forge_root=str(ctx.forge_root))
-    except Exception as e:
-        _log.warning("Adopt rollback failed (index entry): %s", e)
-
-    try:
+    def _delete_manifest() -> None:
         # Removes .forge/sessions/<name>/ only -- not the artifact copy, which
         # lives under .forge/artifacts/<name>/ and is unlinked above.
         store.delete()
+
+    try:
+        # Keep the row and manifest removal under the same index lock as ordinary
+        # deletion. Otherwise a same-name creator can publish between the two and
+        # lose its manifest to this rollback.
+        IndexStore().delete_session_txn(
+            name,
+            forge_root=str(ctx.forge_root),
+            expect_manifest_absent=False,
+            delete_manifest=_delete_manifest,
+        )
     except Exception as e:
-        _log.warning("Adopt rollback failed (manifest): %s", e)
+        _log.warning("Adopt rollback failed (session state): %s", e)

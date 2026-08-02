@@ -308,17 +308,29 @@ class SessionStore:
     def delete(self) -> bool:
         """Delete the session directory and its contents.
 
-        Uses shutil.rmtree since the session directory is entirely session-owned.
-        Leaves the parent sessions/ directory in place even if empty (D12).
+        Serializes with ``write`` / ``create_exclusive`` / ``update`` on the
+        manifest lock. The manifest is unlinked before recursive cleanup because
+        the lock file lives inside the directory being removed: a waiter that
+        opens a replacement lock inode during cleanup must see no manifest and
+        fail its read instead of resurrecting a deleted session.
+
+        Uses shutil.rmtree since the rest of the session directory is entirely
+        session-owned. Leaves the parent sessions/ directory in place even if
+        empty (D12).
 
         Returns:
             True if directory was removed, False if it didn't exist.
         """
         session_dir = self.session_dir
-        if session_dir.is_dir():
+        if not session_dir.is_dir():
+            return False
+
+        with file_lock_for_target(target_path=self._manifest_path, timeout_s=CLI_LOCK_TIMEOUT_S):
+            if not session_dir.is_dir():
+                return False
+            self._manifest_path.unlink(missing_ok=True)
             shutil.rmtree(session_dir, ignore_errors=True)
             return True
-        return False
 
     def update_last_accessed(self) -> SessionState:
         """Update last_accessed_at timestamp and return updated manifest."""

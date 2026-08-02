@@ -25,6 +25,23 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-02
+
+### Serialize session manifest deletion
+
+**Goal**: Prevent an in-flight manifest update from recreating a deleted session after its index row is removed.
+
+**Key changes**:
+
+- Terminal deletion now holds the index lock while taking the manifest lock, removes the canonical manifest before the
+  index row, and only then cleans up the session directory. A manifest-lock failure leaves the complete session intact;
+  a later cleanup failure leaves only a prunable index row.
+- Adoption rollback uses the same terminal transaction, closing its gap between index-row removal and manifest cleanup.
+
+**Verification**: `make test-unit` (8586 passed, 1 skipped), `make test-regression` (593 passed), component integration
+(`pytest tests/src -m integration`, 117 passed), Docker session/adoption integration (22 passed), and `make pre-commit`
+clean.
+
 ## 2026-08-01
 
 ### Crash-atomic session creation
