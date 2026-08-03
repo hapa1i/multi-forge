@@ -10,8 +10,9 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 144 severity-ranked finding rows: 1 CRITICAL, 21 HIGH, 92 MEDIUM, and 30 LOW, plus the unranked U001 and
-U002 design-drift notes. Three Opus claims were refuted and five were adjusted during the merge audit.
+**Inventory:** 146 severity-ranked findings: 1 CRITICAL, 21 HIGH, 93 MEDIUM, and 31 LOW, plus unranked U001. The
+original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04. Three Opus claims
+were refuted and five were adjusted during the merge audit.
 
 ## Review Status and Execution Gate
 
@@ -29,7 +30,7 @@ as safe to remove until its compatibility role and tests have been characterized
 according to `docs/developer/board_contract.md`; keep independently shippable fixes as member cards when a shared
 contract requires an epic.
 
-**Coordination epic:** [`epic_repo_maintenance_round`](todo/epic_repo_maintenance_round/card.md). The epic owns
+**Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger.
 
 ### Finding fields
@@ -127,18 +128,19 @@ contracts.
 
 ## Decision Gates
 
-These findings describe real implementation behavior, but the governing documents do not yet select one implementable
-outcome. Resolve each gate in the normative design docs before creating a behavior-change card.
+The four gates were approved on 2026-08-04. Their completed cards hold the target contracts; accepted implementation
+members are linked from the coordination epic. Normative design documents continue to describe shipped behavior and move
+with the corresponding implementation.
 
-| Gate                                                                                     | Findings                   | Unresolved contract                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [DG1 — Stop verification contract](todo/stop_verification_contract/card.md)              | D006, U002                 | `design.md` §3.10 requires the synchronous Stop path to finish in under 100 ms, while `design_workflows.md` §1.3 permits blocking `test_suite` and promises arbitrary `custom_command` checks. The implementation runs only the fixed test suite and silently allows unknown types. Decide the latency exception and whether `custom_command` is removed from the docs or specified as supported behavior. |
-| [DG2 — missing-worktree authority](todo/missing_worktree_authority/card.md)              | D009                       | `list_sessions`, `get_session`, and repair disagree on whether a surviving manifest without its recorded worktree is live. Define the authoritative predicate and recovery ownership.                                                                                                                                                                                                                      |
-| [DG3 — downstream retention ownership](todo/downstream_retention_ownership/card.md)      | D015                       | Appendix §A.11 exposes audit retention while §A.14 delegates provider-trace retention to unified downstream pruning. Define whether the directory has one retention policy or independently retainable record classes.                                                                                                                                                                                     |
-| [DG4 — compatibility surface for deletion](todo/deletion_compatibility_contract/card.md) | O047–O052, O092–O093, O096 | Zero production callers do not prove removal is compatible. Establish whether tests, public imports, serialized config, or extension consumers constitute supported ownership before deleting these surfaces.                                                                                                                                                                                              |
+| Gate                                                                                     | Findings                   | Approved resolution                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [DG1 — Stop verification contract](done/stop_verification_contract/card.md)              | D006, U002–U003            | Fixed `completion_promise`/`test_suite` schema; test suite is the named latency exception; arbitrary commands are unsupported; unknown values become visible fail-open configuration. |
+| [DG2 — missing-worktree authority](done/missing_worktree_authority/card.md)              | D009                       | Manifest owns durable reservation, index owns discovery, and worktree presence owns launchability; surviving sessions become degraded rather than invisible.                          |
+| [DG3 — downstream retention ownership](done/downstream_retention_ownership/card.md)      | D015                       | One global downstream policy and pruner; explicit global config wins, agreeing legacy values bridge, and conflict disables pruning safely.                                            |
+| [DG4 — compatibility surface for deletion](done/deletion_compatibility_contract/card.md) | O047–O052, O092–O093, O096 | Evidence rubric adopted; individually admitted work is ticketed; O093 is characterization-only and unverified candidates remain excluded.                                             |
 
-`D006`, `D009`, and `D015` remain findings because the implementation exposes the conflict. Their current severity
-describes observed impact, not approval of the remedy proposed by either source report.
+`D006`, `D009`, and `D015` remain open findings until their implementation members ship. Approval selected the remedy;
+it did not represent the current code as fixed.
 
 ## Design-Conformance Findings
 
@@ -189,9 +191,10 @@ describes observed impact, not approval of the remedy proposed by either source 
 | D043 | LOW      | F5    | design.md §2/§6 list a `src/forge/status/` component that does not exist (status lives in `cli/status_line.py` + `cli/statusline/`).                                                                                                                                                                                                                                                                                                                                                                     | design.md §2, §6                                         | filesystem                                                                                              |
 | D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
 
-## Design Status Outside the Ranked Inventory
+## Design Status and Post-Review Admissions
 
-These notes are not additional severity-ranked rows. Deferred items remain design status, not defects:
+This section preserves the merge audit's design-status notes. Deferred items remain design status rather than defects;
+the later DG1 decision promoted U002/U003 into the ranked inventory without renumbering the original 144-row table:
 
 - `ModelHyperparameters.strict` / `handle_unsupported_param` defined but unwired (appendix §E.7 says so itself). (F5)
 - Workspace activity aggregation / `forge workspace status` (blocked on root-scoped telemetry identity). (F5)
@@ -209,12 +212,20 @@ Documented drift cross-references the ranked inventory where one exists:
   `["uv", "run", "pytest"]` with no user-configurable command. Because `VerificationConfig.type` is a plain `str`, a
   stored `custom_command` value reaches the unknown-type branch and silently allows Stop with `(True, None)` rather than
   rejecting the manifest or running a command. (`session/models.py:239`; `cli/hooks/verification.py:43-47,126-132`)
+  **Resolved decision:** MEDIUM; remove the documentation promise and implement visible fail-open validation in
+  [`align_stop_verification_contract`](todo/align_stop_verification_contract/card.md).
+- **U003 — `on_incomplete: re_inject` is documented but unsupported:** the same workflow example names `re_inject` as
+  the primary value, while `VerificationConfig` defines `block | warn | allow`. The hook handles `warn` and `allow`
+  explicitly, then treats every other value as `block`, so the documented value works only by falling through the
+  unknown-value path. (`design_workflows.md:296`; `session/models.py:230-244`; `cli/hooks/verification.py:123,179,193`)
+  **Resolved decision:** LOW; document `block` and implement strict authoring plus legacy diagnostics in
+  [`align_stop_verification_contract`](todo/align_stop_verification_contract/card.md).
 - **O092 subset — `IndexState.needs_reindex`:** zero callers; the index re-extracts and rewrites on every Stop even for
   byte-identical snapshots. Split this symbol from the compound O092 row before implementation.
 - **D029 — `tool_prefixes_to_ignore`:** reachable only in a `ProxyConfig` shape that no proxy file can produce.
 
-`U001` and `U002` need severity, acceptance criteria, and board-card decisions before execution. They are intentionally
-excluded from the 144-row severity inventory rather than silently assigning impact during the merge.
+`U001` still needs severity, acceptance criteria, and a board-card decision. U002 and U003 are now admitted into the
+ranked inventory through the approved DG1 record rather than silently changing the original merge audit.
 
 ## Code and Maintenance Findings
 
@@ -345,7 +356,7 @@ one card coordinates them.
 | --------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch       | Normative contract chosen; reproduction or failing test recorded                |
 | 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
-| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002                                               | DG1 resolved; verification and artifact contracts defined                       |
+| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                          | DG1 resolved; verification and artifact contracts defined                       |
 | 3 — session and durable-state safety    | D008–D011, D021–D022, O003, O006, and directly coupled session rows       | State authority, fault outcomes, and recovery paths defined                     |
 | 4 — installer transactions              | D012–D014, D019                                                           | Fault points and rollback ownership enumerated; integration fixtures identified |
 | 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                  | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
@@ -357,7 +368,7 @@ one card coordinates them.
 - **Policy/supervision epic:** coordinate D001–D005, but ship state preservation, verdict hardening, edit identity, and
   any command-core refactor as independently reviewable changes.
 - **Stop/artifact epic:** resolve DG1 first; keep artifact schema/idempotency (D007, D024), sidecar drain (D039), and
-  the verification contract (D006, U002) distinct.
+  the verification contract (D006, U002–U003) distinct.
 - **Durable-state/session epic:** coordinate D008–D011, D021–D022, O003, O006, and related state readers around
   fault-injection and recovery tests.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
