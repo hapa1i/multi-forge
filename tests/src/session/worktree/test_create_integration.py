@@ -198,9 +198,8 @@ print(json.dumps({
         assert result.data["branch_exists"] is True
 
     def test_raises_when_branch_exists(self, worktree_workspace: "WorktreeWorkspace") -> None:
-        """Should raise BranchExistsError when branch already exists."""
-        # Create branch first
-        worktree_workspace.git("branch", "existing")
+        """Should report the second worktree where the branch is checked out."""
+        worktree_workspace.git("worktree", "add", "/second-worktree", "-b", "existing")
 
         result = worktree_workspace.run_python("""
 import json
@@ -212,12 +211,13 @@ try:
     create_worktree('existing', cwd=Path('/workspace'))
     print(json.dumps({'error': None}))
 except BranchExistsError as e:
-    print(json.dumps({'error': 'BranchExistsError', 'branch': e.branch}))
+    print(json.dumps({'error': 'BranchExistsError', 'branch': e.branch, 'worktree': e.worktree}))
 """)
         assert result.ok, f"Failed: {result.stderr}"
         assert result.data is not None
         assert result.data["error"] == "BranchExistsError"
         assert result.data["branch"] == "existing"
+        assert result.data["worktree"] == "/second-worktree"
 
     def test_raises_when_path_exists(self, worktree_workspace: "WorktreeWorkspace") -> None:
         """Should raise WorktreePathExistsError when path already exists."""

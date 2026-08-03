@@ -1,11 +1,12 @@
 # Workspace Scope — `forge workspace` read surface (Slice 2)
 
-**Status**: Doing. Accepted for execution on `feat/workspace-scope-slice2` (2026-08-03). Two precursors shipped on branch
-`fix/workspace-scope` (2026-06-07, see change_log): (1) the `--scope repo` → `--scope workspace` rename resolving review
-concern #1, and (2) **Slice 1** — `project_root` is now consistently `get_main_repo_root()`-derived, so sessions in
-manually-created linked worktrees group under `--scope workspace`. Slice 1 makes the core session-grouping query correct
-with no new surface; what remains (this card) is the net-new `forge workspace worktrees` read surface that joins
-`git worktree list` with the session index (`status` deferred — see CLI / UX Sketch).
+**Status**: Doing. Slice 2 is implemented and verified on `feat/workspace-scope-slice2` (2026-08-03); the lane stays
+`doing/` until merge. Two precursors shipped on branch `fix/workspace-scope` (2026-06-07, see change_log): (1) the
+`--scope repo` → `--scope workspace` rename resolving review concern #1, and (2) **Slice 1** — `project_root` is now
+consistently `get_main_repo_root()`-derived, so sessions in manually-created linked worktrees group under
+`--scope workspace`. Slice 1 made the core session-grouping query correct with no new surface; Slice 2 adds the
+`forge workspace worktrees` read surface joining `git worktree list` with the session index (`status` deferred — see CLI
+/ UX Sketch).
 
 **Re-verified 2026-08-03** against current `main`, then corrected the same day by two adversarial review rounds:
 `session list` and `clean` default to `--scope workspace` (`%clean` defaults to `project`); `memory shadows` and

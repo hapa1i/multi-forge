@@ -1,16 +1,16 @@
 # Checklist — Workspace Scope Slice 2 (`forge workspace worktrees`)
 
-Drafted 2026-08-03 while the card sat in `proposed/` (checklist-first review), revised the
-same day across two adversarial review rounds. Round 2: activity aggregation and `forge workspace status` deferred as
-**blocked** (not merely separable); single `worktrees` leaf; parser and non-Git shapes pinned; `workspace_id` dropped;
-integration gate added. Round 3: `missing` is point-in-time availability (never "gone"); bare-backed families are
-render-only; incognito/legacy-row counting pinned; integration gates routed through `./scripts/test-integration.sh`; a
-discriminating newline-path fixture replaces the space-path one; cross-card ownership repoint added to closeout. Picked
-up on `feat/workspace-scope-slice2` and moved to `doing/` on 2026-08-03.
+Drafted 2026-08-03 while the card sat in `proposed/` (checklist-first review), revised the same day across two
+adversarial review rounds. Round 2: activity aggregation and `forge workspace status` deferred as **blocked** (not
+merely separable); single `worktrees` leaf; parser and non-Git shapes pinned; `workspace_id` dropped; integration gate
+added. Round 3: `missing` is point-in-time availability (never "gone"); bare-backed families are render-only;
+incognito/legacy-row counting pinned; integration gates routed through `./scripts/test-integration.sh`; a discriminating
+newline-path fixture replaces the space-path one; cross-card ownership repoint added to closeout. Picked up on
+`feat/workspace-scope-slice2` and moved to `doing/` on 2026-08-03.
 
 ## Current focus
 
-Phase 1 — git-derived resolver.
+Implementation and verification complete; pending merge and the post-merge lane move.
 
 ## Phase 0 — Decisions to confirm at review (no code)
 
@@ -20,7 +20,8 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   `worktrees` carries per-worktree session counts.
 - [x] D2: the slice ships **one leaf**: top-level `workspace` group (no alias, D6 alias policy in
   `cli_style_guidelines.md`) with `worktrees` (`--json`). `forge workspace status` is deferred with the activity
-  aggregation — until an Activity block exists it answers nothing `worktrees` does not.
+  aggregation — until an Activity block exists it answers nothing `worktrees` does not. The command-tree invariant's
+  narrow `forge workspace` exception records this deliberate debt until a distinct second leaf can ship.
 - [x] D3: activity aggregation is deferred out of this card as **blocked**: ledger/upstream activity queries filter by
   session *name* only while names are project-scoped (`core/ops/usage_summary.py` defers root-scoped ledger identity to
   a future card), so workspace sums can bleed in an out-of-workspace same-named session and double-count same-named
@@ -46,41 +47,41 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
 
 ## Phase 1 — Git-derived workspace resolver (`session/workspace.py`)
 
-- [ ] Frozen dataclasses per the card sketch: `Workspace(primary_root, common_dir: Path | None, worktrees)`;
+- [x] Frozen dataclasses per the card sketch: `Workspace(primary_root, common_dir: Path | None, worktrees)`;
   `WorkspaceWorktree(checkout_root, branch, head, is_primary, is_bare, is_prunable, is_locked, is_detached, path_exists)`.
-- [ ] Parser pinned to `git worktree list --porcelain -z` (attributes NUL-terminated; two consecutive NULs separate
+- [x] Parser pinned to `git worktree list --porcelain -z` (attributes NUL-terminated; two consecutive NULs separate
   entries): first entry is the primary record (git's contract — a bare repo in bare-backed families); `branch` stores
   the short name (full `refs/heads/…` matched internally); `locked`/`prunable`/`detached`/`bare` recognized with
   attribute reasons ignored in v1; unknown attributes skipped (forward-compatible). Assertion: a repo with primary +
   linked + locked + detached + dir-deleted worktrees parses into exactly those flags.
-- [ ] Discriminating `-z` fixture: a worktree path containing an **embedded newline** (POSIX-legal; this is the case the
+- [x] Discriminating `-z` fixture: a worktree path containing an **embedded newline** (POSIX-legal; this is the case the
   current line-based scan cannot represent — a space does not discriminate) round-trips through the parser.
-- [ ] `path_exists` derived independently of git flags (probe-backed contract, 2026-08-03): a **locked** worktree whose
+- [x] `path_exists` derived independently of git flags (probe-backed contract, 2026-08-03): a **locked** worktree whose
   directory was moved away reports `is_locked=True, is_prunable=False, path_exists=False` — and survives
   `git worktree prune --expire=now`; a plain deleted worktree reports `is_prunable=True, path_exists=False` and is
   removed by that prune. Assertion: both states, before and after prune.
-- [ ] Failure taxonomy pinned: not-a-repo → single-directory degrade (Q3) and nothing else degrades; missing git binary
+- [x] Failure taxonomy pinned: not-a-repo → single-directory degrade (Q3) and nothing else degrades; missing git binary
   → clear loud error; `git worktree list`/`rev-parse` non-zero or malformed porcelain → clear loud parse error
   (subprocess output is a system boundary on this command's critical path). Assertion per case.
-- [ ] Workspace identity derived at query time via `rev-parse --path-format=absolute --git-common-dir`. Assertion
+- [x] Workspace identity derived at query time via `rev-parse --path-format=absolute --git-common-dir`. Assertion
   (non-bare families): resolver run from the primary checkout and from a linked worktree returns equal `common_dir` and
   `primary_root`, and `primary_root == get_main_repo_root()` for the same cwd.
-- [ ] Bare-family fixture (D7): `git init --bare` + linked worktree → no crash; first record
+- [x] Bare-family fixture (D7): `git init --bare` + linked worktree → no crash; first record
   `is_bare=True, is_primary=True`, no branch/head requirement; linked rows normal. The identity assertion is explicitly
   not applied.
-- [ ] Non-git degrade pinned (card Q3): `Workspace(primary_root=<resolved dir>, common_dir=None, worktrees=(` one
+- [x] Non-git degrade pinned (card Q3): `Workspace(primary_root=<resolved dir>, common_dir=None, worktrees=(` one
   member: `checkout_root=<dir>, branch=None, head=None, is_primary=True`, all flags `False`, `path_exists=True))`.
   Assertion: `tmp_path` without git → exactly that shape, nothing raised.
-- [ ] Path normalization: `Path.resolve()` on existing paths; a missing path keeps git's recorded spelling with
+- [x] Path normalization: `Path.resolve()` on existing paths; a missing path keeps git's recorded spelling with
   `path_exists=False`; no path-prefix membership tests. Assertion: a worktree reached through a symlinked path still
   matches its index `checkout_root`.
-- [ ] Porcelain parsing single-sourced: characterize `session/worktree/create.py::get_worktree_for_branch` (first
+- [x] Porcelain parsing single-sourced: characterize `session/worktree/create.py::get_worktree_for_branch` (first
   worktree carrying `branch refs/heads/<name>`), then repoint it through the new parser. Assertion: existing
   `tests/src/session/worktree/test_create.py` coverage passes unchanged.
-- [ ] Extend the CIT for the repointed production path: a branch **checked out in a second real worktree** makes
+- [x] Extend the CIT for the repointed production path: a branch **checked out in a second real worktree** makes
   `create_worktree` raise `BranchExistsError` carrying that worktree's path (the existing test only asserts the branch
   name; this drives `get_worktree_for_branch` end-to-end through the new parser).
-- [ ] **Integration gate (required; runner-invoked)**: the repoint touches the session fork/worktree branch-refusal path
+- [x] **Integration gate (required; runner-invoked)**: the repoint touches the session fork/worktree branch-refusal path
   (`get_worktree_for_branch` call in `session/worktree/create.py`), and
   `tests/src/session/worktree/test_create_integration.py` is `integration` + `docker_in` marked — so both gates go
   through the prescribed runner, not direct pytest:
@@ -89,7 +90,7 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
 
 ## Phase 2 — Index/active join + `forge workspace worktrees`
 
-- [ ] `core/ops/workspace.py` builder joins resolver output with
+- [x] `core/ops/workspace.py` builder joins resolver output with
   `core.ops.session.list_sessions(scope="workspace", include_incognito=True)` (D8), grouping items by
   `item.entry.checkout_root or item.entry.worktree_path` (D9; each `ListSessionsItem` carries its full
   `SessionIndexEntry`); rows are counted, never merged by name; `active` counts come from the shipped
@@ -97,41 +98,50 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   with zero sessions appears with `sessions=0`; an active-store live entry flips its worktree's active count; a legacy
   row with `checkout_root=""` and populated `worktree_path` lands under the right worktree; an incognito session is
   counted.
-- [ ] Name-collision honesty (the class that deferred aggregation): two same-named sessions in different Forge roots of
+- [x] Name-collision honesty (the class that deferred aggregation): two same-named sessions in different Forge roots of
   **one** workspace appear under their own worktrees as two counted rows; a same-named session in a **different**
   workspace is excluded by the `project_root` filter. Assertions for both fixtures.
-- [ ] Availability facts rendered per D6: after `rm -rf <linked-worktree>` (no `git worktree prune`), the row shows
+- [x] Availability facts rendered per D6: after `rm -rf <linked-worktree>` (no `git worktree prune`), the row shows
   `missing (prunable)` with `sessions=0` — the list-time self-heal pruned its index rows — and the builder does not
   error on rows vanishing mid-join; a locked worktree with a missing directory shows `missing (locked)`, not prunable.
-- [ ] CLI shape: bare `forge workspace` prints help (non-leaf orients); `worktrees` renders through the call-site
+- [x] CLI shape: bare `forge workspace` prints help (non-leaf orients); `worktrees` renders through the call-site
   `console`; recovery output only via `forge.cli.output` helpers (the `Tip:` / `[red]Error:[/red]` source guards apply);
   errors on stderr.
-- [ ] `--json` pinned (single schema; counts, not collections — session names remain
+- [x] `--json` pinned (single schema; counts, not collections — session names remain
   `forge session list --scope workspace`'s job): top-level `primary_root`, `common_dir` (`null` outside git), and
   `worktrees[]` rows carrying `checkout_root`, `branch`, `head`, `is_primary`, `is_bare`, `is_prunable`, `is_locked`,
   `is_detached`, `path_exists`, `sessions` (count), `active` (count).
-- [ ] Group registered in `cli/main.py` with no alias; `test_command_tree_invariants.py` extended for the new group.
-- [ ] No project-compatibility gating added: read-only surface; the embedded list prune is the already-exempt read-time
+- [x] Group registered in `cli/main.py` with no alias; `test_command_tree_invariants.py` extended for the new group.
+- [x] No project-compatibility gating added: read-only surface; the embedded list prune is the already-exempt read-time
   repair of the derived global index (design.md §3).
 
 ## Phase 3 — Docs, QA, closeout
 
-- [ ] cli_reference.md §1: new Workspace command table (`worktrees` only; `status` and the activity `--scope` are not
+- [x] cli_reference.md §1: new Workspace command table (`worktrees` only; `status` and the activity `--scope` are not
   documented as available).
-- [ ] design.md: a sentence in §3.2 "Session command scoping" naming the read surface; §6 directory map gains
+- [x] design.md: a sentence in §3.2 "Session command scoping" naming the read surface; §6 directory map gains
   `session/workspace.py`.
-- [ ] docs/end-user/session.md: short workspace section (what `--scope workspace` groups, what `worktrees` shows,
+- [x] docs/end-user/session.md: short workspace section (what `--scope workspace` groups, what `worktrees` shows,
   `missing`/`prunable` semantics, bare-family boundary).
-- [ ] QA checklist: new `### N.X` items for `forge workspace worktrees` (`<!-- auto -->` where assertable); bump
+- [x] QA checklist: new `### N.X` items for `forge workspace worktrees` (`<!-- auto -->` where assertable); bump
   `test-count` / `last-updated` in `src/skills/qa/resources/checklist.md`.
-- [ ] **Cross-card ownership repoint**: `docs/board/done/forge_cli_cleanup/checklist.md` (D9, ~line 180) says workspace
+- [x] **Cross-card ownership repoint**: `docs/board/done/forge_cli_cleanup/checklist.md` (D9, ~line 180) says workspace
   telemetry aggregation is owned by this card; since this card defers it, update that line at closeout to point at this
   card's Deferred section — or at the successor card if one is created — so the inbound contract stays true.
-- [ ] `docs/board/change_log.md` entry (feature size, 15–25 lines); durable lessons proposed via
+- [x] `docs/board/change_log.md` entry (feature size, 15–25 lines); durable lessons proposed via
   `.forge/memory/shadow_impl_notes.md`, not written directly to `impl_notes.md`.
-- [ ] Closeout records the deferral: the blocked aggregation/`status` work is either left on this card's Deferred
+- [x] Closeout records the deferral: the blocked aggregation/`status` work is either left on this card's Deferred
   section or split to a new `proposed/` card at the user's call.
 - [ ] Lane move `doing/ → done/` after merge; inbound board links repointed (board-contract closeout).
+
+## Verification record — 2026-08-03
+
+- Focused resolver/join/CLI/session suite: 83 passed.
+- Required runner:
+  `./scripts/test-integration.sh tests/src/session/worktree/test_create_integration.py tests/integration/docker/test_session_lifecycle.py -v`
+  — 37 passed.
+- `make test-unit` — 8,682 passed, 1 skipped, 117 integration tests deselected.
+- `make pre-commit` — all hooks passed, including ruff, black, isort, mypy, pyright, mdformat, and gitleaks.
 
 ## Deferred — activity aggregation + `forge workspace status` (blocked, with anchors)
 
@@ -169,7 +179,7 @@ Not scheduled in this slice; recorded so the blockers are re-checkable:
 | Missing after deletion                | `rm -rf` linked worktree, no prune                                                                | `missing (prunable)`, `sessions=0`, no error mid-join                                                         | `tests/src/core/ops/test_workspace.py`                  |
 | Active counts                         | index rows + seeded `ActiveSessionStore`                                                          | `active` matches `is_active` truth                                                                            | `tests/src/core/ops/test_workspace.py`                  |
 | CLI JSON shape                        | CliRunner, seeded index                                                                           | pinned keys for `worktrees --json` (incl. `is_bare`)                                                          | `tests/src/cli/test_workspace_commands.py`              |
-| Group shape + no alias                | CliRunner                                                                                         | bare `forge workspace` prints help, exit 0; no alias resolves                                                 | `tests/src/cli/test_command_tree_invariants.py`         |
+| Group shape + no alias                | CliRunner                                                                                         | bare `forge workspace` prints help, exit 2 per CLI group policy; no alias resolves                            | `tests/src/cli/test_command_tree_invariants.py`         |
 | `get_worktree_for_branch` unchanged   | existing fixtures                                                                                 | characterized before repoint, green after                                                                     | `tests/src/session/worktree/test_create.py`             |
 | Branch checked out in second worktree | real second worktree on the branch                                                                | `BranchExistsError` carries that worktree's path (parser exercised on the production path)                    | `tests/src/session/worktree/test_create_integration.py` |
 

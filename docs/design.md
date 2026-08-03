@@ -123,6 +123,9 @@ when no `.claude/` directory exists.
 - **`session list`**: workspace-scoped by default (`--scope workspace`, filters by `project_root`). Shows sessions
   across all worktrees and Forge projects within the same logical repo (the workspace). `--scope project` narrows to
   current `forge_root`. `--scope all` shows everything globally.
+- **`workspace worktrees`**: derives the registered worktree family from Git's common directory and overlays
+  workspace-scoped session and active counts. Membership is read-only and never persisted by Forge; outside Git, the
+  command degrades to one directory member. Git records whose checkout is unavailable remain visible as `missing`.
 - **`session show`, `session delete` (named), `session set`, `session reset`**: workspace-scoped with current-project
   preference. Two-tier resolution: try current `forge_root` first (O(1)), fall back to a workspace-scoped scan. Prefers
   current `forge_root` as tiebreaker when the same name exists in multiple projects. Raises `AmbiguousSessionError` if
@@ -1561,6 +1564,7 @@ multi-forge/
 │   │   │   ├── wire_shapes.py # Wire-shape vocabulary leaf (shapes, validity, default)
 │   │   │   └── state/   # File-based state helpers
 │   │   ├── session/     # Session manager
+│   │   │   └── workspace.py # Git-derived worktree-family discovery
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm
 │   │   │   └── ports.py # Loopback port probing shared by proxy startup paths

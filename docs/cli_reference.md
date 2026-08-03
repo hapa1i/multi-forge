@@ -186,6 +186,17 @@ Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)
 `forge session resume <name>` reattaches the TUI; with `--task "…"` it runs the next headless `codex exec resume` turn.
 `--task` is Codex-only.
 
+### Workspace
+
+| Command                     | Purpose                                                                  |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `forge workspace worktrees` | List the Git worktree family with Forge session/active counts (`--json`) |
+
+The workspace is derived from Git's common directory; Forge does not create or persist it. Registered worktrees remain
+visible when their checkout path is currently missing, including Git's independent `locked` and `prunable` annotations.
+Outside a Git repository, the command returns a single-directory workspace. Workspace activity aggregation and
+`forge workspace status` are not available in this slice.
+
 ### Session transfer context
 
 | Command                                      | Purpose                                                                    |

@@ -227,28 +227,17 @@ def get_worktree_for_branch(branch: str, cwd: Path | None = None) -> str | None:
     Returns:
         Worktree path if the branch is checked out, None otherwise.
     """
-    git = find_git_binary()
+    # Imported locally to avoid a module cycle: workspace discovery reuses the
+    # worktree module's established Git-binary lookup.
+    from ..workspace import find_worktree_for_branch
 
-    result = subprocess.run(
-        [git, "worktree", "list", "--porcelain"],
-        cwd=str(cwd or Path.cwd()),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
+    try:
+        worktree = find_worktree_for_branch(branch, cwd)
+    except GitWorktreeError:
+        # Preserve the branch guard's historical failure-soft behavior.  The
+        # workspace read surface itself reports these failures to its caller.
         return None
-
-    # Porcelain format: blocks separated by blank lines, each has
-    # "worktree <path>" and "branch refs/heads/<name>"
-    current_path: str | None = None
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            current_path = line[len("worktree ") :]
-        elif line == f"branch refs/heads/{branch}":
-            return current_path
-
-    return None
+    return str(worktree) if worktree is not None else None
 
 
 def validate_branch_name(branch: str) -> None:

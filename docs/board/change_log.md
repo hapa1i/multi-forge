@@ -25,6 +25,28 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-03
+
+### Git-derived workspace worktree view
+
+**Goal**: Expose the complete Git worktree family with Forge session occupancy, including empty and currently missing
+registered worktrees, without persisting a second workspace identity.
+
+**Key changes**:
+
+- Added a strict `git worktree list --porcelain -z` resolver with common-directory identity, exact path normalization,
+  newline-safe parsing, bare-primary support, independent locked/prunable/availability facts, and a non-Git-only
+  single-directory fallback.
+- Added the UI-agnostic index join and `forge workspace worktrees [--json]`; counts include incognito and legacy index
+  rows, preserve same-name sessions as separate occupants, and use existing active-session liveness.
+- Repointed the session branch-in-use guard through the shared parser. A real second-worktree integration case now pins
+  `BranchExistsError.worktree` to the checkout carrying the branch.
+- Kept the read exempt from retention cleanup, documented the deliberate one-leaf CLI exception, added end-user/design
+  and QA coverage, and left activity aggregation plus `workspace status` blocked on root-scoped telemetry identity.
+
+**Verification**: focused workspace/session/CLI tests passed (83); `make test-unit` passed (8,682 passed, 1 skipped);
+required integration runner passed (37); `make pre-commit` passed.
+
 ## 2026-08-02
 
 ### Proxy ingress + config wiring refactor (proxy_ingress_and_config_wiring)
