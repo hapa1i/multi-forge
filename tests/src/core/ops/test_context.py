@@ -2,63 +2,13 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from forge.core.ops.context import (
     ExecutionContext,
-    _find_main_repo_root,
     find_forge_root,
 )
-
-
-class TestFindMainRepoRoot:
-    """Tests for _find_main_repo_root."""
-
-    def test_regular_repo_returns_same_path(self, tmp_path: Path) -> None:
-        # Regular repo: .git is a directory
-        (tmp_path / ".git").mkdir()
-
-        result = _find_main_repo_root(tmp_path)
-        assert result == tmp_path
-
-    def test_worktree_finds_main_repo(self, tmp_path: Path) -> None:
-        # Setup: main repo at tmp_path/main with worktree at tmp_path/wt
-        main_repo = tmp_path / "main"
-        main_repo.mkdir()
-        (main_repo / ".git").mkdir()
-        (main_repo / ".git" / "worktrees").mkdir()
-        (main_repo / ".git" / "worktrees" / "feature").mkdir()
-
-        worktree = tmp_path / "wt"
-        worktree.mkdir()
-        gitdir = main_repo / ".git" / "worktrees" / "feature"
-        (worktree / ".git").write_text(f"gitdir: {gitdir}")
-
-        result = _find_main_repo_root(worktree)
-        assert result == main_repo
-
-    def test_worktree_relative_gitdir(self, tmp_path: Path) -> None:
-        # Some git versions use relative paths in the gitdir file
-        main_repo = tmp_path / "main"
-        main_repo.mkdir()
-        (main_repo / ".git").mkdir()
-        (main_repo / ".git" / "worktrees").mkdir()
-        (main_repo / ".git" / "worktrees" / "feature").mkdir()
-
-        worktree = tmp_path / "wt"
-        worktree.mkdir()
-        # Relative path from worktree to gitdir
-        (worktree / ".git").write_text("gitdir: ../main/.git/worktrees/feature")
-
-        result = _find_main_repo_root(worktree)
-        assert result == main_repo
-
-    def test_fallback_on_invalid_gitdir(self, tmp_path: Path) -> None:
-        # If .git file has invalid content, fallback to worktree_root
-        (tmp_path / ".git").write_text("invalid content")
-
-        result = _find_main_repo_root(tmp_path)
-        assert result == tmp_path
 
 
 class TestExecutionContextFromCwd:
@@ -96,27 +46,20 @@ class TestExecutionContextFromCwd:
         assert ctx.worktree_root == tmp_path
         assert ctx.project_root == tmp_path
 
-    def test_in_git_worktree(self, tmp_path: Path, monkeypatch) -> None:
-        # Setup main repo
-        main_repo = tmp_path / "main"
-        main_repo.mkdir()
-        (main_repo / ".git").mkdir()
-        (main_repo / ".git" / "worktrees").mkdir()
-        (main_repo / ".git" / "worktrees" / "feature").mkdir()
-
-        # Setup worktree
+    def test_in_git_worktree(self, git_repo: Path, tmp_path: Path, monkeypatch) -> None:
         worktree = tmp_path / "wt"
-        worktree.mkdir()
-        gitdir = main_repo / ".git" / "worktrees" / "feature"
-        (worktree / ".git").write_text(f"gitdir: {gitdir}")
-
+        subprocess.run(
+            ["git", "worktree", "add", "-q", "-b", "feature", str(worktree)],
+            cwd=git_repo,
+            check=True,
+        )
         monkeypatch.chdir(worktree)
 
         ctx = ExecutionContext.from_cwd()
 
         assert ctx.cwd == worktree
         assert ctx.worktree_root == worktree
-        assert ctx.project_root == main_repo
+        assert ctx.project_root == git_repo
 
     def test_forge_root_found(self, tmp_path: Path, monkeypatch) -> None:
         """ExecutionContext.forge_root is set when .forge/ exists."""

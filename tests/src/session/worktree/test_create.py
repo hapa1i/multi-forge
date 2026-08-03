@@ -13,31 +13,13 @@ import pytest
 
 from forge.session.exceptions import (
     BranchExistsError,
-    GitNotFoundError,
     InvalidBranchNameError,
 )
 from forge.session.worktree.create import (
-    find_git_binary,
     get_worktree_for_branch,
     sanitize_branch_name,
     validate_branch_name,
 )
-
-
-class TestFindGitBinary:
-    """Tests for find_git_binary()."""
-
-    def test_finds_git_in_path(self) -> None:
-        """Git should be found in PATH."""
-        result = find_git_binary()
-        assert result.endswith("git")
-        assert Path(result).exists()
-
-    def test_raises_when_git_not_found(self) -> None:
-        """Should raise GitNotFoundError when git is not in PATH."""
-        with patch("shutil.which", return_value=None):
-            with pytest.raises(GitNotFoundError):
-                find_git_binary()
 
 
 class TestValidateBranchName:
@@ -76,25 +58,33 @@ class TestGetWorktreeForBranch:
 
     def test_returns_none_when_branch_not_in_worktree(self) -> None:
         """Branch not checked out in any worktree returns None."""
-        porcelain = "worktree /repo\nbranch refs/heads/main\n\n"
+        porcelain = b"worktree /repo\0HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0branch refs/heads/main\0\0"
         result = _mock_worktree_lookup(porcelain, "feature")
         assert result is None
 
     def test_returns_path_when_branch_in_worktree(self) -> None:
         """Branch checked out in a worktree returns its path."""
-        porcelain = "worktree /repo\nbranch refs/heads/main\n\n" "worktree /repo-feature\nbranch refs/heads/feature\n\n"
+        porcelain = (
+            b"worktree /repo\0HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0branch refs/heads/main\0\0"
+            b"worktree /repo-feature\0HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\0"
+            b"branch refs/heads/feature\0\0"
+        )
         result = _mock_worktree_lookup(porcelain, "feature")
         assert result == "/repo-feature"
 
     def test_returns_none_on_git_failure(self) -> None:
         """Git failure returns None (non-fatal)."""
-        with patch("forge.session.worktree.create.subprocess.run") as mock_run:
+        with patch("forge.session.workspace.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 1
+            mock_run.return_value.stderr = b"failure"
             assert get_worktree_for_branch("feature", Path("/repo")) is None
 
     def test_partial_branch_name_no_false_positive(self) -> None:
         """Branch 'exec' should not match 'executor'."""
-        porcelain = "worktree /repo-executor\nbranch refs/heads/executor\n\n"
+        porcelain = (
+            b"worktree /repo-executor\0HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0"
+            b"branch refs/heads/executor\0\0"
+        )
         result = _mock_worktree_lookup(porcelain, "exec")
         assert result is None
 
@@ -117,9 +107,9 @@ class TestBranchExistsErrorMessage:
         assert "git worktree remove" not in str(e)
 
 
-def _mock_worktree_lookup(porcelain_output: str, branch: str) -> str | None:
+def _mock_worktree_lookup(porcelain_output: bytes, branch: str) -> str | None:
     """Run get_worktree_for_branch with mocked git output."""
-    with patch("forge.session.worktree.create.subprocess.run") as mock_run:
+    with patch("forge.session.workspace.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = porcelain_output
         return get_worktree_for_branch(branch, Path("/repo"))

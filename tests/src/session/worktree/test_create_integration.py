@@ -197,9 +197,8 @@ print(json.dumps({
         assert result.data["branch"] == "feature/auth"
         assert result.data["branch_exists"] is True
 
-    def test_raises_when_branch_exists(self, worktree_workspace: "WorktreeWorkspace") -> None:
-        """Should raise BranchExistsError when branch already exists."""
-        # Create branch first
+    def test_raises_when_branch_exists_but_is_not_checked_out(self, worktree_workspace: "WorktreeWorkspace") -> None:
+        """Should report a plain existing branch without a worktree suffix."""
         worktree_workspace.git("branch", "existing")
 
         result = worktree_workspace.run_python("""
@@ -212,12 +211,53 @@ try:
     create_worktree('existing', cwd=Path('/workspace'))
     print(json.dumps({'error': None}))
 except BranchExistsError as e:
-    print(json.dumps({'error': 'BranchExistsError', 'branch': e.branch}))
+    print(json.dumps({
+        'error': 'BranchExistsError',
+        'branch': e.branch,
+        'worktree': e.worktree,
+        'message': str(e),
+    }))
 """)
         assert result.ok, f"Failed: {result.stderr}"
         assert result.data is not None
-        assert result.data["error"] == "BranchExistsError"
-        assert result.data["branch"] == "existing"
+        assert result.data == {
+            "error": "BranchExistsError",
+            "branch": "existing",
+            "worktree": None,
+            "message": "branch 'existing' already exists",
+        }
+
+    def test_raises_when_branch_is_checked_out_in_second_worktree(
+        self, worktree_workspace: "WorktreeWorkspace"
+    ) -> None:
+        """Should report the second worktree where the branch is checked out."""
+        worktree_workspace.git("worktree", "add", "/second-worktree", "-b", "existing")
+
+        result = worktree_workspace.run_python("""
+import json
+from pathlib import Path
+from forge.session.worktree.create import create_worktree
+from forge.session.exceptions import BranchExistsError
+
+try:
+    create_worktree('existing', cwd=Path('/workspace'))
+    print(json.dumps({'error': None}))
+except BranchExistsError as e:
+    print(json.dumps({
+        'error': 'BranchExistsError',
+        'branch': e.branch,
+        'worktree': e.worktree,
+        'message': str(e),
+    }))
+""")
+        assert result.ok, f"Failed: {result.stderr}"
+        assert result.data is not None
+        assert result.data == {
+            "error": "BranchExistsError",
+            "branch": "existing",
+            "worktree": "/second-worktree",
+            "message": "branch 'existing' already exists (checked out in '/second-worktree')",
+        }
 
     def test_raises_when_path_exists(self, worktree_workspace: "WorktreeWorkspace") -> None:
         """Should raise WorktreePathExistsError when path already exists."""

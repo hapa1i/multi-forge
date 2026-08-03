@@ -713,4 +713,65 @@ forge session delete sd-xfer-parent sd-xfer-explicit sd-xfer-auto sd-xfer-native
 - [ ] Plain same-dir fork (no flags) manifest records `derivation.resume_mode == "native"`
 - [ ] Plain same-dir fork generates no transfer context file (`NATIVE_CTX=false`)
 
+### 5.23 Workspace Worktree View
+
+<!-- auto -->
+
+The workspace view is Git-derived, so it includes empty and currently unavailable registered worktrees alongside Forge
+session occupancy. Use a disposable linked worktree and restore it before cleanup.
+
+```bash
+cd "$FORGE_TEST_REPO"
+
+WORKSPACE_QA_WT="${FORGE_TEST_REPO}-qa-workspace-view"
+WORKSPACE_QA_AWAY="${WORKSPACE_QA_WT}-away"
+
+# Recover an interrupted previous run before starting.
+if test -d "$WORKSPACE_QA_AWAY" && ! test -e "$WORKSPACE_QA_WT"; then
+  mv "$WORKSPACE_QA_AWAY" "$WORKSPACE_QA_WT"
+fi
+git worktree remove "$WORKSPACE_QA_WT" --force 2>/dev/null || true
+git branch -D qa-workspace-view 2>/dev/null || true
+forge session delete qa-workspace-main --yes --force 2>/dev/null || true
+
+forge session start qa-workspace-main --no-launch
+git worktree add "$WORKSPACE_QA_WT" -b qa-workspace-view
+
+forge workspace worktrees
+forge workspace worktrees --json | tee /tmp/forge-workspace-live.json
+jq -e '
+  (.primary_root | type == "string") and
+  (.common_dir | type == "string") and
+  ([.worktrees[] | select(.is_primary and .sessions >= 1)] | length == 1) and
+  ([.worktrees[] | select(.branch == "qa-workspace-view" and .sessions == 0 and .active == 0)] | length == 1)
+' /tmp/forge-workspace-live.json
+
+# Make the registered path unavailable without deleting its Git metadata.
+mv "$WORKSPACE_QA_WT" "$WORKSPACE_QA_AWAY"
+forge workspace worktrees | tee /tmp/forge-workspace-missing.txt
+forge workspace worktrees --json | tee /tmp/forge-workspace-missing.json
+grep -F 'missing (prunable)' /tmp/forge-workspace-missing.txt
+jq -e '[.worktrees[] | select(.branch == "qa-workspace-view" and (.path_exists | not) and .is_prunable)] | length == 1' \
+  /tmp/forge-workspace-missing.json
+
+# Non-Git paths degrade to one directory member with no common directory.
+WORKSPACE_QA_NON_GIT=$(mktemp -d)
+(cd "$WORKSPACE_QA_NON_GIT" && forge workspace worktrees --json) | \
+  jq -e '.common_dir == null and (.worktrees | length == 1) and .worktrees[0].is_primary'
+rmdir "$WORKSPACE_QA_NON_GIT"
+
+# Restore and remove the disposable worktree cleanly.
+mv "$WORKSPACE_QA_AWAY" "$WORKSPACE_QA_WT"
+git worktree remove "$WORKSPACE_QA_WT" --force
+git branch -D qa-workspace-view
+forge session delete qa-workspace-main --yes --force
+```
+
+- [ ] Human output lists both the primary and empty linked worktree
+- [ ] JSON exposes `primary_root`, `common_dir`, and the pinned worktree fields
+- [ ] The main checkout reports at least one session; the empty linked worktree reports zero sessions and zero active
+- [ ] Moving the checkout away preserves its row and renders `missing (prunable)`
+- [ ] Missing-row JSON keeps `path_exists=false` and Git's independent `is_prunable=true` fact
+- [ ] A non-Git directory returns one primary member and `common_dir=null`
+
 ---

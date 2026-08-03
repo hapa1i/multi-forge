@@ -42,16 +42,17 @@ from .status_line import status_line  # noqa: E402
 from .telemetry import telemetry  # noqa: E402
 from .transfer import transfer as transfer_cmd  # noqa: E402
 from .workflow import workflow_cmd  # noqa: E402
+from .workspace import workspace  # noqa: E402
 
 # Subcommands that should NOT trigger pending-work processing or auto file logging.
 # Hooks and status-line are latency-sensitive; logs is exempt so it can inspect/clean
 # log files without creating a fresh "logs.*.log" file as a side effect.
 _EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
 
-# Session auto-cleanup is also exempt for session subcommands so that
-# inspection commands (list, clean preview, show) are side-effect-free.
+# Session auto-cleanup is also exempt for session and workspace subcommands so
+# inspection commands do not delete the state they are about to report.
 # Auto-cleanup still fires on every other forge command.
-_SESSION_CLEANUP_EXEMPT = frozenset({"hook", "status-line", "logs", "session", "clean"})
+_SESSION_CLEANUP_EXEMPT = frozenset({"hook", "status-line", "logs", "session", "workspace", "clean"})
 
 _ALIASES: dict[str, str] = {
     "ext": "extension",
@@ -450,6 +451,7 @@ main.add_command(info_cmd, name="info")
 main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
+main.add_command(workspace, name="workspace")
 
 # Session-scoped subgroups are wired onto `session` here (the assembly layer),
 # not inside session.py: transfer.py, session_memory.py, and session_lane.py import

@@ -178,10 +178,12 @@ defaults to accept or override, not commitments.
   Implemented in Slice 07.
 
 - [x] **D9 Workspace-scope coordination (Q7). DECIDED 2026-06-23: WAIT for the `workspace_scope` card.** This cleanup
-  card does **not** introduce or reserve `forge telemetry … --scope workspace`; the workspace-scoped telemetry
-  aggregation (flag + behavior) is owned by `docs/board/proposed/workspace_scope/`. `forge telemetry activity` keeps its
-  current selector (optional positional `[session]` + `--days`/`--all`). Slice 07 scope-flag work is limited to the F11
-  session-selector rule, not workspace scope.
+  card does **not** introduce or reserve `forge telemetry … --scope workspace`. The identity blocker and deferred
+  aggregation contract are recorded in
+  `docs/board/doing/workspace_scope/checklist.md#deferred--activity-aggregation--forge-workspace-status-blocked-with-anchors`;
+  a successor owns the flag and behavior once telemetry has root-scoped session identity. `forge telemetry activity`
+  keeps its current selector (optional positional `[session]` + `--days`/`--all`). Slice 07 scope-flag work is limited
+  to the F11 session-selector rule, not workspace scope.
 
 - [x] Record every D1-D9 outcome inline here (with date) before starting the matching Phase 2 slice. (D1-D9 all recorded
   with dates as of 2026-06-23.)
@@ -448,8 +450,8 @@ decisions:
   `forge session memory`; passport verbs stay top-level `forge memory`.
 - [x] Hook-management visibility (D5) — RESOLVED 2026-06-23: end users go through `forge extension enable|disable`;
   hidden `forge hook enable|disable` stays lower-level and de-documented as the user path.
-- [x] Whether workspace-level telemetry waits for `workspace_scope` (D9) — RESOLVED 2026-06-23: wait for the separate
-  `workspace_scope` card.
+- [x] Whether workspace-level telemetry waits for `workspace_scope` (D9) — RESOLVED 2026-08-03: the read surface shipped
+  without aggregation; the linked Deferred section records the root-scoped telemetry-identity blocker.
 - [x] Whether any `--json` dest intentionally stays `json_output` (D8) — RESOLVED 2026-06-23: normalize all to
   `as_json`.
 - [ ] Human read-output stdout/stderr rule + any documented exceptions (slice 07).

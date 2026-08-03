@@ -29,6 +29,10 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
   hand-rolling `invoke_without_command` only to echo help. _Guard:_
   `test_command_tree_invariants::test_no_single_leaf_groups`.
 
+  `forge workspace` is the one temporary exception: Slice 2 ships the distinct `worktrees` read question while `status`
+  is blocked on root-scoped telemetry identity. A duplicate or placeholder second leaf would make the surface less
+  clear. `SINGLE_LEAF_GROUP_ALLOWLIST` records the exception and must drop it when a distinct second leaf ships.
+
 - **Name leaves distinctly.** Sibling leaves must not collide on tab-completion: none may be a prefix of another or
   share a six-character-or-longer prefix, and one verb must not name two different engines in a group. _Guard:_
   `test_command_tree_invariants::test_no_confusable_sibling_leaves`.

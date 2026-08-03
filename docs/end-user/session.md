@@ -305,6 +305,26 @@ regardless of which Forge project you're currently in (within the same git repo)
 When the same session name exists in multiple Forge projects within the repo, the current project wins. If you're not in
 any of them, you'll see an error listing the locations.
 
+### Inspect the workspace's worktrees
+
+`--scope workspace` groups sessions whose index entries share the same logical repository (`project_root`). To inspect
+the Git membership behind that scope, including registered worktrees with no Forge sessions, run:
+
+```bash
+forge workspace worktrees
+forge workspace worktrees --json
+```
+
+The view joins `git worktree list` with the workspace-scoped session index. Counts include incognito sessions because
+they still occupy a worktree; session names remain available through `forge session list --scope workspace`. A
+registered path that is unavailable now is shown as `missing`, never "gone." `missing (prunable)` is Git's stale-record
+annotation; `missing (locked)` can be intentional, such as a worktree on unmounted portable media. Those are
+point-in-time facts, and Forge does not prune the Git records.
+
+Outside Git, the command returns the current directory as a one-member workspace. Bare-backed worktree families are
+listed in full, with the bare repository as the primary record, but session counts are currently grouped per checkout in
+those families because their stored `project_root` identity is not yet common across linked checkouts.
+
 When forking `--into` another worktree, the child session lands at the **equivalent position** — if the parent was at
 `monorepo/packages/app`, the child lands at `target-worktree/packages/app`. The target must have Forge enabled at that
 path. Forge strict-checks that target root before routing/proxy preflight and again before manager writes.

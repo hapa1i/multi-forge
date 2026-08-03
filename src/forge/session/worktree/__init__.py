@@ -26,13 +26,11 @@ from .config_copy import (
     get_copied_config_files,
     is_file_tracked,
 )
+from ..git import find_git_binary, get_main_repo_root, get_repo_root
 from .create import (
     WorktreeResult,
     branch_exists,
     create_worktree,
-    find_git_binary,
-    get_main_repo_root,
-    get_repo_root,
     read_file_at_revision,
     resolve_commit,
     resolve_worktree_path,

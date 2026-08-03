@@ -6,7 +6,6 @@ Each session can have its own worktree, enabling parallel work without conflicts
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,11 +13,12 @@ from pathlib import Path
 from ..exceptions import (
     BranchExistsError,
     BranchNotMergedError,
-    GitNotFoundError,
     GitWorktreeError,
     InvalidBranchNameError,
     WorktreePathExistsError,
 )
+from ..git import find_git_binary, get_main_repo_root, get_repo_root
+from ..workspace import find_worktree_for_branch as find_registered_worktree_for_branch
 
 
 @dataclass
@@ -28,95 +28,6 @@ class WorktreeResult:
     worktree_path: str
     branch: str
     created_branch: bool  # True if a new branch was created
-
-
-def find_git_binary() -> str:
-    """Find git binary in PATH.
-
-    Returns:
-        Path to git binary.
-
-    Raises:
-        GitNotFoundError: If git is not found.
-    """
-    git_path = shutil.which("git")
-    if git_path is None:
-        raise GitNotFoundError()
-    return git_path
-
-
-def get_repo_root(cwd: Path | None = None) -> Path:
-    """Get the root of the git repository or worktree.
-
-    For worktrees, this returns the worktree root, not the main repository.
-    Use get_main_repo_root() if you need the main repository.
-
-    Args:
-        cwd: Starting directory (defaults to current).
-
-    Returns:
-        Path to repository/worktree root.
-
-    Raises:
-        GitWorktreeError: If not in a git repository.
-    """
-    git = find_git_binary()
-    start = cwd or Path.cwd()
-
-    result = subprocess.run(
-        [git, "rev-parse", "--show-toplevel"],
-        cwd=str(start),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        raise GitWorktreeError("rev-parse", "not in a git repository", result.returncode)
-
-    return Path(result.stdout.strip())
-
-
-def get_main_repo_root(cwd: Path | None = None) -> Path:
-    """Get the root of the main git repository.
-
-    For worktrees, this returns the main repository root, not the worktree.
-    Uses git-common-dir to find the shared .git directory.
-
-    Args:
-        cwd: Starting directory (defaults to current).
-
-    Returns:
-        Path to main repository root.
-
-    Raises:
-        GitWorktreeError: If not in a git repository.
-    """
-    git = find_git_binary()
-    start = cwd or Path.cwd()
-
-    # Get the common git directory (shared by all worktrees)
-    result = subprocess.run(
-        [git, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        cwd=str(start),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        raise GitWorktreeError("rev-parse", "not in a git repository", result.returncode)
-
-    common_dir = Path(result.stdout.strip())
-    if common_dir.name == ".git":
-        return common_dir.parent
-
-    # Handle edge case where common_dir might be .git/worktrees/name
-    while common_dir.name != ".git" and common_dir.parent != common_dir:
-        common_dir = common_dir.parent
-
-    if common_dir.name == ".git":
-        return common_dir.parent
-
-    return get_repo_root(cwd)
 
 
 def branch_exists(branch: str, cwd: Path | None = None) -> bool:
@@ -227,28 +138,13 @@ def get_worktree_for_branch(branch: str, cwd: Path | None = None) -> str | None:
     Returns:
         Worktree path if the branch is checked out, None otherwise.
     """
-    git = find_git_binary()
-
-    result = subprocess.run(
-        [git, "worktree", "list", "--porcelain"],
-        cwd=str(cwd or Path.cwd()),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
+    try:
+        worktree = find_registered_worktree_for_branch(branch, cwd)
+    except GitWorktreeError:
+        # Preserve the branch guard's historical failure-soft behavior.  The
+        # workspace read surface itself reports these failures to its caller.
         return None
-
-    # Porcelain format: blocks separated by blank lines, each has
-    # "worktree <path>" and "branch refs/heads/<name>"
-    current_path: str | None = None
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            current_path = line[len("worktree ") :]
-        elif line == f"branch refs/heads/{branch}":
-            return current_path
-
-    return None
+    return str(worktree) if worktree is not None else None
 
 
 def validate_branch_name(branch: str) -> None:

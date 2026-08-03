@@ -3,10 +3,10 @@
 Mechanical guards for the `cli_style_guidelines.md` rules that are checkable by
 walking the Click tree (group depth, leaf naming, `--json` scripting contract).
 
-Each ``*_ALLOWLIST`` is a debt ledger of pre-existing violations tracked by
-``docs/board/doing/forge_cli_cleanup/card.md``. Every check asserts both that
-no *new* violation appears and that no allowlisted entry has been *fixed without
-being removed* -- so the ledger can only shrink, never silently grow or rot.
+Each ``*_ALLOWLIST`` is a debt ledger of pre-existing violations or an explicitly
+documented temporary exception. Every check asserts both that no *unrecorded*
+violation appears and that no allowlisted entry has been fixed without being
+removed, so an exception cannot silently rot after its command shape changes.
 """
 
 from __future__ import annotations
@@ -62,9 +62,10 @@ def test_json_option_dest_is_as_json() -> None:
 
 
 # --- Rule: a group earns a path segment only with >=2 visible leaves ----------
-# Hidden groups (internal workers) are exempt. Drained empty by forge_cli_cleanup
-# Slice 12: `forge policy shadow` gained a `status` leaf (now show + status visible).
-SINGLE_LEAF_GROUP_ALLOWLIST: set[str] = set()
+# Hidden groups (internal workers) are exempt. ``forge workspace`` deliberately
+# starts with one read leaf: ``status`` is blocked on root-scoped telemetry
+# identity and must not ship as a placeholder (workspace_scope Slice 2).
+SINGLE_LEAF_GROUP_ALLOWLIST: set[str] = {"forge workspace"}
 
 
 def test_no_single_leaf_groups() -> None:
@@ -77,6 +78,18 @@ def test_no_single_leaf_groups() -> None:
         if len(_visible_subcommands(cmd)) <= 1:
             violations.add(path)
     _assert_ledger(violations, SINGLE_LEAF_GROUP_ALLOWLIST, "group needs >=2 visible leaves")
+
+
+def test_workspace_group_shape_and_no_alias() -> None:
+    tree = dict(_tree())
+    group = tree.get("forge workspace")
+
+    assert isinstance(group, click.Group)
+    assert _visible_subcommands(group) == ["worktrees"]
+    bare = CliRunner().invoke(main, ["workspace"])
+    assert bare.exit_code == 2
+    assert "worktrees" in bare.output
+    assert CliRunner().invoke(main, ["ws"]).exit_code == 2
 
 
 # --- Rule: no confusable sibling leaves (prefix collision / long shared prefix)

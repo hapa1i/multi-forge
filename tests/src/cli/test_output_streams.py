@@ -31,6 +31,7 @@ _JSON_STDOUT_LEAVES = [
     ["proxy", "audit", "diff", "--json"],
     # Regression: empty registry used to print "No proxies registered." to stdout.
     ["proxy", "metrics", "--json"],
+    ["workspace", "worktrees", "--json"],
 ]
 
 

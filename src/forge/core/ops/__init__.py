@@ -55,6 +55,11 @@ from .session import (
     resolve_session,
     set_session_override,
 )
+from .workspace import (
+    ListWorkspaceWorktreesResult,
+    WorkspaceWorktreeSummary,
+    list_workspace_worktrees,
+)
 
 __all__ = [
     "ExecutionContext",
@@ -79,6 +84,10 @@ __all__ = [
     "set_session_override",
     "ResetOverridesResult",
     "reset_session_overrides",
+    # Workspace ops
+    "ListWorkspaceWorktreesResult",
+    "WorkspaceWorktreeSummary",
+    "list_workspace_worktrees",
     # Proxy ops
     "ListProxiesItem",
     "ListProxiesResult",

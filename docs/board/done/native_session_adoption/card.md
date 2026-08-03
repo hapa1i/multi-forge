@@ -2,8 +2,8 @@
 
 **Lane**: `done/` -- shipped and verified 2026-07-27; execution record in [checklist.md](checklist.md). Standalone (not
 an `epic_global_forge_runtime` member); relates to the session identity model (design.md §3.3/§3.5) and complements
-[`workspace_scope`](../../proposed/workspace_scope/card.md), whose identity table says a native Claude session is "bound
-to a Forge session **when launched**" -- this card adds binding **after the fact**.
+[`workspace_scope`](../../doing/workspace_scope/card.md), whose identity table says a native Claude session is "bound to
+a Forge session **when launched**" -- this card adds binding **after the fact**.
 
 **Origin**: user request (2026-07-07) -- pick up a session started outside Forge (bare `claude`, bare `codex`) and
 resume it as a managed Forge session. Primary driver: **native Claude** pickup; Codex is a structured second phase.
