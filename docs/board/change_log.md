@@ -39,13 +39,14 @@ registered worktrees, without persisting a second workspace identity.
   single-directory fallback.
 - Added the UI-agnostic index join and `forge workspace worktrees [--json]`; counts include incognito and legacy index
   rows, preserve same-name sessions as separate occupants, and use existing active-session liveness.
-- Repointed the session branch-in-use guard through the shared parser. A real second-worktree integration case now pins
-  `BranchExistsError.worktree` to the checkout carrying the branch.
+- Moved Git executable and logical-repository path discovery into an acyclic leaf shared by execution context and
+  worktree operations, then repointed the branch-in-use guard through the shared parser. Integration coverage preserves
+  both the plain existing-branch error and the carrying-worktree variant.
 - Kept the read exempt from retention cleanup, documented the deliberate one-leaf CLI exception, added end-user/design
   and QA coverage, and left activity aggregation plus `workspace status` blocked on root-scoped telemetry identity.
 
-**Verification**: focused workspace/session/CLI tests passed (83); `make test-unit` passed (8,682 passed, 1 skipped);
-required integration runner passed (37); `make pre-commit` passed.
+**Verification**: focused Git/workspace/session/CLI tests passed (99); `make test-unit` passed (8,680 passed, 1
+skipped); required integration runner passed (38); `make pre-commit` passed.
 
 ## 2026-08-02
 

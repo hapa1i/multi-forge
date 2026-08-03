@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forge.core.paths import find_git_root
+from forge.session.exceptions import GitNotFoundError, GitWorktreeError
+from forge.session.git import get_main_repo_root
 
 
 @dataclass(frozen=True)
@@ -55,52 +57,18 @@ class ExecutionContext:
             forge_root = find_forge_root(cwd)
             return cls(cwd=cwd, worktree_root=cwd, project_root=cwd, forge_root=forge_root)
 
-        # For worktrees, find the main repository root
-        project_root = _find_main_repo_root(worktree_root)
+        # Git is authoritative for logical-repository identity. Context
+        # construction remains failure-soft for corrupt repositories or hosts
+        # where Git disappeared after the filesystem boundary check.
+        try:
+            project_root = get_main_repo_root(worktree_root)
+        except (GitNotFoundError, GitWorktreeError):
+            project_root = worktree_root
 
         # Find Forge project root (.forge/ directory)
         forge_root = find_forge_root(cwd)
 
         return cls(cwd=cwd, worktree_root=worktree_root, project_root=project_root, forge_root=forge_root)
-
-
-def _find_main_repo_root(worktree_root: Path) -> Path:
-    """Find the main repository root from a worktree.
-
-    In a regular repo, .git is a directory and we return worktree_root.
-    In a worktree, .git is a file containing 'gitdir: <path>' pointing to
-    the worktree's git dir inside the main repo's .git/worktrees/.
-    """
-    git_path = worktree_root / ".git"
-
-    if git_path.is_dir():
-        # Regular repo, not a worktree
-        return worktree_root
-
-    if git_path.is_file():
-        # Worktree: .git file contains 'gitdir: <path>'
-        try:
-            content = git_path.read_text().strip()
-            if content.startswith("gitdir:"):
-                gitdir = content[7:].strip()
-                # gitdir is typically: /path/to/main/.git/worktrees/<name>
-                # We want: /path/to/main
-                gitdir_path = Path(gitdir)
-                if not gitdir_path.is_absolute():
-                    gitdir_path = (worktree_root / gitdir_path).resolve()
-
-                # Navigate up from .git/worktrees/<name> to find main repo
-                if "worktrees" in gitdir_path.parts:
-                    # Find .git directory (parent of worktrees)
-                    idx = gitdir_path.parts.index("worktrees")
-                    git_dir = Path(*gitdir_path.parts[:idx])
-                    if git_dir.name == ".git":
-                        return git_dir.parent
-        except (OSError, ValueError):
-            pass
-
-    # Fallback: return worktree_root
-    return worktree_root
 
 
 def find_forge_root(start: Path) -> Path | None:

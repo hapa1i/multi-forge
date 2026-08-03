@@ -16,7 +16,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .create import find_git_binary
+from ..git import find_git_binary
 
 # Allowlist of runtime config files/directories to copy (relative to repo root).
 # Entries with glob metacharacters are resolved via Path.glob(); exact paths are

@@ -188,9 +188,12 @@ correct and is the foundation the read surface builds on.
 
 **Slice 2 — the `forge workspace` read surface (proposed):**
 
-1. Add a Git-derived resolver (`forge.session.workspace`) that shells out to Git: `rev-parse --git-common-dir`,
-   `worktree list --porcelain`, `rev-parse --show-toplevel`. Returns the `Workspace` / `WorkspaceWorktree` shapes above.
-   Porcelain parsing becomes single-sourced here: the only in-tree reader today is the two-key scan in
+1. Keep Git executable and logical-repository path discovery in the leaf `forge.session.git` module, used by both
+   `ExecutionContext` and worktree operations. Add a Git-derived family resolver (`forge.session.workspace`) that shells
+   out to Git: `rev-parse --git-common-dir`, `worktree list --porcelain`, `rev-parse --show-toplevel`. Returns the
+   `Workspace` / `WorkspaceWorktree` shapes above. `Workspace.primary_root` remains Git's first registered family
+   record, not another `project_root` derivation; the two intentionally differ for bare-backed families as documented
+   above. Porcelain parsing becomes single-sourced here: the only in-tree reader today is the two-key scan in
    `session/worktree/create.py::get_worktree_for_branch`, which should be repointed through the new parser. Pinned
    parser rules: `--porcelain -z` (NUL-robust paths), the first entry is the primary worktree (git's contract), `branch`
    stores the short name (the full `refs/heads/…` ref is matched internally), attribute reasons (`locked <reason>`,

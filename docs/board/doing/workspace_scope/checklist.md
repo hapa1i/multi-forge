@@ -27,7 +27,8 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   a future card), so workspace sums can bleed in an out-of-workspace same-named session and double-count same-named
   siblings. When the follow-up lands, cost keeps activity's reported-or-estimated semantics (`cost_estimated` /
   `cost_partial`); reported-only totals remain `forge +$Y` vocabulary.
-- [x] D4: module placement — parser + resolver in `src/forge/session/workspace.py`; UI-agnostic join builder in
+- [x] D4: module placement — Git executable + logical-repository path helpers in the leaf `src/forge/session/git.py`;
+  parser + family resolver in `src/forge/session/workspace.py`; UI-agnostic join builder in
   `src/forge/core/ops/workspace.py` (ops contract, design.md §3.12: no Click, no printing, typed errors; precedent:
   op-backed `telemetry trace` with no `%` mirror); CLI leaf in `src/forge/cli/workspace.py`.
 - [x] D5: no `workspace_id`. Identity is the resolved common dir + primary root, derived at query time; no exported hash
@@ -66,6 +67,10 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
 - [x] Workspace identity derived at query time via `rev-parse --path-format=absolute --git-common-dir`. Assertion
   (non-bare families): resolver run from the primary checkout and from a linked worktree returns equal `common_dir` and
   `primary_root`, and `primary_root == get_main_repo_root()` for the same cwd.
+- [x] Git dependency direction is acyclic: `session/git.py` owns `find_git_binary()` and the canonical logical
+  `get_main_repo_root()`; `ExecutionContext`, workspace discovery, and worktree operations import that leaf. Worktree
+  creation imports the workspace branch lookup at module scope with no local-import workaround. `Workspace.primary_root`
+  remains the distinct first-record family anchor because bare-backed families intentionally have no non-bare main root.
 - [x] Bare-family fixture (D7): `git init --bare` + linked worktree → no crash; first record
   `is_bare=True, is_primary=True`, no branch/head requirement; linked rows normal. The identity assertion is explicitly
   not applied.
@@ -78,9 +83,9 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
 - [x] Porcelain parsing single-sourced: characterize `session/worktree/create.py::get_worktree_for_branch` (first
   worktree carrying `branch refs/heads/<name>`), then repoint it through the new parser. Assertion: existing
   `tests/src/session/worktree/test_create.py` coverage passes unchanged.
-- [x] Extend the CIT for the repointed production path: a branch **checked out in a second real worktree** makes
-  `create_worktree` raise `BranchExistsError` carrying that worktree's path (the existing test only asserts the branch
-  name; this drives `get_worktree_for_branch` end-to-end through the new parser).
+- [x] Preserve both CIT branch-refusal variants: a branch that exists but is not checked out raises
+  `BranchExistsError(worktree=None)` with the short message; a branch **checked out in a second real worktree** carries
+  that worktree's path and the longer message, driving `get_worktree_for_branch` end-to-end through the new parser.
 - [x] **Integration gate (required; runner-invoked)**: the repoint touches the session fork/worktree branch-refusal path
   (`get_worktree_for_branch` call in `session/worktree/create.py`), and
   `tests/src/session/worktree/test_create_integration.py` is `integration` + `docker_in` marked — so both gates go
@@ -100,7 +105,8 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   counted.
 - [x] Name-collision honesty (the class that deferred aggregation): two same-named sessions in different Forge roots of
   **one** workspace appear under their own worktrees as two counted rows; a same-named session in a **different**
-  workspace is excluded by the `project_root` filter. Assertions for both fixtures.
+  workspace is excluded by the `project_root` filter. The session-op test pins that filter boundary; the join test pins
+  separate same-name rows plus the unmatched-row skip.
 - [x] Availability facts rendered per D6: after `rm -rf <linked-worktree>` (no `git worktree prune`), the row shows
   `missing (prunable)` with `sessions=0` — the list-time self-heal pruned its index rows — and the builder does not
   error on rows vanishing mid-join; a locked worktree with a missing directory shows `missing (locked)`, not prunable.
@@ -136,11 +142,11 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
 
 ## Verification record — 2026-08-03
 
-- Focused resolver/join/CLI/session suite: 83 passed.
+- Focused Git/resolver/context/join/CLI/session suite: 99 passed.
 - Required runner:
   `./scripts/test-integration.sh tests/src/session/worktree/test_create_integration.py tests/integration/docker/test_session_lifecycle.py -v`
-  — 37 passed.
-- `make test-unit` — 8,682 passed, 1 skipped, 117 integration tests deselected.
+  — 38 passed.
+- `make test-unit` — 8,680 passed, 1 skipped, 118 integration tests deselected.
 - `make pre-commit` — all hooks passed, including ruff, black, isort, mypy, pyright, mdformat, and gitleaks.
 
 ## Deferred — activity aggregation + `forge workspace status` (blocked, with anchors)
@@ -161,27 +167,28 @@ Not scheduled in this slice; recorded so the blockers are re-checkable:
 
 ## Acceptance tests
 
-| Test                                  | Fixture                                                                                           | Assertion                                                                                                     | Test File                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Porcelain parse, full flag set        | tmp git repo + `git worktree add`: linked, locked, detached, dir-deleted                          | exact `is_primary`/`is_bare`/`is_prunable`/`is_locked`/`is_detached`; branch short-name/head populated        | `tests/src/session/test_workspace.py`                   |
-| Newline path under `-z`               | worktree path with embedded newline                                                               | path round-trips exactly (discriminates NUL parser from line scan)                                            | `tests/src/session/test_workspace.py`                   |
-| Locked-vs-prunable probe contract     | lock one worktree, `mv` its dir; `rm -rf` another; before/after `git worktree prune --expire=now` | locked: `is_prunable=False`, `path_exists=False`, survives prune; plain: `is_prunable=True`, removed by prune | `tests/src/session/test_workspace.py`                   |
-| Failure taxonomy                      | no git binary on PATH; corrupted porcelain bytes; failing subprocess                              | loud clear errors; only not-a-repo degrades                                                                   | `tests/src/session/test_workspace.py`                   |
-| Bare family render-only               | `git init --bare` + linked worktree                                                               | first record `is_bare=True`/`is_primary=True`; no crash; identity assertion not applied                       | `tests/src/session/test_workspace.py`                   |
-| Identity stable across members        | non-bare repo, resolver run from primary and linked cwd                                           | equal `common_dir` + `primary_root`; equals `get_main_repo_root()`                                            | `tests/src/session/test_workspace.py`                   |
-| Non-git degrade, exact shape          | `tmp_path`, no git                                                                                | pinned single-member shape (`common_dir=None`, flags false, `path_exists=True`), no raise                     | `tests/src/session/test_workspace.py`                   |
-| Symlinked path join                   | symlink to linked worktree; session indexed via real path                                         | worktree row shows the session                                                                                | `tests/src/core/ops/test_workspace.py`                  |
-| Empty worktree visible                | linked worktree, no sessions                                                                      | row present, `sessions=0`                                                                                     | `tests/src/core/ops/test_workspace.py`                  |
-| Legacy row fallback                   | index row with `checkout_root=""`, `worktree_path` set                                            | counted under the right worktree (D9)                                                                         | `tests/src/core/ops/test_workspace.py`                  |
-| Incognito counted                     | incognito session in a worktree                                                                   | included in `sessions`/`active` (D8)                                                                          | `tests/src/core/ops/test_workspace.py`                  |
-| Same-name, same workspace             | same session name in two Forge roots of one repo                                                  | two rows, counts separate, no merge                                                                           | `tests/src/core/ops/test_workspace.py`                  |
-| Same-name, other workspace            | same session name in a second repo                                                                | excluded by `project_root` filter                                                                             | `tests/src/core/ops/test_workspace.py`                  |
-| Missing after deletion                | `rm -rf` linked worktree, no prune                                                                | `missing (prunable)`, `sessions=0`, no error mid-join                                                         | `tests/src/core/ops/test_workspace.py`                  |
-| Active counts                         | index rows + seeded `ActiveSessionStore`                                                          | `active` matches `is_active` truth                                                                            | `tests/src/core/ops/test_workspace.py`                  |
-| CLI JSON shape                        | CliRunner, seeded index                                                                           | pinned keys for `worktrees --json` (incl. `is_bare`)                                                          | `tests/src/cli/test_workspace_commands.py`              |
-| Group shape + no alias                | CliRunner                                                                                         | bare `forge workspace` prints help, exit 2 per CLI group policy; no alias resolves                            | `tests/src/cli/test_command_tree_invariants.py`         |
-| `get_worktree_for_branch` unchanged   | existing fixtures                                                                                 | characterized before repoint, green after                                                                     | `tests/src/session/worktree/test_create.py`             |
-| Branch checked out in second worktree | real second worktree on the branch                                                                | `BranchExistsError` carries that worktree's path (parser exercised on the production path)                    | `tests/src/session/worktree/test_create_integration.py` |
+| Test                                  | Fixture                                                                                           | Assertion                                                                                                     | Test File                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Porcelain parse, full flag set        | tmp git repo + `git worktree add`: linked, locked, detached, dir-deleted                          | exact `is_primary`/`is_bare`/`is_prunable`/`is_locked`/`is_detached`; branch short-name/head populated        | `tests/src/session/test_workspace.py`                                                       |
+| Newline path under `-z`               | worktree path with embedded newline                                                               | path round-trips exactly (discriminates NUL parser from line scan)                                            | `tests/src/session/test_workspace.py`                                                       |
+| Locked-vs-prunable probe contract     | lock one worktree, `mv` its dir; `rm -rf` another; before/after `git worktree prune --expire=now` | locked: `is_prunable=False`, `path_exists=False`, survives prune; plain: `is_prunable=True`, removed by prune | `tests/src/session/test_workspace.py`                                                       |
+| Failure taxonomy                      | no git binary on PATH; corrupted porcelain bytes; failing subprocess                              | loud clear errors; only not-a-repo degrades                                                                   | `tests/src/session/test_workspace.py`                                                       |
+| Bare family render-only               | `git init --bare` + linked worktree                                                               | first record `is_bare=True`/`is_primary=True`; no crash; identity assertion not applied                       | `tests/src/session/test_workspace.py`                                                       |
+| Identity stable across members        | non-bare repo, resolver run from primary and linked cwd                                           | equal `common_dir` + `primary_root`; equals `get_main_repo_root()`                                            | `tests/src/session/test_workspace.py`                                                       |
+| Non-git degrade, exact shape          | `tmp_path`, no git                                                                                | pinned single-member shape (`common_dir=None`, flags false, `path_exists=True`), no raise                     | `tests/src/session/test_workspace.py`                                                       |
+| Symlinked path join                   | symlink to linked worktree; session indexed via real path                                         | worktree row shows the session                                                                                | `tests/src/core/ops/test_workspace.py`                                                      |
+| Empty worktree visible                | linked worktree, no sessions                                                                      | row present, `sessions=0`                                                                                     | `tests/src/core/ops/test_workspace.py`                                                      |
+| Legacy row fallback                   | index row with `checkout_root=""`, `worktree_path` set                                            | counted under the right worktree (D9)                                                                         | `tests/src/core/ops/test_workspace.py`                                                      |
+| Incognito counted                     | incognito session in a worktree                                                                   | included in `sessions`/`active` (D8)                                                                          | `tests/src/core/ops/test_workspace.py`                                                      |
+| Same-name, same workspace             | same session name in two Forge roots of one repo                                                  | two rows, counts separate, no merge                                                                           | `tests/src/core/ops/test_workspace.py`                                                      |
+| Other workspace excluded              | indexed session in a second logical repo                                                          | `scope="workspace"` excludes it by `project_root`                                                             | `tests/src/core/ops/test_session_ops.py::test_list_scope_workspace_filters_by_project_root` |
+| Missing after deletion                | `rm -rf` linked worktree, no prune                                                                | `missing (prunable)`, `sessions=0`, no error mid-join                                                         | `tests/src/core/ops/test_workspace.py`                                                      |
+| Active counts                         | index rows + seeded `ActiveSessionStore`                                                          | `active` matches `is_active` truth                                                                            | `tests/src/core/ops/test_workspace.py`                                                      |
+| CLI JSON shape                        | CliRunner, seeded index                                                                           | pinned keys for `worktrees --json` (incl. `is_bare`)                                                          | `tests/src/cli/test_workspace_commands.py`                                                  |
+| Group shape + no alias                | CliRunner                                                                                         | bare `forge workspace` prints help, exit 2 per CLI group policy; no alias resolves                            | `tests/src/cli/test_command_tree_invariants.py`                                             |
+| `get_worktree_for_branch` unchanged   | existing fixtures                                                                                 | characterized before repoint, green after                                                                     | `tests/src/session/worktree/test_create.py`                                                 |
+| Branch exists, not checked out        | real local branch with no carrying worktree                                                       | `BranchExistsError.worktree is None`; short message preserved                                                 | `tests/src/session/worktree/test_create_integration.py`                                     |
+| Branch checked out in second worktree | real second worktree on the branch                                                                | `BranchExistsError` carries that worktree's path (parser exercised on the production path)                    | `tests/src/session/worktree/test_create_integration.py`                                     |
 
 Unit tests use real tmp git repos (`git init` + `git worktree add`) per the real-over-mock policy — host-only. The
 Phase-1 parser repoint touches session fork/worktree machinery, and the component gate file is `integration` +
@@ -199,7 +206,8 @@ slice is read-only over the index and needs no additional Docker tier.
 ## Verification commands
 
 ```bash
-uv run pytest tests/src/session/test_workspace.py tests/src/core/ops/test_workspace.py \
+uv run pytest tests/src/session/test_git.py tests/src/session/test_workspace.py \
+  tests/src/core/ops/test_context.py tests/src/core/ops/test_workspace.py \
   tests/src/cli/test_workspace_commands.py -q
 uv run pytest tests/src/cli/test_command_tree_invariants.py tests/src/session/worktree/test_create.py -q
 ./scripts/test-integration.sh tests/src/session/worktree/test_create_integration.py \

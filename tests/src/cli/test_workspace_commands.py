@@ -11,7 +11,10 @@ from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.core.ops.session import ForgeOpError
-from forge.core.ops.workspace import ListWorkspaceWorktreesResult, WorkspaceWorktreeSummary
+from forge.core.ops.workspace import (
+    ListWorkspaceWorktreesResult,
+    WorkspaceWorktreeSummary,
+)
 from forge.session.workspace import WorkspaceWorktree
 
 

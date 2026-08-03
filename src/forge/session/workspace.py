@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .exceptions import GitWorktreeError
-from .worktree.create import find_git_binary
+from .git import find_git_binary
 
 
 @dataclass(frozen=True)
@@ -116,6 +116,9 @@ def resolve_workspace(cwd: Path | None = None) -> Workspace:
     common_dir = common_dir.resolve()
 
     worktrees = list_git_worktrees(start)
+    # This is Git's family-primary record, not the logical project root. Bare
+    # families intentionally anchor here while get_main_repo_root() falls back
+    # to the linked checkout from which it was called.
     return Workspace(primary_root=worktrees[0].checkout_root, common_dir=common_dir, worktrees=worktrees)
 
 

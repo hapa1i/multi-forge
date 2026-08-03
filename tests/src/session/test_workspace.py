@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from forge.session.exceptions import GitNotFoundError, GitWorktreeError
+from forge.session.git import get_main_repo_root
 from forge.session.workspace import (
     Workspace,
     WorkspaceWorktree,
@@ -17,7 +18,6 @@ from forge.session.workspace import (
     parse_worktree_porcelain,
     resolve_workspace,
 )
-from forge.session.worktree.create import get_main_repo_root
 
 
 @pytest.fixture

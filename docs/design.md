@@ -1564,6 +1564,7 @@ multi-forge/
 │   │   │   ├── wire_shapes.py # Wire-shape vocabulary leaf (shapes, validity, default)
 │   │   │   └── state/   # File-based state helpers
 │   │   ├── session/     # Session manager
+│   │   │   ├── git.py       # Shared Git executable and logical-repository path discovery
 │   │   │   └── workspace.py # Git-derived worktree-family discovery
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm

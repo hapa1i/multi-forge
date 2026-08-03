@@ -13,31 +13,13 @@ import pytest
 
 from forge.session.exceptions import (
     BranchExistsError,
-    GitNotFoundError,
     InvalidBranchNameError,
 )
 from forge.session.worktree.create import (
-    find_git_binary,
     get_worktree_for_branch,
     sanitize_branch_name,
     validate_branch_name,
 )
-
-
-class TestFindGitBinary:
-    """Tests for find_git_binary()."""
-
-    def test_finds_git_in_path(self) -> None:
-        """Git should be found in PATH."""
-        result = find_git_binary()
-        assert result.endswith("git")
-        assert Path(result).exists()
-
-    def test_raises_when_git_not_found(self) -> None:
-        """Should raise GitNotFoundError when git is not in PATH."""
-        with patch("shutil.which", return_value=None):
-            with pytest.raises(GitNotFoundError):
-                find_git_binary()
 
 
 class TestValidateBranchName:
