@@ -6,11 +6,12 @@ merely separable); single `worktrees` leaf; parser and non-Git shapes pinned; `w
 added. Round 3: `missing` is point-in-time availability (never "gone"); bare-backed families are render-only;
 incognito/legacy-row counting pinned; integration gates routed through `./scripts/test-integration.sh`; a discriminating
 newline-path fixture replaces the space-path one; cross-card ownership repoint added to closeout. Picked up on
-`feat/workspace-scope-slice2` and moved to `doing/` on 2026-08-03.
+`feat/workspace-scope-slice2` and moved to `doing/` on 2026-08-03. Shipped via
+[PR #122](https://github.com/hapa1i/multi-forge/pull/122) and moved to `done/` the same day.
 
 ## Current focus
 
-Implementation and verification complete; pending merge and the post-merge lane move.
+Shipped and closed; implementation, verification, merge, and the post-merge board move are complete.
 
 ## Phase 0 — Decisions to confirm at review (no code)
 
@@ -138,7 +139,8 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   `.forge/memory/shadow_impl_notes.md`, not written directly to `impl_notes.md`.
 - [x] Closeout records the deferral: the blocked aggregation/`status` work is either left on this card's Deferred
   section or split to a new `proposed/` card at the user's call.
-- [ ] Lane move `doing/ → done/` after merge; inbound board links repointed (board-contract closeout).
+- [x] Lane move `doing/ → done/` after merge; inbound board links repointed (board-contract closeout). PR #122 merged as
+  `a5aee0a9` on 2026-08-03.
 
 ## Verification record — 2026-08-03
 
@@ -148,6 +150,8 @@ The 2026-08-03 card adjustments encode these; confirming them closes Phase 0.
   — 38 passed.
 - `make test-unit` — 8,680 passed, 1 skipped, 118 integration tests deselected.
 - `make pre-commit` — all hooks passed, including ruff, black, isort, mypy, pyright, mdformat, and gitleaks.
+- Post-merge closeout — PR #122 merged as `a5aee0a9`; lane move, stale-lane sweep, `make pre-commit-md`, and
+  `git diff --check` passed on `main`.
 
 ## Deferred — activity aggregation + `forge workspace status` (blocked, with anchors)
 

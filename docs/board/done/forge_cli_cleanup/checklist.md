@@ -180,7 +180,7 @@ defaults to accept or override, not commitments.
 - [x] **D9 Workspace-scope coordination (Q7). DECIDED 2026-06-23: WAIT for the `workspace_scope` card.** This cleanup
   card does **not** introduce or reserve `forge telemetry … --scope workspace`. The identity blocker and deferred
   aggregation contract are recorded in
-  `docs/board/doing/workspace_scope/checklist.md#deferred--activity-aggregation--forge-workspace-status-blocked-with-anchors`;
+  `docs/board/done/workspace_scope/checklist.md#deferred--activity-aggregation--forge-workspace-status-blocked-with-anchors`;
   a successor owns the flag and behavior once telemetry has root-scoped session identity. `forge telemetry activity`
   keeps its current selector (optional positional `[session]` + `--days`/`--all`). Slice 07 scope-flag work is limited
   to the F11 session-selector rule, not workspace scope.

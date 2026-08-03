@@ -46,7 +46,8 @@ registered worktrees, without persisting a second workspace identity.
   and QA coverage, and left activity aggregation plus `workspace status` blocked on root-scoped telemetry identity.
 
 **Verification**: focused Git/workspace/session/CLI tests passed (99); `make test-unit` passed (8,680 passed, 1
-skipped); required integration runner passed (38); `make pre-commit` passed.
+skipped); required integration runner passed (38); `make pre-commit` passed. Shipped via PR #122 (`a5aee0a9`);
+post-merge stale-lane sweep, `make pre-commit-md`, and `git diff --check` passed.
 
 ## 2026-08-02
 
