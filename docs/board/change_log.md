@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-04
 
+### Harden semantic supervisor verdict boundary
+
+**Goal**: Prevent malformed external verdict data from denying, escaping into fail-closed handling, or masquerading as a
+clean aligned result.
+
+**Key changes**:
+
+- Made verdict literals exact and observable, degraded malformed confidence to low confidence, filtered invalid
+  violation elements, and shared normalized citations between the displayed violation and block predicate.
+- Made restored throttle reuse strict: only the clean aligned/`1.0` write shape is reused; malformed or non-aligned
+  state re-evaluates.
+- Added one marked regression module for each of D002, D003, D004, and O028, covering direct enforcement, both engine
+  fail modes, cache eligibility, telemetry, shadow classification, and valid controls.
+
+**Verification**: Focused policy/supervision tests passed (321); hook-adapter tests passed (47); full regression suite
+passed (632); `make test-unit` passed (8,702 passed, 1 skipped); Docker policy-hook integration passed (21);
+`make pre-commit` passed after the review follow-up.
+
 ### Preserve policy intent on enable
 
 **Goal**: Prevent terminal bundle re-enablement from silently deleting session-owned semantic and team supervisor

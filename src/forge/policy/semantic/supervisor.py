@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any
 
 from forge.core.invoker.codex_stream import is_subscription_exhausted
 from forge.core.invoker.types import Attribution, HeadlessResult
@@ -246,17 +246,22 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
 
         cached = self._cache.check(cache_key)
         if cached is not None:
-            _log.debug("Using cached supervisor verdict for %s", cache_key)
-            cached_verdict = cached.get("verdict", "aligned")
-            if cached_verdict not in ("aligned", "divergent"):
-                cached_verdict = "aligned"
-            verdict = SupervisorVerdict(
-                verdict=cast(Literal["aligned", "divergent"], cached_verdict),
-                confidence=cached.get("confidence", 1.0),
+            cached_confidence = cached.get("confidence")
+            clean_allow = (
+                cached.get("verdict") == "aligned"
+                and isinstance(cached_confidence, (int, float))
+                and not isinstance(cached_confidence, bool)
+                and cached_confidence == 1.0
             )
-            decision = verdict_to_decision(verdict, intent=self.intent)
-            decision.cached = True
-            return decision
+            if clean_allow:
+                _log.debug("Using cached supervisor verdict for %s", cache_key)
+                decision = verdict_to_decision(
+                    SupervisorVerdict(verdict="aligned", confidence=1.0),
+                    intent=self.intent,
+                )
+                decision.cached = True
+                return decision
+            _log.warning("Ignoring invalid supervisor cache entry for %s", cache_key)
 
         # Invoke supervisor
         decision = invoke_supervisor(self._config, context, lane_record=self._lane_record)

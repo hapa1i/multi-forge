@@ -5,7 +5,8 @@
 **Findings**: D002–D004 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings) and the
 related O028 subset in the [`code and maintenance inventory`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `todo/` -- accepted Wave 1 implementation work after D001.
+**Lane**: `done/` -- implemented on `fix/harden-supervisor-verdict-boundary`; review and merge are tracked by the active
+epic before D005 starts.
 
 ## Goal
 
@@ -58,10 +59,30 @@ The serialized policy schema and confidence threshold do not change. Do not broa
 case folding: the structured-output contract is exact, and malformed external data should remain observable. Do not
 change deterministic policy fail-mode semantics globally.
 
+## Outcome
+
+The semantic parser now rejects unknown verdict literals as parse failures, degrades malformed confidence to `0.0`,
+filters malformed violation elements, and uses one normalized citation value for both display and the block predicate.
+The existing parsed-status propagation makes these failures visible to enforcement, telemetry, caching, and shadow
+classification without changing deterministic fail-mode behavior or the workflow/team schemas.
+
+Restored throttle entries are cache hits only when they match the supervisor's clean-allow write shape: exact `aligned`
+verdict plus numeric `1.0` confidence. Missing, malformed, unknown, or divergent entries are treated as misses and
+re-evaluated instead of being coerced into cached allows.
+
+One marked regression module per admitted finding records the root cause and verifies malformed and valid controls. The
+shipped contract in `docs/design_workflows.md` already specifies the corrected behavior, so no normative design or
+end-user documentation change was required.
+
 ## Verification
 
-- Extend `tests/src/policy/semantic/test_verdict.py` for every malformed field shape and valid control case.
-- Add engine-level coverage for both fail modes, cache eligibility assertions, and shadow classification/telemetry
-  tests.
-- Run focused semantic supervisor, workflow-stage, team-handler, policy-engine, and shadow-runner tests.
-- Run `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` and `make pre-commit`.
+- Pre-fix execution of the four new regression modules: `24 failed, 10 passed`, reproducing D002–D004 and O028.
+- Pre-fix restored-cache follow-up: `8 failed`, covering the O028 regression and seven invalid cache shapes.
+- Verdict unit tests plus the four regression modules: `65 passed`.
+- Focused semantic supervisor, policy engine, shadow, workflow-stage, and team-handler tests: `321 passed`.
+- Claude and Codex policy-hook adapter tests: `47 passed`.
+- Existing D001 marked regression, run directly: `1 passed`.
+- `make test-regression`: `632 passed`.
+- `make test-unit`: `8,702 passed, 1 skipped, 118 deselected`.
+- `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`: `21 passed`.
+- `make pre-commit`: passed after the review follow-up.

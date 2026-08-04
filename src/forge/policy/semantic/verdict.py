@@ -7,6 +7,8 @@ converts them to PolicyDecision objects.
 from __future__ import annotations
 
 import logging
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -85,7 +87,16 @@ def parse_supervisor_verdict_with_status(response: str) -> tuple[SupervisorVerdi
             False,
         )
 
-    return _parse_verdict_data(data), True
+    verdict = _parse_verdict_data(data)
+    if verdict is None:
+        return (
+            _warn_verdict(
+                "Supervisor verdict was missing or invalid — expected exact 'aligned' or 'divergent'",
+                "Verify supervisor session returns the documented verdict schema",
+            ),
+            False,
+        )
+    return verdict, True
 
 
 def parse_supervisor_verdict(response: str) -> SupervisorVerdict:
@@ -93,27 +104,46 @@ def parse_supervisor_verdict(response: str) -> SupervisorVerdict:
     return parse_supervisor_verdict_with_status(response)[0]
 
 
-def _parse_verdict_data(data: dict[str, Any]) -> SupervisorVerdict:
-    """Parse verdict from JSON data."""
-    verdict = data.get("verdict", "aligned")
-    if verdict not in ("aligned", "divergent"):
-        _log.warning("Unknown verdict '%s', treating as aligned", verdict)
-        verdict = "aligned"
+def _parse_verdict_data(data: dict[str, Any]) -> SupervisorVerdict | None:
+    """Parse a schema-valid verdict, returning None for an invalid verdict literal."""
+    raw_verdict = data.get("verdict")
+    if raw_verdict == "aligned":
+        verdict: Literal["aligned", "divergent"] = "aligned"
+    elif raw_verdict == "divergent":
+        verdict = "divergent"
+    else:
+        _log.warning("Unknown supervisor verdict %r, failing open", raw_verdict)
+        return None
 
-    confidence = data.get("confidence", 1.0)
-    if not isinstance(confidence, (int, float)):
-        confidence = 1.0
-    confidence = max(0.0, min(1.0, float(confidence)))
+    raw_confidence = data.get("confidence")
+    if isinstance(raw_confidence, bool) or not isinstance(raw_confidence, (int, float)):
+        _log.warning("Malformed supervisor confidence %r, degrading to 0.0", raw_confidence)
+        confidence = 0.0
+    elif isinstance(raw_confidence, float) and not math.isfinite(raw_confidence):
+        _log.warning("Non-finite supervisor confidence %r, degrading to 0.0", raw_confidence)
+        confidence = 0.0
+    else:
+        confidence = float(max(0, min(1, raw_confidence)))
 
-    violations = data.get("violations", [])
-    if not isinstance(violations, list):
-        violations = []
+    raw_violations = data.get("violations", [])
+    violations = (
+        [dict(violation) for violation in raw_violations if isinstance(violation, Mapping)]
+        if isinstance(raw_violations, list)
+        else []
+    )
 
     return SupervisorVerdict(
-        verdict=verdict,  # type: ignore[arg-type]  # mypy doesn't track narrowing from reassignment
+        verdict=verdict,
         confidence=confidence,
         violations=violations,
     )
+
+
+def _normalize_citations(value: Any) -> list[str]:
+    """Return non-blank string citations from the documented JSON list shape."""
+    if not isinstance(value, list):
+        return []
+    return [citation for citation in value if isinstance(citation, str) and citation.strip()]
 
 
 def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None) -> PolicyDecision:
@@ -147,7 +177,9 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
     warnings: list[str] = []
 
     for v in verdict.violations:
-        citations = v.get("citations", [])
+        if not isinstance(v, Mapping):
+            continue
+        citations = _normalize_citations(v.get("citations"))
         severity_str = v.get("severity", "medium")
         severity: Severity = (
             severity_str if severity_str in ("critical", "high", "medium", "low") else "medium"
@@ -159,11 +191,11 @@ def verdict_to_decision(verdict: SupervisorVerdict, *, intent: str | None = None
             severity=severity,
             evidence=v.get("evidence"),
             suggested_fix=v.get("suggested_fix"),
-            citations=citations if isinstance(citations, list) else [],
+            citations=citations,
         )
 
         # Only block on high-confidence violations with citations
-        if meets_block_bar(verdict.confidence, bool(citations)):
+        if meets_block_bar(verdict.confidence, bool(violation.citations)):
             blocking_violations.append(violation)
         else:
             # Low confidence or no citations → warning only

@@ -1,10 +1,15 @@
 """Tests for policy/semantic/verdict.py."""
 
+import json
+
+import pytest
+
 import forge.policy.semantic.verdict as verdict_module
 from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     meets_block_bar,
     parse_supervisor_verdict,
+    parse_supervisor_verdict_with_status,
     verdict_to_decision,
 )
 
@@ -85,6 +90,57 @@ class TestParseSupervisorVerdict:
 ```"""
         verdict2 = parse_supervisor_verdict(response2)
         assert verdict2.confidence == 0.0
+
+    @pytest.mark.parametrize("raw_confidence", ["null", "true", '"high"', "NaN", "Infinity", "-Infinity"])
+    def test_parse_malformed_confidence_as_low(self, raw_confidence: str) -> None:
+        response = (
+            '{"verdict":"divergent","confidence":'
+            + raw_confidence
+            + ',"violations":[{"citations":["Plan section 2"]}]}'
+        )
+
+        verdict, parsed = parse_supervisor_verdict_with_status(response)
+
+        assert parsed is True
+        assert verdict.confidence == 0.0
+        assert verdict_to_decision(verdict).decision == "warn"
+
+    def test_parse_missing_confidence_as_low(self) -> None:
+        verdict, parsed = parse_supervisor_verdict_with_status(
+            '{"verdict":"divergent","violations":[{"citations":["Plan section 2"]}]}'
+        )
+
+        assert parsed is True
+        assert verdict.confidence == 0.0
+        assert verdict_to_decision(verdict).decision == "warn"
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"verdict": "DIVERGENT", "confidence": 0.9},
+            {"verdict": "unknown", "confidence": 0.9},
+            {"confidence": 0.9},
+        ],
+    )
+    def test_invalid_verdict_literal_reports_parse_failure(self, payload: dict[str, object]) -> None:
+        verdict, parsed = parse_supervisor_verdict_with_status(json.dumps(payload))
+
+        assert parsed is False
+        assert verdict.verdict == "divergent"
+        assert verdict.confidence == 0.0
+
+    def test_parse_filters_non_mapping_violation_entries(self) -> None:
+        response = json.dumps(
+            {
+                "verdict": "divergent",
+                "confidence": 0.9,
+                "violations": ["bad", {"evidence": "Changed the plan", "citations": ["Plan section 2"]}],
+            }
+        )
+
+        verdict = parse_supervisor_verdict(response)
+
+        assert verdict.violations == [{"evidence": "Changed the plan", "citations": ["Plan section 2"]}]
 
 
 class TestVerdictToDecision:
@@ -169,6 +225,35 @@ class TestVerdictToDecision:
         assert decision.decision == "deny"
         assert len(decision.violations) == 1  # Only cited one blocks
         assert len(decision.warnings) == 1  # Uncited one warns
+
+    def test_converter_ignores_non_mapping_violation_entries(self) -> None:
+        verdict = SupervisorVerdict(
+            verdict="divergent",
+            confidence=0.9,
+            violations=["bad"],  # type: ignore[list-item]  # deliberately malformed boundary fixture
+        )
+
+        decision = verdict_to_decision(verdict)
+
+        assert decision.decision == "warn"
+        assert decision.violations == []
+
+    def test_converter_uses_one_normalized_citation_list(self) -> None:
+        verdict = SupervisorVerdict(
+            verdict="divergent",
+            confidence=0.9,
+            violations=[
+                {
+                    "evidence": "Changed the plan",
+                    "citations": [None, "", 7, "Plan section 2"],
+                }
+            ],
+        )
+
+        decision = verdict_to_decision(verdict)
+
+        assert decision.decision == "deny"
+        assert decision.violations[0].citations == ["Plan section 2"]
 
     def test_deny_includes_intent_when_provided(self) -> None:
         """Deny decision carries intent when caller passes it."""
