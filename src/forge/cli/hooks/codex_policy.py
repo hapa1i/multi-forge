@@ -23,6 +23,7 @@ from typing import Any
 
 from forge.cli.hooks.codex_patch import PatchFileOp, parse_apply_patch
 from forge.cli.hooks.policy import format_deny_text, format_needs_review_text
+from forge.policy.action_identity import compute_action_fingerprint
 from forge.policy.deterministic.base import tests_first_sort_key
 from forge.policy.types import ActionContext, CompositeDecision
 
@@ -76,6 +77,22 @@ class CodexHookAdapter:
         except (ValueError, RuntimeError):
             pass  # Keep as-is if can't make relative
 
+        tool_args = {
+            "codex_tool_name": "apply_patch",
+            "path": op.path,
+            "move_to": op.move_to,
+            "kind": op.kind,
+        }
+        full_new_content = op.added_content or None
+        full_raw_diff = op.raw_section if op.kind == "update" else None
+        action_fingerprint = compute_action_fingerprint(
+            tool_name=normalized_tool,
+            target_path=target_path,
+            tool_args=tool_args,
+            new_content=full_new_content,
+            raw_diff=full_raw_diff,
+        )
+
         new_content: str | None = op.added_content
         if new_content and len(new_content) > _MAX_CONTENT_CHARS:
             new_content = new_content[:_MAX_CONTENT_CHARS] + "\n... (truncated)"
@@ -88,17 +105,13 @@ class CodexHookAdapter:
             origin=self.ORIGIN,
             event=f"PreToolUse.{normalized_tool}",
             tool_name=normalized_tool,
-            tool_args={
-                "codex_tool_name": "apply_patch",
-                "path": op.path,
-                "move_to": op.move_to,
-                "kind": op.kind,
-            },
+            tool_args=tool_args,
             repo_root=str(cwd),
             session_name=manifest.name,
             target_path=target_path,
             new_content=new_content or None,
             raw_diff=raw_diff,
+            action_fingerprint=action_fingerprint,
         )
 
 

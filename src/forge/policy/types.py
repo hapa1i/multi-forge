@@ -53,8 +53,11 @@ class ActionContext:
         new_content: Content being introduced — new file content (Write), new_string
             (Edit), or added lines extracted from a unified diff (on-demand check).
             Regex policies match against this field.
-        raw_diff: Full unified diff chunk (on-demand checks only). Provides richer
-            context for LLM-based policies. None for hook-triggered evaluations.
+        raw_diff: Bounded unified diff chunk for Codex updates and on-demand checks.
+            Provides richer presentation context for LLM-based policies.
+        action_fingerprint: SHA-256 of the complete canonical action, computed by
+            adapters before prompt-field truncation. LLM policy caches use this
+            digest; deterministic policies continue to read ``new_content``.
     """
 
     origin: str
@@ -66,6 +69,7 @@ class ActionContext:
     target_path: str | None = None
     new_content: str | None = None
     raw_diff: str | None = None
+    action_fingerprint: str | None = None
 
 
 @dataclass

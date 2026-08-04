@@ -644,6 +644,7 @@ def check(
         forge policy check --bundle tdd --bundle coding_standards -f src/foo.py --json
         git diff | forge policy check --bundle coding_standards --diff
     """
+    from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, extract_added_lines
 
@@ -679,16 +680,25 @@ def check(
         except ValueError:
             target_path = str(target)
 
+    tool_args = {"file_path": file_path or "", "content": new_content[:200]}
+    action_fingerprint = compute_action_fingerprint(
+        tool_name=tool_name,
+        target_path=target_path,
+        tool_args=tool_args,
+        new_content=new_content,
+        raw_diff=raw_input if use_diff else None,
+    )
     context = ActionContext(
         origin="forge_cli",
         event="OnDemand.Check",
         tool_name=tool_name,
-        tool_args={"file_path": file_path or "", "content": new_content[:200]},
+        tool_args=tool_args,
         repo_root=str(cwd),
         session_name="on-demand",
         target_path=target_path,
         new_content=new_content[:5000] if new_content else None,
         raw_diff=raw_input[:5000] if use_diff and raw_input else None,
+        action_fingerprint=action_fingerprint,
     )
 
     try:
@@ -867,6 +877,7 @@ def supervisor_evaluate(
         print_error("--no-proxy and --proxy are mutually exclusive", console=err_console)
         sys.exit(1)
 
+    from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.semantic.supervisor import SUPERVISOR_INTENT, invoke_supervisor
     from forge.policy.types import ActionContext
     from forge.session.models import SupervisorConfig
@@ -896,15 +907,22 @@ def supervisor_evaluate(
         fork_session=True,
     )
 
+    tool_args = {"file_path": file_path, "content": file_content[:200]}
     context = ActionContext(
         origin="forge_cli",
         event="OnDemand.Supervisor",
         tool_name="Write",
-        tool_args={"file_path": file_path, "content": file_content[:200]},
+        tool_args=tool_args,
         repo_root=str(cwd),
         session_name="on-demand",
         target_path=target_path,
         new_content=file_content[:5000],
+        action_fingerprint=compute_action_fingerprint(
+            tool_name="Write",
+            target_path=target_path,
+            tool_args=tool_args,
+            new_content=file_content,
+        ),
     )
 
     try:

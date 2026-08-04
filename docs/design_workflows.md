@@ -110,6 +110,13 @@ missing plan or cold, stale, or unready Codex preflight fails open with a warnin
    - **Divergent + low confidence or no citations**: Warn via stderr, allow the tool.
    - **Unresolved review request**: Block the tool until a supervisor is configured or the user gives a new direction.
 
+The hook adapter computes a SHA-256 fingerprint from the complete canonical action before truncating prompt-facing
+fields. Write identity includes the target and full content; Claude Edit identity includes the matched and replacement
+fragments plus `replace_all`; Codex and on-demand diff identity includes the complete raw diff. The frontier and tier-1
+checker share this base identity, then add their existing plan, route, budget, effort, and target-metadata dimensions.
+Only the digest enters cache keys and shadow sampling. Prompts remain bounded independently: Claude Edit presentation
+includes both matched and replacement fragments, while Codex updates retain their diff context.
+
 **Why this works:** On the Claude lane, native resume supplies the planning conversation; a plan override supersedes it
 when present. On the Codex lane, the in-band approved snapshot is the authority. Executor and supervisor routing are
 independent; specific model identities are lane/proxy choices, not architectural constants.
@@ -164,19 +171,20 @@ short-circuits a frontier check the frontier would have blocked. Shadow sampling
 hook. When `policy.supervisor.shadow_sample_rate > 0`, a *fresh* (uncached) tier-1 `allow` is sampled by a deterministic
 stable hash of `(shadow_seed, session, cache_key)` — no RNG, so it is reproducible and never depends on global state —
 and, if selected, **frozen** to `.forge/artifacts/<session>/shadow/<hash>.json` (capped at `shadow_max_per_session`).
-The candidate freezes the *raw* action inputs plus a copy of the plan (`<hash>.plan.md`) and a routing snapshot, because
-the frontier builds its own prompt and reloads the plan at run time — the **capture/check split**. Capture runs no LLM,
-never blocks, and is fully inert at rate 0 (the directory is not even created). The frontier replay is a post-hoc
-**Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI startup spawns a detached
-`forge policy shadow run` worker (the memory-writer pattern) that claims each candidate atomically (`rename` to
-`.processing`, bounding frontier billing to at-most-once), reconstructs the full `ActionContext`/`SupervisorConfig`,
-runs the frontier, and classifies the verdict with the supervisor's **own** block bar: `agree` (frontier also aligned),
-`disagree` (frontier would have blocked — high-confidence, cited), `inconclusive` (divergent below the bar), or `error`
-(run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
-renames `.processing` → `.done`; it **never enforces**. Spend is a separate `supervisor-shadow` usage row (the worker is
-the sole emitter, re-rooted under the originating session). The read surface is `forge telemetry activity` (a Shadow
-line with checked/disagree/pending counts), `forge policy shadow show` (the disagreement artifacts with citations), and
-`forge policy shadow status` (the sample rate plus pending/done counts for one session).
+The candidate freezes the canonical action fingerprint and replay inputs plus a copy of the plan (`<hash>.plan.md`) and
+a routing snapshot, because the frontier builds its own prompt and reloads the plan at run time — the **capture/check
+split**. Capture runs no LLM, never blocks, and is fully inert at rate 0 (the directory is not even created). The
+frontier replay is a post-hoc **Stop-batch drain**: the Stop hook enqueues a `shadow` work marker, and a later CLI
+startup spawns a detached `forge policy shadow run` worker (the memory-writer pattern) that claims each candidate
+atomically (`rename` to `.processing`, bounding frontier billing to at-most-once), reconstructs the full
+`ActionContext`/`SupervisorConfig`, runs the frontier, and classifies the verdict with the supervisor's **own** block
+bar: `agree` (frontier also aligned), `disagree` (frontier would have blocked — high-confidence, cited), `inconclusive`
+(divergent below the bar), or `error` (run failed or output unparseable, kept distinct from a real low-confidence
+`inconclusive`). It records the verdict and renames `.processing` → `.done`; it **never enforces**. Spend is a separate
+`supervisor-shadow` usage row (the worker is the sole emitter, re-rooted under the originating session). The read
+surface is `forge telemetry activity` (a Shadow line with checked/disagree/pending counts), `forge policy shadow show`
+(the disagreement artifacts with citations), and `forge policy shadow status` (the sample rate plus pending/done counts
+for one session).
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
@@ -211,7 +219,7 @@ rerun).
   the degrade path itself, sticky for the session (reset on `supervisor remove`/re-pin or a fresh process resume). This
   is the *only* general fallback the consumer-lane epic permits; see design_appendix §G for the overlay/reset mechanics.
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
-  configured path prefixes) and MAY cache the last verdict for identical diffs.
+  configured path prefixes) and MAY cache the last verdict for an identical canonical action.
 
 **On-demand invocation:** Deterministic bundles and the semantic supervisor can be evaluated manually without installing
 hooks:

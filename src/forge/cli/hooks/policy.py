@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.state import now_iso
+from forge.policy.action_identity import compute_action_fingerprint
 from forge.policy.types import ActionContext, CompositeDecision
 from forge.session import SessionStore
 from forge.session.models import LaneRecord, SessionState
@@ -46,11 +47,18 @@ class ClaudeHookAdapter:
                 # Keep as-is if can't make relative
                 pass
 
-        new_content = None
+        new_content: str | None = None
         if tool_name == "Write":
             new_content = tool_input.get("content")
         elif tool_name == "Edit":
             new_content = tool_input.get("new_string")
+
+        action_fingerprint = compute_action_fingerprint(
+            tool_name=tool_name,
+            target_path=target_path,
+            tool_args=tool_input,
+            new_content=new_content,
+        )
 
         if new_content and len(new_content) > 5000:
             new_content = new_content[:5000] + "\n... (truncated)"
@@ -65,6 +73,7 @@ class ClaudeHookAdapter:
                 session_name=manifest.name,
                 target_path=target_path,
                 new_content=new_content,
+                action_fingerprint=action_fingerprint,
             )
         ]
 

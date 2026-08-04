@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.state import now_iso
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.types import ActionContext
 from forge.session.artifacts import (
     get_artifact_paths,
@@ -37,11 +38,11 @@ from forge.session.models import LaneRecord, SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# v3 (T1b): the replay lane is the resolved consumer-lane binding (a LaneRecord), replacing the
-# v2 supervisor_runtime string. Shadow candidates are runtime-only state; an in-flight older
-# record simply lacks ``lane`` and replays on the claude default (reconstruct reads it via
-# `.get()`), which is acceptable to discard-and-default per coding_standards section 5.
-SHADOW_SCHEMA_VERSION = 3
+# v4 (D005): freeze the canonical action fingerprint used by the live cache. Shadow candidates
+# are runtime-only state; an older record simply lacks ``action_fingerprint`` and reconstructs
+# with the best-effort compatibility fallback from its stored action fields. v3 introduced the
+# resolved replay lane; that absent-field fallback remains unchanged.
+SHADOW_SCHEMA_VERSION = 4
 
 # Record-file suffixes (the candidate's lifecycle states). The `.plan.md` sidecar is deliberately excluded so it is
 # never counted toward the cap nor mistaken for a candidate record.
@@ -69,6 +70,7 @@ class ShadowCandidate:
     target_path: str | None
     new_content: str | None
     raw_diff: str | None
+    action_fingerprint: str
     tool_args: dict[str, Any]
     repo_root: str
     session_name: str
@@ -269,6 +271,7 @@ def capture_candidate(
         target_path=context.target_path,
         new_content=context.new_content,
         raw_diff=context.raw_diff,
+        action_fingerprint=action_fingerprint(context),
         tool_args=context.tool_args,
         repo_root=context.repo_root,
         session_name=context.session_name,

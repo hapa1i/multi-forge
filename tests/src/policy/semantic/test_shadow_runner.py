@@ -34,6 +34,7 @@ from forge.policy.semantic.supervisor import (
     _PLAN_OVERRIDE_PREAMBLE,
     SUPERVISOR_PROMPT,
     SupervisorRun,
+    _supervisor_action_content,
     load_plan_override,
 )
 from forge.policy.semantic.verdict import SupervisorVerdict, verdict_to_decision
@@ -61,6 +62,7 @@ def _ctx(**kw: object) -> ActionContext:
         target_path=str(kw.get("target_path", "f.py")),
         new_content=kw.get("new_content", "print('hi')"),  # type: ignore[arg-type]
         raw_diff=kw.get("raw_diff"),  # type: ignore[arg-type]
+        action_fingerprint=kw.get("action_fingerprint"),  # type: ignore[arg-type]
     )
 
 
@@ -100,7 +102,7 @@ def _frontier_prompt(config: SupervisorConfig, context: ActionContext) -> str:
     prompt = SUPERVISOR_PROMPT.format(
         tool_name=context.tool_name,
         target_path=context.target_path or "N/A",
-        content=(context.raw_diff or context.new_content or "")[:2000],
+        content=_supervisor_action_content(context),
     )
     plan_content = load_plan_override(config)
     if plan_content:
@@ -173,7 +175,12 @@ class TestClassifyShadow:
 
 class TestReconstruction:
     def test_context_round_trips_raw_fields(self, tmp_path: Path) -> None:
-        ctx = _ctx(new_content="body", raw_diff="@@ -1 +1 @@", tool_args={"file_path": "f.py", "k": 2})
+        ctx = _ctx(
+            new_content="body",
+            raw_diff="@@ -1 +1 @@",
+            tool_args={"file_path": "f.py", "k": 2},
+            action_fingerprint="a" * 64,
+        )
         path = _capture(ctx, _cfg(tmp_path))
         candidate = json.loads(path.read_text())
         rebuilt = reconstruct_context(candidate)
@@ -181,6 +188,7 @@ class TestReconstruction:
         assert rebuilt.target_path == ctx.target_path
         assert rebuilt.new_content == ctx.new_content
         assert rebuilt.raw_diff == ctx.raw_diff
+        assert rebuilt.action_fingerprint == ctx.action_fingerprint
         assert rebuilt.tool_args == ctx.tool_args
         assert rebuilt.session_name == ctx.session_name
 
