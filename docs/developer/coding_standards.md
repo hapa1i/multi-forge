@@ -97,6 +97,29 @@ Internal code not exposed to users follows a clean-break policy:
   - Moved behavior → update test
   - Don't accumulate skips
 
+### Compatibility evidence before deletion
+
+Zero production callers do not by themselves authorize deletion. Before removing a module, symbol, branch, config field,
+or serialized field, the change must record:
+
+1. repository-wide static callers, dynamic imports, entry points, package resources, templates, documentation, and
+   bundled extension consumers;
+2. whether the surface is private implementation, deliberately re-exported API, user-authored config, Forge-owned
+   durable state, or an external wire/CLI contract;
+3. what existing tests characterize and whether those tests move to a reachable replacement or are removed with the dead
+   feature; and
+4. the compatibility action and verification tier: clean deletion, explicit replacement, justified deprecation, schema
+   migration/reset, or further characterization.
+
+A test-only caller proves coverage, not a supported interface. Importability under `src/forge` alone is also not a
+public-API promise; documentation, a declared entry point, stable output/config, packaged consumers, or an intentional
+supported re-export establishes that obligation. Conversely, user-authored config and strict durable documents cannot
+lose a recognized field silently: follow the public-surface and durable-state rules above.
+
+Demonstrate an unreachable branch from its preconditions and retain behavior coverage on the reachable path. When an
+unused symbol encodes an intended optimization or safety invariant, prefer wiring or replacing it over deletion. Split
+compound cleanup claims into individually evidenced surfaces before implementation.
+
 ### Boundary framework (reject vs degrade)
 
 Three boundary types determine error-handling policy:

@@ -36,6 +36,23 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Repository maintenance gates are ownership decisions, not cleanup permission (approved 2026-08-04)
+
+- **Stop verification has two supported modes.** `completion_promise` stays on the ordinary under-100-ms path;
+  explicitly selected fixed `uv run pytest` is the sole blocking latency exception. Arbitrary commands are not a
+  verification type, and invalid stored values must become visible fail-open configuration rather than silent success.
+- **A session has separate durable, discovery, and launchability facts.** A valid manifest reserves the name and
+  conversation bindings, the global index publishes it, and the recorded worktree decides whether checkout-dependent
+  operations may run. A surviving manifest is degraded when its worktree vanishes, not dead.
+- **Retention follows physical storage ownership.** Audit, cost, and provider lifecycle fields share downstream shards,
+  so `~/.forge/telemetry/downstream/` gets one global policy and pruner. Conflicting legacy policies disable pruning
+  rather than choosing a destructive minimum.
+- **Deletion requires compatibility evidence per surface.** Tests alone do not make an API public, but zero production
+  callers do not authorize removal. Classify imports/exports, user config, durable schemas, packaged consumers, wire
+  contracts, and test disposition before deleting; split compound claims and wire intended invariants when appropriate.
+- Decision records live under `docs/board/done/*_contract/`; implementation members update normative design docs only as
+  behavior ships, so approval itself does not manufacture design/code drift.
+
 ### Binding a pre-existing conversation is a uniqueness problem, not a write problem (native_session_adoption, shipped 2026-07-27)
 
 - **A lock only excludes what it encloses.** Uniqueness needs its guard at the narrowest scope covering *every* writer.

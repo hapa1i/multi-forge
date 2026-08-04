@@ -290,21 +290,26 @@ files and git history, enabling autonomous improvement.
 ```yaml
 # In session intent
 verification:
-  type: completion_promise    # or: test_suite, custom_command
+  type: completion_promise    # or: test_suite
   promise: "<done>COMPLETE</done>"
   max_iterations: 50          # safety limit
-  on_incomplete: re_inject    # or: warn, allow
+  on_incomplete: block        # or: warn, allow
   re_inject_prompt: |
     Continue working. Output <done>COMPLETE</done> when all requirements met.
 ```
 
 **Verification types:**
 
-| Type                 | Verification method        | Use case          |
-| -------------------- | -------------------------- | ----------------- |
-| `completion_promise` | Look for text in output    | Goal-driven tasks |
-| `test_suite`         | Run tests, check exit code | Code changes      |
-| `custom_command`     | Run any command            | Domain-specific   |
+| Type                 | Verification method                   | Use case          |
+| -------------------- | ------------------------------------- | ----------------- |
+| `completion_promise` | Look for text in output               | Goal-driven tasks |
+| `test_suite`         | Run fixed `uv run pytest`, check exit | Code changes      |
+
+`test_suite` is an explicit blocking Stop mode and the sole exception to the ordinary under-100-ms synchronous budget.
+It invokes the fixed argv `uv run pytest` without a shell in the hook's working directory, inherits the session
+environment, captures output, and defaults to a 300-second timeout. Forge does not support an arbitrary-command
+verification type. `block` is the stored `on_incomplete` value that emits reinjection guidance; `re_inject` is not a
+separate mode.
 
 **Completion promise correctness:**
 

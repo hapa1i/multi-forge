@@ -25,6 +25,25 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-04
+
+### Repository maintenance decision wave
+
+**Goal**: Resolve the four design gates from the combined whole-repository review before behavior changes or cleanup
+deletions enter implementation.
+
+**Key changes**:
+
+- Approved the Stop verification latency/schema contract, manifest-owned missing-worktree liveness, global downstream
+  retention ownership, and evidence-based deletion compatibility rubric.
+- Corrected the shipped verification documentation, added the deletion-evidence standard, admitted U002/U003 with
+  severity, and preserved design docs as shipped truth for DG2/DG3 until their code changes land.
+- Created 13 accepted implementation members, moved DG1–DG4 to `done/`, and kept the repository-maintenance epic active
+  for later execution waves.
+
+**Verification**: `make pre-commit-md` and `git diff --check` passed; board links and lane references were checked after
+the moves.
+
 ## 2026-08-03
 
 ### Git-derived workspace worktree view

@@ -1107,9 +1107,9 @@ performs synchronous capture/verification and then only enqueues deferred work:
 ```
 Stop Pipeline:
 
-  [Sync - blocks exit decision, must be <100ms]
+  [Sync - blocks exit decision, must be <100ms except explicit test_suite wall time]
   1. capture_artifacts()    Copy transcript to .forge/artifacts/ (idempotent via UUID)
-  2. run_verification()     Check completion promise → returns allow|block
+  2. run_verification()     Check completion promise or fixed test suite → returns allow|block
 
   [Deferred - Stop writes markers; it does not launch a writer]
   3. enqueue stop/index markers
@@ -1123,6 +1123,10 @@ Later eligible Forge CLI startup:
   7. handoff handler launches detached `forge memory-writer run` and returns
   8. detached writer scans passports and synthesizes updates
 ```
+
+The under-100-ms budget covers Forge-owned work, including verification dispatch and result persistence. A session that
+explicitly selects `test_suite` asks Stop to synchronously run the fixed `uv run pytest` subprocess, so only that
+external process's bounded wall time is excluded from the budget. No user-configurable command is executed at Stop.
 
 The memory writer runs asynchronously in a detached process after a later, non-exempt Forge CLI startup drains the
 handoff marker. Memory doc updates are eventually consistent; this is acceptable because they benefit future sessions,
@@ -1141,8 +1145,8 @@ shadow marker when pending shadow candidates exist. A later eligible CLI startup
 the detached writer; the Stop hook never spawns it. See §3.13 (Async Work Queue) for the queue contract, schema, and
 processing model.
 
-This keeps the Stop hook fast (\<100ms) while arranging memory-writer work and indexing after subsequent eligible CLI
-activity.
+This keeps the ordinary Stop hook fast (\<100ms) while arranging memory-writer work and indexing after subsequent
+eligible CLI activity; the explicitly selected blocking test-suite mode is the named exception above.
 
 Design rule: hooks emit machine-readable JSON; no `systemMessage` required (the memory writer replaces manual
 reminders).
