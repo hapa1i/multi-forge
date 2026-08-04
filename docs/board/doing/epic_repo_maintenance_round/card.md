@@ -1,7 +1,8 @@
 # Epic: Repository maintenance round
 
-**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-decision-wave work is active on `docs/repo-maintenance-decisions`.
+**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
+1 policy/supervision coordination is active on `docs/policy-supervision-wave-1`; member implementation remains on
+separate execution branches.
 
 ## Goal
 
@@ -56,8 +57,14 @@ Normative design documents move with shipped behavior, not ahead of it.
 
 ## Accepted Implementation Members
 
+Wave 1 is coordinated by [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md), which
+owns the shared external data and edit-identity contracts without collapsing its implementation members.
+
 | Wave | Findings        | Member                                                                                                |
 | ---- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| 1    | D001            | [`preserve_policy_intent_on_enable`](../../todo/preserve_policy_intent_on_enable/card.md)             |
+| 1    | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../todo/harden_supervisor_verdict_boundary/card.md)         |
+| 1    | D005            | [`preserve_supervisor_edit_identity`](../../todo/preserve_supervisor_edit_identity/card.md)           |
 | 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md)             |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)             |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                         |

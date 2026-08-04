@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: decision wave complete; prepare Wave 1 policy/supervision members and CRITICAL/HIGH reproductions.
+Current focus: Wave 1 evidence and member boundaries are complete; start D001 on its own execution branch.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -10,8 +10,10 @@ Current focus: decision wave complete; prepare Wave 1 policy/supervision members
 - [x] Run documentation and board-consistency checks.
 - [x] Obtain human approval of the decision set (2026-08-04).
 - [x] Create accepted implementation members and close the four decision cards.
-- [ ] Convert Wave 1 policy/supervision findings into independently shippable member cards.
-- [ ] Recheck and reproduce each CRITICAL/HIGH finding before its implementation member starts.
-- [ ] Sequence accepted members without starting parked `todo/` work implicitly.
+- [x] Convert Wave 1 policy/supervision findings into independently shippable member cards.
+- [x] Recheck and reproduce Wave 1 D001–D005 and the related O028 parser subset.
+- [x] Sequence Wave 1 members without starting parked `todo/` work implicitly.
+- [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
+- [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 
 The epic remains in `doing/` after the decision cards close; later execution waves remain outstanding.
