@@ -4,7 +4,7 @@
 
 **Finding**: D001 (CRITICAL) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 1 implementation work; execute first.
+**Lane**: `done/` -- implemented and verified on `fix/preserve-policy-intent-on-enable` as the first Wave 1 member.
 
 ## Goal
 
@@ -29,7 +29,8 @@ fields. If no policy intent exists, the command may create one with normal defau
 ## Scope
 
 - Correct the terminal CLI's durable-intent mutation.
-- Add a regression fixture containing non-default `SupervisorConfig` and `TeamSupervisorConfig` values.
+- Add a marked `tests/regression/test_bug_d001_policy_enable_supervisor_loss.py` fixture containing non-default
+  `SupervisorConfig` and `TeamSupervisorConfig` values.
 - Preserve current bundle validation, target compatibility checks, hook-install warning, output, and disable behavior.
 
 ## Acceptance Criteria
@@ -48,7 +49,14 @@ ownership planes.
 
 ## Verification
 
-- Extend `tests/src/cli/test_policy_enable.py` with preservation and no-prior-intent regressions.
-- Run the focused policy CLI/session tests and
-  `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`.
-- Run `make pre-commit`.
+- `uv run pytest -q tests/src/cli/test_policy_enable.py`: 6 passed.
+- Focused policy and hook unit suite: 252 passed.
+- `make test-regression`: 595 passed, including the dedicated D001 silent-loss reproduction.
+- `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`: 21 passed.
+- `make pre-commit`: passed.
+
+## Outcome
+
+Terminal enable now creates a policy intent only when one is absent, then updates the four bundle-owned fields in place.
+Existing semantic and team supervisor configuration therefore survives re-enablement. No manifest migration, CLI change,
+or `%policy` override change was required.

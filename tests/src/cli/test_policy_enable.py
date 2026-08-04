@@ -8,7 +8,9 @@ from click.testing import CliRunner
 from pytest import MonkeyPatch, fixture
 
 from forge.cli.main import main
+from forge.policy.team.config import TeamSupervisorConfig
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.models import PolicyIntent, SupervisorConfig
 
 
 @fixture
@@ -44,7 +46,7 @@ class TestEnableRequiresBundle:
         assert "coding_standards" in result.output
 
 
-class TestPolicyTargetCompatibility:
+class TestPolicyEnable:
     @staticmethod
     def _seed_target(tmp_path: Path, monkeypatch: MonkeyPatch) -> tuple[Path, Path, SessionStore]:
         caller = tmp_path / "caller"
@@ -97,3 +99,84 @@ class TestPolicyTargetCompatibility:
         policy = store.read().intent.policy
         assert policy is not None
         assert policy.enabled is True
+
+    def test_enable_preserves_supervisor_intent_while_replacing_bundle_fields(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, store = self._seed_target(tmp_path, monkeypatch)
+        supervisor = SupervisorConfig(
+            resume_id="planner",
+            direct=True,
+            timeout_seconds=17,
+            throttle_seconds=9,
+            suspended=True,
+            checker_effort="xhigh",
+            supervisor_effort="max",
+            shadow_sample_rate=0.25,
+            shadow_max_per_session=7,
+            shadow_seed="preserve-me",
+        )
+        team_supervisor = TeamSupervisorConfig(
+            enabled=True,
+            resume_id="team-planner",
+            direct=True,
+            timeout_seconds=19,
+            throttle_seconds=11,
+            max_blocks_per_task=5,
+            effort="high",
+        )
+        state = store.read()
+        state.intent.policy = PolicyIntent(
+            enabled=False,
+            fail_mode="open",
+            bundles=["coding_standards"],
+            bundle_config={"coding_standards": {"legacy": True}},
+            supervisor=supervisor,
+            team_supervisor=team_supervisor,
+        )
+        store.write(state)
+
+        result = runner.invoke(
+            main,
+            [
+                "policy",
+                "enable",
+                "--bundle",
+                "tdd",
+                "--fail-mode",
+                "closed",
+                "--permissive",
+                "--session",
+                "worker",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        policy = store.read().intent.policy
+        assert policy is not None
+        assert policy.enabled is True
+        assert policy.fail_mode == "closed"
+        assert policy.bundles == ["tdd"]
+        assert policy.bundle_config == {"tdd": {"strict": False}}
+        assert policy.supervisor == supervisor
+        assert policy.team_supervisor == team_supervisor
+
+    def test_enable_creates_policy_intent_when_absent(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        _caller, _target, store = self._seed_target(tmp_path, monkeypatch)
+        state = store.read()
+        state.intent.policy = None
+        store.write(state)
+
+        result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd", "--session", "worker"])
+
+        assert result.exit_code == 0, result.output
+        policy = store.read().intent.policy
+        assert policy is not None
+        assert policy.enabled is True
+        assert policy.fail_mode == "open"
+        assert policy.bundles == ["tdd"]
+        assert policy.bundle_config == {}
+        assert policy.supervisor is None
+        assert policy.team_supervisor is None
