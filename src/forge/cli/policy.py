@@ -309,12 +309,13 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         if not isinstance(m, SessionState):
             raise TypeError(f"Expected SessionState, got {type(m)}")
 
-        m.intent.policy = PolicyIntent(
-            enabled=True,
-            fail_mode=fail_mode,  # type: ignore[arg-type]  # click Choice returns str, not Literal
-            bundles=list(bundles),
-            bundle_config=bundle_config,
-        )
+        if m.intent.policy is None:
+            m.intent.policy = PolicyIntent()
+
+        m.intent.policy.enabled = True
+        m.intent.policy.fail_mode = fail_mode  # type: ignore[assignment]  # click Choice returns str, not Literal
+        m.intent.policy.bundles = list(bundles)
+        m.intent.policy.bundle_config = bundle_config
 
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)

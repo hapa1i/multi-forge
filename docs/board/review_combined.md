@@ -191,6 +191,13 @@ it did not represent the current code as fixed.
 | D043 | LOW      | F5    | design.md §2/§6 list a `src/forge/status/` component that does not exist (status lives in `cli/status_line.py` + `cli/statusline/`).                                                                                                                                                                                                                                                                                                                                                                     | design.md §2, §6                                         | filesystem                                                                                              |
 | D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
 
+### Implementation Outcomes
+
+- **D001 — resolved 2026-08-04:** terminal `forge policy enable` updates only bundle-owned policy-intent fields and
+  preserves semantic and team supervisor configuration. A dedicated marked regression reproduces the original silent
+  loss; focused unit coverage also covers creation when policy intent is absent. See
+  [`preserve_policy_intent_on_enable`](done/preserve_policy_intent_on_enable/card.md).
+
 ## Design Status and Post-Review Admissions
 
 This section preserves the merge audit's design-status notes. Deferred items remain design status rather than defects;

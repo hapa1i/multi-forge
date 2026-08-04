@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 1 evidence and member boundaries are complete; start D001 on its own execution branch.
+Current focus: review and merge completed Wave 1 member D001 before starting either remaining policy member.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.

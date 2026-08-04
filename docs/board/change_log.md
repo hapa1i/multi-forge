@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-04
 
+### Preserve policy intent on enable
+
+**Goal**: Prevent terminal bundle re-enablement from silently deleting session-owned semantic and team supervisor
+configuration.
+
+**Key changes**:
+
+- Changed `forge policy enable` to update only its four bundle-owned fields on the existing policy intent, creating a
+  default intent only when none exists.
+- Added regressions for preserving non-default supervisor configurations, replacing requested bundle fields, and the
+  absent-policy path; `%policy` override ownership remains unchanged.
+
+**Verification**: Focused policy and hook unit suite passed (252); full regression suite passed (595); Docker
+policy-hook integration passed (21); `make pre-commit` passed.
+
 ### Repository maintenance decision wave
 
 **Goal**: Resolve the four design gates from the combined whole-repository review before behavior changes or cleanup
