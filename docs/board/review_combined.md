@@ -199,7 +199,8 @@ it did not represent the current code as fixed.
   [`preserve_policy_intent_on_enable`](done/preserve_policy_intent_on_enable/card.md).
 - **D002–D004 and O028 — resolved 2026-08-04:** semantic supervisor verdict parsing now degrades malformed confidence,
   violation entries, and citations without denying or raising, while unknown verdict literals remain visible fail-open
-  parse failures rather than cacheable aligned results. Dedicated marked regressions cover each finding. See
+  parse failures rather than cacheable aligned results. Restored throttle state also accepts only the clean aligned
+  cache-write shape; invalid entries re-evaluate. Dedicated marked regressions cover each finding. See
   [`harden_supervisor_verdict_boundary`](done/harden_supervisor_verdict_boundary/card.md).
 
 ## Design Status and Post-Review Admissions

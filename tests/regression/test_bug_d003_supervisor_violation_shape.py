@@ -49,9 +49,7 @@ def test_non_mapping_violation_cannot_become_policy_error_denial(
     mock_run: Any, fail_mode: Literal["open", "closed"]
 ) -> None:
     mock_run.return_value = SessionResult(stdout=_response(["bad"]), stderr="", returncode=0)
-    policy = SemanticSupervisorPolicy(
-        SupervisorConfig(resume_id=_SUPERVISOR_UUID, direct=True, throttle_seconds=0)
-    )
+    policy = SemanticSupervisorPolicy(SupervisorConfig(resume_id=_SUPERVISOR_UUID, direct=True, throttle_seconds=0))
     engine = PolicyEngine(policies=[policy], fail_mode=fail_mode)
 
     result = engine.evaluate(_context())

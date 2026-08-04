@@ -14,11 +14,16 @@ from unittest.mock import patch
 import pytest
 
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.reactive.throttle import compute_cache_key
+from forge.core.state import now_iso
 from forge.policy.engine import PolicyEngine
 from forge.policy.semantic.shadow_runner import STATUS_ERROR, classify_shadow
-from forge.policy.semantic.supervisor import SemanticSupervisorPolicy, run_supervisor_check
+from forge.policy.semantic.supervisor import (
+    SemanticSupervisorPolicy,
+    run_supervisor_check,
+)
 from forge.policy.semantic.verdict import parse_supervisor_verdict_with_status
-from forge.policy.types import ActionContext
+from forge.policy.types import ActionContext, PolicyDecision
 from forge.session.models import SupervisorConfig
 
 pytestmark = pytest.mark.regression
@@ -95,3 +100,32 @@ def test_unknown_verdict_is_not_cached_and_emits_fail_open_telemetry(mock_run: A
     assert mock_record.call_count == 2
     assert all(call.kwargs["status"] == "fail_open" for call in mock_record.call_args_list)
     assert all(call.kwargs["reason_code"] == "parse_failure" for call in mock_record.call_args_list)
+
+
+@patch("forge.policy.semantic.supervisor.invoke_supervisor")
+def test_unknown_restored_cache_verdict_is_a_miss(mock_invoke: Any) -> None:
+    context = _context()
+    cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
+    policy = SemanticSupervisorPolicy(_config())
+    policy.set_state(
+        {
+            "cache": {
+                cache_key: {
+                    "checked_at": now_iso(),
+                    "verdict": "DIVERGENT",
+                    "confidence": 0.95,
+                }
+            }
+        }
+    )
+    mock_invoke.return_value = PolicyDecision(
+        decision="warn",
+        policy_id="semantic.supervisor",
+        warnings=["Fresh supervisor result"],
+    )
+
+    result = policy.evaluate(context)
+
+    assert result.decision == "warn"
+    assert result.cached is False
+    mock_invoke.assert_called_once()

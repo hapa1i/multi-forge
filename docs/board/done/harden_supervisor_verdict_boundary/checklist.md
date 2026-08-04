@@ -1,6 +1,6 @@
 # Harden supervisor verdict boundary checklist
 
-Current focus: implementation and verification are complete; the active epic owns review and merge before D005 starts.
+Current focus: review feedback and verification are complete; the active epic owns review and merge before D005 starts.
 
 ## Evidence and Regression
 
@@ -18,6 +18,7 @@ Current focus: implementation and verification are complete; the active epic own
 - [x] Use normalized citations for both stored violations and the semantic block predicate.
 - [x] Preserve unknown and case-mismatched verdicts as visible parse failures through enforcement, cache, telemetry, and
   shadow classification.
+- [x] Treat restored cache entries outside the clean aligned/`1.0` write shape as misses that re-evaluate.
 - [x] Preserve valid aligned, cited divergent, uncited divergent, and mixed-violation decisions.
 - [x] Keep workflow/team schemas, the confidence threshold, and deterministic policy semantics unchanged.
 
@@ -32,12 +33,13 @@ Current focus: implementation and verification are complete; the active epic own
 
 ## Verification and Closeout
 
-- [x] Run focused semantic verdict, engine, supervisor, shadow, workflow-stage, and team-handler tests (`314 passed`).
+- [x] Run focused semantic verdict, engine, supervisor, shadow, workflow-stage, and team-handler tests (`321 passed`).
 - [x] Run Claude and Codex policy-hook adapter tests (`47 passed`).
-- [x] Run `make test-regression` (`631 passed`).
-- [x] Run `make test-unit` (`8,695 passed, 1 skipped, 118 deselected`).
+- [x] Run the existing D001 marked regression directly (`1 passed`).
+- [x] Run `make test-regression` (`632 passed`).
+- [x] Run `make test-unit` (`8,702 passed, 1 skipped, 118 deselected`).
 - [x] Run `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` (`21 passed`).
-- [x] Run `make pre-commit`.
+- [x] Run `make pre-commit` after review follow-up.
 - [x] Confirm the implementation restores the existing design contract without a normative or end-user doc change.
 - [x] Record the outcome in the review ledger and `docs/board/change_log.md`.
 - [x] Move the member to `done/`, repoint inbound links, and record final verification.

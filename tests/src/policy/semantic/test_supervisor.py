@@ -19,6 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.reactive.throttle import compute_cache_key
+from forge.core.state import now_iso
 from forge.policy.engine import build_engine
 from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
 from forge.policy.semantic.verdict import verdict_to_decision
@@ -169,19 +171,55 @@ class TestSupervisorEvaluate:
         assert len(result.warnings) > 0
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
-    def test_clean_allow_is_cached(self, mock_invoke: MagicMock) -> None:
-        """Clean allows (no warnings) should be cached."""
+    def test_clean_allow_round_trip_is_cached(self, mock_invoke: MagicMock) -> None:
+        """The exact clean-allow write shape remains a hit after state restoration."""
         mock_invoke.return_value = _allow_decision()
         policy = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
 
-        # First call: cache miss, invokes supervisor
         policy.evaluate(_make_context())
         assert mock_invoke.call_count == 1
 
-        # Second call: cache hit, no invocation
-        result = policy.evaluate(_make_context())
+        restored = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
+        restored.set_state(policy.get_state())
+        result = restored.evaluate(_make_context())
+
         assert mock_invoke.call_count == 1
         assert result.cached is True
+
+    @pytest.mark.parametrize(
+        "cache_values",
+        [
+            {},
+            {"verdict": "DIVERGENT", "confidence": 1.0},
+            {"verdict": "divergent", "confidence": 1.0},
+            {"verdict": "aligned"},
+            {"verdict": "aligned", "confidence": "1.0"},
+            {"verdict": "aligned", "confidence": True},
+            {"verdict": "aligned", "confidence": 0.9},
+        ],
+        ids=[
+            "missing-fields",
+            "unknown-verdict",
+            "non-allow-verdict",
+            "missing-confidence",
+            "string-confidence",
+            "boolean-confidence",
+            "non-write-confidence",
+        ],
+    )
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
+    def test_invalid_restored_cache_entry_is_a_miss(self, mock_invoke: MagicMock, cache_values: dict[str, Any]) -> None:
+        context = _make_context()
+        cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
+        policy = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
+        policy.set_state({"cache": {cache_key: {"checked_at": now_iso(), **cache_values}}})
+        mock_invoke.return_value = _warn_decision("Fresh supervisor result")
+
+        result = policy.evaluate(context)
+
+        assert result.decision == "warn"
+        assert result.cached is False
+        mock_invoke.assert_called_once()
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_warn_outcome_not_cached(self, mock_invoke: MagicMock) -> None:

@@ -66,6 +66,10 @@ filters malformed violation elements, and uses one normalized citation value for
 The existing parsed-status propagation makes these failures visible to enforcement, telemetry, caching, and shadow
 classification without changing deterministic fail-mode behavior or the workflow/team schemas.
 
+Restored throttle entries are cache hits only when they match the supervisor's clean-allow write shape: exact `aligned`
+verdict plus numeric `1.0` confidence. Missing, malformed, unknown, or divergent entries are treated as misses and
+re-evaluated instead of being coerced into cached allows.
+
 One marked regression module per admitted finding records the root cause and verifies malformed and valid controls. The
 shipped contract in `docs/design_workflows.md` already specifies the corrected behavior, so no normative design or
 end-user documentation change was required.
@@ -73,10 +77,12 @@ end-user documentation change was required.
 ## Verification
 
 - Pre-fix execution of the four new regression modules: `24 failed, 10 passed`, reproducing D002–D004 and O028.
-- Verdict unit tests plus the four regression modules: `64 passed`.
-- Focused semantic supervisor, policy engine, shadow, workflow-stage, and team-handler tests: `314 passed`.
+- Pre-fix restored-cache follow-up: `8 failed`, covering the O028 regression and seven invalid cache shapes.
+- Verdict unit tests plus the four regression modules: `65 passed`.
+- Focused semantic supervisor, policy engine, shadow, workflow-stage, and team-handler tests: `321 passed`.
 - Claude and Codex policy-hook adapter tests: `47 passed`.
-- `make test-regression`: `631 passed`.
-- `make test-unit`: `8,695 passed, 1 skipped, 118 deselected`.
+- Existing D001 marked regression, run directly: `1 passed`.
+- `make test-regression`: `632 passed`.
+- `make test-unit`: `8,702 passed, 1 skipped, 118 deselected`.
 - `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`: `21 passed`.
-- `make pre-commit`: passed.
+- `make pre-commit`: passed after the review follow-up.

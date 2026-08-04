@@ -13,7 +13,10 @@ from typing import Any
 
 import pytest
 
-from forge.policy.semantic.verdict import parse_supervisor_verdict_with_status, verdict_to_decision
+from forge.policy.semantic.verdict import (
+    parse_supervisor_verdict_with_status,
+    verdict_to_decision,
+)
 
 pytestmark = pytest.mark.regression
 
