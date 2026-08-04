@@ -35,15 +35,15 @@ sequencing and disposition; this report remains the evidence ledger.
 
 ### Finding fields
 
-| Field            | Meaning                                                                                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ID`             | Stable reference within this review: `D###` for design-conformance findings, `O###` for other code findings, `U###` for unranked design drift |
-| `Sev`            | Triage impact, not execution order                                                                                                            |
-| `Src`            | Discovery provenance: `F5`, `O5`, or independent agreement `F5+O5`                                                                            |
-| `(unverified)`   | Agent-reported claim not independently confirmed; ineligible for implementation                                                               |
-| `(adjusted)`     | Original claim was corrected before inclusion                                                                                                 |
-| `partial`        | Only the stated subset is supported; scope must be resolved before implementation                                                             |
-| source-confirmed | The cited implementation shape was inspected; runtime impact may still need reproduction                                                      |
+| Field            | Meaning                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ID`             | Stable reference within this review: `D###` for design-conformance findings, `O###` for other code findings, `U###` for design-drift notes numbered outside the original D/O tables; unranked until a decision gate admits them |
+| `Sev`            | Triage impact, not execution order                                                                                                                                                                                              |
+| `Src`            | Discovery provenance: `F5`, `O5`, or independent agreement `F5+O5`                                                                                                                                                              |
+| `(unverified)`   | Agent-reported claim not independently confirmed; ineligible for implementation                                                                                                                                                 |
+| `(adjusted)`     | Original claim was corrected before inclusion                                                                                                                                                                                   |
+| `partial`        | Only the stated subset is supported; scope must be resolved before implementation                                                                                                                                               |
+| source-confirmed | The cited implementation shape was inspected; runtime impact may still need reproduction                                                                                                                                        |
 
 ### Severity rubric
 
