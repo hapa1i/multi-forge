@@ -48,7 +48,7 @@ Verification performed during triage:
 | Order | Findings        | Member                                                                                        | Review boundary                                                 |
 | ----- | --------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | 1     | D001            | [`preserve_policy_intent_on_enable`](../../done/preserve_policy_intent_on_enable/card.md)     | Session-intent mutation and CLI regression only                 |
-| 2     | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../todo/harden_supervisor_verdict_boundary/card.md) | One external-data parser, converter, telemetry, and shadow seam |
+| 2     | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md) | One external-data parser, converter, telemetry, and shadow seam |
 | 3     | D005            | [`preserve_supervisor_edit_identity`](../../todo/preserve_supervisor_edit_identity/card.md)   | Action normalization, prompts, and cache identity               |
 
 D001 goes first because it is the repository review's sole CRITICAL finding. The remaining members are independent after

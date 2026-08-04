@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge completed Wave 1 member D001 before starting either remaining policy member.
+Current focus: Wave 1 verdict-boundary implementation is complete; review and merge gate D005.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.

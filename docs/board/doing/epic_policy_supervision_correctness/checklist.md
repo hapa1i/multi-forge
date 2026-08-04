@@ -1,6 +1,6 @@
 # Policy and supervision correctness checklist
 
-Current focus: review and merge the completed D001 member before starting either HIGH-severity member.
+Current focus: D002–D004 and O028 implementation is complete; review and merge must finish before D005 starts.
 
 - [x] Recheck D001–D005 and O028 against merged code and normative design.
 - [x] Run isolated executable reproductions for every admitted finding.
@@ -8,8 +8,11 @@ Current focus: review and merge the completed D001 member before starting either
 - [x] Split state preservation, verdict hardening, and edit identity into independent members.
 - [x] Exclude O044 from Wave 1 pending separate bounded-maintenance admission.
 - [x] Move `preserve_policy_intent_on_enable` to `doing/` on its implementation branch.
-- [ ] Review and merge the D001 result before starting either HIGH-severity member.
+- [x] Review and merge the D001 result before starting either HIGH-severity member.
 - [x] Keep parent/member links and sequencing current as D001 moves to `done/`.
+- [x] Move `harden_supervisor_verdict_boundary` to `doing/` on its implementation branch.
+- [x] Complete D002–D004 and O028 with dedicated regressions and move the member to `done/`.
+- [ ] Review and merge the D002–D004 and O028 result before starting D005.
 - [ ] Close only after every live member ships and the review ledger records the outcomes.
 
 ## Member Acceptance Map
