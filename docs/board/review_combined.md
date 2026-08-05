@@ -225,6 +225,11 @@ implementation outcome below records its completed code and regression work.
   regressions and the Docker artifact-hook path cover the contract. This also closes O099's transcript-selector subset;
   its `_FakeResponse` family remains Wave 7 work. See
   [`preserve_transcript_artifact_identity`](done/preserve_transcript_artifact_identity/card.md).
+- **D039 — implementation verified 2026-08-06; pending merge:** sidecar Stop candidate discovery now uses the
+  container-visible `SessionStore` Forge root, while the deferred marker retains the separately translated host worktree
+  and Forge-root paths. A marked regression covers distinct container and host roots, and the Docker sidecar hook test
+  proves that the host drainer resolves the resulting marker. Candidate and marker schemas are unchanged. See
+  [`repair_sidecar_shadow_drain_routing`](doing/repair_sidecar_shadow_drain_routing/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -403,9 +408,9 @@ one card coordinates them.
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
   independent members. O044 remains later bounded-maintenance work because terminal commands own intent while `%policy`
   commands deliberately own overrides.
-- **[Stop/artifact epic](doing/epic_stop_artifact_correctness/card.md):** DG1 and the verification contract are shipped;
-  artifact schema/idempotency (D007, D024) is implemented and verified, while sidecar drain (D039) remains a distinct
-  parked member.
+- **[Stop/artifact epic](doing/epic_stop_artifact_correctness/card.md):** DG1, verification, and artifact
+  schema/idempotency (D007, D024) are shipped; sidecar drain (D039) is implemented and awaiting review and merge as the
+  final distinct member.
 - **Durable-state/session epic:** coordinate D008–D011, D021–D022, O003, O006, and related state readers around
   fault-injection and recovery tests.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the

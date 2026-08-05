@@ -652,7 +652,11 @@ def stop() -> None:
     try:
         from forge.policy.semantic.shadow import has_pending_candidates
 
-        if has_pending_candidates(effective_forge_root, manifest.name):
+        # Candidate discovery runs at the hook boundary and must use the root
+        # visible to this process. In a sidecar, only the deferred marker payload
+        # is translated back to host-resolvable paths for the later host drain.
+        shadow_probe_root = str(store.forge_root)
+        if has_pending_candidates(shadow_probe_root, manifest.name):
             queued_shadow = (
                 enqueue_shadow_marker(
                     session_id=session_id,

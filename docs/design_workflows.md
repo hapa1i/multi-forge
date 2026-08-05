@@ -186,6 +186,9 @@ surface is `forge telemetry activity` (a Shadow line with checked/disagree/pendi
 (the disagreement artifacts with citations), and `forge policy shadow status` (the sample rate plus pending/done counts
 for one session).
 
+In sidecar mode, Stop discovers candidates through the mounted, container-visible Forge root. The queued marker keeps
+the host-resolvable worktree and manifest Forge-root paths because only the later host CLI drains it.
+
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
 - `%policy supervisor off` (suspend, config preserved)

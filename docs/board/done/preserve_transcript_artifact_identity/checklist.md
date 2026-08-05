@@ -1,6 +1,6 @@
 # Preserve transcript artifact identity checklist
 
-Current focus: PR review follow-up is implemented and verified; review and merge before activating D039 sidecar routing.
+Current focus: merged in PR #131 (`3e090ef5`); D039 sidecar routing is now active.
 
 ## Activation and reproduction
 
@@ -42,4 +42,4 @@ Current focus: PR review follow-up is implemented and verified; review and merge
 - [x] Run `make pre-commit` after PR review follow-up.
 - [x] Record the outcome in the review ledger, card, and change log; move the member to `done/` with inbound links
   fixed.
-- [ ] Review and merge this member before activating D039 sidecar routing.
+- [x] Review and merge this member before activating D039 sidecar routing (PR #131, `3e090ef5`).

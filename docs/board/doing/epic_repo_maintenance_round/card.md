@@ -1,7 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- the
-first Wave 2 member shipped in PR #130, and transcript-artifact correctness is implemented and awaiting review.
+first two Wave 2 members shipped in PRs #130–#131, and the final sidecar-routing member is implemented and awaiting
+review and merge.
 
 ## Goal
 
@@ -62,7 +63,8 @@ post-close D005 parser defect was corrected by
 [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) and
 merged in PR #129 (`5813994c`). Wave 2 is coordinated by the active
 [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md); its verification member shipped in PR
-#130 (`fee562ab`), transcript-artifact work is implemented and awaiting review, and the sidecar member remains parked.
+#130 (`fee562ab`), transcript-artifact work shipped in PR #131 (`3e090ef5`), and the sidecar member is implemented and
+awaiting review and merge.
 
 | Wave | Findings        | Member                                                                                                          |
 | ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -72,7 +74,7 @@ merged in PR #129 (`5813994c`). Wave 2 is coordinated by the active
 | 1C   | D005            | [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) |
 | 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)                       |
 | 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md)             |
-| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)                 |
+| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../repair_sidecar_shadow_drain_routing/card.md)                         |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                       |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                   |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                   |
