@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-05
 
+### Preserve transcript artifact identity
+
+**Goal**: Keep transcript artifacts idempotent and schema-safe across Stop, rollover, adoption, and PreCompact.
+
+**Key changes**:
+
+- Reconciled canonical `(session_id, copied_path)` records through one session-layer writer without deleting distinct
+  identities or replacing malformed durable state.
+- Moved new PreCompact metadata exclusively to its compaction collection and added lazy migration for the recognized
+  legacy mixed-list shape.
+- Shared strict latest-canonical selection across manager derivation, transfer assembly, and both full-strategy budget
+  preflights, with marked D007/D024 regressions and Docker hook coverage.
+
+**Verification**: Focused transcript/session suites passed (309); full regression suite passed (655); `make test-unit`
+passed (8,732 passed, 1 pre-existing platform skip); Docker artifact-hook integration passed (12); `make pre-commit`
+passed after formatter updates.
+
 ### Align Stop verification contract
 
 **Goal**: Enforce the approved two-type Stop-verification schema without silent success or infrastructure-induced

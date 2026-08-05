@@ -28,6 +28,7 @@ from forge.session.hooks import (
     parse_hook_input,
     resolve_session_name,
 )
+from forge.session.hooks.session_start import _capture_transcript_rollover
 
 
 def _hold_lock(lock_path: str, hold_s: float) -> None:
@@ -416,6 +417,34 @@ class TestHandleSessionStart:
             temp_worktree / ".forge" / "artifacts" / "test-session" / "transcripts" / "original-uuid-123.jsonl"
         )
         assert rollover_copy.exists()
+
+    def test_repeated_rollover_reuses_identity_without_replacing_successful_provenance(
+        self, temp_worktree: Path, sample_manifest: None
+    ) -> None:
+        previous_transcript = temp_worktree / "previous.jsonl"
+        previous_transcript.write_text("first\n", encoding="utf-8")
+
+        _capture_transcript_rollover(
+            cwd=temp_worktree,
+            session_name="test-session",
+            forge_root=str(temp_worktree),
+            previous_session_id="original-uuid-123",
+            previous_transcript_path=str(previous_transcript),
+        )
+        previous_transcript.write_text("second\n", encoding="utf-8")
+        _capture_transcript_rollover(
+            cwd=temp_worktree,
+            session_name="test-session",
+            forge_root=str(temp_worktree),
+            previous_session_id="original-uuid-123",
+            previous_transcript_path=str(previous_transcript),
+        )
+
+        entries = SessionStore(str(temp_worktree), "test-session").read().confirmed.artifacts["transcripts"]
+        assert len(entries) == 1
+        assert entries[0]["copied"] is True
+        copied_path = temp_worktree / entries[0]["copied_path"]
+        assert copied_path.read_text(encoding="utf-8") == "first\n"
 
     def _seed_supervisor_degrade(self, store: SessionStore) -> None:
         """Seed a sticky codex degrade marker into the manifest (under the store lock)."""

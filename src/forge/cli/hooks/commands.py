@@ -40,6 +40,8 @@ from forge.install.project_compat import (
 )
 from forge.session.artifacts import (
     get_artifact_paths,
+    migrate_legacy_transcript_snapshots,
+    reconcile_transcript_artifact,
     safe_copy_file,
     snapshot_plan_approved,
 )
@@ -167,11 +169,9 @@ def _capture_transcript_artifact(
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
 
-            artifacts = m.confirmed.artifacts
-            _append_artifact_entry(
-                artifacts,
-                kind="transcripts",
-                entry={
+            reconcile_transcript_artifact(
+                m,
+                {
                     "captured_at": now_iso(),
                     "reason": reason,
                     "source_path": transcript_path,
@@ -179,6 +179,7 @@ def _capture_transcript_artifact(
                     "copied_path": str(dst_rel),
                     "copied": copied,
                 },
+                refresh_existing=copied,
             )
 
             m.confirmed.claude_session_id = session_id
@@ -883,19 +884,9 @@ def pre_compact() -> None:
             if m.confirmed.compaction is None:
                 m.confirmed.compaction = CompactionConfirmed()
 
+            migrate_legacy_transcript_snapshots(m)
             m.confirmed.compaction.compact_count += 1
 
-            _append_artifact_entry(
-                m.confirmed.artifacts,
-                kind="transcripts",
-                entry={
-                    "captured_at": now_iso(),
-                    "reason": "pre-compact",
-                    "source_path": transcript_path,
-                    "snapshot_path": str(dst_rel),
-                    "copied": copied,
-                },
-            )
             m.confirmed.compaction.transcript_snapshots.append(
                 {
                     "captured_at": now_iso(),

@@ -5,7 +5,8 @@
 **Findings**: D007 (HIGH) and D024 (MEDIUM) in
 [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 2 implementation work, parked.
+**Lane**: `done/` -- implemented and verified on `fix/preserve-transcript-artifact-identity` as the second Wave 2
+member.
 
 ## Goal
 
@@ -23,11 +24,16 @@ state instead of clobbering it, and prevent PreCompact snapshots from hiding the
 
 ## Evidence
 
-Rechecked on merged `main` at `86fa53da`:
+Rechecked on the execution-branch base `fee562ab` because the preceding Stop-verification member changed the Stop hook.
+The two retained regression modules failed in six cases before implementation: repeated Stop produced duplicate records,
+a mapping-valued transcript field was clobbered, new PreCompact polluted the canonical list, native derivation/transfer
+lost the canonical tail, and both manager and CLI full-strategy budget preflights were bypassed.
 
 - `src/forge/cli/hooks/commands.py:157-177` appends a new Stop record after every UUID-named artifact refresh.
 - `src/forge/cli/hooks/_helpers.py:131-149` has no identity check and replaces a non-list field; the same append/clobber
   implementation is duplicated at `src/forge/session/hooks/session_start.py:481-497`.
+- `src/forge/core/ops/session_adopt.py` contains a third canonical writer with the same append/clobber behavior, so
+  leaving adoption outside the shared write seam would preserve the durable-state defect.
 - An executable characterization appended one identical `session_id`/`copied_path` record twice and observed two equal
   entries; a mapping-valued `transcripts` field was discarded and replaced by the new entry.
 - `src/forge/cli/hooks/commands.py:870-880` writes `snapshot_path`-only PreCompact records into `transcripts`, while
@@ -86,8 +92,25 @@ Rechecked on merged `main` at `86fa53da`:
   treat unrelated malformed entries as the same legacy shape.
 - Preserve artifact files, `captured_at`/reason provenance, forge-root-relative paths, rollover behavior, and shared
   transcript deletion safeguards.
-- Sharing the selector is a D024 drift-control requirement, not an independent admission or disposition of compound
-  O099; its `_FakeResponse` family and final ledger disposition remain Wave 7 work.
+- Sharing the selector is a D024 drift-control requirement that closes only O099's transcript-selector subset; its
+  `_FakeResponse` family and final ledger disposition remain Wave 7 work.
 - Do not redesign plan artifacts, transcript retention, or resume strategies. In particular, replacing the existing
   artifact-list lookup in the two budget preflights does not expand them to D023's other transcript sources; D023
   remains a separate finding.
+
+## Verification
+
+- The two marked D007/D024 regression modules failed in six cases on `fee562ab`, then passed after implementation.
+- Focused session, hook, adoption, transfer, and fork suites passed (309 tests).
+- `./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py`: 12 passed.
+- `make test-regression`: 655 passed.
+- `make test-unit`: 8,732 passed, 1 pre-existing platform-conditional skip, 118 deselected.
+- `make pre-commit`: passed after formatter updates; the final run was clean.
+
+## Outcome
+
+Stop, SessionStart rollover, and adoption now share one canonical `(session_id, copied_path)` reconciliation seam.
+Repeated writes collapse only the matching identity, distinct records survive, and malformed transcript state is
+surfaced without being replaced. PreCompact writes only to its dedicated snapshot collection and lazily migrates its
+recognized legacy mixed-list shape. Manager derivation, transfer assembly, and both full-strategy budget preflights now
+share one strict latest-canonical selector; D023's broader source-resolution behavior remains deferred.

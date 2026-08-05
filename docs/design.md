@@ -831,6 +831,9 @@ Notes:
   - `/compact` or `/clear` rollover (captured by `SessionStart` with `source=compact|clear` before overwriting
     `confirmed.transcript_path`)
 - Destination filename is `{session_id}.jsonl` (idempotent per Claude session UUID).
+- Canonical manifest identity is the pair `(session_id, copied_path)`. Stop refreshes that record after overwriting the
+  UUID-named copy; rollover retains an existing successful record when its idempotent copy is skipped. Repeated writes
+  reconcile duplicates for that identity without deleting distinct transcript records.
 
 **Session file fields (hook-owned, additive):**
 
@@ -838,7 +841,16 @@ Notes:
 - `confirmed.artifacts.plans[]`: entries like:
   - `{ kind: "approved", captured_at, source_path, snapshot_path }`
 - `confirmed.artifacts.transcripts[]`: entries like:
-  - `{ captured_at, reason: "stop"|"compact"|"clear", source_path, session_id, copied_path, copied }`
+  - `{ captured_at, reason: "stop"|"stop-failure"|"rollover"|"adopt", source_path, session_id, copied_path, copied }`
+- `confirmed.compaction.transcript_snapshots[]`: PreCompact-only entries like:
+  - `{ captured_at, reason: "pre-compact", source_path, snapshot_path, copied }`
+
+The canonical transcript list is validated at its shared session-layer write and latest-read seams. A non-list field or
+an unrelated malformed entry is surfaced rather than clobbered or skipped. Readers explicitly tolerate older
+`copied_path`-only records and the known legacy shape where PreCompact also appended a `snapshot_path` record to the
+canonical list; the latter emits a compatibility diagnostic and is moved to the compaction collection on the next
+transcript-related write. Manager derivation, transfer assembly, and both full-strategy budget preflights use the same
+latest-canonical-record selector, so a trailing legacy snapshot cannot hide the resumable transcript.
 
 ### 3.9 Session Resume (context management)
 
@@ -1087,8 +1099,9 @@ a genuine duplicate trigger; both may appear.
 - `forge hook plan-write` (PostToolUse:Write): Updates `confirmed.latest_plan_path` for plan files.
 - `forge hook exit-plan-mode` (PreToolUse:ExitPlanMode): Snapshots approved plan to artifacts.
 - `forge hook stop` (Stop:\*): Runs the Stop pipeline (see below).
-- `forge hook pre-compact` (PreCompact): Captures full transcript before compaction to artifacts. Canonical compaction
-  snapshot; SessionStart rollover is fallback for `/clear` and defense-in-depth.
+- `forge hook pre-compact` (PreCompact): Captures the full transcript before compaction and records it only under
+  `confirmed.compaction.transcript_snapshots`. This is the canonical compaction snapshot; SessionStart rollover is
+  fallback for `/clear` and defense-in-depth.
 - `forge hook post-compact` (PostCompact): Records compaction metadata (`last_compact_at`, `last_compact_type`).
 - `forge hook worktree-create` (WorktreeCreate): Replaces Claude Code's default `git worktree add` to auto-install Forge
   extensions. It strict-checks the source Forge root before creating a checkout, maps a nested source root to the same
@@ -1108,7 +1121,7 @@ performs synchronous capture/verification and then only enqueues deferred work:
 Stop Pipeline:
 
   [Sync - blocks exit decision, must be <100ms except explicit test_suite wall time]
-  1. capture_artifacts()    Copy transcript to .forge/artifacts/ (idempotent via UUID)
+   1. capture_artifacts()    Copy transcript and reconcile its canonical record (idempotent via UUID)
   2. run_verification()     Classify completion promise or fixed test suite result
   3. apply_verification()   Apply block|warn|allow posture → returns allow|block
 

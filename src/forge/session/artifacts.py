@@ -17,8 +17,11 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .claude.paths import find_project_root
+from .exceptions import TranscriptArtifactStateError
+from .models import CompactionConfirmed, SessionState
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +30,10 @@ logger = logging.getLogger(__name__)
 # writing op (`core.ops.session_adopt`) because `session.manager` reads it during
 # deletion, and the session layer cannot import from core.ops.
 ADOPT_ARTIFACT_REASON = "adopt"
+
+_CANONICAL_TRANSCRIPT = "canonical"
+_LEGACY_PATH_TRANSCRIPT = "legacy_path"
+_LEGACY_PRECOMPACT_SNAPSHOT = "legacy_precompact"
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,187 @@ class ArtifactPaths:
 
     shadow_abs: Path
     shadow_rel: Path
+
+
+def _non_empty_string(value: object) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _transcript_entry_kind(entry: object, *, index: int) -> str:
+    """Classify one persisted transcript entry without silently skipping bad state."""
+    if not isinstance(entry, dict):
+        raise TranscriptArtifactStateError(f"entry {index} must be an object, got {type(entry).__name__}")
+
+    copied_path = entry.get("copied_path")
+    session_id = entry.get("session_id")
+    snapshot_path = entry.get("snapshot_path")
+
+    if _non_empty_string(copied_path):
+        if snapshot_path is not None:
+            raise TranscriptArtifactStateError(
+                f"entry {index} mixes canonical copied_path with compaction snapshot_path"
+            )
+        if _non_empty_string(session_id):
+            return _CANONICAL_TRANSCRIPT
+        if "session_id" not in entry:
+            # Older path-only entries are an explicit read-compatibility shape. New
+            # writes always carry both identity fields and never create this form.
+            return _LEGACY_PATH_TRANSCRIPT
+        raise TranscriptArtifactStateError(f"entry {index} has a non-string or empty session_id")
+
+    if copied_path is not None:
+        raise TranscriptArtifactStateError(f"entry {index} has a non-string or empty copied_path")
+
+    if entry.get("reason") == "pre-compact" and "session_id" not in entry:
+        required = {
+            "captured_at": entry.get("captured_at"),
+            "source_path": entry.get("source_path"),
+            "snapshot_path": snapshot_path,
+        }
+        invalid = [name for name, value in required.items() if not _non_empty_string(value)]
+        if not isinstance(entry.get("copied"), bool):
+            invalid.append("copied")
+        if invalid:
+            details = ", ".join(invalid)
+            raise TranscriptArtifactStateError(f"entry {index} has an invalid legacy PreCompact field: {details}")
+        return _LEGACY_PRECOMPACT_SNAPSHOT
+
+    raise TranscriptArtifactStateError(
+        f"entry {index} is neither a canonical transcript nor a recognized legacy PreCompact snapshot"
+    )
+
+
+def _validated_transcript_entries(state: SessionState) -> list[tuple[dict[str, Any], str]]:
+    artifacts = state.confirmed.artifacts
+    if not isinstance(artifacts, dict):
+        raise TranscriptArtifactStateError(f"confirmed.artifacts must be an object, got {type(artifacts).__name__}")
+
+    raw_entries = artifacts.get("transcripts")
+    if raw_entries is None:
+        return []
+    if not isinstance(raw_entries, list):
+        raise TranscriptArtifactStateError(f"expected a list, got {type(raw_entries).__name__}")
+
+    entries: list[tuple[dict[str, Any], str]] = []
+    for index, raw_entry in enumerate(raw_entries):
+        kind = _transcript_entry_kind(raw_entry, index=index)
+        assert isinstance(raw_entry, dict)
+        entries.append((raw_entry, kind))
+    return entries
+
+
+def _validated_compaction_snapshots(state: SessionState) -> list[dict[str, Any]]:
+    compaction = state.confirmed.compaction
+    if compaction is None:
+        return []
+    snapshots = compaction.transcript_snapshots
+    if not isinstance(snapshots, list):
+        raise TranscriptArtifactStateError(
+            f"expected a list, got {type(snapshots).__name__}",
+            field="confirmed.compaction.transcript_snapshots",
+        )
+    for index, snapshot in enumerate(snapshots):
+        if not isinstance(snapshot, dict) or not _non_empty_string(snapshot.get("snapshot_path")):
+            raise TranscriptArtifactStateError(
+                f"entry {index} must contain a non-empty snapshot_path",
+                field="confirmed.compaction.transcript_snapshots",
+            )
+    return snapshots
+
+
+def migrate_legacy_transcript_snapshots(state: SessionState) -> int:
+    """Move recognized legacy PreCompact records out of the canonical transcript list.
+
+    Migration is lazy at a transcript-related write seam. Existing compaction
+    records are deduplicated by ``snapshot_path`` because the old PreCompact
+    writer stored the same record in both collections.
+    """
+    entries = _validated_transcript_entries(state)
+    legacy = [entry for entry, kind in entries if kind == _LEGACY_PRECOMPACT_SNAPSHOT]
+    if not legacy:
+        return 0
+
+    snapshots = _validated_compaction_snapshots(state)
+    migrated_snapshots = list(snapshots)
+    existing_paths = {snapshot["snapshot_path"] for snapshot in snapshots}
+    for snapshot in legacy:
+        snapshot_path = snapshot["snapshot_path"]
+        if snapshot_path not in existing_paths:
+            migrated_snapshots.append(dict(snapshot))
+            existing_paths.add(snapshot_path)
+
+    if state.confirmed.compaction is None:
+        state.confirmed.compaction = CompactionConfirmed(transcript_snapshots=migrated_snapshots)
+    else:
+        state.confirmed.compaction.transcript_snapshots = migrated_snapshots
+    state.confirmed.artifacts["transcripts"] = [entry for entry, kind in entries if kind != _LEGACY_PRECOMPACT_SNAPSHOT]
+    return len(legacy)
+
+
+def reconcile_transcript_artifact(
+    state: SessionState,
+    entry: dict[str, Any],
+    *,
+    refresh_existing: bool = True,
+) -> int:
+    """Replace one canonical transcript identity and preserve every distinct record.
+
+    When ``refresh_existing`` is false, the newest matching record is retained;
+    rollover and failed best-effort copies use that path so a skipped copy cannot
+    replace successful provenance with ``copied=False``. Returns the number of
+    matching records replaced or removed. Invalid durable state raises before the
+    store transaction writes, allowing hook callers to apply their established
+    fail-open behavior without clobbering the original value.
+    """
+    if _transcript_entry_kind(entry, index=0) != _CANONICAL_TRANSCRIPT:
+        raise TranscriptArtifactStateError("new transcript records require non-empty session_id and copied_path")
+
+    migrate_legacy_transcript_snapshots(state)
+    entries = _validated_transcript_entries(state)
+    identity = (entry["session_id"], entry["copied_path"])
+    reconciled: list[dict[str, Any]] = []
+    matching: list[dict[str, Any]] = []
+    for existing, kind in entries:
+        if kind == _CANONICAL_TRANSCRIPT and (existing["session_id"], existing["copied_path"]) == identity:
+            matching.append(existing)
+            continue
+        reconciled.append(existing)
+    if matching and not refresh_existing:
+        reconciled.append(matching[-1])
+        changed = len(matching) - 1
+    else:
+        reconciled.append(dict(entry))
+        changed = len(matching)
+    state.confirmed.artifacts["transcripts"] = reconciled
+    return changed
+
+
+def latest_transcript_artifact_path(state: SessionState) -> str | None:
+    """Return the newest canonical copied path after validating the whole collection."""
+    entries = _validated_transcript_entries(state)
+    latest: str | None = None
+    legacy_paths = 0
+    legacy_snapshots = 0
+    for entry, kind in entries:
+        if kind == _LEGACY_PRECOMPACT_SNAPSHOT:
+            legacy_snapshots += 1
+            continue
+        if kind == _LEGACY_PATH_TRANSCRIPT:
+            legacy_paths += 1
+        latest = entry["copied_path"]
+
+    if legacy_snapshots:
+        logger.warning(
+            "recognized %d legacy PreCompact snapshot(s) in confirmed.artifacts.transcripts; "
+            "the next transcript write will migrate them",
+            legacy_snapshots,
+        )
+    if legacy_paths:
+        logger.warning(
+            "recognized %d legacy copied_path-only transcript record(s); new writes use complete identity",
+            legacy_paths,
+        )
+    return latest
 
 
 def resolve_forge_root(cwd: Path) -> Path:

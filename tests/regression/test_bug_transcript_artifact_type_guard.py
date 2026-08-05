@@ -3,7 +3,8 @@
 Bug: the native-resume branch in ``SessionManager.resume_session`` copied the latest
 transcript artifact's ``copied_path`` without the ``isinstance(str)`` guard used by
 its helper/twin. A malformed manifest could therefore persist a non-string
-``parent_transcript`` and return a non-string transfer artifact path.
+``parent_transcript`` and return a non-string transfer artifact path. D024 later
+strengthened the durable-state contract from silent omission to a specific error.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from forge.session import SessionManager, SessionStore
+from forge.session.exceptions import TranscriptArtifactStateError
 
 pytestmark = pytest.mark.regression
 
@@ -24,7 +26,7 @@ def _init_forge_project(path: Path) -> None:
     (path / ".forge").mkdir()
 
 
-def test_native_resume_ignores_non_string_transcript_copied_path(tmp_path: Path) -> None:
+def test_native_resume_rejects_non_string_transcript_copied_path(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     _init_forge_project(project)
@@ -38,11 +40,7 @@ def test_native_resume_ignores_non_string_transcript_copied_path(tmp_path: Path)
 
     store.update(timeout_s=5.0, mutate=_corrupt_artifact)
 
-    child, transfer = manager.resume_session("parent", child_name="child", resume_mode="native")
+    with pytest.raises(TranscriptArtifactStateError, match="non-string or empty copied_path"):
+        manager.resume_session("parent", child_name="child", resume_mode="native")
 
-    assert transfer.transcript_artifact_path is None
-    assert child.confirmed.derivation is not None
-    assert child.confirmed.derivation.parent_transcript is None
-    persisted = SessionStore(str(project), "child").read()
-    assert persisted.confirmed.derivation is not None
-    assert persisted.confirmed.derivation.parent_transcript is None
+    assert not SessionStore(str(project), "child").exists()
