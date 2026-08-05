@@ -1,7 +1,6 @@
 # Preserve supervisor edit identity checklist
 
-Current focus: implementation and verification are complete; the active epic owns review and merge before Wave 1
-closes.
+Current focus: implementation and verification are complete; the active epic owns review and merge before Wave 1 closes.
 
 ## Evidence and Regression
 
@@ -25,12 +24,12 @@ closes.
 
 ## Acceptance Matrix
 
-| Runtime/path | Distinguishing input | Expected prompt | Expected identity/cache result |
-| ------------ | -------------------- | --------------- | ------------------------------ |
-| Claude Edit | Different `old_string`, same replacement | Matched and replacement fragments | Distinct supervisor and plan-check entries |
-| Codex Update File | Different delete-only raw hunks | Bounded raw diff | Distinct supervisor and plan-check entries |
-| Claude/Codex long actions | Difference only after 5,000 characters | Existing bounded presentation | Distinct pre-truncation identities |
-| Identical action | Byte-identical canonical fields | Same bounded presentation | Clean allow remains a cache hit |
+| Runtime/path              | Distinguishing input                     | Expected prompt                   | Expected identity/cache result             |
+| ------------------------- | ---------------------------------------- | --------------------------------- | ------------------------------------------ |
+| Claude Edit               | Different `old_string`, same replacement | Matched and replacement fragments | Distinct supervisor and plan-check entries |
+| Codex Update File         | Different delete-only raw hunks          | Bounded raw diff                  | Distinct supervisor and plan-check entries |
+| Claude/Codex long actions | Difference only after 5,000 characters   | Existing bounded presentation     | Distinct pre-truncation identities         |
+| Identical action          | Byte-identical canonical fields          | Same bounded presentation         | Clean allow remains a cache hit            |
 
 ## Verification and Closeout
 

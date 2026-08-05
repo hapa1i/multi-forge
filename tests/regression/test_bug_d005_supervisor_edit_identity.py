@@ -19,6 +19,7 @@ import pytest
 from forge.cli.hooks.codex_policy import CodexHookAdapter
 from forge.cli.hooks.policy import ClaudeHookAdapter
 from forge.core.reactive.session_runner import SessionResult
+from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.semantic.plan_check import PlanCheckPolicy, PlanCheckVerdict
 from forge.policy.semantic.supervisor import SemanticSupervisorPolicy, invoke_supervisor
 from forge.policy.types import ActionContext, PolicyDecision
@@ -72,6 +73,7 @@ def _codex_delete_only_update(tmp_path: Path, *, removed: str) -> ActionContext:
 
 
 def _exercise_cache_layer(layer: CacheLayer, contexts: list[ActionContext], tmp_path: Path) -> MagicMock:
+    policy: DeterministicPolicy
     if layer == "supervisor":
         policy = SemanticSupervisorPolicy(
             SupervisorConfig(resume_id=_SUPERVISOR_UUID, direct=True, throttle_seconds=60)
