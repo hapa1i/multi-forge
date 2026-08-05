@@ -90,13 +90,16 @@ lost the canonical tail, and both manager and CLI full-strategy budget preflight
 - Existing manifests may contain duplicate Stop records and legacy PreCompact-shaped entries; support them on read and
   converge duplicates only at the corresponding write seam rather than requiring an eager migration. Do not silently
   treat unrelated malformed entries as the same legacy shape.
+- Older `copied_path`-only records remain read-compatible and diagnostic. They lack the identity needed for safe
+  migration, so reconciliation preserves them rather than inventing a `session_id`; new records always carry complete
+  identity.
 - Preserve artifact files, `captured_at`/reason provenance, forge-root-relative paths, rollover behavior, and shared
   transcript deletion safeguards.
 - Sharing the selector is a D024 drift-control requirement that closes only O099's transcript-selector subset; its
   `_FakeResponse` family and final ledger disposition remain Wave 7 work.
-- Do not redesign plan artifacts, transcript retention, or resume strategies. In particular, replacing the existing
-  artifact-list lookup in the two budget preflights does not expand them to D023's other transcript sources; D023
-  remains a separate finding.
+- The analogous plan-artifact clobber is tracked separately as D045 in Wave 6. Do not redesign transcript retention or
+  resume strategies here; replacing the existing artifact-list lookup in the two budget preflights does not expand them
+  to D023's other transcript sources.
 
 ## Verification
 

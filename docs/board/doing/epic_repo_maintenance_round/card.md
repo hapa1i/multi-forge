@@ -10,8 +10,9 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003 for a current total of 146 ranked findings plus unranked U001. The report remains the
-evidence ledger; this epic owns member coordination, sequencing, and final disposition.
+notes; DG1 admitted U002/U003, and a follow-up review admitted D045, for a current total of 147 ranked findings plus
+unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
+disposition.
 
 ## Admission Contract
 

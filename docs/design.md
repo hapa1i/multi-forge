@@ -847,10 +847,11 @@ Notes:
 
 The canonical transcript list is validated at its shared session-layer write and latest-read seams. A non-list field or
 an unrelated malformed entry is surfaced rather than clobbered or skipped. Readers explicitly tolerate older
-`copied_path`-only records and the known legacy shape where PreCompact also appended a `snapshot_path` record to the
-canonical list; the latter emits a compatibility diagnostic and is moved to the compaction collection on the next
-transcript-related write. Manager derivation, transfer assembly, and both full-strategy budget preflights use the same
-latest-canonical-record selector, so a trailing legacy snapshot cannot hide the resumable transcript.
+`copied_path`-only records, warn about them, and preserve them because no stable `session_id` can be reconstructed
+safely; new writes always carry complete identity. The known legacy shape where PreCompact also appended a
+`snapshot_path` record to the canonical list emits a compatibility diagnostic and moves to the compaction collection on
+the next transcript-related write. Manager derivation, transfer assembly, and both full-strategy budget preflights use
+the same latest-canonical-record selector, so a trailing legacy snapshot cannot hide the resumable transcript.
 
 ### 3.9 Session Resume (context management)
 

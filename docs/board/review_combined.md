@@ -10,9 +10,10 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 146 severity-ranked findings: 1 CRITICAL, 21 HIGH, 93 MEDIUM, and 31 LOW, plus unranked U001. The
-original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04. Three Opus claims
-were refuted and five were adjusted during the merge audit.
+**Inventory:** 147 severity-ranked findings: 1 CRITICAL, 21 HIGH, 94 MEDIUM, and 31 LOW, plus unranked U001. The
+original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and a follow-up
+review admitted D045 as MEDIUM on 2026-08-05. Three Opus claims were refuted and five were adjusted during the merge
+audit.
 
 ## Review Status and Execution Gate
 
@@ -39,7 +40,7 @@ sequencing and disposition; this report remains the evidence ledger.
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ID`             | Stable reference within this review: `D###` for design-conformance findings, `O###` for other code findings, `U###` for design-drift notes numbered outside the original D/O tables; unranked until a decision gate admits them |
 | `Sev`            | Triage impact, not execution order                                                                                                                                                                                              |
-| `Src`            | Discovery provenance: `F5`, `O5`, or independent agreement `F5+O5`                                                                                                                                                              |
+| `Src`            | Discovery provenance: `F5`, `O5`, independent agreement `F5+O5`, or follow-up review `R`                                                                                                                                        |
 | `(unverified)`   | Agent-reported claim not independently confirmed; ineligible for implementation                                                                                                                                                 |
 | `(adjusted)`     | Original claim was corrected before inclusion                                                                                                                                                                                   |
 | `partial`        | Only the stated subset is supported; scope must be resolved before implementation                                                                                                                                               |
@@ -190,6 +191,7 @@ implementation outcome below records its completed code and regression work.
 | D042 | LOW      | F5    | Sidecar also mounts `~/.forge/config.yaml` ro — deliberate per impl notes, but design §7's mount enumeration was never updated (doc fix).                                                                                                                                                                                                                                                                                                                                                                | design.md §7                                             | `sidecar/container.py:231`                                                                              |
 | D043 | LOW      | F5    | design.md §2/§6 list a `src/forge/status/` component that does not exist (status lives in `cli/status_line.py` + `cli/statusline/`).                                                                                                                                                                                                                                                                                                                                                                     | design.md §2, §6                                         | filesystem                                                                                              |
 | D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
+| D045 | MED      | R     | Exit-plan-mode's snapshot writer is the sole remaining caller of `_append_artifact_entry`; when `confirmed.artifacts.plans` is non-list, the helper silently replaces that durable value with a one-entry list and discards the malformed state.                                                                                                                                                                                                                                                         | coding_standards §5 no silent durable-state clobber      | `cli/hooks/_helpers.py:131-149`; `cli/hooks/commands.py:456`                                            |
 
 ### Implementation Outcomes
 
@@ -385,16 +387,16 @@ one card coordinates them.
 
 ### Proposed execution waves
 
-| Wave                                    | Scope                                                                     | Entry condition                                                                 |
-| --------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch       | Normative contract chosen; reproduction or failing test recorded                |
-| 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
-| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                          | DG1 resolved; verification and artifact contracts defined                       |
-| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, O006, and directly coupled session rows       | State authority, fault outcomes, and recovery paths defined                     |
-| 4 — installer transactions              | D012–D014, D019                                                           | Fault points and rollback ownership enumerated; integration fixtures identified |
-| 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                  | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
-| 6 — bounded maintenance fixes           | Remaining verified MED/LOW bugs, performance issues, and docs drift       | Each row split to one behavior and assigned a test tier                         |
-| 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings    | Behavior characterized; DG4 resolved; unverified symbols excluded               |
+| Wave                                    | Scope                                                                         | Entry condition                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch           | Normative contract chosen; reproduction or failing test recorded                |
+| 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset     | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
+| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                              | DG1 resolved; verification and artifact contracts defined                       |
+| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, O006, and directly coupled session rows           | State authority, fault outcomes, and recovery paths defined                     |
+| 4 — installer transactions              | D012–D014, D019                                                               | Fault points and rollback ownership enumerated; integration fixtures identified |
+| 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                      | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
+| 6 — bounded maintenance fixes           | D045 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
+| 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings        | Behavior characterized; DG4 resolved; unverified symbols excluded               |
 
 ### Suggested coordination boundaries
 
