@@ -1,7 +1,7 @@
 # Epic: Repository maintenance round
 
-**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-1 is closed; Wave 2 Stop/artifact coordination is accepted and parked with no implementation member active.
+**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- the
+D005 corrective follow-up is implemented and verified; Wave 2 remains parked pending its review and merge.
 
 ## Goal
 
@@ -56,31 +56,34 @@ Normative design documents move with shipped behavior, not ahead of it.
 
 ## Accepted Implementation Members
 
-Wave 1 closed through [`epic_policy_supervision_correctness`](../../done/epic_policy_supervision_correctness/card.md).
-Wave 2 is coordinated by the parked
+Wave 1 closed through [`epic_policy_supervision_correctness`](../../done/epic_policy_supervision_correctness/card.md). A
+post-close D005 parser defect was corrected by
+[`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md); review
+and merge of that member remain Wave 2 entry gates. Wave 2 is coordinated by the parked
 [`epic_stop_artifact_correctness`](../../todo/epic_stop_artifact_correctness/card.md); its three independently shippable
-members share Stop-path contracts but no implementation card is active.
+members share Stop-path contracts and remain inactive until the correction merges.
 
-| Wave | Findings        | Member                                                                                                |
-| ---- | --------------- | ----------------------------------------------------------------------------------------------------- |
-| 1    | D001            | [`preserve_policy_intent_on_enable`](../../done/preserve_policy_intent_on_enable/card.md)             |
-| 1    | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md)         |
-| 1    | D005            | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)           |
-| 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md)             |
-| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../todo/preserve_transcript_artifact_identity/card.md)   |
-| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)       |
-| 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)             |
-| 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                         |
-| 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)         |
-| 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                       |
-| 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                     |
-| 7    | O051            | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                   |
-| 7    | O052            | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)           |
-| 7    | O092            | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                   |
-| 7    | O092            | [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md)   |
-| 7    | O093            | [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md)   |
-| 7    | O092, O096      | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)           |
-| 7    | O096            | [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md) |
+| Wave | Findings        | Member                                                                                                          |
+| ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1    | D001            | [`preserve_policy_intent_on_enable`](../../done/preserve_policy_intent_on_enable/card.md)                       |
+| 1    | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md)                   |
+| 1    | D005            | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)                     |
+| 1C   | D005            | [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) |
+| 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md)                       |
+| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../todo/preserve_transcript_artifact_identity/card.md)             |
+| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)                 |
+| 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                       |
+| 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                   |
+| 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                   |
+| 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                 |
+| 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                               |
+| 7    | O051            | [`replace_legacy_tier_inference`](../../todo/replace_legacy_tier_inference/card.md)                             |
+| 7    | O052            | [`remove_dead_session_context_retry`](../../todo/remove_dead_session_context_retry/card.md)                     |
+| 7    | O092            | [`wire_transcript_reindex_guard`](../../todo/wire_transcript_reindex_guard/card.md)                             |
+| 7    | O092            | [`remove_verified_internal_zero_callers`](../../todo/remove_verified_internal_zero_callers/card.md)             |
+| 7    | O093            | [`characterize_explicit_backend_mapping`](../../todo/characterize_explicit_backend_mapping/card.md)             |
+| 7    | O092, O096      | [`retire_test_only_settings_helpers`](../../todo/retire_test_only_settings_helpers/card.md)                     |
+| 7    | O096            | [`remove_unreachable_fork_routing_branch`](../../todo/remove_unreachable_fork_routing_branch/card.md)           |
 
 ## Execution Waves
 

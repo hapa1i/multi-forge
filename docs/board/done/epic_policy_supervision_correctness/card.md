@@ -81,3 +81,10 @@ All three live members shipped independently and remain linked above:
 The member cards record their focused, regression, unit, integration, and pre-commit verification. Normative policy and
 supervision documentation is synchronized with the shipped behavior, and the review ledger records each finding's
 resolution.
+
+## Post-close Correction
+
+A later review found a Codex apply-patch parsing defect that could erase valid plus-prefixed Write content before D005's
+fingerprint was computed. The parent maintenance epic admitted the separate
+[`preserve_codex_plus_prefixed_write_identity`](../preserve_codex_plus_prefixed_write_identity/card.md) corrective
+member; it preserves the original wave boundary while closing that parser-specific identity gap.

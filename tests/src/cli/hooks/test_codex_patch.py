@@ -27,6 +27,12 @@ class TestParseAddFile:
         assert ops is not None
         assert ops[0].added_content == "def f():\n    return 1"
 
+    def test_add_preserves_content_beginning_with_plus(self) -> None:
+        cmd = "*** Begin Patch\n*** Add File: values.txt\n+++first\n++++second\n*** End Patch"
+        ops = parse_apply_patch(cmd)
+        assert ops is not None
+        assert ops[0].added_content == "++first\n+++second"
+
 
 class TestParseUpdateFile:
     def test_update_with_hunk_markers_and_mixed_lines(self) -> None:
@@ -70,6 +76,13 @@ class TestParseUpdateFile:
         ops = parse_apply_patch(cmd)
         assert ops is not None
         assert ops[0].added_content == "one\ntwo"
+
+    def test_update_preserves_added_content_beginning_with_plus(self) -> None:
+        cmd = "*** Begin Patch\n*** Update File: a.txt\n@@\n-old\n+++new\n*** End Patch"
+        ops = parse_apply_patch(cmd)
+        assert ops is not None
+        assert ops[0].added_content == "++new"
+        assert "+++new" in ops[0].raw_section
 
 
 class TestParseDeleteFile:

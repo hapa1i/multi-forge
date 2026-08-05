@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-05
 
+### Preserve plus-prefixed Codex Write identity
+
+**Goal**: Prevent valid plus-prefixed Codex file content from collapsing to an empty, reusable policy identity.
+
+**Key changes**:
+
+- Replaced the unified-diff extractor at the Codex apply-patch boundary with grammar-specific removal of exactly one
+  transport `+`, preserving Add and Update content that begins with plus signs.
+- Kept true unified-diff header handling and the existing fingerprint schema unchanged while restoring complete
+  deterministic-policy input and distinct semantic cache identity.
+- Extended D005 regression coverage across both semantic cache layers and recorded the correction without reopening the
+  shipped Wave 1 epic.
+
+**Verification**: Focused parser/adapter/policy tests passed (76); full regression suite passed (643); `make test-unit`
+passed (8,712 passed, 1 skipped); Docker policy-hook integration passed (21); `make pre-commit` passed.
+
 ### Close policy wave and sequence Stop/artifact work
 
 **Goal**: Close the shipped policy/supervision wave and admit Wave 2 as bounded, independently reviewable work.

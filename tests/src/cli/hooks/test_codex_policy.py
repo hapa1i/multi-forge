@@ -62,6 +62,20 @@ class TestCodexHookAdapter:
             "kind": "add",
         }
 
+    def test_plus_prefixed_add_content_has_complete_distinct_identity(self, tmp_path: Path) -> None:
+        contexts = [
+            CodexHookAdapter().build_contexts(
+                _payload("apply_patch", _patch("*** Add File: src/x.py", transport_line), cwd=str(tmp_path)),
+                "apply_patch",
+                _make_manifest(),
+            )[0]
+            for transport_line in ("+++first", "+++second")
+        ]
+
+        assert [context.new_content for context in contexts] == ["++first", "++second"]
+        assert contexts[0].action_fingerprint is not None
+        assert contexts[0].action_fingerprint != contexts[1].action_fingerprint
+
     def test_update_file_normalizes_to_edit_with_raw_diff(self, tmp_path: Path) -> None:
         patch_cmd = _patch("*** Update File: src/x.py", "@@ def f():", "-    return 1", "+    return 2")
         payload = _payload("apply_patch", patch_cmd, cwd=str(tmp_path))

@@ -202,11 +202,14 @@ it did not represent the current code as fixed.
   parse failures rather than cacheable aligned results. Restored throttle state also accepts only the clean aligned
   cache-write shape; invalid entries re-evaluate. Dedicated marked regressions cover each finding. See
   [`harden_supervisor_verdict_boundary`](done/harden_supervisor_verdict_boundary/card.md).
-- **D005 — resolved 2026-08-05:** Claude and Codex adapters now hash the complete canonical action before presentation
-  truncation; the frontier and tier-1 caches share that identity, Claude frontier prompts include matched and
-  replacement fragments, and shadow replay freezes the live digest. A marked regression covers removed-text,
-  delete-only, and post-truncation aliases across both semantic cache layers. See
-  [`preserve_supervisor_edit_identity`](done/preserve_supervisor_edit_identity/card.md).
+- **D005 — resolved 2026-08-05, corrected 2026-08-05:** Claude and Codex adapters hash the complete canonical action
+  before presentation truncation; the frontier and tier-1 caches share that identity, Claude frontier prompts include
+  matched and replacement fragments, and shadow replay freezes the live digest. A follow-up found that Codex apply-patch
+  parsing discarded valid plus-prefixed Add and Update content before this boundary. A Codex-specific extractor now
+  preserves that content, with marked regressions covering the original removed-text/delete-only/post-truncation aliases
+  and plus-prefixed Write cache misses in both semantic layers. See
+  [`preserve_supervisor_edit_identity`](done/preserve_supervisor_edit_identity/card.md) and
+  [`preserve_codex_plus_prefixed_write_identity`](done/preserve_codex_plus_prefixed_write_identity/card.md).
 
 ## Design Status and Post-Review Admissions
 
