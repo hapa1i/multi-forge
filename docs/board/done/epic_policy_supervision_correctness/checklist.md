@@ -1,7 +1,7 @@
 # Policy and supervision correctness checklist
 
-Current focus: D005 implementation and verification are complete; review and merge this final member before closing Wave
-1\.
+Current focus: Wave 1 is closed; all three members shipped and the parent epic and review ledger point to their
+outcomes.
 
 - [x] Recheck D001–D005 and O028 against merged code and normative design.
 - [x] Run isolated executable reproductions for every admitted finding.
@@ -16,8 +16,8 @@ Current focus: D005 implementation and verification are complete; review and mer
 - [x] Review and merge the D002–D004 and O028 result before starting D005 (PR #126).
 - [x] Move `preserve_supervisor_edit_identity` to `doing/` on its implementation branch.
 - [x] Complete D005 with a marked regression and move the verified member to `done/`.
-- [ ] Review and merge the D005 result before closing this epic.
-- [ ] Close only after every live member ships and the review ledger records the outcomes.
+- [x] Review and merge the D005 result before closing this epic (PR #127).
+- [x] Close only after every live member ships and the review ledger records the outcomes.
 
 ## Member Acceptance Map
 

@@ -1,8 +1,7 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-1 policy/supervision coordination is active on `docs/policy-supervision-wave-1`; member implementation remains on
-separate execution branches.
+1 is closed; Wave 2 Stop/artifact coordination is accepted and parked with no implementation member active.
 
 ## Goal
 
@@ -57,8 +56,10 @@ Normative design documents move with shipped behavior, not ahead of it.
 
 ## Accepted Implementation Members
 
-Wave 1 is coordinated by [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md), which
-owns the shared external data and edit-identity contracts without collapsing its implementation members.
+Wave 1 closed through [`epic_policy_supervision_correctness`](../../done/epic_policy_supervision_correctness/card.md).
+Wave 2 is coordinated by the parked
+[`epic_stop_artifact_correctness`](../../todo/epic_stop_artifact_correctness/card.md); its three independently shippable
+members share Stop-path contracts but no implementation card is active.
 
 | Wave | Findings        | Member                                                                                                |
 | ---- | --------------- | ----------------------------------------------------------------------------------------------------- |
@@ -66,6 +67,8 @@ owns the shared external data and edit-identity contracts without collapsing its
 | 1    | D002–D004, O028 | [`harden_supervisor_verdict_boundary`](../../done/harden_supervisor_verdict_boundary/card.md)         |
 | 1    | D005            | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)           |
 | 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md)             |
+| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../todo/preserve_transcript_artifact_identity/card.md)   |
+| 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)       |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)             |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                         |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)         |

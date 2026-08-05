@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-05
 
+### Close policy wave and sequence Stop/artifact work
+
+**Goal**: Close the shipped policy/supervision wave and admit Wave 2 as bounded, independently reviewable work.
+
+**Key changes**:
+
+- Closed the policy/supervision epic after PRs #125–#127 shipped all three members and repointed its parent, member, and
+  review-ledger links to the completed record.
+- Reproduced D006–D007 and characterized D024/D039 on merged `main`, then created one parked Stop/artifact epic with
+  separate verification, transcript-artifact, and sidecar-shadow members.
+- Kept every Wave 2 member in `todo/`; no implementation card or execution checklist was activated.
+
+**Verification**: Four isolated executable characterizations passed; `make pre-commit-md` and `git diff --check` passed;
+relative board links were checked after the lane move and card creation.
+
 ### Preserve complete supervisor edit identity
 
 **Goal**: Prevent materially different edits from sharing a semantic supervisor or plan-check clean allow.
