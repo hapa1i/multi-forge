@@ -314,10 +314,23 @@ verification:
 | `test_suite`         | Run fixed `uv run pytest`, check exit | Code changes      |
 
 `test_suite` is an explicit blocking Stop mode and the sole exception to the ordinary under-100-ms synchronous budget.
-It invokes the fixed argv `uv run pytest` without a shell in the hook's working directory, inherits the session
-environment, captures output, and defaults to a 300-second timeout. Forge does not support an arbitrary-command
-verification type. `block` is the stored `on_incomplete` value that emits reinjection guidance; `re_inject` is not a
-separate mode.
+It invokes the fixed argv `uv run pytest` without a shell in the resolved session worktree, inherits the session
+environment, captures output, and defaults to a 300-second timeout. Only the external test-process wall time is exempt
+from the latency budget; Forge-owned dispatch, classification, and persistence remain under 100 ms. Forge does not
+support an arbitrary-command verification type. `block` is the stored `on_incomplete` value that emits reinjection
+guidance; `re_inject` is not a separate mode.
+
+New authoring accepts exactly `completion_promise | test_suite` and `block | warn | allow`. Mutation commands reject
+other values with the supported choices. Persisted manifests deliberately keep these fields readable as strings: legacy
+unknown values produce a stderr diagnostic, record `misconfigured` when state is writable, and allow Stop. They are
+never reinterpreted as a supported value or recorded as `passed`.
+
+Verification records `passed`, `incomplete`, `misconfigured`, or `infrastructure_error`. A missing configured promise or
+a multiline promise is misconfiguration. A configured promise absent from the last assistant message, a non-zero test
+exit, or a test timeout after launch is incomplete and follows `on_incomplete`. An unavailable transcript or worktree, a
+missing `uv`, or another execution failure is an infrastructure error and fails open with a diagnostic. Failure to
+persist any result also fails open. Captured test output is not copied wholesale: diagnostics are secret-redacted and
+bounded before both stderr display and manifest persistence.
 
 **Completion promise correctness:**
 

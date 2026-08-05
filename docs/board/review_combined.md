@@ -139,8 +139,8 @@ with the corresponding implementation.
 | [DG3 — downstream retention ownership](done/downstream_retention_ownership/card.md)      | D015                       | One global downstream policy and pruner; explicit global config wins, agreeing legacy values bridge, and conflict disables pruning safely.                                            |
 | [DG4 — compatibility surface for deletion](done/deletion_compatibility_contract/card.md) | O047–O052, O092–O093, O096 | Evidence rubric adopted; individually admitted work is ticketed; O093 is characterization-only and unverified candidates remain excluded.                                             |
 
-`D006`, `D009`, and `D015` remain open findings until their implementation members ship. Approval selected the remedy;
-it did not represent the current code as fixed.
+`D009` and `D015` remain open findings until their implementation members ship. DG1 selected the remedy for D006; the
+implementation outcome below records its completed code and regression work.
 
 ## Design-Conformance Findings
 
@@ -210,6 +210,12 @@ it did not represent the current code as fixed.
   and plus-prefixed Write cache misses in both semantic layers. See
   [`preserve_supervisor_edit_identity`](done/preserve_supervisor_edit_identity/card.md) and
   [`preserve_codex_plus_prefixed_write_identity`](done/preserve_codex_plus_prefixed_write_identity/card.md).
+- **D006 and U002–U003 — resolved 2026-08-05:** fixed `test_suite` verification now runs without a shell in the resolved
+  session worktree, separates external test time from Forge-owned overhead, and bounds and redacts captured diagnostics.
+  New authoring accepts only the approved type/mode values; legacy unknown strings warn and fail open as non-passing
+  misconfiguration. Runtime state distinguishes incomplete, misconfigured, and infrastructure outcomes, and a failed
+  state write cannot block Stop. Three marked regression modules and the Docker Stop-hook path cover the contract. See
+  [`align_stop_verification_contract`](done/align_stop_verification_contract/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -233,13 +239,13 @@ Documented drift cross-references the ranked inventory where one exists:
   stored `custom_command` value reaches the unknown-type branch and silently allows Stop with `(True, None)` rather than
   rejecting the manifest or running a command. (`session/models.py:239`; `cli/hooks/verification.py:43-47,126-132`)
   **Resolved decision:** MEDIUM; remove the documentation promise and implement visible fail-open validation in
-  [`align_stop_verification_contract`](todo/align_stop_verification_contract/card.md).
+  [`align_stop_verification_contract`](done/align_stop_verification_contract/card.md).
 - **U003 — `on_incomplete: re_inject` is documented but unsupported:** the same workflow example names `re_inject` as
   the primary value, while `VerificationConfig` defines `block | warn | allow`. The hook handles `warn` and `allow`
   explicitly, then treats every other value as `block`, so the documented value works only by falling through the
   unknown-value path. (`design_workflows.md:296`; `session/models.py:230-244`; `cli/hooks/verification.py:123,179,193`)
   **Resolved decision:** LOW; document `block` and implement strict authoring plus legacy diagnostics in
-  [`align_stop_verification_contract`](todo/align_stop_verification_contract/card.md).
+  [`align_stop_verification_contract`](done/align_stop_verification_contract/card.md).
 - **O092 subset — `IndexState.needs_reindex`:** zero callers; the index re-extracts and rewrites on every Stop even for
   byte-identical snapshots. Split this symbol from the compound O092 row before implementation.
 - **D029 — `tool_prefixes_to_ignore`:** reachable only in a `ProxyConfig` shape that no proxy file can produce.
@@ -388,7 +394,7 @@ one card coordinates them.
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
   independent members. O044 remains later bounded-maintenance work because terminal commands own intent while `%policy`
   commands deliberately own overrides.
-- **[Stop/artifact epic](todo/epic_stop_artifact_correctness/card.md):** DG1 is resolved; keep artifact
+- **[Stop/artifact epic](doing/epic_stop_artifact_correctness/card.md):** DG1 is resolved; keep artifact
   schema/idempotency (D007, D024), sidecar drain (D039), and the verification contract (D006, U002–U003) distinct.
 - **Durable-state/session epic:** coordinate D008–D011, D021–D022, O003, O006, and related state readers around
   fault-injection and recovery tests.

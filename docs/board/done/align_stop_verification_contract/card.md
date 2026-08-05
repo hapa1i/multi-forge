@@ -1,13 +1,13 @@
 # Align Stop verification validation and failure reporting
 
-**Epic**: [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md).
+**Epic**: [`epic_stop_artifact_correctness`](../../doing/epic_stop_artifact_correctness/card.md).
 
 **Decision**: [`stop_verification_contract`](../../done/stop_verification_contract/card.md) (DG1; D006, U002–U003).
 
 **Findings**: D006 (HIGH), U002 (MEDIUM), and U003 (LOW) in
 [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 2 implementation work, parked.
+**Lane**: `done/` -- implemented and verified on `fix/align-stop-verification-contract` as the first Wave 2 member.
 
 ## Goal
 
@@ -16,7 +16,7 @@ the fixed test suite as the only opt-in blocking latency exception.
 
 ## Evidence
 
-Rechecked on merged `main` at `86fa53da`:
+Rechecked on merged `main` at `5813994c`:
 
 - `src/forge/cli/hooks/verification.py:56-63` calls fixed `uv run pytest` synchronously from the Stop decision path, and
   `src/forge/session/models.py:246` supplies a 300-second default timeout. An executable characterization injected a
@@ -26,6 +26,7 @@ Rechecked on merged `main` at `86fa53da`:
   `verification.py:130-132` silently allows Stop, while an unknown mode falls through to block at `:193`.
 - DG1 removed the stale arbitrary-command and `re_inject` documentation promises, but strict authoring, legacy
   diagnostics, result classification, worktree resolution, and redaction remain implementation work.
+- Six retained regression cases reproduce the current contract gaps across D006/U002/U003 before implementation.
 
 ## Expected Behavior
 
@@ -34,8 +35,8 @@ Rechecked on merged `main` at `86fa53da`:
 - Legacy unknown values warn on stderr, fail open, and never persist a passing verification result.
 - Fixed `test_suite` remains synchronous and bounded, runs without a shell in the resolved session worktree, and is the
   only named exception to the ordinary Stop latency contract.
-- Outcomes distinguish passed, incomplete, misconfigured, and infrastructure error without turning execution or
-  persistence failures into an incomplete goal or a false pass.
+- Outcomes distinguish passed, incomplete, misconfigured, and infrastructure error without turning launch/runtime
+  infrastructure or persistence failures into an incomplete goal or a false pass.
 
 ## Scope
 
@@ -55,8 +56,8 @@ Rechecked on merged `main` at `86fa53da`:
   never recorded as passed.
 - Each regression module has `pytestmark = pytest.mark.regression` and a module docstring naming its finding and root
   cause, per the Regression Test Mandate.
-- Unit tests cover missing or multiline promises, missing `uv`, persistence failure, and each valid `on_incomplete`
-  mode.
+- Unit tests cover missing or multiline promises, missing `uv`, persistence failure, each valid `on_incomplete` mode,
+  and a positive over-budget warning at the real Stop call site.
 - Existing iteration/minute escape hatches and `%cancel-verification` remain intact.
 - `docs/design.md` and `docs/design_workflows.md` remain synchronized with the implemented behavior.
 
@@ -70,5 +71,17 @@ Rechecked on merged `main` at `86fa53da`:
 
 ## Verification
 
-Run the focused Stop-hook unit suite, `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`,
-`make test-regression`, and `make pre-commit`.
+- Focused Stop/config/model suite: 166 passed.
+- `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py -q`: 22 passed.
+- `make test-regression`: 649 passed.
+- `make test-unit`: 8,724 passed, 1 skipped, 118 deselected.
+- `make pre-commit`: passed after formatter updates; the final run was clean.
+
+## Outcome
+
+Stop verification now validates newly authored type and incomplete-mode values while retaining string-backed legacy
+manifests for visible fail-open diagnosis. The fixed suite runs synchronously without a shell in the resolved session
+worktree, and only its measured subprocess wall time is excluded from the Forge-owned latency check. Runtime outcomes
+now distinguish incomplete goals from configuration and infrastructure failures; captured diagnostics are bounded and
+redacted, and a state-persistence failure cannot block Stop. The approved timeout posture remains unchanged: a timeout
+after test launch is incomplete and follows `block | warn | allow`.

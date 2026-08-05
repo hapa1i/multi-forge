@@ -218,6 +218,9 @@ class VerificationConfig:
     Verification runs at the Stop boundary and can block exit until
     the assistant produces a completion signal.
 
+    ``type`` and ``on_incomplete`` remain strings so legacy unknown values can
+    be read and diagnosed. Supported authoring seams validate their exact values.
+
     Fields:
         type: Verification type.
               - "completion_promise": Check for promise string in last assistant message.
@@ -373,13 +376,14 @@ class VerificationConfirmed:
         started_at: ISO8601 timestamp of first blocked Stop (for max_minutes).
         iterations: Number of times Stop was blocked (not total Stop invocations).
         last_result: Outcome of last verification check:
-                     - "passed": promise found, Stop allowed
-                     - "failed": promise not found, Stop blocked
-                     - "warned": promise not found, Stop allowed (on_incomplete=warn)
+                     - "passed": configured check passed
+                     - "incomplete": promise absent, tests failed, or tests timed out
+                     - "misconfigured": configured check could not be interpreted
+                     - "infrastructure_error": Forge could not run or record the check
                      - "max_iterations": limit exceeded, auto-bypassed
                      - "max_minutes": time limit exceeded, auto-bypassed
                      - "bypassed": manually bypassed via %cancel-verification
-                     - "error": verification check failed due to internal error
+                     Legacy "failed", "warned", and "error" values remain readable.
         last_error: Short description of last failure (for debugging).
     """
 

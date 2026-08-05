@@ -5,10 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
 from forge.session import IndexStore, SessionStore, create_session_state
+from forge.session.models import VerificationConfig
 from tests.src.cli.session_command_support import (
     successful_claude_launch,
 )
@@ -169,6 +171,90 @@ class TestSessionSetOverride:
 
         assert result.exit_code == 0, result.output
         assert store.read().overrides["policy"]["fail_mode"] == "closed"
+
+    @pytest.mark.parametrize(
+        ("key", "value", "expected"),
+        [
+            ("verification.type", "completion_promise", "completion_promise"),
+            ("verification.type", "test_suite", "test_suite"),
+            ("verification.on_incomplete", "block", "block"),
+            ("verification.on_incomplete", "warn", "warn"),
+            ("verification.on_incomplete", "allow", "allow"),
+        ],
+    )
+    def test_set_accepts_supported_verification_values(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        value: str,
+        expected: str,
+    ) -> None:
+        with successful_claude_launch():
+            runner.invoke(main, ["session", "start", "verification-values"])
+
+        result = runner.invoke(
+            main,
+            ["session", "set", "--session", "verification-values", key, value],
+        )
+
+        assert result.exit_code == 0, result.output
+        field = key.rsplit(".", maxsplit=1)[1]
+        assert SessionStore(str(temp_env), "verification-values").read().overrides["verification"][field] == expected
+
+    @pytest.mark.parametrize(
+        ("key", "value", "expected_values"),
+        [
+            ("verification.type", "custom_command", "completion_promise, test_suite"),
+            ("verification", '{"type":"custom_command"}', "completion_promise, test_suite"),
+            ("verification.on_incomplete", "re_inject", "block, warn, allow"),
+        ],
+    )
+    def test_set_rejects_unknown_verification_values_without_writing(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        value: str,
+        expected_values: str,
+    ) -> None:
+        with successful_claude_launch():
+            runner.invoke(main, ["session", "start", "invalid-verification-value"])
+        store = SessionStore(str(temp_env), "invalid-verification-value")
+        before = store.manifest_path.read_bytes()
+
+        result = runner.invoke(
+            main,
+            ["session", "set", "--session", "invalid-verification-value", key, value],
+        )
+
+        assert result.exit_code == 1
+        assert key in result.output
+        assert expected_values in result.output
+        assert store.manifest_path.read_bytes() == before
+
+    def test_set_bypass_remains_available_for_legacy_unknown_type(self, runner: CliRunner, temp_env: Path) -> None:
+        with successful_claude_launch():
+            runner.invoke(main, ["session", "start", "legacy-verification-value"])
+        store = SessionStore(str(temp_env), "legacy-verification-value")
+        manifest = store.read()
+        manifest.intent.verification = VerificationConfig(type="custom_command")
+        store.write(manifest)
+
+        result = runner.invoke(
+            main,
+            [
+                "session",
+                "set",
+                "--session",
+                "legacy-verification-value",
+                "verification.bypass",
+                "true",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert store.read().overrides["verification"]["bypass"] is True
 
 
 class TestSessionReset:

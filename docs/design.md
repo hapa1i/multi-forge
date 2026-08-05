@@ -1109,24 +1109,35 @@ Stop Pipeline:
 
   [Sync - blocks exit decision, must be <100ms except explicit test_suite wall time]
   1. capture_artifacts()    Copy transcript to .forge/artifacts/ (idempotent via UUID)
-  2. run_verification()     Check completion promise or fixed test suite → returns allow|block
+  2. run_verification()     Classify completion promise or fixed test suite result
+  3. apply_verification()   Apply block|warn|allow posture → returns allow|block
 
   [Deferred - Stop writes markers; it does not launch a writer]
-  3. enqueue stop/index markers
-  4. enqueue handoff marker when memory is enabled
-  5. enqueue shadow marker when pending shadow candidates exist
+  4. enqueue stop/index markers
+  5. enqueue handoff marker when memory is enabled
+  6. enqueue shadow marker when pending shadow candidates exist
 
   return verification_decision
 
 Later eligible Forge CLI startup:
-  6. opportunistically drain pending work
-  7. handoff handler launches detached `forge memory-writer run` and returns
-  8. detached writer scans passports and synthesizes updates
+  7. opportunistically drain pending work
+  8. handoff handler launches detached `forge memory-writer run` and returns
+  9. detached writer scans passports and synthesizes updates
 ```
 
 The under-100-ms budget covers Forge-owned work, including verification dispatch and result persistence. A session that
 explicitly selects `test_suite` asks Stop to synchronously run the fixed `uv run pytest` subprocess, so only that
-external process's bounded wall time is excluded from the budget. No user-configurable command is executed at Stop.
+external process's bounded wall time is excluded from the budget. The subprocess runs without a shell in the resolved
+session worktree and inherits the session environment. No user-configurable command is executed at Stop.
+
+New writes accept only `completion_promise | test_suite` and `block | warn | allow`. Legacy unknown strings remain
+readable but warn and fail open as `misconfigured`; they never become a pass or acquire implicit blocking semantics. The
+result classifier records `passed`, `incomplete`, `misconfigured`, or `infrastructure_error`. A configured promise
+absent from the last assistant message, a non-zero test exit, or a test timeout after launch is incomplete and follows
+the configured posture. Missing or multiline promise configuration is misconfigured. Unavailable inputs, worktree or
+executable failures, and other execution errors are infrastructure failures and allow Stop with a diagnostic.
+Persistence failure also allows Stop. Captured subprocess diagnostics are secret-redacted and bounded before display or
+persistence.
 
 The memory writer runs asynchronously in a detached process after a later, non-exempt Forge CLI startup drains the
 handoff marker. Memory doc updates are eventually consistent; this is acceptable because they benefit future sessions,

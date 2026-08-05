@@ -12,6 +12,7 @@ Note: Stop hook copies transcript to artifacts; we use a small synthetic transcr
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -112,6 +113,36 @@ class TestStopVerification:
         out = json.loads(result.output)
         assert out["success"] is True
         assert out["action"] in ("copied", "partial")
+
+    def test_warns_when_forge_owned_stop_overhead_exceeds_budget(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The real Stop call site reports Forge-owned work above 100 ms."""
+        from forge.cli.hooks import commands, verification
+
+        monkeypatch.chdir(tmp_path)
+        _write_session(tmp_path, monkeypatch)
+        transcript = tmp_path / "t.jsonl"
+        _write_transcript_requestid_format(transcript, text="some work done")
+
+        # Keep the test deterministic: Stop starts at 10.0 and its warning
+        # helper observes 10.2. No verifier subprocess runs in this fixture.
+        monkeypatch.setattr(commands, "perf_counter", lambda: 10.0)
+        monkeypatch.setattr(verification, "perf_counter", lambda: 10.2)
+
+        payload = {
+            "hook_event_name": "Stop",
+            "transcript_path": str(transcript),
+            "session_id": "uuid-123",
+        }
+        with caplog.at_level(logging.WARNING, logger="forge.cli.hooks.verification"):
+            result = CliRunner().invoke(hooks, ["stop"], input=json.dumps(payload))
+
+        assert result.exit_code == 0, result.stderr
+        assert "Forge-owned Stop overhead exceeded 100 ms" in caplog.text
 
     def test_allows_when_bypassed_via_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -474,7 +505,7 @@ class TestTestSuiteVerification:
 
         updated = store.read()
         assert updated.confirmed.verification is not None
-        assert updated.confirmed.verification.last_result == "failed"
+        assert updated.confirmed.verification.last_result == "incomplete"
         assert updated.confirmed.verification.last_error is not None
         assert "exit 1" in updated.confirmed.verification.last_error
 
@@ -517,8 +548,8 @@ class TestTestSuiteVerification:
         updated = store.read()
         assert updated.overrides.get("verification", {}).get("bypass") is True
 
-    def test_test_suite_timeout_returns_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """test_suite treats timeout as failure."""
+    def test_test_suite_timeout_is_incomplete_and_blocks(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """test_suite treats a timeout after launch as an incomplete result."""
         import subprocess
 
         monkeypatch.chdir(tmp_path)
@@ -553,6 +584,6 @@ class TestTestSuiteVerification:
 
         updated = store.read()
         assert updated.confirmed.verification is not None
-        assert updated.confirmed.verification.last_result == "failed"
+        assert updated.confirmed.verification.last_result == "incomplete"
         assert updated.confirmed.verification.last_error is not None
         assert "timeout" in updated.confirmed.verification.last_error
