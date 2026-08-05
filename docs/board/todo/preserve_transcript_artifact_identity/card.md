@@ -1,6 +1,6 @@
 # Preserve transcript artifact identity and schema
 
-**Epic**: [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md).
+**Epic**: [`epic_stop_artifact_correctness`](../../doing/epic_stop_artifact_correctness/card.md).
 
 **Findings**: D007 (HIGH) and D024 (MEDIUM) in
 [`review_combined.md`](../../review_combined.md#design-conformance-findings).

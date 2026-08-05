@@ -3,80 +3,227 @@
 from __future__ import annotations
 
 import json
-import sys
+import logging
+import os
+import re
+import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
+from typing import Literal
 
 import click
 
+from forge.core.credential_registry import CREDENTIALS
+from forge.core.reactive.env import FORGE_SIDECAR_VAR
 from forge.core.state import now_iso, parse_iso
 from forge.session import SessionStore, set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.models import SessionState, VerificationConfig, VerificationConfirmed
 from forge.session.store import HOOK_LOCK_TIMEOUT_S
+from forge.session.verification_config import (
+    VERIFICATION_INCOMPLETE_MODES,
+    VERIFICATION_TYPES,
+)
+
+_logger = logging.getLogger(__name__)
+_MAX_DIAGNOSTIC_CHARS = 200
+_FORGE_OVERHEAD_WARNING_SECONDS = 0.1
+_SECRET_ASSIGNMENT_RE = re.compile(r"(?im)\b(api[_-]?key|token|secret|password|authorization)\b(\s*[:=]\s*)([^\r\n]*)")
+_TOKEN_PREFIX_RE = re.compile(r"\b(?:sk|gh[pousr])-[A-Za-z0-9_-]{8,}\b|\bgh[pousr]_[A-Za-z0-9_]{8,}\b")
+
+_VerificationStatus = Literal["passed", "incomplete", "misconfigured", "infrastructure_error"]
 
 
-def _check_completion_promise(ver: "VerificationConfig", transcript_path: Path) -> tuple[bool | None, str | None]:
-    """Check if promise appears on standalone line in last assistant message.
+@dataclass(frozen=True)
+class _VerificationOutcome:
+    status: _VerificationStatus
+    detail: str | None = None
+    external_seconds: float = 0.0
 
-    Returns:
-        (True, None): Verification passed
-        (False, error): Verification failed
-        (None, None): Skip (misconfiguration - no persistence needed)
-    """
-    if not ver.promise:
-        return (None, None)  # No promise configured = skip
 
-    if "\n" in ver.promise:
-        return (None, None)  # Multi-line promises not supported = skip
+@dataclass
+class _VerificationTiming:
+    """External verification time excluded from the enclosing Stop budget."""
 
-    last_text = _get_last_assistant_text_for_verification(transcript_path)
+    external_seconds: float = 0.0
+
+
+def _warn_if_forge_overhead_exceeded(*, started: float, external_seconds: float, operation: str) -> None:
+    forge_overhead = max(0.0, perf_counter() - started - external_seconds)
+    if forge_overhead > _FORGE_OVERHEAD_WARNING_SECONDS:
+        _logger.warning(
+            "Forge-owned %s overhead exceeded 100 ms: %.1f ms",
+            operation,
+            forge_overhead * 1000,
+        )
+
+
+def _bounded_diagnostic(value: str | bytes | None) -> str:
+    """Redact known credentials and bound untrusted verification diagnostics."""
+    if value is None:
+        return ""
+    text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+    for credential in CREDENTIALS.values():
+        for env_var in credential.env_vars:
+            secret = os.environ.get(env_var.name) if env_var.secret else None
+            if secret:
+                text = text.replace(secret, "[REDACTED]")
+    text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text)
+    text = _TOKEN_PREFIX_RE.sub("[REDACTED]", text)
+    return text[:_MAX_DIAGNOSTIC_CHARS]
+
+
+def _check_completion_promise(ver: VerificationConfig, transcript_path: Path) -> _VerificationOutcome:
+    """Classify a completion-promise check without applying Stop policy."""
+    if not ver.promise or not ver.promise.strip():
+        return _VerificationOutcome("misconfigured", "completion_promise requires a non-empty promise")
+
+    if "\n" in ver.promise or "\r" in ver.promise:
+        return _VerificationOutcome("misconfigured", "completion_promise must be a single line")
+
+    if not transcript_path.is_file():
+        return _VerificationOutcome("infrastructure_error", "verification transcript is unavailable")
+
+    try:
+        last_text = _get_last_assistant_text_for_verification(transcript_path, raise_on_error=True)
+    except Exception as exc:
+        return _VerificationOutcome(
+            "infrastructure_error",
+            f"verification transcript could not be read ({type(exc).__name__})",
+        )
+
     promise_stripped = ver.promise.strip()
 
     if last_text is not None:
         for line in last_text.splitlines():
             if line.strip() == promise_stripped:
-                return (True, None)  # Passed
+                return _VerificationOutcome("passed")
 
-    return (False, f"Promise not found: {ver.promise}")
+    return _VerificationOutcome("incomplete", _bounded_diagnostic(f"Promise not found: {ver.promise}"))
 
 
-def _check_test_suite(ver: "VerificationConfig") -> tuple[bool | None, str | None]:
-    """Run test suite and return (passed, error_message).
+def _check_test_suite(ver: VerificationConfig, worktree: Path) -> _VerificationOutcome:
+    """Run the fixed suite synchronously and classify its result.
 
     Command is fixed: ["uv", "run", "pytest"]
-    No shell=True, no user-configurable command.
-
-    Returns:
-        (True, None): Tests passed
-        (False, error): Tests failed
-        (None, None): Skip (infrastructure issue - no persistence needed)
+    No shell, no user-configurable command. Only the subprocess wall time is
+    recorded as external so Stop overhead accounting can exclude it.
     """
-    import subprocess
-
     cmd = ["uv", "run", "pytest"]
+    if not worktree.is_dir():
+        return _VerificationOutcome(
+            "infrastructure_error",
+            f"session worktree is unavailable: {_bounded_diagnostic(str(worktree))}",
+        )
+
+    external_started = perf_counter()
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             timeout=ver.test_timeout_seconds,
-            cwd=Path.cwd(),
+            cwd=worktree,
+            shell=False,
         )
+        external_seconds = perf_counter() - external_started
         if result.returncode == 0:
-            return (True, None)
-        else:
-            # Include stderr snippet for debugging
-            stderr_snippet = result.stderr.decode("utf-8", errors="replace")[:200]
-            return (False, f"Tests failed (exit {result.returncode}): {stderr_snippet}")
+            return _VerificationOutcome("passed", external_seconds=external_seconds)
+        raw_diagnostic = result.stderr or result.stdout
+        diagnostic = _bounded_diagnostic(raw_diagnostic)
+        detail = f"Tests failed (exit {result.returncode})"
+        if diagnostic:
+            detail = f"{detail}: {diagnostic}"
+        return _VerificationOutcome("incomplete", _bounded_diagnostic(detail), external_seconds)
     except subprocess.TimeoutExpired:
-        return (False, f"timeout: {ver.test_timeout_seconds} seconds")
+        return _VerificationOutcome(
+            "incomplete",
+            f"test_suite timeout after {ver.test_timeout_seconds} seconds",
+            perf_counter() - external_started,
+        )
     except FileNotFoundError:
-        # uv not found = misconfiguration, skip with warning (same as missing promise)
-        click.echo("Warning: uv not found - skipping test_suite verification", err=True)
-        return (None, None)
-    except Exception as e:
-        # Other errors = fail-open with warning
-        click.echo(f"Warning: test_suite execution error: {e}", err=True)
-        return (None, None)
+        return _VerificationOutcome(
+            "infrastructure_error",
+            "uv executable was not found for test_suite verification",
+            perf_counter() - external_started,
+        )
+    except Exception as exc:
+        return _VerificationOutcome(
+            "infrastructure_error",
+            f"test_suite execution failed ({type(exc).__name__})",
+            perf_counter() - external_started,
+        )
+
+
+def _verification_worktree(store: SessionStore, manifest: SessionState) -> Path:
+    """Resolve the checkout visible to the process running the Stop hook."""
+    if os.environ.get(FORGE_SIDECAR_VAR) == "1":
+        return store.forge_root
+    if manifest.worktree is not None:
+        return Path(manifest.worktree.path).expanduser().resolve()
+    return store.forge_root
+
+
+def _legacy_config_outcome(ver: VerificationConfig) -> _VerificationOutcome | None:
+    if ver.type not in VERIFICATION_TYPES:
+        return _VerificationOutcome(
+            "misconfigured",
+            _bounded_diagnostic(f"Unknown legacy verification.type {ver.type!r}"),
+        )
+    if ver.on_incomplete not in VERIFICATION_INCOMPLETE_MODES:
+        return _VerificationOutcome(
+            "misconfigured",
+            _bounded_diagnostic(f"Unknown legacy verification.on_incomplete {ver.on_incomplete!r}"),
+        )
+    return None
+
+
+def _persist_verification(
+    store: SessionStore,
+    *,
+    result: str,
+    error: str | None = None,
+    increment_iterations: bool = False,
+    set_started_at: bool = False,
+    auto_bypass: bool = False,
+) -> bool:
+    """Persist one verification outcome; report failure without changing Stop policy."""
+
+    def _mutate(manifest: SessionState) -> None:
+        if manifest.confirmed.verification is None:
+            manifest.confirmed.verification = VerificationConfirmed()
+
+        manifest.confirmed.verification.last_result = result
+        manifest.confirmed.verification.last_error = _bounded_diagnostic(error) or None
+
+        if set_started_at and manifest.confirmed.verification.started_at is None:
+            manifest.confirmed.verification.started_at = now_iso()
+
+        if increment_iterations:
+            manifest.confirmed.verification.iterations += 1
+
+        if auto_bypass:
+            set_override(manifest.overrides, "verification.bypass", True)
+
+        manifest.confirmed.confirmed_at = now_iso()
+        manifest.confirmed.confirmed_by = "hook:stop:verification"
+
+    try:
+        store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
+    except Exception as exc:
+        click.echo(
+            f"[forge] Verification state persistence failed ({type(exc).__name__}); allowing Stop.",
+            err=True,
+        )
+        return False
+    return True
+
+
+def _report_fail_open(outcome: _VerificationOutcome, store: SessionStore) -> tuple[bool, None]:
+    _persist_verification(store, result=outcome.status, error=outcome.detail)
+    label = outcome.status.replace("_", " ")
+    click.echo(f"Warning: Verification {label} - {outcome.detail}; allowing Stop.", err=True)
+    return (True, None)
 
 
 def _run_verification_check(
@@ -84,6 +231,7 @@ def _run_verification_check(
     store: SessionStore,
     manifest: SessionState,
     transcript_path: Path,
+    timing: _VerificationTiming | None = None,
 ) -> tuple[bool, str | None]:
     """Run verification check on Stop (Ralph-Wiggum pattern).
 
@@ -97,6 +245,7 @@ def _run_verification_check(
         store: SessionStore for persisting verification state.
         manifest: Current session manifest.
         transcript_path: Path to the transcript file (for completion_promise type).
+        timing: Optional accumulator for the enclosing Stop pipeline.
 
     Returns:
         Tuple of (should_allow_stop, block_message_or_none).
@@ -104,183 +253,143 @@ def _run_verification_check(
     """
     from datetime import UTC, datetime
 
+    verification_started = perf_counter()
+    external_seconds = 0.0
     try:
-        effective = compute_effective_intent(manifest)
-    except Exception as e:
-        print(
-            f"[forge] Verification check: cannot compute effective intent: {e}",
-            file=sys.stderr,
-        )
-        return (True, None)
-
-    ver = effective.verification
-    if ver is None:
-        return (True, None)
-
-    if ver.bypass:
-        return (True, None)
-
-    if ver.on_incomplete == "allow":  # applies to both verification types
-        return (True, None)
-
-    if ver.type == "test_suite":
-        passed, check_error = _check_test_suite(ver)
-    elif ver.type == "completion_promise":
-        passed, check_error = _check_completion_promise(ver, transcript_path)
-    else:
-        # Unknown verification type = skip
-        return (True, None)
-
-    # passed=None means misconfiguration/infra issue; skip without persisting state
-    if passed is None:
-        return (True, None)
-
-    # Persist verification state
-    def _persist_verification(
-        m: object,
-        *,
-        result: str,
-        error: str | None = None,
-        increment_iterations: bool = False,
-        set_started_at: bool = False,
-        auto_bypass: bool = False,
-    ) -> None:
-        if not isinstance(m, SessionState):
-            return
-
-        if m.confirmed.verification is None:
-            m.confirmed.verification = VerificationConfirmed()
-
-        m.confirmed.verification.last_result = result
-        m.confirmed.verification.last_error = error[:200] if error else None
-
-        if set_started_at and m.confirmed.verification.started_at is None:
-            m.confirmed.verification.started_at = now_iso()
-
-        if increment_iterations:
-            m.confirmed.verification.iterations += 1
-
-        if auto_bypass:
-            set_override(m.overrides, "verification.bypass", True)
-
-        m.confirmed.confirmed_at = now_iso()
-        m.confirmed.confirmed_by = "hook:stop:verification"
-
-    if passed:
         try:
-            store.update(
-                timeout_s=HOOK_LOCK_TIMEOUT_S,
-                mutate=lambda m: _persist_verification(m, result="passed"),
+            effective = compute_effective_intent(manifest)
+        except Exception as exc:
+            click.echo(
+                f"[forge] Verification check could not compute effective intent ({type(exc).__name__}); allowing Stop.",
+                err=True,
             )
-        except Exception as e:
-            print(f"[forge] Verification state persistence failed: {e}", file=sys.stderr)
-        return (True, None)
+            return (True, None)
 
-    if ver.on_incomplete == "warn":
-        try:
-            store.update(
-                timeout_s=HOOK_LOCK_TIMEOUT_S,
-                mutate=lambda m: _persist_verification(m, result="warned", error=check_error),
+        ver = effective.verification
+        if ver is None:
+            return (True, None)
+
+        legacy_outcome = _legacy_config_outcome(ver)
+        if legacy_outcome is not None:
+            return _report_fail_open(legacy_outcome, store)
+
+        if ver.bypass or ver.on_incomplete == "allow":
+            return (True, None)
+
+        if ver.type == "test_suite":
+            outcome = _check_test_suite(ver, _verification_worktree(store, manifest))
+            external_seconds = outcome.external_seconds
+        else:
+            outcome = _check_completion_promise(ver, transcript_path)
+
+        if outcome.status == "passed":
+            _persist_verification(store, result="passed")
+            return (True, None)
+
+        if outcome.status in {"misconfigured", "infrastructure_error"}:
+            return _report_fail_open(outcome, store)
+
+        check_error = outcome.detail or "verification did not pass"
+        if ver.on_incomplete == "warn":
+            _persist_verification(store, result="incomplete", error=check_error)
+            click.echo(f"Warning: Verification incomplete - {check_error}", err=True)
+            return (True, None)
+
+        # on_incomplete == "block" - check escape hatches before blocking
+        current_iterations = 0
+        started_at: str | None = None
+        if manifest.confirmed.verification:
+            current_iterations = manifest.confirmed.verification.iterations
+            started_at = manifest.confirmed.verification.started_at
+
+        if current_iterations + 1 > ver.max_iterations:
+            persisted = _persist_verification(
+                store,
+                result="max_iterations",
+                error=f"Exceeded {ver.max_iterations} iterations",
+                auto_bypass=True,
             )
-        except Exception as e:
-            print(f"[forge] Verification state persistence failed: {e}", file=sys.stderr)
-        click.echo(
-            f"Warning: Verification incomplete - {check_error}",
-            err=True,
-        )
-        return (True, None)
-
-    # on_incomplete == "block" - check escape hatches before blocking
-    current_iterations = 0
-    started_at: str | None = None
-    if manifest.confirmed.verification:
-        current_iterations = manifest.confirmed.verification.iterations
-        started_at = manifest.confirmed.verification.started_at
-
-    # current_iterations + 1 is the count after this block executes
-    if current_iterations + 1 > ver.max_iterations:
-        try:
-            store.update(
-                timeout_s=HOOK_LOCK_TIMEOUT_S,
-                mutate=lambda m: _persist_verification(
-                    m,
-                    result="max_iterations",
-                    error=f"Exceeded {ver.max_iterations} iterations",
-                    auto_bypass=True,
-                ),
-            )
-        except Exception as e:
-            print(f"[forge] Verification state persistence failed: {e}", file=sys.stderr)
-        click.echo(
-            f"Verification auto-bypassed: exceeded max_iterations ({ver.max_iterations}).",
-            err=True,
-        )
-        return (True, None)
-
-    if ver.max_minutes is not None and started_at is not None:
-        try:
-            start_dt = parse_iso(started_at)
-            now_dt = datetime.now(UTC)
-            elapsed_minutes = (now_dt - start_dt).total_seconds() / 60
-            if elapsed_minutes > ver.max_minutes:
-                store.update(
-                    timeout_s=HOOK_LOCK_TIMEOUT_S,
-                    mutate=lambda m: _persist_verification(
-                        m,
-                        result="max_minutes",
-                        error=f"Exceeded {ver.max_minutes} minutes",
-                        auto_bypass=True,
-                    ),
-                )
+            if persisted:
                 click.echo(
-                    f"Verification auto-bypassed: exceeded max_minutes ({ver.max_minutes}).",
+                    f"Verification auto-bypassed: exceeded max_iterations ({ver.max_iterations}).",
                     err=True,
                 )
+            return (True, None)
+
+        if ver.max_minutes is not None and started_at is not None:
+            try:
+                start_dt = parse_iso(started_at)
+                elapsed_minutes = (datetime.now(UTC) - start_dt).total_seconds() / 60
+            except Exception as exc:
+                return _report_fail_open(
+                    _VerificationOutcome(
+                        "infrastructure_error",
+                        f"verification timing state is unreadable ({type(exc).__name__})",
+                    ),
+                    store,
+                )
+            if elapsed_minutes > ver.max_minutes:
+                persisted = _persist_verification(
+                    store,
+                    result="max_minutes",
+                    error=f"Exceeded {ver.max_minutes} minutes",
+                    auto_bypass=True,
+                )
+                if persisted:
+                    click.echo(
+                        f"Verification auto-bypassed: exceeded max_minutes ({ver.max_minutes}).",
+                        err=True,
+                    )
                 return (True, None)
-        except Exception as e:
-            print(f"[forge] Verification time check failed: {e}", file=sys.stderr)
 
-    try:
-        store.update(
-            timeout_s=HOOK_LOCK_TIMEOUT_S,
-            mutate=lambda m: _persist_verification(
-                m,
-                result="failed",
-                error=check_error,
-                increment_iterations=True,
-                set_started_at=True,
-            ),
-        )
-    except Exception as e:
-        print(f"[forge] Verification state persistence failed: {e}", file=sys.stderr)
+        if not _persist_verification(
+            store,
+            result="incomplete",
+            error=check_error,
+            increment_iterations=True,
+            set_started_at=True,
+        ):
+            return (True, None)
 
-    if ver.re_inject_prompt:
-        block_message = ver.re_inject_prompt
-    elif ver.type == "test_suite":
-        block_message = (
-            f"Verification incomplete: tests did not pass.\n"
-            f"Error: {check_error}\n\n"
-            f"Fix the failing tests and try again.\n"
-            f"Escape hatches:\n"
-            f"  - Type: %cancel-verification\n"
-            f"  - Or run: forge session set verification.bypass true"
-        )
-    else:
-        block_message = (
-            f"Verification incomplete: expected completion promise not found.\n"
-            f"Expected: {ver.promise}\n"
-            f"(must appear on its own line in the assistant's response)\n\n"
-            f"Continue working and output the completion promise when done.\n"
-            f"Escape hatches:\n"
-            f"  - Type: %cancel-verification\n"
-            f"  - Or run: forge session set verification.bypass true"
-        )
+        if ver.re_inject_prompt:
+            block_message = ver.re_inject_prompt
+        elif ver.type == "test_suite":
+            block_message = (
+                f"Verification incomplete: tests did not pass.\n"
+                f"Error: {check_error}\n\n"
+                f"Fix the failing tests and try again.\n"
+                f"Escape hatches:\n"
+                f"  - Type: %cancel-verification\n"
+                f"  - Or run: forge session set verification.bypass true"
+            )
+        else:
+            expected = _bounded_diagnostic(ver.promise)
+            block_message = (
+                f"Verification incomplete: expected completion promise not found.\n"
+                f"Expected: {expected}\n"
+                f"(must appear on its own line in the assistant's response)\n\n"
+                f"Continue working and output the completion promise when done.\n"
+                f"Escape hatches:\n"
+                f"  - Type: %cancel-verification\n"
+                f"  - Or run: forge session set verification.bypass true"
+            )
 
-    return (False, block_message)
+        return (False, block_message)
+    finally:
+        if timing is not None:
+            timing.external_seconds = external_seconds
+        else:
+            _warn_if_forge_overhead_exceeded(
+                started=verification_started,
+                external_seconds=external_seconds,
+                operation="verification",
+            )
 
 
 def _get_last_assistant_text_for_verification(
     transcript_path: str | Path,
+    *,
+    raise_on_error: bool = False,
 ) -> str | None:
     """Extract text from the most recent assistant message for verification.
 
@@ -295,6 +404,10 @@ def _get_last_assistant_text_for_verification(
 
     Returns:
         The text content of the last assistant message, or None if not found.
+
+    Raises:
+        OSError: When ``raise_on_error`` is true and the transcript cannot be read.
+        UnicodeError: When ``raise_on_error`` is true and transcript decoding fails.
     """
     path = Path(transcript_path) if isinstance(transcript_path, str) else transcript_path
 
@@ -365,6 +478,7 @@ def _get_last_assistant_text_for_verification(
                             latest_text = joined
 
     except Exception:
-        pass
+        if raise_on_error:
+            raise
 
     return latest_text

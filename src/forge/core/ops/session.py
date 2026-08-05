@@ -36,6 +36,10 @@ from forge.session.exceptions import (
     InvalidOverrideValueError,
 )
 from forge.session.overrides import parse_value, validate_key
+from forge.session.verification_config import (
+    validate_verification_mode_for_authoring,
+    validate_verification_type_for_authoring,
+)
 
 from .context import ExecutionContext
 
@@ -403,7 +407,11 @@ def set_session_override(
         # The mutate callback receives the fresh state from disk, avoiding TOCTOU.
         def _mutate(m: SessionState) -> None:
             set_override(m.overrides, key, parsed_value)
-            compute_effective_intent(m, strict=True, override_key=key)
+            effective = compute_effective_intent(m, strict=True, override_key=key)
+            if key in {"verification", "verification.*", "verification.type"}:
+                validate_verification_type_for_authoring(effective.verification)
+            if key in {"verification", "verification.*", "verification.on_incomplete"}:
+                validate_verification_mode_for_authoring(effective.verification)
 
         store.update(timeout_s=5.0, mutate=_mutate)
 

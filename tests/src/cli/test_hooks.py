@@ -318,14 +318,19 @@ class TestRunVerificationCheck:
         assert allow is True
         assert message is None
 
-    def test_no_promise_configured(self, tmp_path: Path) -> None:
-        """Should allow stop when promise is None/empty."""
+    def test_no_promise_configured(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A missing promise is visible misconfiguration and fails open."""
         store, wt_path = self._create_session_with_verification(tmp_path, promise=None)
         manifest = store.read()
         transcript = self._create_transcript(tmp_path, "Some output")
 
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
         assert allow is True
+        assert message is None
+        assert "misconfigured" in capsys.readouterr().err
+        confirmed = store.read().confirmed.verification
+        assert confirmed is not None
+        assert confirmed.last_result == "misconfigured"
 
     def test_bypass_allows_stop(self, tmp_path: Path) -> None:
         """Should allow stop when bypass is True."""
@@ -355,6 +360,9 @@ class TestRunVerificationCheck:
         assert allow is False
         assert message is not None
         assert "verification" in message.lower() or "promise" in message.lower()
+        confirmed = store.read().confirmed.verification
+        assert confirmed is not None
+        assert confirmed.last_result == "incomplete"
 
     def test_promise_not_found_warns_only(self, tmp_path: Path) -> None:
         """Should allow stop with warning when on_incomplete=warn."""
@@ -364,6 +372,10 @@ class TestRunVerificationCheck:
 
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
         assert allow is True  # Warn allows stop
+        assert message is None
+        confirmed = store.read().confirmed.verification
+        assert confirmed is not None
+        assert confirmed.last_result == "incomplete"
 
     def test_promise_not_found_allow_mode(self, tmp_path: Path) -> None:
         """Should allow stop silently when on_incomplete=allow."""
@@ -373,6 +385,8 @@ class TestRunVerificationCheck:
 
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
         assert allow is True
+        assert message is None
+        assert store.read().confirmed.verification is None
 
     def test_whitespace_tolerance(self, tmp_path: Path) -> None:
         """Should match promise with leading/trailing whitespace on line."""
@@ -384,15 +398,65 @@ class TestRunVerificationCheck:
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
         assert allow is True
 
-    def test_multiline_promise_skips_verification(self, tmp_path: Path) -> None:
-        """Should skip verification if promise contains newlines (misconfiguration)."""
+    def test_multiline_promise_is_visible_misconfiguration(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A multiline promise is visible misconfiguration and fails open."""
         store, wt_path = self._create_session_with_verification(tmp_path, promise="Line1\nLine2")
         manifest = store.read()
         transcript = self._create_transcript(tmp_path, "Some output")
 
         allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
-        # Multi-line promises are treated as misconfiguration, skip verification
         assert allow is True
+        assert message is None
+        assert "single line" in capsys.readouterr().err
+        confirmed = store.read().confirmed.verification
+        assert confirmed is not None
+        assert confirmed.last_result == "misconfigured"
+
+    def test_missing_uv_is_infrastructure_error_and_fails_open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A missing fixed-command executable cannot become an incomplete goal."""
+        import subprocess
+
+        store, wt_path = self._create_session_with_verification(tmp_path, promise=None)
+        manifest = store.read()
+        assert manifest.intent.verification is not None
+        manifest.intent.verification.type = "test_suite"
+        store.write(manifest)
+        transcript = self._create_transcript(tmp_path, "Some output")
+        monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError()))
+
+        allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+        assert allow is True
+        assert message is None
+        assert "uv executable was not found" in capsys.readouterr().err
+        confirmed = store.read().confirmed.verification
+        assert confirmed is not None
+        assert confirmed.last_result == "infrastructure_error"
+
+    def test_persistence_failure_fails_open(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Stop cannot block on an incomplete result it failed to persist."""
+        store, wt_path = self._create_session_with_verification(tmp_path, promise="✓ COMPLETE")
+        manifest = store.read()
+        transcript = self._create_transcript(tmp_path, "No promise")
+        monkeypatch.setattr(store, "update", lambda **_kwargs: (_ for _ in ()).throw(OSError("read-only")))
+
+        allow, message = _run_verification_check(store=store, manifest=manifest, transcript_path=transcript)
+
+        assert allow is True
+        assert message is None
+        assert "persistence failed" in capsys.readouterr().err
 
     def test_iterations_increment_on_block(self, tmp_path: Path) -> None:
         """Should increment iterations count when blocking."""

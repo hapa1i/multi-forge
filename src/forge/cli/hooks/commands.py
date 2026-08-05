@@ -16,6 +16,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable
 
 import click
@@ -84,7 +85,11 @@ from .policy import (
     build_hook_engine,
     register_supervisor_and_restore,
 )
-from .verification import _run_verification_check
+from .verification import (
+    _run_verification_check,
+    _VerificationTiming,
+    _warn_if_forge_overhead_exceeded,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -499,6 +504,8 @@ def stop() -> None:
         _output_json({"success": True, "action": "skip", "reason": "wrong_event"})
         return
 
+    stop_started = perf_counter()
+    verification_timing = _VerificationTiming()
     cwd = Path.cwd().resolve()
     pending_transcript_path: Path | None = None
     raw_transcript_path = data.get("transcript_path")
@@ -574,11 +581,17 @@ def stop() -> None:
         store=store,
         manifest=manifest,
         transcript_path=dst_abs,  # Check the copied artifact, not the original
+        timing=verification_timing,
     )
 
     if not should_allow_stop:
         # Verification failed - block Stop
         # Do NOT enqueue pending-work since we're blocking
+        _warn_if_forge_overhead_exceeded(
+            started=stop_started,
+            external_seconds=verification_timing.external_seconds,
+            operation="Stop",
+        )
         click.echo(block_message, err=True)
         sys.exit(2)
 
@@ -679,6 +692,11 @@ def stop() -> None:
                 "queued_shadow": queued_shadow,
             }
         )
+    _warn_if_forge_overhead_exceeded(
+        started=stop_started,
+        external_seconds=verification_timing.external_seconds,
+        operation="Stop",
+    )
 
 
 @hooks.command(name="stop-failure")

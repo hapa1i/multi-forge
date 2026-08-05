@@ -652,14 +652,18 @@ class TestVerificationConfirmed:
         assert confirmed.last_error == "Promise not found in assistant message"
 
     def test_result_types(self) -> None:
-        """VerificationConfirmed supports various result types."""
+        """VerificationConfirmed keeps current and legacy result strings readable."""
         result_types = [
             "passed",
-            "failed",
-            "warned",
+            "incomplete",
+            "misconfigured",
+            "infrastructure_error",
             "max_iterations",
             "max_minutes",
             "bypassed",
+            # Legacy persisted values:
+            "failed",
+            "warned",
             "error",
         ]
         for result in result_types:

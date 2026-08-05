@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the implemented D005 Codex plus-prefix correction before activating a Wave 2 member. The
-three accepted Stop/artifact members remain parked in `todo/`.
+Current focus: review and merge the completed `align_stop_verification_contract`; its other two Stop/artifact members
+remain parked in `todo/`.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -19,7 +19,9 @@ three accepted Stop/artifact members remain parked in `todo/`.
 - [x] Characterize Wave 2 D024 and D039 at their affected read/path seams.
 - [x] Sequence Wave 2 into three parked members under `epic_stop_artifact_correctness`.
 - [x] Implement and verify the D005 plus-prefix corrective member.
-- [ ] Review and merge the D005 corrective member before starting Wave 2 implementation.
+- [x] Review and merge the D005 corrective member before starting Wave 2 implementation (PR #129, 2026-08-05).
+- [x] Implement and verify the D006/U002/U003 Stop-verification member.
+- [ ] Review and merge the Stop-verification member before activating transcript-artifact work.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

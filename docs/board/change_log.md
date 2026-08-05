@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-05
 
+### Align Stop verification contract
+
+**Goal**: Enforce the approved two-type Stop-verification schema without silent success or infrastructure-induced
+blocking.
+
+**Key changes**:
+
+- Added strict authoring validation while preserving legacy unknown strings for visible non-passing fail-open handling.
+- Kept the fixed no-shell test suite synchronous in the resolved session worktree, separated its wall time from
+  Forge-owned overhead, and classified incomplete, configuration, and infrastructure outcomes explicitly.
+- Made verification-state persistence failure visible and fail open so it cannot cause an infrastructure-induced block.
+- Bounded and redacted captured diagnostics, added marked D006/U002/U003 regressions, and exercised the real Stop hook
+  in Docker without activating the next Wave 2 member.
+
+**Verification**: Focused Stop/config/model tests passed (166); full regression suite passed (649); `make test-unit`
+passed (8,724 passed, 1 skipped); Docker policy-hook integration passed (22); `make pre-commit` passed.
+
 ### Preserve plus-prefixed Codex Write identity
 
 **Goal**: Prevent valid plus-prefixed Codex file content from collapsing to an empty, reusable policy identity.

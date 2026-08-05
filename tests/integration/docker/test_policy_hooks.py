@@ -1,4 +1,4 @@
-"""Docker-based tests for PolicyCheck, CodexPolicyCheck, and PreCompact hooks.
+"""Docker-based tests for PolicyCheck, CodexPolicyCheck, Stop, and PreCompact hooks.
 
 These tests verify hook behavior with complete filesystem and network isolation.
 PolicyCheck tests TDD enforcement (Claude wire: exit 2 blocks); CodexPolicyCheck
@@ -128,6 +128,30 @@ def invoke_precompact(
     payload_json = json.dumps(payload)
     env_exports = f"export FORGE_SESSION={session_name}"
     result = workspace.exec(f"cd {cwd} && {env_exports} && printf '%s' '{payload_json}' | forge hook pre-compact")
+    return result.returncode, result.stdout, result.stderr
+
+
+def invoke_stop(
+    workspace: ContainerLike,
+    *,
+    cwd: str = "/workspace",
+    session_name: str = "policy-test",
+    transcript_path: str = "/tmp/stop-transcript.jsonl",
+) -> tuple[int, str, str]:
+    """Invoke forge hook stop and return (exit_code, stdout, stderr)."""
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "stop-test-uuid",
+        "transcript_path": transcript_path,
+        "cwd": cwd,
+    }
+    payload_json = json.dumps(payload)
+    result = workspace.exec(
+        f"cd {cwd} && export FORGE_SESSION={session_name}"
+        f" && export FORGE_DEBUG=1"
+        f" && export PATH=/tmp/verification-bin:$PATH"
+        f" && printf '%s' '{payload_json}' | forge hook stop"
+    )
     return result.returncode, result.stdout, result.stderr
 
 
@@ -264,6 +288,45 @@ class TestPolicyCheckDocker:
         if result.stdout.strip():
             output = json.loads(result.stdout)
             assert output.get("action") == "skip" or output.get("reason") == "no_session"
+
+
+# =============================================================================
+# Stop Verification Tests
+# =============================================================================
+
+
+class TestStopVerificationDocker:
+    """Fixed test-suite verification at the real containerized Stop boundary."""
+
+    def test_fixed_suite_runs_from_resolved_session_worktree(self, policy_workspace: ContainerLike) -> None:
+        manifest_path = "/workspace/.forge/sessions/policy-test/forge.session.json"
+        manifest = read_manifest(policy_workspace)
+        manifest["intent"]["verification"] = {"type": "test_suite", "on_incomplete": "block"}
+        policy_workspace.write_json(manifest_path, manifest)
+
+        policy_workspace.mkdir("/tmp/verification-bin")
+        policy_workspace.write_file(
+            "/tmp/verification-bin/uv",
+            "#!/bin/bash\npwd > /tmp/verification-cwd\nprintf '%s\\n' \"$@\" > /tmp/verification-args\nsleep 0.12\n",
+        )
+        policy_workspace.exec("chmod +x /tmp/verification-bin/uv")
+        policy_workspace.write_file(
+            "/tmp/stop-transcript.jsonl",
+            '{"timestamp":"2026-08-05T00:00:00Z","message":{"role":"assistant","content":[{"text":"done"}]}}',
+        )
+
+        exit_code, stdout, stderr = invoke_stop(policy_workspace, cwd="/tmp")
+
+        assert exit_code == 0, f"Expected successful Stop verification, got {exit_code}. stderr: {stderr}"
+        assert json.loads(stdout)["success"] is True
+        hook_logs = policy_workspace.exec('find "$HOME/.forge/logs/hooks" -type f -name "stop.*.log" -exec cat {} +')
+        assert hook_logs.returncode == 0, hook_logs.stderr
+        assert "stop: session_id=stop-test-u" in hook_logs.stdout
+        assert "Forge-owned Stop overhead exceeded" not in hook_logs.stdout
+        assert policy_workspace.read_file("/tmp/verification-cwd").strip() == "/workspace"
+        assert policy_workspace.read_file("/tmp/verification-args").splitlines() == ["run", "pytest"]
+        confirmed = read_manifest(policy_workspace)["confirmed"]["verification"]
+        assert confirmed["last_result"] == "passed"
 
 
 # =============================================================================

@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG1; D006 and U002–U003).
 
-**Lane**: `done/` -- approved on 2026-08-04; implementation is parked in
-[`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md).
+**Lane**: `done/` -- approved on 2026-08-04; implementation is complete in
+[`align_stop_verification_contract`](../align_stop_verification_contract/card.md).
 
 ## Problem
 
@@ -111,5 +111,5 @@ unknown values are visible and fail open rather than passing silently.
 
 The workflow and Stop-pipeline documentation now describe the shipped two-type schema and fixed-command latency
 exception. Validation, legacy diagnostics, resolved cwd, redaction, result classification, and overhead regression work
-remain in [`align_stop_verification_contract`](../../todo/align_stop_verification_contract/card.md). Verification:
-`make pre-commit-md` and `git diff --check`.
+were completed in [`align_stop_verification_contract`](../align_stop_verification_contract/card.md). Decision-phase
+verification: `make pre-commit-md` and `git diff --check`.
