@@ -22,7 +22,11 @@ from forge.install.project_compat import (
     enforce_project_compatibility_toml,
 )
 
-from .artifacts import ADOPT_ARTIFACT_REASON, resolve_artifact_path
+from .artifacts import (
+    ADOPT_ARTIFACT_REASON,
+    latest_transcript_artifact_path,
+    resolve_artifact_path,
+)
 from .claude.paths import (
     get_transcript_path,
     resolve_claude_project_root,
@@ -298,18 +302,6 @@ def _candidate_transcript_project_roots(
     _add_unique_project_root(roots, entry.forge_root or entry.worktree_path)
     _add_unique_project_root(roots, entry.worktree_path)
     return roots
-
-
-def _latest_transcript_artifact_path(state: SessionState) -> str | None:
-    """Return the latest copied transcript artifact path from confirmed state."""
-    transcripts = state.confirmed.artifacts.get("transcripts")
-    if not isinstance(transcripts, list) or not transcripts:
-        return None
-    latest = transcripts[-1]
-    if not isinstance(latest, dict):
-        return None
-    copied_path = latest.get("copied_path")
-    return copied_path if isinstance(copied_path, str) else None
 
 
 class SessionManager:
@@ -849,7 +841,7 @@ class SessionManager:
                 warnings_sink=inh_warnings_native,
             )
             # Resolve parent transcript path for traceability (best-effort)
-            transcript_artifact_path = _latest_transcript_artifact_path(parent_state)
+            transcript_artifact_path = latest_transcript_artifact_path(parent_state)
 
             child_state.confirmed.derivation = Derivation(
                 parent_session=parent_name,
@@ -891,20 +883,15 @@ class SessionManager:
             resume_strategy = ResumeStrategy.STRUCTURED
 
         if resume_strategy == ResumeStrategy.FULL and context_limit is not None:
-            transcripts = parent_state.confirmed.artifacts.get("transcripts", [])
-            if transcripts and isinstance(transcripts, list) and len(transcripts) > 0:
-                latest = transcripts[-1]
-                if isinstance(latest, dict):
-                    copied_path = latest.get("copied_path")
-                    if isinstance(copied_path, str):
-                        transcript_path = resolve_artifact_path(parent_artifact_root, copied_path)
-                        if transcript_path is not None and transcript_path.is_file():
-                            token_estimate = estimate_transcript_tokens(
-                                transcript_path,
-                                multiplier=token_estimate_multiplier,
-                            )
-                            if token_estimate > context_limit:
-                                raise ContextBudgetExceededError(token_estimate, context_limit)
+            copied_path = latest_transcript_artifact_path(parent_state)
+            transcript_path = resolve_artifact_path(parent_artifact_root, copied_path)
+            if transcript_path is not None and transcript_path.is_file():
+                token_estimate = estimate_transcript_tokens(
+                    transcript_path,
+                    multiplier=token_estimate_multiplier,
+                )
+                if token_estimate > context_limit:
+                    raise ContextBudgetExceededError(token_estimate, context_limit)
 
         def get_session_safe(session_name: str) -> SessionState | None:
             try:
@@ -1222,6 +1209,11 @@ class SessionManager:
         if parent_launch is not None and parent_launch.runtime == "codex":
             raise CannotForkCodexParentError(parent_name)
 
+        # Validate the parent artifact collection before worktree creation or
+        # target replacement. The shared selector is strict durable-state input;
+        # discovering corruption after those side effects would leak Git state.
+        parent_transcript_artifact_path = latest_transcript_artifact_path(parent)
+
         if fork_name is None:
             existing = {name for name, _ in self.list_sessions(forge_root_filter=parent_forge_root)}
             fork_name = generate_unique_name(existing)
@@ -1511,7 +1503,7 @@ class SessionManager:
         fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
         fork_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
-            parent_transcript=_latest_transcript_artifact_path(parent),
+            parent_transcript=parent_transcript_artifact_path,
             inherited_proxy=fork_proxy_template,
             resume_mode=fork_resume_mode,
             strategy=None,

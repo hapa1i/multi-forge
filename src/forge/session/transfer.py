@@ -39,7 +39,10 @@ from forge.core.transcript import (
     resolve_entry_role,
     truncate,
 )
-from forge.session.artifacts import resolve_artifact_path
+from forge.session.artifacts import (
+    latest_transcript_artifact_path,
+    resolve_artifact_path,
+)
 from forge.session.claude.paths import get_transcript_path
 from forge.session.models import SessionState
 from forge.session.prev_sessions import (
@@ -1111,15 +1114,10 @@ def assemble_transfer_context(
     transcript_path: Path | None = None
     artifacts_path: str | None = None
 
-    transcripts = confirmed.artifacts.get("transcripts", [])
-    if transcripts and isinstance(transcripts, list) and len(transcripts) > 0:
-        # Use most recent transcript artifact
-        latest = transcripts[-1]
-        if isinstance(latest, dict):
-            copied_path = latest.get("copied_path")
-            if isinstance(copied_path, str):
-                artifacts_path = copied_path
-                transcript_path = resolve_artifact_path(forge_root, copied_path)
+    copied_path = latest_transcript_artifact_path(parent_state)
+    if copied_path is not None:
+        artifacts_path = copied_path
+        transcript_path = resolve_artifact_path(forge_root, copied_path)
 
     if transcript_path is None and confirmed.transcript_path:
         inferred_path = Path(confirmed.transcript_path).expanduser()

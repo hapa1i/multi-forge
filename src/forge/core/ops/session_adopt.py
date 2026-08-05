@@ -37,6 +37,7 @@ from forge.session import SessionManager, SessionStore, UuidAlreadyBoundError
 from forge.session.artifacts import (
     ADOPT_ARTIFACT_REASON,
     get_artifact_paths,
+    reconcile_transcript_artifact,
     safe_copy_file,
 )
 from forge.session.claude.paths import get_project_encoded_dir, get_transcript_path
@@ -729,11 +730,8 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
 
             if not isinstance(m, SessionState):
                 raise TypeError(f"Expected SessionState, got {type(m)}")
-            entries = m.confirmed.artifacts.setdefault("transcripts", [])
-            if not isinstance(entries, list):
-                entries = []
-                m.confirmed.artifacts["transcripts"] = entries
-            entries.append(
+            reconcile_transcript_artifact(
+                m,
                 {
                     "captured_at": now_iso(),
                     "reason": ADOPT_ARTIFACT_REASON,
@@ -741,7 +739,7 @@ def adopt_session(ctx: ExecutionContext, plan: AdoptPlan, *, name: str) -> Adopt
                     "session_id": plan.session_uuid,
                     "copied_path": str(dst_rel),
                     "copied": True,
-                }
+                },
             )
             m.confirmed.claude_project_root = plan.claude_project_root
             # confirmed.adoption was pre-seeded by start_session (write-once);

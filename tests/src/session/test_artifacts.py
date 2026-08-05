@@ -6,6 +6,7 @@ make_timestamp_suffix, snapshot_plan_approved, ensure_dirs.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,13 +15,39 @@ import pytest
 from forge.session.artifacts import (
     ensure_dirs,
     get_artifact_paths,
+    latest_transcript_artifact_path,
     make_content_hash,
     make_timestamp_suffix,
+    migrate_legacy_transcript_snapshots,
+    reconcile_transcript_artifact,
     resolve_artifact_path,
     resolve_forge_root,
     safe_copy_file,
     snapshot_plan_approved,
 )
+from forge.session.exceptions import TranscriptArtifactStateError
+from forge.session.models import CompactionConfirmed, create_session_state
+
+
+def _canonical_transcript(session_id: str, copied_path: str, *, captured_at: str) -> dict[str, object]:
+    return {
+        "captured_at": captured_at,
+        "reason": "stop",
+        "source_path": f"/tmp/{session_id}.jsonl",
+        "session_id": session_id,
+        "copied_path": copied_path,
+        "copied": True,
+    }
+
+
+def _legacy_precompact(snapshot_path: str) -> dict[str, object]:
+    return {
+        "captured_at": "2026-08-05T00:02:00Z",
+        "reason": "pre-compact",
+        "source_path": "/tmp/current.jsonl",
+        "snapshot_path": snapshot_path,
+        "copied": True,
+    }
 
 
 class TestResolveForgeRoot:
@@ -87,6 +114,128 @@ class TestResolveArtifactPath:
 
     def test_none_returns_none(self, tmp_path: Path) -> None:
         assert resolve_artifact_path(tmp_path, None) is None
+
+
+class TestTranscriptArtifactState:
+    def test_reconcile_refreshes_identity_preserves_distinct_and_migrates_snapshot(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        state = create_session_state("session")
+        distinct = _canonical_transcript(
+            "distinct", ".forge/artifacts/session/transcripts/distinct.jsonl", captured_at="1"
+        )
+        stale = _canonical_transcript("active", ".forge/artifacts/session/transcripts/active.jsonl", captured_at="2")
+        duplicate = dict(stale, captured_at="3")
+        snapshot = _legacy_precompact(".forge/artifacts/session/transcripts/precompact.jsonl")
+        state.confirmed.artifacts["transcripts"] = [distinct, stale, snapshot, duplicate]
+        state.confirmed.compaction = CompactionConfirmed(transcript_snapshots=[dict(snapshot)])
+        refreshed = dict(stale, captured_at="4", reason="stop-failure")
+
+        with caplog.at_level(logging.WARNING, logger="forge.session.artifacts"):
+            changed = reconcile_transcript_artifact(state, refreshed)
+
+        assert changed == 2
+        assert state.confirmed.artifacts["transcripts"] == [distinct, refreshed]
+        assert state.confirmed.compaction.transcript_snapshots == [snapshot]
+        assert "migrated 1 recognized legacy PreCompact snapshot" in caplog.text
+
+    def test_reconcile_without_refresh_keeps_latest_successful_record(self) -> None:
+        state = create_session_state("session")
+        path = ".forge/artifacts/session/transcripts/active.jsonl"
+        first = _canonical_transcript("active", path, captured_at="1")
+        latest = dict(first, captured_at="2")
+        state.confirmed.artifacts["transcripts"] = [first, latest]
+        skipped = dict(latest, captured_at="3", copied=False)
+
+        changed = reconcile_transcript_artifact(state, skipped, refresh_existing=False)
+
+        assert changed == 1
+        assert state.confirmed.artifacts["transcripts"] == [latest]
+
+    def test_reconcile_without_refresh_moves_retained_identity_to_tail(self) -> None:
+        state = create_session_state("session")
+        retained_path = ".forge/artifacts/session/transcripts/retained.jsonl"
+        retained = _canonical_transcript("retained", retained_path, captured_at="1")
+        distinct = _canonical_transcript(
+            "distinct", ".forge/artifacts/session/transcripts/distinct.jsonl", captured_at="2"
+        )
+        state.confirmed.artifacts["transcripts"] = [retained, distinct]
+        skipped = dict(retained, captured_at="3", copied=False)
+
+        changed = reconcile_transcript_artifact(state, skipped, refresh_existing=False)
+
+        assert changed == 0
+        assert state.confirmed.artifacts["transcripts"] == [distinct, retained]
+        assert latest_transcript_artifact_path(state) == retained_path
+
+    @pytest.mark.parametrize(
+        "malformed",
+        [{"unexpected": "mapping"}, None],
+        ids=["mapping", "null"],
+    )
+    def test_reconcile_rejects_non_list_without_mutation(self, malformed: object) -> None:
+        state = create_session_state("session")
+        state.confirmed.artifacts["transcripts"] = malformed
+        entry = _canonical_transcript("active", ".forge/artifacts/session/transcripts/active.jsonl", captured_at="1")
+
+        with pytest.raises(TranscriptArtifactStateError, match="expected a list"):
+            reconcile_transcript_artifact(state, entry)
+
+        assert state.confirmed.artifacts["transcripts"] == malformed
+
+    def test_latest_path_tolerates_recognized_legacy_shapes_with_diagnostic(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        state = create_session_state("session")
+        path = ".forge/artifacts/session/transcripts/active.jsonl"
+        state.confirmed.artifacts["transcripts"] = [
+            {"copied_path": ".forge/artifacts/session/transcripts/old.jsonl"},
+            _canonical_transcript("active", path, captured_at="1"),
+            _legacy_precompact(".forge/artifacts/session/transcripts/precompact.jsonl"),
+        ]
+
+        with caplog.at_level(logging.WARNING, logger="forge.session.artifacts"):
+            selected = latest_transcript_artifact_path(state)
+
+        assert selected == path
+        assert "legacy PreCompact" in caplog.text
+        assert "copied_path-only" in caplog.text
+
+    def test_latest_path_rejects_unrecognized_entry_without_skipping(self) -> None:
+        state = create_session_state("session")
+        valid = _canonical_transcript("active", ".forge/artifacts/session/transcripts/active.jsonl", captured_at="1")
+        state.confirmed.artifacts["transcripts"] = [valid, {"source_path": "/tmp/orphan.jsonl"}]
+
+        with pytest.raises(TranscriptArtifactStateError, match="neither a canonical transcript"):
+            latest_transcript_artifact_path(state)
+
+    def test_migration_preserves_compaction_count(self) -> None:
+        state = create_session_state("session")
+        snapshot = _legacy_precompact(".forge/artifacts/session/transcripts/precompact.jsonl")
+        state.confirmed.artifacts["transcripts"] = [snapshot]
+        state.confirmed.compaction = CompactionConfirmed(compact_count=4)
+
+        assert migrate_legacy_transcript_snapshots(state) == 1
+        assert state.confirmed.compaction.compact_count == 4
+        assert state.confirmed.compaction.transcript_snapshots == [snapshot]
+        assert state.confirmed.artifacts["transcripts"] == []
+
+    def test_migration_rejects_non_list_compaction_state_without_mutation(self) -> None:
+        state = create_session_state("session")
+        snapshot = _legacy_precompact(".forge/artifacts/session/transcripts/precompact.jsonl")
+        state.confirmed.artifacts["transcripts"] = [snapshot]
+        state.confirmed.compaction = CompactionConfirmed(compact_count=4)
+        malformed = {"unexpected": "mapping"}
+        setattr(state.confirmed.compaction, "transcript_snapshots", malformed)
+
+        with pytest.raises(
+            TranscriptArtifactStateError,
+            match="confirmed.compaction.transcript_snapshots is malformed: expected a list",
+        ):
+            migrate_legacy_transcript_snapshots(state)
+
+        assert state.confirmed.compaction.transcript_snapshots == malformed
+        assert state.confirmed.artifacts["transcripts"] == [snapshot]
 
 
 class TestSafeCopyFile:

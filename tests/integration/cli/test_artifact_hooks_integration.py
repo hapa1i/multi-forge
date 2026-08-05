@@ -304,6 +304,55 @@ class TestStopHookArtifacts:
         assert len(transcripts) >= 1
         assert transcripts[-1]["session_id"] == "uuid-123"
 
+    def test_repeated_stop_precompact_and_rollover_keep_artifact_schemas_separate(
+        self, mock_claude_workspace: ContainerLike
+    ) -> None:
+        transcript_path = self._setup_session_with_transcript(mock_claude_workspace, session_name="schema-boundary")
+        payload = {
+            "hook_event_name": "Stop",
+            "transcript_path": transcript_path,
+            "session_id": "uuid-123",
+        }
+        self._invoke_stop_hook(mock_claude_workspace, payload, session_name="schema-boundary")
+        mock_claude_workspace.exec(f"printf 'second\\n' > {transcript_path}")
+        self._invoke_stop_hook(mock_claude_workspace, payload, session_name="schema-boundary")
+
+        precompact = json.dumps(
+            {
+                "hook_event_name": "PreCompact",
+                "transcript_path": transcript_path,
+                "session_id": "uuid-123",
+                "cwd": "/workspace",
+            }
+        )
+        result = mock_claude_workspace.exec(
+            f"cd /workspace && export FORGE_SESSION=schema-boundary && echo '{precompact}' | forge hook pre-compact"
+        )
+        assert result.returncode == 0, result.stderr
+
+        rollover = json.dumps(
+            {
+                "session_id": "uuid-456",
+                "transcript_path": "/tmp/claude/next.jsonl",
+                "source": "compact",
+            }
+        )
+        result = mock_claude_workspace.exec(
+            f"cd /workspace && export FORGE_SESSION=schema-boundary && echo '{rollover}' | forge hook session-start"
+        )
+        assert result.returncode == 0, result.stderr
+
+        raw = mock_claude_workspace.exec("cat /workspace/.forge/sessions/schema-boundary/forge.session.json")
+        manifest = json.loads(raw.stdout)
+        transcripts = manifest["confirmed"]["artifacts"]["transcripts"]
+        snapshots = manifest["confirmed"]["compaction"]["transcript_snapshots"]
+        assert len(transcripts) == 1
+        assert transcripts[0]["session_id"] == "uuid-123"
+        assert transcripts[0]["reason"] == "stop"
+        assert len(snapshots) == 1
+        assert snapshots[0]["reason"] == "pre-compact"
+        assert "copied_path" not in snapshots[0]
+
     def test_creates_pending_work_marker(self, mock_claude_workspace: ContainerLike) -> None:
         """Should create pending-work marker for async processing."""
         transcript_path = self._setup_session_with_transcript(mock_claude_workspace)

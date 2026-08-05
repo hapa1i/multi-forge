@@ -24,7 +24,12 @@ from forge.core.state import (
     now_iso,
 )
 
-from ..artifacts import get_artifact_paths, resolve_forge_root, safe_copy_file
+from ..artifacts import (
+    get_artifact_paths,
+    reconcile_transcript_artifact,
+    resolve_forge_root,
+    safe_copy_file,
+)
 from ..exceptions import SessionFileNotFoundError
 from ..index import IndexStore
 from ..models import SessionState, StartedWithProxy
@@ -449,21 +454,9 @@ def _capture_transcript_rollover(
         store = SessionStore(_resolve_store_root(session_name, cwd, forge_root), session_name)
 
         def _mutate(state: SessionState) -> None:
-            artifacts = state.confirmed.artifacts
-            transcripts = artifacts.get("transcripts")
-            if isinstance(transcripts, list):
-                for artifact in transcripts:
-                    if not isinstance(artifact, dict):
-                        continue
-                    if artifact.get("session_id") == previous_session_id and artifact.get("copied_path") == str(
-                        dst_rel
-                    ):
-                        return
-
-            _append_artifact_entry(
-                artifacts,
-                kind="transcripts",
-                entry={
+            reconcile_transcript_artifact(
+                state,
+                {
                     "captured_at": now_iso(),
                     "reason": "rollover",
                     "source_path": previous_transcript_path,
@@ -471,30 +464,12 @@ def _capture_transcript_rollover(
                     "copied_path": str(dst_rel),
                     "copied": copied,
                 },
+                refresh_existing=copied,
             )
 
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
         print(f"[forge] Transcript rollover failed: {e}", file=sys.stderr)
-
-
-def _append_artifact_entry(
-    confirmed_artifacts: dict[str, object],
-    *,
-    kind: str,
-    entry: dict[str, object],
-) -> None:
-    """Append an artifact record under confirmed.artifacts in a stable shape."""
-    items = confirmed_artifacts.get(kind)
-    if items is None:
-        confirmed_artifacts[kind] = [entry]
-        return
-
-    if not isinstance(items, list):
-        confirmed_artifacts[kind] = [entry]
-        return
-
-    items.append(entry)
 
 
 def parse_hook_input(data: dict[str, object]) -> HookInput | None:

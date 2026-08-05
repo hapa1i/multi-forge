@@ -1,7 +1,7 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- the
-D005 corrective follow-up is merged, and the first Wave 2 Stop/artifact member is complete pending review/merge.
+first Wave 2 member shipped in PR #130, and transcript-artifact correctness is implemented and awaiting review.
 
 ## Goal
 
@@ -10,8 +10,9 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003 for a current total of 146 ranked findings plus unranked U001. The report remains the
-evidence ledger; this epic owns member coordination, sequencing, and final disposition.
+notes; DG1 admitted U002/U003, and a follow-up review admitted D045, for a current total of 147 ranked findings plus
+unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
+disposition.
 
 ## Admission Contract
 
@@ -60,8 +61,8 @@ Wave 1 closed through [`epic_policy_supervision_correctness`](../../done/epic_po
 post-close D005 parser defect was corrected by
 [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) and
 merged in PR #129 (`5813994c`). Wave 2 is coordinated by the active
-[`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md); its verification member is implemented
-and verified, while the transcript-artifact and sidecar members remain parked.
+[`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md); its verification member shipped in PR
+#130 (`fee562ab`), transcript-artifact work is implemented and awaiting review, and the sidecar member remains parked.
 
 | Wave | Findings        | Member                                                                                                          |
 | ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -70,7 +71,7 @@ and verified, while the transcript-artifact and sidecar members remain parked.
 | 1    | D005            | [`preserve_supervisor_edit_identity`](../../done/preserve_supervisor_edit_identity/card.md)                     |
 | 1C   | D005            | [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) |
 | 2    | D006, U002–U003 | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)                       |
-| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../todo/preserve_transcript_artifact_identity/card.md)             |
+| 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md)             |
 | 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)                 |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                       |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                   |

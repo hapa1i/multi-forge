@@ -626,7 +626,10 @@ def fork(
 
     if (is_cross_dir or resume_mode == "transfer") and strategy == "full" and not direct:
         try:
-            from forge.session.artifacts import resolve_artifact_path
+            from forge.session.artifacts import (
+                latest_transcript_artifact_path,
+                resolve_artifact_path,
+            )
 
             parent_state = manager.get_session(parent, forge_root=_fr)
             # --proxy override > parent's proxy for budget check
@@ -640,31 +643,29 @@ def fork(
                 from forge.session.transfer import estimate_transcript_tokens
 
                 artifact_root = _resolve_session_artifact_root(manager=manager, state=parent_state)
-                transcripts = parent_state.confirmed.artifacts.get("transcripts", [])
-                if transcripts and isinstance(transcripts, list):
-                    latest = transcripts[-1]
-                    if isinstance(latest, dict):
-                        copied_path = latest.get("copied_path")
-                        if isinstance(copied_path, str):
-                            transcript_path = resolve_artifact_path(artifact_root, copied_path)
-                            if transcript_path is not None and transcript_path.is_file():
-                                token_est = estimate_transcript_tokens(transcript_path)
-                                if token_est > context_limit_preflight:
-                                    if force:
-                                        console.print(
-                                            f"[yellow]Warning:[/yellow] Parent transcript ({token_est:,} tokens) "
-                                            f"exceeds context limit ({context_limit_preflight:,}). "
-                                            "Proceeding anyway (--force)."
-                                        )
-                                    else:
-                                        print_error_with_tip(
-                                            f"Parent transcript ({token_est:,} tokens) exceeds "
-                                            f"context limit ({context_limit_preflight:,}).",
-                                            "Use --strategy structured or --strategy ai-curated instead.",
-                                        )
-                                        sys.exit(1)
-        except ForgeSessionError:
+                copied_path = latest_transcript_artifact_path(parent_state)
+                transcript_path = resolve_artifact_path(artifact_root, copied_path)
+                if transcript_path is not None and transcript_path.is_file():
+                    token_est = estimate_transcript_tokens(transcript_path)
+                    if token_est > context_limit_preflight:
+                        if force:
+                            console.print(
+                                f"[yellow]Warning:[/yellow] Parent transcript ({token_est:,} tokens) "
+                                f"exceeds context limit ({context_limit_preflight:,}). "
+                                "Proceeding anyway (--force)."
+                            )
+                        else:
+                            print_error_with_tip(
+                                f"Parent transcript ({token_est:,} tokens) exceeds "
+                                f"context limit ({context_limit_preflight:,}).",
+                                "Use --strategy structured or --strategy ai-curated instead.",
+                            )
+                            sys.exit(1)
+        except SessionNotFoundError:
             pass  # Parent not found; fork_session() will raise the right error
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
 
     # Preflight supervisor proxy BEFORE fork_session() to avoid half-created state
     if supervisor_proxy:

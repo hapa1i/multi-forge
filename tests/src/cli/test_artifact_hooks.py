@@ -525,10 +525,9 @@ class TestAdoptionProvenanceSurvivesHooks:
     def test_pre_compact_leaves_the_binding_untouched(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A compaction snapshot must not disturb the adopted UUID or its provenance.
 
-        Pre-compact does not mutate the binding today -- it writes only a compaction
-        snapshot entry, which omits `session_id` entirely (commands.py:875). This is a
-        guard against a future refactor unifying the two capture paths, since the Stop
-        rewrite at :179 has no falsy guard and would happily write a None through.
+        PreCompact writes its snapshot-only shape to the dedicated compaction
+        collection. This guards against accidentally routing it through the canonical
+        transcript writer, which also updates the active Claude binding at Stop.
         """
         monkeypatch.chdir(tmp_path)
         store = self._adopted_session(tmp_path, monkeypatch)
@@ -557,12 +556,12 @@ class TestAdoptionProvenanceSurvivesHooks:
         # (commands.py:891), which is exactly why provenance cannot live there.
         assert updated.confirmed.confirmed_by == "hook:pre-compact"
 
-        # The compaction entry is the one artifact shape with no session_id; a reader
-        # that assumes every transcript entry carries one would read None as drift.
-        entries = updated.confirmed.artifacts.get("transcripts", [])
-        compaction_entries = [e for e in entries if e.get("reason") == "pre-compact"]
-        assert compaction_entries, "pre-compact should have recorded a snapshot entry"
-        assert all("session_id" not in e for e in compaction_entries)
+        assert updated.confirmed.artifacts.get("transcripts") is None
+        assert updated.confirmed.compaction is not None
+        compaction_entries = updated.confirmed.compaction.transcript_snapshots
+        assert len(compaction_entries) == 1
+        assert compaction_entries[0]["reason"] == "pre-compact"
+        assert "session_id" not in compaction_entries[0]
 
 
 class TestStopFailureHook:

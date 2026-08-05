@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the completed `align_stop_verification_contract`; its other two Stop/artifact members
-remain parked in `todo/`.
+Current focus: review and merge the completed D007/D024 transcript-artifact member; sidecar routing remains parked.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -21,7 +20,9 @@ remain parked in `todo/`.
 - [x] Implement and verify the D005 plus-prefix corrective member.
 - [x] Review and merge the D005 corrective member before starting Wave 2 implementation (PR #129, 2026-08-05).
 - [x] Implement and verify the D006/U002/U003 Stop-verification member.
-- [ ] Review and merge the Stop-verification member before activating transcript-artifact work.
+- [x] Review and merge the Stop-verification member before activating transcript-artifact work (PR #130, 2026-08-05).
+- [x] Activate `preserve_transcript_artifact_identity` on its execution branch.
+- [x] Implement and verify the D007/D024 transcript-artifact member without activating sidecar routing.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

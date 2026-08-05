@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- coordinating active Wave 2 work; the verification member is complete pending review/merge, and the
-remaining two members are parked.
+**Lane**: `doing/` -- coordinating active Wave 2 work; the verification member shipped in PR #130, the
+transcript-artifact member is implemented and verified pending review, and the sidecar member remains parked.
 
 ## Goal
 
@@ -43,7 +43,7 @@ target contract.
 | Order | Findings        | Member                                                                                              | Review boundary                                      |
 | ----- | --------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1     | D006, U002–U003 | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)           | Verification schema, result states, and latency      |
-| 2     | D007, D024      | [`preserve_transcript_artifact_identity`](../../todo/preserve_transcript_artifact_identity/card.md) | Artifact identity, schema, and legacy reads          |
+| 2     | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md) | Artifact identity, schema, and legacy reads          |
 | 3     | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)     | Container-local detection and host-marker path split |
 
 The verification member goes first because DG1 already defines its complete contract and it owns the Stop decision
@@ -52,7 +52,13 @@ because it requires container-path integration evidence and does not depend on e
 
 D006/U002/U003 were rechecked again on their execution branch from merged `main` at `5813994c`. The three retained
 regression modules failed in six cases before implementation, reproducing hook-CWD execution, timeout and persistence
-misclassification, unredacted diagnostics, silent unknown-type allow, and unknown-mode blocking.
+misclassification, unredacted diagnostics, silent unknown-type allow, and unknown-mode blocking. The member shipped in
+PR #130 (`fee562ab`) on 2026-08-05 before transcript-artifact work was activated.
+
+D007/D024 were rechecked again on the execution branch from `fee562ab`. The two retained regression modules failed in
+six cases before implementation, covering duplicate and clobbering writes, schema pollution, two broken read paths, and
+both bypassed budget preflights. The member now passes focused, regression, unit, and required Docker-hook coverage; it
+must be reviewed and merged before D039 is activated.
 
 ## Drift Constraints
 
