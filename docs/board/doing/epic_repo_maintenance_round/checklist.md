@@ -1,7 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: Wave 1 is closed. Wave 2 Stop/artifact findings are reproduced and split into three accepted `todo/`
-members; no implementation member is active.
+Current focus: review and merge the implemented D005 Codex plus-prefix correction before activating a Wave 2 member. The
+three accepted Stop/artifact members remain parked in `todo/`.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -18,6 +18,8 @@ members; no implementation member is active.
 - [x] Recheck and reproduce Wave 2 D006–D007 against merged `main` before implementation starts.
 - [x] Characterize Wave 2 D024 and D039 at their affected read/path seams.
 - [x] Sequence Wave 2 into three parked members under `epic_stop_artifact_correctness`.
+- [x] Implement and verify the D005 plus-prefix corrective member.
+- [ ] Review and merge the D005 corrective member before starting Wave 2 implementation.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

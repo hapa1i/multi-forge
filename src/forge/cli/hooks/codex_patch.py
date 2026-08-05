@@ -21,8 +21,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from forge.policy.types import extract_added_lines
-
 PatchOpKind = Literal["add", "update", "delete"]
 
 _BEGIN = "*** Begin Patch"
@@ -61,12 +59,11 @@ class _Section:
     body: list[str] = field(default_factory=list)
 
     def finalize(self) -> PatchFileOp:
-        body = "\n".join(self.body)
         return PatchFileOp(
             kind=self.kind,
             path=self.move_to or self.path,
             move_to=self.move_to,
-            added_content="" if self.kind == "delete" else extract_added_lines(body),
+            added_content="" if self.kind == "delete" else _extract_codex_added_lines(self.body),
             raw_section="\n".join(self.header_lines + self.body),
         )
 
@@ -127,3 +124,13 @@ def _match_header(line: str) -> tuple[PatchOpKind, str] | None:
         if line.startswith(prefix):
             return kind, line[len(prefix) :].strip()
     return None
+
+
+def _extract_codex_added_lines(body: list[str]) -> str:
+    """Strip the single Codex transport prefix from added body lines.
+
+    Unlike a unified diff, a Codex apply-patch section has no ``+++`` file
+    header in its body. A line such as ``+++value`` therefore represents file
+    content beginning with ``++`` and must lose exactly its first character.
+    """
+    return "\n".join(line[1:] for line in body if line.startswith("+"))

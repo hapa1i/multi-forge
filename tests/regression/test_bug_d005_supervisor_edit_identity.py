@@ -5,6 +5,11 @@ the semantic supervisor and plan checker built cache keys. Both caches hashed
 only ``tool_name``, path, and truncated ``new_content``; Claude's frontier
 prompt also omitted ``old_string``. Distinct removals and changes beyond the
 5,000-character presentation boundary could therefore reuse a clean allow.
+
+Follow-up root cause: the Codex parser reused a unified-diff extractor that
+discarded valid apply-patch Add and Update lines beginning with ``+++`` as file
+headers. Distinct plus-prefixed Writes therefore normalized to empty content and
+shared one fingerprint and clean-allow cache entry.
 """
 
 from __future__ import annotations
@@ -72,6 +77,21 @@ def _codex_delete_only_update(tmp_path: Path, *, removed: str) -> ActionContext:
     return contexts[0]
 
 
+def _codex_add(tmp_path: Path, *, content: str) -> ActionContext:
+    command = "\n".join(
+        [
+            "*** Begin Patch",
+            "*** Add File: src/app.py",
+            f"+{content}",
+            "*** End Patch",
+        ]
+    )
+    payload = {"cwd": str(tmp_path), "tool_input": {"command": command}}
+    contexts = CodexHookAdapter().build_contexts(payload, "apply_patch", _manifest())
+    assert len(contexts) == 1
+    return contexts[0]
+
+
 def _exercise_cache_layer(layer: CacheLayer, contexts: list[ActionContext], tmp_path: Path) -> MagicMock:
     policy: DeterministicPolicy
     if layer == "supervisor":
@@ -128,6 +148,20 @@ def test_codex_delete_only_hunks_distinguish_cache_identity(layer: CacheLayer, t
         _codex_delete_only_update(tmp_path, removed="remove_second()"),
     ]
     assert contexts[0].new_content is None and contexts[1].new_content is None
+
+    mock = _exercise_cache_layer(layer, contexts, tmp_path)
+
+    assert mock.call_count == 2
+
+
+@pytest.mark.parametrize("layer", ["supervisor", "plan_check"])
+def test_codex_plus_prefixed_writes_distinguish_cache_identity(layer: CacheLayer, tmp_path: Path) -> None:
+    contexts = [
+        _codex_add(tmp_path, content="++first"),
+        _codex_add(tmp_path, content="++second"),
+    ]
+    assert [context.new_content for context in contexts] == ["++first", "++second"]
+    assert contexts[0].action_fingerprint != contexts[1].action_fingerprint
 
     mock = _exercise_cache_layer(layer, contexts, tmp_path)
 

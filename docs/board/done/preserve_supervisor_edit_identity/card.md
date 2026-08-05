@@ -89,3 +89,10 @@ configuration replay gap and whole-file delete behavior remain unchanged.
 - `make test-unit`: `8,709 passed, 1 skipped, 118 deselected`.
 - `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`: `21 passed`.
 - `make pre-commit`: passed.
+
+## Corrective Follow-up
+
+A later review found that the Codex parser discarded valid plus-prefixed Add and Update content before this member's
+canonical fingerprint boundary. The independently verified
+[`preserve_codex_plus_prefixed_write_identity`](../preserve_codex_plus_prefixed_write_identity/card.md) follow-up fixes
+that grammar seam without changing this member's fingerprint schema or cache policy.
