@@ -39,10 +39,12 @@ wc -l docs/board/change_log.md
   legacy mixed-list shape.
 - Shared strict latest-canonical selection across manager derivation, transfer assembly, and both full-strategy budget
   preflights, with marked D007/D024 regressions and Docker hook coverage.
+- Rejected explicit-null canonical state and incomplete dedicated snapshots without mutation, and moved manager fork
+  validation ahead of Git branch/worktree creation.
 
-**Verification**: Focused transcript/session suites passed (309); full regression suite passed (655); `make test-unit`
-passed (8,732 passed, 1 pre-existing platform skip); Docker artifact-hook integration passed (12); `make pre-commit`
-passed after formatter updates.
+**Verification**: Focused transcript/session suites passed (332); full regression suite passed (658); `make test-unit`
+passed (8,733 passed, 1 pre-existing platform skip, 118 deselected); Docker artifact-hook integration passed (12); final
+`make pre-commit` passed after formatter updates.
 
 ### Align Stop verification contract
 

@@ -76,11 +76,15 @@ def test_repeated_stop_refreshes_one_record_without_losing_distinct_identity(
     assert (tmp_path / active["copied_path"]).read_text(encoding="utf-8") == "second\n"
 
 
+@pytest.mark.parametrize(
+    "malformed",
+    [{"unexpected": "mapping"}, None],
+    ids=["mapping", "null"],
+)
 def test_stop_surfaces_non_list_transcript_state_without_clobbering_it(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, malformed: object
 ) -> None:
     store = _store(tmp_path, monkeypatch)
-    malformed = {"unexpected": "mapping"}
     state = store.read()
     state.confirmed.artifacts["transcripts"] = malformed
     store.write(state)
@@ -92,4 +96,5 @@ def test_stop_surfaces_non_list_transcript_state_without_clobbering_it(
     assert output["action"] == "partial"
     assert output["manifest_updated"] is False
     assert "confirmed.artifacts.transcripts" in str(output["manifest_error"])
+    assert "Forge left it unchanged" in str(output["manifest_error"])
     assert store.read().confirmed.artifacts["transcripts"] == malformed

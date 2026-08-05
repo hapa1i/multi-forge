@@ -148,9 +148,13 @@ class TestTranscriptArtifactState:
         assert changed == 1
         assert state.confirmed.artifacts["transcripts"] == [latest]
 
-    def test_reconcile_rejects_non_list_without_mutation(self) -> None:
+    @pytest.mark.parametrize(
+        "malformed",
+        [{"unexpected": "mapping"}, None],
+        ids=["mapping", "null"],
+    )
+    def test_reconcile_rejects_non_list_without_mutation(self, malformed: object) -> None:
         state = create_session_state("session")
-        malformed = {"unexpected": "mapping"}
         state.confirmed.artifacts["transcripts"] = malformed
         entry = _canonical_transcript("active", ".forge/artifacts/session/transcripts/active.jsonl", captured_at="1")
 

@@ -27,7 +27,10 @@ state instead of clobbering it, and prevent PreCompact snapshots from hiding the
 Rechecked on the execution-branch base `fee562ab` because the preceding Stop-verification member changed the Stop hook.
 The two retained regression modules failed in six cases before implementation: repeated Stop produced duplicate records,
 a mapping-valued transcript field was clobbered, new PreCompact polluted the canonical list, native derivation/transfer
-lost the canonical tail, and both manager and CLI full-strategy budget preflights were bypassed.
+lost the canonical tail, and both manager and CLI full-strategy budget preflights were bypassed. Review hardening then
+reproduced four additional failures: explicit-null transcript state was clobbered by both the shared writer and Stop, an
+incomplete dedicated snapshot was accepted as valid migration state, and manager fork validation ran after Git side
+effects.
 
 - `src/forge/cli/hooks/commands.py:157-177` appends a new Stop record after every UUID-named artifact refresh.
 - `src/forge/cli/hooks/_helpers.py:131-149` has no identity check and replaces a non-list field; the same append/clobber
@@ -56,6 +59,8 @@ lost the canonical tail, and both manager and CLI full-strategy budget preflight
   diagnostic; unrelated malformed entries are not silently filtered out.
 - A non-list `confirmed.artifacts.transcripts` value is surfaced as malformed state and is never overwritten merely to
   append a new record. Hook failure behavior remains fail open as defined for each caller.
+- A malformed dedicated compaction snapshot is surfaced unchanged rather than accepted as a migration target, and
+  manager fork validation rejects malformed parent artifact state before creating a branch or worktree.
 
 ## Scope
 
@@ -104,11 +109,11 @@ lost the canonical tail, and both manager and CLI full-strategy budget preflight
 ## Verification
 
 - The two marked D007/D024 regression modules failed in six cases on `fee562ab`, then passed after implementation.
-- Focused session, hook, adoption, transfer, and fork suites passed (309 tests).
+- Focused session, hook, adoption, transfer, and fork suites passed (332 tests).
 - `./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py`: 12 passed.
-- `make test-regression`: 655 passed.
-- `make test-unit`: 8,732 passed, 1 pre-existing platform-conditional skip, 118 deselected.
-- `make pre-commit`: passed after formatter updates; the final run was clean.
+- `make test-regression`: 658 passed.
+- `make test-unit`: 8,733 passed, 1 pre-existing platform-conditional skip, 118 deselected.
+- `make pre-commit`: passed after formatter updates; the final full run was clean.
 
 ## Outcome
 
@@ -116,4 +121,5 @@ Stop, SessionStart rollover, and adoption now share one canonical `(session_id, 
 Repeated writes collapse only the matching identity, distinct records survive, and malformed transcript state is
 surfaced without being replaced. PreCompact writes only to its dedicated snapshot collection and lazily migrates its
 recognized legacy mixed-list shape. Manager derivation, transfer assembly, and both full-strategy budget preflights now
-share one strict latest-canonical selector; D023's broader source-resolution behavior remains deferred.
+share one strict latest-canonical selector. Malformed dedicated snapshots fail unchanged, and manager fork validates
+artifact state before Git side effects; D023's broader source-resolution behavior remains deferred.

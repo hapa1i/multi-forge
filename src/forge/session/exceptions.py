@@ -57,7 +57,10 @@ class TranscriptArtifactStateError(ForgeSessionError):
     def __init__(self, reason: str, *, field: str = "confirmed.artifacts.transcripts") -> None:
         self.reason = reason
         self.field = field
-        super().__init__(f"{field} is malformed: {reason}")
+        super().__init__(
+            f"{field} is malformed: {reason}. "
+            "Repair that field in the session manifest before retrying; Forge left it unchanged."
+        )
 
 
 class PassportError(ForgeSessionError):

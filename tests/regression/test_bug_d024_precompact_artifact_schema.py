@@ -18,7 +18,10 @@ from click.testing import CliRunner
 from forge.cli.hooks import hooks
 from forge.cli.main import main
 from forge.session import SessionManager, SessionStore, create_session_state
-from forge.session.exceptions import ContextBudgetExceededError
+from forge.session.exceptions import (
+    ContextBudgetExceededError,
+    TranscriptArtifactStateError,
+)
 from forge.session.models import CompactionConfirmed
 from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
@@ -120,6 +123,48 @@ def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_
     assert all(snapshot["reason"] == "pre-compact" for snapshot in snapshots)
 
 
+def test_precompact_preserves_malformed_dedicated_snapshot_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _project(tmp_path, monkeypatch)
+    monkeypatch.setenv("FORGE_SESSION", "parent")
+    monkeypatch.setenv("FORGE_FORGE_ROOT", str(project))
+    store = SessionStore(str(project), "parent")
+    state = create_session_state("parent", worktree_path=str(project))
+    canonical = _canonical(".forge/artifacts/parent/transcripts/parent-uuid.jsonl")
+    legacy = _legacy_snapshot()
+    malformed_snapshots = [{"snapshot_path": legacy["snapshot_path"]}]
+    state.confirmed.claude_session_id = "parent-uuid"
+    state.confirmed.artifacts["transcripts"] = [canonical, legacy]
+    state.confirmed.compaction = CompactionConfirmed(
+        compact_count=3,
+        transcript_snapshots=malformed_snapshots,
+    )
+    store.write(state)
+    transcript = project / "parent.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        hooks,
+        ["pre-compact"],
+        input=json.dumps(
+            {
+                "hook_event_name": "PreCompact",
+                "session_id": "parent-uuid",
+                "transcript_path": str(transcript),
+                "cwd": str(project),
+            }
+        ),
+    )
+
+    assert result.exit_code == 0
+    updated = store.read()
+    assert updated.confirmed.artifacts["transcripts"] == [canonical, legacy]
+    assert updated.confirmed.compaction is not None
+    assert updated.confirmed.compaction.compact_count == 3
+    assert updated.confirmed.compaction.transcript_snapshots == malformed_snapshots
+
+
 def test_legacy_snapshot_tail_does_not_hide_native_derivation_or_transfer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -185,3 +230,24 @@ def test_legacy_snapshot_tail_does_not_bypass_cli_fork_full_budget_preflight(
     assert "exceeds context limit" in result.output
     manager.fork_session.assert_not_called()
     invoke_claude.assert_not_called()
+
+
+def test_malformed_parent_artifacts_fail_before_worktree_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _project(tmp_path, monkeypatch)
+    manager = SessionManager()
+    manager.start_session(name="parent", worktree_path=str(project), direct=True)
+    store = SessionStore(str(project), "parent")
+    state = store.read()
+    state.confirmed.artifacts["transcripts"] = [{"copied_path": {"not": "a string"}}]
+    store.write(state)
+
+    with patch(
+        "forge.session.worktree.create_worktree",
+        side_effect=AssertionError("worktree creation must not run"),
+    ) as create_worktree:
+        with pytest.raises(TranscriptArtifactStateError, match="non-string or empty copied_path"):
+            manager.fork_session("parent", "child", create_worktree=True)
+
+    create_worktree.assert_not_called()

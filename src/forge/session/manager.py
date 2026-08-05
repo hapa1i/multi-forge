@@ -1209,6 +1209,11 @@ class SessionManager:
         if parent_launch is not None and parent_launch.runtime == "codex":
             raise CannotForkCodexParentError(parent_name)
 
+        # Validate the parent artifact collection before worktree creation or
+        # target replacement. The shared selector is strict durable-state input;
+        # discovering corruption after those side effects would leak Git state.
+        parent_transcript_artifact_path = latest_transcript_artifact_path(parent)
+
         if fork_name is None:
             existing = {name for name, _ in self.list_sessions(forge_root_filter=parent_forge_root)}
             fork_name = generate_unique_name(existing)
@@ -1498,7 +1503,7 @@ class SessionManager:
         fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
         fork_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
-            parent_transcript=latest_transcript_artifact_path(parent),
+            parent_transcript=parent_transcript_artifact_path,
             inherited_proxy=fork_proxy_template,
             resume_mode=fork_resume_mode,
             strategy=None,

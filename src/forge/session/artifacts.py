@@ -58,6 +58,22 @@ def _non_empty_string(value: object) -> bool:
     return isinstance(value, str) and bool(value)
 
 
+def _invalid_precompact_snapshot_fields(entry: dict[str, Any]) -> list[str]:
+    invalid: list[str] = []
+    if entry.get("reason") != "pre-compact":
+        invalid.append("reason")
+    for name in ("captured_at", "source_path", "snapshot_path"):
+        if not _non_empty_string(entry.get(name)):
+            invalid.append(name)
+    if not isinstance(entry.get("copied"), bool):
+        invalid.append("copied")
+    if "session_id" in entry:
+        invalid.append("session_id")
+    if "copied_path" in entry:
+        invalid.append("copied_path")
+    return invalid
+
+
 def _transcript_entry_kind(entry: object, *, index: int) -> str:
     """Classify one persisted transcript entry without silently skipping bad state."""
     if not isinstance(entry, dict):
@@ -84,14 +100,7 @@ def _transcript_entry_kind(entry: object, *, index: int) -> str:
         raise TranscriptArtifactStateError(f"entry {index} has a non-string or empty copied_path")
 
     if entry.get("reason") == "pre-compact" and "session_id" not in entry:
-        required = {
-            "captured_at": entry.get("captured_at"),
-            "source_path": entry.get("source_path"),
-            "snapshot_path": snapshot_path,
-        }
-        invalid = [name for name, value in required.items() if not _non_empty_string(value)]
-        if not isinstance(entry.get("copied"), bool):
-            invalid.append("copied")
+        invalid = _invalid_precompact_snapshot_fields(entry)
         if invalid:
             details = ", ".join(invalid)
             raise TranscriptArtifactStateError(f"entry {index} has an invalid legacy PreCompact field: {details}")
@@ -107,9 +116,9 @@ def _validated_transcript_entries(state: SessionState) -> list[tuple[dict[str, A
     if not isinstance(artifacts, dict):
         raise TranscriptArtifactStateError(f"confirmed.artifacts must be an object, got {type(artifacts).__name__}")
 
-    raw_entries = artifacts.get("transcripts")
-    if raw_entries is None:
+    if "transcripts" not in artifacts:
         return []
+    raw_entries = artifacts["transcripts"]
     if not isinstance(raw_entries, list):
         raise TranscriptArtifactStateError(f"expected a list, got {type(raw_entries).__name__}")
 
@@ -132,9 +141,16 @@ def _validated_compaction_snapshots(state: SessionState) -> list[dict[str, Any]]
             field="confirmed.compaction.transcript_snapshots",
         )
     for index, snapshot in enumerate(snapshots):
-        if not isinstance(snapshot, dict) or not _non_empty_string(snapshot.get("snapshot_path")):
+        if not isinstance(snapshot, dict):
             raise TranscriptArtifactStateError(
-                f"entry {index} must contain a non-empty snapshot_path",
+                f"entry {index} must be an object, got {type(snapshot).__name__}",
+                field="confirmed.compaction.transcript_snapshots",
+            )
+        invalid = _invalid_precompact_snapshot_fields(snapshot)
+        if invalid:
+            details = ", ".join(invalid)
+            raise TranscriptArtifactStateError(
+                f"entry {index} has an invalid PreCompact field: {details}",
                 field="confirmed.compaction.transcript_snapshots",
             )
     return snapshots
