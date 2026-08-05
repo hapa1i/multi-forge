@@ -1629,7 +1629,8 @@ undermines port isolation). The launcher stages the canonical Claude runtime-hoo
 sidecar is already a managed session and does not need the host dispatcher's enrollment gate. The file is replaced on
 every launch and the entrypoint merges `apiKeyHelper` into it idempotently; project `.claude/settings*.json` bytes are
 never rewritten. `FORGE_FORGE_ROOT` is normalized to `/workspace` for hook reads, while deferred-work markers retain the
-host checkout and manifest-owned Forge root separately.
+host checkout and manifest-owned Forge root separately. Stop therefore probes for pending shadow candidates through the
+mounted `/workspace` Forge root and translates only the resulting marker payload back to host-resolvable paths.
 
 The host `~/.forge/pending-work/` queue is always mounted read-write at `/root/.forge/pending-work/`, so
 index/memory/shadow markers enqueued at Stop survive `--rm` and are drained only by the host CLI. **Narrow exception

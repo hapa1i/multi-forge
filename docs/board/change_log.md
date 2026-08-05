@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-06
+
+### Repair sidecar shadow-drain routing
+
+**Goal**: Make sidecar Stop candidate discovery and deferred host-drain routing use paths visible at their respective
+execution boundaries.
+
+**Key changes**:
+
+- Probed pending shadow candidates through the hook process's mounted Forge root while retaining host worktree and
+  Forge-root paths in the deferred marker.
+- Preserved marker/candidate schemas, host-mode routing, and no-candidate inertness, with a marked D039 regression.
+- Exercised the real sidecar Stop hook and then handled its host-visible marker through the host drain path.
+
+**Verification**: Focused hook/shadow/workqueue tests passed (120); full sidecar hook integration passed (4); regression
+suite passed (659); `make test-unit` passed (8,734 passed, 1 pre-existing platform skip, 118 deselected); final
+`make pre-commit` passed after Markdown normalization.
+
 ## 2026-08-05
 
 ### Preserve transcript artifact identity
@@ -44,9 +62,9 @@ wc -l docs/board/change_log.md
 - Made write-side legacy migration and PreCompact corruption visible at warning level, pinned retained-record tail
   ordering, and documented the intentionally tolerant supervisor and model-history projections.
 
-**Verification**: Focused transcript/session suites passed (333); full regression suite passed (658); `make test-unit`
-passed (8,734 passed, 1 pre-existing platform skip, 118 deselected); Docker artifact-hook integration passed (12); final
-`make pre-commit` passed after Markdown normalization.
+**Verification**: PR #131 merged as `3e090ef5`; focused transcript/session suites passed (333); full regression suite
+passed (658); `make test-unit` passed (8,734 passed, 1 pre-existing platform skip, 118 deselected); Docker artifact-hook
+integration passed (12); final `make pre-commit` passed after Markdown normalization.
 
 ### Align Stop verification contract
 
@@ -1793,57 +1811,19 @@ Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_down
 
 ## 2026-06-16 (compacted)
 
-### proxy_log_hygiene (slices 0-5 + reviewer follow-ups)
-
-**Goal**: Cut low-value proxy log volume (poll spam, per-chunk dumps), add bounded redacted request diagnostics aligned
-with the audit no-plaintext policy, and close reviewer-found leaks.
-
-**Key changes**: Folded loader bug fixed -- both proxy-config hops now carry `provider_trace` + `logging` (was silently
-dropped; `test_bug_provider_trace_loader_dropped.py`). Successful completions log at DEBUG, INFO reserved for `>=400` /
-slow polls; per-chunk stream dumps require opt-in AND DEBUG; shared `format_stream_lifecycle_summary` replaces
-per-stream INFO bookends. Per-proxy `logging.requests` (`RequestLogConfig`, strict coercers, `body_capture=full`
-rejected) reuses the audit body redactor -- no second sanitizer. New shared `proxy/retention.py::prune_jsonl_shards`
-(age-then-size) backs audit/provider-trace/request planes. Reviewer round: 8 converter log sites reduced to
-metadata-only, `stop_sequences` plaintext leak redacted in `_redact_body_for_log`, CLI int coercion for
-`max_file_mb`/`stream_chunk_max_bytes`, third `create_proxy_file` template-block drop fixed.
-
-**Verification**: 6401 unit + 438 regression green; live-proxy integration (`test_proxy_local_litellm_e2e`,
-`test_provider_trace_e2e` incl. cancelled-stream) pass; two adversarial review rounds (0 production defects; nits fixed
-incl. 0600-owner assertion). Docs: design §7.x/§3.14, appendix §A.11, `proxy.md`, `cli_reference.md`.
-
-### openrouter_observability Phases 3-5
-
-**Goal**: Persist metadata-only, owner-only provider-trace records at the shared stream seam and give them a read
-surface (answer "what happened to this OpenRouter request?" after a timeout), then close the loop upstream via opt-in
-`user`-field injection.
-
-**Key changes**: **P3** -- new `proxy/provider_trace_logger.py` plane (versioned, `0600` shards, strict-dacite read,
-retention prune; modeled on the audit log); shared `record_provider_trace` at the one SSE seam gates
-direct-OpenRouter-only and tracks four lifecycle flags (records `client_disconnected` on cancel); `ProviderTraceConfig`
-nested into `ProxyConfig`/`ProxyInstanceConfig`. **P4** -- `core/ops/provider_trace.py` UI-agnostic `list/show/explain`
-(explain is route-only/trace-derived, no credential read) behind `forge provider trace` + `%provider trace`, shared
-plain-text renderer. **P5** -- opt-in `inject_openrouter_user` writes the Forge session grouping id into the OpenAI
-`user` field on proxied direct-OpenRouter requests (top-level kwarg, verified channel); direct callers deferred to
-`todo/openrouter_user_direct_callers/`.
-
-**Verification**: full unit (6161->6191) + integration (393) green across phases; live-OpenRouter E2E proves a real
-`gen-` id surfaces and a cancelled stream records `client_disconnected=True` / `local_usage_status="unavailable"`;
-metadata-only regression (no body/prompt/completion). Docs: design §3.14, appendix §A.14.
-
-### supervisor_statusline_health: surface frontier-supervisor fail-open
-
-**Goal**: Make a silently-failing supervisor visible (incident: supervisor timed out 24/24, failed open to `allow` while
-the status line still showed a healthy `SUP`) -- surface the fail-open the usage ledger already records, no new durable
-state.
-
-**Key changes**: `read_supervisor_health` over the ledger (newest-first contiguous error/timeout streak) via the
-`forge_cost` throttle; status-line `SUP!N <kind>` suffix (YELLOW 1-2, RED `>=3`, byte-identical when 0);
-`forge activity` gains generic `CommandUsage.error_kinds` + `format_failing_open` ("failing open: N timeout, N error")
-and `--json` carries it. Scope: "failing open" is the supervisor formatter's read only; parse/auth fail-opens deferred
-to `upstream_downstream_ledgers`.
-
-**Verification**: 191 + 112 + Phase 3 cases green (`test_usage_summary.py`, `test_activity.py`); status-line suites
-unchanged; `make pre-commit` clean. Read-only render -- no integration tier.
+- **proxy_log_hygiene slices 0-5 + review fixes:** fixed the two-hop loader drop for `provider_trace`/`logging`, moved
+  successful completions and opt-in stream dumps to DEBUG, added strictly coerced and audit-redacted request logging,
+  and shared age-then-size JSONL retention across the three proxy planes. Review fixes removed converter and
+  `stop_sequences` plaintext leaks and restored a dropped template block. Verification: 6,401 unit, 438 regression, live
+  LiteLLM/provider-trace integrations including cancellation, two adversarial reviews, and `make pre-commit`.
+- **openrouter_observability Phases 3-5:** added versioned owner-only provider traces at the shared SSE seam, including
+  cancellation lifecycle state; UI-free `list/show/explain` operations and CLI/hook reads; and opt-in OpenAI `user`
+  grouping for proxied direct-OpenRouter requests. Direct callers remained deferred. Verification: 6,161-6,191 unit, 393
+  integration, live OpenRouter generation/cancellation evidence, and a metadata-only regression.
+- **supervisor_statusline_health:** derived a contiguous supervisor failure streak from the usage ledger (no new durable
+  state), rendered `SUP!N <kind>`, and exposed failure kinds through activity text/JSON. Parse/auth fail-opens remained
+  deferred to `upstream_downstream_ledgers`. Verification: focused usage/activity/status-line suites and
+  `make pre-commit`.
 
 ## 2026-06-15 (compacted)
 

@@ -5,8 +5,7 @@
 **Findings**: D007 (HIGH) and D024 (MEDIUM) in
 [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `done/` -- implemented and verified on `fix/preserve-transcript-artifact-identity` as the second Wave 2
-member.
+**Lane**: `done/` -- shipped in PR #131 (`3e090ef5`) as the second Wave 2 member.
 
 ## Goal
 

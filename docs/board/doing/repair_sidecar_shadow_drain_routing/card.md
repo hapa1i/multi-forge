@@ -1,10 +1,11 @@
 # Repair sidecar shadow-drain routing
 
-**Epic**: [`epic_stop_artifact_correctness`](../../doing/epic_stop_artifact_correctness/card.md).
+**Epic**: [`epic_stop_artifact_correctness`](../epic_stop_artifact_correctness/card.md).
 
 **Finding**: D039 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 2 implementation work, parked.
+**Lane**: `doing/` -- implemented and verified on `fix/repair-sidecar-shadow-drain-routing`; awaiting review and merge
+as the final Wave 2 member.
 
 ## Goal
 
@@ -21,15 +22,16 @@ enqueue a marker whose paths the later host drain can resolve.
 
 ## Evidence
 
-Rechecked on merged `main` at `86fa53da`:
+Rechecked on the execution-branch base `3e090ef5` with a retained marked regression:
 
 - `src/forge/cli/hooks/commands.py:113-121` deliberately translates deferred marker paths to host paths in sidecar mode,
   but `:640` reuses that host-only Forge root for the in-container `has_pending_candidates` filesystem probe.
 - `src/forge/policy/semantic/shadow.py:157-169` checks `<forge_root>/.forge/artifacts/<session>/shadow/*.json` directly;
   the host checkout path is not mounted at that location in the container.
 - An executable characterization created a candidate under the container-visible project root and supplied distinct
-  sidecar host-path environment values. The current effective-root probe returned false; probing the mounted project
-  root returned true.
+  sidecar host-path environment values. Stop exited zero but reported `queued_shadow=false` and created no shadow marker
+  because the current effective-root probe searched the host-only Forge root. The container-visible root held the
+  pending candidate, while the existing stop/index markers retained the required host payload paths.
 
 ## Expected Behavior
 
@@ -37,6 +39,16 @@ Rechecked on merged `main` at `86fa53da`:
 - A resulting shadow marker retains the host worktree and Forge-root paths required by the host queue drain.
 - Host-mode behavior is unchanged, rate-zero/no-candidate sessions enqueue nothing, and probe/enqueue failures remain
   best-effort and visible only through existing diagnostics.
+
+## Implementation Outcome
+
+Stop now discovers pending candidates through the `SessionStore` Forge root visible to the hook process. Deferred marker
+creation still uses the separately translated worktree and Forge-root paths, so sidecar markers remain resolvable by the
+later host drain and ordinary host-mode routing is unchanged. The marker and candidate schemas were not changed.
+
+The retained D039 regression failed before the fix with `queued_shadow=false`, then passed after the path split. Focused
+hook/shadow/workqueue coverage passed (120), the full sidecar hook integration file passed (4), the regression suite
+passed (659), and the unit suite passed (8,734 with one pre-existing platform skip and 118 deselected).
 
 ## Scope
 

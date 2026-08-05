@@ -119,7 +119,11 @@ def _policy_shadow_diagnostic_root(supervisor: Any) -> str | Path | None:
 
 
 def _deferred_work_paths(cwd: Path, store: SessionStore | None) -> tuple[Path, str | None]:
-    """Return host-resolvable paths for deferred work produced in a sidecar."""
+    """Return host-resolvable paths for deferred-work marker payloads.
+
+    These paths belong to the later host consumer, not filesystem probes in the
+    current hook process.
+    """
     forge_root = str(store.forge_root) if store else None
     if os.environ.get(FORGE_SIDECAR_VAR) == "1":
         host_forge_root = os.environ.get(FORGE_SIDECAR_HOST_FORGE_ROOT_VAR)
@@ -601,14 +605,14 @@ def stop() -> None:
     # Important: enqueue even if manifest update failed - the transcript artifact
     # exists on disk and deferred work should still be triggered.
     # Only enqueue if verification passed (we reach here only if should_allow_stop=True)
-    deferred_worktree_path, effective_forge_root = _deferred_work_paths(cwd, store)
+    deferred_worktree_path, marker_forge_root = _deferred_work_paths(cwd, store)
     queued_stop = (
         enqueue_stop_marker(
             session_id=session_id,
             worktree_path=deferred_worktree_path,
             session_name=manifest.name,
             transcript_snapshot_rel=str(dst_rel),
-            forge_root=effective_forge_root,
+            forge_root=marker_forge_root,
         )
         is not None
     )
@@ -618,7 +622,7 @@ def stop() -> None:
             worktree_path=deferred_worktree_path,
             session_name=manifest.name,
             transcript_snapshot_rel=str(dst_rel),
-            forge_root=effective_forge_root,
+            forge_root=marker_forge_root,
         )
         is not None
     )
@@ -638,7 +642,7 @@ def stop() -> None:
                     session_name=manifest.name,
                     transcript_snapshot_rel=str(dst_rel),
                     subprocess_proxy=effective.subprocess_proxy,
-                    forge_root=effective_forge_root,
+                    forge_root=marker_forge_root,
                 )
                 is not None
             )
@@ -652,13 +656,17 @@ def stop() -> None:
     try:
         from forge.policy.semantic.shadow import has_pending_candidates
 
-        if has_pending_candidates(effective_forge_root, manifest.name):
+        # Candidate discovery runs at the hook boundary and must use the root
+        # visible to this process. In a sidecar, only the deferred marker payload
+        # is translated back to host-resolvable paths for the later host drain.
+        shadow_probe_root = str(store.forge_root)
+        if has_pending_candidates(shadow_probe_root, manifest.name):
             queued_shadow = (
                 enqueue_shadow_marker(
                     session_id=session_id,
                     session_name=manifest.name,
                     worktree_path=deferred_worktree_path,
-                    forge_root=effective_forge_root,
+                    forge_root=marker_forge_root,
                 )
                 is not None
             )
@@ -785,7 +793,7 @@ def stop_failure() -> None:
     # Enqueuing for a nonexistent artifact wastes retries until poison handling.
     queued_stop = False
     queued_index = False
-    deferred_worktree_path, effective_forge_root = _deferred_work_paths(cwd, store)
+    deferred_worktree_path, marker_forge_root = _deferred_work_paths(cwd, store)
     if dst_abs.is_file():
         queued_stop = (
             enqueue_stop_marker(
@@ -793,7 +801,7 @@ def stop_failure() -> None:
                 worktree_path=deferred_worktree_path,
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
-                forge_root=effective_forge_root,
+                forge_root=marker_forge_root,
             )
             is not None
         )
@@ -803,7 +811,7 @@ def stop_failure() -> None:
                 worktree_path=deferred_worktree_path,
                 session_name=manifest.name,
                 transcript_snapshot_rel=str(dst_rel),
-                forge_root=effective_forge_root,
+                forge_root=marker_forge_root,
             )
             is not None
         )

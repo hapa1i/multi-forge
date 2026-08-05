@@ -289,8 +289,7 @@ class TestStopHook:
         assert output["queued_handoff"] is False
 
     def _write_shadow_candidate(self, store: SessionStore, session_name: str = "test-session") -> None:
-        # Use the store's own forge_root so the candidate lands exactly where the hook's
-        # `has_pending_candidates(effective_forge_root, ...)` gate will look for it.
+        # Candidate discovery always uses the process-visible root owned by the store.
         from forge.session.artifacts import get_artifact_paths
 
         d = get_artifact_paths(Path(str(store.forge_root)), session_name).shadow_abs
@@ -311,7 +310,11 @@ class TestStopHook:
         assert result.exit_code == 0
         output = json.loads(result.output)
         assert output["queued_shadow"] is True
-        assert (pending_work_dir() / "shadow-uuid-sh1.json").is_file()
+        marker_path = pending_work_dir() / "shadow-uuid-sh1.json"
+        assert marker_path.is_file()
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        assert marker["payload"]["worktree_path"] == str(tmp_path)
+        assert marker["payload"]["forge_root"] == str(tmp_path)
 
     def test_stop_skips_shadow_when_no_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)

@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- coordinating active Wave 2 work; the verification member shipped in PR #130, the
-transcript-artifact member is implemented and verified pending review, and the sidecar member remains parked.
+**Lane**: `doing/` -- coordinating the final Wave 2 member; verification shipped in PR #130, transcript artifacts
+shipped in PR #131, and sidecar shadow-drain routing is implemented and awaiting review and merge.
 
 ## Goal
 
@@ -44,7 +44,7 @@ target contract.
 | ----- | --------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1     | D006, U002–U003 | [`align_stop_verification_contract`](../../done/align_stop_verification_contract/card.md)           | Verification schema, result states, and latency      |
 | 2     | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md) | Artifact identity, schema, and legacy reads          |
-| 3     | D039            | [`repair_sidecar_shadow_drain_routing`](../../todo/repair_sidecar_shadow_drain_routing/card.md)     | Container-local detection and host-marker path split |
+| 3     | D039            | [`repair_sidecar_shadow_drain_routing`](../repair_sidecar_shadow_drain_routing/card.md)             | Container-local detection and host-marker path split |
 
 The verification member goes first because DG1 already defines its complete contract and it owns the Stop decision
 boundary. Artifact reconciliation follows as a separate durable-state change. Sidecar shadow routing remains separate
@@ -57,8 +57,14 @@ PR #130 (`fee562ab`) on 2026-08-05 before transcript-artifact work was activated
 
 D007/D024 were rechecked again on the execution branch from `fee562ab`. The two retained regression modules failed in
 six cases before implementation, covering duplicate and clobbering writes, schema pollution, two broken read paths, and
-both bypassed budget preflights. The member now passes focused, regression, unit, and required Docker-hook coverage; it
-must be reviewed and merged before D039 is activated.
+both bypassed budget preflights. The member shipped in PR #131 (`3e090ef5`) with focused, regression, unit, and required
+Docker-hook coverage before D039 was activated.
+
+D039 was rechecked again on the execution branch from `3e090ef5`. Its retained regression failed before implementation
+because Stop reported `queued_shadow=false` when the candidate existed under the mounted root but marker paths named
+distinct host roots. The implemented split probes through the process-visible `SessionStore` root and translates only
+the marker payload. Focused tests (120), the full sidecar hook integration file (4), the regression suite (659), and the
+unit suite (8,734 passed, one pre-existing platform skip) passed; review and merge remain before Wave 2 closeout.
 
 ## Drift Constraints
 

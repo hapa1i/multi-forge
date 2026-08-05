@@ -18,6 +18,7 @@ from forge.core.ops.claude_session import _stage_sidecar_hook_settings
 from forge.core.paths import get_forge_home
 from forge.core.workqueue import pending_work_dir
 from forge.session import LAUNCH_MODE_SIDECAR, SessionStore, create_session_state
+from forge.session.artifacts import get_artifact_paths
 from forge.sidecar.docker import is_docker_available
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
@@ -159,6 +160,101 @@ def test_entrypoint_merges_api_helper_into_hooks_idempotently(tmp_path: Path, si
         assert (sidecar_home / "settings.json").read_bytes() == first_bytes
     finally:
         os.unlink(env_file)
+
+
+def test_sidecar_stop_routes_mounted_shadow_candidate_to_host_drain(
+    tmp_path: Path,
+    sidecar_image: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import patch
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path / "host-forge-home"))
+    monkeypatch.delenv("FORGE_SIDECAR", raising=False)
+
+    project = tmp_path / "project"
+    _init_project(project)
+    session_name = "sidecar-shadow-routing"
+    session_id = "sidecar-shadow-routing-id"
+    transcript = project / "transcript.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+
+    state = create_session_state(
+        session_name,
+        worktree_path=str(project),
+        launch_mode=LAUNCH_MODE_SIDECAR,
+    )
+    state.forge_root = str(project)
+    state.confirmed.claude_session_id = session_id
+    state.confirmed.transcript_path = str(transcript)
+    SessionStore(str(project), session_name).write(state)
+
+    shadow_dir = get_artifact_paths(project, session_name).shadow_abs
+    shadow_dir.mkdir(parents=True)
+    (shadow_dir / "candidate.json").write_text('{"status":"pending"}\n', encoding="utf-8")
+
+    host_queue = pending_work_dir()
+    host_queue.mkdir(parents=True)
+    result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-i",
+            "--rm",
+            "--entrypoint",
+            "/bin/sh",
+            *_user_args(),
+            "-v",
+            f"{project}:/workspace",
+            "-v",
+            f"{host_queue}:/root/.forge/pending-work",
+            "-e",
+            "HOME=/root",
+            "-e",
+            "FORGE_SIDECAR=1",
+            "-e",
+            f"FORGE_SESSION={session_name}",
+            "-e",
+            "FORGE_FORGE_ROOT=/workspace",
+            "-e",
+            f"FORGE_SIDECAR_HOST_WORKTREE_PATH={project}",
+            "-e",
+            f"FORGE_SIDECAR_HOST_FORGE_ROOT={project}",
+            "-w",
+            "/workspace",
+            sidecar_image,
+            "-c",
+            "forge hook stop",
+        ],
+        input=json.dumps(
+            {
+                "hook_event_name": "Stop",
+                "session_id": session_id,
+                "transcript_path": "/workspace/transcript.jsonl",
+                "cwd": "/workspace",
+            }
+        ),
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["queued_shadow"] is True
+    markers = list(host_queue.glob(f"shadow-{session_id}.json"))
+    assert len(markers) == 1
+    marker = json.loads(markers[0].read_text(encoding="utf-8"))
+    assert marker["payload"]["worktree_path"] == str(project)
+    assert marker["payload"]["forge_root"] == str(project)
+
+    with patch("subprocess.Popen") as popen:
+        _process_pending_work_best_effort()
+
+    popen.assert_called_once()
+    command = popen.call_args.args[0] if popen.call_args.args else popen.call_args.kwargs["args"]
+    assert command[:4] == ["forge", "policy", "shadow", "run"]
+    assert command[command.index("--root") + 1] == str(project)
+    assert not markers[0].exists()
 
 
 @pytest.mark.slow
