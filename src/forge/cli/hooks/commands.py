@@ -46,6 +46,7 @@ from forge.session.artifacts import (
     snapshot_plan_approved,
 )
 from forge.session.effective import compute_effective_intent
+from forge.session.exceptions import TranscriptArtifactStateError
 from forge.session.hooks import (
     HookResult,
     handle_session_start,
@@ -901,6 +902,10 @@ def pre_compact() -> None:
 
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
         logger.debug("pre-compact: transcript snapshot captured at %s", dst_rel)
+    except TranscriptArtifactStateError as e:
+        # Fail open, but durable-state corruption must remain visible at this
+        # best-effort writer boundary.
+        logger.warning("pre-compact: transcript artifact state is malformed; manifest update skipped: %s", e)
     except Exception as e:
         # Fail-open: never block compaction
         logger.debug("pre-compact: snapshot failed: %s", e)

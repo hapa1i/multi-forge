@@ -332,7 +332,11 @@ class _ResolvedTarget:
 
 
 def _latest_transcript_artifact_session_id(state: SessionState) -> str | None:
-    """Return newest transcript artifact UUID, tolerating legacy/raw artifact shapes."""
+    """Return the newest UUID through the supervisor's deliberately tolerant projection.
+
+    Supervisor resume degrades across legacy or malformed artifact lists, so this
+    UUID-only lookup must remain outside the strict copied-path selector.
+    """
     artifacts = state.confirmed.artifacts
     if not isinstance(artifacts, dict):
         return None

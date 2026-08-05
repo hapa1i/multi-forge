@@ -117,7 +117,9 @@ class TestResolveArtifactPath:
 
 
 class TestTranscriptArtifactState:
-    def test_reconcile_refreshes_identity_preserves_distinct_and_migrates_snapshot(self) -> None:
+    def test_reconcile_refreshes_identity_preserves_distinct_and_migrates_snapshot(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         state = create_session_state("session")
         distinct = _canonical_transcript(
             "distinct", ".forge/artifacts/session/transcripts/distinct.jsonl", captured_at="1"
@@ -129,11 +131,13 @@ class TestTranscriptArtifactState:
         state.confirmed.compaction = CompactionConfirmed(transcript_snapshots=[dict(snapshot)])
         refreshed = dict(stale, captured_at="4", reason="stop-failure")
 
-        changed = reconcile_transcript_artifact(state, refreshed)
+        with caplog.at_level(logging.WARNING, logger="forge.session.artifacts"):
+            changed = reconcile_transcript_artifact(state, refreshed)
 
         assert changed == 2
         assert state.confirmed.artifacts["transcripts"] == [distinct, refreshed]
         assert state.confirmed.compaction.transcript_snapshots == [snapshot]
+        assert "migrated 1 recognized legacy PreCompact snapshot" in caplog.text
 
     def test_reconcile_without_refresh_keeps_latest_successful_record(self) -> None:
         state = create_session_state("session")
@@ -147,6 +151,22 @@ class TestTranscriptArtifactState:
 
         assert changed == 1
         assert state.confirmed.artifacts["transcripts"] == [latest]
+
+    def test_reconcile_without_refresh_moves_retained_identity_to_tail(self) -> None:
+        state = create_session_state("session")
+        retained_path = ".forge/artifacts/session/transcripts/retained.jsonl"
+        retained = _canonical_transcript("retained", retained_path, captured_at="1")
+        distinct = _canonical_transcript(
+            "distinct", ".forge/artifacts/session/transcripts/distinct.jsonl", captured_at="2"
+        )
+        state.confirmed.artifacts["transcripts"] = [retained, distinct]
+        skipped = dict(retained, captured_at="3", copied=False)
+
+        changed = reconcile_transcript_artifact(state, skipped, refresh_existing=False)
+
+        assert changed == 0
+        assert state.confirmed.artifacts["transcripts"] == [distinct, retained]
+        assert latest_transcript_artifact_path(state) == retained_path
 
     @pytest.mark.parametrize(
         "malformed",

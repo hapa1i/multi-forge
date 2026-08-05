@@ -41,10 +41,12 @@ wc -l docs/board/change_log.md
   preflights, with marked D007/D024 regressions and Docker hook coverage.
 - Rejected explicit-null canonical state and incomplete dedicated snapshots without mutation, and moved manager fork
   validation ahead of Git branch/worktree creation.
+- Made write-side legacy migration and PreCompact corruption visible at warning level, pinned retained-record tail
+  ordering, and documented the intentionally tolerant supervisor and model-history projections.
 
-**Verification**: Focused transcript/session suites passed (332); full regression suite passed (658); `make test-unit`
-passed (8,733 passed, 1 pre-existing platform skip, 118 deselected); Docker artifact-hook integration passed (12); final
-`make pre-commit` passed after formatter updates.
+**Verification**: Focused transcript/session suites passed (333); full regression suite passed (658); `make test-unit`
+passed (8,734 passed, 1 pre-existing platform skip, 118 deselected); Docker artifact-hook integration passed (12); final
+`make pre-commit` passed after Markdown normalization.
 
 ### Align Stop verification contract
 

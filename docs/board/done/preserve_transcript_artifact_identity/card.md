@@ -30,7 +30,9 @@ a mapping-valued transcript field was clobbered, new PreCompact polluted the can
 lost the canonical tail, and both manager and CLI full-strategy budget preflights were bypassed. Review hardening then
 reproduced four additional failures: explicit-null transcript state was clobbered by both the shared writer and Stop, an
 incomplete dedicated snapshot was accepted as valid migration state, and manager fork validation ran after Git side
-effects.
+effects. PR review then reproduced two visibility failures: successful write-side migration emitted no diagnostic, and
+PreCompact reduced malformed durable state to debug-only logging. A retain-without-refresh characterization already
+passed and pinned the intended move-to-tail behavior.
 
 - `src/forge/cli/hooks/commands.py:157-177` appends a new Stop record after every UUID-named artifact refresh.
 - `src/forge/cli/hooks/_helpers.py:131-149` has no identity check and replaces a non-list field; the same append/clobber
@@ -61,6 +63,8 @@ effects.
   append a new record. Hook failure behavior remains fail open as defined for each caller.
 - A malformed dedicated compaction snapshot is surfaced unchanged rather than accepted as a migration target, and
   manager fork validation rejects malformed parent artifact state before creating a branch or worktree.
+- Recognized write-side migration emits a compatibility warning. PreCompact remains fail open on malformed artifact
+  state but warns instead of reducing the failure to debug-only logging.
 
 ## Scope
 
@@ -84,8 +88,8 @@ effects.
   canonical copied artifact and assert the chosen migration or diagnostic behavior.
 - Both regression modules have `pytestmark = pytest.mark.regression` and module docstrings naming the finding and root
   cause, per the Regression Test Mandate.
-- Unit coverage proves malformed non-list state is not clobbered and both Stop and rollover share the same identity
-  rules.
+- Unit coverage proves malformed non-list state is not clobbered, both Stop and rollover share the same identity rules,
+  and a retained rollover identity moves behind distinct older records to remain the latest canonical artifact.
 - `./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py` covers repeated Stop plus
   PreCompact/SessionStart boundaries.
 - `make test-regression`, the focused unit suite, the required integration runner, and `make pre-commit` pass.
@@ -109,11 +113,11 @@ effects.
 ## Verification
 
 - The two marked D007/D024 regression modules failed in six cases on `fee562ab`, then passed after implementation.
-- Focused session, hook, adoption, transfer, and fork suites passed (332 tests).
+- Focused session, hook, adoption, transfer, and fork suites passed (333 tests).
 - `./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py`: 12 passed.
 - `make test-regression`: 658 passed.
-- `make test-unit`: 8,733 passed, 1 pre-existing platform-conditional skip, 118 deselected.
-- `make pre-commit`: passed after formatter updates; the final full run was clean.
+- `make test-unit`: 8,734 passed, 1 pre-existing platform-conditional skip, 118 deselected.
+- `make pre-commit`: passed after Markdown normalization; the final full run was clean.
 
 ## Outcome
 
@@ -122,4 +126,6 @@ Repeated writes collapse only the matching identity, distinct records survive, a
 surfaced without being replaced. PreCompact writes only to its dedicated snapshot collection and lazily migrates its
 recognized legacy mixed-list shape. Manager derivation, transfer assembly, and both full-strategy budget preflights now
 share one strict latest-canonical selector. Malformed dedicated snapshots fail unchanged, and manager fork validates
-artifact state before Git side effects; D023's broader source-resolution behavior remains deferred.
+artifact state before Git side effects. Write-side legacy migration and PreCompact corruption now emit warnings, while
+the supervisor UUID and display-only model-history projections remain explicitly tolerant; D023's broader
+source-resolution behavior remains deferred.

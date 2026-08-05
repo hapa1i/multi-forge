@@ -212,6 +212,11 @@ def _direct_model_history_from_transcript_artifacts(manifest: SessionState, *, f
 
 
 def _transcript_artifact_paths(artifacts: dict[str, Any], *, forge_root: Path) -> list[Path]:
+    """Return usable model-history paths through a deliberately tolerant display projection.
+
+    This display-only reader may fall back to source paths and must not inherit
+    the strict resumable-artifact selector's durable-state failure contract.
+    """
     raw_transcripts = artifacts.get("transcripts")
     if not isinstance(raw_transcripts, list):
         return []

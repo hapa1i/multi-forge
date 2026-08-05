@@ -182,6 +182,10 @@ def migrate_legacy_transcript_snapshots(state: SessionState) -> int:
     else:
         state.confirmed.compaction.transcript_snapshots = migrated_snapshots
     state.confirmed.artifacts["transcripts"] = [entry for entry, kind in entries if kind != _LEGACY_PRECOMPACT_SNAPSHOT]
+    logger.warning(
+        "migrated %d recognized legacy PreCompact snapshot(s) from confirmed.artifacts.transcripts",
+        len(legacy),
+    )
     return len(legacy)
 
 

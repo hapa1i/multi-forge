@@ -8,6 +8,7 @@ full-strategy budget preflights lost the preceding ``copied_path`` record.
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
@@ -83,7 +84,9 @@ def _seed_parent(
 
 
 def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_collection(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     project = _project(tmp_path, monkeypatch)
     monkeypatch.setenv("FORGE_SESSION", "parent")
@@ -100,18 +103,19 @@ def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_
     transcript = project / "parent.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
 
-    result = CliRunner().invoke(
-        hooks,
-        ["pre-compact"],
-        input=json.dumps(
-            {
-                "hook_event_name": "PreCompact",
-                "session_id": "parent-uuid",
-                "transcript_path": str(transcript),
-                "cwd": str(project),
-            }
-        ),
-    )
+    with caplog.at_level(logging.WARNING, logger="forge.session.artifacts"):
+        result = CliRunner().invoke(
+            hooks,
+            ["pre-compact"],
+            input=json.dumps(
+                {
+                    "hook_event_name": "PreCompact",
+                    "session_id": "parent-uuid",
+                    "transcript_path": str(transcript),
+                    "cwd": str(project),
+                }
+            ),
+        )
 
     assert result.exit_code == 0
     updated = store.read()
@@ -121,10 +125,13 @@ def test_precompact_migrates_legacy_tail_and_writes_only_the_dedicated_snapshot_
     assert len(snapshots) == 2
     assert sum(snapshot["snapshot_path"] == legacy["snapshot_path"] for snapshot in snapshots) == 1
     assert all(snapshot["reason"] == "pre-compact" for snapshot in snapshots)
+    assert "migrated 1 recognized legacy PreCompact snapshot" in caplog.text
 
 
 def test_precompact_preserves_malformed_dedicated_snapshot_state(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     project = _project(tmp_path, monkeypatch)
     monkeypatch.setenv("FORGE_SESSION", "parent")
@@ -144,18 +151,19 @@ def test_precompact_preserves_malformed_dedicated_snapshot_state(
     transcript = project / "parent.jsonl"
     transcript.write_text("{}\n", encoding="utf-8")
 
-    result = CliRunner().invoke(
-        hooks,
-        ["pre-compact"],
-        input=json.dumps(
-            {
-                "hook_event_name": "PreCompact",
-                "session_id": "parent-uuid",
-                "transcript_path": str(transcript),
-                "cwd": str(project),
-            }
-        ),
-    )
+    with caplog.at_level(logging.WARNING, logger="forge.cli.hooks.commands"):
+        result = CliRunner().invoke(
+            hooks,
+            ["pre-compact"],
+            input=json.dumps(
+                {
+                    "hook_event_name": "PreCompact",
+                    "session_id": "parent-uuid",
+                    "transcript_path": str(transcript),
+                    "cwd": str(project),
+                }
+            ),
+        )
 
     assert result.exit_code == 0
     updated = store.read()
@@ -163,6 +171,7 @@ def test_precompact_preserves_malformed_dedicated_snapshot_state(
     assert updated.confirmed.compaction is not None
     assert updated.confirmed.compaction.compact_count == 3
     assert updated.confirmed.compaction.transcript_snapshots == malformed_snapshots
+    assert "pre-compact: transcript artifact state is malformed" in caplog.text
 
 
 def test_legacy_snapshot_tail_does_not_hide_native_derivation_or_transfer(
