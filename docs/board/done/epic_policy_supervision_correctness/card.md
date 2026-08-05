@@ -1,9 +1,8 @@
 # Epic: Policy and supervision correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- Wave 1 coordination is active on `docs/policy-supervision-wave-1`; implementation remains in
-separate member branches.
+**Lane**: `done/` -- Wave 1 shipped through PRs #125–#127 and closed on 2026-08-05.
 
 ## Goal
 
@@ -70,8 +69,15 @@ ride along with the critical behavior fix.
 - Treat LLM output as external data: malformed structure must never become a clean allow or a policy-error deny.
 - Keep runtime adapters as normalization boundaries and the policy engine runtime-neutral.
 
-## Closeout
+## Outcome
 
-Move this epic to `done/` only after all three live members ship with regression coverage, design documentation remains
-synchronized, the parent epic and review ledger point to their outcomes, and the required policy/session verification is
-recorded.
+All three live members shipped independently and remain linked above:
+
+- D001 shipped in PR #125 (`1765afa5`) with a marked regression for the original policy-intent loss.
+- D002–D004 and O028 shipped in PR #126 (`d40748ac`) with strict external-verdict and restored-cache handling.
+- D005 shipped in PR #127 (`86fa53da`) with complete pre-truncation action identity across Claude, Codex, frontier,
+  tier-1, and shadow replay.
+
+The member cards record their focused, regression, unit, integration, and pre-commit verification. Normative policy and
+supervision documentation is synchronized with the shipped behavior, and the review ledger records each finding's
+resolution.

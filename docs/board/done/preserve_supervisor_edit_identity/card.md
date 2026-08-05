@@ -1,6 +1,6 @@
 # Preserve complete edit identity in supervision
 
-**Epic**: [`epic_policy_supervision_correctness`](../../doing/epic_policy_supervision_correctness/card.md).
+**Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
 **Finding**: D005 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 

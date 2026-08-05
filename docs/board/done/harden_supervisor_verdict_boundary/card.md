@@ -1,6 +1,6 @@
 # Harden the semantic supervisor verdict boundary
 
-**Epic**: [`epic_policy_supervision_correctness`](../../doing/epic_policy_supervision_correctness/card.md).
+**Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
 **Findings**: D002–D004 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings) and the
 related O028 subset in the [`code and maintenance inventory`](../../review_combined.md#code-and-maintenance-findings).

@@ -1,6 +1,6 @@
 # Preserve policy intent when enabling bundles
 
-**Epic**: [`epic_policy_supervision_correctness`](../../doing/epic_policy_supervision_correctness/card.md).
+**Epic**: [`epic_policy_supervision_correctness`](../epic_policy_supervision_correctness/card.md).
 
 **Finding**: D001 (CRITICAL) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 

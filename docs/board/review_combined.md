@@ -382,11 +382,11 @@ one card coordinates them.
 
 ### Suggested coordination boundaries
 
-- **[Policy/supervision epic](doing/epic_policy_supervision_correctness/card.md):** coordinate D001–D005 and O028, but
-  ship state preservation, verdict hardening, and edit identity independently. O044 remains later bounded-maintenance
-  work because terminal commands own intent while `%policy` commands deliberately own overrides.
-- **Stop/artifact epic:** resolve DG1 first; keep artifact schema/idempotency (D007, D024), sidecar drain (D039), and
-  the verification contract (D006, U002–U003) distinct.
+- **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
+  independent members. O044 remains later bounded-maintenance work because terminal commands own intent while `%policy`
+  commands deliberately own overrides.
+- **[Stop/artifact epic](todo/epic_stop_artifact_correctness/card.md):** DG1 is resolved; keep artifact
+  schema/idempotency (D007, D024), sidecar drain (D039), and the verification contract (D006, U002–U003) distinct.
 - **Durable-state/session epic:** coordinate D008–D011, D021–D022, O003, O006, and related state readers around
   fault-injection and recovery tests.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
