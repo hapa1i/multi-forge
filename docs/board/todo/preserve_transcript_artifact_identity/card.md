@@ -34,6 +34,9 @@ Rechecked on merged `main` at `86fa53da`:
   `src/forge/session/manager.py:303-312,893-900` and `src/forge/session/transfer.py:1114-1122` inspect the last entry
   for `copied_path`. A canonical record followed by a snapshot-shaped entry made the shared latest-artifact helper
   return `None`.
+- `src/forge/cli/session_fork.py:643-649` contains a fourth copy of the same tail-entry selection for full-strategy
+  context-budget preflight, so fixing only the three evidence-ledger sites would leave the D024 failure shape live in
+  the fork twin.
 
 ## Expected Behavior
 
@@ -52,6 +55,9 @@ Rechecked on merged `main` at `86fa53da`:
 
 - Put canonical transcript record validation/reconciliation in one session-layer helper used by Stop and SessionStart
   rollover instead of retaining duplicated hook-local append logic.
+- Put canonical latest-transcript selection in one session-layer helper used by manager derivation, manager
+  full-strategy preflight, transfer assembly, and CLI fork full-strategy preflight. Do not leave call-site-local
+  `transcripts[-1]` schema interpretation at those seams.
 - Reconcile existing duplicates for the same identity when that identity is next written, without deleting distinct
   session artifacts.
 - Keep PreCompact snapshot metadata in its dedicated compaction collection and harden latest-transcript selection for
@@ -63,8 +69,8 @@ Rechecked on merged `main` at `86fa53da`:
 - `tests/regression/test_bug_d007_stop_artifact_idempotency.py` invokes repeated Stop capture for one UUID and asserts
   one canonical manifest record, refreshed artifact content, and no loss of distinct records.
 - `tests/regression/test_bug_d024_precompact_artifact_schema.py` covers new PreCompact writes and a legacy mixed-shape
-  manifest; resume/transfer selection still resolves the latest canonical copied artifact and asserts the chosen
-  migration or diagnostic behavior.
+  manifest; manager derivation, transfer assembly, and both full-strategy budget preflights resolve the same latest
+  canonical copied artifact and assert the chosen migration or diagnostic behavior.
 - Both regression modules have `pytestmark = pytest.mark.regression` and module docstrings naming the finding and root
   cause, per the Regression Test Mandate.
 - Unit coverage proves malformed non-list state is not clobbered and both Stop and rollover share the same identity
@@ -80,5 +86,8 @@ Rechecked on merged `main` at `86fa53da`:
   treat unrelated malformed entries as the same legacy shape.
 - Preserve artifact files, `captured_at`/reason provenance, forge-root-relative paths, rollover behavior, and shared
   transcript deletion safeguards.
-- Do not redesign plan artifacts, transcript retention, resume strategies, or D023's context-budget source coverage in
-  this member.
+- Sharing the selector is a D024 drift-control requirement, not an independent admission or disposition of compound
+  O099; its `_FakeResponse` family and final ledger disposition remain Wave 7 work.
+- Do not redesign plan artifacts, transcript retention, or resume strategies. In particular, replacing the existing
+  artifact-list lookup in the two budget preflights does not expand them to D023's other transcript sources; D023
+  remains a separate finding.

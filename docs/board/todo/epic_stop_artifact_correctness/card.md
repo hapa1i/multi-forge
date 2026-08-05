@@ -53,6 +53,8 @@ because it requires container-path integration evidence and does not depend on e
 - Do not add arbitrary-command verification or hide unknown configuration as success.
 - Do not charge the fixed test subprocess wall time to Forge's under-100-ms overhead measurement.
 - Do not append snapshot-only records to the canonical transcript-artifact schema or discard malformed durable state.
+- Keep canonical transcript-list selection behind one session-layer selector across manager, transfer, and fork without
+  absorbing D023's broader source-resolution work.
 - Preserve existing transcript files and provenance while tolerating legacy duplicate and PreCompact-shaped records.
 - Keep sidecar candidate discovery on a container-visible path and deferred marker payloads host-resolvable.
 - Preserve fail-open hook behavior, rate-zero shadow inertness, and idempotent pending-work markers.
