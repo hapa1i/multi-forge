@@ -86,6 +86,7 @@ def reconstruct_context(candidate: dict[str, Any]) -> ActionContext:
         target_path=candidate.get("target_path"),
         new_content=candidate.get("new_content"),
         raw_diff=candidate.get("raw_diff"),
+        action_fingerprint=candidate.get("action_fingerprint"),
     )
 
 

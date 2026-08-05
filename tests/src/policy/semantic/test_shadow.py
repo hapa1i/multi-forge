@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.semantic import shadow
 from forge.policy.semantic.shadow import (
     candidate_hash,
@@ -41,6 +42,7 @@ def _ctx(session: str = "sess", **kw: object) -> ActionContext:
         target_path=str(kw.get("target_path", "f.py")),
         new_content=kw.get("new_content", "x"),  # type: ignore[arg-type]
         raw_diff=kw.get("raw_diff"),  # type: ignore[arg-type]
+        action_fingerprint=kw.get("action_fingerprint"),  # type: ignore[arg-type]
     )
 
 
@@ -175,13 +177,14 @@ class TestCaptureCandidate:
         # raw replay inputs
         assert data["new_content"] == "print('hi')"
         assert data["raw_diff"] == "@@ -1 +1 @@"
+        assert data["action_fingerprint"] == action_fingerprint(ctx)
         assert data["tool_args"] == {"a": 1}
         assert data["target_path"] == "f.py"
         # routing snapshot
         assert data["resume_id"] == "rid"
         assert data["direct"] is False
         assert data["fork_session"] is True
-        assert data["lane"] is None  # v3 field always serialized; None == claude default lane
+        assert data["lane"] is None  # v3+ field always serialized; None == claude default lane
         # dims + audit + lifecycle
         assert data["tier1_reason"] == "looks aligned"
         assert data["checker_model"] == "google/gemini-3.5-flash"
@@ -390,7 +393,6 @@ class TestConfigValidation:
             compute_effective_intent(manifest, strict=True, override_key="policy.supervisor.shadow_sample_rate")
 
     def test_schema_constant_present(self) -> None:
-        # v3 (T1b): the replay lane is the resolved consumer-lane binding (a LaneRecord),
-        # replacing the v2 supervisor_runtime string. Older records lack `lane` and reconstruct
-        # to None (claude) -- see test_shadow_runner.test_reconstruct_lane_absent_defaults_to_none.
-        assert shadow.SHADOW_SCHEMA_VERSION == 3
+        # v4 (D005) freezes canonical action identity. Older records reconstruct with a
+        # best-effort fingerprint from their stored, possibly truncated action fields.
+        assert shadow.SHADOW_SCHEMA_VERSION == 4

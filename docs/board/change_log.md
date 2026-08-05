@@ -25,6 +25,24 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-08-05
+
+### Preserve complete supervisor edit identity
+
+**Goal**: Prevent materially different edits from sharing a semantic supervisor or plan-check clean allow.
+
+**Key changes**:
+
+- Added a versioned canonical action fingerprint computed before adapter presentation truncation, shared by the frontier
+  and tier-1 cache paths and frozen into shadow replay candidates.
+- Included Claude matched and replacement fragments in the bounded frontier prompt while retaining Codex raw-diff
+  context and deterministic policies' existing `new_content` input.
+- Added a marked D005 regression for Claude removed text, Codex delete-only hunks, and both runtimes' post-truncation
+  tails; left D026 configuration reconstruction and whole-file deletion behavior unchanged.
+
+**Verification**: Focused identity/policy/hook tests passed (304); full regression suite passed (641); `make test-unit`
+passed (8,709 passed, 1 skipped); Docker policy-hook integration passed (21); `make pre-commit` passed.
+
 ## 2026-08-04
 
 ### Harden semantic supervisor verdict boundary

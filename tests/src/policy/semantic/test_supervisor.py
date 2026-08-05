@@ -19,10 +19,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.core.reactive.throttle import compute_cache_key
 from forge.core.state import now_iso
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.engine import build_engine
-from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
+from forge.policy.semantic.supervisor import (
+    SemanticSupervisorPolicy,
+    _supervisor_action_content,
+)
 from forge.policy.semantic.verdict import verdict_to_decision
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import LaneRecord, SupervisorConfig, create_session_state
@@ -129,6 +132,27 @@ class TestSupervisorAppliesTo:
         assert policy.applies_to(_make_context("Write")) is False
 
 
+def test_edit_prompt_content_is_bounded_and_preserves_both_fragments() -> None:
+    context = ActionContext(
+        origin="claude_code",
+        event="PreToolUse.Edit",
+        tool_name="Edit",
+        tool_args={"old_string": "old-start" + "x" * 3_000, "new_string": "new-start" + "y" * 3_000},
+        repo_root="/workspace",
+        session_name="test-session",
+        target_path="src/main.py",
+        new_content=("new-start" + "y" * 3_000)[:5_000],
+    )
+
+    content = _supervisor_action_content(context)
+
+    assert len(content) <= 2_000
+    assert "Matched/replaced fragment (old_string)" in content
+    assert "old-start" in content
+    assert "Replacement fragment (new_string)" in content
+    assert "new-start" in content
+
+
 # --- _evaluate() and Caching Tests ---
 
 
@@ -210,7 +234,7 @@ class TestSupervisorEvaluate:
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_invalid_restored_cache_entry_is_a_miss(self, mock_invoke: MagicMock, cache_values: dict[str, Any]) -> None:
         context = _make_context()
-        cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
+        cache_key = action_fingerprint(context)
         policy = SemanticSupervisorPolicy(config=_make_config(throttle_seconds=60))
         policy.set_state({"cache": {cache_key: {"checked_at": now_iso(), **cache_values}}})
         mock_invoke.return_value = _warn_decision("Fresh supervisor result")

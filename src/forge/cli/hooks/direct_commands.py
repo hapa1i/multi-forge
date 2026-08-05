@@ -1070,6 +1070,7 @@ def _handle_policy_check(argv: list[str]) -> None:
     """
     import subprocess
 
+    from forge.policy.action_identity import compute_action_fingerprint
     from forge.policy.engine import build_engine
     from forge.policy.types import ActionContext, extract_added_lines
 
@@ -1203,16 +1204,24 @@ def _handle_policy_check(argv: list[str]) -> None:
         # origin stays "claude_code": %policy check is dispatched from a Claude
         # UserPromptSubmit hook, so the invoking actor genuinely is the Claude session
         # (unlike the forge_cli-tagged terminal leaves in cli/policy.py).
+        tool_args = {"file_path": file_path, "content": (added or "")[:200]}
         context = ActionContext(
             origin="claude_code",
             event="OnDemand.Check",
             tool_name="Edit",
-            tool_args={"file_path": file_path, "content": (added or "")[:200]},
+            tool_args=tool_args,
             repo_root=repo_root,
             session_name="on-demand",
             target_path=file_path,
             new_content=added[:5000] if added else None,
             raw_diff=diff_chunk[:5000] if diff_chunk else None,
+            action_fingerprint=compute_action_fingerprint(
+                tool_name="Edit",
+                target_path=file_path,
+                tool_args=tool_args,
+                new_content=added,
+                raw_diff=diff_chunk,
+            ),
         )
 
         try:

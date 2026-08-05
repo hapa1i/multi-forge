@@ -202,6 +202,11 @@ it did not represent the current code as fixed.
   parse failures rather than cacheable aligned results. Restored throttle state also accepts only the clean aligned
   cache-write shape; invalid entries re-evaluate. Dedicated marked regressions cover each finding. See
   [`harden_supervisor_verdict_boundary`](done/harden_supervisor_verdict_boundary/card.md).
+- **D005 — resolved 2026-08-05:** Claude and Codex adapters now hash the complete canonical action before presentation
+  truncation; the frontier and tier-1 caches share that identity, Claude frontier prompts include matched and
+  replacement fragments, and shadow replay freezes the live digest. A marked regression covers removed-text,
+  delete-only, and post-truncation aliases across both semantic cache layers. See
+  [`preserve_supervisor_edit_identity`](done/preserve_supervisor_edit_identity/card.md).
 
 ## Design Status and Post-Review Admissions
 

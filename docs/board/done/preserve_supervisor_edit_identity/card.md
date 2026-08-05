@@ -4,7 +4,8 @@
 
 **Finding**: D005 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 1 implementation work after D001.
+**Lane**: `done/` -- implemented and verified on `fix/preserve-supervisor-edit-identity`; review and merge are tracked
+by the active epic before Wave 1 closes.
 
 ## Goal
 
@@ -67,11 +68,24 @@ Avoid placing raw action content in logs or persisted cache keys; hash the canon
 configuration reconstruction is outside this member: [D026](../../review_combined.md#design-conformance-findings) and
 its omitted `supervisor_effort` remain separately owned and must not be partially fixed here.
 
+## Outcome
+
+Claude and Codex adapters now hash one versioned, canonical action representation before truncating presentation fields.
+The semantic supervisor and plan checker use that digest as their shared base cache identity while preserving their
+existing plan, route, budget, effort, target-metadata, TTL, and clean-allow-only dimensions. On-demand policy paths use
+the same representation, and shadow candidates freeze the digest used by the live decision for deterministic replay.
+
+The frontier prompt now presents both matched and replacement fragments for Claude Edits and retains bounded Codex diff
+context. Raw action content is not placed in cache keys; only the SHA-256 digest is persisted. Older runtime-only shadow
+records fall back to identity reconstructed from their stored fields, and no durable migration is required. D026's
+configuration replay gap and whole-file delete behavior remain unchanged.
+
 ## Verification
 
-- Add Claude/Codex adapter and frontier-prompt regressions for removed content.
-- Add supervisor and plan-check cache miss/hit tests for distinct versus identical edit identities.
-- Add both-runtime regressions for actions that differ only after the prompt-truncation boundary.
-- Run focused policy hook, supervisor, plan-check, shadow, and Codex-hook tests.
-- Run `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`.
-- Run `make pre-commit`.
+- Pre-fix D005 regression: `9 failed`, reproducing Claude removed-text aliases, Codex delete-only aliases,
+  post-truncation aliases on both runtimes, and the missing Claude frontier fragment.
+- Focused identity, adapter, supervisor, plan-check, shadow, and D005 regression suite: `304 passed`.
+- `make test-regression`: `641 passed`.
+- `make test-unit`: `8,709 passed, 1 skipped, 118 deselected`.
+- `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py`: `21 passed`.
+- `make pre-commit`: passed.

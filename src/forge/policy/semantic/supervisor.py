@@ -22,7 +22,8 @@ from forge.core.reactive.session_runner import (
     SessionResult,
     run_claude_session,
 )
-from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
+from forge.core.reactive.throttle import ThrottleCache
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.queries import RESUME_ID_UUID_RE
 from forge.policy.semantic.verdict import (
@@ -101,6 +102,44 @@ conflicts between this plan and earlier conversation context, THIS plan takes pr
 {plan_content}
 
 ---"""
+
+_SUPERVISOR_CONTENT_CHARS = 2000
+
+
+def _bounded_excerpt(text: str, limit: int) -> str:
+    """Keep a prompt excerpt within ``limit`` while retaining both ends."""
+    if limit <= 0:
+        return ""
+    if len(text) <= limit:
+        return text
+    marker = "\n... (truncated) ...\n"
+    if limit <= len(marker):
+        return text[:limit]
+    available = max(0, limit - len(marker))
+    head = available // 2
+    tail = available - head
+    return text[:head] + marker + (text[-tail:] if tail else "")
+
+
+def _supervisor_action_content(context: ActionContext) -> str:
+    """Build bounded frontier presentation without weakening action identity."""
+    if context.raw_diff is not None:
+        return _bounded_excerpt(context.raw_diff, _SUPERVISOR_CONTENT_CHARS)
+
+    if context.tool_name == "Edit" and ("old_string" in context.tool_args or "new_string" in context.tool_args):
+        old_string = context.tool_args.get("old_string")
+        new_string = context.tool_args.get("new_string")
+        old_text = old_string if isinstance(old_string, str) else ""
+        new_text = new_string if isinstance(new_string, str) else context.new_content or ""
+        old_header = "Matched/replaced fragment (old_string):\n"
+        between = "\n\nReplacement fragment (new_string):\n"
+        content_budget = max(0, _SUPERVISOR_CONTENT_CHARS - len(old_header) - len(between))
+        old_budget = content_budget // 2
+        new_budget = content_budget - old_budget
+        return old_header + _bounded_excerpt(old_text, old_budget) + between + _bounded_excerpt(new_text, new_budget)
+
+    return _bounded_excerpt(context.new_content or "", _SUPERVISOR_CONTENT_CHARS)
+
 
 # The supervisor as a consumer-lane binding (epic consumer_lanes). It reads repo
 # files (a `tool_agent` capability floor), and `runtime_id` selects the dispatch arm
@@ -234,11 +273,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
             return PolicyDecision(decision="allow", policy_id=self.policy_id)
 
         # Check cache
-        cache_key = compute_cache_key(
-            context.tool_name,
-            context.target_path,
-            context.new_content,
-        )
+        cache_key = action_fingerprint(context)
         if self._config.plan_override_path:
             cache_key = (
                 cache_key + "|plan:" + plan_fingerprint(self._config.plan_override_path, self._config.forge_root)
@@ -784,7 +819,7 @@ def run_supervisor_check(
     prompt = SUPERVISOR_PROMPT.format(
         tool_name=context.tool_name,
         target_path=context.target_path or "N/A",
-        content=(context.raw_diff or context.new_content or "")[:2000],
+        content=_supervisor_action_content(context),
     )
 
     plan_content = load_plan_override(config)

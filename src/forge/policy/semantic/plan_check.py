@@ -15,7 +15,8 @@ from typing import Any, cast
 
 from forge.core.llm.detection import ProviderType, detect_provider
 from forge.core.reactive.structured_output import extract_json_from_response
-from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
+from forge.core.reactive.throttle import ThrottleCache
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.deterministic.base import StatefulDeterministicPolicy
 from forge.policy.semantic.supervisor import (
     load_plan_override,
@@ -538,7 +539,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         route = resolve_plan_check_route(config)
         budget_tokens = _budget_tokens(config)
 
-        cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
+        cache_key = action_fingerprint(context)
         # plan_override_path is non-None here (load_plan_override returned content)
         cache_key = cache_key + "|plan:" + plan_fingerprint(str(config.plan_override_path), config.forge_root)
         cache_key = (

@@ -14,8 +14,8 @@ from unittest.mock import patch
 import pytest
 
 from forge.core.reactive.session_runner import SessionResult
-from forge.core.reactive.throttle import compute_cache_key
 from forge.core.state import now_iso
+from forge.policy.action_identity import action_fingerprint
 from forge.policy.engine import PolicyEngine
 from forge.policy.semantic.shadow_runner import STATUS_ERROR, classify_shadow
 from forge.policy.semantic.supervisor import (
@@ -105,7 +105,7 @@ def test_unknown_verdict_is_not_cached_and_emits_fail_open_telemetry(mock_run: A
 @patch("forge.policy.semantic.supervisor.invoke_supervisor")
 def test_unknown_restored_cache_verdict_is_a_miss(mock_invoke: Any) -> None:
     context = _context()
-    cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
+    cache_key = action_fingerprint(context)
     policy = SemanticSupervisorPolicy(_config())
     policy.set_state(
         {

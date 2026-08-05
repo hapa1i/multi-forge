@@ -889,7 +889,7 @@ class TestPlanCheckEffort:
 
     def test_effort_changes_cache_key_string(self, tmp_path: Path) -> None:
         """The computed cache key embeds the effort segment, so differing effort -> differing key."""
-        from forge.core.reactive.throttle import compute_cache_key
+        from forge.policy.action_identity import action_fingerprint
 
         plan = tmp_path / "plan.md"
         plan.write_text("# Plan\nDo the thing.")
@@ -899,7 +899,7 @@ class TestPlanCheckEffort:
         def cache_key_for(effort: str | None) -> str:
             config = _make_config(plan_override_path=str(plan), checker_effort=effort)
             route = resolve_plan_check_route(config)
-            key = compute_cache_key(ctx.tool_name, ctx.target_path, ctx.new_content)
+            key = action_fingerprint(ctx)
             key = key + "|plan:" + plan_fingerprint(str(config.plan_override_path), config.forge_root)
             return (
                 key
