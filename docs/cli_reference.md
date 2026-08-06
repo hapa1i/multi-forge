@@ -505,7 +505,7 @@ scope rationale remain in design.md.
 Shared commands (mirrors CLI syntax):
 
 - `%session list` (calls the same command-core op as `forge session list`)
-- `%session show [name]` (defaults to the current `FORGE_SESSION`)
+- `%session show [name]` (defaults to the current session)
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
