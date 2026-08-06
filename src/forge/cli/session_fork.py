@@ -432,6 +432,18 @@ def fork(
             )
             sys.exit(1)
 
+        from forge.session.launchability import require_session_worktree
+
+        try:
+            require_session_worktree(
+                parent,
+                (_parent_runtime_state.worktree.path if _parent_runtime_state.worktree is not None else None),
+                action="fork",
+            )
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
+
     # --into cross-repo preflight: reject before fork_session() to avoid orphaned sessions
     if into_resolved is not None and into_target_common is not None:
         import subprocess as _sp2

@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-06
 
+### Retain sessions whose recorded worktree disappears
+
+**Goal**: Keep a valid manifest authoritative for session identity while treating checkout presence as derived
+launchability.
+
+**Key changes**:
+
+- Stopped list self-healing from pruning valid missing-worktree sessions and exposed derived launchability in terminal
+  and `%session` list/show output without changing manifest or index schemas.
+- Made repair republish valid degraded orphans through the existing identity, binding, collision, and unchanged-bytes
+  transaction; clean reports them without deleting, while explicit delete remains available.
+- Refused Claude and Codex resume, fork, relaunch, and shared launch paths before mutation when the recorded directory
+  is unavailable; recreating the same path restores launchability automatically.
+
+**Verification**: The marked D009 regression failed on `8ebdb644` because listing returned no session and deleted the
+row accepted by direct lookup. Focused tests passed (398); complete Docker session-command and lifecycle files passed
+(46 and 23); regressions passed (663); unit tests passed (8,790 with one pre-existing platform skip and 118 deselected);
+the review-amendment slice passed (188); final `make pre-commit` passed. Independent review and merge remain pending.
+
 ### Enforce launch-runtime override immutability
 
 **Goal**: Prevent effective overrides from contradicting the raw runtime identity used for launcher dispatch.
@@ -44,7 +63,8 @@ wc -l docs/board/change_log.md
 mutated the override dictionary. Focused override/CLI tests passed (113), Docker session-command integration passed
 (45), regressions passed (662), and unit tests passed (8,771 with one pre-existing platform skip and 118 deselected).
 Independent review found no design violations; its adjacent stale-override relaunch-inheritance observation is tracked
-separately as D048 rather than assigning a scrub policy inside this fix. Final `make pre-commit` passed.
+separately as D048 rather than assigning a scrub policy inside this fix. Final `make pre-commit` passed. Shipped in PR
+#136 (`8ebdb644`).
 
 ### Reject non-object confirmed manifest state
 

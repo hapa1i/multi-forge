@@ -4,7 +4,7 @@
 
 **Decision**: [`missing_worktree_authority`](../../done/missing_worktree_authority/card.md) (DG2; D009).
 
-**Lane**: `todo/` -- accepted Wave 3 implementation work.
+**Lane**: `doing/` -- active on `fix/retain-missing-worktree-sessions` from merged `main` at `8ebdb644`.
 
 ## Goal
 
@@ -22,10 +22,10 @@ does not silently erase discoverability or conversation-binding ownership.
 
 ## Evidence
 
-Rechecked on merged `main` at `dc963a7c`: a valid manifest stored under an existing Forge root named a missing recorded
-worktree. `IndexStore.get_session` returned its row because the manifest exists, while `list_sessions` returned no
-session and deleted the row because the worktree does not. The existing repair scanner still classifies the same shape
-as `missing-worktree` report-only because republishing it would immediately trigger that prune.
+The admission recheck on merged `main` at `dc963a7c` showed that a valid manifest under an existing Forge root could
+name a missing recorded worktree: `IndexStore.get_session` returned the row, while `list_sessions` returned no session
+and deleted the row. The execution branch retained a marked regression against `8ebdb644`; it failed with the same
+`list_sessions() == []` result and row deletion before the implementation changed.
 
 ## Expected Behavior
 
@@ -57,10 +57,24 @@ as `missing-worktree` report-only because republishing it would immediately trig
 
 ## Verification
 
-Run focused session/index/repair/delete/clean tests, then
-`./scripts/test-integration.sh tests/integration/cli/test_session_commands_integration.py` and
-`./scripts/test-integration.sh tests/integration/docker/test_session_lifecycle.py`, plus `make test-regression` and
-`make pre-commit`.
+Focused index, lifecycle, launcher, repair, clean, and list/show tests passed (398). The complete required Docker files
+passed: session-command integration (46) and session lifecycle (23). `make test-regression` passed (663), and
+`make test-unit` passed (8,790 with one pre-existing platform skip and 118 deselected). Final `make pre-commit` passed.
+The review amendment adding launchability parity to `%session list` and `%session show` has dedicated focused coverage:
+the expanded list/show, hook-dispatcher, session-context, and D009 regression slice passed (188), and final
+`make pre-commit` passed.
+
+## Implementation Outcome
+
+- Index listing now prunes only a row whose manifest is absent. Valid manifests retain their name and conversation
+  bindings while terminal and `%session` list/show reads derive `launchable`, `missing_worktree`, or `unknown` without
+  changing durable schemas.
+- `session repair --yes` republishes valid missing-worktree orphans through the existing collision, binding, and
+  unchanged-manifest transaction. It preserves manifest bytes and shared-checkout ownership and never creates a path.
+- Claude and Codex resume, fork, relaunch, and shared launcher seams reject a missing recorded directory before state,
+  preflight, callback, or child creation. Recreating the same directory restores launchability automatically.
+- `forge clean` reports valid degraded sessions in an additive report-only category and excludes them from cleanable
+  totals and apply; explicit `session delete` remains the removal owner.
 
 ## Compatibility and Exclusions
 

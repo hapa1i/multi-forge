@@ -18,6 +18,11 @@ index self-heals rows whose worktree vanished (deleted-checkout "history" is git
 never marks a locked worktree prunable; probed live), and bare-backed families are render-only (see Proposed
 Definition).
 
+> **Superseded subset (2026-08-06):** DG2/D009 changes only this card's assumption that the session index cannot retain
+> a session whose valid manifest survives a missing worktree. Such sessions now remain published as degraded; the Git
+> worktree view remains the authority for workspace membership and Git's own missing/prunable/locked facts. See
+> [`retain_missing_worktree_sessions`](../../doing/retain_missing_worktree_sessions/card.md).
+
 **References**: design.md §3 (session/proxy state contracts; §3.2 contract files), §3.9 (resume across path boundaries),
 §3.14 (activity/cost planes), cli_reference.md §2 (direct command scope policy), design_appendix.md §G (subprocess
 routing), §A.13 (activity read surface)

@@ -52,12 +52,13 @@ def repair(yes: bool, as_json: bool) -> None:
     \b
     Examples:
         forge session repair          # Report orphaned manifests in this project
-        forge session repair --yes    # Re-index the repairable ones
+        forge session repair --yes    # Re-index repairable and degraded records
 
     A session manifest with no index row is invisible to 'forge session list'
     but still owns its name and conversation. Previews by default; pass --yes
-    to re-publish repairable manifests through the ordinary session-creation
-    transaction. Scope is the current Forge project root.
+    to re-publish repairable and missing-worktree manifests through the ordinary
+    session-creation transaction. Missing checkouts are never recreated or claimed.
+    Scope is the current Forge project root.
     """
     forge_root = _cwd_forge_root()
     if forge_root is None:
@@ -183,8 +184,8 @@ def _render(
             console.print(f"    [dim]{record.detail}[/dim]")
             if record.classification == "missing-worktree":
                 console.print(
-                    f"    [dim]Recreate the worktree, or run 'forge session delete {record.name}' from"
-                    f" {report.forge_root}[/dim]"
+                    f"    [dim]Use --yes to restore discovery. Recreate the worktree to launch, or run "
+                    f"'forge session delete {record.name}' from {report.forge_root}.[/dim]"
                 )
             if record.classification == "unrepairable":
                 console.print(f"    [dim]Run 'forge session delete {record.name}' from {report.forge_root}[/dim]")
@@ -201,7 +202,7 @@ def _render(
         for item in apply_result.failed:
             print_error(f"failed to repair {item.name}: {item.reason}", console=err_console)
     elif not applied:
-        if report.by_classification("repairable"):
+        if report.by_classification("repairable") or report.by_classification("missing-worktree"):
             print_tip("Use --yes to repair.", console=console)
         if report.by_classification("corrupt"):
             print_tip("Run 'forge clean' to remove corrupt manifests.", console=console)

@@ -1332,6 +1332,18 @@ def resume(
         handle_session_error(e)
         return
 
+    from forge.session.launchability import require_session_worktree
+
+    try:
+        require_session_worktree(
+            name,
+            manifest.worktree.path if manifest.worktree is not None else None,
+            action="resume",
+        )
+    except ForgeSessionError as e:
+        handle_session_error(e)
+        return
+
     target_forge_root = manifest.forge_root or (manifest.worktree.path if manifest.worktree else None)
     if target_forge_root is None:
         print_error(f"Session '{name}' has no Forge project root")

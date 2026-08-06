@@ -208,6 +208,29 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
 
+**Session liveness and launchability are separate.** A valid session manifest is the durable reservation for its name,
+provenance, and conversation bindings. The global index is a derived publication layer: readers may prune a row only
+when its corresponding manifest is absent, not when the recorded checkout is unavailable. Worktree presence is derived
+at read time and is never persisted as another authority. `session list` and `session show` expose `launchability` as
+`launchable`, `missing_worktree`, or `unknown` (when no validated recorded path is available); human output also names
+the missing path and recovery command. If that path later reappears as a directory, the session becomes launchable
+without a state migration.
+
+A valid manifest with a missing recorded worktree remains a live, degraded session. Operations divide at the checkout
+boundary:
+
+| Operation                                     | Missing-worktree behavior                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| list, get, show, and binding/name reads       | Retain the row and reservation; expose the derived degraded status.                                                            |
+| resume, fork, launch, worktree-local mutation | Refuse before durable mutation, naming the recorded path and the recreate-or-delete recovery.                                  |
+| `session repair`                              | Re-publish an orphan as degraded after the existing collision, binding, and unchanged-manifest checks; never claim a checkout. |
+| `session delete`                              | Remove the manifest/index reservation explicitly; an already absent checkout is not an error.                                  |
+| `forge clean`                                 | Report the degraded session but never auto-delete its valid manifest.                                                          |
+
+Corrupt, unreadable, newer-schema, and identity-conflicting manifests retain their strict classifications and are not
+promoted to valid degraded sessions. A nested project whose manifest disappeared with its checkout has no durable
+reservation; any remaining row is ordinary prunable residue.
+
 **Creation is one transaction; the manifest is the durable reservation.** Every path that mints a session
 (`start_session`, fork, resume-child, relaunch) commits through `IndexStore.create_session_txn`, which holds the index
 write lock across both durable writes: uniqueness checks, then the index row, then `SessionStore.create_exclusive` for
@@ -277,18 +300,19 @@ and fail closed on the index *and* on every manifest they touch, so a read-only 
 reports "unbound" because a read failed. An unreadable manifest raises `BindingLookupError` naming the directory to
 repair: a swallowed read is indistinguishable from an absent binding, which is what would let one conversation bind
 twice. `forge session repair` surfaces and re-indexes these orphans (preview by default, `--yes` to apply), scoped to
-the current Forge root. The scan classifies each unindexed manifest — `repairable`, `missing-worktree` (report-only: a
-republished row would be pruned on the next `session list`), `collision`, `corrupt` (owned by `forge clean`),
-`unreadable`, or `unrepairable` — and identity for a repaired row derives from the manifest's **recorded** worktree
-metadata, not its on-disk location, so a root-level worktree session repairs to its linked worktree rather than the main
-checkout that stores its manifest. Collision detection uses the same binding scans adoption uses (rows **and** the
-manifest behind each row, fail-closed; columns lag or lead manifests), invoked without the per-root orphan walk so the
-manifests under classification are not counted as live holders. A moved ordinary checkout is re-derived from its actual
-location: apply corrects the recorded `worktree.path` and `forge_root` on disk, and leaves
-`confirmed.claude_project_root` alone — it points at Claude Code's conversation namespace, which a checkout move does
-not relocate. Apply goes through `create_session_txn` with `require_uuid_unbound=True` and a callback that verifies the
-manifest is byte-identical to the scanned copy (`SessionStore.update_if_unchanged`), so a raced manifest compensates the
-row away instead of indexing somebody else's session.
+the current Forge root. The scan classifies each unindexed manifest — `repairable`, `missing-worktree`, `collision`,
+`corrupt` (owned by `forge clean`), `unreadable`, or `unrepairable`. A missing-worktree record is an apply target:
+repair republishes its recorded identity as degraded without recreating, probing through, or claiming the checkout.
+Identity otherwise derives from the manifest's **recorded** worktree metadata, not its on-disk location, so a root-level
+worktree session repairs to its linked worktree rather than the main checkout that stores its manifest. Collision
+detection uses the same binding scans adoption uses (rows **and** the manifest behind each row, fail-closed; columns lag
+or lead manifests), invoked without the per-root orphan walk so the manifests under classification are not counted as
+live holders. A moved ordinary checkout is re-derived from its actual location: apply corrects the recorded
+`worktree.path` and `forge_root` on disk, and leaves `confirmed.claude_project_root` alone — it points at Claude Code's
+conversation namespace, which a checkout move does not relocate. Apply goes through `create_session_txn` with
+`require_uuid_unbound=True` and a callback that verifies the manifest is byte-identical to the scanned copy
+(`SessionStore.update_if_unchanged`), so a raced manifest compensates the row away instead of indexing somebody else's
+session.
 
 **A pre-existing conversation is bound by the same write that publishes the session.** Adoption passes its binding into
 `start_session` — `claude_session_id` for the Claude arm, `confirmed.codex` for the Codex arm — rather than writing it

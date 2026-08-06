@@ -35,6 +35,7 @@ from forge.session.exceptions import (
     InvalidOverrideKeyError,
     InvalidOverrideValueError,
 )
+from forge.session.launchability import Launchability, derive_launchability
 from forge.session.overrides import parse_value, validate_key
 from forge.session.verification_config import (
     validate_verification_mode_for_authoring,
@@ -58,6 +59,8 @@ class ListSessionsItem:
     model: str | None
     models: tuple[str, ...]
     is_active: bool
+    launchability: Launchability = "unknown"
+    recorded_worktree_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -134,10 +137,14 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
         proxy_template: str | None = None
         model: str | None = None
         models: tuple[str, ...] = ()
+        launchability: Launchability = "unknown"
+        recorded_worktree_path: str | None = None
 
         try:
             session_forge_root = entry.forge_root or entry.worktree_path
             manifest = manager.get_session(name, forge_root=session_forge_root)
+            recorded_worktree_path = manifest.worktree.path if manifest.worktree is not None else None
+            launchability = derive_launchability(recorded_worktree_path)
             if manifest.intent.proxy:
                 proxy_template = manifest.intent.proxy.template
             else:
@@ -163,6 +170,8 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
                 model=model,
                 models=models,
                 is_active=is_active,
+                launchability=launchability,
+                recorded_worktree_path=recorded_worktree_path,
             )
         )
 

@@ -21,6 +21,19 @@ class SessionNotFoundError(ForgeSessionError):
         super().__init__(f"session '{name}' not found")
 
 
+class SessionWorktreeMissingError(ForgeSessionError):
+    """Raised when an operation needs a session's unavailable checkout."""
+
+    def __init__(self, name: str, path: str, action: str) -> None:
+        self.name = name
+        self.path = path
+        self.action = action
+        super().__init__(
+            f"cannot {action} session '{name}': recorded worktree is missing at '{path}'. "
+            f"Recreate the checkout at that path, or remove the reservation with 'forge session delete {name}'."
+        )
+
+
 class SessionExistsError(ForgeSessionError):
     """Raised when trying to create a session that already exists."""
 

@@ -73,6 +73,7 @@ from .exceptions import (
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
+    SessionWorktreeMissingError,
     UuidAlreadyBoundError,
 )
 
@@ -130,6 +131,7 @@ __all__ = [
     # Exceptions (base + common operational)
     "ForgeSessionError",
     "SessionNotFoundError",
+    "SessionWorktreeMissingError",
     "SessionExistsError",
     "InvalidSessionNameError",
     "UuidAlreadyBoundError",

@@ -168,8 +168,9 @@ class IndexStore:
     ) -> list[tuple[str, SessionIndexEntry]]:
         """List sessions sorted by last_accessed_at DESC, then name ASC.
 
-        Also self-heals stale index entries: if an entry points to a missing worktree
-        or missing manifest file, it is pruned.
+        Also self-heals stale index entries when their authoritative manifest is
+        absent. A missing worktree degrades launchability but does not end the
+        durable session reservation.
 
         Args:
             include_incognito: Whether to include incognito sessions.
@@ -191,11 +192,10 @@ class IndexStore:
         stale: set[str] = set()  # scoped keys (dict keys)
         for key, entry in index.sessions.items():
             display_name = session_name_from_key(key)
-            worktree = Path(entry.worktree_path)
             store_root = Path(entry.forge_root or entry.worktree_path)
             manifest_path = get_manifest_path(store_root, display_name)
 
-            if not worktree.exists() or not manifest_path.is_file():
+            if not manifest_path.is_file():
                 stale.add(key)
 
         if stale:
@@ -209,10 +209,9 @@ class IndexStore:
                         continue
 
                     display_name = session_name_from_key(key)
-                    worktree = Path(latest_entry.worktree_path)
                     store_root = Path(latest_entry.forge_root or latest_entry.worktree_path)
                     manifest_path = get_manifest_path(store_root, display_name)
-                    if not worktree.exists() or not manifest_path.is_file():
+                    if not manifest_path.is_file():
                         del latest.sessions[key]
                         pruned_any = True
 

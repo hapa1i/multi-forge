@@ -49,6 +49,7 @@ def test_fork_threads_subprocess_proxy_env(temp_project: Path) -> None:
         patch("forge.core.ops.claude_session.invoke_claude", return_value=0) as mock_invoke,
     ):
         mock_manager = mock_manager_cls.return_value
+        mock_manager.get_session.return_value = parent
         mock_manager.fork_session.return_value = (parent, fork_state)
 
         result = CliRunner().invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])

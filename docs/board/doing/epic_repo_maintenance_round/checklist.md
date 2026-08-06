@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: merge the independently reviewed D008 member without starting D009 or D021.
+Current focus: independently review and merge D009 without starting O003 or D021.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -43,7 +43,10 @@ Current focus: merge the independently reviewed D008 member without starting D00
 - [x] Activate D008 from merged `main` and create its execution checklist.
 - [x] Implement and behaviorally verify D008 without activating D009 or D021.
 - [x] Review D008 and record its separate D048 relaunch-inheritance policy follow-up (2026-08-06).
-- [ ] Merge D008 before activating D009.
+- [x] Merge D008 before activating D009 (PR #136, `8ebdb644`).
+- [x] Activate D009 from merged `main` and create its execution checklist.
+- [x] Implement and behaviorally verify D009 without activating O003 or D021.
+- [ ] Independently review and merge D009 before activating O003.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

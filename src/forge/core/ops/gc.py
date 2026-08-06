@@ -62,6 +62,7 @@ class OrphanCategory:
     description: str
     count: int
     items: list[str]
+    report_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,11 @@ class CleanReport:
 
     @property
     def total_count(self) -> int:
-        return sum(c.count for c in self.categories)
+        return sum(c.count for c in self.categories if not c.report_only)
+
+    @property
+    def report_only_count(self) -> int:
+        return sum(c.count for c in self.categories if c.report_only)
 
     @property
     def is_clean(self) -> bool:
@@ -396,6 +401,38 @@ def _detect_orphan_session_dirs(ref_set: set[tuple[str, str]], forge_roots: set[
         description="Session directories not in the index",
         count=len(orphans),
         items=sorted(orphans),
+    )
+
+
+def _detect_missing_worktree_sessions(
+    ctx: ExecutionContext,
+    scope: str,
+    scope_roots: set[Path],
+) -> OrphanCategory:
+    """Report live sessions whose recorded checkout is unavailable; never delete them."""
+    from forge.session import ForgeSessionError, SessionStore
+    from forge.session.launchability import derive_launchability
+
+    degraded: list[str] = []
+    for name, forge_root, _indexed_worktree in _list_reference_entries(ctx, scope):
+        if not forge_root or Path(forge_root) not in scope_roots:
+            continue
+        try:
+            state = SessionStore(forge_root, name).read()
+        except ForgeSessionError:
+            # Corrupt and unreadable manifests retain their existing strict
+            # classification; neither is promoted to a valid degraded session.
+            continue
+        worktree_path = state.worktree.path if state.worktree is not None else None
+        if derive_launchability(worktree_path) == "missing_worktree":
+            degraded.append(f"{name}: {worktree_path}")
+
+    return OrphanCategory(
+        category="missing_worktree_sessions",
+        description="Live sessions with missing recorded worktrees (report only)",
+        count=len(degraded),
+        items=sorted(degraded),
+        report_only=True,
     )
 
 
@@ -942,6 +979,8 @@ def _project_compatibility_skips(
         for transcript_path, forge_root in search_doc_owners:
             search_owners.setdefault(transcript_path, []).append(Path(forge_root))
     for category in categories:
+        if category.report_only:
+            continue
         for item in category.items:
             if category.category == "search_docs":
                 if search_owners is None:
@@ -1062,6 +1101,7 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
     search_doc_owners: list[tuple[str, str]] = []
     categories = [
         _detect_orphan_session_dirs(ref_set, scope_roots),
+        _detect_missing_worktree_sessions(ctx, scope, scope_roots),
         _detect_orphan_transfer_files(ref_set, scope_roots),
         _detect_stale_active_entries(scope_roots),
         _detect_stale_work_queue(worktree_ref_set, scope_roots),
@@ -1112,6 +1152,7 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
             items=items,
         )
         for category in report.categories
+        if not category.report_only
         if (
             items := (
                 list(category.items)

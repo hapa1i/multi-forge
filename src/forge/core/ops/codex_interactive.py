@@ -74,8 +74,12 @@ from forge.session.codex_handoff import (
 )
 from forge.session.codex_invoke import invoke_codex_interactive
 from forge.session.config import LAUNCH_MODE_HOST
-from forge.session.exceptions import SessionFileNotFoundError
+from forge.session.exceptions import (
+    SessionFileNotFoundError,
+    SessionWorktreeMissingError,
+)
 from forge.session.index import IndexStore
+from forge.session.launchability import require_session_worktree
 from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.store import MANIFEST_FILENAME, SessionStore
@@ -164,9 +168,15 @@ def start_interactive_codex_session(
             raise ForgeOpError(str(e)) from e
         try:
             parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
-            manager.get_session(parent, forge_root=str(forge_root))
+            parent_state = manager.get_session(parent, forge_root=str(forge_root))
+            parent_worktree = (
+                parent_state.worktree.path if parent_state.worktree is not None else parent_entry.worktree_path
+            )
+            require_session_worktree(parent, parent_worktree, action="resume")
         except (StateCorruptedError, StateUnreadableError):
             raise  # corrupt parent manifest/index -> top-level reset handler
+        except SessionWorktreeMissingError as e:
+            raise ForgeOpError(str(e)) from e
         except ForgeSessionError as e:
             raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 

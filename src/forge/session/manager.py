@@ -49,6 +49,7 @@ from .exceptions import (
     SessionNotFoundError,
 )
 from .index import IndexStore
+from .launchability import require_session_worktree
 from .models import (
     AdoptionConfirmed,
     CodexConfirmed,
@@ -381,6 +382,9 @@ class SessionManager:
             raise SessionNotFoundError(name)
 
         state = store.read()
+
+        worktree_path = state.worktree.path if state.worktree is not None else entry.worktree_path
+        require_session_worktree(name, worktree_path, action="launch")
 
         timestamp = now_iso()
 
@@ -797,6 +801,10 @@ class SessionManager:
             raise SessionNotFoundError(parent_name)
 
         parent_state = parent_store.read()
+        parent_worktree_path = (
+            parent_state.worktree.path if parent_state.worktree is not None else parent_entry.worktree_path
+        )
+        require_session_worktree(parent_name, parent_worktree_path, action="resume")
 
         name_was_auto = child_name is None
         if name_was_auto:
@@ -1197,6 +1205,9 @@ class SessionManager:
         parent = self.get_session(parent_name, forge_root=forge_root)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
+
+        parent_worktree_path_str = parent.worktree.path if parent.worktree is not None else parent_entry.worktree_path
+        require_session_worktree(parent_name, parent_worktree_path_str, action="fork")
 
         if parent.is_incognito:
             raise CannotForkIncognitoError(parent_name)
@@ -1685,6 +1696,9 @@ class SessionManager:
         parent = self.get_session(parent_name, forge_root=forge_root)
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
+
+        parent_worktree_path = parent.worktree.path if parent.worktree is not None else parent_entry.worktree_path
+        require_session_worktree(parent_name, parent_worktree_path, action="launch")
 
         if child_name is None:
             child_name = self._generate_relaunch_name(parent_name, forge_root=parent_forge_root)

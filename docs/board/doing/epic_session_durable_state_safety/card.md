@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D011 and O006 shipped in PRs #134--#135; D008 is independently reviewed from merged `main` at
-`00692356` and pending merge, and the remaining five members stay parked in sequence.
+**Lane**: `doing/` -- D011, O006, and D008 shipped in PRs #134--#136; D009 is implementation-verified from merged `main`
+at `8ebdb644` and pending independent review, and the remaining four members stay parked in sequence.
 
 ## Goal
 
@@ -48,8 +48,8 @@ of the documented broken behavior and was removed after the evidence was recorde
 | ----- | ------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | 1     | D011    | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) | Generic read errors and caller-specific safe outcomes                    |
 | 2     | O006    | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   | Strict manifest shape and repair/delete classification                   |
-| 3     | D008    | [`enforce_launch_runtime_override_immutability`](../enforce_launch_runtime_override_immutability/card.md)           | Parent-object override validation without freezing sibling launch fields |
-| 4     | D009    | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                           | Manifest liveness, derived launchability, repair, and binding ownership  |
+| 3     | D008    | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   | Parent-object override validation without freezing sibling launch fields |
+| 4     | D009    | [`retain_missing_worktree_sessions`](../retain_missing_worktree_sessions/card.md)                                   | Manifest liveness, derived launchability, repair, and binding ownership  |
 | 5     | O003    | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)         | Post-turn reconciliation when explicit deletion wins                     |
 | 6     | D021    | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                           | Forward-schema preservation distinct from retryable handler failure      |
 | 7     | D022    | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               | Transfer-strategy validation before artifacts or child state             |

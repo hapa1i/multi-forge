@@ -292,6 +292,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -413,6 +414,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -467,6 +469,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1203,6 +1206,7 @@ class TestSessionFork:
             patch("forge.sidecar.run_sidecar_session", return_value=0),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1272,6 +1276,7 @@ class TestSessionFork:
             successful_claude_launch() as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1338,6 +1343,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1448,6 +1454,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1515,6 +1522,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork)
 
             result = runner.invoke(
@@ -1559,6 +1567,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude", return_value=1),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(main, ["session", "fork", "fork-parent", "--name", "fork-child"])
@@ -1590,6 +1599,7 @@ class TestSessionFork:
             successful_claude_launch(),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1639,6 +1649,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1685,6 +1696,7 @@ class TestSessionFork:
             patch("forge.core.ops.claude_session.invoke_claude") as mock_invoke,
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1741,6 +1753,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1807,6 +1820,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(
@@ -1877,6 +1891,7 @@ class TestSessionFork:
             ),
         ):
             mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
             mock_manager.fork_session.return_value = (parent, fork_state)
 
             result = runner.invoke(

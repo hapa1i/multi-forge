@@ -540,6 +540,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
                     "models": list(item.models),
                     "last_accessed_at": item.entry.last_accessed_at,
                     "is_active": item.is_active,
+                    "launchability": item.launchability,
                     "worktree_path": item.entry.worktree_path,
                     "forge_root": item.entry.forge_root,
                     "checkout_root": item.entry.checkout_root,
@@ -568,6 +569,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
         table.add_column("LOCATION")
     table.add_column("TEMPLATE")
     table.add_column("MODEL")
+    table.add_column("STATUS")
     table.add_column("LAST USED")
 
     for item in items:
@@ -577,10 +579,25 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
         row = [item.name]
         if duplicate_names:
             row.append(_session_list_location(entry))
-        row.extend([proxy_template, item.model or "-", last_used])
+        status = "missing worktree" if item.launchability == "missing_worktree" else item.launchability
+        row.extend([proxy_template, item.model or "-", status, last_used])
         table.add_row(*row)
 
     console.print(table)
+
+    for item in items:
+        if item.launchability != "missing_worktree":
+            continue
+        recorded_path = item.recorded_worktree_path or item.entry.worktree_path
+        console.print(
+            f"[yellow]Session '{item.name}' cannot launch: recorded worktree is missing at "
+            f"{display_path(recorded_path)}.[/yellow]"
+        )
+        print_tip(
+            f"Recreate the checkout at that path, or run 'forge session delete {item.name}'.",
+            blank_before=False,
+            console=console,
+        )
 
     if older_than is None:
         _print_session_list_tips(items)
@@ -973,6 +990,12 @@ def _build_show_json(
         "parent_session": ctx.parent_session,
     }
 
+    from forge.session.launchability import derive_launchability
+
+    data["launchability"] = derive_launchability(
+        state.worktree.path if state is not None and state.worktree is not None else None
+    )
+
     if state:
         data["last_accessed_at"] = state.last_accessed_at
         data["intent"] = {
@@ -1299,6 +1322,14 @@ def _print_session_detail(
         console.print(f"  UUID:         {state.confirmed.claude_session_id}")
     console.print(f"  Created:      {state.created_at}")
     console.print(f"  Last Used:    {state.last_accessed_at}")
+
+    from forge.session.launchability import derive_launchability
+
+    launchability = derive_launchability(state.worktree.path if state.worktree is not None else None)
+    console.print(f"  Launchability: {launchability}")
+    if launchability == "missing_worktree" and state.worktree is not None:
+        console.print(f"  [yellow]Recorded worktree missing: {display_path(state.worktree.path)}[/yellow]")
+        console.print(f"  [dim]Recreate the checkout at that path, or run 'forge session delete {state.name}'.[/dim]")
 
     session_type = _get_session_type(state.is_fork, state.is_incognito, state.parent_session)
     console.print(f"  Type:         {session_type}")

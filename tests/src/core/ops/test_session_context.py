@@ -115,6 +115,8 @@ class TestSessionContextDataclass:
         data = ctx.to_dict()
         assert data["session_name"] == "test-session"
         assert data["model_family"] == "openai"
+        assert data["launchability"] == "unknown"
+        assert data["recorded_worktree_path"] is None
         assert "main_model" in data
         assert "model_profile" not in data
         assert data["proxy"]["is_direct"] is True
@@ -280,6 +282,8 @@ class TestGetSessionContext:
         assert ctx.proxy.is_direct is True
         assert ctx.model_family == "anthropic"
         assert ctx.main_model == "claude-opus-4-8"
+        assert ctx.recorded_worktree_path == str(worktree)
+        assert ctx.launchability == "launchable"
         assert data["main_model"] == "claude-opus-4-8"
 
     def test_uuid_resolution_falls_back_to_manifest_scan_when_index_is_stale(self, tmp_path: Path):

@@ -69,7 +69,8 @@ def _print_report(report: CleanReport, verbose: bool, console: Console) -> None:
     for cat in report.categories:
         label = _category_label(cat.category)
         count_style = "cyan" if cat.count > 0 else "dim"
-        console.print(f"  {label:<32} [{count_style}]{cat.count}[/{count_style}]")
+        suffix = " [yellow](report only)[/yellow]" if cat.report_only and cat.count else ""
+        console.print(f"  {label:<32} [{count_style}]{cat.count}[/{count_style}]{suffix}")
 
         if verbose and cat.items:
             for item in cat.items:
@@ -84,6 +85,11 @@ def _print_report(report: CleanReport, verbose: bool, console: Console) -> None:
     console.print()
     if report.is_clean:
         console.print("[green]Nothing to clean.[/green]")
+        if report.report_only_count:
+            console.print(
+                f"[yellow]{report.report_only_count} live degraded session(s) reported above; "
+                "Forge will preserve them.[/yellow]"
+            )
     else:
         console.print(f"Total: [cyan]{report.total_count}[/cyan] objects to clean\n")
         print_tip(
@@ -97,6 +103,11 @@ def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, cons
     """Run cleanup and report results."""
     if report.is_clean:
         console.print("[green]Nothing to clean.[/green]")
+        if report.report_only_count:
+            console.print(
+                f"[yellow]{report.report_only_count} live degraded session(s) reported; "
+                "Forge preserved them.[/yellow]"
+            )
         return
 
     try:
@@ -147,6 +158,17 @@ def _run_and_report_json(ctx: ExecutionContext, scope: str, report: CleanReport)
         "scope": report.scope,
         "dry_run": False,
         "total": report.total_count,
+        "report_only_total": report.report_only_count,
+        "report_only_categories": [
+            {
+                "category": cat.category,
+                "description": cat.description,
+                "count": cat.count,
+                "items": cat.items,
+            }
+            for cat in report.categories
+            if cat.report_only
+        ],
         "deleted": clean_result.deleted_count,
         "failed": [{"item": item, "error": err} for item, err in clean_result.failed],
         "categories_cleaned": clean_result.categories_cleaned,
@@ -163,12 +185,14 @@ def _print_json(report: CleanReport) -> None:
         "scope": report.scope,
         "dry_run": True,
         "total": report.total_count,
+        "report_only_total": report.report_only_count,
         "categories": [
             {
                 "category": cat.category,
                 "description": cat.description,
                 "count": cat.count,
                 "items": cat.items,
+                "report_only": cat.report_only,
             }
             for cat in report.categories
         ],
@@ -201,6 +225,7 @@ def _category_label(category: str) -> str:
     """Human-readable label for a category."""
     labels = {
         "session_dirs": "Orphan session dirs:",
+        "missing_worktree_sessions": "Missing-worktree sessions:",
         "transfer_files": "Orphan transfer files:",
         "active_entries": "Stale active entries:",
         "work_queue": "Stale work queue:",

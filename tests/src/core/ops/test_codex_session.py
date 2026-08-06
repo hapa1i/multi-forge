@@ -196,6 +196,30 @@ def _codex_mocks(
 
 
 class TestStartCodexSession:
+    def test_missing_parent_worktree_refuses_before_preflight_or_child_creation(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        missing = tmp_path / "deleted-parent-worktree"
+        parent_store = SessionStore(str(proj), "planner")
+        parent = parent_store.read()
+        assert parent.worktree is not None
+        parent.worktree.path = str(missing)
+        parent_store.write(parent)
+
+        with patch(
+            "forge.core.ops.codex_session.assert_codex_ready",
+            side_effect=AssertionError("preflight must not run"),
+        ):
+            with pytest.raises(ForgeOpError) as exc_info:
+                start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it")
+
+        assert "cannot resume session 'planner'" in str(exc_info.value)
+        assert str(missing) in str(exc_info.value)
+        assert not SessionStore(str(proj), "impl").exists()
+
     def test_happy_path_writes_manifest_facts(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
@@ -676,6 +700,38 @@ def _seed_codex_session(proj: Path, name: str = "impl", thread_id: str | None = 
 
 
 class TestContinueCodexSession:
+    def test_missing_recorded_worktree_refuses_before_preflight_or_mutation(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        missing = tmp_path / "deleted-codex-worktree"
+        state = create_session_state(name="impl", worktree_path=str(missing), runtime="codex")
+        state.forge_root = str(proj)
+        state.confirmed.codex = CodexConfirmed(thread_id=_SUCCESS_TID)
+        SessionStore(str(proj), "impl").write(state)
+        IndexStore().add_from_state(
+            state,
+            project_root=str(proj),
+            forge_root=str(proj),
+            checkout_root=str(missing),
+        )
+        before = SessionStore(str(proj), "impl").manifest_path.read_bytes()
+
+        with patch(
+            "forge.core.ops.codex_session.assert_codex_ready",
+            side_effect=AssertionError("preflight must not run"),
+        ):
+            with pytest.raises(ForgeOpError) as exc_info:
+                continue_codex_session(ctx=ctx, name="impl", task="Keep going")
+
+        message = str(exc_info.value)
+        assert "recorded worktree is missing" in message
+        assert str(missing) in message
+        assert "forge session delete impl" in message
+        assert SessionStore(str(proj), "impl").manifest_path.read_bytes() == before
+
     def test_resume_builds_resume_argv_in_session_worktree(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

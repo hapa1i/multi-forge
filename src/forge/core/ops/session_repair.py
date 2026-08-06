@@ -3,8 +3,9 @@
 A session manifest with no index row is invisible to `forge session list` yet
 still owns its name and its conversation binding (design.md §3.2). The scan
 classifies every unindexed manifest under one Forge project; apply re-publishes
-repairable ones through the same creation transaction ordinary session creation
-uses, so a repaired row is indistinguishable from a natively created one.
+repairable and valid missing-worktree records through the same creation
+transaction ordinary session creation uses, so a repaired row is
+indistinguishable from a natively created one.
 
 Classification and identity follow the ratified decisions on the board card
 (docs/board/doing/session_orphan_manifest_repair/checklist.md, D1-D6):
@@ -14,13 +15,13 @@ Classification and identity follow the ratified decisions on the board card
   worktree session keeps its manifest under the main checkout while its
   session checkout is the recorded linked worktree, so deriving from location
   would silently repoint it (D1).
-- A missing recorded worktree is report-only for worktree-backed shapes
-  (``is_worktree=True``); only the ordinary shape may re-derive from the
-  actual location -- its manifest travels inside its own checkout by
-  construction -- correcting the stale recorded ``worktree.path`` and
-  ``forge_root`` on disk. ``confirmed.claude_project_root`` is never touched:
-  it points at Claude Code's conversation namespace, which a checkout move
-  does not relocate (D2).
+- A missing recorded worktree remains a live degraded shape for worktree-backed
+  sessions (``is_worktree=True``). Repair may publish its existing manifest and
+  recorded path without recreating or claiming the checkout. Only the ordinary
+  moved-checkout shape re-derives from the manifest's actual location and
+  corrects stale ``worktree.path``/``forge_root`` on disk.
+  ``confirmed.claude_project_root`` is never touched: it points at Claude Code's
+  conversation namespace, which a checkout move does not relocate (D2).
 - Collisions refuse, not bind (D3). Live bindings are gathered with the same
   three-source, fail-closed semantics the adoption scans use
   (``collect_bound_uuids`` / ``collect_bound_codex_threads`` without the
@@ -64,6 +65,7 @@ from forge.session.exceptions import (
     UuidAlreadyBoundError,
 )
 from forge.session.identity import make_scoped_key
+from forge.session.launchability import derive_launchability
 from forge.session.store import CLI_LOCK_TIMEOUT_S, SessionStore, get_manifest_path
 from forge.session.worktree import get_repo_root
 
@@ -240,7 +242,7 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
             continue
 
         recorded = Path(worktree.path)
-        if recorded.exists():
+        if derive_launchability(recorded) == "launchable":
             identity = _derive_identity(recorded, root, manager)
             record(
                 "repairable",
@@ -250,9 +252,11 @@ def scan_repairable_orphans(forge_root: str | Path) -> RepairScanReport:
                 **ids,
             )
         elif worktree.is_worktree:
+            identity = _derive_missing_worktree_identity(recorded, root, manager)
             record(
                 "missing-worktree",
                 f"recorded worktree is gone: {worktree.path}",
+                identity=identity,
                 manifest_sha256=digest,
                 **ids,
             )
@@ -287,9 +291,8 @@ def repair_orphans(
     """Re-index the ``repairable`` records through the creation transaction.
 
     Fails closed on an incompatible project pin before any write. Collisions
-    are refused without an attempt; report-only classifications (corrupt,
-    unreadable, missing-worktree, unrepairable) are not apply targets and are
-    skipped silently -- the scan report already carries their guidance.
+    are refused without an attempt. ``missing-worktree`` records are publishable
+    as degraded rows; corrupt, unreadable, and unrepairable records are skipped.
 
     Raises:
         ProjectCompatibilityError: If the project pin refuses mutation (D5).
@@ -307,15 +310,16 @@ def repair_orphans(
         if rec.classification == "collision":
             refused.append(ApplyItem(rec.name, rec.detail))
             continue
-        if rec.classification != "repairable":
+        if rec.classification not in {"repairable", "missing-worktree"}:
             continue
         identity = rec.identity
         if identity is None or rec.manifest_sha256 is None:
             failed.append(ApplyItem(rec.name, "repairable record missing identity or hash"))
             continue
-        # Prune stability (D2): never publish a row the list_sessions prune
-        # would immediately delete.
-        if not Path(identity.worktree_path).exists():
+        # A normal repair must not publish a path that vanished after scan. A
+        # missing-worktree repair intentionally publishes the degraded row; the
+        # surviving manifest, not checkout presence, is the liveness authority.
+        if rec.classification == "repairable" and derive_launchability(identity.worktree_path) != "launchable":
             refused.append(
                 ApplyItem(rec.name, f"recorded checkout vanished between scan and apply: {identity.worktree_path}")
             )
@@ -409,5 +413,24 @@ def _derive_identity(anchor: Path, forge_root: Path, manager: SessionManager) ->
         worktree_path=worktree_path,
         checkout_root=checkout_root,
         project_root=project_root,
+        relative_path=relative_path,
+    )
+
+
+def _derive_missing_worktree_identity(
+    recorded_worktree: Path,
+    forge_root: Path,
+    manager: SessionManager,
+) -> RepairIdentity:
+    """Build a row from surviving manifest facts without probing the gone checkout."""
+    project_root = Path(manager.resolve_project_root(forge_root))
+    try:
+        relative_path = str(forge_root.relative_to(project_root))
+    except ValueError:
+        relative_path = "."
+    return RepairIdentity(
+        worktree_path=str(recorded_worktree),
+        checkout_root=str(recorded_worktree),
+        project_root=str(project_root),
         relative_path=relative_path,
     )
