@@ -1,6 +1,6 @@
 # Preserve unreadable JSON state classification checklist
 
-Current focus: implementation, verification, and review are complete; merge D011 before activating O006.
+Completed in PR #134 (`6be815bf`) on 2026-08-06.
 
 ## Activation and reproduction
 
@@ -38,4 +38,4 @@ Current focus: implementation, verification, and review are complete; merge D011
 - [x] Run final `make pre-commit` after Markdown normalization.
 - [x] Synchronize the card, review ledger, change log, and normative queue documentation affected by the fix.
 - [x] Complete review and record the accepted GC-documentation amendment and separate D046 follow-up.
-- [ ] Merge this member before activating O006.
+- [x] Merge this member before activating O006 (PR #134, `6be815bf`).

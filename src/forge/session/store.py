@@ -440,6 +440,7 @@ class SessionStore:
         The manifest is treated as a strict contract:
         - schema_version must be supported
         - required fields must be present
+        - intent, overrides, and present confirmed sections must be objects
         - overrides must target valid SessionIntent fields only
 
         Raises:
@@ -499,6 +500,8 @@ class SessionStore:
 
         # Optional: confirmed.started_with_proxy (B2.1.6)
         confirmed = data.get("confirmed", {})
+        if not isinstance(confirmed, dict):
+            raise ManifestCorruptedError(str(self._manifest_path), "confirmed must be an object")
         started_with_proxy = confirmed.get("started_with_proxy")
         if started_with_proxy is not None:
             if not isinstance(started_with_proxy, dict):

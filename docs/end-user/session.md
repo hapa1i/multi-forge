@@ -51,6 +51,10 @@ A session is **not** a proxy routing identity.
 Multiple sessions can coexist in the same Forge project, each with its own directory under
 `<forge_root>/.forge/sessions/`.
 
+Session manifests are strict durable state. `intent` and `overrides` must be JSON objects; `confirmed` defaults to an
+empty section when absent for legacy compatibility but must also be an object when present. Forge reports invalid shapes
+as corruption and does not rewrite them during ordinary reads.
+
 The session file includes hook-confirmed facts such as:
 
 - `confirmed.claude_session_id` (launch-owned: pre-seeded by `forge session start` and by transfer/fresh children, then

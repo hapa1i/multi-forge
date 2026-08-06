@@ -421,6 +421,53 @@ class TestSessionStoreRead:
         with pytest.raises(ManifestCorruptedError, match="expected a JSON object"):
             store.read()
 
+    @pytest.mark.parametrize(
+        "confirmed",
+        [
+            pytest.param(None, id="null"),
+            pytest.param([], id="list"),
+            pytest.param("invalid", id="string"),
+            pytest.param(7, id="number"),
+            pytest.param(True, id="boolean"),
+        ],
+    )
+    def test_read_rejects_non_object_confirmed(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        confirmed: object,
+    ) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        data["confirmed"] = confirmed
+        store.manifest_path.write_text(json.dumps(data))
+        original = store.manifest_path.read_bytes()
+
+        with pytest.raises(ManifestCorruptedError, match="confirmed must be an object") as exc_info:
+            store.read()
+
+        assert exc_info.value.path == str(store.manifest_path)
+        assert store.manifest_path.read_bytes() == original
+
+    @pytest.mark.parametrize("confirmed_present", [False, True], ids=["missing", "empty-object"])
+    def test_read_accepts_missing_or_empty_confirmed(
+        self,
+        store: SessionStore,
+        sample_manifest: SessionState,
+        confirmed_present: bool,
+    ) -> None:
+        store.write(sample_manifest)
+        data = json.loads(store.manifest_path.read_text())
+        if confirmed_present:
+            data["confirmed"] = {}
+        else:
+            data.pop("confirmed")
+        store.manifest_path.write_text(json.dumps(data))
+
+        loaded = store.read()
+
+        assert loaded.confirmed.claude_session_id is None
+
     def test_read_rejects_directory_name_mismatch(self, temp_worktree: Path) -> None:
         """The directory name IS the session name; a manifest naming another
         session is corruption (write already enforces this)."""

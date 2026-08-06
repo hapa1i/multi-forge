@@ -202,6 +202,34 @@ class TestSessionDelete:
         assert result.returncode == 1
         assert "not found" in result.stdout or "not found" in result.stderr
 
+    def test_delete_non_object_confirmed_reports_corruption_without_mutation(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        mock_claude_workspace.exec("cd /workspace && forge session start bad-confirmed --no-launch")
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            import json
+            from pathlib import Path
+
+            path = Path("/workspace/.forge/sessions/bad-confirmed/forge.session.json")
+            data = json.loads(path.read_text())
+            data["confirmed"] = None
+            path.write_text(json.dumps(data))
+            """,
+        )
+        path = "/workspace/.forge/sessions/bad-confirmed/forge.session.json"
+        original = mock_claude_workspace.read_file(path)
+
+        result = mock_claude_workspace.exec("cd /workspace && forge session delete bad-confirmed --yes")
+
+        assert result.returncode == 1
+        assert "Forge state is corrupt" in result.stderr
+        assert "confirmed must be an object" in result.stderr
+        assert "Traceback" not in result.stderr
+        assert mock_claude_workspace.read_file(path) == original
+
 
 class TestSessionResume:
     """Tests for 'forge session resume' command."""

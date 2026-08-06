@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ import forge.session.claude.cleanup as cleanup_mod
 import forge.session.worktree as worktree_pkg
 import forge.session.worktree.cleanup as worktree_cleanup_mod
 from forge.session import ForgeSessionError, IndexStore, SessionManager, SessionStore
+from forge.session.exceptions import ManifestCorruptedError
 from forge.session.manager import _tracked_derivation_transcript_session_ids
 from forge.session.models import Derivation
 
@@ -85,3 +87,30 @@ def test_delete_preserves_session_when_worktree_cleanup_reports_errors(
     assert captured["cleanup_called"] is False
     assert manager.session_exists("cleanup-fail-test") is True
     assert store.exists() is True
+
+
+def test_delete_refuses_non_object_confirmed_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    project = tmp_path / "project"
+    _init_project(project)
+    monkeypatch.chdir(project)
+
+    manager = SessionManager(index_store=IndexStore())
+    manager.start_session(name="bad-confirmed", worktree_path=str(project))
+    store = SessionStore(str(project), "bad-confirmed")
+    data = json.loads(store.manifest_path.read_text())
+    data["confirmed"] = None
+    store.manifest_path.write_text(json.dumps(data))
+    original = store.manifest_path.read_bytes()
+
+    with pytest.raises(ManifestCorruptedError, match="confirmed must be an object"):
+        manager.delete_session("bad-confirmed")
+
+    assert manager.session_exists("bad-confirmed") is True
+    assert store.manifest_path.read_bytes() == original

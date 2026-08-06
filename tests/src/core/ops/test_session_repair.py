@@ -236,6 +236,21 @@ class TestScan:
         rec = report.records[0]
         assert rec.classification == "corrupt"
 
+    def test_non_object_confirmed_is_corrupt_without_mutation(self, project: Path) -> None:
+        seed_orphan(project, "bad-confirmed")
+        path = get_manifest_path(project, "bad-confirmed")
+        data = json.loads(path.read_text())
+        data["confirmed"] = None
+        path.write_text(json.dumps(data))
+        original = path.read_bytes()
+
+        report = scan_repairable_orphans(project)
+
+        rec = report.records[0]
+        assert rec.classification == "corrupt"
+        assert "confirmed must be an object" in rec.detail
+        assert path.read_bytes() == original
+
     def test_dir_name_mismatch_is_corrupt(self, project: Path) -> None:
         """Review round 3: a manifest naming a different session than its directory
         violates the store invariant; classify corrupt, never 'repair' it into a
