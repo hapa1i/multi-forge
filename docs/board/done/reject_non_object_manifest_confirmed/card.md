@@ -1,11 +1,10 @@
 # Reject non-object confirmed manifest state
 
-**Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
+**Epic**: [`epic_session_durable_state_safety`](../../doing/epic_session_durable_state_safety/card.md).
 
 **Finding**: O006 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `doing/` -- independently reviewed and pending merge on `fix/reject-non-object-manifest-confirmed` from merged
-`main` at `6be815bf`.
+**Lane**: `done/` -- shipped in PR #135 (`00692356`) on 2026-08-06.
 
 ## Goal
 

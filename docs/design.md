@@ -442,6 +442,9 @@ started_with_proxy:
 - Lists: override replaces entirely (no concat)
 - Dicts: recurse into nested keys (untouched keys preserved)
 - Explicit `null`: clears the field
+- `intent.launch.runtime` is immutable dispatch identity: set rejects the direct key, a parent `launch` object carrying
+  `runtime`, and `launch.*` before mutation. A whole-launch null clear remains valid because the section is optional and
+  dispatch reads raw intent; reset accepts `launch` or `launch.runtime` so stale illegal overrides remain recoverable.
 
 > **Note:** There is no "merging"—overrides simply win. The only subtlety is nested dicts: you can override
 > `memory.tags` without losing `memory.auto_recall`. This applies to session-owned fields only (`tdd_mode`, `memory.*`,
@@ -904,8 +907,8 @@ op.
 
 **Codex session lifecycle.** The headless frontend over it is
 **`forge session start <name> --runtime codex --resume-from <parent> --task "…"`** (`core/ops/codex_session.py`): it
-creates a real Codex-runtime session (manifest `intent.launch.runtime="codex"`, immutable —
-`forge session set launch.runtime` is rejected), keys the transfer snapshot by the **real session name** so
+creates a real Codex-runtime session (manifest `intent.launch.runtime="codex"`, immutable — direct, parent-object, and
+wildcard override writes are rejected), keys the transfer snapshot by the **real session name** so
 `Derivation.context_file` GC-protects it (no synthetic per-run transfer children), and runs the first `codex exec` turn.
 A failed first turn keeps the session (a turn that never reached `thread.started` leaves no `thread_id`; resume refuses
 with delete-and-retry guidance). Headless continuation is `forge session resume <name> --task "…"` ->

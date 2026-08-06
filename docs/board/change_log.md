@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-06
 
+### Enforce launch-runtime override immutability
+
+**Goal**: Prevent effective overrides from contradicting the raw runtime identity used for launcher dispatch.
+
+**Key changes**:
+
+- Rejected direct, parent-object, and wildcard writes that introduce `launch.runtime` before override or manifest
+  mutation, using one actionable diagnostic.
+- Preserved supported sibling launch overrides, whole-launch and nullable-field null clears, and reset-based cleanup of
+  illegal runtime overrides written by older Forge versions.
+- Kept raw intent as the dispatch authority and documented the immutable write boundary without changing consumer lanes
+  or runtime creation flags.
+
+**Verification**: The marked D008 regression failed on `00692356` because the parent-object write returned normally and
+mutated the override dictionary. Focused override/CLI tests passed (113), Docker session-command integration passed
+(45), regressions passed (662), and unit tests passed (8,771 with one pre-existing platform skip and 118 deselected).
+Independent review found no design violations; its adjacent stale-override relaunch-inheritance observation is tracked
+separately as D048 rather than assigning a scrub policy inside this fix. Final `make pre-commit` passed.
+
 ### Reject non-object confirmed manifest state
 
 **Goal**: Classify an explicitly present non-object `confirmed` section as manifest corruption without rewriting it.
@@ -42,7 +61,7 @@ wc -l docs/board/change_log.md
 **Verification**: The marked O006 regression failed with raw `AttributeError` on `6be815bf`; focused tests passed (95),
 Docker session-command integration passed (44), regressions passed (661), and unit tests passed (8,751 with one
 pre-existing platform skip and 118 deselected). Independent review found no design violations; its adjacent status-line
-raw-reader observation is tracked separately as D047. Final `make pre-commit` passed.
+raw-reader observation is tracked separately as D047. Final `make pre-commit` passed. Shipped in PR #135 (`00692356`).
 
 ### Preserve unreadable JSON state classification
 

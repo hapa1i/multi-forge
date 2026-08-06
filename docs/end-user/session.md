@@ -891,6 +891,11 @@ forge session reset memory.tags
 forge session reset --all
 ```
 
+Launch runtime is immutable session identity. `session set` rejects `launch.runtime`, a parent `launch` object that
+contains `runtime`, and `launch.*`; create a new session with `--runtime` instead. Whole-launch and nullable sibling
+null clears remain supported, while `session reset launch.runtime` and `session reset launch` can remove stale illegal
+overrides written by an older Forge.
+
 **Policy/TDD enforcement** is managed separately via the Policy CLI, not session set:
 
 ```bash

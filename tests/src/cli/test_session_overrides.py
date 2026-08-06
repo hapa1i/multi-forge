@@ -256,6 +256,74 @@ class TestSessionSetOverride:
         assert result.exit_code == 0, result.output
         assert store.read().overrides["verification"]["bypass"] is True
 
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("launch.runtime", "null"),
+            ("launch", '{"runtime":"codex"}'),
+            ("launch.*", "null"),
+        ],
+    )
+    def test_set_rejects_invalid_launch_identity_writes_without_mutation(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        value: str,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "launch-identity", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "launch-identity")
+        before = store.manifest_path.read_bytes()
+
+        result = runner.invoke(main, ["session", "set", "--session", "launch-identity", key, value])
+
+        assert result.exit_code == 1
+        assert "runtime is immutable launch identity" in result.output
+        assert "start a new session with --runtime" in result.output
+        assert store.manifest_path.read_bytes() == before
+
+    def test_set_parent_launch_sibling_and_nullable_clear_remain_supported(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "launch-siblings", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "launch-siblings")
+
+        parent_result = runner.invoke(
+            main,
+            ["session", "set", "--session", "launch-siblings", "launch", '{"mode":"sidecar"}'],
+        )
+        clear_result = runner.invoke(
+            main,
+            ["session", "set", "--session", "launch-siblings", "launch.direct_model", "null"],
+        )
+
+        assert parent_result.exit_code == 0, parent_result.output
+        assert clear_result.exit_code == 0, clear_result.output
+        launch = store.read().overrides["launch"]
+        assert launch == {"mode": "sidecar", "direct_model": None}
+        assert "runtime" not in launch
+
+    def test_set_whole_launch_null_clears_only_the_effective_view(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "clear-launch", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "clear-launch")
+
+        result = runner.invoke(main, ["session", "set", "--session", "clear-launch", "launch", "null"])
+
+        assert result.exit_code == 0, result.output
+        state = store.read()
+        assert state.overrides["launch"] is None
+        assert state.intent.launch is not None
+        assert state.intent.launch.runtime == "claude_code"
+
 
 class TestSessionReset:
     """Tests for 'forge session reset' command."""
@@ -363,6 +431,33 @@ class TestSessionReset:
         # Should succeed and clear all overrides
         assert result.exit_code == 0
         assert "Cleared" in result.output or "No overrides" in result.output
+
+    @pytest.mark.parametrize(
+        ("key", "expected_launch"),
+        [
+            ("launch.runtime", {"mode": "sidecar"}),
+            ("launch", None),
+        ],
+    )
+    def test_reset_removes_persisted_illegal_launch_runtime_override(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+        key: str,
+        expected_launch: dict[str, str] | None,
+    ) -> None:
+        start = runner.invoke(main, ["session", "start", "legacy-launch-override", "--no-launch"])
+        assert start.exit_code == 0, start.output
+        store = SessionStore(str(temp_env), "legacy-launch-override")
+        state = store.read()
+        state.overrides["launch"] = {"runtime": "codex", "mode": "sidecar"}
+        store.write(state)
+
+        result = runner.invoke(main, ["session", "reset", "--session", "legacy-launch-override", key])
+
+        assert result.exit_code == 0, result.output
+        launch = store.read().overrides.get("launch")
+        assert launch == expected_launch
 
 
 class TestInspectShowsOverrides:

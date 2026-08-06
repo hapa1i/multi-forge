@@ -1,6 +1,6 @@
 # Session and durable-state safety checklist
 
-Current focus: merge the reviewed O006 member without starting D008 or D009.
+Current focus: merge the independently reviewed D008 member without starting D009.
 
 ## Activation and sequencing
 
@@ -14,10 +14,15 @@ Current focus: merge the reviewed O006 member without starting D008 or D009.
 - [x] Start O006 from merged `main`, move it to `doing/`, and retain its baseline regression failure.
 - [x] Implement and behaviorally verify O006 without changing D009 liveness or D011 read classification.
 - [x] Review O006 and record its separate D047 status-line raw-reader follow-up.
+- [x] Merge O006 before moving D008 from `todo/` (PR #135, `00692356`).
+- [x] Start D008 from merged `main`, move it to `doing/`, and create its execution checklist.
+- [x] Implement and behaviorally verify D008 without changing raw-intent dispatch or sibling launch overrides.
+- [x] Review D008 and record its separate D048 relaunch-inheritance policy follow-up.
+- [ ] Merge D008 before moving D009 from `todo/`.
 
 ## Remaining members
 
-- [ ] Ship O006 strict `confirmed` classification.
+- [x] Ship O006 strict `confirmed` classification (PR #135, `00692356`).
 - [ ] Ship D008 launch-runtime override immutability.
 - [ ] Ship D009 missing-worktree liveness and launchability.
 - [ ] Ship O003 headless Codex concurrent-delete reconciliation.
