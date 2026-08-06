@@ -1,9 +1,8 @@
 # Epic: Stop and artifact correctness
 
-**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- coordinating the final Wave 2 member; verification shipped in PR #130, transcript artifacts
-shipped in PR #131, and sidecar shadow-drain routing is implemented and awaiting review and merge.
+**Lane**: `done/` -- all three Wave 2 members shipped in PRs #130–#132 and the coordinated outcome closed on 2026-08-06.
 
 ## Goal
 
@@ -64,7 +63,7 @@ D039 was rechecked again on the execution branch from `3e090ef5`. Its retained r
 because Stop reported `queued_shadow=false` when the candidate existed under the mounted root but marker paths named
 distinct host roots. The implemented split probes through the process-visible `SessionStore` root and translates only
 the marker payload. Focused tests (120), the full sidecar hook integration file (4), the regression suite (659), and the
-unit suite (8,734 passed, one pre-existing platform skip) passed; review and merge remain before Wave 2 closeout.
+unit suite (8,734 passed, one pre-existing platform skip) passed. It shipped in PR #132 (`dc963a7c`) on 2026-08-06.
 
 ## Drift Constraints
 
@@ -79,5 +78,6 @@ unit suite (8,734 passed, one pre-existing platform skip) passed; review and mer
 
 ## Closeout
 
-Close this epic only after all three members ship independently with regression and required integration coverage, the
-review ledger records their outcomes, and normative design documentation matches the shipped behavior.
+All three members shipped independently with marked regressions and their required Docker integration coverage. The
+review ledger, member cards, and normative design documentation record the final contracts; Wave 3 is coordinated
+separately by [`epic_session_durable_state_safety`](../../todo/epic_session_durable_state_safety/card.md).

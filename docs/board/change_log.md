@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-06
 
+### Close Stop/artifact work and sequence session/state safety
+
+**Goal**: Close the shipped Wave 2 coordination record and admit Wave 3 as bounded, independently reviewable work.
+
+**Key changes**:
+
+- Closed the Stop/artifact epic after PR #132 shipped D039 and repointed its parent, member, and review-ledger links to
+  the completed records.
+- Reproduced D008–D011, D021–D022, O003, and O006 on merged `main`, then created one parked session/durable-state epic
+  with eight ordered members and explicit regression/integration requirements.
+- Kept every Wave 3 member in `todo/`; D011 is first in sequence, but no implementation card or checklist was activated.
+
+**Verification**: One disposable pytest module passed eight assertions of the documented broken behavior and was removed
+after the evidence was recorded; `make pre-commit-md` and `git diff --check` passed; relative board links were checked
+after the lane moves and card creation.
+
 ### Repair sidecar shadow-drain routing
 
 **Goal**: Make sidecar Stop candidate discovery and deferred host-drain routing use paths visible at their respective
@@ -39,9 +55,9 @@ execution boundaries.
 - Preserved marker/candidate schemas, host-mode routing, and no-candidate inertness, with a marked D039 regression.
 - Exercised the real sidecar Stop hook and then handled its host-visible marker through the host drain path.
 
-**Verification**: Focused hook/shadow/workqueue tests passed (120); full sidecar hook integration passed (4); regression
-suite passed (659); `make test-unit` passed (8,734 passed, 1 pre-existing platform skip, 118 deselected); final
-`make pre-commit` passed after Markdown normalization.
+**Verification**: PR #132 merged as `dc963a7c`; focused hook/shadow/workqueue tests passed (120); full sidecar hook
+integration passed (4); regression suite passed (659); `make test-unit` passed (8,734 passed, 1 pre-existing platform
+skip, 118 deselected); final `make pre-commit` passed after Markdown normalization.
 
 ## 2026-08-05
 
