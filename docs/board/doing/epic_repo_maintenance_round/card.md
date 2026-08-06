@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-2 is closed, D011 shipped in PR #134, and O006 is independently reviewed and pending merge as the second Wave 3
-session/durable-state member.
+2 is closed, D011 and O006 shipped in PRs #134--#135, and D008 is independently reviewed and pending merge as the third
+Wave 3 session/durable-state member.
 
 ## Goal
 
@@ -11,8 +11,8 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045/D046, for a current total of 148 ranked findings plus
-unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D048, for a current total of 150 ranked findings
+plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
 ## Admission Contract
@@ -65,7 +65,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 is coordinated by the active
 [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, D011 shipped in PR #134 (`6be815bf`), and O006 is implementation-verified from that merged baseline.
+before admission, D011 and O006 shipped in PRs #134--#135, and D008 is independently reviewed from merged `main` at
+`00692356` and pending merge.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -77,8 +78,8 @@ before admission, D011 shipped in PR #134 (`6be815bf`), and O006 is implementati
 | 2    | D007, D024      | [`preserve_transcript_artifact_identity`](../../done/preserve_transcript_artifact_identity/card.md)                 |
 | 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../done/repair_sidecar_shadow_drain_routing/card.md)                     |
 | 3    | D011            | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) |
-| 3    | O006            | [`reject_non_object_manifest_confirmed`](../reject_non_object_manifest_confirmed/card.md)                           |
-| 3    | D008            | [`enforce_launch_runtime_override_immutability`](../../todo/enforce_launch_runtime_override_immutability/card.md)   |
+| 3    | O006            | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   |
+| 3    | D008            | [`enforce_launch_runtime_override_immutability`](../enforce_launch_runtime_override_immutability/card.md)           |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                           |
 | 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)         |
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                           |

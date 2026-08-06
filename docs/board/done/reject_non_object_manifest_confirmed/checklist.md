@@ -1,6 +1,6 @@
 # Reject non-object confirmed manifest state checklist
 
-Current focus: merge the reviewed O006 member before activating D008.
+Completed in PR #135 (`00692356`) on 2026-08-06.
 
 ## Activation and reproduction
 
@@ -26,4 +26,4 @@ Current focus: merge the reviewed O006 member before activating D008.
 - [x] Run final `make pre-commit`.
 - [x] Synchronize the card, review ledger, change log, and affected design documentation.
 - [x] Complete independent review and record the adjacent status-line raw-reader issue as D047.
-- [ ] Merge O006 before activating D008.
+- [x] Merge O006 before activating D008 (PR #135, `00692356`).

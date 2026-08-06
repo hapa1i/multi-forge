@@ -736,6 +736,48 @@ class TestSessionSetOverride:
 
         assert result.returncode == 1
 
+    def test_launch_runtime_parent_override_is_rejected_and_recoverable(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        mock_claude_workspace.exec("cd /workspace && forge session start runtime-guard --no-launch")
+        path = "/workspace/.forge/sessions/runtime-guard/forge.session.json"
+        original = mock_claude_workspace.read_file(path)
+
+        rejected = mock_claude_workspace.exec(
+            'cd /workspace && forge session set --session runtime-guard launch \'{"runtime":"codex"}\''
+        )
+
+        assert rejected.returncode == 1
+        assert "runtime is immutable launch identity" in rejected.stderr
+        assert "start a new session with --runtime" in rejected.stderr
+        assert mock_claude_workspace.read_file(path) == original
+
+        sibling = mock_claude_workspace.exec(
+            'cd /workspace && forge session set --session runtime-guard launch \'{"mode":"sidecar"}\''
+        )
+        assert sibling.returncode == 0, sibling.stderr
+
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            import json
+            from pathlib import Path
+
+            path = Path("/workspace/.forge/sessions/runtime-guard/forge.session.json")
+            data = json.loads(path.read_text())
+            data["overrides"]["launch"]["runtime"] = "codex"
+            path.write_text(json.dumps(data))
+            """,
+        )
+        reset = mock_claude_workspace.exec(
+            "cd /workspace && forge session reset --session runtime-guard launch.runtime"
+        )
+
+        assert reset.returncode == 0, reset.stderr
+        manifest = json.loads(mock_claude_workspace.read_file(path))
+        assert manifest["overrides"]["launch"] == {"mode": "sidecar"}
+
 
 class TestSessionReset:
     """Tests for 'forge session reset' command."""

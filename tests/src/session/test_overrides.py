@@ -143,6 +143,7 @@ class TestValidateKey:
 
     def test_other_launch_keys_still_valid(self) -> None:
         """Only launch.runtime is blocked; sibling launch keys keep working."""
+        assert validate_key("launch") == ["launch"]
         assert validate_key("launch.mode") == ["launch", "mode"]
 
     @pytest.mark.parametrize(
@@ -205,6 +206,7 @@ class TestExpandWildcard:
         paths = expand_wildcard("launch.*")
         assert "launch.mode" in paths
         assert "launch.sidecar" in paths
+        assert "launch.runtime" in paths
 
     def test_system_prompt_wildcard(self) -> None:
         """system_prompt.* expands to system_prompt nested fields."""
@@ -356,6 +358,56 @@ class TestSetOverride:
         with pytest.raises(InvalidOverrideKeyError):
             set_override(overrides, "confirmed.claude_session_id", "value")
 
+    @pytest.mark.parametrize("value", [None, "claude_code", "codex"])
+    def test_set_rejects_direct_launch_runtime_for_every_value(self, value: object) -> None:
+        overrides: dict = {}
+
+        with pytest.raises(InvalidOverrideKeyError, match="runtime is immutable launch identity") as exc_info:
+            set_override(overrides, "launch.runtime", value)
+
+        assert "start a new session with --runtime" in str(exc_info.value)
+        assert overrides == {}
+
+    @pytest.mark.parametrize("runtime", [None, "claude_code", "codex"])
+    def test_set_rejects_runtime_inside_parent_launch_object(self, runtime: object) -> None:
+        overrides: dict = {}
+
+        with pytest.raises(InvalidOverrideKeyError, match="runtime is immutable launch identity"):
+            set_override(overrides, "launch", {"runtime": runtime})
+
+        assert overrides == {}
+
+    def test_set_rejects_launch_wildcard_before_mutation(self) -> None:
+        overrides: dict = {"launch": {"mode": "host"}}
+
+        with pytest.raises(InvalidOverrideKeyError, match="runtime is immutable launch identity"):
+            set_override(overrides, "launch.*", None)
+
+        assert overrides == {"launch": {"mode": "host"}}
+
+    def test_set_parent_launch_object_without_runtime(self) -> None:
+        overrides: dict = {}
+
+        set_override(overrides, "launch", {"mode": "sidecar"})
+
+        assert overrides == {"launch": {"mode": "sidecar"}}
+
+    def test_set_whole_launch_to_none_remains_supported(self) -> None:
+        overrides: dict = {"launch": {"mode": "sidecar"}}
+
+        set_override(overrides, "launch", None)
+
+        assert overrides == {"launch": None}
+
+    @pytest.mark.parametrize("key", ["launch.sidecar", "launch.direct_model"])
+    def test_set_nullable_launch_sibling_to_none(self, key: str) -> None:
+        overrides: dict = {}
+
+        set_override(overrides, key, None)
+
+        section, field = key.split(".")
+        assert overrides[section][field] is None
+
 
 class TestDeleteOverride:
     """Test delete_override() function."""
@@ -399,6 +451,22 @@ class TestDeleteOverride:
         overrides: dict = {}
         with pytest.raises(InvalidOverrideKeyError):
             delete_override(overrides, "confirmed.foo")
+
+    def test_delete_launch_runtime_remains_a_recovery_path(self) -> None:
+        overrides: dict = {"launch": {"runtime": "codex", "mode": "sidecar"}}
+
+        result = delete_override(overrides, "launch.runtime")
+
+        assert result is True
+        assert overrides == {"launch": {"mode": "sidecar"}}
+
+    def test_delete_parent_launch_removes_persisted_illegal_shape(self) -> None:
+        overrides: dict = {"launch": {"runtime": "codex", "mode": "sidecar"}}
+
+        result = delete_override(overrides, "launch")
+
+        assert result is True
+        assert overrides == {}
 
 
 class TestClearOverrides:

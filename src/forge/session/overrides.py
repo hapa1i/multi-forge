@@ -199,13 +199,7 @@ def validate_key(key: str) -> list[str]:
         raise InvalidOverrideKeyError(key, "custom.* is not supported")
 
     if key == "launch.runtime":
-        # Launcher dispatch trusts raw intent (never effective state), so an override
-        # here would be recorded but ignored -- worse than rejection.
-        raise InvalidOverrideKeyError(
-            key,
-            "runtime is immutable launch identity",
-            hint="start a new session with --runtime instead",
-        )
+        _reject_launch_runtime_override(key)
 
     if first_part == "consumer_lanes":
         # Consumer-lane bindings (epic consumer_lanes, T1b) are set only through resolving commands
@@ -301,11 +295,15 @@ def set_override(overrides: dict[str, Any], key: str, value: Any) -> None:
     """
     if "*" in key:
         expanded = expand_wildcard(key)
+        if "launch.runtime" in expanded:
+            _reject_launch_runtime_override(key)
         for path in expanded:
             _set_path(overrides, path.split("."), value)
         return
 
     parts = validate_key(key)
+    if key == "launch" and isinstance(value, dict) and "runtime" in value:
+        _reject_launch_runtime_override(key)
     _set_path(overrides, parts, value)
 
 
@@ -343,8 +341,12 @@ def delete_override(overrides: dict[str, Any], key: str) -> bool:
                 any_deleted = True
         return any_deleted
 
-    # Validate key (allows us to catch invalid paths even on delete)
-    parts = validate_key(key)
+    # Runtime is immutable for writes, but reset must remain a recovery path for
+    # an illegal override persisted by an older Forge.
+    if key == "launch.runtime":
+        parts: list[str] = ["launch", "runtime"]
+    else:
+        parts = validate_key(key)
     return _delete_path(overrides, parts)
 
 
@@ -365,3 +367,12 @@ def _delete_path(d: dict[str, Any], parts: list[str]) -> bool:
 def clear_overrides(overrides: dict[str, Any]) -> None:
     """Clear all overrides."""
     overrides.clear()
+
+
+def _reject_launch_runtime_override(key: str) -> None:
+    """Reject every write path that can replace immutable launcher identity."""
+    raise InvalidOverrideKeyError(
+        key,
+        "runtime is immutable launch identity",
+        hint="start a new session with --runtime instead",
+    )
