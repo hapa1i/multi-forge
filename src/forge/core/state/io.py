@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .exceptions import StateCorruptedError, StateNotFoundError
+from .exceptions import StateCorruptedError, StateNotFoundError, StateUnreadableError
 
 
 def decode_json_object(line: str) -> dict[str, Any] | None:
@@ -199,6 +199,7 @@ def read_json(path: Path) -> dict[str, Any]:
 
     Raises:
         StateNotFoundError: If the file does not exist.
+        StateUnreadableError: If the file exists but cannot be read.
         StateCorruptedError: If the file contains invalid JSON or is not a JSON object.
     """
     if not path.exists():
@@ -210,7 +211,7 @@ def read_json(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         raise StateCorruptedError(str(path), f"invalid JSON: {e}") from e
     except OSError as e:
-        raise StateCorruptedError(str(path), f"read error: {e}") from e
+        raise StateUnreadableError(str(path), f"read error: {e}") from e
 
     if not isinstance(data, dict):
         raise StateCorruptedError(

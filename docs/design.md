@@ -1245,7 +1245,9 @@ semantic-supervisor shadow drains.
 
 Each marker is a JSON file with `kind` (routing key), `marker_id` (idempotency key), `payload` (kind-specific data), and
 retry tracking (`attempt_count`/`last_error`). Handlers are passed as an explicit dict (no global registry). Successful
-handling deletes the marker; poison markers (5+ attempts) move to `pending-work/failed/`.
+handling deletes the marker; poison markers (5+ attempts) move to `pending-work/failed/`. An existing marker that cannot
+be read stays byte-identical and pending without consuming a retry; startup emits a diagnostic and continues with later
+markers. Malformed JSON is known-bad content and moves directly to `failed/`.
 
 > Marker schema, processing contract, and known kinds in
 > [design_appendix.md §B](design_appendix.md#b-work-queue-internals).

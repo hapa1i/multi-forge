@@ -8,10 +8,13 @@ codex install.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from forge.core.runtime import codex_preflight_cache as cpc
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.state import StateUnreadableError
 from forge.core.state.io import atomic_write_json
 
 
@@ -67,6 +70,18 @@ class TestCodexPreflightCacheInvalidation:
         path = cpc._cache_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("this is not json{", encoding="utf-8")
+        assert cpc.read_fresh_codex_preflight() is None
+
+    def test_unreadable_file_is_miss(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        path = cpc._cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"version": 1}', encoding="utf-8")
+
+        def raise_unreadable(_path: Path) -> dict:
+            raise StateUnreadableError(str(path), "simulated transient read failure")
+
+        monkeypatch.setattr(cpc, "read_json", raise_unreadable)
+
         assert cpc.read_fresh_codex_preflight() is None
 
     def test_version_mismatch_is_miss(self, pinned_signatures: None) -> None:

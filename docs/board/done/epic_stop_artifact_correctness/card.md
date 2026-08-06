@@ -80,4 +80,4 @@ unit suite (8,734 passed, one pre-existing platform skip) passed. It shipped in 
 
 All three members shipped independently with marked regressions and their required Docker integration coverage. The
 review ledger, member cards, and normative design documentation record the final contracts; Wave 3 is coordinated
-separately by [`epic_session_durable_state_safety`](../../todo/epic_session_durable_state_safety/card.md).
+separately by [`epic_session_durable_state_safety`](../../doing/epic_session_durable_state_safety/card.md).

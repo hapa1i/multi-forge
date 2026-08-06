@@ -17,7 +17,7 @@ reads *before* the store) -- plus a TTL backstop. Process **env vars** (``CODEX_
 only; both stale directions are fail-open-safe and self-correct (a stale positive fails open
 when ``codex exec`` errors; a stale negative just re-runs ``forge runtime preflight codex``).
 
-Runtime-only state: a missing file, a parse failure, a version/shape mismatch, or a stale
+Runtime-only state: a missing file, a read/parse failure, a version/shape mismatch, or a stale
 key is treated as a **cache miss** (returns ``None``), never an error -- the cache is
 always regenerable by re-running the preflight. A stale *positive* is safe too: the codex
 arm still fails open if ``codex exec`` errors in-stream, so an over-optimistic cache
@@ -38,7 +38,11 @@ from forge.core.paths import get_forge_home
 from forge.core.runtime.codex_preflight import CodexPreflight
 from forge.core.runtime.codex_rollouts import codex_home
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
-from forge.core.state.exceptions import StateCorruptedError, StateNotFoundError
+from forge.core.state.exceptions import (
+    StateCorruptedError,
+    StateNotFoundError,
+    StateUnreadableError,
+)
 from forge.core.state.io import atomic_write_json, read_json
 
 _log = logging.getLogger(__name__)
@@ -143,7 +147,7 @@ def read_fresh_codex_preflight(
     runtime = runtime or get_runtime("codex")
     try:
         raw = read_json(_cache_path())
-    except (StateNotFoundError, StateCorruptedError):
+    except (StateNotFoundError, StateCorruptedError, StateUnreadableError):
         return None
 
     if raw.get("version") != CODEX_PREFLIGHT_CACHE_VERSION:

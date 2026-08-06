@@ -36,6 +36,7 @@ import json
 import logging
 import re
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,9 @@ from forge import __version__
 from forge.core.paths import get_forge_home
 from forge.core.state import (
     FileLockTimeoutError,
+    StateCorruptedError,
+    StateNotFoundError,
+    StateUnreadableError,
     atomic_write_json,
     file_lock_for_target,
     now_iso,
@@ -69,6 +73,13 @@ PROCESSOR_LOCK_TIMEOUT_S = 0.05  # 50ms per marker during startup processing
 # Regex for safe marker IDs (prevents path traversal)
 # Allow alphanumeric, hyphens, underscores, dots (typical UUID/session ID chars)
 SAFE_MARKER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+@dataclass(frozen=True)
+class _DeferredMarker:
+    """A marker left pending because its bytes could not be read safely."""
+
+    diagnostic: str
 
 
 def pending_work_dir() -> Path:
@@ -351,6 +362,7 @@ def process_pending_work(
     - Validates marker schema
     - Dispatches to handler by kind (if handler exists)
     - Deletes marker on success
+    - On unreadable bytes: leaves the marker unchanged and records a diagnostic
     - On failure: keeps marker, updates attempt_count/last_error
     - On poison (attempt_count >= MAX_ATTEMPTS): moves to failed/
 
@@ -361,7 +373,7 @@ def process_pending_work(
                   (markers with no handler are left in place).
 
     Returns:
-        ProcessResult with counts and any error messages.
+        ProcessResult with counts, user-facing diagnostics, and error messages.
     """
     if handlers is None:
         handlers = {}
@@ -385,6 +397,9 @@ def process_pending_work(
         outcome = _process_single_marker(marker_file, timeout_s=timeout_s, handlers=handlers)
         if outcome is None:
             result.processed += 1
+        elif isinstance(outcome, _DeferredMarker):
+            result.skipped += 1
+            result.diagnostics.append(outcome.diagnostic)
         elif outcome == "skipped":
             result.skipped += 1
         elif outcome == "failed":
@@ -400,7 +415,7 @@ def _process_single_marker(
     *,
     timeout_s: float,
     handlers: dict[str, WorkHandler],
-) -> str | None:
+) -> str | _DeferredMarker | None:
     """Process a single marker file.
 
     Args:
@@ -410,7 +425,8 @@ def _process_single_marker(
 
     Returns:
         None on success, "skipped" if lock contention, "failed" if moved to failed/,
-        error message on validation failure.
+        _DeferredMarker if the bytes could not be read, or an error message on
+        validation failure.
     """
     try:
         with file_lock_for_target(target_path=marker_file, timeout_s=timeout_s):
@@ -420,9 +436,14 @@ def _process_single_marker(
 
             try:
                 data = read_json(marker_file)
-            except Exception as e:
-                # Unrecoverable: marker isn't valid JSON, retrying won't help.
-                # Move directly to failed/ rather than leaving it stuck forever.
+            except StateNotFoundError:
+                return None  # Deleted after the post-lock existence check
+            except StateUnreadableError as e:
+                return _DeferredMarker(
+                    f"Pending-work marker {marker_file.name} could not be read; " f"leaving it unchanged for retry: {e}"
+                )
+            except StateCorruptedError as e:
+                # Unrecoverable content: retrying the same malformed bytes cannot help.
                 _move_corrupted_to_failed(marker_file, f"read error: {e}")
                 return "failed"
 

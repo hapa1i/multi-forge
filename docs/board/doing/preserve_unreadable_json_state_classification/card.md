@@ -4,7 +4,7 @@
 
 **Finding**: D011 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted as the first Wave 3 implementation member.
+**Lane**: `doing/` -- active on `fix/preserve-unreadable-json-state-classification` from `eef7cee0`.
 
 ## Goal
 
@@ -37,6 +37,27 @@ rebuilds; the queue catches every exception as unrecoverable corruption and move
 - The queue surfaces the read failure without counting it as processed or poison and without blocking later readable
   markers.
 
+## Implementation Outcome
+
+`read_json` now maps a failed file read to the existing `StateUnreadableError` while retaining distinct initial-absence,
+malformed-JSON, and non-object outcomes. The production caller audit kept audit drift state and team-hook caches as
+intentional non-destructive safe misses, added unreadable state to the Codex preflight cache-miss contract, and verified
+that spend-cap bootstrap still warns and rebuilds from logs.
+
+Workqueue drains now distinguish unreadable bytes from malformed content. An unreadable marker remains byte-identical,
+does not increment retry or poison state, contributes a structured non-fatal diagnostic, and does not stop a later
+selected marker. CLI startup owns rendering that diagnostic on stderr, so a foreground `--json` result stays parseable;
+malformed markers still move directly to `failed/`, and handler failures keep their bounded retry behavior. The queue
+processing contract is synchronized in `docs/design.md` and `docs/design_appendix.md` without implementing D021's
+newer-schema outcome.
+
+The marked D011 regression failed on the branch base with `StateCorruptedError` and passed after the fix. Focused
+reader, caller, workqueue, and CLI coverage passed (198); the Docker startup-queue file passed (9), including a real
+non-root permission failure; the regression suite passed (660); and the unit suite passed (8,742 with one pre-existing
+platform skip and 118 deselected). Independent review found no design violations and endorsed the queue and consumer
+contracts. Its amendments corrected stale GC exception documentation and admitted the separate D046 proxy YAML
+follow-up. Final `make pre-commit` passed after Markdown normalization; merge remains pending.
+
 ## Acceptance Criteria
 
 - Add `tests/regression/test_bug_d011_unreadable_json_state.py` with `pytestmark = pytest.mark.regression` and a module
@@ -58,3 +79,5 @@ rebuilds; the queue catches every exception as unrecoverable corruption and move
 - Preserve broad best-effort behavior only where it is already intentional and visible; do not turn strict readers into
   silent cache misses.
 - Do not address newer workqueue schemas (D021), manifest liveness (D009), or non-object manifest sections (O006).
+- Do not extend this JSON-reader fix into the proxy YAML loader; its analogous `OSError` misclassification is tracked
+  separately as D046 and still requires runtime reproduction before implementation.

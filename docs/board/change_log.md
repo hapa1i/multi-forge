@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-06
 
+### Preserve unreadable JSON state classification
+
+**Goal**: Distinguish transient JSON read failures from malformed content and preserve unreadable queue markers.
+
+**Key changes**:
+
+- Mapped shared JSON read `OSError` to `StateUnreadableError`; missing, malformed, and non-object outcomes stay
+  distinct.
+- Audited all five production callers: audit/team and Codex caches degrade to safe misses, spend-cap bootstrap visibly
+  rebuilds, and unreadable workqueue markers remain byte-identical and pending.
+- Added a structured queue diagnostic rendered on CLI stderr, preserved parseable foreground JSON and later-marker
+  progress, and documented unreadable versus malformed, retry, and poison outcomes without implementing D021.
+- Corrected stale GC exception docs and admitted the analogous proxy YAML misclassification as D046.
+
+**Verification**: The marked D011 regression failed with `StateCorruptedError` on the branch base; focused tests passed
+(198), Docker startup-queue integration passed (9), regressions passed (660), and unit tests passed (8,742 with one
+pre-existing platform skip and 118 deselected). Independent review found no design violations; final `make pre-commit`
+passed after Markdown normalization.
+
 ### Close Stop/artifact work and sequence session/state safety
 
 **Goal**: Close the shipped Wave 2 coordination record and admit Wave 3 as bounded, independently reviewable work.
@@ -1891,32 +1910,19 @@ Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_down
   guards; headless-retry / parallel-cleanup / negative-delta / status-line regressions added.
 - **Verification**: Codex probe/preflight, bridge/transfer + real-codex E2E, metric/activity/status-line suites clean.
 
-## 2026-06-01 -- 2026-06-03 (compacted)
+## 2026-05-22 -- 2026-06-03 (compacted)
 
-**runtime_abstraction Phase 4 (Slices 4a-4f) + statusline** — runtime-abstraction core:
+Runtime, memory/transfer, audit-proxy, and status-line foundation. Detailed history remains in the corresponding done
+cards and PRs.
 
-- **Run-tree + usage ledger (4a-4c)**: `RunIdentity` env (re-roots under origin); durable versioned
-  `~/.forge/usage/events/` (schema v1 strict reads, never-raising writer); `track_verb_cost` emitters.
-- **Invoker + runtime registry (4d-4f)**: `core/invoker/` (review fan-out behind `run_parallel`); frozen `RuntimeSpec`
-  in `RUNTIMES` + `forge runtime list` (Phase 5 capability source); runtime-tagged `ActionContext`.
-- **Hardening**: `run_parallel` TOCTOU fix; both-or-neither `origin_run_id`; `forge usage [session]` + session-end
-  summary; sidecar usage-ledger mount. Review fixes: workflow double-count, QA proxy bugs.
-- **Phase 3 native-relocate** (PASS): opt-in `session fork --resume-mode native-relocate` (host only; transfer stays
-  default). Deferred: `--rewrite-paths`, sidecar native-relocate, gated default flip.
-- **Phase 2 optional audit proxy**: opt-in wire chokepoint (inert by default); redact-before-persist audit JSONL
-  (`forge proxy audit show|diff`). Deferred: real-upstream `@slow` passthrough replay e2e.
-- **Statusline (Phases 1-5)**: config-driven segments + lazy `RenderContext`; billing-aware cost; opt-in
-  `supervisor`/`policy`/`audit`/`drift`. Break: `show_rate_limits` -> opt-in `rate_limits`.
-- **Verification**: policy-hook/supervisor E2E + native-relocate regression suites pass.
-
-## 2026-05-22 — 2026-05-31 (compacted)
-
-- **runtime_abstraction Phase 1**: schema-backed curated transfer + `forge transfer` CLI (schema v1, three-file
-  artifacts, `show|regenerate|edit|diff`; `--review`/`ai-curated` opt-in, `structured` default).
-- **memory_substrate (PR #8)**: split "handoff" into **memory writer** (Stop-time curation) + **transfer**
-  (resume/fork); renamed CLI, old paths tombstoned.
-- **Add Claude Opus 4.8** (opt-in); **memory strategies 7->4** (`--as`->`--strategy`; shadow via `--propose`).
-- **Memory Enhancement (PR #1)**: passport-authoritative doc ownership; `forge memory enable/track/untrack/list/status`
-  - `shadows review`; removed `.forge/memory.yaml` + three-tier resolver. Card in `done/memory_enhancement/`.
-- **CLI hardening**: command-shape invariant, shared recovery-tip helpers (`cli/output.py`), template auto-start
-  proxies, live-session deletion protection.
+- **Runtime abstraction**: added origin-rooted `RunIdentity`, the schema-v1 usage ledger, shared invoker/parallel
+  fan-out, frozen runtime registry, `forge runtime list`, and runtime-tagged actions. Native relocation shipped
+  host-only and opt-in; path rewriting, sidecar support, and any default flip remained deferred.
+- **Memory and transfer**: split handoff into Stop-time memory writing and resume/fork transfer, shipped schema-backed
+  curated transfer artifacts and explicit CLI leaves, reduced memory strategies from seven to four, and made passports
+  authoritative for document ownership. Old CLI/state paths were tombstoned.
+- **Audit and UI**: added an opt-in, redact-before-persist audit proxy plus config-driven status-line segments; real
+  upstream slow-passthrough replay remained deferred. CLI hardening added shared recovery tips, template auto-start,
+  live-session deletion protection, and opt-in Claude Opus 4.8.
+- **Verification**: policy-hook/supervisor E2E and native-relocation regression suites passed; review fixes covered
+  parallel TOCTOU, run-origin consistency, workflow double-counting, and QA proxy defects.

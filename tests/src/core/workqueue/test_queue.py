@@ -13,6 +13,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import forge.core.workqueue.queue as workqueue_queue
+from forge.core.state import StateUnreadableError
 from forge.core.workqueue import (
     MARKER_SCHEMA_VERSION,
     MAX_ATTEMPTS,
@@ -356,6 +358,35 @@ class TestProcessPendingWork:
 
         remaining = list(pending_work_dir().glob("*.json"))
         assert len(remaining) == 3
+
+    def test_unreadable_marker_is_deferred_without_starving_later_work(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        unreadable = enqueue(kind="test", marker_id="a-unreadable", payload={})
+        readable = enqueue(kind="test", marker_id="z-readable", payload={})
+        assert unreadable is not None
+        assert readable is not None
+        original_bytes = unreadable.read_bytes()
+        real_read_json = workqueue_queue.read_json
+
+        def read_with_transient_failure(path: Path) -> dict:
+            if path == unreadable:
+                raise StateUnreadableError(str(path), "simulated transient read failure")
+            return real_read_json(path)
+
+        monkeypatch.setattr(workqueue_queue, "read_json", read_with_transient_failure)
+        handler = MagicMock()
+
+        result = process_pending_work(handlers={"test": handler})
+
+        assert result.processed == 1
+        assert result.skipped == 1
+        assert result.failed == 0
+        assert result.errors == []
+        assert len(result.diagnostics) == 1
+        assert "a-unreadable.json could not be read" in result.diagnostics[0]
+        assert unreadable.read_bytes() == original_bytes
+        assert not readable.exists()
+        assert not (pending_work_dir() / "failed" / unreadable.name).exists()
+        handler.assert_called_once()
 
 
 class TestHandlerDispatch:

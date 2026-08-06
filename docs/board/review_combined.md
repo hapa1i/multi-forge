@@ -10,10 +10,10 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 147 severity-ranked findings: 1 CRITICAL, 21 HIGH, 94 MEDIUM, and 31 LOW, plus unranked U001. The
-original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and a follow-up
-review admitted D045 as MEDIUM on 2026-08-05. Three Opus claims were refuted and five were adjusted during the merge
-audit.
+**Inventory:** 148 severity-ranked findings: 1 CRITICAL, 21 HIGH, 95 MEDIUM, and 31 LOW, plus unranked U001. The
+original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and follow-up
+reviews admitted D045 and D046 as MEDIUM on 2026-08-05 and 2026-08-06 respectively. Three Opus claims were refuted and
+five were adjusted during the merge audit.
 
 ## Review Status and Execution Gate
 
@@ -34,7 +34,8 @@ contract requires an epic.
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
 were reproduced on merged `main` at `dc963a7c` and converted into parked members under
-[`epic_session_durable_state_safety`](todo/epic_session_durable_state_safety/card.md).
+[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011 is implementation-verified
+and reviewed, pending merge as the first member.
 
 ### Finding fields
 
@@ -194,6 +195,7 @@ implementation outcome below records its completed code and regression work.
 | D043 | LOW      | F5    | design.md §2/§6 list a `src/forge/status/` component that does not exist (status lives in `cli/status_line.py` + `cli/statusline/`).                                                                                                                                                                                                                                                                                                                                                                     | design.md §2, §6                                         | filesystem                                                                                              |
 | D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
 | D045 | MED      | R     | Exit-plan-mode's snapshot writer is the sole remaining caller of `_append_artifact_entry`; when `confirmed.artifacts.plans` is non-list, the helper silently replaces that durable value with a one-entry list and discards the malformed state.                                                                                                                                                                                                                                                         | coding_standards §5 no silent durable-state clobber      | `cli/hooks/_helpers.py:131-149`; `cli/hooks/commands.py:456`                                            |
+| D046 | MED      | R     | `load_proxy_instance_config` catches every exception around opening and parsing `proxy.yaml` as `StateCorruptedError`, so a transient `OSError` can reach invalid-config or global corruption/reset handling even though Forge never inspected the bytes. Several optional consumers instead swallow the same misclassification as a best-effort miss. *Source-confirmed; runtime impact not yet reproduced.*                                                                                            | coding_standards §5 distinct durable-state outcomes      | `config/loader.py:370-393`; `cli/main.py:75-94`; `cli/output.py:120-147`                                |
 
 ### Implementation Outcomes
 
@@ -232,6 +234,12 @@ implementation outcome below records its completed code and regression work.
   regression covers distinct container and host roots, and the Docker sidecar hook test proves that the host drainer
   resolves the resulting marker. Candidate and marker schemas are unchanged. It shipped in PR #132 (`dc963a7c`). See
   [`repair_sidecar_shadow_drain_routing`](done/repair_sidecar_shadow_drain_routing/card.md).
+- **D011 — reviewed 2026-08-06; pending merge:** shared JSON read `OSError` now raises `StateUnreadableError`.
+  Audit/team and Codex caches retain their intended safe-miss outcomes, spend-cap bootstrap warns and rebuilds, and the
+  workqueue leaves unreadable bytes unchanged while surfacing a stderr diagnostic and continuing later selected work.
+  Malformed markers and handler retry/poison behavior remain distinct, and D021 newer-schema handling is unchanged. A
+  marked regression, five-caller audit, and real permission-denied Docker path cover the fix. See
+  [`preserve_unreadable_json_state_classification`](doing/preserve_unreadable_json_state_classification/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -394,16 +402,16 @@ one card coordinates them.
 
 ### Proposed execution waves
 
-| Wave                                    | Scope                                                                         | Entry condition                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch           | Normative contract chosen; reproduction or failing test recorded                |
-| 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset     | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
-| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                              | DG1 resolved; verification and artifact contracts defined                       |
-| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                          | State authority, fault outcomes, and recovery paths defined                     |
-| 4 — installer transactions              | D012–D014, D019                                                               | Fault points and rollback ownership enumerated; integration fixtures identified |
-| 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                      | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
-| 6 — bounded maintenance fixes           | D045 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
-| 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings        | Behavior characterized; DG4 resolved; unverified symbols excluded               |
+| Wave                                    | Scope                                                                              | Entry condition                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch                | Normative contract chosen; reproduction or failing test recorded                |
+| 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset          | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
+| 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                                   | DG1 resolved; verification and artifact contracts defined                       |
+| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                               | State authority, fault outcomes, and recovery paths defined                     |
+| 4 — installer transactions              | D012–D014, D019                                                                    | Fault points and rollback ownership enumerated; integration fixtures identified |
+| 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                           | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
+| 6 — bounded maintenance fixes           | D045–D046 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
+| 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings             | Behavior characterized; DG4 resolved; unverified symbols excluded               |
 
 ### Wave 3 admission record
 
@@ -411,16 +419,16 @@ All five HIGH and three MEDIUM Wave 3 rows were rechecked on merged `main` at `d
 passed eight assertions of the documented broken behavior and was removed after the evidence was recorded. No
 implementation member was activated during admission.
 
-| Order | Findings | Reproduced boundary                                                                  | Accepted member                                                                                               |
-| ----- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](todo/preserve_unreadable_json_state_classification/card.md) |
-| 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](todo/reject_non_object_manifest_confirmed/card.md)                   |
-| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](todo/enforce_launch_runtime_override_immutability/card.md)   |
-| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                           |
-| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)         |
-| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                           |
-| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
-| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
+| Order | Findings | Reproduced boundary                                                                  | Accepted member                                                                                                |
+| ----- | -------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](doing/preserve_unreadable_json_state_classification/card.md) |
+| 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](todo/reject_non_object_manifest_confirmed/card.md)                    |
+| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](todo/enforce_launch_runtime_override_immutability/card.md)    |
+| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                            |
+| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)          |
+| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                            |
+| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                                |
+| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                                |
 
 The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
 later workqueue member. O006 pins strict manifest classification before D009 changes manifest/index liveness, and D009
@@ -434,8 +442,9 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
   commands deliberately own overrides.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
-- **[Durable-state/session epic](todo/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and O006
-  are reproduced and parked as eight separately reviewable members around fault-injection and recovery tests.
+- **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
+  O006 are reproduced as eight separately reviewable members; D011 is reviewed and pending merge, and the remaining
+  members stay parked.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

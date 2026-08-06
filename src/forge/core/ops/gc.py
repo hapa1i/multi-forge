@@ -312,11 +312,11 @@ def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[
     """Build absolute paths referenced by session derivation context_file fields.
 
     Raises:
-        StateCorruptedError: if an in-scope session manifest fails strict parse
-            (the store also surfaces transient read errors as corruption). Callers
-            MUST fail closed: a partial reference set silently drops the protection
-            on a live child snapshot, and the GC / codex deletion paths would then
-            unlink an in-use context file as a false orphan.
+        StateCorruptedError: if an in-scope session manifest fails strict parse.
+        StateUnreadableError: if an in-scope session manifest cannot be read. Callers
+            MUST fail closed for either outcome: a partial reference set silently
+            drops the protection on a live child snapshot, and the GC / codex
+            deletion paths would then unlink an in-use context file as a false orphan.
     """
     from forge.session import SessionStore
     from forge.session.exceptions import SessionFileNotFoundError
@@ -329,8 +329,8 @@ def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[
             # Manifest gone -- a dangling index entry that slipped past
             # list_sessions() self-heal (deleted between list and read). It
             # references nothing, so there is genuinely no path to protect.
-            # Corruption (StateCorruptedError) is deliberately NOT caught here:
-            # it propagates so callers fail closed instead of dropping protection.
+            # Corrupt and unreadable state are deliberately NOT caught here: both
+            # propagate so callers fail closed instead of dropping protection.
             continue
 
         derivation = state.confirmed.derivation
@@ -353,10 +353,11 @@ def referenced_transfer_context_paths() -> set[str]:
     a snapshot outside its own root -- a path-local existence check is not enough.
 
     Raises:
-        StateCorruptedError: if any indexed session manifest is unreadable. The
-        guard depends on this -- when references can't be verified it must refuse
-        to delete a possibly-referenced snapshot (fail closed), never treat it as
-        unreferenced and unlink it.
+        StateCorruptedError: if any indexed session manifest fails strict parse.
+        StateUnreadableError: if any indexed session manifest cannot be read. The
+            guard depends on propagating either outcome -- when references cannot be
+            verified it must refuse to delete a possibly referenced snapshot (fail
+            closed), never treat it as unreferenced and unlink it.
     """
     from forge.session import SessionManager
 

@@ -8,6 +8,8 @@ import time
 
 import pytest
 
+from forge.core import state as state_module
+from forge.core.state import StateUnreadableError
 from forge.core.telemetry import downstream as downstream_telemetry
 from forge.proxy import audit_logger
 from forge.proxy.utils import redact_headers
@@ -76,6 +78,20 @@ class TestAuditStatePath:
         monkeypatch.setenv("FORGE_SIDECAR", "1")
         monkeypatch.delenv("FORGE_PROXY_ID", raising=False)
         assert audit_logger._audit_state_path("px") == get_forge_home() / "proxies" / "px" / "audit_state.json"
+
+    def test_unreadable_baseline_is_a_non_destructive_safe_miss(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        path = audit_logger._audit_state_path("px")
+        path.parent.mkdir(parents=True)
+        path.write_text('{"schema_version": 1, "last_seen": {"prompt": "sha256:x"}}')
+        original_bytes = path.read_bytes()
+
+        def raise_unreadable(_path) -> dict:
+            raise StateUnreadableError(str(path), "simulated transient read failure")
+
+        monkeypatch.setattr(state_module, "read_json", raise_unreadable)
+
+        assert audit_logger._load_drift_baseline("px") == {}
+        assert path.read_bytes() == original_bytes
 
 
 class TestHashing:

@@ -13,7 +13,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import forge.core.workqueue.queue as workqueue_queue
 from forge.cli.main import _EXEMPT_SUBCOMMANDS, main
+from forge.core.state import StateUnreadableError
 from forge.core.workqueue import (
     enqueue_index_marker,
     enqueue_shadow_marker,
@@ -166,6 +168,30 @@ class TestStartupQueueRobustness:
 
         # All markers should be deleted
         assert all(not m.is_file() for m in markers), "All valid markers should be processed"
+
+    def test_unreadable_marker_warns_on_stderr_and_leaves_json_stdout_clean(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        unreadable = _create_test_marker(tmp_path, session_id="a-unreadable")
+        readable = _create_test_marker(tmp_path, session_id="z-readable")
+        original_bytes = unreadable.read_bytes()
+        real_read_json = workqueue_queue.read_json
+
+        def read_with_transient_failure(path: Path) -> dict:
+            if path == unreadable:
+                raise StateUnreadableError(str(path), "simulated transient read failure")
+            return real_read_json(path)
+
+        monkeypatch.setattr(workqueue_queue, "read_json", read_with_transient_failure)
+
+        result = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert result.exit_code == 0, result.output
+        json.loads(result.stdout)
+        assert "Warning:" in result.stderr
+        assert "a-unreadable.json could not be read" in result.stderr
+        assert unreadable.read_bytes() == original_bytes
+        assert not readable.exists()
 
 
 def _create_index_marker_with_transcript(tmp_path: Path, session_id: str = "test-idx-123") -> Path:
