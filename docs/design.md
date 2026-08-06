@@ -379,6 +379,10 @@ The session file has three sections:
 
 > Schema is intentionally strict: unknown fields and unknown override keys are rejected.
 
+The section containers are typed too: `intent` and `overrides` are required objects. A missing `confirmed` remains a
+legacy-compatible empty/default section, but when present it must be an object; null, list, and scalar values are
+manifest corruption. Strict reads surface that classification without rewriting the file.
+
 | Section         | Definition                    | Written by              | Semantics                                    |
 | --------------- | ----------------------------- | ----------------------- | -------------------------------------------- |
 | **`intent`**    | Baseline config Forge *wants* | `forge session start`   | Session-owned fields only                    |

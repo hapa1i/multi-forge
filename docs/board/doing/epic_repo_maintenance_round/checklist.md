@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: merge the reviewed D011 implementation without starting O006 or D021.
+Current focus: merge the reviewed O006 member without starting D008, D009, or D021.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -35,7 +35,11 @@ Current focus: merge the reviewed D011 implementation without starting O006 or D
 - [x] Activate `preserve_unreadable_json_state_classification` from merged `main` on its own execution branch.
 - [x] Implement and verify D011 without activating O006 or D021.
 - [x] Review D011 and record its GC-documentation amendment and separate D046 follow-up (2026-08-06).
-- [ ] Merge D011 before activating O006.
+- [x] Merge D011 before activating O006 (PR #134, `6be815bf`).
+- [x] Activate O006 from merged `main` and retain its baseline `AttributeError` regression failure.
+- [x] Implement and behaviorally verify O006 without changing D009 liveness or D011 read classification.
+- [x] Review O006 and record its separate D047 status-line raw-reader follow-up (2026-08-06).
+- [ ] Merge O006 before activating D008.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

@@ -1,10 +1,10 @@
 # Preserve unreadable JSON state classification
 
-**Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
+**Epic**: [`epic_session_durable_state_safety`](../../doing/epic_session_durable_state_safety/card.md).
 
 **Finding**: D011 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- active on `fix/preserve-unreadable-json-state-classification` from `eef7cee0`.
+**Lane**: `done/` -- shipped in PR #134 (`6be815bf`) on 2026-08-06.
 
 ## Goal
 
@@ -56,7 +56,7 @@ reader, caller, workqueue, and CLI coverage passed (198); the Docker startup-que
 non-root permission failure; the regression suite passed (660); and the unit suite passed (8,742 with one pre-existing
 platform skip and 118 deselected). Independent review found no design violations and endorsed the queue and consumer
 contracts. Its amendments corrected stale GC exception documentation and admitted the separate D046 proxy YAML
-follow-up. Final `make pre-commit` passed after Markdown normalization; merge remains pending.
+follow-up. Final `make pre-commit` passed after Markdown normalization; PR #134 merged as `6be815bf`.
 
 ## Acceptance Criteria
 

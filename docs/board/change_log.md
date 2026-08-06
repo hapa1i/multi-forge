@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-06
 
+### Reject non-object confirmed manifest state
+
+**Goal**: Classify an explicitly present non-object `confirmed` section as manifest corruption without rewriting it.
+
+**Key changes**:
+
+- Validated the `confirmed` container before nested reads while preserving the missing-field legacy default.
+- Kept repair and delete on their typed corruption paths; delete retains the manifest and session reservation, and the
+  Docker CLI reports actionable stderr without a traceback.
+- Synchronized the strict section-container contract in design and end-user session documentation without changing D009
+  liveness or D011 read-error behavior.
+
+**Verification**: The marked O006 regression failed with raw `AttributeError` on `6be815bf`; focused tests passed (95),
+Docker session-command integration passed (44), regressions passed (661), and unit tests passed (8,751 with one
+pre-existing platform skip and 118 deselected). Independent review found no design violations; its adjacent status-line
+raw-reader observation is tracked separately as D047. Final `make pre-commit` passed.
+
 ### Preserve unreadable JSON state classification
 
 **Goal**: Distinguish transient JSON read failures from malformed content and preserve unreadable queue markers.
@@ -44,7 +61,7 @@ wc -l docs/board/change_log.md
 **Verification**: The marked D011 regression failed with `StateCorruptedError` on the branch base; focused tests passed
 (198), Docker startup-queue integration passed (9), regressions passed (660), and unit tests passed (8,742 with one
 pre-existing platform skip and 118 deselected). Independent review found no design violations; final `make pre-commit`
-passed after Markdown normalization.
+passed after Markdown normalization. Shipped in PR #134 (`6be815bf`).
 
 ### Close Stop/artifact work and sequence session/state safety
 
@@ -1844,85 +1861,35 @@ Telemetry backend-attribution + remote-reconciliation arc (cards: `upstream_down
   `inject_provider_user`/`inject_openrouter_user` removed (stale key ignored with a one-time relocation warning).
   Verified: 432 tests; mypy/pyright; sidecar Docker integration; `make pre-commit`.
 
-## 2026-06-16 (compacted)
+## 2026-05-22 -- 2026-06-16 (compacted)
 
-- **proxy_log_hygiene slices 0-5 + review fixes:** fixed the two-hop loader drop for `provider_trace`/`logging`, moved
-  successful completions and opt-in stream dumps to DEBUG, added strictly coerced and audit-redacted request logging,
-  and shared age-then-size JSONL retention across the three proxy planes. Review fixes removed converter and
-  `stop_sequences` plaintext leaks and restored a dropped template block. Verification: 6,401 unit, 438 regression, live
-  LiteLLM/provider-trace integrations including cancellation, two adversarial reviews, and `make pre-commit`.
-- **openrouter_observability Phases 3-5:** added versioned owner-only provider traces at the shared SSE seam, including
-  cancellation lifecycle state; UI-free `list/show/explain` operations and CLI/hook reads; and opt-in OpenAI `user`
-  grouping for proxied direct-OpenRouter requests. Direct callers remained deferred. Verification: 6,161-6,191 unit, 393
-  integration, live OpenRouter generation/cancellation evidence, and a metadata-only regression.
-- **supervisor_statusline_health:** derived a contiguous supervisor failure streak from the usage ledger (no new durable
-  state), rendered `SUP!N <kind>`, and exposed failure kinds through activity text/JSON. Parse/auth fail-opens remained
-  deferred to `upstream_downstream_ledgers`. Verification: focused usage/activity/status-line suites and
-  `make pre-commit`.
+Runtime, Codex frontend, session transfer, proxy observability, and status-line foundation. Detailed history remains in
+the corresponding `done/` cards and PRs.
 
-## 2026-06-15 (compacted)
-
-- **openrouter_observability Phases 0-2 + review fixes** (detail in `done/openrouter_observability/`): live-probed the
-  OpenRouter externals first (Phase 0 -- the `gen-` id is in `body.id`, the `x-generation-id` header, and every stream
-  `chunk.id`; a stream cancelled after its first chunk is remote-absent, justifying a local-only trace; the direct path
-  records the OpenAI-standard `user` but ignores a custom `session_id`, steering Phase 5 to inject under `user`). Phase
-  1 minted Forge-owned provider session ids + two leak-gated `X-Forge-Session`/`X-Forge-Command` headers; Phase 2
-  carried provider/generation id + allowlisted headers to the proxy boundary on an additive `ProviderTraceMeta`, kept
-  separate from Forge's synthetic `chatcmpl-` id. Review fixes (R1-R3) closed the incident path: a cancelled stream
-  emits `provider_meta` on the first content event (not only terminal usage), the LiteLLM Responses fallback keeps meta,
-  and the direct non-streaming path populates headers via `with_raw_response`. Verification: +25 then +6 unit tests;
-  full `make test-unit` green at each step; mypy/pyright/pre-commit clean.
-- **supervisor_launch_controls** (detail in `done/supervisor_launch_controls/`): gave `fork/start --supervise` the
-  tier-1 cascade knobs `policy supervise` had, and added per-caller `--effort` to every Forge-spawned `claude -p` (no
-  global default). Two effort vocabularies kept distinct (`claude --effort` low/medium/high/xhigh/max via
-  `core/effort.py`; core.llm `ReasoningEffort` none/low/medium/high/xhigh); `run_claude_session` appends `--effort` and
-  fails loud on an older `claude`. Additive optional fields, no SCHEMA_VERSION bump. Verification: 906 unit + 2
-  integration green; pre-commit clean.
-- **same_dir_transfer_forks** (detail in `done/same_dir_transfer_forks/`): a same-dir fork with explicit
-  `--strategy`/`--inline-plan` auto-switches to a curated `transfer` launch (gated on `resume_mode is None`) instead of
-  silently dropping them; the worktree-transfer branch widened to
-  `(is_worktree_fork and not native_relocate) or same_dir_transfer` rather than duplicating. Derivation writes the
-  transfer baseline pre-refinement so a best-effort failure can't record a transfer fork as native. Verification: 41
-  unit
-  - 4 integration green; pre-commit clean.
-
-## 2026-06-10 -- 2026-06-14 (compacted)
-
-- **Codex frontend shipped as a first-class alternate runtime** (detail in `done/codex_frontend/`,
-  `done/runtime_abstraction/`). Phases 2-6: one-command launch (`forge session start/resume --runtime codex`), hook
-  adapter/responder surfaces, SessionStart transfer delivery, interactive TUI, codex-hooks enrollment,
-  capability/version guards, review fixes (fork/rollback isolation, enrollment state, policy persistence, handoff
-  artifacts, invoker). Deferred: app-server transport (`codex app-server`/`--stdio`), upstream fail-open issue (draft),
-  PermissionRequest/ `trusted_hash` source-dive. Enrollment evidence (stages 84-87): trust scoped, `pretool_policy`
-  enrollment-gated, SessionStart context viable when enrolled.
-- **Supervisor/session in parallel**: supervisor cascade tier-1 plan checks; launch-control cascade/effort parity across
-  subprocesses; shadow sampling of false-aligned outcomes; same-dir transfer forks decoupled from worktree isolation.
-- **Verification**: Codex runtime/hook/session suites, real-Codex E2E, supervisor cascade/shadow suites, same-dir
-  transfer regressions, mypy/pyright, `make pre-commit` clean.
-
-## 2026-06-04 -- 2026-06-09 (compacted)
-
-- **Codex/runtime_abstraction closeout.** `codex exec` hooks confirmed no-go headless (codex-cli 0.138.0); bridge stays
-  initial-message based (`bridge_session_to_codex`, one run tree) + transfer-curation attribution; docs synced.
-- **Metric/activity closeout.** Cost accounting -> reported-or-unavailable (deleted price catalog, reporter/confidence
-  vocab). Breaks: `forge usage` -> `forge activity`; `--scope repo` -> `--scope workspace`; stale shims removed.
-- **Reader/proxy + status-line safety.** `project_root` git-common-dir-derived for linked worktrees; JSONL non-object
-  guards; headless-retry / parallel-cleanup / negative-delta / status-line regressions added.
-- **Verification**: Codex probe/preflight, bridge/transfer + real-codex E2E, metric/activity/status-line suites clean.
-
-## 2026-05-22 -- 2026-06-03 (compacted)
-
-Runtime, memory/transfer, audit-proxy, and status-line foundation. Detailed history remains in the corresponding done
-cards and PRs.
-
-- **Runtime abstraction**: added origin-rooted `RunIdentity`, the schema-v1 usage ledger, shared invoker/parallel
-  fan-out, frozen runtime registry, `forge runtime list`, and runtime-tagged actions. Native relocation shipped
-  host-only and opt-in; path rewriting, sidecar support, and any default flip remained deferred.
-- **Memory and transfer**: split handoff into Stop-time memory writing and resume/fork transfer, shipped schema-backed
-  curated transfer artifacts and explicit CLI leaves, reduced memory strategies from seven to four, and made passports
-  authoritative for document ownership. Old CLI/state paths were tombstoned.
-- **Audit and UI**: added an opt-in, redact-before-persist audit proxy plus config-driven status-line segments; real
-  upstream slow-passthrough replay remained deferred. CLI hardening added shared recovery tips, template auto-start,
-  live-session deletion protection, and opt-in Claude Opus 4.8.
-- **Verification**: policy-hook/supervisor E2E and native-relocation regression suites passed; review fixes covered
-  parallel TOCTOU, run-origin consistency, workflow double-counting, and QA proxy defects.
+- **05-22--06-03 -- runtime and handoff foundations:** added origin-rooted `RunIdentity`, the schema-v1 usage ledger,
+  shared invoker/fan-out, frozen runtime registry, runtime-tagged actions, and host-only opt-in native relocation. Split
+  Stop-time memory writing from resume/fork transfer, made passports authoritative for document ownership, and shipped
+  schema-backed transfer artifacts. Added the redact-before-persist audit proxy and configurable status line. Path
+  rewriting, sidecar relocation, a native-relocation default flip, and slow-upstream replay remained deferred.
+- **06-04--06-09 -- runtime and CLI closeout:** confirmed `codex exec` hooks were unavailable headlessly, retaining the
+  initial-message bridge and transfer-curation attribution. Cost accounting became reported-or-unavailable;
+  `forge usage` became `forge activity`, `--scope repo` became `--scope workspace`, and stale shims were removed. Linked
+  worktrees gained git-common-dir project roots, strict JSONL object guards, and retry/cleanup/delta regressions.
+- **06-10--06-14 -- first-class Codex frontend:** shipped Codex start/resume, hook adapter/responder surfaces,
+  SessionStart transfer delivery, interactive TUI, enrollment, and capability/version guards. Enrollment evidence kept
+  trust scoped and policy enrollment-gated. App-server transport, an upstream fail-open draft, and
+  PermissionRequest/`trusted_hash` research remained deferred. Supervisor cascade/effort controls, shadow sampling, and
+  same-directory curated transfer forks shipped alongside it.
+- **06-15 -- provider tracing and launch controls:** live probes established OpenRouter generation-id and cancellation
+  semantics before Forge added leak-gated session/command headers and a separate `ProviderTraceMeta`. Review fixes made
+  cancelled streams emit metadata early and preserved metadata through fallback/non-stream paths. Session launchers
+  gained tier-1 cascade controls and per-caller Claude effort without a schema bump; explicit same-directory transfer
+  options no longer disappear into native resume.
+- **06-16 -- proxy and operator observability:** fixed dropped logging/provider-trace config, made successful and opt-in
+  stream logging DEBUG-only, added strict redacted request logging and shared JSONL retention, and closed two plaintext
+  leak paths. Provider traces gained owner-only lifecycle records, `list/show/explain`, cancellation state, and proxied
+  OpenRouter `user` grouping; direct callers remained deferred. Status-line health derives supervisor failure streaks
+  from the usage ledger without new durable state; parse/auth fail-opens remained deferred.
+- **Verification:** successive unit suites ranged from roughly 6.1k to 6.4k tests, with focused integration and
+  real-provider/Codex paths covering policy, transfer, generation, cancellation, and launch behavior. Regression, mypy,
+  pyright, adversarial-review follow-ups, and final `make pre-commit` checks passed at each closeout.

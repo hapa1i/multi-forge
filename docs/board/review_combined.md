@@ -34,8 +34,8 @@ contract requires an epic.
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
 were reproduced on merged `main` at `dc963a7c` and converted into parked members under
-[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011 is implementation-verified
-and reviewed, pending merge as the first member.
+[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011 shipped in PR #134, and
+O006 is independently reviewed and pending merge as the second member.
 
 ### Finding fields
 
@@ -196,6 +196,7 @@ implementation outcome below records its completed code and regression work.
 | D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
 | D045 | MED      | R     | Exit-plan-mode's snapshot writer is the sole remaining caller of `_append_artifact_entry`; when `confirmed.artifacts.plans` is non-list, the helper silently replaces that durable value with a one-entry list and discards the malformed state.                                                                                                                                                                                                                                                         | coding_standards §5 no silent durable-state clobber      | `cli/hooks/_helpers.py:131-149`; `cli/hooks/commands.py:456`                                            |
 | D046 | MED      | R     | `load_proxy_instance_config` catches every exception around opening and parsing `proxy.yaml` as `StateCorruptedError`, so a transient `OSError` can reach invalid-config or global corruption/reset handling even though Forge never inspected the bytes. Several optional consumers instead swallow the same misclassification as a best-effort miss. *Source-confirmed; runtime impact not yet reproduced.*                                                                                            | coding_standards §5 distinct durable-state outcomes      | `config/loader.py:370-393`; `cli/main.py:75-94`; `cli/output.py:120-147`                                |
+| D047 | LOW      | R     | Three status-line raw-manifest formatters call `.get()` on `confirmed` without a shape check. Explicit-null state raises `AttributeError` inside each producer; the registry's broad fail-open contains it by silently dropping the breadcrumb, verification, and sidecar segments. The impact is bounded, but the raw-reader degradation policy is implicit and inconsistent with guarded sibling projections.                                                                                          | §3.3 typed section containers; appendix §A.8 fail-open   | `cli/status_line.py:924,950,965`; `cli/statusline/registry.py:386-391`                                  |
 
 ### Implementation Outcomes
 
@@ -234,12 +235,19 @@ implementation outcome below records its completed code and regression work.
   regression covers distinct container and host roots, and the Docker sidecar hook test proves that the host drainer
   resolves the resulting marker. Candidate and marker schemas are unchanged. It shipped in PR #132 (`dc963a7c`). See
   [`repair_sidecar_shadow_drain_routing`](done/repair_sidecar_shadow_drain_routing/card.md).
-- **D011 — reviewed 2026-08-06; pending merge:** shared JSON read `OSError` now raises `StateUnreadableError`.
-  Audit/team and Codex caches retain their intended safe-miss outcomes, spend-cap bootstrap warns and rebuilds, and the
-  workqueue leaves unreadable bytes unchanged while surfacing a stderr diagnostic and continuing later selected work.
-  Malformed markers and handler retry/poison behavior remain distinct, and D021 newer-schema handling is unchanged. A
-  marked regression, five-caller audit, and real permission-denied Docker path cover the fix. See
-  [`preserve_unreadable_json_state_classification`](doing/preserve_unreadable_json_state_classification/card.md).
+- **D011 — resolved 2026-08-06:** shared JSON read `OSError` now raises `StateUnreadableError`. Audit/team and Codex
+  caches retain their intended safe-miss outcomes, spend-cap bootstrap warns and rebuilds, and the workqueue leaves
+  unreadable bytes unchanged while surfacing a stderr diagnostic and continuing later selected work. Malformed markers
+  and handler retry/poison behavior remain distinct, and D021 newer-schema handling is unchanged. A marked regression,
+  five-caller audit, and real permission-denied Docker path cover the fix. It shipped in PR #134 (`6be815bf`). See
+  [`preserve_unreadable_json_state_classification`](done/preserve_unreadable_json_state_classification/card.md).
+- **O006 — reviewed 2026-08-06; pending merge:** `SessionStore` now rejects an explicitly present non-object `confirmed`
+  section as typed manifest corruption before nested access, while missing and empty-object compatibility remain
+  unchanged. Repair classifies the state as corrupt, delete preserves the reservation and bytes, and the Docker CLI path
+  reports actionable stderr without a traceback. A marked fail-first regression and parameterized unit coverage pin
+  null, list, string, number, and boolean values. Independent review found no design violations; its contained
+  status-line bypass-reader observation is recorded separately as D047. See
+  [`reject_non_object_manifest_confirmed`](doing/reject_non_object_manifest_confirmed/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -419,16 +427,16 @@ All five HIGH and three MEDIUM Wave 3 rows were rechecked on merged `main` at `d
 passed eight assertions of the documented broken behavior and was removed after the evidence was recorded. No
 implementation member was activated during admission.
 
-| Order | Findings | Reproduced boundary                                                                  | Accepted member                                                                                                |
-| ----- | -------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](doing/preserve_unreadable_json_state_classification/card.md) |
-| 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](todo/reject_non_object_manifest_confirmed/card.md)                    |
-| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](todo/enforce_launch_runtime_override_immutability/card.md)    |
-| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                            |
-| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)          |
-| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                            |
-| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                                |
-| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                                |
+| Order | Findings | Reproduced boundary                                                                  | Accepted member                                                                                               |
+| ----- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](done/preserve_unreadable_json_state_classification/card.md) |
+| 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](doing/reject_non_object_manifest_confirmed/card.md)                  |
+| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](todo/enforce_launch_runtime_override_immutability/card.md)   |
+| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                           |
+| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)         |
+| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                           |
+| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
+| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
 
 The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
 later workqueue member. O006 pins strict manifest classification before D009 changes manifest/index liveness, and D009
@@ -443,8 +451,8 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; D011 is reviewed and pending merge, and the remaining
-  members stay parked.
+  O006 are reproduced as eight separately reviewable members; D011 shipped in PR #134, O006 is reviewed and pending
+  merge, and the remaining members stay parked.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

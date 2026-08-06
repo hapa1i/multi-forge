@@ -2,7 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D011 is reviewed and pending merge; the remaining seven members stay parked in sequence.
+**Lane**: `doing/` -- D011 shipped in PR #134 (`6be815bf`); O006 is independently reviewed and pending merge, and the
+remaining six members stay parked in sequence.
 
 ## Goal
 
@@ -43,16 +44,16 @@ of the documented broken behavior and was removed after the evidence was recorde
 
 ## Members and Sequence
 
-| Order | Finding | Member                                                                                                            | Review boundary                                                          |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1     | D011    | [`preserve_unreadable_json_state_classification`](../preserve_unreadable_json_state_classification/card.md)       | Generic read errors and caller-specific safe outcomes                    |
-| 2     | O006    | [`reject_non_object_manifest_confirmed`](../../todo/reject_non_object_manifest_confirmed/card.md)                 | Strict manifest shape and repair/delete classification                   |
-| 3     | D008    | [`enforce_launch_runtime_override_immutability`](../../todo/enforce_launch_runtime_override_immutability/card.md) | Parent-object override validation without freezing sibling launch fields |
-| 4     | D009    | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                         | Manifest liveness, derived launchability, repair, and binding ownership  |
-| 5     | O003    | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)       | Post-turn reconciliation when explicit deletion wins                     |
-| 6     | D021    | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                         | Forward-schema preservation distinct from retryable handler failure      |
-| 7     | D022    | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                             | Transfer-strategy validation before artifacts or child state             |
-| 8     | D010    | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                             | CLI root-guard parity for worktree creation                              |
+| Order | Finding | Member                                                                                                              | Review boundary                                                          |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1     | D011    | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) | Generic read errors and caller-specific safe outcomes                    |
+| 2     | O006    | [`reject_non_object_manifest_confirmed`](../reject_non_object_manifest_confirmed/card.md)                           | Strict manifest shape and repair/delete classification                   |
+| 3     | D008    | [`enforce_launch_runtime_override_immutability`](../../todo/enforce_launch_runtime_override_immutability/card.md)   | Parent-object override validation without freezing sibling launch fields |
+| 4     | D009    | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                           | Manifest liveness, derived launchability, repair, and binding ownership  |
+| 5     | O003    | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)         | Post-turn reconciliation when explicit deletion wins                     |
+| 6     | D021    | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                           | Forward-schema preservation distinct from retryable handler failure      |
+| 7     | D022    | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               | Transfer-strategy validation before artifacts or child state             |
+| 8     | D010    | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               | CLI root-guard parity for worktree creation                              |
 
 D011 goes first because its exception contract is consumed by the queue and other state readers. O006 then pins strict
 manifest classification before D009 changes index/repair behavior. D008 is a bounded immutable-identity fix. D009 ships

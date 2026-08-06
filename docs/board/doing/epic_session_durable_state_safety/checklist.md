@@ -1,6 +1,6 @@
 # Session and durable-state safety checklist
 
-Current focus: D011 review is complete; merge it before activating O006.
+Current focus: merge the reviewed O006 member without starting D008 or D009.
 
 ## Activation and sequencing
 
@@ -10,7 +10,10 @@ Current focus: D011 review is complete; merge it before activating O006.
 - [x] Retain a marked D011 regression that fails on the merged baseline before implementation.
 - [x] Implement and verify D011 without activating O006 or D021.
 - [x] Review D011 and record the accepted review amendments.
-- [ ] Merge D011 before moving O006 from `todo/`.
+- [x] Merge D011 before moving O006 from `todo/` (PR #134, `6be815bf`).
+- [x] Start O006 from merged `main`, move it to `doing/`, and retain its baseline regression failure.
+- [x] Implement and behaviorally verify O006 without changing D009 liveness or D011 read classification.
+- [x] Review O006 and record its separate D047 status-line raw-reader follow-up.
 
 ## Remaining members
 
