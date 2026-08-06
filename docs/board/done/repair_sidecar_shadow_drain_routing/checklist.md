@@ -1,6 +1,6 @@
 # Repair sidecar shadow-drain routing checklist
 
-Current focus: review and merge the implemented D039 path split before closing Wave 2.
+Current focus: complete -- D039 shipped in PR #132 (`dc963a7c`) and Wave 2 is closed.
 
 ## Activation and reproduction
 
@@ -34,5 +34,5 @@ Current focus: review and merge the implemented D039 path split before closing W
   deselected).
 - [x] Run final `make pre-commit` after recording closeout evidence.
 - [x] Record the implementation outcome in the review ledger, card, and change log.
-- [ ] After review and merge, move the member and Wave 2 epic to `done/` and fix inbound links.
-- [ ] Review and merge this member before sequencing Wave 3.
+- [x] After review and merge, move the member and Wave 2 epic to `done/` and fix inbound links.
+- [x] Review and merge this member before sequencing Wave 3 (PR #132, `dc963a7c`).

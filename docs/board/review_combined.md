@@ -32,7 +32,9 @@ according to `docs/developer/board_contract.md`; keep independently shippable fi
 contract requires an epic.
 
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
-sequencing and disposition; this report remains the evidence ledger.
+sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
+were reproduced on merged `main` at `dc963a7c` and converted into parked members under
+[`epic_session_durable_state_safety`](todo/epic_session_durable_state_safety/card.md).
 
 ### Finding fields
 
@@ -225,11 +227,11 @@ implementation outcome below records its completed code and regression work.
   regressions and the Docker artifact-hook path cover the contract. This also closes O099's transcript-selector subset;
   its `_FakeResponse` family remains Wave 7 work. See
   [`preserve_transcript_artifact_identity`](done/preserve_transcript_artifact_identity/card.md).
-- **D039 — implementation verified 2026-08-06; pending merge:** sidecar Stop candidate discovery now uses the
-  container-visible `SessionStore` Forge root, while the deferred marker retains the separately translated host worktree
-  and Forge-root paths. A marked regression covers distinct container and host roots, and the Docker sidecar hook test
-  proves that the host drainer resolves the resulting marker. Candidate and marker schemas are unchanged. See
-  [`repair_sidecar_shadow_drain_routing`](doing/repair_sidecar_shadow_drain_routing/card.md).
+- **D039 — resolved 2026-08-06:** sidecar Stop candidate discovery now uses the container-visible `SessionStore` Forge
+  root, while the deferred marker retains the separately translated host worktree and Forge-root paths. A marked
+  regression covers distinct container and host roots, and the Docker sidecar hook test proves that the host drainer
+  resolves the resulting marker. Candidate and marker schemas are unchanged. It shipped in PR #132 (`dc963a7c`). See
+  [`repair_sidecar_shadow_drain_routing`](done/repair_sidecar_shadow_drain_routing/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -397,22 +399,43 @@ one card coordinates them.
 | 0 — decisions and reproduction          | DG1–DG4; recheck all CRITICAL/HIGH findings on the execution branch           | Normative contract chosen; reproduction or failing test recorded                |
 | 1 — policy and supervision correctness  | D001–D005 plus related parser behavior such as the unknown-verdict subset     | Policy-state preservation and fail-open/citation acceptance criteria agreed     |
 | 2 — Stop and artifact correctness       | D006–D007, D024, D039, U002–U003                                              | DG1 resolved; verification and artifact contracts defined                       |
-| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, O006, and directly coupled session rows           | State authority, fault outcomes, and recovery paths defined                     |
+| 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                          | State authority, fault outcomes, and recovery paths defined                     |
 | 4 — installer transactions              | D012–D014, D019                                                               | Fault points and rollback ownership enumerated; integration fixtures identified |
 | 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                      | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
 | 6 — bounded maintenance fixes           | D045 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
 | 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings        | Behavior characterized; DG4 resolved; unverified symbols excluded               |
+
+### Wave 3 admission record
+
+All five HIGH and three MEDIUM Wave 3 rows were rechecked on merged `main` at `dc963a7c`. One disposable pytest module
+passed eight assertions of the documented broken behavior and was removed after the evidence was recorded. No
+implementation member was activated during admission.
+
+| Order | Findings | Reproduced boundary                                                                  | Accepted member                                                                                               |
+| ----- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](todo/preserve_unreadable_json_state_classification/card.md) |
+| 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](todo/reject_non_object_manifest_confirmed/card.md)                   |
+| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](todo/enforce_launch_runtime_override_immutability/card.md)   |
+| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                           |
+| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)         |
+| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                           |
+| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
+| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
+
+The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
+later workqueue member. O006 pins strict manifest classification before D009 changes manifest/index liveness, and D009
+precedes O003 so the concurrent-delete fix can preserve the approved live-versus-absent authority model. The MEDIUM
+members follow as separate review boundaries; D021 depends explicitly on D011.
 
 ### Suggested coordination boundaries
 
 - **[Policy/supervision epic](done/epic_policy_supervision_correctness/card.md):** D001–D005 and O028 shipped as three
   independent members. O044 remains later bounded-maintenance work because terminal commands own intent while `%policy`
   commands deliberately own overrides.
-- **[Stop/artifact epic](doing/epic_stop_artifact_correctness/card.md):** DG1, verification, and artifact
-  schema/idempotency (D007, D024) are shipped; sidecar drain (D039) is implemented and awaiting review and merge as the
-  final distinct member.
-- **Durable-state/session epic:** coordinate D008–D011, D021–D022, O003, O006, and related state readers around
-  fault-injection and recovery tests.
+- **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
+  and sidecar drain shipped independently in PRs #130–#132.
+- **[Durable-state/session epic](todo/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and O006
+  are reproduced and parked as eight separately reviewable members around fault-injection and recovery tests.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

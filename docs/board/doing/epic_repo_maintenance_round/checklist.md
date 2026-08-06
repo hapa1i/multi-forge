@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge D039 sidecar shadow-drain routing, then close the Wave 2 child epic.
+Current focus: review and merge the Wave 2 closeout/Wave 3 admission record, then activate D011 on a separate branch.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -26,7 +26,12 @@ Current focus: review and merge D039 sidecar shadow-drain routing, then close th
 - [x] Review and merge the D007/D024 transcript-artifact member (PR #131, `3e090ef5`).
 - [x] Activate `repair_sidecar_shadow_drain_routing` on its execution branch.
 - [x] Implement and verify D039 without broadening the shadow candidate or marker schemas.
-- [ ] Review and merge D039, then close the Wave 2 child epic.
+- [x] Review and merge D039, then close the Wave 2 child epic (PR #132, `dc963a7c`).
+- [x] Recheck and reproduce Wave 3 D008–D011, D021–D022, O003, and O006 on merged `main` (8 executable characterizations
+  passed on `dc963a7c`).
+- [x] Sequence Wave 3 under `epic_session_durable_state_safety` without activating a parked member.
+- [x] Run Wave 3 admission Markdown, relative-link, stale-lane, and diff checks.
+- [ ] Review and merge the Wave 3 admission record before activating D011.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

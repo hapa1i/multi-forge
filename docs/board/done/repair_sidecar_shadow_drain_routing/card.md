@@ -4,8 +4,7 @@
 
 **Finding**: D039 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- implemented and verified on `fix/repair-sidecar-shadow-drain-routing`; awaiting review and merge
-as the final Wave 2 member.
+**Lane**: `done/` -- shipped in PR #132 (`dc963a7c`) on 2026-08-06 as the final Wave 2 member.
 
 ## Goal
 
@@ -48,7 +47,8 @@ later host drain and ordinary host-mode routing is unchanged. The marker and can
 
 The retained D039 regression failed before the fix with `queued_shadow=false`, then passed after the path split. Focused
 hook/shadow/workqueue coverage passed (120), the full sidecar hook integration file passed (4), the regression suite
-passed (659), and the unit suite passed (8,734 with one pre-existing platform skip and 118 deselected).
+passed (659), and the unit suite passed (8,734 with one pre-existing platform skip and 118 deselected). PR #132 merged
+the implementation and its follow-up path-ownership clarification as `dc963a7c`.
 
 ## Scope
 
