@@ -958,13 +958,15 @@ also snapshot the Stop-time `subprocess_proxy`.
 Handlers are passed explicitly as a `handlers` dict (no global registry -- avoids import-order coupling and test state
 leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
-| Outcome                             | Behavior                                                                |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| Handler succeeds                    | Delete marker under lock                                                |
-| Handler raises                      | Keep marker, increment `attempt_count`, write `last_error` under lock   |
-| Lock contention                     | Skip (another process holds it)                                         |
-| No handler for kind                 | Skip and leave marker in place (debug log)                              |
-| `attempt_count >= MAX_ATTEMPTS` (5) | Move to `pending-work/failed/` (poison marker, preserved for debugging) |
+| Outcome                               | Behavior                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| Handler succeeds                      | Delete marker under lock                                                      |
+| Handler raises                        | Keep marker, increment `attempt_count`, write `last_error` under lock         |
+| Marker read is unreadable (`OSError`) | Leave bytes unchanged and pending; diagnose, skip, and continue later markers |
+| Marker contains malformed JSON        | Move directly to `pending-work/failed/`                                       |
+| Lock contention                       | Skip (another process holds it)                                               |
+| No handler for kind                   | Skip and leave marker in place (debug log)                                    |
+| `attempt_count >= MAX_ATTEMPTS` (5)   | Move to `pending-work/failed/` (poison marker, preserved for debugging)       |
 
 ### B.3 Known marker kinds
 

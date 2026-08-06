@@ -10,6 +10,7 @@ import pytest
 from forge.core.state import (
     StateCorruptedError,
     StateNotFoundError,
+    StateUnreadableError,
     atomic_write_bytes,
     atomic_write_json,
     atomic_write_text,
@@ -275,6 +276,18 @@ class TestReadJson:
 
         assert str(target) in exc_info.value.path
         assert "expected JSON object" in exc_info.value.reason
+
+    def test_raises_state_unreadable_for_read_oserror(self, tmp_path: Path) -> None:
+        """Existing state that cannot be read is not mislabeled as corrupt."""
+        target = tmp_path / "test.json"
+        target.write_text('{"key": "value"}')
+
+        with patch("builtins.open", side_effect=OSError("simulated transient read failure")):
+            with pytest.raises(StateUnreadableError) as exc_info:
+                read_json(target)
+
+        assert str(target) in exc_info.value.path
+        assert "simulated transient read failure" in exc_info.value.reason
 
     def test_uses_utf8_encoding(self, tmp_path: Path) -> None:
         """read_json uses UTF-8 encoding."""

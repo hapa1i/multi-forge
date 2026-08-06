@@ -1,6 +1,6 @@
 # Reject non-object confirmed manifest state
 
-**Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
+**Epic**: [`epic_session_durable_state_safety`](../../doing/epic_session_durable_state_safety/card.md).
 
 **Finding**: O006 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 

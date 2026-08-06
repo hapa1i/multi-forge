@@ -1,6 +1,6 @@
 # Retain sessions whose manifest survives a missing worktree
 
-**Epic**: [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md).
+**Epic**: [`epic_session_durable_state_safety`](../../doing/epic_session_durable_state_safety/card.md).
 
 **Decision**: [`missing_worktree_authority`](../../done/missing_worktree_authority/card.md) (DG2; D009).
 

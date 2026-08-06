@@ -50,6 +50,7 @@ class ProcessResult:
     skipped: int = 0
     failed: int = 0  # Markers that exceeded MAX_ATTEMPTS (moved to failed/)
     errors: list[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)  # Non-fatal outcomes callers should surface
 
 
 class WorkHandler(Protocol):

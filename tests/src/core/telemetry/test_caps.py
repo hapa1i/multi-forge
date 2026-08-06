@@ -6,6 +6,8 @@ import json
 
 import pytest
 
+from forge.core.state import StateUnreadableError
+from forge.core.telemetry import caps
 from forge.core.telemetry.caps import (
     CapState,
     cap_state_path,
@@ -52,4 +54,18 @@ def test_load_rejects_proxy_id_mismatch() -> None:
     path.write_text(json.dumps({"schema_version": 1, "proxy_id": "proxy-b", "daily_window": []}))
 
     with pytest.raises(ValueError, match="proxy_id mismatch"):
+        load_cap_state("proxy-a")
+
+
+def test_load_propagates_unreadable_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    path = cap_state_path("proxy-a")
+    path.parent.mkdir(parents=True)
+    path.write_text('{"schema_version": 1}')
+
+    def raise_unreadable(_path) -> dict:
+        raise StateUnreadableError(str(path), "simulated transient read failure")
+
+    monkeypatch.setattr(caps, "read_json", raise_unreadable)
+
+    with pytest.raises(StateUnreadableError, match="simulated transient read failure"):
         load_cap_state("proxy-a")

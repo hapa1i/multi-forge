@@ -368,7 +368,12 @@ def _process_pending_work_best_effort() -> None:
 
         # Limit to 5 items per startup to avoid blocking CLI when many
         # index markers are pending (each involves file I/O + JSON parsing)
-        process_pending_work(max_items=5, timeout_s=0.05, handlers=handlers)
+        result = process_pending_work(max_items=5, timeout_s=0.05, handlers=handlers)
+        if result.diagnostics:
+            from forge.cli.output import err_console
+
+            for diagnostic in result.diagnostics:
+                err_console.print(f"[yellow]Warning:[/yellow] {diagnostic}")
     except Exception as e:
         logger.debug("Queue processing error (non-fatal): %s", e)
 

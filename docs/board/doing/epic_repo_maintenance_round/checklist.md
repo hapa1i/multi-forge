@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the Wave 2 closeout/Wave 3 admission record, then activate D011 on a separate branch.
+Current focus: merge the reviewed D011 implementation without starting O006 or D021.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -31,7 +31,11 @@ Current focus: review and merge the Wave 2 closeout/Wave 3 admission record, the
   passed on `dc963a7c`).
 - [x] Sequence Wave 3 under `epic_session_durable_state_safety` without activating a parked member.
 - [x] Run Wave 3 admission Markdown, relative-link, stale-lane, and diff checks.
-- [ ] Review and merge the Wave 3 admission record before activating D011.
+- [x] Review and merge the Wave 3 admission record before activating D011 (PR #133, `eef7cee0`).
+- [x] Activate `preserve_unreadable_json_state_classification` from merged `main` on its own execution branch.
+- [x] Implement and verify D011 without activating O006 or D021.
+- [x] Review D011 and record its GC-documentation amendment and separate D046 follow-up (2026-08-06).
+- [ ] Merge D011 before activating O006.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

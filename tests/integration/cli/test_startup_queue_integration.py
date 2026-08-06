@@ -4,7 +4,7 @@ These tests run inside a session-scoped container (docker_in marker) for
 complete filesystem isolation. They test the behavioral aspects of:
 - Non-exempt commands processing pending-work queue
 - Exempt commands skipping queue processing
-- Robustness against corrupted markers
+- Robustness against corrupted and unreadable markers
 
 The startup queue lives at ~/.forge/pending-work/ and is processed by
 non-exempt commands on startup.
@@ -24,10 +24,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 def _create_stop_marker(
     workspace: ContainerLike,
     session_id: str = "test-marker-123",
+    forge_home: str = "$HOME/.forge",
 ) -> str:
     """Create a valid pending-work stop marker."""
-    marker_path = f"$HOME/.forge/pending-work/{session_id}.json"
-    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
+    marker_path = f"{forge_home}/pending-work/{session_id}.json"
+    workspace.mkdir(f"{forge_home}/pending-work", parents=True)
 
     marker_data = {
         "schema_version": 1,
@@ -153,6 +154,44 @@ class TestStartupQueueRobustness:
         assert result.stderr == ""
         assert not mock_claude_workspace.file_exists("$HOME/.forge/pending-work/corrupted.json")
         assert mock_claude_workspace.file_exists("$HOME/.forge/pending-work/failed/corrupted.json")
+
+    def test_unreadable_marker_stays_pending_without_blocking_later_work(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        """A real permission failure is visible but does not mutate or poison the marker."""
+        forge_home = "/tmp/forge-d011"
+        mock_claude_workspace.exec(f"rm -rf {forge_home}")
+        unreadable = _create_stop_marker(
+            mock_claude_workspace,
+            session_id="a-unreadable",
+            forge_home=forge_home,
+        )
+        readable = _create_stop_marker(
+            mock_claude_workspace,
+            session_id="z-readable",
+            forge_home=forge_home,
+        )
+        original = mock_claude_workspace.read_file(unreadable)
+        permissions = mock_claude_workspace.exec(
+            f"chmod 0777 {forge_home} {forge_home}/pending-work && chmod 000 {unreadable}"
+        )
+        assert permissions.returncode == 0, permissions.stderr
+
+        result = mock_claude_workspace.exec(
+            "su -s /bin/sh nobody -c "
+            f"'HOME={forge_home} FORGE_HOME={forge_home} /usr/local/bin/forge model backend list --json'"
+        )
+
+        assert result.returncode == 0, result.stderr
+        json.loads(result.stdout)
+        assert "Warning:" in result.stderr
+        assert "a-unreadable.json could not be read" in result.stderr
+        assert mock_claude_workspace.read_file(unreadable) == original
+        assert not mock_claude_workspace.file_exists(readable)
+        assert not mock_claude_workspace.file_exists(f"{forge_home}/pending-work/failed/a-unreadable.json")
+
+        mock_claude_workspace.exec(f"rm -rf {forge_home}")
 
     def test_incompatible_index_marker_retries_without_failing_foreground(
         self,
