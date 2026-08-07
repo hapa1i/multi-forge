@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: independently review and merge D022 without starting D010.
+Current focus: independently review and merge D010 before closing Wave 3.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -56,6 +56,9 @@ Current focus: independently review and merge D022 without starting D010.
 - [x] Merge D021 before activating D022 (PR #140, `ecc79aa2`).
 - [x] Activate D022 from merged `main` at `ecc79aa2` and create its execution checklist.
 - [x] Retain D022's silent structured-fallback regression and implement canonical transfer-strategy validation.
+- [x] Review and merge D022 before activating D010 (PR #141, `d2ed2349`).
+- [x] Activate D010 from merged `main` at `d2ed2349` and create its execution checklist.
+- [x] Retain D010's linked-worktree guard regression and implement root-guard parity.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

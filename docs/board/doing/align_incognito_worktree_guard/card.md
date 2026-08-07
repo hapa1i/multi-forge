@@ -4,7 +4,8 @@
 
 **Finding**: D010 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted as the final Wave 3 implementation member.
+**Lane**: `doing/` -- implementation-verified on `fix/align-incognito-worktree-guard` from merged `main` at `d2ed2349`;
+pending independent review.
 
 ## Goal
 
@@ -23,6 +24,10 @@ creating a new Git worktree.
 Rechecked on `dc963a7c`: observing both guards during `forge session incognito guard-drift --worktree --no-proxy` showed
 an unconditional `require_repo_root()` call and no `require_main_repo_root()` call. `session start`, `session fork`, and
 Codex start already branch on `--worktree` and require the main checkout.
+
+Execution source recheck on merged `main` at `d2ed2349` found the same unconditional guard at the incognito entry. The
+marked D010 regression then failed because the linked-worktree invocation returned exit code 0 and reached the patched
+launch seam.
 
 ## Expected Behavior
 
@@ -44,3 +49,16 @@ Codex start already branch on `--worktree` and require the main checkout.
 
 - This aligns an existing option with sibling behavior; it does not remove `--worktree` or change branch naming.
 - Do not change `--into`, same-directory sessions, worktree ownership, or incognito cleanup semantics.
+
+## Verification
+
+The marked D010 regression failed on `d2ed2349` because the linked-worktree invocation returned exit code 0 and reached
+the patched launch seam. After implementation, the focused guard slice passed (12), the complete Docker session
+lifecycle file passed (23), the regression suite passed (669), and final `make pre-commit` passed.
+
+## Implementation Outcome
+
+The incognito shortcut now selects `require_main_repo_root()` when `--worktree` is present and retains
+`require_repo_root()` otherwise. Linked-worktree rejection therefore occurs before `launch_new_session`, while
+main-checkout worktree launches and ordinary incognito behavior keep their existing downstream arguments and lifecycle.
+This aligns implementation with the existing worktree design contract; no normative design change was required.

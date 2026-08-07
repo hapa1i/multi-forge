@@ -35,8 +35,8 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
 were reproduced on merged `main` at `dc963a7c` and converted into members under
 [`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, D008, D009, and O003
-shipped in PRs #134--#138, and D021 shipped in PR #140. D022 is implementation-verified from merged `main` at `ecc79aa2`
-as the seventh member and is pending independent review.
+shipped in PRs #134--#138, D021 shipped in PR #140, and D022 shipped in PR #141. D010 is implementation-verified from
+merged `main` at `d2ed2349` pending independent review as the eighth and final member.
 
 ### Finding fields
 
@@ -285,13 +285,18 @@ implementation outcome below records its completed code and regression work.
   absent-handler, handler-failure, and poison outcomes remain distinct. A marked fail-first regression, 82 focused
   tests, all 10 Docker startup-queue tests, 667 regressions, and 8,804 unit tests cover the boundary. It shipped in PR
   #140 (`ecc79aa2`). See [`preserve_newer_workqueue_markers`](done/preserve_newer_workqueue_markers/card.md).
-- **D022 — implementation-verified 2026-08-07, pending independent review:** transfer-mode resume now parses through the
-  canonical strategy boundary before context assembly or durable writes. Unknown values and transfer-ineligible `rewind`
-  fail with the supported set instead of running structured while persisting a false literal; successful derivations
-  record the parsed value, and native provenance remains null. Existing invalid durable values are not migrated. A
-  marked fail-first regression, 107 focused host tests, 3 focused Docker manager tests, all 9 Docker resume integration
-  tests, and 668 regressions cover the boundary. See
-  [`reject_unknown_resume_strategy`](doing/reject_unknown_resume_strategy/card.md).
+- **D022 — resolved 2026-08-07:** transfer-mode resume now parses through the canonical strategy boundary before context
+  assembly or durable writes. Unknown values and transfer-ineligible `rewind` fail with the supported set instead of
+  running structured while persisting a false literal; successful derivations record the parsed value, and native
+  provenance remains null. Existing invalid durable values are not migrated. A marked fail-first regression, 107 focused
+  host tests, 3 focused Docker manager tests, all 9 Docker resume integration tests, and 668 regressions cover the
+  boundary. It shipped in PR #141 (`d2ed2349`). See
+  [`reject_unknown_resume_strategy`](done/reject_unknown_resume_strategy/card.md).
+- **D010 — implementation-verified 2026-08-07, pending independent review:** `session incognito --worktree` now uses the
+  same main-checkout guard as the other worktree-creating session commands, while ordinary incognito retains the
+  repository-root guard. Rejection occurs before the shared launch seam. A marked fail-first regression, 12 focused CLI
+  tests, all 23 Docker session lifecycle tests, 669 regressions, and final `make pre-commit` cover the boundary. See
+  [`align_incognito_worktree_guard`](doing/align_incognito_worktree_guard/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -479,8 +484,8 @@ implementation member was activated during admission.
 | 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](done/retain_missing_worktree_sessions/card.md)                           |
 | 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md)         |
 | 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](done/preserve_newer_workqueue_markers/card.md)                           |
-| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](doing/reject_unknown_resume_strategy/card.md)                              |
-| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
+| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](done/reject_unknown_resume_strategy/card.md)                               |
+| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](doing/align_incognito_worktree_guard/card.md)                              |
 
 The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
 later workqueue member. O006 pins strict manifest classification before D009 changes manifest/index liveness, and D009
@@ -495,9 +500,8 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; the five HIGH members shipped in PRs #134--#138, D021
-  shipped in PR #140, D022 is implementation-verified from merged `main` at `ecc79aa2` pending independent review, and
-  D010 remains parked.
+  O006 are reproduced as eight separately reviewable members; the first seven shipped through PR #141, and D010 is
+  implementation-verified from merged `main` at `d2ed2349` pending independent review as the final member.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

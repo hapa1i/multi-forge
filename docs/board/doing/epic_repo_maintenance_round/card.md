@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
-**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-2 is closed, the five HIGH Wave 3 members shipped in PRs #134--#138, D021 shipped in PR #140, and D022 is
-implementation-verified pending independent review as the active MEDIUM session/durable-state member.
+**Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
+Waves 1 and 2 are closed, the first seven Wave 3 members shipped through PR #141, and D010 is implementation-verified
+pending independent review as the final member.
 
 ## Goal
 
@@ -65,8 +65,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 is coordinated by the active
 [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, the five HIGH members shipped in PRs #134--#138, and D021 shipped in PR #140. D022 is
-implementation-verified from merged `main` at `ecc79aa2` pending independent review.
+before admission, and the first seven members shipped in PRs #134--#138, #140, and #141. D010 is implementation-verified
+from merged `main` at `d2ed2349` pending independent review as the final member.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -83,8 +83,8 @@ implementation-verified from merged `main` at `ecc79aa2` pending independent rev
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           |
 | 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         |
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
-| 3    | D022            | [`reject_unknown_resume_strategy`](../reject_unknown_resume_strategy/card.md)                                       |
-| 3    | D010            | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               |
+| 3    | D022            | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               |
+| 3    | D010            | [`align_incognito_worktree_guard`](../align_incognito_worktree_guard/card.md)                                       |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
