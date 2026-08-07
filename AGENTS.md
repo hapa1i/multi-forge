@@ -53,14 +53,16 @@ For Day 1 install or extension lifecycle changes, verify the global-tool path wi
 `--json` when checking install kind, PATH reachability, hook dispatcher, project registry, and compatibility fields),
 then verify `forge extension enable --scope user` for runtime hooks and `forge extension enable` for project setup. For
 runtime-skill/compiler changes, verify `forge runtime list --json`, `forge extension enable --runtime claude|codex|all`,
-and `forge extension status --json`; also exercise `forge extension sync` and `forge extension disable` when package
-ownership changes. `--runtime` filters every module by its runtime ownership, while sync preserves the installation's
-tracked runtime set and runtime-package health belongs to `extension status`, not `extension doctor`. Codex skills
-support user and project scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local scope
-onto the shared project target. For installer/GC changes involving untracked runtime packages, verify the schema-v3
-`forge extension status --json` object (`installations` plus `unmanaged_skill_packages`), then preview cleanup with
-`forge clean --scope <project|workspace|all> --verbose` before applying the same scope with `--yes`. Cleanup must remain
-fail-closed: unmarked, modified, malformed/newer, or unsafe packages are report-only and must not be removed
+and `forge extension status --json`; also exercise `forge extension sync` and
+`forge extension disable --runtime claude|codex|all` when package ownership changes. `--runtime` filters every module by
+its runtime ownership, while sync preserves the installation's tracked runtime set and runtime-package health belongs to
+`extension status`, not `extension doctor`. Runtime-scoped disable removes only selected ownership; omitted runtime
+surfaces and unrelated user content must remain, while omitting `--runtime` retains whole-installation behavior. Codex
+skills support user and project scopes only (`$HOME/.agents/skills` and `<root>/.agents/skills`); never map Forge local
+scope onto the shared project target. For installer/GC changes involving untracked runtime packages, verify the
+schema-v3 `forge extension status --json` object (`installations` plus `unmanaged_skill_packages`), then preview cleanup
+with `forge clean --scope <project|workspace|all> --verbose` before applying the same scope with `--yes`. Cleanup must
+remain fail-closed: unmarked, modified, malformed/newer, or unsafe packages are report-only and must not be removed
 automatically. For Codex-hook disable changes, also verify behavior after `$CODEX_HOME` changes: disable must name both
 config paths and preserve the managed block and tracking row without mutating either.
 
@@ -99,6 +101,13 @@ is removed, and `forge telemetry costs show` remains the authoritative proxy-sco
 launch-strategy changes, verify `forge session resume <parent> --fresh --strategy rewind --drop-last N` and
 `forge session fork <parent> --worktree|--into <path> --strategy rewind --drop-last N`; `rewind` is not a
 `forge session transfer regenerate` strategy.
+
+For session-store, launchability, repair, or workspace-scope changes, preview orphan recovery with
+`forge session repair [--json]`, apply it with `forge session repair --yes`, check degraded records with
+`forge session list --scope workspace --json` and `forge session show <session> --json`, and inspect Git worktree
+membership and session occupancy with `forge workspace worktrees [--json]`. Repair is scoped to the current Forge root;
+it must never recreate missing worktrees or accept collision/corrupt records. Valid missing-worktree sessions remain
+visible but unlaunchable until the checkout returns.
 
 For native-session adoption changes, run `forge session adopt [--json]` from the native launch directory, adopt a full
 Claude conversation or Codex thread id with `forge session adopt <conversation-id> --name <name>`, then resume the
