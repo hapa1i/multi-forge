@@ -1,6 +1,6 @@
 # Enforce launch-runtime override immutability checklist
 
-Current focus: merge the independently reviewed D008 member before starting D009.
+Current focus: complete; D008 shipped in PR #136 (`8ebdb644`) before D009 activation.
 
 ## Activation and reproduction
 
@@ -26,4 +26,4 @@ Current focus: merge the independently reviewed D008 member before starting D009
 - [x] Run final `make pre-commit`.
 - [x] Synchronize the member, epics, review ledger, change log, and affected design/end-user docs.
 - [x] Complete independent review and record the adjacent relaunch-inheritance policy gap as D048.
-- [ ] Merge D008 before activating D009.
+- [x] Merge D008 before activating D009 (PR #136, `8ebdb644`).

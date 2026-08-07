@@ -171,7 +171,13 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
     for item in result.sessions:
         template = item.proxy_template or "-"
         model = f", model: {item.model}" if item.model else ""
-        lines.append(f"  {item.name}  ({template}{model})")
+        lines.append(f"  {item.name}  ({template}{model}, launchability: {item.launchability})")
+        if item.launchability == "missing_worktree":
+            recorded_path = item.recorded_worktree_path or item.entry.worktree_path
+            lines.append(f"    Recorded worktree missing: {display_path(recorded_path)}")
+            lines.append(
+                f"    Recovery: recreate the checkout at that path, or run 'forge session delete {item.name}'."
+            )
 
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
@@ -208,7 +214,12 @@ def _handle_session_show(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return
 
-    lines = [f"Session: {ctx.session_name}"]
+    lines = [f"Session: {ctx.session_name}", f"  Launchability: {ctx.launchability}"]
+    if ctx.launchability == "missing_worktree" and ctx.recorded_worktree_path:
+        lines.append(f"  Recorded worktree missing: {display_path(ctx.recorded_worktree_path)}")
+        lines.append(
+            f"  Recovery: recreate the checkout at that path, or run 'forge session delete {ctx.session_name}'."
+        )
     if ctx.claude_session_id:
         lines.append(f"  UUID:     {ctx.claude_session_id}")
     if ctx.parent_session:
@@ -219,8 +230,9 @@ def _handle_session_show(argv: list[str]) -> None:
         lines.append(f"  Template: {ctx.proxy.template}")
     if ctx.proxy.base_url:
         lines.append(f"  Base URL: {ctx.proxy.base_url}")
-    if ctx.worktree_path:
-        lines.append(f"  Worktree: {display_path(ctx.worktree_path)}")
+    worktree_path = ctx.recorded_worktree_path or ctx.worktree_path
+    if worktree_path:
+        lines.append(f"  Worktree: {display_path(worktree_path)}")
     if ctx.model_family != "anthropic":
         lines.append(f"  Family:   {ctx.model_family}")
     if ctx.models:
@@ -1417,7 +1429,7 @@ def _handle_cmd_clean(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return
 
-    if report.is_clean:
+    if report.is_clean and report.report_only_count == 0:
         click.echo(json.dumps({"decision": "block", "reason": "Nothing to clean."}))
         return
 
@@ -1425,7 +1437,10 @@ def _handle_cmd_clean(argv: list[str]) -> None:
     for cat in report.categories:
         if cat.count > 0:
             lines.append(f"  {cat.description}: {cat.count}")
-    lines.append(f"\nTotal: {report.total_count} objects")
-    lines.append("\nRun `forge clean --yes` from terminal to clean.")
+    lines.append(f"\nTotal: {report.total_count} cleanable objects")
+    if report.report_only_count:
+        lines.append(f"Report only: {report.report_only_count} live degraded sessions (preserved).")
+    if report.total_count:
+        lines.append("\nRun `forge clean --yes` from terminal to clean.")
 
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))

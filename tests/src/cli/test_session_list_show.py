@@ -26,6 +26,23 @@ from tests.src.cli.session_command_support import (
 )
 
 
+def _seed_missing_worktree_session(project: Path, name: str = "degraded") -> Path:
+    """Write a valid root-owned manifest whose recorded linked worktree is gone."""
+    missing = project.parent / f"{name}-deleted-worktree"
+    state = create_session_state(name, worktree_path=str(missing))
+    assert state.worktree is not None
+    state.worktree.is_worktree = True
+    state.forge_root = str(project)
+    SessionStore(str(project), name).write(state)
+    IndexStore().add_from_state(
+        state,
+        project_root=str(project),
+        forge_root=str(project),
+        checkout_root=str(missing),
+    )
+    return missing
+
+
 def test_resume_token_estimate_multiplier_skips_proxy_config_lookup(
     temp_env: Path,
 ) -> None:
@@ -113,6 +130,29 @@ class TestSessionList:
 
         assert result.exit_code == 0
         assert "test-session" in result.output
+
+    def test_list_reports_missing_worktree_without_pruning(self, runner: CliRunner, temp_env: Path) -> None:
+        import json
+
+        missing = _seed_missing_worktree_session(temp_env)
+
+        human = runner.invoke(main, ["session", "list", "--scope", "all"])
+        machine = runner.invoke(main, ["session", "list", "--scope", "all", "--json"])
+
+        assert human.exit_code == 0
+        assert "degraded" in human.output
+        assert "missing worktree" in human.output
+        assert str(missing) in human.output
+        assert "forge session delete degraded" in human.output
+        assert machine.exit_code == 0
+        row = next(item for item in json.loads(machine.output) if item["name"] == "degraded")
+        assert row["launchability"] == "missing_worktree"
+        assert IndexStore().get_session("degraded", forge_root=str(temp_env)).worktree_path == str(missing)
+
+        missing.mkdir()
+        restored = runner.invoke(main, ["session", "list", "--scope", "all", "--json"])
+        restored_row = next(item for item in json.loads(restored.output) if item["name"] == "degraded")
+        assert restored_row["launchability"] == "launchable"
 
     def test_list_shows_direct_model_pin(self, runner: CliRunner, temp_env: Path) -> None:
         """Should show persisted --model pins in human and JSON output."""
@@ -427,6 +467,28 @@ class TestSessionShow:
         assert "main_model" in data["context"]
         assert "main_model" in data
         assert "model_profile" not in data
+
+    def test_show_reports_missing_worktree_in_human_json_and_field_output(
+        self,
+        runner: CliRunner,
+        temp_env: Path,
+    ) -> None:
+        import json
+
+        missing = _seed_missing_worktree_session(temp_env)
+
+        human = runner.invoke(main, ["session", "show", "degraded"])
+        machine = runner.invoke(main, ["session", "show", "degraded", "--json"])
+        field = runner.invoke(main, ["session", "show", "degraded", "--field", "launchability"])
+
+        assert human.exit_code == 0
+        assert "Launchability: missing_worktree" in human.output
+        assert str(missing) in human.output
+        assert "forge session delete degraded" in human.output
+        assert machine.exit_code == 0
+        assert json.loads(machine.output)["launchability"] == "missing_worktree"
+        assert field.exit_code == 0
+        assert field.output.strip() == "missing_worktree"
 
     def test_show_field_extraction(self, runner: CliRunner, temp_env: Path) -> None:
         """--field should extract a single value."""

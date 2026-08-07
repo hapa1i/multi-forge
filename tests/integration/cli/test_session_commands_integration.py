@@ -234,6 +234,50 @@ class TestSessionDelete:
 class TestSessionResume:
     """Tests for 'forge session resume' command."""
 
+    def test_missing_worktree_remains_visible_and_resume_refuses_without_mutation(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        missing = "/tmp/forge-deleted-worktree"
+        _run_container_python(
+            mock_claude_workspace,
+            f"""
+            from forge.session import IndexStore, SessionStore, create_session_state
+
+            state = create_session_state("degraded", worktree_path="{missing}")
+            state.worktree.is_worktree = True
+            state.forge_root = "/workspace"
+            SessionStore("/workspace", "degraded").write(state)
+            IndexStore().add_from_state(
+                state,
+                project_root="/workspace",
+                forge_root="/workspace",
+                checkout_root="{missing}",
+            )
+            """,
+        )
+        manifest_path = "/workspace/.forge/sessions/degraded/forge.session.json"
+        before = mock_claude_workspace.read_file(manifest_path)
+
+        listed = mock_claude_workspace.exec("cd /workspace && forge session list --scope all --json")
+        shown = mock_claude_workspace.exec("cd /workspace && forge session show degraded --json")
+        resumed = mock_claude_workspace.exec("cd /workspace && forge session resume degraded")
+
+        assert listed.returncode == 0, listed.stderr
+        row = next(item for item in json.loads(listed.stdout) if item["name"] == "degraded")
+        assert row["launchability"] == "missing_worktree"
+        assert shown.returncode == 0, shown.stderr
+        assert json.loads(shown.stdout)["launchability"] == "missing_worktree"
+        assert resumed.returncode == 1
+        assert missing in resumed.stderr
+        assert "forge session delete" in resumed.stderr
+        assert "degraded" in resumed.stderr
+        assert mock_claude_workspace.read_file(manifest_path) == before
+
+        deleted = mock_claude_workspace.exec("cd /workspace && forge session delete degraded --yes")
+        assert deleted.returncode == 0, deleted.stderr
+        assert "Deleted session" in deleted.stdout
+
     def test_resume_existing_session(self, mock_claude_workspace: ContainerLike) -> None:
         """Resume without --fresh launches in-place (session never confirmed by hook)."""
         mock_claude_workspace.exec("cd /workspace && forge session start resume-test")

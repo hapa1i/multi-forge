@@ -150,15 +150,22 @@ update of an already tracked package can be repaired by sync.
 | `forge session resume [name]`           | Reattach to an existing session (default), or derive a fresh child with `--fresh`                                                                                                                                                            |
 | `forge session fork <parent> [--name]`  | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context)                                                                                                                  |
 | `forge session adopt [conversation-id]` | Bind a Forge session to an existing native Claude conversation or Codex thread (`--name`, `--model`, `--yes`); the runtime is detected from on-disk evidence. Bare lists unbound Claude candidates (`--json`). Run from its launch directory |
-| `forge session show [session]`          | Show session details (`--json`, `--field`); accepts name or UUID                                                                                                                                                                             |
-| `forge session list`                    | List sessions (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                                                                                                                                             |
+| `forge session show [session]`          | Show session details and derived launchability (`--json`, `--field`); accepts name or UUID                                                                                                                                                   |
+| `forge session list`                    | List sessions with derived launchability (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                                                                                                                  |
 | `forge session set <key> <value>`       | Set a mid-session override; immutable `launch.runtime` cannot be introduced directly, through `launch`, or through `launch.*`                                                                                                                |
 | `forge session reset [key]`             | Reset overrides to intent                                                                                                                                                                                                                    |
 | `forge session delete <name>...`        | Delete one or more sessions (`--all` for bulk deletion)                                                                                                                                                                                      |
 | `forge session clean --older-than N`    | Preview sessions older than N days; `--yes` to delete                                                                                                                                                                                        |
-| `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` to re-index the repairable ones. Scoped to the current Forge root                                                                                                        |
+| `forge session repair`                  | Report session manifests missing from the index (`--json`); `--yes` re-indexes repairable and valid missing-worktree manifests. Scoped to the current Forge root                                                                             |
 | `forge session incognito [name]`        | Start an ephemeral session (auto-delete on exit)                                                                                                                                                                                             |
 | `forge session shell [name]`            | Open shell in sidecar container                                                                                                                                                                                                              |
+
+`session list --json` and `session show --json` include an additive `launchability` field: `launchable`,
+`missing_worktree`, or `unknown` when no validated recorded path is available. A valid manifest whose recorded worktree
+is missing remains listed and keeps its name and conversation bindings. Human list/show output names the missing path
+and recovery. Resume, fork, and launch refuse before session mutation until the checkout reappears; `session delete`
+remains available, `session repair --yes` can restore a missing index row without recreating the checkout, and
+`forge clean` reports but does not remove the valid degraded session.
 
 Note: `session resume --fresh --review` opens the per-child user-notes overlay (`children/<child>.notes.md`) in
 `$EDITOR` before launching Claude; the AI snapshot stays read-only. Session-scoped memory activation lives under
@@ -479,7 +486,7 @@ scope rationale remain in design.md.
 
 ### 2.1 Scope policy table
 
-- **Session / plan**: allow `%session list` and `%plan`.
+- **Session / plan**: allow `%session list`, `%session show [name]`, and `%plan`.
 - **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
   `%proxy edit`, `%proxy set`, and `%proxy delete`.
 - **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
@@ -498,6 +505,7 @@ scope rationale remain in design.md.
 Shared commands (mirrors CLI syntax):
 
 - `%session list` (calls the same command-core op as `forge session list`)
+- `%session show [name]` (defaults to the current session)
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
@@ -510,5 +518,9 @@ Shared commands (mirrors CLI syntax):
 - `%policy supervisor reload [path]` (reload latest approved plan, or from explicit path)
 - `%cancel-verification` (bypasses the active Stop-hook verification loop)
 - `%clean [--scope workspace|project|all]` (read-only: shows orphaned state report, default scope=project)
+
+`%session list` and `%session show` include the same derived launchability marker as their terminal counterparts. For a
+missing recorded worktree, the hook payload also names the path and the recreate-or-delete recovery choices so an
+assistant does not need to attempt a resume to discover that the session cannot launch.
 
 ---

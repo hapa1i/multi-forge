@@ -612,6 +612,39 @@ class TestCollectCleanReport:
         assert isinstance(report, CleanReport)
         assert report.is_clean
 
+    def test_missing_worktree_session_is_reported_but_never_cleanable(self, tmp_path: Path) -> None:
+        fr = tmp_path / "project"
+        missing = tmp_path / "deleted-worktree"
+        state = create_session_state("degraded", worktree_path=str(missing))
+        assert state.worktree is not None
+        state.worktree.is_worktree = True
+        state.forge_root = str(fr)
+        SessionStore(str(fr), "degraded").write(state)
+        IndexStore().add_from_state(
+            state,
+            project_root=str(tmp_path),
+            forge_root=str(fr),
+            checkout_root=str(missing),
+        )
+        manifest = SessionStore(str(fr), "degraded").manifest_path
+        before = manifest.read_bytes()
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        report = collect_clean_report(ctx=ctx, scope="workspace")
+
+        category = next(c for c in report.categories if c.category == "missing_worktree_sessions")
+        assert category.report_only is True
+        assert category.items == [f"degraded: {missing}"]
+        assert report.report_only_count == 1
+        assert report.total_count == 0
+        assert report.is_clean
+
+        result = run_clean(ctx=ctx, scope="workspace")
+        assert result.deleted_count == 0
+        assert not result.failed
+        assert manifest.read_bytes() == before
+        assert IndexStore().get_session("degraded", forge_root=str(fr)).worktree_path == str(missing)
+
     def test_invalid_scope_raises(self, tmp_path: Path) -> None:
 
         ctx = _make_ctx(tmp_path)

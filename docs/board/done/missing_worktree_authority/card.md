@@ -2,8 +2,8 @@
 
 **Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md) (DG2; D009).
 
-**Lane**: `done/` -- approved on 2026-08-04; implementation is parked in
-[`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md).
+**Lane**: `done/` -- approved on 2026-08-04; implementation is verified and pending independent review in
+[`retain_missing_worktree_sessions`](../../doing/retain_missing_worktree_sessions/card.md).
 
 ## Problem
 
@@ -97,7 +97,6 @@ uniqueness, delete/clean ownership, JSON/human output, and targeted session inte
 
 ## Closeout
 
-The target contract and operation matrix are approved. Per the board contract, `docs/design.md` continues to describe
-the shipped report-only behavior until
-[`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md) changes the predicates; that
-member owns design, end-user, and repair-doc synchronization. Verification: `make pre-commit-md` and `git diff --check`.
+The target contract and operation matrix are approved. The implementation member now aligns the list/get predicates,
+repair, clean, launch refusal, and normative/end-user documentation with this decision; it remains in `doing/` until
+independent review and merge. Decision verification: `make pre-commit-md` and `git diff --check`.

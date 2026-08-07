@@ -33,9 +33,9 @@ contract requires an epic.
 
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
-were reproduced on merged `main` at `dc963a7c` and converted into parked members under
-[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011 and O006 shipped in PRs
-#134--#135, and D008 is independently reviewed and pending merge as the third member.
+were reproduced on merged `main` at `dc963a7c` and converted into members under
+[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, and D008 shipped in
+PRs #134--#136, and D009 is implementation-verified and pending independent review as the fourth member.
 
 ### Finding fields
 
@@ -193,7 +193,7 @@ implementation outcome below records its completed code and regression work.
 | D041 | MED      | O5    | `forge` root group exits **0** on bare invocation (hand-rolled `invoke_without_command`); sibling groups use `no_args_is_help=True` and exit 2. Verified live: `forge` → 0, `forge session` → 2.                                                                                                                                                                                                                                                                                                         | §4 command-shape policy                                  | `cli/main.py:423`                                                                                       |
 | D042 | LOW      | F5    | Sidecar also mounts `~/.forge/config.yaml` ro — deliberate per impl notes, but design §7's mount enumeration was never updated (doc fix).                                                                                                                                                                                                                                                                                                                                                                | design.md §7                                             | `sidecar/container.py:231`                                                                              |
 | D043 | LOW      | F5    | design.md §2/§6 list a `src/forge/status/` component that does not exist (status lives in `cli/status_line.py` + `cli/statusline/`).                                                                                                                                                                                                                                                                                                                                                                     | design.md §2, §6                                         | filesystem                                                                                              |
-| D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%session show` and `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                    | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
+| D044 | LOW      | F5+O5 | Shipped-but-undocumented surfaces: `forge auth logout`/`auth profiles`, `workflow list-models --available`, all four `forge config` leaves (cli_reference §1); `%policy supervisor cascade` (§2).                                                                                                                                                                                                                                                                                                        | cli_reference.md                                         | `cli/auth.py:458,490`; `cli/workflow.py:252`; `cli/config_cmd.py`                                       |
 | D045 | MED      | R     | Exit-plan-mode's snapshot writer is the sole remaining caller of `_append_artifact_entry`; when `confirmed.artifacts.plans` is non-list, the helper silently replaces that durable value with a one-entry list and discards the malformed state.                                                                                                                                                                                                                                                         | coding_standards §5 no silent durable-state clobber      | `cli/hooks/_helpers.py:131-149`; `cli/hooks/commands.py:456`                                            |
 | D046 | MED      | R     | `load_proxy_instance_config` catches every exception around opening and parsing `proxy.yaml` as `StateCorruptedError`, so a transient `OSError` can reach invalid-config or global corruption/reset handling even though Forge never inspected the bytes. Several optional consumers instead swallow the same misclassification as a best-effort miss. *Source-confirmed; runtime impact not yet reproduced.*                                                                                            | coding_standards §5 distinct durable-state outcomes      | `config/loader.py:370-393`; `cli/main.py:75-94`; `cli/output.py:120-147`                                |
 | D047 | LOW      | R     | Three status-line raw-manifest formatters call `.get()` on `confirmed` without a shape check. Explicit-null state raises `AttributeError` inside each producer; the registry's broad fail-open contains it by silently dropping the breadcrumb, verification, and sidecar segments. The impact is bounded, but the raw-reader degradation policy is implicit and inconsistent with guarded sibling projections.                                                                                          | §3.3 typed section containers; appendix §A.8 fail-open   | `cli/status_line.py:924,950,965`; `cli/statusline/registry.py:386-391`                                  |
@@ -249,15 +249,22 @@ implementation outcome below records its completed code and regression work.
   string, number, and boolean values. Independent review found no design violations; its contained status-line
   bypass-reader observation is recorded separately as D047. It shipped in PR #135 (`00692356`). See
   [`reject_non_object_manifest_confirmed`](done/reject_non_object_manifest_confirmed/card.md).
-- **D008 — implementation-verified 2026-08-06:** override writes now reject immutable `launch.runtime` through the
-  direct key, a parent `launch` object, or `launch.*` before manifest mutation. Supported sibling writes and
-  explicit-null clears remain available, while reset accepts exact-runtime and parent cleanup for stale illegal state.
-  Raw intent remains the sole launcher-dispatch authority. Execution corrected the parked assumption that a whole-launch
-  null must reject: the optional legacy-compatible launch section follows the general explicit-null contract and cannot
-  change raw runtime identity. A marked fail-first regression, focused override/CLI coverage, and the Docker
-  session-command path cover the boundary. Independent review found no design violations; its adjacent stale-override
-  relaunch-inheritance observation is recorded separately as D048. See
-  [`enforce_launch_runtime_override_immutability`](doing/enforce_launch_runtime_override_immutability/card.md).
+- **D008 — resolved 2026-08-06:** override writes now reject immutable `launch.runtime` through the direct key, a parent
+  `launch` object, or `launch.*` before manifest mutation. Supported sibling writes and explicit-null clears remain
+  available, while reset accepts exact-runtime and parent cleanup for stale illegal state. Raw intent remains the sole
+  launcher-dispatch authority. Execution corrected the parked assumption that a whole-launch null must reject: the
+  optional legacy-compatible launch section follows the general explicit-null contract and cannot change raw runtime
+  identity. A marked fail-first regression, focused override/CLI coverage, and the Docker session-command path cover the
+  boundary. Independent review found no design violations; its adjacent stale-override relaunch-inheritance observation
+  is recorded separately as D048. It shipped in PR #136 (`8ebdb644`). See
+  [`enforce_launch_runtime_override_immutability`](done/enforce_launch_runtime_override_immutability/card.md).
+- **D009 — implementation-verified 2026-08-06:** a surviving valid manifest now keeps its index publication, name, and
+  conversation bindings when its recorded worktree disappears. Terminal and `%session` list/show reads derive the same
+  launchability marker; checkout-dependent Claude and Codex paths refuse before mutation; repair can republish the
+  degraded row without claiming the checkout; clean reports but never auto-deletes it; and explicit delete remains
+  available. The marked regression, focused state/lifecycle tests, both complete Docker session files, regression suite,
+  and unit suite cover the boundary. See
+  [`retain_missing_worktree_sessions`](doing/retain_missing_worktree_sessions/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -441,8 +448,8 @@ implementation member was activated during admission.
 | ----- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | 1     | D011     | generic `read_json` maps read `OSError` to corruption                                | [`preserve_unreadable_json_state_classification`](done/preserve_unreadable_json_state_classification/card.md) |
 | 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](done/reject_non_object_manifest_confirmed/card.md)                   |
-| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](doing/enforce_launch_runtime_override_immutability/card.md)  |
-| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](todo/retain_missing_worktree_sessions/card.md)                           |
+| 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](done/enforce_launch_runtime_override_immutability/card.md)   |
+| 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](doing/retain_missing_worktree_sessions/card.md)                          |
 | 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](todo/preserve_headless_codex_concurrent_delete/card.md)         |
 | 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                           |
 | 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
@@ -461,8 +468,8 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; D011 and O006 shipped in PRs #134--#135, D008 is
-  independently reviewed and pending merge, and the remaining members stay parked.
+  O006 are reproduced as eight separately reviewable members; D011, O006, and D008 shipped in PRs #134--#136, D009 is
+  implementation-verified pending independent review, and the remaining members stay parked.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

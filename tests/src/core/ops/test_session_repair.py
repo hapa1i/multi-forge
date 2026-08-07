@@ -136,14 +136,17 @@ class TestScan:
         assert rec.identity.corrected_worktree_path == str(project)
         assert str(gone) in rec.detail
 
-    def test_missing_worktree_reports_only(self, project: Path, tmp_path: Path) -> None:
+    def test_missing_worktree_is_publishable_as_degraded(self, project: Path, tmp_path: Path) -> None:
         gone = tmp_path / "deleted-worktree"
         seed_orphan(project, "wt-orphan", worktree_path=str(gone), is_worktree=True)
         report = scan_repairable_orphans(project)
 
         rec = report.records[0]
         assert rec.classification == "missing-worktree"
-        assert rec.identity is None
+        assert rec.identity is not None
+        assert rec.identity.worktree_path == str(gone)
+        assert rec.identity.checkout_root == str(gone)
+        assert rec.identity.project_root == str(project)
         assert str(gone) in rec.detail
 
     def test_claude_uuid_collision(self, project: Path) -> None:
@@ -342,14 +345,17 @@ class TestScan:
         assert rec.identity.project_root == str(project)
         assert rec.identity.relative_path == "."
 
-    def test_root_level_worktree_gone_reports_only(self, project: Path, tmp_path: Path) -> None:
+    def test_root_level_worktree_gone_is_publishable_as_degraded(self, project: Path, tmp_path: Path) -> None:
         linked = tmp_path / "linked-wt"
         _git(["worktree", "add", str(linked), "-b", "lw"], project)
         seed_orphan(project, "root-wt", worktree_path=str(linked), is_worktree=True)
         shutil.rmtree(linked)
 
         report = scan_repairable_orphans(project)
-        assert report.records[0].classification == "missing-worktree"
+        rec = report.records[0]
+        assert rec.classification == "missing-worktree"
+        assert rec.identity is not None
+        assert rec.identity.worktree_path == str(linked)
 
     def test_nested_project_worktree_shape(self, project: Path, tmp_path: Path) -> None:
         """Nested shape: forge_root remapped into the linked worktree, manifest inside it."""
@@ -521,7 +527,11 @@ class TestApply:
         assert "bound to a live session" in result.refused[0].reason
         assert make_scoped_key("orphan", str(project)) not in IndexStore().read().sessions
 
-    def test_report_only_classes_skipped(self, project: Path, tmp_path: Path) -> None:
+    def test_missing_worktree_published_while_nonrepairable_classes_are_skipped(
+        self,
+        project: Path,
+        tmp_path: Path,
+    ) -> None:
         seed_orphan(project, "no-wt", worktree_path=None)
         seed_orphan(project, "wt-gone", worktree_path=str(tmp_path / "gone"), is_worktree=True)
         path = get_manifest_path(project, "broken")
@@ -530,11 +540,76 @@ class TestApply:
 
         result = repair_orphans(project, self._scan(project).records)
 
-        assert result.repaired == ()
+        assert result.repaired == ("wt-gone",)
         assert result.refused == ()
         assert result.failed == ()
         assert result.clean
-        assert _rows() == {}
+        assert set(_rows()) == {make_scoped_key("wt-gone", str(project))}
+
+    def test_missing_worktree_repair_preserves_manifest_and_guest_ownership(
+        self,
+        project: Path,
+        tmp_path: Path,
+    ) -> None:
+        gone = tmp_path / "shared-checkout"
+        seed_orphan(
+            project,
+            "guest",
+            worktree_path=str(gone),
+            is_worktree=True,
+            owns_worktree=False,
+        )
+        manifest = get_manifest_path(project, "guest")
+        before = manifest.read_bytes()
+
+        result = repair_orphans(project, self._scan(project).records)
+
+        assert result.repaired == ("guest",)
+        assert not gone.exists()
+        assert manifest.read_bytes() == before
+        state = SessionStore(str(project), "guest").read()
+        assert state.worktree is not None
+        assert state.worktree.owns_worktree is False
+        entry = IndexStore().get_session("guest", forge_root=str(project))
+        assert entry.worktree_path == str(gone)
+        assert entry.checkout_root == str(gone)
+        assert [name for name, _entry in SessionManager().list_sessions()] == ["guest"]
+
+    def test_missing_worktree_deleted_between_scan_and_apply_is_refused(
+        self,
+        project: Path,
+        tmp_path: Path,
+    ) -> None:
+        seed_orphan(project, "gone", worktree_path=str(tmp_path / "checkout"), is_worktree=True)
+        records = self._scan(project).records
+        SessionStore(str(project), "gone").delete()
+
+        result = repair_orphans(project, records)
+
+        assert result.repaired == ()
+        assert len(result.refused) == 1
+        assert "manifest no longer readable" in result.refused[0].reason
+        assert make_scoped_key("gone", str(project)) not in _rows()
+
+    def test_missing_worktree_name_claimed_between_scan_and_apply_is_refused(
+        self,
+        project: Path,
+        tmp_path: Path,
+    ) -> None:
+        state = seed_orphan(
+            project,
+            "claimed",
+            worktree_path=str(tmp_path / "checkout"),
+            is_worktree=True,
+        )
+        records = self._scan(project).records
+        IndexStore().add_from_state(state, str(project), forge_root=str(project))
+
+        result = repair_orphans(project, records)
+
+        assert result.repaired == ()
+        assert len(result.refused) == 1
+        assert "claimed by a live session" in result.refused[0].reason
 
     def test_incompatible_pin_fails_closed(self, project: Path) -> None:
         seed_orphan(project, "orphan")

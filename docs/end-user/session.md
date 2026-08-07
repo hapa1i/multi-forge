@@ -237,19 +237,26 @@ or branches automatically.
 ### Repairing invisible sessions
 
 A session can end up with its manifest on disk but no entry in the session index — a crash during creation on an older
-Forge, or a deleted worktree whose session recorded it. Such an orphan never appears in `forge session list`, yet its
+Forge or manual index damage can produce this shape. Such an orphan does not appear in `forge session list`, yet its
 name stays taken and its conversation stays bound. From the project root:
 
 ```bash
 forge session repair          # Report orphaned manifests and what repair would do
-forge session repair --yes    # Re-index the repairable ones
+forge session repair --yes    # Re-index repairable and degraded records
 ```
 
-Repair never deletes anything. The preview labels each orphan: `repairable` orphans are re-indexed by `--yes`;
-`missing-worktree` means the session's checkout is gone — recreate it or `forge session delete <name>`; `collision`
-means the conversation now belongs to a live session and is refused; `corrupt` manifests are `forge clean`'s job. With
-`--yes`, the command exits 1 if any repair was refused or failed. A `.forge/project.toml` version pin refuses `--yes`
-the same way other session mutations are refused.
+Repair never deletes or recreates anything. The preview labels each orphan: `repairable` and valid `missing-worktree`
+manifests are re-indexed by `--yes`; `collision` means the conversation now belongs to a live session and is refused;
+`corrupt` manifests are `forge clean`'s job. Repairing a `missing-worktree` record restores discovery only — it does not
+claim the missing checkout. With `--yes`, the command exits 1 if any repair was refused or failed. A
+`.forge/project.toml` version pin refuses `--yes` the same way other session mutations are refused.
+
+Current Forge keeps an already indexed session visible when its valid manifest survives but its recorded worktree is
+gone. `session list` and `session show` report `launchability=missing_worktree` and name the recorded path; their JSON
+forms expose the same `launchability` field. Resume, fork, and launch refuse before changing session state. Recreate a
+directory at the recorded path to make the session launchable again without migration, or run
+`forge session delete <name>` to remove its durable reservation. `forge clean` reports this degraded state but never
+auto-deletes the valid manifest.
 
 ---
 

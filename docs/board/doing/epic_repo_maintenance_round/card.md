@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-2 is closed, D011 and O006 shipped in PRs #134--#135, and D008 is independently reviewed and pending merge as the third
-Wave 3 session/durable-state member.
+2 is closed, D011, O006, and D008 shipped in PRs #134--#136, and D009 is implementation-verified and pending independent
+review as the fourth Wave 3 session/durable-state member.
 
 ## Goal
 
@@ -65,8 +65,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 is coordinated by the active
 [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, D011 and O006 shipped in PRs #134--#135, and D008 is independently reviewed from merged `main` at
-`00692356` and pending merge.
+before admission, D011, O006, and D008 shipped in PRs #134--#136, and D009 is implementation-verified from merged `main`
+at `8ebdb644` pending independent review.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -79,8 +79,8 @@ before admission, D011 and O006 shipped in PRs #134--#135, and D008 is independe
 | 2    | D039            | [`repair_sidecar_shadow_drain_routing`](../../done/repair_sidecar_shadow_drain_routing/card.md)                     |
 | 3    | D011            | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) |
 | 3    | O006            | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   |
-| 3    | D008            | [`enforce_launch_runtime_override_immutability`](../enforce_launch_runtime_override_immutability/card.md)           |
-| 3    | D009            | [`retain_missing_worktree_sessions`](../../todo/retain_missing_worktree_sessions/card.md)                           |
+| 3    | D008            | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   |
+| 3    | D009            | [`retain_missing_worktree_sessions`](../retain_missing_worktree_sessions/card.md)                                   |
 | 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)         |
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                           |
 | 3    | D022            | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               |

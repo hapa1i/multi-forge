@@ -4,8 +4,7 @@
 
 **Finding**: D008 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- independently reviewed on `fix/enforce-launch-runtime-override-immutability` from merged `main` at
-`00692356`; pending merge.
+**Lane**: `done/` -- independently reviewed and shipped in PR #136 (`8ebdb644`) on 2026-08-06.
 
 ## Goal
 
@@ -53,6 +52,8 @@ the mid-execution card correction. It also found that `relaunch_session` deep-co
 `launch.runtime` override into its child. Dispatch remains safe and reset works, but whether relaunch inheritance should
 preserve, scrub, or diagnose that stale key is a separate compatibility policy; the observation is recorded as D048
 rather than changed here.
+
+Shipped in PR #136 (`8ebdb644`) on 2026-08-06.
 
 ## Expected Behavior
 

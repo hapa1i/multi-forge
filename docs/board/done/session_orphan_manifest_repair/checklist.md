@@ -2,6 +2,9 @@
 
 **Card**: [card.md](card.md). Branch: `feat/session-orphan-manifest-repair`.
 
+**Historical note (2026-08-06)**: DG2/D009 supersedes the missing-worktree report-only checklist decisions; see the
+current note in [card.md](card.md). This checklist remains the shipped PR #120 execution record.
+
 **Current focus**: Phases 1-3 implemented; review round 3 findings F7-F11 fixed and verified 2026-08-02. Awaiting
 re-review/merge, then closeout. D1-D6 ratified 2026-08-02 (review round 2: D2 confirmed as-is, no overrides). Phase 0
 history: the reviewer declined to ratify the original D1-D5; every correction was verified against source (findings

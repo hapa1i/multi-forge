@@ -119,6 +119,7 @@ class TestCleanCmdDryRun:
                 "description": "Untracked Forge runtime skill packages with verified provenance",
                 "count": 1,
                 "items": [package],
+                "report_only": False,
             }
         ]
 

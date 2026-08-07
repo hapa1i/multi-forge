@@ -55,7 +55,9 @@ from forge.session.codex_handoff import (
     pending_context_path,
     read_receipt,
 )
+from forge.session.exceptions import SessionWorktreeMissingError
 from forge.session.index import IndexStore
+from forge.session.launchability import require_session_worktree
 from forge.session.models import (
     CodexConfirmed,
     Derivation,
@@ -153,6 +155,11 @@ def resolve_codex_session(
 
     if session_runtime(state) != CODEX_RUNTIME:
         raise ForgeOpError(f"Session '{name}' is not a Codex session (runtime={session_runtime(state)!r}).")
+    worktree_path = state.worktree.path if state.worktree is not None else entry.worktree_path
+    try:
+        require_session_worktree(name, worktree_path, action="resume")
+    except ForgeSessionError as e:
+        raise ForgeOpError(str(e)) from e
     return entry, state
 
 
@@ -208,9 +215,15 @@ def start_codex_session(
     manager = SessionManager()
     try:
         parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
-        manager.get_session(parent, forge_root=str(forge_root))
+        parent_state = manager.get_session(parent, forge_root=str(forge_root))
+        parent_worktree = (
+            parent_state.worktree.path if parent_state.worktree is not None else parent_entry.worktree_path
+        )
+        require_session_worktree(parent, parent_worktree, action="resume")
     except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt parent manifest/index -> top-level reset handler
+    except SessionWorktreeMissingError as e:
+        raise ForgeOpError(str(e)) from e
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 

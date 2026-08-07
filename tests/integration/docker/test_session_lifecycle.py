@@ -8,6 +8,8 @@ Note: Uses forge_workspace fixture for forge in PATH + clean state.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from tests.fixtures.docker import ContainerLike
@@ -229,6 +231,72 @@ print('row_dropped')
 
         restored = forge_workspace.exec("cd /workspace && forge session list")
         assert "repair-me" in restored.stdout, f"Repaired session should be listed: {restored.stdout}"
+
+    def test_missing_root_worktree_is_degraded_repairable_and_report_only_to_clean(
+        self,
+        forge_workspace: ContainerLike,
+    ) -> None:
+        """A root-owned manifest survives removal of its linked checkout through repair and path recovery."""
+        forge_workspace.exec("forge extension enable --scope user --profile minimal")
+        started = forge_workspace.exec("cd /workspace && forge session start degraded --worktree --no-launch")
+        assert started.returncode == 0, started.stderr
+
+        lookup = forge_workspace.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+index = json.loads((Path.home() / '.forge' / 'sessions' / 'index.json').read_text())
+entry = next(v for k, v in index['sessions'].items() if k.split('|', 1)[0] == 'degraded')
+print(entry['worktree_path'])
+"
+            """)
+        assert lookup.returncode == 0, lookup.stderr
+        worktree = lookup.stdout.strip()
+        removed = forge_workspace.exec(f"git -C /workspace worktree remove --force {worktree}")
+        assert removed.returncode == 0, removed.stderr
+
+        listed = forge_workspace.exec("cd /workspace && forge session list --scope all --json")
+        assert listed.returncode == 0, listed.stderr
+        row = next(item for item in json.loads(listed.stdout) if item["name"] == "degraded")
+        assert row["launchability"] == "missing_worktree"
+
+        clean = forge_workspace.exec("cd /workspace && forge clean --scope project --json")
+        assert clean.returncode == 0, clean.stderr
+        clean_payload = json.loads(clean.stdout)
+        degraded_category = next(
+            item for item in clean_payload["categories"] if item["category"] == "missing_worktree_sessions"
+        )
+        assert degraded_category["report_only"] is True
+        assert degraded_category["count"] == 1
+
+        drop = forge_workspace.exec("""
+            cd /forge && uv run python -c "
+import json
+from pathlib import Path
+path = Path.home() / '.forge' / 'sessions' / 'index.json'
+index = json.loads(path.read_text())
+index['sessions'] = {k: v for k, v in index['sessions'].items() if k.split('|', 1)[0] != 'degraded'}
+path.write_text(json.dumps(index))
+"
+            """)
+        assert drop.returncode == 0, drop.stderr
+
+        preview = forge_workspace.exec("cd /workspace && forge session repair")
+        assert preview.returncode == 0, preview.stderr
+        assert "degraded" in preview.stdout and "missing-worktree" in preview.stdout
+        repaired = forge_workspace.exec("cd /workspace && forge session repair --yes")
+        assert repaired.returncode == 0, repaired.stderr
+        assert "Repaired 1: degraded" in repaired.stdout
+
+        recreated = forge_workspace.exec(f"mkdir -p {worktree}")
+        assert recreated.returncode == 0, recreated.stderr
+        restored = forge_workspace.exec("cd /workspace && forge session list --scope all --json")
+        restored_row = next(item for item in json.loads(restored.stdout) if item["name"] == "degraded")
+        assert restored_row["launchability"] == "launchable"
+
+        forge_workspace.exec(f"rmdir {worktree}")
+        deleted = forge_workspace.exec("cd /workspace && forge session delete degraded --yes")
+        assert deleted.returncode == 0, deleted.stderr
 
 
 class TestIntentVsConfirmed:

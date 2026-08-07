@@ -17,6 +17,39 @@ from forge.cli.hooks import hooks
 from forge.session import IndexStore, SessionStore, create_session_state
 
 
+def _seed_missing_worktree_session(
+    project: Path,
+    name: str,
+    *,
+    index_worktree_path: Path | None = None,
+) -> Path:
+    """Write a root-owned manifest whose recorded worktree no longer exists."""
+    missing = project.parent / f"{name}-deleted-worktree"
+    state = create_session_state(name, worktree_path=str(missing))
+    assert state.worktree is not None
+    state.worktree.is_worktree = True
+    state.forge_root = str(project)
+    SessionStore(str(project), name).write(state)
+    index = IndexStore()
+    if index_worktree_path is None:
+        index.add_from_state(
+            state,
+            project_root=str(project),
+            forge_root=str(project),
+            checkout_root=str(missing),
+        )
+    else:
+        index.add_session(
+            name=name,
+            worktree_path=str(index_worktree_path),
+            project_root=str(project),
+            forge_root=str(project),
+            checkout_root=str(index_worktree_path),
+            relative_path=".",
+        )
+    return missing
+
+
 @pytest.mark.parametrize(
     "prompt,should_block",
     [
@@ -216,6 +249,23 @@ class TestUserPromptSubmitDispatcher:
         assert "model-pinned" in out["reason"]
         assert "claude-opus-4-8" in out["reason"]
 
+    def test_session_list_marks_missing_worktree(self, tmp_path: Path, monkeypatch) -> None:
+        project = tmp_path / "project"
+        project.mkdir()
+        missing = _seed_missing_worktree_session(project, "degraded-list")
+        monkeypatch.chdir(project)
+
+        payload = {"prompt": "%session list", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "degraded-list" in out["reason"]
+        assert "launchability: missing_worktree" in out["reason"]
+        assert str(missing) in out["reason"]
+        assert "forge session delete degraded-list" in out["reason"]
+
     def test_help_blocks_with_help_text(self, tmp_path: Path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
@@ -283,6 +333,27 @@ class TestSessionShowDirectCommand:
         out = json.loads(result.output)
         assert out["decision"] == "block"
         assert "named-show" in out["reason"]
+
+    def test_session_show_marks_missing_worktree(self, tmp_path: Path, monkeypatch) -> None:
+        project = tmp_path / "project"
+        project.mkdir()
+        missing = _seed_missing_worktree_session(
+            project,
+            "degraded-show",
+            index_worktree_path=project,
+        )
+        monkeypatch.chdir(project)
+
+        payload = {"prompt": "%session show degraded-show", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "Launchability: missing_worktree" in out["reason"]
+        assert str(missing) in out["reason"]
+        assert "forge session delete degraded-show" in out["reason"]
+        assert f"Worktree: {missing}" in out["reason"]
 
     def test_session_show_no_env_no_name(self, tmp_path: Path, monkeypatch) -> None:
         """No FORGE_SESSION and no name -> error, not active-session fallback."""

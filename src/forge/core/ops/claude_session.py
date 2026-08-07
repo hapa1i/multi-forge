@@ -54,6 +54,7 @@ from forge.session.exceptions import (
     ManifestValidationError,
     SessionExistsError,
     SessionFileNotFoundError,
+    SessionWorktreeMissingError,
     WorktreePathExistsError,
 )
 from forge.session.launch import (
@@ -69,6 +70,7 @@ from forge.session.launch_confirmation import (
     read_proxy_cost_baseline,
     record_launch_confirmed,
 )
+from forge.session.launchability import require_session_worktree
 from forge.session.model_pin import _apply_direct_model_env_if_supported
 from forge.session.models import session_runtime
 
@@ -405,7 +407,14 @@ def launch_claude_session(
             "and cannot be launched with Claude. Use the matching runtime command."
         )
 
-    worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
+    try:
+        worktree_path = require_session_worktree(
+            manifest.name,
+            manifest.worktree.path if manifest.worktree is not None else None,
+            action="launch",
+        )
+    except SessionWorktreeMissingError as e:
+        raise ForgeOpError(str(e)) from e
     forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
 
     from forge.session.claude.paths import resolve_claude_project_root

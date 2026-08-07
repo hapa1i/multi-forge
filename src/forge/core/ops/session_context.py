@@ -27,6 +27,7 @@ from forge.session import (
 from forge.session.exceptions import AmbiguousSessionError
 from forge.session.identity import session_name_from_key
 from forge.session.index import IndexStore
+from forge.session.launchability import Launchability, derive_launchability
 from forge.session.store import get_sessions_dir
 
 _log = logging.getLogger(__name__)
@@ -68,6 +69,8 @@ class SessionContext:
     session_name: str
     claude_session_id: str | None = None
     worktree_path: str | None = None
+    recorded_worktree_path: str | None = None
+    launchability: Launchability = "unknown"
     project_root: str | None = None
     created_at: str | None = None
     is_fork: bool = False
@@ -86,6 +89,8 @@ class SessionContext:
             "session_name": self.session_name,
             "claude_session_id": self.claude_session_id,
             "worktree_path": self.worktree_path,
+            "recorded_worktree_path": self.recorded_worktree_path,
+            "launchability": self.launchability,
             "project_root": self.project_root,
             "created_at": self.created_at,
             "is_fork": self.is_fork,
@@ -303,11 +308,14 @@ def get_session_context(session: str | None = None) -> SessionContext:
     proxy_ctx = _build_proxy_context(state)
     family, models, main_model = _build_model_context(proxy_ctx, state)
     policy_ctx = _build_policy_context(state)
+    recorded_worktree_path = state.worktree.path if state.worktree is not None else None
 
     return SessionContext(
         session_name=name,
         claude_session_id=state.confirmed.claude_session_id,
         worktree_path=entry.worktree_path,
+        recorded_worktree_path=recorded_worktree_path,
+        launchability=derive_launchability(recorded_worktree_path),
         project_root=entry.project_root,
         created_at=state.created_at,
         is_fork=state.is_fork,
