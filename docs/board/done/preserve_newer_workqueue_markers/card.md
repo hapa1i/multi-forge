@@ -4,8 +4,7 @@
 
 **Finding**: D021 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- implementation-verified on `fix/preserve-newer-workqueue-markers` from merged `main` at
-`de8adaac`; pending independent review.
+**Lane**: `done/` -- shipped in PR #140 (`ecc79aa2`) on 2026-08-07.
 
 ## Goal
 

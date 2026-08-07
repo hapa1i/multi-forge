@@ -1,6 +1,6 @@
 # Preserve newer-schema workqueue markers checklist
 
-Current focus: complete independent review and merge without activating D022.
+Current focus: complete; D021 shipped in PR #140 (`ecc79aa2`) before D022 activation.
 
 ## Activation and reproduction
 
@@ -26,4 +26,4 @@ Current focus: complete independent review and merge without activating D022.
 - [x] Run the complete unit suite (8,804 passed, one pre-existing platform skip, 118 deselected).
 - [x] Synchronize design, member/epic cards, ledger, and change log.
 - [x] Run final `make pre-commit` after Markdown normalization.
-- [ ] Complete independent review and merge D021 before activating D022.
+- [x] Complete independent review and merge D021 before activating D022 (PR #140, `ecc79aa2`).

@@ -67,6 +67,7 @@ from .transfer import (
     TransferResult,
     assemble_transfer_context,
     estimate_transcript_tokens,
+    parse_transfer_context_strategy,
 )
 
 logger = logging.getLogger(__name__)
@@ -776,7 +777,7 @@ class SessionManager:
         Args:
             parent_name: Parent session name to derive from.
             child_name: Name for the child session (auto-generated if None).
-            strategy: Context assembly strategy (minimal/structured/full).
+            strategy: Context assembly strategy (minimal/structured/full/ai-curated).
             depth: How many ancestors to traverse (1 = parent only).
             context_limit: Context limit for budget check (required for full strategy).
             token_estimate_multiplier: Optional model-specific multiplier for heuristic budget checks.
@@ -790,6 +791,7 @@ class SessionManager:
             SessionExistsError: If child_name already exists.
             InvalidSessionNameError: If name is invalid.
             ContextBudgetExceededError: If full strategy exceeds context limit.
+            ValueError: If transfer mode receives an unsupported strategy.
         """
         if resume_mode not in {"transfer", "native"}:
             raise ValueError(f"Unsupported resume_mode: {resume_mode}")
@@ -885,10 +887,7 @@ class SessionManager:
             return child_state, transfer_result
 
         # --- Transfer mode: assemble context from parent history ---
-        try:
-            resume_strategy = ResumeStrategy(strategy)
-        except ValueError:
-            resume_strategy = ResumeStrategy.STRUCTURED
+        resume_strategy = parse_transfer_context_strategy(strategy)
 
         if resume_strategy == ResumeStrategy.FULL and context_limit is not None:
             copied_path = latest_transcript_artifact_path(parent_state)
@@ -936,7 +935,7 @@ class SessionManager:
             parent_transcript=transfer_result.transcript_artifact_path,
             inherited_proxy=inherited_proxy,
             resume_mode="transfer",
-            strategy=strategy,
+            strategy=resume_strategy.value,
             depth=depth,
             resumed_at=timestamp,
             lineage=transfer_result.lineage,

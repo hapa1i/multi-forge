@@ -10,9 +10,9 @@ Every Opus-only claim was revisited; claims that still lacked enough evidence we
 `(unverified)`. Every CRITICAL and HIGH row was source-checked again during the merge. Source inspection confirms that
 the cited code has the described shape; it does not by itself constitute a runtime reproduction.
 
-**Inventory:** 151 severity-ranked findings: 1 CRITICAL, 21 HIGH, 95 MEDIUM, and 34 LOW, plus unranked U001. The
+**Inventory:** 152 severity-ranked findings: 1 CRITICAL, 21 HIGH, 95 MEDIUM, and 35 LOW, plus unranked U001. The
 original merge contained 144 ranked rows; DG1 admitted U002 as MEDIUM and U003 as LOW on 2026-08-04, and follow-up
-reviews admitted D045 and D046 as MEDIUM plus D047--D049 as LOW from 2026-08-05 through 2026-08-07. Three Opus claims
+reviews admitted D045 and D046 as MEDIUM plus D047--D050 as LOW from 2026-08-05 through 2026-08-07. Three Opus claims
 were refuted and five were adjusted during the merge audit.
 
 ## Review Status and Execution Gate
@@ -35,8 +35,8 @@ contract requires an epic.
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
 were reproduced on merged `main` at `dc963a7c` and converted into members under
 [`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, D008, D009, and O003
-shipped in PRs #134--#138. D021 is implementation-verified from merged `main` at `de8adaac` and pending independent
-review as the sixth member.
+shipped in PRs #134--#138, and D021 shipped in PR #140. D022 is implementation-verified from merged `main` at `ecc79aa2`
+as the seventh member and is pending independent review.
 
 ### Finding fields
 
@@ -200,6 +200,7 @@ implementation outcome below records its completed code and regression work.
 | D047 | LOW      | R     | Three status-line raw-manifest formatters call `.get()` on `confirmed` without a shape check. Explicit-null state raises `AttributeError` inside each producer; the registry's broad fail-open contains it by silently dropping the breadcrumb, verification, and sidecar segments. The impact is bounded, but the raw-reader degradation policy is implicit and inconsistent with guarded sibling projections.                                                                                                                | §3.3 typed section containers; appendix §A.8 fail-open   | `cli/status_line.py:924,950,965`; `cli/statusline/registry.py:386-391`                                  |
 | D048 | LOW      | R     | `relaunch_session` deep-copies a parent's already-persisted illegal `overrides.launch.runtime` into its child. Raw-intent dispatch remains correct and reset can remove the key, but the recorded/effective divergence propagates across relaunches until reset. Whether inheritance should preserve, scrub, or diagnose stale immutable keys is unresolved compatibility policy.                                                                                                                                              | §3.3 override/identity ownership; §3.9 immutable runtime | `session/manager.py:1715`                                                                               |
 | D049 | LOW      | R     | The Codex SessionStart hook resolves `FORGE_SESSION` without rechecking manifest liveness, then its nothing-staged observation writer creates missing parent directories. A delete landing after resolution can therefore recreate a receipt-only session shell; the O003 cleanup correctly preserves that non-lock content. Whether hook receipt writes need a liveness guard or another terminal-delete authority is unresolved. *Runtime-reproduced with `write_observation_receipt` after removing the session directory.* | §3.2 terminal deletion; §3.5 hook receipt ownership      | `cli/hooks/codex_transfer.py:94-104`; `session/codex_handoff.py:179-202`; `core/state/io.py:130-146`    |
+| D050 | LOW      | R     | Fork transfer-context regeneration is not strategy-authoritative: `_generate_parent_transfer_context` silently coerces unknown input to `structured`; the never-launched relaunch caller omits `confirmed.derivation.strategy` when a per-child context is missing, so a valid non-default fork regenerates and launches as `structured` while retaining different provenance. CLI choice validation and rewind routing currently shield the invalid-input arm. *Source-confirmed; recovery-path impact not yet reproduced.*   | §3.9 strategy provenance; appendix §H.3 child artifacts  | `cli/session.py:427-429`; `cli/session_lifecycle.py:1596-1604`                                          |
 
 ### Implementation Outcomes
 
@@ -277,14 +278,20 @@ implementation outcome below records its completed code and regression work.
   post-amendment CLI integration collection (166) and final `make pre-commit` passed. It shipped in PR #138
   (`4a601dc2`). See
   [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md).
-- **D021 — implementation-verified 2026-08-07, pending independent review:** a readable marker with a strictly newer
-  integer schema is now resident deferred work before ordinary validation. The older consumer leaves its bytes and
-  unknown fields untouched, does not dispatch a handler or accrue retry/poison state, emits one actionable diagnostic
-  per process, and advances the bounded scan cursor so later current-schema work remains reachable. Malformed,
-  missing/non-integer/older-schema, lock-contention, absent-handler, handler-failure, and poison outcomes remain
-  distinct. A marked fail-first regression, 82 focused tests, all 10 Docker startup-queue tests, 667 regressions, and
-  8,804 unit tests cover the boundary. See
-  [`preserve_newer_workqueue_markers`](doing/preserve_newer_workqueue_markers/card.md).
+- **D021 — resolved 2026-08-07:** a readable marker with a strictly newer integer schema is now resident deferred work
+  before ordinary validation. The older consumer leaves its bytes and unknown fields untouched, does not dispatch a
+  handler or accrue retry/poison state, emits one actionable diagnostic per process, and advances the bounded scan
+  cursor so later current-schema work remains reachable. Malformed, missing/non-integer/older-schema, lock-contention,
+  absent-handler, handler-failure, and poison outcomes remain distinct. A marked fail-first regression, 82 focused
+  tests, all 10 Docker startup-queue tests, 667 regressions, and 8,804 unit tests cover the boundary. It shipped in PR
+  #140 (`ecc79aa2`). See [`preserve_newer_workqueue_markers`](done/preserve_newer_workqueue_markers/card.md).
+- **D022 — implementation-verified 2026-08-07, pending independent review:** transfer-mode resume now parses through the
+  canonical strategy boundary before context assembly or durable writes. Unknown values and transfer-ineligible `rewind`
+  fail with the supported set instead of running structured while persisting a false literal; successful derivations
+  record the parsed value, and native provenance remains null. Existing invalid durable values are not migrated. A
+  marked fail-first regression, 107 focused host tests, 3 focused Docker manager tests, all 9 Docker resume integration
+  tests, and 668 regressions cover the boundary. See
+  [`reject_unknown_resume_strategy`](doing/reject_unknown_resume_strategy/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -455,7 +462,7 @@ one card coordinates them.
 | 3 — session and durable-state safety    | D008–D011, D021–D022, O003, and O006                                               | State authority, fault outcomes, and recovery paths defined                     |
 | 4 — installer transactions              | D012–D014, D019                                                                    | Fault points and rollback ownership enumerated; integration fixtures identified |
 | 5 — CLI, proxy, and runtime correctness | D015–D018, O001–O004, then accepted MED correctness rows                           | DG3 resolved; stdout/stderr/JSON, retention, and lifecycle contracts cited      |
-| 6 — bounded maintenance fixes           | D045–D046 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
+| 6 — bounded maintenance fixes           | D045–D050 plus remaining verified MED/LOW bugs, performance issues, and docs drift | Each row split to one behavior and assigned a test tier                         |
 | 7 — refactor and deletion               | Verified duplication, dead code, inert config, and structural findings             | Behavior characterized; DG4 resolved; unverified symbols excluded               |
 
 ### Wave 3 admission record
@@ -471,8 +478,8 @@ implementation member was activated during admission.
 | 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](done/enforce_launch_runtime_override_immutability/card.md)   |
 | 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](done/retain_missing_worktree_sessions/card.md)                           |
 | 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md)         |
-| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](doing/preserve_newer_workqueue_markers/card.md)                          |
-| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
+| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](done/preserve_newer_workqueue_markers/card.md)                           |
+| 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](doing/reject_unknown_resume_strategy/card.md)                              |
 | 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
 
 The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
@@ -488,9 +495,9 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; the five HIGH members shipped in PRs #134--#138, D021 is
-  implementation-verified from merged `main` at `de8adaac` pending independent review, and the remaining members stay
-  parked.
+  O006 are reproduced as eight separately reviewable members; the five HIGH members shipped in PRs #134--#138, D021
+  shipped in PR #140, D022 is implementation-verified from merged `main` at `ecc79aa2` pending independent review, and
+  D010 remains parked.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

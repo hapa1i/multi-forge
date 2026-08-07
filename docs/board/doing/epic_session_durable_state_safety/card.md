@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- the five HIGH members shipped in PRs #134--#138; D021 is implementation-verified from merged
-`main` at `de8adaac` and pending independent review, while the remaining two members stay parked in sequence.
+**Lane**: `doing/` -- the five HIGH members shipped in PRs #134--#138 and D021 shipped in PR #140; D022 is
+implementation-verified from merged `main` at `ecc79aa2` pending independent review, while D010 remains parked.
 
 ## Goal
 
@@ -51,8 +51,8 @@ of the documented broken behavior and was removed after the evidence was recorde
 | 3     | D008    | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   | Parent-object override validation without freezing sibling launch fields |
 | 4     | D009    | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           | Manifest liveness, derived launchability, repair, and binding ownership  |
 | 5     | O003    | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         | Post-turn reconciliation when explicit deletion wins                     |
-| 6     | D021    | [`preserve_newer_workqueue_markers`](../preserve_newer_workqueue_markers/card.md)                                   | Forward-schema preservation distinct from retryable handler failure      |
-| 7     | D022    | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               | Transfer-strategy validation before artifacts or child state             |
+| 6     | D021    | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           | Forward-schema preservation distinct from retryable handler failure      |
+| 7     | D022    | [`reject_unknown_resume_strategy`](../reject_unknown_resume_strategy/card.md)                                       | Transfer-strategy validation before artifacts or child state             |
 | 8     | D010    | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               | CLI root-guard parity for worktree creation                              |
 
 D011 goes first because its exception contract is consumed by the queue and other state readers. O006 then pins strict
