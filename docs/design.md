@@ -956,6 +956,13 @@ discovery over rollouts created after a tight pre-launch timestamp, cwd-narrowed
 usage event** (mirrors the reserved `claude_interactive` route); the bridge's transfer curation still emits, under the
 same run root the TUI inherits.
 
+Both Codex frontends share one post-turn deletion boundary. If an explicit delete removes the session while Codex is
+running, the completed runtime result or TUI exit status still returns with a warning, while manifest and index fact
+reconciliation are skipped. A delete that lands between the manifest-presence check and the locked update may make the
+lock layer recreate an empty or lock-only session directory; Forge removes only that shell. Any other directory content
+is preserved, and corruption, unreadability, or lock timeout remains a strict error rather than being mistaken for
+deletion.
+
 **Recorded Codex facts** are CLI-owned, written to `confirmed.codex`; `confirmed.launch` and `claude_session_id` stay
 unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 [design_appendix.md §I.1](design_appendix.md#i1-recorded-codex-facts-confirmedcodex).

@@ -252,6 +252,50 @@ class TestStartCodexSession:
         assert (children / "impl.md").is_file()
         assert not [p for p in children.iterdir() if "-codex-" in p.name]
 
+    def test_deleted_during_first_turn_returns_result_without_recreating_state(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        def _delete_during_codex() -> None:
+            SessionManager().delete_session(
+                "impl",
+                delete_transcripts=False,
+                delete_worktree=False,
+                forge_root=str(proj),
+            )
+
+        with (
+            patch(
+                "forge.core.ops.codex_session._sync_codex_thread_to_index",
+                side_effect=AssertionError("deleted identity must not reach index reconciliation"),
+            ),
+            _codex_mocks(on_codex_spawn=_delete_during_codex),
+        ):
+            result = start_codex_session(
+                ctx=ctx,
+                name="impl",
+                parent="planner",
+                task="Build it",
+                context_delivery="hook",
+            )
+
+        assert isinstance(result, CodexSessionStartResult)
+        assert result.codex.success
+        assert result.thread_id == _SUCCESS_TID
+        assert result.context_delivery == "hook_undelivered"
+        assert result.warnings == (
+            "Session 'impl' was deleted while Codex was running; skipped post-exit manifest update.",
+        )
+        store = SessionStore(str(proj), "impl")
+        assert not store.exists()
+        assert not store.session_dir.exists()
+        assert not pending_context_path(store.session_dir).exists()
+        with pytest.raises(SessionNotFoundError):
+            SessionManager().get_session_entry("impl", forge_root=str(proj))
+
     def test_run_tree_attributed_to_new_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _, ctx = _make_project(tmp_path, monkeypatch)
         with _codex_mocks():
@@ -751,6 +795,43 @@ class TestContinueCodexSession:
         # Cross-CWD: the turn runs in the session's recorded worktree, not the invocation cwd.
         assert codex.call.kwargs["cwd"] == str(proj)
         assert codex.stdin == "Keep going"
+
+    def test_deleted_during_resume_returns_result_without_recreating_state(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+
+        def _delete_during_codex() -> None:
+            SessionManager().delete_session(
+                "impl",
+                delete_transcripts=False,
+                delete_worktree=False,
+                forge_root=str(proj),
+            )
+
+        with (
+            patch(
+                "forge.core.ops.codex_session._sync_codex_thread_to_index",
+                side_effect=AssertionError("deleted identity must not reach index reconciliation"),
+            ),
+            _codex_mocks(on_codex_spawn=_delete_during_codex),
+        ):
+            result = continue_codex_session(ctx=ctx, name="impl", task="Keep going")
+
+        assert isinstance(result, CodexSessionResumeResult)
+        assert result.codex.success
+        assert result.thread_id == _SUCCESS_TID
+        assert result.warnings == (
+            "Session 'impl' was deleted while Codex was running; skipped post-exit manifest update.",
+        )
+        store = SessionStore(str(proj), "impl")
+        assert not store.exists()
+        assert not store.session_dir.exists()
+        with pytest.raises(SessionNotFoundError):
+            SessionManager().get_session_entry("impl", forge_root=str(proj))
 
     def test_resume_falls_back_to_global_lookup_from_other_forge_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

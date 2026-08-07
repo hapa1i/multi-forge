@@ -1,6 +1,6 @@
 # Session and durable-state safety checklist
 
-Current focus: independently review and merge D009 without starting O003.
+Current focus: merge the independently reviewed O003 without starting D021.
 
 ## Activation and sequencing
 
@@ -21,13 +21,16 @@ Current focus: independently review and merge D009 without starting O003.
 - [x] Merge D008 before moving D009 from `todo/` (PR #136, `8ebdb644`).
 - [x] Start D009 from merged `main`, move it to `doing/`, and create its execution checklist.
 - [x] Implement and behaviorally verify D009 without changing terminal-delete or strict-state classification.
-- [ ] Independently review and merge D009 before moving O003 from `todo/`.
+- [x] Independently review and merge D009 before moving O003 from `todo/` (PR #137, `cce6e8c6`).
+- [x] Start O003 from merged `main`, move it to `doing/`, and create its execution checklist.
+- [x] Implement and behaviorally verify O003 without weakening non-absence errors or activating D021.
+- [x] Review O003, repair the stale CLI integration-fixture import, and record the separate D049 receipt-shell race.
 
 ## Remaining members
 
 - [x] Ship O006 strict `confirmed` classification (PR #135, `00692356`).
 - [x] Ship D008 launch-runtime override immutability (PR #136, `8ebdb644`).
-- [ ] Ship D009 missing-worktree liveness and launchability.
+- [x] Ship D009 missing-worktree liveness and launchability (PR #137, `cce6e8c6`).
 - [ ] Ship O003 headless Codex concurrent-delete reconciliation.
 - [ ] Ship D021 newer-schema workqueue preservation after D011.
 - [ ] Ship D022 transfer-strategy validation.

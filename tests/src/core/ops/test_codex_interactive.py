@@ -23,14 +23,17 @@ import pytest
 from forge.core.ops.codex_interactive import (
     ROLLOUT_SOURCE_POST_EXIT,
     CodexInteractiveResult,
-    _remove_lock_only_session_dir,
-    _update_manifest_if_present,
     reattach_codex_session,
     start_interactive_codex_session,
+)
+from forge.core.ops.codex_session import (
+    _remove_lock_only_session_dir,
+    _update_manifest_if_present,
 )
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
 from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.state import FileLockTimeoutError
 from forge.core.usage.ledger import read_usage_events
 from forge.session import SessionManager, SessionStore
 from forge.session.active import ActiveSessionStore
@@ -40,6 +43,7 @@ from forge.session.codex_handoff import (
     stage_pending_context,
     write_observation_receipt,
 )
+from forge.session.exceptions import ManifestCorruptedError, ManifestUnreadableError
 from forge.session.index import IndexStore
 from forge.session.models import CodexConfirmed, create_session_state
 
@@ -690,6 +694,26 @@ class TestUpdateManifestIfPresent:
         assert any("deleted while Codex was running" in w for w in warnings)
         # A dir holding more than the lock is not ours to judge; nothing is removed.
         assert (receipt_dir / "observation-receipt.json").exists()
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ManifestCorruptedError("manifest.json", "bad json"),
+            ManifestUnreadableError("manifest.json", "permission denied"),
+            FileLockTimeoutError(Path("manifest.json.lock"), 5.0),
+        ],
+        ids=["corrupted", "unreadable", "lock-timeout"],
+    )
+    def test_non_absence_update_errors_remain_strict(self, tmp_path: Path, error: Exception) -> None:
+        store = SessionStore(str(tmp_path), "live")
+        store.write(create_session_state(name="live", worktree_path=str(tmp_path)))
+        warnings: list[str] = []
+
+        with patch.object(store, "update", side_effect=error):
+            with pytest.raises(type(error), match=str(error)):
+                _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="live")
+
+        assert warnings == []
 
     def test_sweep_removes_empty_dir_shell(self, tmp_path: Path) -> None:
         # Another actor already unlinked the lock; the bare shell still goes.

@@ -98,6 +98,7 @@ def _register_parent(forge_root: Path, transcript: Path) -> None:
     SessionStore(str(forge_root), "planner").write(state)
 
 
+@pytest.mark.usefixtures("real_codex_home")
 def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pf = _require_codex_ready()
     _init_git_repo(tmp_path)

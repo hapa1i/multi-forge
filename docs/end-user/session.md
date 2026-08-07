@@ -569,6 +569,10 @@ supervision, memory, and other Claude-only flags are rejected. `--task` selects 
 `--resume-from`, and is only valid for Codex sessions; omitting it opens the interactive TUI (next section). If the
 first turn fails before Codex opens a thread, resume refuses with guidance — delete the session and start again.
 
+If the session is explicitly deleted while a Codex turn is still running, deletion wins. Forge returns the completed
+turn result with a warning but does not recreate the manifest, index entry, or a lock-only session directory; the
+post-turn Codex facts have nowhere to be saved.
+
 **Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
 prompt without Codex hook setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead
 (`additionalContext`): use the [hooks-only user-scope recipe](hook.md#installing-runtime-hooks) to register the

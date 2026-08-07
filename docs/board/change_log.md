@@ -25,7 +25,28 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
-## 2026-08-06
+## 2026-08-07
+
+### Preserve explicit deletion during headless Codex turns
+
+**Goal**: Keep session deletion terminal when it lands during a long Codex start or resume without discarding the
+completed turn result.
+
+**Key changes**:
+
+- Shared one post-turn manifest-presence guard across headless and interactive Codex frontends; deleted sessions return
+  their completed runtime result with a warning and skip manifest/index fact reconciliation.
+- Removed only empty or lock-only directory shells created by the exists-to-update race while preserving unrelated
+  content and strict corruption, unreadability, and lock-timeout errors.
+- Hoisted the existing non-autouse real-Codex-home integration fixture so core lifecycle and session-consumer E2Es both
+  exercise the host subscription-auth path past the global test isolation fixture.
+
+**Verification**: The marked O003 regression failed on `cce6e8c6` because the completed resume raised
+`SessionFileNotFoundError` and recreated a lock-only session directory. Focused tests passed (72), Codex preflight was
+ready, the live two-turn start/resume integration passed (1), and regressions passed (664). Independent review found no
+production design violation, caught a stale fixture import that broke CLI integration collection, and admitted the
+separate SessionStart receipt-shell race as D049. Post-amendment CLI integration collection (166), the focused suite
+(72), and final `make pre-commit` passed; merge remains pending.
 
 ### Retain sessions whose recorded worktree disappears
 
@@ -44,7 +65,10 @@ launchability.
 **Verification**: The marked D009 regression failed on `8ebdb644` because listing returned no session and deleted the
 row accepted by direct lookup. Focused tests passed (398); complete Docker session-command and lifecycle files passed
 (46 and 23); regressions passed (663); unit tests passed (8,790 with one pre-existing platform skip and 118 deselected);
-the review-amendment slice passed (188); final `make pre-commit` passed. Independent review and merge remain pending.
+the review-amendment slice passed (188); final `make pre-commit` passed. Independent review found no design violations.
+Shipped in PR #137 (`cce6e8c6`).
+
+## 2026-08-06
 
 ### Enforce launch-runtime override immutability
 

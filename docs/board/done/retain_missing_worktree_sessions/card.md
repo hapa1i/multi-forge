@@ -4,7 +4,7 @@
 
 **Decision**: [`missing_worktree_authority`](../../done/missing_worktree_authority/card.md) (DG2; D009).
 
-**Lane**: `doing/` -- active on `fix/retain-missing-worktree-sessions` from merged `main` at `8ebdb644`.
+**Lane**: `done/` -- shipped in PR #137 (`cce6e8c6`).
 
 ## Goal
 
