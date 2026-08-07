@@ -4,7 +4,7 @@
 
 **Finding**: O003 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `doing/` -- active on `fix/preserve-headless-codex-concurrent-delete` from merged `main` at `cce6e8c6`.
+**Lane**: `done/` -- shipped in PR #138 (`4a601dc2`) on 2026-08-07.
 
 ## Goal
 

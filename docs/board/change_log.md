@@ -27,6 +27,38 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-07
 
+### Preserve newer-schema workqueue markers
+
+**Goal**: Keep deferred work written by a newer Forge intact and reachable for a compatible future processor.
+
+**Key changes**:
+
+- Classified strictly newer integer schemas as resident deferred work before ordinary validation, preserving exact
+  marker bytes without handler dispatch, retry metadata, or poison moves.
+- Added one actionable upgrade diagnostic per process and joined PR #139's bounded scan cursor so unsupported windows
+  cannot starve later current-schema work.
+
+**Verification**: The marked D021 regression failed on `de8adaac`; focused tests passed (82), Docker startup-queue
+integration passed (10), regressions passed (667), unit tests passed (8,804 with one pre-existing platform skip and 118
+deselected), and final `make pre-commit` passed after Markdown normalization. Implementation is pending independent
+review.
+
+### Prevent bounded queue starvation and publish wheel dependency floors
+
+**Goal**: Let every resident queue window yield to later actionable work and make the clean wheel's LiteLLM runtime
+dependencies explicit and security-patched.
+
+**Key changes**:
+
+- Added a persistent bounded-scan cursor for unreadable, lock-contended, and unhandled markers without changing
+  retryable handler or validation failures.
+- Replaced LiteLLM's proxy extra with the start-validated dependency set, capped compatibility at 1.95.0, and added a
+  clean-wheel start/health/stop CI gate.
+
+**Verification**: Unit tests passed (8,798 with one pre-existing platform skip and 118 deselected), regressions passed
+(666), targeted startup-queue and LiteLLM integration passed (10), the clean Python 3.13 wheel smoke passed, and final
+`make pre-commit` passed. Shipped in PR #139 (`de8adaac`).
+
 ### Preserve explicit deletion during headless Codex turns
 
 **Goal**: Keep session deletion terminal when it lands during a long Codex start or resume without discarding the
@@ -46,7 +78,7 @@ completed turn result.
 ready, the live two-turn start/resume integration passed (1), and regressions passed (664). Independent review found no
 production design violation, caught a stale fixture import that broke CLI integration collection, and admitted the
 separate SessionStart receipt-shell race as D049. Post-amendment CLI integration collection (166), the focused suite
-(72), and final `make pre-commit` passed; merge remains pending.
+(72), and final `make pre-commit` passed. Shipped in PR #138 (`4a601dc2`).
 
 ### Retain sessions whose recorded worktree disappears
 

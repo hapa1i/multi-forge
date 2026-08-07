@@ -71,6 +71,7 @@ logger = logging.getLogger(__name__)
 MARKER_LOCK_TIMEOUT_S = 0.1  # 100ms for hooks (must be fast)
 PROCESSOR_LOCK_TIMEOUT_S = 0.05  # 50ms per marker during startup processing
 _SCAN_CURSOR_FILE = ".scan-cursor"
+_warned_newer_schema = False
 
 # Regex for safe marker IDs (prevents path traversal)
 # Allow alphanumeric, hyphens, underscores, dots (typical UUID/session ID chars)
@@ -79,9 +80,9 @@ SAFE_MARKER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 @dataclass(frozen=True)
 class _DeferredMarker:
-    """A marker left pending because its bytes could not be read safely."""
+    """A resident marker left pending without mutating its bytes."""
 
-    diagnostic: str
+    diagnostic: str | None
 
 
 def pending_work_dir() -> Path:
@@ -364,7 +365,8 @@ def process_pending_work(
     - Validates marker schema
     - Dispatches to handler by kind (if handler exists)
     - Deletes marker on success
-    - On unreadable bytes: leaves the marker unchanged and records a diagnostic
+    - On unreadable bytes or a strictly newer schema: leaves the marker unchanged
+      and records an applicable diagnostic
     - On failure: keeps marker, updates attempt_count/last_error
     - On poison (attempt_count >= MAX_ATTEMPTS): moves to failed/
 
@@ -404,7 +406,8 @@ def process_pending_work(
         if isinstance(outcome, _DeferredMarker):
             resident_seen = True
             result.skipped += 1
-            result.diagnostics.append(outcome.diagnostic)
+            if outcome.diagnostic is not None:
+                result.diagnostics.append(outcome.diagnostic)
         elif outcome is None:
             result.processed += 1
         elif outcome == "skipped":
@@ -481,8 +484,8 @@ def _process_single_marker(
 
     Returns:
         None on success, "skipped" if lock contention, "failed" if moved to failed/,
-        _DeferredMarker if the bytes could not be read, or an error message on
-        validation failure.
+        _DeferredMarker if the bytes must remain unchanged, or an error message
+        on validation failure.
     """
     try:
         with file_lock_for_target(target_path=marker_file, timeout_s=timeout_s):
@@ -502,6 +505,14 @@ def _process_single_marker(
                 # Unrecoverable content: retrying the same malformed bytes cannot help.
                 _move_corrupted_to_failed(marker_file, f"read error: {e}")
                 return "failed"
+
+            schema_version = data.get("schema_version")
+            if (
+                isinstance(schema_version, int)
+                and not isinstance(schema_version, bool)
+                and schema_version > MARKER_SCHEMA_VERSION
+            ):
+                return _defer_newer_schema(marker_file, schema_version)
 
             # Clean up old-shape markers (session_id/work, no marker_id) on sight
             # rather than letting them consume the per-run processing budget
@@ -576,6 +587,21 @@ def _process_single_marker(
 
     except Exception as e:
         return f"Error processing {marker_file.name}: {e}"
+
+
+def _defer_newer_schema(marker_file: Path, schema_version: int) -> _DeferredMarker:
+    """Leave a future marker pending and surface one actionable process warning."""
+    global _warned_newer_schema
+
+    diagnostic: str | None = None
+    if not _warned_newer_schema:
+        diagnostic = (
+            f"Pending-work marker {marker_file.name} was written by newer Forge "
+            f"(schema_version={schema_version}; supported={MARKER_SCHEMA_VERSION}); "
+            "leaving it unchanged. Upgrade Forge to process it."
+        )
+        _warned_newer_schema = True
+    return _DeferredMarker(diagnostic)
 
 
 def _validate_marker(data: dict[str, Any]) -> str | None:

@@ -1,6 +1,6 @@
 # Preserve headless Codex concurrent deletion checklist
 
-Current focus: verify the review amendments, then merge O003 without activating D021.
+Current focus: complete; O003 shipped in PR #138 (`4a601dc2`) before D021 activation.
 
 ## Activation and reproduction
 
@@ -26,4 +26,4 @@ Current focus: verify the review amendments, then merge O003 without activating 
 - [x] Complete independent review; remove the stale CLI fixture re-export and record the separate D049 receipt-shell
   race.
 - [x] Re-run CLI integration collection (166 collected), focused tests (72 passed), and the final repository gate.
-- [ ] Merge O003 before activating D021.
+- [x] Merge O003 before activating D021 (PR #138, `4a601dc2`).

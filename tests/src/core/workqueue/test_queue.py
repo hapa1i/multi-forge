@@ -30,6 +30,32 @@ from forge.core.workqueue import (
 )
 
 
+def _write_newer_marker(marker_id: str) -> tuple[Path, bytes]:
+    queue_dir = pending_work_dir()
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    path = queue_dir / f"{marker_id}.json"
+    content = (
+        json.dumps(
+            {
+                "schema_version": MARKER_SCHEMA_VERSION + 1,
+                "kind": "future-kind",
+                "marker_id": marker_id,
+                "forge_version": "future",
+                "created_at": "2099-01-01T00:00:00Z",
+                "payload": {"future_payload_field": [1, 2, 3]},
+                "attempt_count": 0,
+                "last_attempt_at": None,
+                "last_error": None,
+                "future_envelope_field": {"must": "survive"},
+            },
+            indent=4,
+        )
+        + "\n"
+    ).encode()
+    path.write_bytes(content)
+    return path, content
+
+
 class TestPathHelpers:
     """Tests for path helper functions."""
 
@@ -388,6 +414,88 @@ class TestProcessPendingWork:
         assert not (pending_work_dir() / "failed" / unreadable.name).exists()
         handler.assert_called_once()
 
+    def test_newer_schema_markers_are_preserved_and_warn_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(workqueue_queue, "_warned_newer_schema", False)
+        first_future, first_bytes = _write_newer_marker("a-future")
+        second_future, second_bytes = _write_newer_marker("b-future")
+        current = enqueue(kind="current", marker_id="z-current", payload={})
+        assert current is not None
+        handler = MagicMock()
+
+        first = process_pending_work(handlers={"current": handler})
+
+        assert first.processed == 1
+        assert first.skipped == 2
+        assert first.failed == 0
+        assert first.errors == []
+        assert len(first.diagnostics) == 1
+        assert "written by newer Forge" in first.diagnostics[0]
+        assert "Upgrade Forge" in first.diagnostics[0]
+        assert first_future.read_bytes() == first_bytes
+        assert second_future.read_bytes() == second_bytes
+        assert not current.exists()
+        handler.assert_called_once()
+
+        second = process_pending_work(handlers={"current": handler})
+
+        assert second.processed == 0
+        assert second.skipped == 2
+        assert second.failed == 0
+        assert second.errors == []
+        assert second.diagnostics == []
+        assert first_future.read_bytes() == first_bytes
+        assert second_future.read_bytes() == second_bytes
+
+    def test_newer_schema_window_rotates_to_later_current_work(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(workqueue_queue, "_warned_newer_schema", False)
+        futures = [_write_newer_marker(f"a-future-{i}") for i in range(5)]
+        current = enqueue(kind="current", marker_id="z-current", payload={})
+        assert current is not None
+        handler = MagicMock()
+
+        first = process_pending_work(max_items=5, handlers={"current": handler})
+
+        assert first.processed == 0
+        assert first.skipped == 5
+        assert len(first.diagnostics) == 1
+        assert current.exists()
+        handler.assert_not_called()
+
+        second = process_pending_work(max_items=5, handlers={"current": handler})
+
+        assert second.processed == 1
+        assert second.skipped == 4
+        assert second.errors == []
+        assert not current.exists()
+        assert {path: path.read_bytes() for path, _ in futures} == dict(futures)
+        handler.assert_called_once()
+
+    def test_newer_schema_is_preserved_before_legacy_shape_cleanup(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(workqueue_queue, "_warned_newer_schema", False)
+        queue_dir = pending_work_dir()
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        marker = queue_dir / "old-looking-future.json"
+        marker.write_text(
+            json.dumps(
+                {
+                    "schema_version": MARKER_SCHEMA_VERSION + 1,
+                    "kind": "future-kind",
+                    "session_id": "legacy-looking",
+                    "work": [{"future": True}],
+                },
+                indent=4,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        original = marker.read_bytes()
+
+        result = process_pending_work(handlers={})
+
+        assert result.skipped == 1
+        assert result.errors == []
+        assert marker.read_bytes() == original
+
     def test_persistent_resident_windows_rotate_without_exceeding_processing_budget(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -626,7 +734,12 @@ class TestSchemaValidation:
         failed_dir = queue_dir / "failed"
         assert (failed_dir / "corrupted.json").is_file()
 
-    def test_rejects_invalid_schema_version(self) -> None:
+    @pytest.mark.parametrize(
+        "schema_version",
+        [MARKER_SCHEMA_VERSION - 1, str(MARKER_SCHEMA_VERSION + 1), float(MARKER_SCHEMA_VERSION + 1)],
+        ids=["older", "newer-string", "newer-float"],
+    )
+    def test_rejects_invalid_schema_version(self, schema_version: object) -> None:
         """process_pending_work rejects markers with invalid schema version."""
         queue_dir = pending_work_dir()
         queue_dir.mkdir(parents=True, exist_ok=True)
@@ -635,7 +748,7 @@ class TestSchemaValidation:
         invalid_marker.write_text(
             json.dumps(
                 {
-                    "schema_version": 999,
+                    "schema_version": schema_version,
                     "kind": "stop",
                     "marker_id": "test",
                 }
@@ -646,6 +759,7 @@ class TestSchemaValidation:
         assert result.processed == 0
         assert len(result.errors) == 1
         assert "unsupported schema_version" in result.errors[0]
+        assert json.loads(invalid_marker.read_text())["attempt_count"] == 1
 
     def test_writes_last_error_on_failure(self) -> None:
         """process_pending_work writes last_error to marker on failure."""

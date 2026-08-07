@@ -74,6 +74,46 @@ def _create_index_marker(workspace: ContainerLike, session_id: str = "compat-ind
     return marker_path
 
 
+def _create_newer_marker(workspace: ContainerLike, marker_id: str = "a-future") -> tuple[str, str]:
+    marker_path = f"$HOME/.forge/pending-work/{marker_id}.json"
+    marker_data = {
+        "schema_version": 2,
+        "kind": "future-kind",
+        "marker_id": marker_id,
+        "forge_version": "future",
+        "created_at": "2099-01-01T00:00:00Z",
+        "payload": {"future_payload_field": [1, 2, 3]},
+        "attempt_count": 0,
+        "last_attempt_at": None,
+        "last_error": None,
+        "future_envelope_field": "preserve",
+    }
+    content = json.dumps(marker_data, indent=4) + "\n"
+    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
+    workspace.write_file(marker_path, content)
+    return marker_path, content
+
+
+def _create_current_stop_marker(workspace: ContainerLike, marker_id: str = "z-current") -> str:
+    marker_path = f"$HOME/.forge/pending-work/{marker_id}.json"
+    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
+    workspace.write_json(
+        marker_path,
+        {
+            "schema_version": 1,
+            "kind": "stop",
+            "marker_id": marker_id,
+            "forge_version": "current",
+            "created_at": "2026-01-01T00:00:00Z",
+            "payload": {},
+            "attempt_count": 0,
+            "last_attempt_at": None,
+            "last_error": None,
+        },
+    )
+    return marker_path
+
+
 class TestStartupQueueProcessing:
     """Tests for CLI startup queue processing behavior."""
 
@@ -192,6 +232,25 @@ class TestStartupQueueRobustness:
         assert not mock_claude_workspace.file_exists(f"{forge_home}/pending-work/failed/a-unreadable.json")
 
         mock_claude_workspace.exec(f"rm -rf {forge_home}")
+
+    def test_newer_schema_marker_stays_unchanged_and_does_not_pollute_json_stdout(
+        self,
+        mock_claude_workspace: ContainerLike,
+    ) -> None:
+        newer, original = _create_newer_marker(mock_claude_workspace)
+        current = _create_current_stop_marker(mock_claude_workspace)
+
+        result = mock_claude_workspace.exec("forge model backend list --json")
+
+        assert result.returncode == 0, result.stderr
+        json.loads(result.stdout)
+        assert result.stderr.count("Warning:") == 1
+        assert "written by newer Forge" in result.stderr
+        assert "Upgrade Forge" in result.stderr
+        assert mock_claude_workspace.read_file(newer) == original
+        assert not mock_claude_workspace.file_exists(current)
+        failed = f"$HOME/.forge/pending-work/failed/{newer.rsplit('/', 1)[-1]}"
+        assert not mock_claude_workspace.file_exists(failed)
 
     def test_incompatible_index_marker_retries_without_failing_foreground(
         self,
