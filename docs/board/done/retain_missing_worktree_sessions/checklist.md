@@ -1,6 +1,6 @@
 # Retain missing-worktree sessions checklist
 
-Current focus: independently review and merge the verified D009 implementation before activating O003.
+Current focus: complete; D009 shipped in PR #137 (`cce6e8c6`) before O003 activation.
 
 ## Activation and reproduction
 
@@ -28,4 +28,4 @@ Current focus: independently review and merge the verified D009 implementation b
 - [x] Synchronize design, CLI reference, end-user session docs, member/epic cards, ledger, and change log.
 - [x] Verify the review amendment for `%session list` / `%session show` launchability parity (188 focused tests passed).
 - [x] Rerun final `make pre-commit` after the review amendment.
-- [ ] Complete independent review and merge D009 before activating O003.
+- [x] Complete independent review and merge D009 before activating O003 (PR #137, `cce6e8c6`).

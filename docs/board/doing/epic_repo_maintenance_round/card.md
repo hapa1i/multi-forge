@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-2 is closed, D011, O006, and D008 shipped in PRs #134--#136, and D009 is implementation-verified and pending independent
-review as the fourth Wave 3 session/durable-state member.
+2 is closed, D011, O006, D008, and D009 shipped in PRs #134--#137, and O003 is independently reviewed and awaiting merge
+as the fifth Wave 3 session/durable-state member.
 
 ## Goal
 
@@ -11,7 +11,7 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D048, for a current total of 150 ranked findings
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D049, for a current total of 151 ranked findings
 plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
@@ -65,8 +65,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 is coordinated by the active
 [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, D011, O006, and D008 shipped in PRs #134--#136, and D009 is implementation-verified from merged `main`
-at `8ebdb644` pending independent review.
+before admission, D011, O006, D008, and D009 shipped in PRs #134--#137, and O003 is independently reviewed from merged
+`main` at `cce6e8c6` and awaiting merge.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -80,8 +80,8 @@ at `8ebdb644` pending independent review.
 | 3    | D011            | [`preserve_unreadable_json_state_classification`](../../done/preserve_unreadable_json_state_classification/card.md) |
 | 3    | O006            | [`reject_non_object_manifest_confirmed`](../../done/reject_non_object_manifest_confirmed/card.md)                   |
 | 3    | D008            | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   |
-| 3    | D009            | [`retain_missing_worktree_sessions`](../retain_missing_worktree_sessions/card.md)                                   |
-| 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../todo/preserve_headless_codex_concurrent_delete/card.md)         |
+| 3    | D009            | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           |
+| 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../preserve_headless_codex_concurrent_delete/card.md)                 |
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../todo/preserve_newer_workqueue_markers/card.md)                           |
 | 3    | D022            | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               |
 | 3    | D010            | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               |

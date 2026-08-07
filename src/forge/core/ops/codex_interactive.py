@@ -53,6 +53,7 @@ from forge.core.ops.codex_session import (
     ContextDeliveryMode,
     _clear_stale_child_snapshot,
     _rollback_created_session,
+    _update_manifest_if_present,
     require_codex_thread_id,
     resolve_codex_session,
 )
@@ -74,15 +75,11 @@ from forge.session.codex_handoff import (
 )
 from forge.session.codex_invoke import invoke_codex_interactive
 from forge.session.config import LAUNCH_MODE_HOST
-from forge.session.exceptions import (
-    SessionFileNotFoundError,
-    SessionWorktreeMissingError,
-)
+from forge.session.exceptions import SessionWorktreeMissingError
 from forge.session.index import IndexStore
 from forge.session.launchability import require_session_worktree
 from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
 from forge.session.prev_sessions import child_notes_path, child_path
-from forge.session.store import MANIFEST_FILENAME, SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
 logger = logging.getLogger(__name__)
@@ -354,8 +351,8 @@ def start_interactive_codex_session(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-interactive-start"
 
-    _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name)
-    _sync_codex_thread_to_index(name, thread_id, str(child_forge_root))
+    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
+        _sync_codex_thread_to_index(name, thread_id, str(child_forge_root))
 
     if thread_id is None:
         warnings.append(
@@ -478,8 +475,8 @@ def reattach_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name)
-    _sync_codex_thread_to_index(name, effective_thread, session_forge_root)
+    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
+        _sync_codex_thread_to_index(name, effective_thread, session_forge_root)
 
     return CodexInteractiveResult(
         session=name,
@@ -533,50 +530,6 @@ def _discover_thread_post_exit(
             f"refusing to guess which one is this session's thread."
         )
     return None, None, None
-
-
-def _update_manifest_if_present(
-    store: SessionStore,
-    *,
-    mutate: Callable[[SessionState], None],
-    warnings: list[str],
-    session: str,
-) -> bool:
-    """Best-effort post-TUI manifest update without resurrecting deleted sessions."""
-    if not store.exists():
-        warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
-        return False
-    try:
-        store.update(timeout_s=5.0, mutate=mutate)
-    except SessionFileNotFoundError:
-        # A concurrent delete can land after exists() but before update() reads. The
-        # lock layer creates the session dir to hold forge.session.json.lock; remove
-        # that lock-only shell so delete remains delete.
-        _remove_lock_only_session_dir(store.session_dir)
-        warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
-        return False
-    return True
-
-
-def _remove_lock_only_session_dir(session_dir: Path) -> None:
-    lock_name = f"{MANIFEST_FILENAME}.lock"
-    try:
-        entries = list(session_dir.iterdir())
-    except FileNotFoundError:
-        return
-    except OSError:
-        logger.debug("Could not inspect deleted session directory %s", session_dir, exc_info=True)
-        return
-    if any(entry.name != lock_name or not entry.is_file() for entry in entries):
-        return
-    # Empty entries means another actor already unlinked the lock; the bare shell is
-    # still a partial resurrection, so it is removed the same way.
-    try:
-        for entry in entries:
-            entry.unlink()
-        session_dir.rmdir()
-    except OSError:
-        logger.debug("Could not remove lock-only deleted session directory %s", session_dir, exc_info=True)
 
 
 def _sync_codex_thread_to_index(name: str, thread_id: str | None, forge_root: str | None) -> None:

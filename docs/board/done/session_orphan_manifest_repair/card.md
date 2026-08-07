@@ -8,7 +8,7 @@ Phase 0 ratification. That card stops **new** orphans being created; this one ha
 > **Superseded subset (2026-08-06):** DG2 and D009 replace this card's missing-worktree report-only policy. A surviving
 > valid manifest is now a live degraded reservation, and `session repair --yes` may republish it without recreating or
 > claiming the checkout. The remaining classification, identity, collision, and transaction decisions below still apply.
-> See [`retain_missing_worktree_sessions`](../../doing/retain_missing_worktree_sessions/card.md).
+> See [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md).
 
 **References**: `session_create_crash_atomicity` card.md §"Design decisions owed" item 3 (the paragraph this card is
 seeded from) and its Phase 0 decisions block.

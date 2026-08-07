@@ -20,6 +20,7 @@ Claude, so ``direct + key:none`` would misread an authenticated Codex run.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -55,7 +56,10 @@ from forge.session.codex_handoff import (
     pending_context_path,
     read_receipt,
 )
-from forge.session.exceptions import SessionWorktreeMissingError
+from forge.session.exceptions import (
+    SessionFileNotFoundError,
+    SessionWorktreeMissingError,
+)
 from forge.session.index import IndexStore
 from forge.session.launchability import require_session_worktree
 from forge.session.models import (
@@ -65,6 +69,7 @@ from forge.session.models import (
     session_runtime,
 )
 from forge.session.prev_sessions import child_notes_path, child_path
+from forge.session.store import MANIFEST_FILENAME, SessionStore
 from forge.session.transfer import parse_transfer_context_strategy
 
 logger = logging.getLogger(__name__)
@@ -197,8 +202,9 @@ def start_codex_session(
     this path).
 
     A failed Codex *turn* keeps the session (its outcome is on ``result.codex``,
-    mirroring the bridge stance); an unexpected raise after creation rolls the
-    session and this run's snapshot back, then re-raises.
+    mirroring the bridge stance). Explicit deletion during the turn remains terminal
+    and returns the completed result with a warning; any other unexpected raise after
+    creation rolls the session and this run's snapshot back, then re-raises.
     """
     forge_root = ctx.forge_root
     if forge_root is None:
@@ -395,8 +401,8 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
-    store.update(timeout_s=5.0, mutate=_mutate)
-    _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
+        _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     if effective_thread_id is None:
         warnings.append(
@@ -534,8 +540,8 @@ def continue_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    store.update(timeout_s=5.0, mutate=_mutate)
-    _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
+    if _update_manifest_if_present(store, mutate=_mutate, warnings=warnings, session=name):
+        _sync_codex_thread_to_index(name, effective_thread_id, state.forge_root)
 
     return CodexSessionResumeResult(
         session=name,
@@ -571,6 +577,51 @@ def _clear_stale_child_snapshot(transfer_root: Path, parent: str, child: str, wa
     if notes.exists():
         notes.unlink()
     warnings.append(f"Replaced a stale transfer snapshot left by a previous run: {snapshot}")
+
+
+def _update_manifest_if_present(
+    store: SessionStore,
+    *,
+    mutate: Callable[[SessionState], None],
+    warnings: list[str],
+    session: str,
+) -> bool:
+    """Best-effort post-turn update without resurrecting a deleted session."""
+    if not store.exists():
+        warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
+        return False
+    try:
+        store.update(timeout_s=5.0, mutate=mutate)
+    except SessionFileNotFoundError:
+        # A concurrent delete can land after exists() but before update() reads. The
+        # lock layer creates the session dir to hold forge.session.json.lock; remove
+        # that lock-only shell so delete remains delete.
+        _remove_lock_only_session_dir(store.session_dir)
+        warnings.append(f"Session '{session}' was deleted while Codex was running; skipped post-exit manifest update.")
+        return False
+    return True
+
+
+def _remove_lock_only_session_dir(session_dir: Path) -> None:
+    """Remove only the empty or lock-only shell created by a raced update."""
+    lock_name = f"{MANIFEST_FILENAME}.lock"
+    try:
+        entries = list(session_dir.iterdir())
+    except FileNotFoundError:
+        return
+    except OSError:
+        logger.debug("Could not inspect deleted session directory %s", session_dir, exc_info=True)
+        return
+    if any(entry.name != lock_name or not entry.is_file() for entry in entries):
+        return
+    # Empty entries means another actor already unlinked the lock; the bare shell is
+    # still a partial resurrection, so it is removed the same way.
+    try:
+        for entry in entries:
+            entry.unlink()
+        session_dir.rmdir()
+    except OSError:
+        logger.debug("Could not remove lock-only deleted session directory %s", session_dir, exc_info=True)
 
 
 def _rollback_created_session(

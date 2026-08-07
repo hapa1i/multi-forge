@@ -1,11 +1,11 @@
-"""Shared fixtures for host-based real-``codex exec`` smoke tests (epic consumer_lanes T6b/T6c).
+"""Shared fixtures for host-based real-``codex exec`` integration tests.
 
 These smokes spawn the host ``codex`` binary on the ChatGPT (``codex_store``) **subscription**
 lane, so they need the host's real auth store restored past the autouse isolation fixtures and the
-live preflight seeded into the cache the dispatch arms read. Extracted here (rather than copied per
-file) because ``real_codex_home`` is correctness-critical: it suppresses ``CODEX_API_KEY`` so the
-subscription lane wins -- a drifted copy could silently assert ``subscription_quota`` while actually
-running on an API key.
+live preflight seeded into the cache when dispatch arms need it. The integration-root scope keeps
+``real_codex_home`` available to both session-consumer smokes and core Codex lifecycle tests. It is
+correctness-critical: it suppresses ``CODEX_API_KEY`` so the subscription lane wins -- a drifted copy
+could silently assert ``subscription_quota`` while actually running on an API key.
 """
 
 from __future__ import annotations
