@@ -16,6 +16,7 @@ import json
 
 import pytest
 
+from forge.core.workqueue import MARKER_SCHEMA_VERSION
 from tests.fixtures.docker import ContainerLike
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
@@ -77,7 +78,7 @@ def _create_index_marker(workspace: ContainerLike, session_id: str = "compat-ind
 def _create_newer_marker(workspace: ContainerLike, marker_id: str = "a-future") -> tuple[str, str]:
     marker_path = f"$HOME/.forge/pending-work/{marker_id}.json"
     marker_data = {
-        "schema_version": 2,
+        "schema_version": MARKER_SCHEMA_VERSION + 1,
         "kind": "future-kind",
         "marker_id": marker_id,
         "forge_version": "future",

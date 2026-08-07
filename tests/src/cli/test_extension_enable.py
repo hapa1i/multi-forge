@@ -1764,8 +1764,9 @@ def test_disable_all_runtime_aggregates_failure_and_processes_healthy_scope(
     )
 
     assert result.exit_code == 1, result.output
-    assert "Completed with 1 error(s)." in result.output
-    assert "injected batch removal fault" in result.output
+    output = " ".join(result.output.split())
+    assert "Completed with 1 error(s)." in output
+    assert "injected batch removal fault" in output
     assert tracking.get_installation("project", str(failed_root)) is not None
     assert tracking.get_installation("project", str(healthy_root)) is None
     assert targets["failed"].exists()
