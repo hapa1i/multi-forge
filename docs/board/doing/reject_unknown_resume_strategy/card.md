@@ -4,7 +4,8 @@
 
 **Finding**: D022 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- accepted Wave 3 implementation work after the HIGH-severity members.
+**Lane**: `doing/` -- implementation-verified on `fix/reject-unknown-resume-strategy` from merged `main` at `ecc79aa2`;
+pending independent review.
 
 ## Goal
 
@@ -26,6 +27,9 @@ Rechecked on `dc963a7c`: `SessionManager.resume_session(..., strategy="not-a-str
 failure, assembled structured context, created the child, and persisted `confirmed.derivation.strategy` as the original
 unknown string. Runtime behavior and durable provenance therefore disagreed.
 
+Execution rechecked on merged `main` at `ecc79aa2`. The marked D022 regression failed because the invalid strategy
+returned normally instead of raising before transfer artifacts and child state could be written.
+
 ## Expected Behavior
 
 - Transfer mode validates through the canonical parser before writing a context artifact, index row, or child manifest.
@@ -46,4 +50,23 @@ unknown string. Runtime behavior and durable provenance therefore disagreed.
 
 - This is an internal clean break for invalid input; no legacy durable value is migrated by this member.
 - Do not absorb CLI reattach flags (O022), rewind launch semantics, or full-strategy artifact selection.
+- Keep the adjacent fork-helper fallback and missing-context relaunch provenance mismatch separate as D050.
 - Preserve automatic child-name and snapshot ownership behavior for valid strategies.
+
+## Verification
+
+The marked D022 regression failed on `ecc79aa2` because the unknown strategy returned normally. The focused host slice
+passed (107), the focused Docker manager-resume class passed (3), the complete Docker resume integration file passed
+(9), and the regression suite passed (668). Final `make pre-commit` passed after Markdown normalization.
+
+## Implementation Outcome
+
+Transfer-mode `SessionManager.resume_session` now uses the existing canonical transfer-strategy parser before budget
+checks, context assembly, child-state construction, or durable writes. Unknown values and transfer-ineligible `rewind`
+raise the canonical error naming `minimal`, `structured`, `full`, and `ai-curated`; no context, notes, manifest, or
+index state is created.
+
+Successful transfer derivations persist the parsed strategy value that actually drove assembly. All four supported
+strategies, automatic child naming, and snapshot ownership remain intact, while native mode still writes null strategy
+provenance and no transfer context. Existing read-time compatibility for already-persisted legacy derivation values is
+unchanged; this member prevents new invalid writes rather than migrating old state.

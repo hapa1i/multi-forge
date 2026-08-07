@@ -982,6 +982,8 @@ unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
 | `full`       | Complete parent context (fails if exceeds proxy context limit) |
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
 
+Transfer accepts only these values before writes and persists the value used.
+
 **Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
 same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
 runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while

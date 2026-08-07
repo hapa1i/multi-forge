@@ -27,21 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-07
 
+### Reject unknown resume strategies
+
+**Goal**: Reject unsupported transfer strategies before writes.
+
+**Outcome**: `resume_session` now rejects unknown values and `rewind` and persists the parsed value; other paths are
+unchanged. D022 failed on `ecc79aa2`; then 107 focused host, 3 Docker manager, 9 Docker integration, 668 regression
+tests, and `make pre-commit` passed. Pending independent review.
+
 ### Preserve newer-schema workqueue markers
 
-**Goal**: Keep deferred work written by a newer Forge intact and reachable for a compatible future processor.
+**Goal**: Preserve newer-schema work while keeping later current-schema markers reachable.
 
-**Key changes**:
-
-- Classified strictly newer integer schemas as resident deferred work before ordinary validation, preserving exact
-  marker bytes without handler dispatch, retry metadata, or poison moves.
-- Added one actionable upgrade diagnostic per process and joined PR #139's bounded scan cursor so unsupported windows
-  cannot starve later current-schema work.
-
-**Verification**: The marked D021 regression failed on `de8adaac`; focused tests passed (82), Docker startup-queue
-integration passed (10), regressions passed (667), unit tests passed (8,804 with one pre-existing platform skip and 118
-deselected), and final `make pre-commit` passed after Markdown normalization. Implementation is pending independent
-review.
+**Outcome**: Newer integer schemas remain byte-exact without dispatch, retry, or poison; one diagnostic per process and
+the cursor preserve later work. D021 failed on `de8adaac`; then 82 focused, 10 Docker, 667 regression, and 8,804 unit
+tests plus `make pre-commit` passed. Shipped in PR #140 (`ecc79aa2`).
 
 ### Prevent bounded queue starvation and publish wheel dependency floors
 

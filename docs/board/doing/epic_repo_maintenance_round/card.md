@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` -- Wave
-2 is closed, the five HIGH Wave 3 members shipped in PRs #134--#138, and D021 is implementation-verified pending
-independent review as the first MEDIUM session/durable-state member.
+2 is closed, the five HIGH Wave 3 members shipped in PRs #134--#138, D021 shipped in PR #140, and D022 is
+implementation-verified pending independent review as the active MEDIUM session/durable-state member.
 
 ## Goal
 
@@ -11,7 +11,7 @@ unresolved design choices into implementation, or destabilizing the healthy inva
 
 The evidence source is [`review_combined.md`](../../review_combined.md), reviewed at commit
 `0a03786fc9b333e9890a64bf80436bb09d8606cf`. It began with 144 severity-ranked rows and three unranked design-drift
-notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D049, for a current total of 151 ranked findings
+notes; DG1 admitted U002/U003, and follow-up reviews admitted D045--D050, for a current total of 152 ranked findings
 plus unranked U001. The report remains the evidence ledger; this epic owns member coordination, sequencing, and final
 disposition.
 
@@ -65,8 +65,8 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 is coordinated by the active
 [`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, the five HIGH members shipped in PRs #134--#138, and D021 is implementation-verified from merged
-`main` at `de8adaac` pending independent review.
+before admission, the five HIGH members shipped in PRs #134--#138, and D021 shipped in PR #140. D022 is
+implementation-verified from merged `main` at `ecc79aa2` pending independent review.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -82,8 +82,8 @@ before admission, the five HIGH members shipped in PRs #134--#138, and D021 is i
 | 3    | D008            | [`enforce_launch_runtime_override_immutability`](../../done/enforce_launch_runtime_override_immutability/card.md)   |
 | 3    | D009            | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           |
 | 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         |
-| 3    | D021            | [`preserve_newer_workqueue_markers`](../preserve_newer_workqueue_markers/card.md)                                   |
-| 3    | D022            | [`reject_unknown_resume_strategy`](../../todo/reject_unknown_resume_strategy/card.md)                               |
+| 3    | D021            | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
+| 3    | D022            | [`reject_unknown_resume_strategy`](../reject_unknown_resume_strategy/card.md)                                       |
 | 3    | D010            | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
