@@ -1,6 +1,6 @@
 # Align the incognito worktree root guard checklist
 
-Current focus: complete final quality checks and independent review.
+Current focus: closed after PR #142 (`2461e3fa`).
 
 ## Activation and reproduction
 
@@ -30,4 +30,4 @@ Current focus: complete final quality checks and independent review.
 - [x] Run the complete regression suite (669 passed).
 - [x] Confirm the existing design contract and synchronize member/epic cards, review ledger, and change log.
 - [x] Run final `make pre-commit`.
-- [ ] Complete independent review and merge D010 before closing Wave 3.
+- [x] Complete independent review and merge D010 before closing Wave 3 (PR #142, `2461e3fa`).

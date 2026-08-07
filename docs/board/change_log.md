@@ -27,13 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-07
 
+### Close session/state safety and sequence installer transactions
+
+**Goal/outcome**: Close the eight-member Wave 3 boundary and admit Wave 4 as three parked installer transaction fixes.
+
+**Key changes**:
+
+- Closed D010 and the session/durable-state epic after PR #142, then repointed their parent and review-ledger links.
+- Reproduced D012--D014 and D019 on merged `main`, corrected D012's stale tracked-baseline claim, and sequenced Codex
+  rollback, settings-baseline ownership, and legacy value-aware removal without activating implementation.
+
+**Verification**: Four disposable broken-behavior characterizations and a separate two-run D012 characterization passed;
+both temporary modules were removed. The Markdown hooks, a 236-file relative-link scan, and stale-lane and diff checks
+passed; after compaction, the log measured approximately 19.3k tokens and 1,278 physical lines, below both size guides.
+
 ### Align the incognito worktree root guard
 
 **Goal/outcome**: Apply the main-checkout guard to `session incognito --worktree` before launch while retaining the
 repository-root guard for ordinary incognito.
 
 **Verification**: D010 failed on `d2ed2349` with exit 0; then 12 focused, 23 Docker lifecycle, and 669 regression tests
-plus `make pre-commit` passed. Pending independent review.
+plus `make pre-commit` passed. Shipped in PR #142 (`2461e3fa`).
 
 ### Reject unknown resume strategies
 
@@ -1082,793 +1096,76 @@ effects; isolated walkthrough migration exercise; `make pre-commit`.
 `make pre-commit`; PR #94 GitHub checks (test, pre-commit, CodeQL analyses); `make pre-commit-md`; post-merge board
 link/stale-reference scan.
 
-## 2026-07-08
-
-### user_scope_hook_ownership closeout
-
-**Goal**: Close T5 after PR #93 merged and hand the epic cursor to the remaining runtime-hook migration work.
-
-**Key changes**:
-
-- Moved `user_scope_hook_ownership` from `doing/` to `done/` with its checklist preserved as the execution record.
-- Repointed the member back-link, epic forward-links, and the matcher-consolidation inbound link to the done card.
-- Updated the epic focus to show T5 shipped and hand the next cursor to **T10** sidecar resolution and **T6** migration
-  cleanup, with **T8** still parked.
-
-**Verification**: `./scripts/test-integration.sh tests/integration/docker/test_installer.py` (`15 passed`);
-`make pre-commit-md`; `git diff --check`.
-
-### user_scope_hook_ownership implementation
-
-**Goal**: Flip runtime hook ownership to user scope while preserving cleanup paths for legacy project/local installs.
-
-**Key changes**:
-
-- Scoped the extension module policy so user installs own `hooks`/`codex-hooks` and omit `status-line`, while
-  project/local installs keep project settings such as `statusLine` and reject explicit runtime-hook module requests.
-- Registered Claude and Codex runtime hooks through the T4 dispatcher command bytes, extended detection to accept both
-  `forge-hook <handler>` and legacy `forge hook <handler>`, and added double-fire diagnostics.
-- Tightened diagnostics so `~/.claude` is not misreported as a project install even when doctor runs from `$HOME`,
-  same-file old+new hook siblings still report double-fire risk, distinct `PreToolUse` matchers do not, and Codex legacy
-  hook registrations dedupe by logical `(event, handler)` identity.
-- Preserved filtered-update cleanup tracking for pre-T5 project/local hook entries, while user-scope sync removes the
-  old command bytes before adding dispatcher entries. Dispatcher rendering now happens before hook settings are written.
-- Updated Day-1 CLI guidance, end-user docs, QA/walkthrough checks, and the interim sidecar warning path.
-
-**Verification**: `make test-unit` (`7511 passed, 1 skipped, 116 deselected`); targeted hook/Codex/installer regression
-suites including `tests/regression/test_bug_codex_dedupe_wrong_event.py`; `make pre-commit`;
-`./scripts/test-integration.sh tests/integration/docker/test_installer.py::TestCodexHooksModule::test_enable_registers_block_and_disable_removes_it`
-(`1 passed`).
-
-### forge_hook_dispatcher closeout
-
-**Goal**: Close T4 after its PR merged and hand the epic cursor back to the remaining user-scope hook migration work.
-
-**Key changes**:
-
-- Moved `forge_hook_dispatcher` from `doing/` to `done/` with its checklist preserved as the execution record.
-- Repointed the member back-link and epic forward-links to the done card, and updated the epic focus to show no active
-  member in `doing/`.
-- Reframed the remaining detection risk as T5-owned now that T4 chose the hyphenated `forge-hook` shim.
-
-**Verification**: stale-reference scan for `doing/forge_hook_dispatcher` and pre-merge T4 status language;
-`git diff --check -- docs/board`; `make pre-commit-md`.
-
-### forge_hook_dispatcher implementation and review hardening
-
-**Goal**: Ship the T4 user-scope hook dispatcher mechanism without flipping hook registration to user scope.
-
-**Key changes**:
-
-- Added the generated stdlib `~/.forge/bin/forge-hook` artifact, `~/.forge/runtime.json` launcher metadata,
-  known-location resolver fallback, runtime-agnostic `exec` forwarding, sync re-rendering, and doctor drift reporting.
-- Chose the shim shape from the populated-registry benchmark: p95 22.13 ms for the shim versus p95 611.78 ms for the
-  full Forge gate representative.
-- Hardened review findings: gate exceptions fail open, registry unknown top-level fields now match package fail-open
-  behavior, resolver bin-dir precedence is single-sourced, the in-suite perf assertion no longer has a tight wall-clock
-  bound, and dispatcher render failures are wrapped as install errors.
-- Synced the epic/member docs and promoted durable dispatcher invariants to `impl_notes.md`; T5 still owns user-scope
-  registration bytes and hook-detection updates.
-
-**Verification**: `uv run pytest tests/src/install/test_hook_dispatcher.py -q` (`25 passed`);
-`uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py -q` (`39 passed`);
-`uv run pytest tests/src/install/test_hook_dispatcher.py tests/src/install/test_doctor.py tests/src/cli/test_extension_enable.py tests/src/cli/test_env_vocabulary.py -q`
-(`100 passed`); `uv run pytest tests/src/install -q` (`364 passed, 1 skipped`); `make pre-commit`;
-`./scripts/test-integration.sh tests/integration/docker/test_installer.py` (`15 passed`).
-
-## 2026-07-07
-
-### env_var_interface_boundary closeout
-
-**Goal**: Close the shipped env-var vocabulary boundary after PR #91 landed on `main`.
-
-**Key changes**:
-
-- Closed PR #91 (`c593eb66`) on `main`: card/checklist are in `done/`, durable notes are promoted, and the epic
-  coordinator points at the done card.
-- Added the `FORGE_*` vocabulary table in `design_appendix.md` with a `design.md` pointer: public (`FORGE_HOME`,
-  `FORGE_PROFILE`), public-diagnostic (`FORGE_DEBUG`, `FORGE_STATUS_TRUNCATE`), internal wiring, and Test/QA harness
-  classes.
-- Rewrote normal-flow CLI errors/help/docstrings and user docs to say "current session", "Forge-managed session", and
-  `--session <name>` instead of teaching users to set internal session env vars.
-- Added paired diagnostic markers for troubleshooting sections that legitimately name hook/session env wiring; no
-  whole-file docs exemption.
-- Added `tests/src/cli/test_env_vocabulary.py`, a two-layer guard over CLI/op user-visible sinks and user-facing docs,
-  with live product-env inventory coverage, boundary-matched names, and parity against the appendix table.
-
-**Verification**: `rg "Set FORGE_SESSION|set \\$FORGE_SESSION" src/ docs/end-user docs/cli_reference.md` clean;
-`uv run pytest tests/src/cli/test_env_vocabulary.py tests/src/cli/test_memory.py tests/src/cli/test_session_memory.py tests/src/cli/test_session_lane.py tests/src/cli/test_output.py tests/src/core/ops/test_session_context.py -q`
-(`169 passed`); `make pre-commit` clean. Integration not run because the change is docs, strings, and a source-scan test
-only with no runtime behavior change. Post-merge closeout re-checked `main` at `c593eb66`, the done-lane card/checklist,
-the epic inbound link, and `make pre-commit-md`.
-
-### forge_project_registry / forge_project_compat closeout
-
-**Goal**: Close the merged project-registry work and the first project-compat guardrail slice after PR #90 landed on
-`main`.
-
-**Key changes**:
-
-- Moved T3 `forge_project_registry` to `done/`: `~/.forge/projects.json` is now the machine-written trusted-root
-  registry, with locked read-modify-write enrollment, strict CLI reads, fail-open hook reads, doctor surfacing, and
-  managed-worktree auto-enrollment.
-- Moved T7 `forge_project_compat` to `done/` for the shipped first slice: `.forge/project.toml` is an opt-in,
-  hand-edited compatibility pin; extension/session command paths enforce it, and doctor reports malformed or
-  incompatible state.
-- Split T7's uncovered mutation families into accepted follow-up `todo/forge_project_compat_mutator_sweep/`:
-  confirmed-state hook writes, memory-writer doc writes, and proxy/backend registry mutations.
-- Promoted durable registry/compat invariants to `impl_notes.md`; epic links now point at the done cards.
-
-**Verification**: PR #90 verification included the targeted install/doctor/extension/guard/session/hook suite
-(`355 passed, 1 skipped`), focused follow-up suite (`38 passed, 1 skipped`), named Docker integration checks
-(`3 passed, 33 deselected`), `make pre-commit`, and `uv run --frozen pyright`. Closeout docs verified with
-`make pre-commit-md`.
-
-## 2026-07-06
-
-### global_forge_install closeout
-
-**Goal**: Close the shipped T1 member after PR #89 merged to `main`.
-
-**Key changes**:
-
-- Moved the card `doing/ -> done/`; repointed the 5 cross-lane links (T1 \<-> epic).
-- Promoted the install-kind detection invariants to `impl_notes.md` (editable-first, launcher-symlink-not-realpath,
-  `on_path_minimal` as a reported fact, kind-vs-path seam).
-- Updated the epic coordinator: T1 shipped, no active member, D2 timing decision now actionable (awaiting the epic
-  owner); epic stays in `doing/` with 8 members remaining.
-
-**Verification**: `make pre-commit` clean.
-
-### global_forge_install (epic T1): Global-tool Day-1 install + `forge extension doctor`
-
-**Goal**: Make global-tool install the documented Day-1 path and add a read-only `forge extension doctor` reporting how
-Forge is installed and whether it is globally reachable -- the epic's first, dependency-free member.
-
-**Key changes**:
-
-- New `src/forge/install/doctor.py` (`diagnose_install`, injectable seams): classifies the install as
-  `global`/`editable`/`venv`/`unknown` (global honors `~/.local/bin`, `UV_TOOL_BIN_DIR`, `XDG_BIN_HOME`,
-  `PIPX_BIN_DIR`), resolves the `forge` launcher path, and reports PATH reachability. Adds a GUI/launchd minimal-PATH
-  probe (`on_path_minimal`) -- the mechanical signal for epic D2 (a healthy global install still reads `false`, since
-  `~/.local/bin` is off launchd's PATH; advice is keyed on `on_path`/kind, not the probe). Advice is state-aware: an
-  installed-but-off-PATH global install is told to fix PATH (`uv tool update-shell` / `pipx ensurepath`), not to
-  reinstall.
-- New `forge extension doctor` leaf (thin CLI over `doctor.py`; `--json` for scripting, `print_tip` advice).
-- Day-1 docs: README Quick Start leads with `uv tool install` / `pipx install` (dev sub-note -> `uv sync`); uninstall ->
-  tool form; end-user README gains an "Install Forge (once)" prerequisite (the workflow previously assumed `forge` was
-  already on PATH).
-- Design sync: cli_reference Installation table, design.md §5.1 (two install layers), design_appendix §C (tool
-  distribution, kinds, probe semantics, `--json` shape).
-
-**Verification**: `tests/src/install/test_doctor.py` (14 new tests) covers all kinds + both probe outcomes +
-off-PATH-global advice + CLI JSON shape; `tests/src/{install,cli} -m "not integration"` -> 2586 passed;
-`make pre-commit` clean; live `forge extension doctor` on the editable dev install reported `editable` + real path +
-`on_path_minimal=false`. Installer Docker integration skipped with rationale (read-only diagnostic, no write-path
-change).
-
-### forge_hook_legacy_writer: Remove the standalone hook writer
-
-**Goal**: End the second, untracked Claude hook mutation path before `epic_global_forge_runtime` changes hook command
-bytes and ownership.
-
-**Key changes**:
-
-- Deleted the standalone `forge hook enable` / `forge hook disable` writer and its duplicate `FORGE_HOOK_CONFIG`
-  registry; hook registration now goes through the tracked extension installer.
-- Module-gated settings merges so the public replacement
-  `forge extension enable --scope local --profile minimal --with hooks --without commands` writes tracked hooks only,
-  without commands, agents, skills, permissions, or env.
-- Migrated docs, QA checklists, Docker integration setup, and removed-command assertions to the tracked replacement.
-  Clean break: the old `--user` local-file target (`~/.claude/settings.local.json`) was dropped; tracked user scope uses
-  `~/.claude/settings.json`.
-
-**Verification**:
-`uv run pytest tests/src/install/test_settings_merge.py::TestMerge tests/src/install/test_installer.py::TestInstallerInit tests/src/cli/test_extension_enable.py::TestEnableWithPath tests/src/cli/test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks tests/src/cli/test_hooks.py tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_read_hygiene.py::TestReadHygieneRegistration tests/src/policy/team/test_handlers.py::TestHookInstallConfig tests/src/install/test_version.py tests/regression/test_bug_stale_preset_hooks.py -q`;
-`make test-unit`; `./scripts/test-integration.sh tests/integration/docker/test_installer.py`;
-`./scripts/test-integration.sh tests/integration/docker/test_real_claude_hooks.py::TestRealClaudeHooks::test_session_start_hook_sets_session_id`;
-grep sweep for removed command/import symbols; `make pre-commit`.
-
-### forge_hook_matcher_consolidation: Shared hook predicate and byte contract
-
-**Goal**: De-risk `epic_global_forge_runtime` Seam 1 by single-sourcing Forge hook-command detection and pinning the
-registered command bytes before the epic changes them.
-
-**Key changes**:
-
-- Added `install/hooks.py::is_forge_hook_command` / `entry_is_forge_hook` with invocation-token semantics: command
-  basename `forge`, second token `hook`, optional handler token; contains-only strings like `echo forge hook stop` no
-  longer satisfy presence checks or destructive disable removal.
-- Repointed both existing matcher sites through the shared predicate; `forge hook disable` keeps its `type == "command"`
-  guard while dropping the bespoke prefix body.
-- Added a contract golden for the 16 rendered Claude hook entries as `(event, matcher, command, timeout)` tuples, plus
-  statusLine, Codex hook registrations, and a `merge_hooks -> unmerge` sibling-preservation round-trip.
-- Promoted the durable matcher/golden invariant to `docs/board/impl_notes.md`; no design or end-user doc change was
-  needed because matcher internals are not documented.
-
-**Verification**:
-`uv run pytest tests/src/install/test_hooks.py tests/src/install/test_registered_commands_contract.py tests/src/cli/test_hooks.py tests/regression/test_bug_hook_registry_drift.py -q`;
-`make test-unit`; `./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py`; scoped
-`uv run pre-commit run --files ...` over this card's changed files.
-
-### proxy_tier_resolvers closeout
-
-**Goal**: Close the shipped proxy tier/model-resolution card after PR #86 merged to `main`.
-
-**Key changes**:
-
-- Promoted the durable resolver invariants to `docs/board/impl_notes.md`.
-- Marked the final checklist closeout items and moved the card from `doing/` to `done/`.
-
-**Verification**: `make pre-commit-md`.
-
-### proxy_tier_resolvers B2: Shared proxy resolution and port probe
-
-**Goal**: Collapse the duplicated proxy model-resolution and port-probing paths without changing routing, cost, or
-startup contracts.
-
-**Key changes**:
-
-- Added characterization coverage for `/v1/messages` and `/v1/messages/count_tokens` before refactoring, including
-  explicit-backend, OpenRouter slash-passthrough, tier-alternative, and ambiguous-default cases.
-- Repointed message creation and token counting through one server resolver for
-  tier/default/alternative/explicit-backend decisions, with cost logging still receiving the same resolved model and
-  tier.
-- Added `LITELLM_PROVIDER_PREFIXES` for LiteLLM detector sites while intentionally leaving `data_models._normalize` on
-  its narrower canonical-prefix contract; the code comment now marks that as a deliberate non-unification.
-- Added `forge.proxy.ports` as the shared loopback probe and kept caller-specific exception contracts for the server CLI
-  and proxy orchestrator.
-- Added real proxy `/v1/messages/count_tokens` integration smoke coverage for default-tier and explicit-tier requests;
-  resolved-model parity stays unit-pinned because that endpoint emits no resolved-model/tier headers.
-
-**Verification**:
-`uv run pytest tests/src/proxy/test_server_model_resolution.py tests/src/proxy/test_model_alternatives.py tests/src/proxy/test_routing_invariants.py tests/src/proxy/test_data_models.py tests/src/proxy/test_ports.py tests/src/proxy/test_proxy_orchestrator.py tests/src/proxy/test_server_cost.py -q`;
-`./scripts/test-integration.sh tests/integration/proxy/test_proxy_local_litellm_e2e.py tests/integration/proxy/test_session_routing_e2e.py`;
-`./scripts/test-integration.sh tests/integration/proxy/test_multi_proxy_workflow_e2e.py`;
-`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py`; `make pre-commit`.
-
-### proxy_tier_resolvers B1: Tier-word resolver leaf
-
-**Goal**: Single-source proxy/statusline tier-word detection while preserving the deliberate display-name fallback
-divergence.
-
-**Key changes**:
-
-- Added `forge.core.tiers.detect_tier_word` for raw model-name tier detection, including the `fable -> opus` rule and
-  the existing naive substring behavior.
-- Repointed the three 1:1 mirror sites: proxy request validation, passthrough/server tier detection, and statusline
-  explicit-model tier detection.
-- Preserved `get_tier_from_display_name` unchanged: display names still check opus/fable first and default to `sonnet`
-  when no tier word is visible.
-- Updated the active card checklist and design directory map for the new neutral leaf.
-
-**Verification**:
-`uv run pytest tests/src/core/test_tiers.py tests/src/proxy/test_data_models.py tests/src/cli/statusline/test_statusline_forge_segments.py -q`;
-`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py`; touched-file `uv run ruff check`;
-`make pre-commit`.
-
-### test_mirror_and_contract_cleanup implementation: Test mirror and shared contract cleanup
-
-**Goal**: Restore test mirrors and collapse duplicated support seams.
-
-**Key changes**:
-
-- Fixed a status_line miscount (the one behavior change): `human`/`ai` transcript role aliases now normalize through the
-  shared `resolve_entry_role` primitive; regression-guarded by `test_bug_statusline_transcript_role_alias.py`.
-- Moved statusline, Claude session, and direct-model tests into mirrored packages.
-- Deleted the sidecar secrets shim; folded remaining coverage into core auth.
-- Shared Codex result/proxy setup, transcript parsing, git-root walking, workflow tips, and direct-model pins.
-
-**Verification**: Focused slice sweep (1045 passed); affected formatter rerun (288 passed); touched-file
-`uv run ruff check`; `make pre-commit`.
-
-### ops_policy_seam implementation: Policy command-core seam
-
-**Goal**: Move shared policy-supervisor mutations behind a UI-agnostic op layer and close the drifted proxy-id recovery
-posture.
-
-**Key changes**:
-
-- Added `core/ops/policy.py` for supervisor set/off/on/remove/reload/cascade and repointed both terminal CLI and
-  `%policy supervisor` to it while preserving CLI output and hook JSON contracts.
-- Collapsed session routing override/effective-proxy helpers into `core/ops/claude_session.py` with CLI compatibility
-  aliases.
-- Added logged best-effort proxy base-url recovery wrappers in `proxy/proxies.py`; kept `find_by_base_url()` fail-loud.
-- Aligned `%policy supervisor reload <absolute-path>` with CLI reload path semantics: absolute paths are stored as
-  provided, while relative paths still resolve from cwd.
-- Matched `list_sessions_older_than(ctx, scope)` to its sibling contract and added public
-  `ActiveSessionStore.is_live()`.
-
-**Verification**: Focused suites covering policy ops/supervisor, `%direct`, session/gc contracts, proxy recovery,
-session-start hook, and policy-shadow coupling (392 passed, 48 passed, 90 passed); integration
-`./scripts/test-integration.sh tests/integration/cli/test_hooks_integration.py -k TestSessionStartHook` (7 passed, 9
-deselected); touched-file `uv run ruff check`; `make pre-commit`.
-
-### diverged_twin_consolidation implementation: Session and hook twin consolidation
-
-**Goal**: Collapse must-stay-identical twins in session inheritance, runtime/lane helpers, supervisor options, TDD sort,
-and hook capture paths while fixing the two verified drift bugs.
-
-**Key changes**:
-
-- Added one session intent inheritance helper and routed native-resume transcript artifact lookup through the guarded
-  helper, closing the malformed `copied_path` type leak.
-- Moved `session_runtime` to `session.models`, promoted `record_to_lane`, and shared the TDD tests-first sort key from
-  `policy.deterministic.base`.
-- Shared the start/fork supervisor option family and dependency error text while keeping their distinct `--supervise`
-  command shapes.
-- Extracted the Stop/StopFailure transcript capture core and the teammate/task team-supervisor hook body without folding
-  their intentionally different failure channels.
-- Verified-and-dropped 3c and 4b: codex preflight arms diverge immediately after the already-shared read, and
-  template-only context routing is not reachable through the production inline CLI resolver paths.
-
-**Verification**: Focused slice suite
-`uv run pytest tests/regression/test_bug_transcript_artifact_type_guard.py tests/regression/test_bug_consumer_lane_fork_resume_inherit.py tests/regression/test_bug_policy_check_nested_tdd_sort.py tests/regression/test_bug_codex_tdd_nested_layout.py tests/src/cli/test_user_prompt_dispatcher.py::TestGuardCheck tests/src/session/test_consumer_lanes.py tests/src/session/test_shadow_curation.py tests/src/session/test_memory_writer.py tests/src/core/ops/test_codex_session.py tests/src/cli/test_session_codex.py tests/src/cli/test_session_list_show.py tests/src/cli/test_session_start_delete.py tests/src/cli/test_session_fork.py tests/regression/test_characterize_context_limit_routing_ref_template_only.py tests/src/cli/test_artifact_hooks.py tests/src/cli/hooks/test_team_hook_lane_freeze.py tests/src/cli/test_stop_verification.py tests/regression/test_bug_walkthrough_stale_stop_snapshot.py tests/regression/test_bug_supervisor_fork_uuid_drift.py`
-(510 passed); hook integration
-`./scripts/test-integration.sh tests/integration/cli/test_artifact_hooks_integration.py tests/integration/cli/test_stop_verification_integration.py tests/integration/docker/test_policy_hooks.py`
-(42 passed); `make test-unit` (7,379 passed, 116 deselected); touched-file `uv run ruff check`.
-
-## 2026-07-05
-
-### state_primitive_hoist implementation: Core durable-state primitive hoist
-
-**Goal**: Hoist durable-state and JSONL primitives to core leaves without merging telemetry planes or changing store
-schemas.
-
-**Key changes**:
-
-- Moved `prune_jsonl_shards` to `core/state/retention.py`, repointed live callers, and deleted the dead
-  `prune_usage_events` export.
-- Added `atomic_write_bytes`, layered `atomic_write_text` on it, and repointed four text writers plus binary transcript
-  relocation through the shared durable writer.
-- Added shared telemetry JSONL append mechanics in `core/telemetry/jsonl_io.py`.
-- Added a versioned JSON read helper and converged search read `OSError` handling to domain-specific
-  `StateUnreadableError` subclasses.
-- Review follow-up removed the unused `proxy/retention.py` shim and installer `now_iso` re-export, kept `version: null`
-  diagnostics aligned with pre-hoist readers, and made search `--scope all` skip unreadable project indexes while
-  `search status` reports corrupt indexes with rebuild guidance.
-
-**Verification**: Focused card suite
-`uv run pytest tests/src/core/state/test_timestamps.py tests/src/core/state/test_io.py tests/src/core/state/test_retention.py tests/src/core/telemetry/test_jsonl_io.py tests/regression/test_bug_state_atomic_write_fsync.py tests/regression/test_bug_search_store_oserror_unreadable.py tests/src/backend/test_registry.py tests/src/proxy/test_proxies.py tests/src/session/test_index.py tests/src/install/test_tracking.py tests/src/search/test_store.py tests/src/search/test_content_store.py tests/src/search/test_bm25_store.py tests/src/search/test_index_state.py tests/src/cli/test_search.py`;
-review follow-up suite
-`uv run pytest tests/src/core/state/test_versioned_store.py tests/src/cli/test_search.py tests/src/install/test_models.py tests/src/install/test_tracking.py tests/src/backend/test_registry.py tests/src/proxy/test_proxies.py tests/src/session/test_index.py tests/src/search/test_store.py tests/src/search/test_content_store.py tests/src/search/test_bm25_store.py tests/src/search/test_index_state.py tests/regression/test_bug_search_store_oserror_unreadable.py`;
-`make test-unit`; targeted integration
-`./scripts/test-integration.sh tests/integration/cli/test_search_workflow_integration.py tests/integration/cli/test_proxy_commands_integration.py::TestProxySet tests/integration/backend/test_backend_cli.py::TestBackendRegistry`;
-`make pre-commit`.
-
-### test-session-command-fixture-and-split closeout: Session CLI test split
-
-**Goal**: Close the session CLI test refactor after PR #77 split the 4,933-line catch-all file without changing command
-behavior.
-
-**Key changes**:
-
-- Moved `test-session-command-fixture-and-split` from `doing/` to `done/` and marked the card/checklist closeout items
-  complete.
-- Confirmed PR #77 (`08e4a787`) deleted `tests/src/cli/test_session_commands.py`, added command-family files for
-  list/show, start/delete, fork, resume, and overrides, and introduced the narrow `successful_claude_launch` helper in
-  `tests/src/cli/session_command_support.py`.
-- No durable `impl_notes.md` promotion was needed; the shipped behavior is test organization only.
-
-**Verification**: PR #77 recorded `uv run pytest tests/src/cli/test_session_*.py -q`, `make pre-commit-md`,
-`git diff --check`, and `make pre-commit`; closeout re-verified the merged file layout on `main` and ran
-`make pre-commit-md` plus `git diff --check`.
-
-### rewind_resume_strategy follow-up: Real-Claude clean-prefix gate
-
-**Goal**: Close the disclosed rewind gap by proving a fresh-UUID truncated prefix is resumable by real Claude Code, not
-only unit-covered.
-
-**Key changes**:
-
-- Added `tests/integration/docker/test_rewind_native_contract.py`, a slow Docker real-Claude gate that creates a parent
-  conversation, writes a rewind-owned fresh `<R>.jsonl` prefix with `write_rewind_transcript_prefix`, resumes it with
-  `claude --resume <R> --fork-session` from another CWD, and asserts the prefix is not mutated.
-- Extended the shared real-Claude Docker helper with `rewind_prefix_and_resume`.
-- Updated design and board memory to replace the old disclosed clean-prefix caveat with the new integration-test anchor.
-
-**Verification**: `uv run pytest tests/src/session/test_rewind_strategy.py tests/src/cli/test_session_rewind_cli.py -q`;
-`uv run ruff check tests/integration/docker/conftest.py tests/integration/docker/test_rewind_native_contract.py`;
-`./scripts/test-integration.sh tests/integration/docker/test_rewind_native_contract.py -v`; `git diff --check`.
-
-## 2026-07-04
-
-### accidental_complexity_cleanup Phase C: finishing phase (Defect B, #17, Gap A, WorkflowPolicy demote, dedups)
-
-**Goal**: Close the accidental-complexity cleanup -- fix the one real bug, drop the last dead code, and resolve the owed
-decisions (WorkflowPolicy scope + two dedups).
-
-**Key changes**:
-
-- **Defect B (proxy provider-trace hole)**: the auth-retry success path (401 -> refresh -> 200) recorded cost/metrics
-  but never wrote a provider-trace record. Routed all three proxy trace sites through one shared `_trace_ctx` dict
-  spread (no-behavior refactor) and added the retry call, so a new provider path can't silently omit the run-tree
-  context.
-- **Gap A (supervisor exit code)**: `supervisor evaluate` keyed "passed" on warning-prose matching, so fail-open paths
-  without an `_INFRA_FAILURE_PREFIXES` prefix reported exit 0 instead of 2. Now honors the structural
-  `PolicyDecision.fail_open` flag (prose match kept as fallback).
-- **#17**: deleted unused `CredentialManager.get_cache_status`/`clear_cache`.
-- **WorkflowPolicy DEMOTE**: deleted the test-only `get_all_bundles()` (the only place `workflow` was advertised as a
-  discoverable bundle); relabeled `policy.md` experimental/manifest-only. Pipeline + `build_divergence_config` kept;
-  `proposed/graduate_workflow_policy_cli` filed for the real CLI UX.
-- **Micro-cleanups**: (a) `design_appendix §B.1` marker schema `v2 -> v1` to match `MARKER_SCHEMA_VERSION = 1`; (b)
-  single-sourced `Reporter`/`Confidence` in a new neutral leaf `core/telemetry/vocabulary.py`. The card's assumed
-  "vocabulary owns" direction cycles via `usage/__init__ -> emit -> downstream`; the leaf sits below `downstream` and
-  both planes re-export.
-
-**Verification**: Regression `test_bug_auth_retry_provider_trace.py` (real helper + `read_provider_traces` round-trip,
-capable + non-capable, fail-first proven). Focused suites green (proxy/telemetry/usage/policy/credentials); user ran the
-full integration suite green. mypy/pyright/ruff clean. `server.py` held under the personal 2,500-line guardrail via the
-trace DRY; a durable `server.py` module extraction is deferred (logged in the checklist).
-
-### backend_instance_identity_model S1-S6: Backend Instance Identity Clean Break
-
-**Goal**: Separate backend instances, managed processes, and telemetry origin fields.
-
-**Key changes**:
-
-- `proxy.backend` is canonical; old `proxy.source` clean-breaks. Recreate affected proxies with
-  `forge proxy create ...`.
-- Backend CLI JSON now uses `backend_instance_id` / `managed_process`. Backend registry `~/.forge/backends/index.json`
-  is schema v2; for old records, stop local backends first (or free ports), delete the file, then restart.
-- Downstream telemetry is schema v2: `backend_id` means backend instance id, `source_id`/`source_kind` stay origin
-  fields, and missing/older schemas are skipped with activity/cost `skipped_legacy_schema` counts.
-
-**Verification**: S1-S5 focused tests and `make test-unit` passed; S6 docs verified with `make pre-commit-md`.
-
-## 2026-07-03
-
-### cli_style_ux_compliance S5/C2: Backend Public Terminology
-
-**Goal**: Make `forge model backend` use first-class CLI nouns without changing backend storage or JSON contracts.
-
-**Key changes**:
-
-- Reworded backend help, metavars, human tables, errors/tips, and public docs to backend/backend-instance/adapter
-  language while keeping `source_id`, `runtime_instance`, `BackendInstance.backend_id`, and telemetry `backend_id`
-  stable. Deeper domain migration is split to `backend_instance_identity_model`.
-
-**Verification**: backend + command-tree tests passed (51); help/list smoke checked; `make pre-commit` clean.
-
-### cli_style_ux_compliance S3/A3: policy enable Fail-Loud
-
-**Goal**: Replace bare `forge policy enable`'s silent no-op (warning on stdout, exit 0) with a loud, actionable failure.
-
-**Key changes**:
-
-- Bare `policy enable` (no `--bundle`) now prints `Error:` + `Tip:` (naming `tdd`/`coding_standards`) on stderr and
-  exits 1; stdout stays empty for scripts.
-- OQ-1 resolved as a clean break: the CLI requires an explicit `--bundle`. Restore-from-intent stays the interactive
-  `%policy enable` shortcut's job (a separate parser writing `overrides`, still planned); `design_workflows.md` updated
-  to state the CLI/dispatcher split.
-
-**Verification**: new `tests/src/cli/test_policy_enable.py` (fail-loud names both bundles) passes; happy-path
-`enable --bundle tdd` and the `%` dispatcher/M7 regression suites unaffected; CLI tip/error guards pass;
-`make pre-commit` clean.
-
-### cli_style_ux_compliance S5/C1: Activity Period Clean Break
-
-**Goal**: Align `forge telemetry activity` with sibling telemetry period selectors.
-
-**Key changes**:
-
-- Replaced `--days`/`--all` with `--period today|week|month|all` (default `today`), and updated tests, docs, QA, and
-  integration references.
-
-**Verification**: 23 focused tests, 9 invariants, 1 targeted integration test, and `make pre-commit` clean.
-
-### cli_style_ux_compliance S4: Help And Lane Errors
-
-**Goal**: Finish the Batch B CLI help/error-message pass and the planned `telemetry activity --json` tip shape.
-
-**Key changes**:
-
-- Normalized touched help wording/examples, added the activity JSON error tip, and made lane help/errors enumerate live
-  valid lanes including defaults.
-
-**Verification**: Focused help/error suite passed (171 tests); `make pre-commit` clean.
-
-### cli_style_ux_compliance S2: Logs Group Redesign
-
-**Goal**: Split `forge logs` into a scriptable read surface and a preview-default cleanup surface that follows the CLI
-destructive-verb shape.
-
-**Key changes**:
-
-- Promoted `forge logs` to `show`/`clean`: `show --json`, preview-default `clean --yes`, shared dry-count filtering, and
-  Click clean breaks for the old bare flags.
-- Updated CLI docs and bundled QA/walkthrough guidance for the new spellings.
-
-**Verification**: Focused logs/command-tree/stream tests passed (99 tests); `make pre-commit` clean.
-
-### backend_runtime_cleanup Step 2: Runtime-Id Backend Stop
-
-**Goal**: Make backend runtime cleanup operate on the live runtime objects users see in `forge model backend list`,
-while keeping backend config management separate.
-
-**Key changes**:
-
-- Changed `forge model backend stop` to accept runtime instance ids, multiple targets, and `--all`/`--yes`; local source
-  ids and bare adapters now fail with runtime-id guidance, while remote sources keep the no-local-lifecycle boundary.
-- Removed the `stop/delete --port` runtime spelling. `delete <adapter>` is config-only, rejects registered runtime ids
-  with a `stop <runtime-id>` tip, and still stops matching local runtime instances before removing the adapter config.
-- Deleted the obsolete `delete --port` double-stop regression after replacing that behavior with a clean-break exit-2
-  assertion.
-- Folded in the backend slice of cli_style B1: group help defines source id/runtime instance id/adapter, examples use
-  valid id spaces, reconcile help names `backend list` discovery, and source-row JSON dual keys are documented.
-
-**Verification**: `uv run pytest tests/src/cli/test_backend_commands.py -q` (42 passed); `make test-regression` (482
-passed); `make test-unit` (7302 passed, 117 deselected);
-`uv run ruff check src/forge/cli/backend.py tests/src/cli/test_backend_commands.py`; help smoke for
-`forge model backend --help`, `stop --help`, and `delete --help`; `make pre-commit` clean.
-
-### cli_style A1: CLI Error Streams To Stderr
-
-**Goal**: Keep CLI result streams parse-safe by routing top-level CLI errors and diagnostics to stderr.
-
-**Key changes**:
-
-- Flipped error-helper defaults and bare `handle_session_error` to `err_console`; `print_tip` stays stdout by default.
-- Removed explicit stdout overrides, added `err=True` to JSON/red error echoes, and kept multi-statement error
-  continuations on stderr.
-- Saved AST guards for stdout overrides, adjacent stdout continuations, JSON errors, and red diagnostics; added
-  in-branch `--json` error coverage with stdout-empty assertions.
-
-**Verification**: `uv run pytest tests/src/cli -q` (2207 passed); `make pre-commit` clean.
-
-## 2026-07-02
-
-### session_op_layer_extraction Slice 5: Session shim retirement
-
-**Goal**: Remove the `forge.cli.session` compatibility shim that kept tests patching parent-module re-exports after the
-Claude session path was split into focused CLI/core modules.
-
-**Key changes**:
-
-- Repointed parent-module test patches to the real seams by sub-slice: low-volume helpers, resume-mode local imports,
-  `SessionManager`, and the Claude launcher seam in `forge.core.ops.claude_session`.
-- Deleted the `_sess()` / `_session_cli()` lazy module seams and replaced the `session.py` wildcard re-export tail with
-  side-effect imports that preserve Click command registration.
-- Repointed direct test imports for submodule-owned commands/helpers while leaving `session.py`-defined helper tests on
-  the parent module.
-
-**Verification**: CLI/regression suite 2681 passed; Docker lifecycle integration 21 passed; stale shim greps clean
-except for helpers still defined in `session.py`; `make pre-commit` clean.
-
-### session_op_layer_extraction Slice 4b: Fork supervisor wiring
-
-**Goal**: Finish the post-fork cleanup by collapsing fork supervisor persistence onto the core wiring primitive and
-settling the remaining sidecar testability question.
-
-**Key changes**:
-
-- Replaced `session_fork.py`'s hand-rolled `SupervisorConfig` / lane persistence block with `SupervisorWiring` +
-  `_apply_supervisor_wiring`, preserving the existing `_preflight_routing` guards and CLI-owned validation.
-- Moved sidecar `is_sandboxed=True` confirmation to after mount/secret/env prep, immediately before the runner, so
-  launcher validation failures such as a bad `--mount` do not strand a stale sandbox flag.
-- Added a fork-sidecar bad-mount regression that asserts clean launch failure, no sidecar runner invocation, and
-  `confirmed.is_sandboxed == false`.
-
-**Verification**: focused supervisor/session/regression suite 293 passed; Docker supervisor integration 10 passed;
-layering/UI-free greps empty; `make pre-commit` clean.
-
-### session_op_layer_extraction Slice 1: Claude session preflight split
-
-**Goal**: Start the staged Claude session CLI/core split with the lowest-risk helpers and a manifest characterization
-safety net.
-
-**Key changes**:
-
-- Added a JSON-string manifest characterization test for Claude `start --no-launch` and fresh resume, pinning dataclass
-  field order and normalized volatile values.
-- Added `forge.core.ops.claude_session.resolve_and_validate_system_prompt` and rewired launch prompt resolution through
-  it while keeping the CLI's `Path -> str` launcher boundary explicit. Follow-up cleanup kept `--no-launch` prompt
-  validation CLI-owned, avoiding a dead op-level `ForgeOpError` path.
-- Moved the CLI-free model-pin support cluster into `forge.session.model_pin`; `cli/session_model_pin.py` now only keeps
-  UI-tangled persistence/warning behavior.
-- Accepted `session_op_layer_extraction` into `doing/` with Slice 1 verification recorded. Parent patch count remains
-  270 across 13 files; `session_lifecycle.py` is 2,496 lines after the slice.
-
-**Verification**: characterization test 2 passed; focused units 241 passed; Docker lifecycle integration 21 passed;
-layering/UI-free greps empty; `make pre-commit` clean.
-
-### reject_rewind_transfer_strategy: rewind is not a transfer-context strategy (PR #68)
-
-**Goal**: Fix the follow-up bug from #66 -- adding `ResumeStrategy.REWIND` made the codex/transfer ops accept
-`strategy="rewind"` at the front door even though transfer assembly rejects it (rewind is a Claude-only `--drop-last`
-launch path, not a context-assembly strategy).
-
-**Key changes**:
-
-- Single source of truth in `session/transfer.py`: `TRANSFER_CONTEXT_STRATEGIES` / `TRANSFER_CONTEXT_STRATEGY_VALUES` +
-  `parse_transfer_context_strategy()` (the four assembly strategies; excludes rewind). The four codex/transfer ops and
-  both transfer-facing CLI `Choice` lists source from it; `assemble_transfer_context` now rejects any non-transfer
-  strategy (not just `REWIND`) with one uniform message, fired before the ~20s `codex doctor` preflight + session
-  create/rollback.
-- Deliberately untouched: the `manager.py`/`cli/session.py` transfer-mode branches (rewind dispatches to its own launch
-  path before they see it; their `assemble` backstop still fires) and the fork/resume `Choice` lists (rewind-inclusive
-  superset).
-
-**Verification**: 253 unit tests green (codex ops + transfer + session_codex, incl. parametrized `[bogus, rewind]`
-rejection); `make pre-commit` clean. Merged via PR #68 (`016e9d0a`).
-
-### rewind_resume_strategy closeout: drop-last-N resume with an AI code-delta
-
-**Goal**: Ship `--strategy rewind --drop-last N` -- resume/fork a session that carries turns `1..(T-N)` as *real*
-relocated Claude history plus an AI-generated code-delta of the dropped window -- and close the card after PR #66 merged
-to `main`.
-
-**Key changes** (shipped via PR #66, `107b9251`):
-
-- New `session/rewind.py` primitive: writes a truncated raw-JSONL prefix under a **fresh** rewind-owned UUID `<R>`
-  (snapped to a complete `tool_use`/`tool_result` turn boundary), and builds a grounded net-change code-delta over only
-  the dropped window `(T-N)..T`. Launches `--resume <R> --fork-session` co-delivered with an
-  `--append-system-prompt-file` code-delta context.
-- Deliberate break of the `native-relocate => no context file` convention: `Derivation` gains additive `dropped_turns` +
-  `rewind_relocated_session_id` (no `SCHEMA_VERSION` bump); design.md §3.9 documents the new matrix row and flags it
-  convention-not-guard.
-- Fail-closed contiguity guard (`_assert_kept_turns_form_raw_prefix`) rejects requestId-interleaved transcripts;
-  code-delta LLM failure falls back to plain native-relocate + a "code-delta unavailable" note; a privacy warning fires
-  when the dropped window is sent to the curation model. Fork rewind is worktree/`--into`-only (same-dir/sidecar
-  rejected); `resume --fresh --strategy rewind` is legitimately same-dir because it resumes `<R>`, not the parent UUID.
-- Docs synced in-PR: design.md §3.9, design_appendix.md §H (frontmatter enum + `rewind-code-delta` schema marker),
-  cli_reference.md, end-user/transfer.md.
-
-**Verification**: unit green on merged `main` -- 26 rewind tests (`test_rewind_strategy.py` +
-`test_session_rewind_cli.py`) and 30 fork/derivation tests (`test_fork_into.py` + `test_models_derivation.py`); PR #66
-landed after an 8-dimension adversarial review (verdict: mergeable, no blocking defects). **Disclosed gap**: the
-real-`claude` resume against a truncated `<R>` prefix is unit-covered only -- the `@pytest.mark.slow` integration test
-is not yet written (design.md:765 records the same caveat). The Slice-1 stem probe proved stem-tolerance live on Claude
-Code 2.1.197.
-
-### Board closeout: Sonnet 5 done; accidental_complexity A/B merged + paused
-
-**Goal**: Reconcile the board after PR #65 merged -- close the shipped Sonnet 5 card and pause the accidental-complexity
-cleanup with Batch C still open.
-
-**Key changes**:
-
-- `sonnet_5_default` moved `doing/ -> done/`: Sonnet 5 catalog/template support + the sonnet/opus default-tier flip
-  shipped via PR #64 (`75cd28b5`). Final closeout item ticked.
-- `accidental_complexity_cleanup` moved `doing/ -> paused/`: Batches A + B merged via PR #65 (`584aa2a1`), including two
-  pre-merge review follow-ups (a `FORGE_DEBUG` fail-open regression test and a `loader.py` black-format fix). Paused
-  with Batch C (#17-#20) and the two surfaced defects (Defect B auth-retry provider-trace gap, Gap A policy fail-open
-  prose-only check) still open.
-
-**Verification**: Board/docs-only commit. PR #65 landed green (8-dimension adversarial review + independent
-`make pre-commit` and full touched-suite run clean); no code change here.
-
-### accidental_complexity_cleanup Batch B follow-up: proxy/template config load boundaries
-
-**Goal**: Close the Batch B review findings around newly-invalid proxy providers and malformed proxy/template YAML
-surfacing as raw tracebacks in user-facing CLI paths.
-
-**Key changes**:
-
-- `ProxyInstanceConfig` loading now normalizes malformed proxy-file shape to `ValueError` at the loader boundary, with
-  explicit mapping checks for `tiers`, `tier_overrides`, and each tier override leaf. Empty/null override leaves remain
-  "no override"; falsy non-mappings (`[]`, `false`, `""`, `0`) now fail instead of being ignored.
-- Template loading now rejects non-mapping nested dataclass fields before schema `__post_init__` can raise raw
-  `AttributeError`/`TypeError`; proxy orchestration wraps malformed templates as `ProxyStartError`.
-- CLI boundaries for `proxy start`, `proxy create`, and session model-pin proxy config reads now report clean contextual
-  errors for legacy `provider: gemini/openai` proxy files and malformed YAML sections.
-
-**Verification**: 328 targeted tests green across proxy commands, session model pins, config loader/schema, and proxy
-orchestrator; ruff clean for touched loader/tests. Manual repros now fail cleanly for legacy provider, `tiers: []`,
-malformed template `tier_overrides: []`, and falsy override leaf `tier_overrides.haiku: []`.
-
-## 2026-07-01
-
-### accidental_complexity_cleanup Batch B: template move, legacy-search delete, secrets/provider narrowing
-
-**Goal**: Execute Batch B (#13-#16) of the 2026-07-01 simplicity-audit card -- remove the remaining medium-effort
-accidental complexity behind clean seams (same branch).
-
-**Key changes**:
-
-- **#13**: The 4 debate/consensus evaluation templates existed twice (constants in `cli/workflow.py` + copies under
-  `src/skills/*/resources/`, kept in sync by drift-guard tests). `git mv`'d the copies into `forge.review.resources`
-  (byte-identical); resolvers load them via the existing `_load_workflow_resource`. Single source now, so both drift
-  guards are deleted; placeholder/vocabulary invariants + direct `_resolve_*_prompt` tests move to `test_run_resources`.
-  Net -336 LOC in `workflow.py`.
-- **#14 (full delete)**: Removed the legacy in-memory `search()` -- a second BM25 scorer with no production callers,
-  used only as a test oracle. The 12 `TestSearch` cases now run through a `_search_docs` adapter over the real
-  `search_from_index`; the score-equivalence oracle is retired. `SearchDocument.tokens` kept (rebuild-index reads it).
-- **#15**: Deleted `ConfigSecretsProvider` + `ProviderConfig.auth_url` + the `GEMINI_AUTH_URL`/`OPENAI_AUTH_URL` env
-  mappings -- write-only plumbing never wired into the production Env+File credential chain. Chain tests moved onto the
-  real Env+File chain; the h6 no-coercion guard now covers the surviving `FORGE_HOME` mapping.
-- **#16**: Narrowed `ProxyInstanceConfig` providers to `{litellm, openrouter}`. `gemini`/`openai` previously validated
-  then silently routed to LiteLLM; since validation runs on every read, they now fail fast with a message naming the
-  supported providers + recreate path (durable-state clean break). Shipped templates write `provider=litellm`, so create
-  flows are unaffected; gemini/openai model-name detection is untouched.
-
-**Verification**: targeted unit suites green per item (search 153; config/auth/proxy/backend 1143; run_resources +
-skill_content 84); #15/#16 integration-verified (auth credential resolution 4 passed, proxy commands 27 passed);
-per-file `make pre-commit` clean. A 4-way adversarial review over the committed diff returned one low finding (a stale
-provider comment), fixed. Batch C + surfaced defects stay open (card in `doing/`).
-
-### accidental_complexity_cleanup Batch A: dead-code removal + drift fixes + one CLI bug
-
-**Goal**: Execute Batch A of the 2026-07-01 simplicity-audit card -- remove verified accidental complexity and fix the
-one bug it surfaced (branch `cleanup/accidental-complexity-batch-a`).
-
-**Key changes**:
-
-- Deleted zero-caller dead code: `promotion.py`, `resolve_template_paths`, `load_yaml_strict`,
-  `resolve_subprocess_proxy_url`, `_dedupe_specs` (verified no-op: sole caller feeds one unique-path scan), and the
-  never-run generic `_coerce_env_value` branch.
-- De-duplicated telemetry: `provider_trace_logger` imports `RequestMode`/`LocalUsageStatus` from owner `downstream.py`;
-  hoisted the byte-identical `_worker_reason_code` + upstream-emission block from the Claude/Codex invokers into the
-  shared `_lifecycle` base (`operation=None` suppression preserved). Passport drops the unread `inherit_on_fork` field
-  but keeps the key in `_KNOWN_UPDATE_KEYS` (accept-and-ignore).
-- **Bug fix (#1)**: `backend delete --port` drove `stop_cmd.callback()` (double "Stopped" + a `sys.exit` bypassing
-  delete's error path); both commands now share a silent `_stop_instance`.
-- **Behavior (#9)**: `ListSessionsItem.is_active` wired to the runtime `ActiveSessionStore` (was hardcoded `False`).
-- Docs/UX: reworded the `--no-proxy` guard to name `--proxy`; removed two stale CLI-alias doc lines; fixed the
-  `CredentialManager` "proactive refresh" docstring.
-
-**Verification**: full unit suite `7222 passed`; ruff + mypy + `make pre-commit` clean. New tests: `is_active` liveness,
-legacy-passport accept-and-ignore, backend delete-double-stop regression. Batches B/C + surfaced defects stay open (card
-in `doing/`).
-
-### Sonnet 5 support + default-tier flip
-
-**Goal**: Teach Forge about Claude Sonnet 5 across catalog/templates and promote the newest models to the default tiers.
-
-**Key changes**:
-
-- Catalog: added `claude-sonnet-5` (native 1M, adaptive-only, `token_estimate_multiplier: 1.35`) + aliases
-  (`anthropic/claude-sonnet-5`, `sonnet-5`, `claude-sonnet`). Flipped all four `defaults` — sonnet -> `claude-sonnet-5`,
-  opus -> `claude-opus-4-8` (anthropic + openrouter); `sonnet`/`opus`/`claude-opus` friendly aliases follow. Cleared
-  Opus 4.8's stale `opt-in` tag and the now-wrong "defaults stay on 4.6" comments.
-- Templates: the four anthropic-family templates default sonnet -> Sonnet 5, opus -> Opus 4.8; Fable 5, Opus 4.6, and
-  Sonnet 4.6 moved into `model_alternatives` (still pinnable via `--model`).
-- Passthrough: `_proxy_supports_model_pin` now short-circuits for `wire_shape == "anthropic_passthrough"`, so any Claude
-  `--model` pin is honored (passthrough forwards unchanged). Also fixes a latent inability to pin Opus 4.8/4.6 on
-  passthrough. Covered by `tests/regression/test_bug_passthrough_model_pin.py`.
-- Estimator: `PROXY_CONTEXT_MODEL_DEFAULTS` -> `claude-opus-4-8[1m]` / `claude-sonnet-5[1m]`.
-- Intelligence-score rerank so Sonnet 5 (98) sits between Opus 4.6 and Opus 4.8: Opus 4.6 98 -> 97, Opus 4.7 99 -> 98
-  (was tied with 4.8 at 99), Opus 4.8 99 and Fable 5 100 unchanged. Sonnet 5 = 98, peer of Opus 4.7.
-- Review quorum's `claude-opus` worker now resolves to Opus 4.8 automatically (it tracks `get_default_model`, no
-  review-code change).
-- Docs: proxy / model_selection / session / skills / workflow / cli_reference / README + QA proxy checklist synced.
-
-**Verification**: `make test-unit` (7231 passed); targeted catalog/config/session/proxy suites + new passthrough
-regression (470 passed); scoped Docker integration (`session start --model`, bare `claude start` default model — 2
-passed); `make pre-commit` clean.
-
-### consumer_lanes epic: closeout (team-supervisor codex dispatch carved out)
-
-**Goal**: Close the `consumer_lanes` epic now that its lane contract is shipped and folded into normative design docs.
-The one remaining follow-on -- team-supervisor codex dispatch -- is a different abstraction, so it is re-filed as a
-standalone card rather than held open under the epic.
-
-**Key changes**:
-
-- **Decision**: consumer_lanes is complete at the lane-contract level for team-supervisor (lane placement, `claude-max`
-  billing, freeze-on-real-dispatch, observability). A codex team-supervisor lane is deferred because it needs
-  runtime-neutral plan/context delivery -- a team-orchestration / context-design concern, not the lane substrate.
-- **Verified basis** (`src/forge/policy/team/handlers.py`): `TEAM_SUPERVISOR_CONSUMER.allowed_lanes` has no codex lane
-  (`:38-43`), and supervision context reaches the handler only via `run_claude_session(resume_id=...)` =
-  `claude -p --resume` (`:267-269`). `codex exec` has no `--resume`, so a codex arm would be plan-blind -- unlike the
-  blind / in-band T4/T6b/T6c arms.
-- New follow-on card `docs/board/proposed/team_supervisor_plan_context/` (goal, design decisions owed, constraints).
-- Epic `doing/epic_consumer_lanes/ -> done/`; card + checklist marked closed; the stale checklist closeout note (still
-  describing T6c as active in `doing/`) corrected. 22 member back-links repointed to `done/epic_consumer_lanes` (line-3
-  `**Epic**:` headers only; no narrative touched).
-
-**Verification**: Docs-only closeout, no code change. Code claims re-verified against `handlers.py` before writing;
-back-link repoint confirmed (0 remaining `doing/epic_consumer_lanes` refs in `done/`).
-
-### consumer_lanes T6c: Memory-writer codex dispatch arm
-
-**Goal/outcome**: Bind memory writing to the resolved lane runtime. Codex uses `review-only`/`read-only` or
-`augment`/`workspace-write`, resolves before Claude availability, degrades asynchronously, and leaves spawned-run
-telemetry to the invoker; the Claude path stayed unchanged. No Claude permission scan is applied.
-
-**Verification**: 189 unit tests, CLI bridge coverage, and two live Codex E2E cases passed; augment edited an in-project
-doc with one `subscription_quota` event and no duplicate upstream row. `make pre-commit` passed. Shipped in PR #62
-(`1064b8c8`).
+## 2026-07-01 -- 2026-07-08 (compacted)
+
+Global-runtime foundations, session/rewind work, CLI boundary cleanup, and model/backend changes. Detailed execution
+history remains in the matching `docs/board/done/` cards and PRs; this summary preserves the goals, decisions,
+verification anchors, and deferred items.
+
+- **Global install and runtime hooks (07-06--07-08)**: made global-tool installation the Day-1 path and added read-only
+  `forge extension doctor` install-kind/PATH diagnostics; removed the untracked `forge hook enable|disable` writer;
+  single-sourced Forge hook matching and pinned registered command bytes; then shipped the fail-open
+  `~/.forge/bin/forge-hook` dispatcher and moved Claude/Codex runtime-hook ownership to user scope. Project/local
+  installs retained project settings such as `statusLine`, old project/local hook rows stayed removable, and detection
+  accepted both dispatcher and legacy command forms while diagnosing logical double-fire risk. Decisions: minimal-PATH
+  status is a reported fact, dispatcher drift is doctor-owned, and legacy user-local settings were a clean break. At
+  closeout, T10 sidecar resolution and T6 migration cleanup were next and T8 remained parked. Verification: full unit
+  runs around 7.5k tests, focused install/hook/doctor/regression suites, Docker installer and real-Claude hook
+  integrations, dispatcher latency characterization, and `make pre-commit`.
+- **Project and environment contracts (07-07)**: established `~/.forge/projects.json` as the locked trusted-root
+  registry and `.forge/project.toml` as an opt-in hand-edited compatibility pin enforced by extension/session paths and
+  surfaced by doctor. Uncovered confirmed-state, memory-writer, and proxy/backend mutators moved to the accepted
+  `forge_project_compat_mutator_sweep` follow-up. The public/internal `FORGE_*` vocabulary was documented and guarded
+  across CLI and user docs so normal guidance names sessions and CLI flags rather than internal wiring. Verification:
+  355-test and 38-test focused suites, three named Docker checks, 169 env-vocabulary/CLI tests, pyright, Markdown hooks,
+  and `make pre-commit`.
+- **Shared proxy, policy, and test seams (07-06)**: single-sourced raw tier-word detection while deliberately preserving
+  display-name fallback behavior; unified message/count-token model resolution and loopback port probing without
+  changing routing, cost, or caller exception contracts; moved policy-supervisor mutations behind UI-free ops; and
+  consolidated session inheritance, runtime/lane, TDD-sort, supervisor-option, and hook-capture twins. Test mirrors and
+  support helpers were reorganized, fixing the surfaced status-line role-alias miscount and malformed transcript-path
+  leak. Verification: focused suites from 392 to 1,045 tests, a 7,379-test unit run, proxy/status-line/policy/hook
+  Docker integrations, and `make pre-commit`.
+- **Durable state and session-test structure (07-05)**: hoisted atomic byte/text writes, JSONL append/retention, and
+  versioned reads into core leaves while keeping telemetry planes and schemas separate; unreadable search state now maps
+  to domain errors and all-scope search skips unreadable project indexes. The 4,933-line session CLI test catch-all was
+  split by command family with a narrow shared launcher fixture. Verification: focused state/search/install/backend
+  suites, full unit tests, targeted search/proxy/backend integrations, merged PR #77 layout checks, and
+  `make pre-commit`.
+- **Rewind and session-layer extraction (07-02--07-05)**: shipped PR #66 rewind resume/fork using a fresh UUID,
+  turn-boundary-truncated native history, and an AI code delta over dropped turns; interleaved history fails closed,
+  code-delta failure falls back to native relocation, and fork rewind remains worktree/`--into` only. PR #68 then
+  excluded `rewind` from transfer-context parsers before expensive preflight. A real-Claude Docker gate later closed the
+  disclosed truncated-prefix gap without mutating the prefix. In parallel, session preflight/model-pin helpers and fork
+  supervisor wiring moved behind core seams, the parent CLI shim was retired, and sidecar sandbox confirmation was
+  delayed until immediately before launch. Verification: rewind/fork units, 2,681 CLI/regression tests, 21 lifecycle and
+  10 supervisor Docker tests, the real-Claude rewind integration, and `make pre-commit`.
+- **CLI and backend boundaries (07-03--07-04)**: routed top-level errors/diagnostics to stderr; made bare
+  `policy enable` fail loudly without `--bundle`; replaced activity `--days|--all` with `--period today|week|month|all`;
+  split logs into scriptable `show` and preview-default `clean`; and normalized help/lane errors. Backend stop now
+  targets live runtime instance ids, while delete remains adapter-config ownership. The backend identity clean break
+  made `proxy.backend` canonical, upgraded backend/downstream schemas to v2, and separated backend instance, managed
+  process, and telemetry origin fields. Verification: 2,207 CLI tests, 7.3k unit tests, 482 regressions, focused
+  command/help/stream tests, targeted integration, and `make pre-commit`.
+- **Accidental-complexity closeout (07-01--07-04)**: removed verified dead code and duplicate workflow templates/search
+  scoring/secrets plumbing, narrowed proxy providers to `litellm|openrouter`, and made malformed legacy proxy/template
+  config fail contextually. Fixed backend delete's double-stop, live session activity reporting, the auth-retry
+  provider-trace hole, and fail-open supervisor exit status; demoted the test-only workflow policy surface and corrected
+  the marker schema to v1. Decisions: retain `SearchDocument.tokens`, accept-and-ignore the legacy passport key, keep
+  the real Env+File credential chain, and put shared telemetry vocabulary in a neutral leaf to avoid a cycle. Deferred:
+  a durable `server.py` extraction and a separately proposed workflow-policy CLI graduation. Verification: full unit
+  runs from 7,222 tests upward, focused suites and integration checks, manual malformed-config repros, adversarial
+  review, static checks, and `make pre-commit`.
+- **Model catalog and defaults (07-01)**: added Claude Sonnet 5, promoted Sonnet 5/Opus 4.8 across Anthropic and
+  OpenRouter defaults/templates, retained older models as alternatives, updated context-estimator defaults, and allowed
+  any Claude pin through Anthropic passthrough. Verification: 7,231 unit tests, 470 focused tests, two Docker model-pin
+  smokes, the passthrough regression, and `make pre-commit`. Shipped in PR #64.
+- **Consumer lanes closeout (07-01--07-02)**: completed the lane contract and the memory-writer Codex dispatch arm.
+  Memory writing resolves its runtime before Claude availability, uses read-only or workspace-write Codex sandboxes,
+  degrades asynchronously, and leaves spawned-run telemetry to the invoker. Team-supervisor Codex dispatch was carved
+  out because Codex lacks Claude's resume-based plan context; runtime-neutral plan/context delivery remained the
+  explicit follow-up rather than holding the lane substrate open. Verification: 189 unit/bridge tests, two live Codex
+  E2Es with one subscription-quota event and no duplicate upstream row, board-link checks, and `make pre-commit`.
 
 ## 2026-06-22 -- 2026-06-30 (compacted)
 

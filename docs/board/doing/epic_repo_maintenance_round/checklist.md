@@ -1,6 +1,7 @@
 # Repository maintenance round checklist
 
-Current focus: independently review and merge D010 before closing Wave 3.
+Current focus: review and merge the Wave 3 closeout/Wave 4 admission record, then activate Codex install rollback on a
+separate branch.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -59,6 +60,13 @@ Current focus: independently review and merge D010 before closing Wave 3.
 - [x] Review and merge D022 before activating D010 (PR #141, `d2ed2349`).
 - [x] Activate D010 from merged `main` at `d2ed2349` and create its execution checklist.
 - [x] Retain D010's linked-worktree guard regression and implement root-guard parity.
+- [x] Review and merge D010, then close the Wave 3 child epic (PR #142, `2461e3fa`).
+- [x] Recheck and reproduce Wave 4 D012--D014 and D019 on merged `main` (four broken-behavior characterizations passed;
+  a fifth corrected D012's stale tracked-baseline claim).
+- [x] Sequence Wave 4 into three parked members under `epic_installer_transaction_safety` without activating installer
+  implementation.
+- [x] Run Wave 4 admission Markdown, relative-link, stale-lane, change-log size, and diff checks.
+- [ ] Review and merge the Wave 4 admission record before activating D013/D014.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

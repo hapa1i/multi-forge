@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1 and 2 are closed, the first seven Wave 3 members shipped through PR #141, and D010 is implementation-verified
-pending independent review as the final member.
+Waves 1--3 are closed. Wave 4's four installer findings were reproduced on merged `main` at `2461e3fa` and sequenced
+into three parked members; no installer implementation member is active.
 
 ## Goal
 
@@ -63,10 +63,11 @@ post-close D005 parser defect was corrected by
 [`preserve_codex_plus_prefixed_write_identity`](../../done/preserve_codex_plus_prefixed_write_identity/card.md) and
 merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
-#130–#132. Wave 3 is coordinated by the active
-[`epic_session_durable_state_safety`](../epic_session_durable_state_safety/card.md); all eight findings were reproduced
-before admission, and the first seven members shipped in PRs #134--#138, #140, and #141. D010 is implementation-verified
-from merged `main` at `d2ed2349` pending independent review as the final member.
+#130–#132. Wave 3 closed through
+[`epic_session_durable_state_safety`](../../done/epic_session_durable_state_safety/card.md) after all eight members
+shipped in PRs #134--#138 and #140--#142. Wave 4 is parked under
+[`epic_installer_transaction_safety`](../../todo/epic_installer_transaction_safety/card.md) as three independently
+reviewable members; the admission record must merge before the first one activates.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -84,7 +85,10 @@ from merged `main` at `d2ed2349` pending independent review as the final member.
 | 3    | O003            | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         |
 | 3    | D021            | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           |
 | 3    | D022            | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               |
-| 3    | D010            | [`align_incognito_worktree_guard`](../align_incognito_worktree_guard/card.md)                                       |
+| 3    | D010            | [`align_incognito_worktree_guard`](../../done/align_incognito_worktree_guard/card.md)                               |
+| 4    | D013–D014       | [`rollback_codex_install_transaction`](../../todo/rollback_codex_install_transaction/card.md)                       |
+| 4    | D012            | [`preserve_install_settings_baseline`](../../todo/preserve_install_settings_baseline/card.md)                       |
+| 4    | D019            | [`preserve_legacy_settings_user_edits`](../../todo/preserve_legacy_settings_user_edits/card.md)                     |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                       |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |

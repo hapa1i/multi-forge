@@ -1,6 +1,6 @@
 # Session and durable-state safety checklist
 
-Current focus: independently review and merge D010 before closing Wave 3.
+Current focus: closed after all eight Wave 3 members shipped through PR #142 (`2461e3fa`).
 
 ## Activation and sequencing
 
@@ -44,10 +44,10 @@ Current focus: independently review and merge D010 before closing Wave 3.
 - [x] Ship O003 headless Codex concurrent-delete reconciliation (PR #138, `4a601dc2`).
 - [x] Ship D021 newer-schema workqueue preservation after D011 (PR #140, `ecc79aa2`).
 - [x] Ship D022 transfer-strategy validation (PR #141, `d2ed2349`).
-- [ ] Ship D010 incognito worktree guard parity.
+- [x] Ship D010 incognito worktree guard parity (PR #142, `2461e3fa`).
 
 ## Closeout
 
-- [ ] Keep the review ledger, member paths, and parent epic cursor current after each merge.
-- [ ] Close this epic only after all eight independently reviewed members ship with their required regressions and
+- [x] Keep the review ledger, member paths, and parent epic cursor current after each merge.
+- [x] Close this epic only after all eight independently reviewed members ship with their required regressions and
   integration coverage.
