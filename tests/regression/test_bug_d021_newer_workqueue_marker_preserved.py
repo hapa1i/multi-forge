@@ -11,7 +11,11 @@ import json
 
 import pytest
 
-from forge.core.workqueue import MARKER_SCHEMA_VERSION, pending_work_dir, process_pending_work
+from forge.core.workqueue import (
+    MARKER_SCHEMA_VERSION,
+    pending_work_dir,
+    process_pending_work,
+)
 
 pytestmark = pytest.mark.regression
 
