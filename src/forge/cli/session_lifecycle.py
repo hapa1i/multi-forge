@@ -1993,9 +1993,12 @@ def incognito(
     if not proxy_name and not direct and not sidecar and not host_proxy:
         direct = True
 
-    from forge.cli.guards import require_repo_root
+    from forge.cli.guards import require_main_repo_root, require_repo_root
 
-    require_repo_root()
+    if worktree:
+        require_main_repo_root()
+    else:
+        require_repo_root()
 
     routing: ResolvedRouting | None = None
     if proxy_name:

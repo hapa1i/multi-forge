@@ -4,8 +4,7 @@
 
 **Finding**: D022 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- implementation-verified on `fix/reject-unknown-resume-strategy` from merged `main` at `ecc79aa2`;
-pending independent review.
+**Lane**: `done/` -- shipped in PR #141 (`d2ed2349`) on 2026-08-07.
 
 ## Goal
 

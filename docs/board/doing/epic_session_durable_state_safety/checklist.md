@@ -1,6 +1,6 @@
 # Session and durable-state safety checklist
 
-Current focus: independently review and merge D022 without activating D010.
+Current focus: independently review and merge D010 before closing Wave 3.
 
 ## Activation and sequencing
 
@@ -32,6 +32,9 @@ Current focus: independently review and merge D022 without activating D010.
 - [x] Start D022 from merged `main` at `ecc79aa2`, move it to `doing/`, and create its execution checklist.
 - [x] Retain the marked D022 silent-fallback regression failure on `ecc79aa2`.
 - [x] Implement and behaviorally verify D022 without changing legacy derivation reads or activating D010.
+- [x] Review and merge D022 before activating D010 (PR #141, `d2ed2349`).
+- [x] Start D010 from merged `main` at `d2ed2349`, move it to `doing/`, and create its execution checklist.
+- [x] Retain D010's linked-worktree guard regression failure on `d2ed2349` and implement guard parity.
 
 ## Remaining members
 
@@ -40,7 +43,7 @@ Current focus: independently review and merge D022 without activating D010.
 - [x] Ship D009 missing-worktree liveness and launchability (PR #137, `cce6e8c6`).
 - [x] Ship O003 headless Codex concurrent-delete reconciliation (PR #138, `4a601dc2`).
 - [x] Ship D021 newer-schema workqueue preservation after D011 (PR #140, `ecc79aa2`).
-- [ ] Ship D022 transfer-strategy validation.
+- [x] Ship D022 transfer-strategy validation (PR #141, `d2ed2349`).
 - [ ] Ship D010 incognito worktree guard parity.
 
 ## Closeout

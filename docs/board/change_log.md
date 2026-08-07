@@ -27,21 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-07
 
+### Align the incognito worktree root guard
+
+**Goal/outcome**: Apply the main-checkout guard to `session incognito --worktree` before launch while retaining the
+repository-root guard for ordinary incognito.
+
+**Verification**: D010 failed on `d2ed2349` with exit 0; then 12 focused, 23 Docker lifecycle, and 669 regression tests
+plus `make pre-commit` passed. Pending independent review.
+
 ### Reject unknown resume strategies
 
-**Goal**: Reject unsupported transfer strategies before writes.
+**Goal/outcome**: Reject unsupported transfer strategies before writes. `resume_session` rejects unknown values and
+`rewind` and persists the value used; valid, native, and legacy-read paths are unchanged.
 
-**Outcome**: `resume_session` now rejects unknown values and `rewind` and persists the parsed value; other paths are
-unchanged. D022 failed on `ecc79aa2`; then 107 focused host, 3 Docker manager, 9 Docker integration, 668 regression
-tests, and `make pre-commit` passed. Pending independent review.
+**Verification**: 107 host, 12 Docker, and 668 regression tests plus `make pre-commit` passed. Shipped in PR #141
+(`d2ed2349`).
 
 ### Preserve newer-schema workqueue markers
 
-**Goal**: Preserve newer-schema work while keeping later current-schema markers reachable.
+**Goal/outcome**: Preserve newer-schema work and keep later current-schema markers reachable. Newer schemas remain
+byte-exact without dispatch, retry, or poison; one diagnostic per process and the cursor advance preserve later work.
 
-**Outcome**: Newer integer schemas remain byte-exact without dispatch, retry, or poison; one diagnostic per process and
-the cursor preserve later work. D021 failed on `de8adaac`; then 82 focused, 10 Docker, 667 regression, and 8,804 unit
-tests plus `make pre-commit` passed. Shipped in PR #140 (`ecc79aa2`).
+**Verification**: 82 focused, 10 Docker, 667 regression, and 8,804 unit tests plus `make pre-commit` passed. Shipped in
+PR #140 (`ecc79aa2`).
 
 ### Prevent bounded queue starvation and publish wheel dependency floors
 
@@ -1854,30 +1862,13 @@ back-link repoint confirmed (0 remaining `doing/epic_consumer_lanes` refs in `do
 
 ### consumer_lanes T6c: Memory-writer codex dispatch arm
 
-**Goal**: Bind the memory writer to its resolved lane's runtime so a codex binding dispatches a real `codex exec` arm
-(`review-only` on `read-only`, `augment` on `workspace-write`) instead of falling through to `claude -p` -- the epic's
-first consumer whose codex lane can write the repo.
+**Goal/outcome**: Bind memory writing to the resolved lane runtime. Codex uses `review-only`/`read-only` or
+`augment`/`workspace-write`, resolves before Claude availability, degrades asynchronously, and leaves spawned-run
+telemetry to the invoker; the Claude path stayed unchanged. No Claude permission scan is applied.
 
-**Key changes**:
-
-- `run_memory_writer` resolves the runtime from the bound `LaneRecord` (T6b's `LaneRecord -> Lane -> resolve_lane`
-  guard) **before** the claude-availability check, then branches into `_dispatch_codex_memory_writer` ahead of the
-  claude `on_dispatch` (claude path byte-identical). A codex-bound writer runs when `claude` is absent (Finding 2).
-- Per-mode sandbox; **no Claude permission scan** (D4). A live Phase 0 probe found a codex `workspace-write` *denial*
-  exits 0 with `is_error=False` (rides `turn.completed`), so `runtime_is_error` does not catch it -- immaterial, because
-  in-project doc writes (`cwd=forge_root`) auto-approve and never hit the rejection path. Real provider/turn failures
-  still fold via `runtime_is_error`.
-- Degrade is **best-effort async** (detached worker, stdout -> DEVNULL): log + outcome + `return False`, never raises.
-  Single upstream row -- the invoker's `_emit_codex` owns the outcome for spawned runs (failure-biased, so a success
-  writes none under default volume, claude parity); the arm records manually only on a no-spawn preflight failure
-  (Finding 1, no double-count).
-- Shared codex-smoke fixtures extracted to `tests/integration/session/conftest.py`. Design docs synced (design_appendix
-  §G, cli_reference, design.md, end-user memory.md).
-
-**Verification**: 189 unit green (`test_memory_writer.py` + lane siblings), CLI bridge covered
-(`test_run_cmd_forwards_codex_lane_record`, `test_set_memory_writer_via_codex_runtime`); live real-codex E2E 2 passed
-(64s) -- augment actually edited a doc under `workspace-write`, one `runtime=codex`/`subscription_quota` event, no
-upstream row on success; `make pre-commit` clean. Merged in PR #62 (`1064b8c8`).
+**Verification**: 189 unit tests, CLI bridge coverage, and two live Codex E2E cases passed; augment edited an in-project
+doc with one `subscription_quota` event and no duplicate upstream row. `make pre-commit` passed. Shipped in PR #62
+(`1064b8c8`).
 
 ## 2026-06-22 -- 2026-06-30 (compacted)
 

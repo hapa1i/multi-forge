@@ -2,8 +2,8 @@
 
 **Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- the five HIGH members shipped in PRs #134--#138 and D021 shipped in PR #140; D022 is
-implementation-verified from merged `main` at `ecc79aa2` pending independent review, while D010 remains parked.
+**Lane**: `doing/` -- the first seven members shipped in PRs #134--#138, #140, and #141; D010 is implementation-verified
+from merged `main` at `d2ed2349` pending independent review as the final Wave 3 member.
 
 ## Goal
 
@@ -52,8 +52,8 @@ of the documented broken behavior and was removed after the evidence was recorde
 | 4     | D009    | [`retain_missing_worktree_sessions`](../../done/retain_missing_worktree_sessions/card.md)                           | Manifest liveness, derived launchability, repair, and binding ownership  |
 | 5     | O003    | [`preserve_headless_codex_concurrent_delete`](../../done/preserve_headless_codex_concurrent_delete/card.md)         | Post-turn reconciliation when explicit deletion wins                     |
 | 6     | D021    | [`preserve_newer_workqueue_markers`](../../done/preserve_newer_workqueue_markers/card.md)                           | Forward-schema preservation distinct from retryable handler failure      |
-| 7     | D022    | [`reject_unknown_resume_strategy`](../reject_unknown_resume_strategy/card.md)                                       | Transfer-strategy validation before artifacts or child state             |
-| 8     | D010    | [`align_incognito_worktree_guard`](../../todo/align_incognito_worktree_guard/card.md)                               | CLI root-guard parity for worktree creation                              |
+| 7     | D022    | [`reject_unknown_resume_strategy`](../../done/reject_unknown_resume_strategy/card.md)                               | Transfer-strategy validation before artifacts or child state             |
+| 8     | D010    | [`align_incognito_worktree_guard`](../align_incognito_worktree_guard/card.md)                                       | CLI root-guard parity for worktree creation                              |
 
 D011 goes first because its exception contract is consumed by the queue and other state readers. O006 then pins strict
 manifest classification before D009 changes index/repair behavior. D008 is a bounded immutable-identity fix. D009 ships

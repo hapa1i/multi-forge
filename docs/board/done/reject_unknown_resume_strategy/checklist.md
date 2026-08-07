@@ -1,6 +1,6 @@
 # Reject unknown resume strategies checklist
 
-Current focus: complete independent review and merge without activating D010.
+Current focus: closed after PR #141 (`d2ed2349`).
 
 ## Activation and reproduction
 
@@ -35,4 +35,4 @@ Current focus: complete independent review and merge without activating D010.
 - [x] Run the complete regression suite (668 passed).
 - [x] Synchronize design, member/epic cards, review ledger, and change log.
 - [x] Run final `make pre-commit` after Markdown normalization.
-- [ ] Complete independent review and merge D022 before activating D010.
+- [x] Complete independent review and merge D022 before activating D010 (PR #141, `d2ed2349`).

@@ -1035,6 +1035,38 @@ class TestSessionDelete:
 class TestSessionIncognito:
     """Tests for 'forge session incognito' command."""
 
+    def test_incognito_worktree_uses_main_repo_guard(self, runner: CliRunner, temp_env: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_main_repo_root", return_value=temp_env) as main_guard,
+            patch("forge.cli.guards.require_repo_root") as repo_guard,
+            patch("forge.cli.session_lifecycle.launch_new_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "incognito", "incognito-worktree", "--worktree", "--no-proxy"],
+            )
+
+        assert result.exit_code == 0
+        main_guard.assert_called_once_with()
+        repo_guard.assert_not_called()
+        assert launch.call_args.kwargs["worktree"] is True
+
+    def test_incognito_without_worktree_uses_repo_guard(self, runner: CliRunner, temp_env: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_main_repo_root") as main_guard,
+            patch("forge.cli.guards.require_repo_root", return_value=temp_env) as repo_guard,
+            patch("forge.cli.session_lifecycle.launch_new_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "incognito", "ordinary-incognito", "--no-proxy"],
+            )
+
+        assert result.exit_code == 0
+        repo_guard.assert_called_once_with()
+        main_guard.assert_not_called()
+        assert launch.call_args.kwargs["worktree"] is False
+
     def test_incognito_creates_session(self, runner: CliRunner, temp_env: Path) -> None:
         """Should create an incognito session."""
         with successful_claude_launch():
