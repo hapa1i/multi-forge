@@ -16,6 +16,10 @@ def test_launch_refuses_missing_recorded_worktree_before_callbacks(
     state = create_session_state("degraded", worktree_path=str(missing))
     callbacks: list[str] = []
 
+    def record_invoke(**_kwargs: object) -> int:
+        callbacks.append("invoke")
+        return 0
+
     with pytest.raises(ForgeOpError) as exc_info:
         launch_claude_session(
             manifest=state,
@@ -26,7 +30,7 @@ def test_launch_refuses_missing_recorded_worktree_before_callbacks(
             context_limit=200_000,
             use_sidecar=False,
             before_launch=lambda _path: callbacks.append("before_launch"),
-            invoke=lambda **_kwargs: callbacks.append("invoke") or 0,
+            invoke=record_invoke,
             run_active=lambda runner, **_kwargs: runner(),
         )
 
