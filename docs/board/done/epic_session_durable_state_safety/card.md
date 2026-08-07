@@ -1,9 +1,9 @@
 # Epic: Session and durable-state safety
 
-**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- the first seven members shipped in PRs #134--#138, #140, and #141; D010 is implementation-verified
-from merged `main` at `d2ed2349` pending independent review as the final Wave 3 member.
+**Lane**: `done/` -- all eight Wave 3 members shipped independently in PRs #134--#138 and #140--#142; the coordinated
+outcome closed on 2026-08-07.
 
 ## Goal
 
@@ -76,6 +76,8 @@ members follow the HIGH-severity set; D021 explicitly depends on D011's unreadab
 
 ## Closeout
 
-Close this epic only after all eight members ship independently, the review ledger records each outcome, the approved
-DG2 liveness model is reflected in normative and end-user docs, and all durable-state compatibility behavior is covered
-by regression tests.
+All eight members shipped independently with marked regressions and the required integration coverage. The review
+ledger, member cards, normative design, and end-user documentation record the final unreadable-state, manifest-shape,
+runtime-identity, missing-worktree, terminal-delete, newer-schema, transfer-strategy, and worktree-guard contracts. Wave
+4 is coordinated separately by
+[`epic_installer_transaction_safety`](../../todo/epic_installer_transaction_safety/card.md).

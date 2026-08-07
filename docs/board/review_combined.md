@@ -32,11 +32,11 @@ according to `docs/developer/board_contract.md`; keep independently shippable fi
 contract requires an epic.
 
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
-sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
-were reproduced on merged `main` at `dc963a7c` and converted into members under
-[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, D008, D009, and O003
-shipped in PRs #134--#138, D021 shipped in PR #140, and D022 shipped in PR #141. D010 is implementation-verified from
-merged `main` at `d2ed2349` pending independent review as the eighth and final member.
+sequencing and disposition; this report remains the evidence ledger. Waves 1--3 are closed after all eight Wave 3
+members shipped through PR #142. Wave 4's four installer findings were rechecked on merged `main` at `2461e3fa` and
+converted into three parked members under
+[`epic_installer_transaction_safety`](todo/epic_installer_transaction_safety/card.md); no installer implementation is
+active.
 
 ### Finding fields
 
@@ -162,9 +162,9 @@ implementation outcome below records its completed code and regression work.
 | D009 | HIGH     | O5    | `list_sessions` prunes on `not worktree.exists()`, `get_session` keeps on `store_root.exists()` — the same state (worktree gone, manifest present) is alive to one and stale to the other. For root-level worktree sessions the list prune manufactures orphan manifests that keep owning the name/binding; `session repair` classifies them `missing-worktree` report-only (a deliberate choice per the change log, which names this prune as the known producer — the residue is still unrecoverable).                       | §3.2 orphan-manifest bug class                           | `session/index.py:198` vs `:271`                                                                        |
 | D010 | MED      | O5    | `incognito` accepts `--worktree` but calls `require_repo_root()` unconditionally; `start`, `fork`, and codex-start branch to `require_main_repo_root()` — worktree-from-inside-a-worktree is refused by three commands, permitted by the fourth.                                                                                                                                                                                                                                                                               | §3.4 worktree rules                                      | `cli/session_lifecycle.py:1986` vs `:1053-1055`; `session_fork.py:400-402`                              |
 | D011 | HIGH     | F5    | `read_json` maps read `OSError` to `StateCorruptedError`, contradicting the package's unreadable-vs-corrupt contract; workqueue moves markers hit by *transient* read errors permanently to `failed/`, cap bootstrap misreports transient failures as corruption.                                                                                                                                                                                                                                                              | coding_standards §5; `core/state/exceptions.py`          | `core/state/io.py:212`; `core/workqueue/queue.py:422`; `core/telemetry/caps.py:38`                      |
-| D012 | HIGH     | F5+O5 | Disable's unmerge baseline is `find_backup_files(...)[0]` = **newest** backup, but `backup_settings()` runs on every enable *and* sync — from the second run the "pre-Forge baseline" contains Forge's own values, so disable restores them instead of removing them. `Installation.settings_backup_path` records the correct first backup and is never read for this.                                                                                                                                                         | appendix §C.3 reversible-transition contract             | `install/installer.py:2396`; `install/runtime_removal.py:505`; `settings_merge.py:119`                  |
+| D012 | HIGH     | F5+O5 | Every settings-bearing enable/sync creates a backup and replaces `Installation.settings_backup_path`; full and runtime-scoped disable independently read `find_backup_files(...)[0]` = **newest**. From the second run both the tracked path and disable lookup select a Forge-bearing backup, so the pre-Forge baseline is no longer authoritative and disable restores Forge values.                                                                                                                                         | appendix §C.3 reversible-transition contract             | `install/installer.py:1794,2029-2031,2369,2396`; `install/runtime_removal.py:489,505`                   |
 | D013 | HIGH     | O5    | `_execute_codex` writes the managed Codex block; a failure in the final `set_installation` rolls back files + settings but **not** the Codex block, while the error message says everything was rolled back. Nothing ever removes it.                                                                                                                                                                                                                                                                                          | appendix §C.4 rollback contract                          | `install/installer.py:1962` → `:2037-2046`, `:2071-2074`                                                |
-| D014 | HIGH     | O5    | `_execute_codex` (including the config read-back) runs unguarded between file installation and the tracking commit — an `OSError` there escapes `init()` after files/settings are written and before tracking exists, so `disable` later reports "not installed".                                                                                                                                                                                                                                                              | appendix §C.4 tracking commits last                      | `install/installer.py:1962`; `install/codex_hooks.py:324`                                               |
+| D014 | HIGH     | O5    | `_execute_codex` (including the config read-back) runs unguarded between file installation and the tracking commit — an `OSError` there escapes `init()` after files/settings are written and before tracking exists, so `disable` later reports "not installed".                                                                                                                                                                                                                                                              | appendix §C.4 tracking commits last                      | `install/installer.py:1375-1412,1962`                                                                   |
 | D015 | HIGH     | F5+O5 | `prune_audit_logs` and `prune_provider_traces` are byte-identical wrappers pruning the **same** unified downstream directory back-to-back with independent budgets — effective retention is the minimum; `audit.retention_days: 90` silently defeated by the default trace 14.                                                                                                                                                                                                                                                 | appendix §A.11/§A.14 retention semantics                 | `proxy/server.py:228`, `:245`; `audit_logger.py:426`; `provider_trace_logger.py:302`                    |
 | D016 | HIGH     | F5+O5 | `proxy create --json --smoke-test` prints a **second** top-level JSON document (stdout unparseable) and exits 0 on smoke failure — `sys.exit(1)` lives only in the human branch. CI reads a broken proxy as healthy.                                                                                                                                                                                                                                                                                                           | §4 `--json` contract                                     | `cli/proxy.py:511-519`                                                                                  |
 | D017 | HIGH     | F5+O5 | Search-index corruption produces three exit behaviors: `query` exits 0 in human **and** `--json` mode, `status --json` exits 1, `status` human exits 0.                                                                                                                                                                                                                                                                                                                                                                        | §4 clean-failure contract                                | `cli/search.py:155` vs `:624-630`, `:683`                                                               |
@@ -292,11 +292,11 @@ implementation outcome below records its completed code and regression work.
   host tests, 3 focused Docker manager tests, all 9 Docker resume integration tests, and 668 regressions cover the
   boundary. It shipped in PR #141 (`d2ed2349`). See
   [`reject_unknown_resume_strategy`](done/reject_unknown_resume_strategy/card.md).
-- **D010 — implementation-verified 2026-08-07, pending independent review:** `session incognito --worktree` now uses the
-  same main-checkout guard as the other worktree-creating session commands, while ordinary incognito retains the
-  repository-root guard. Rejection occurs before the shared launch seam. A marked fail-first regression, 12 focused CLI
-  tests, all 23 Docker session lifecycle tests, 669 regressions, and final `make pre-commit` cover the boundary. See
-  [`align_incognito_worktree_guard`](doing/align_incognito_worktree_guard/card.md).
+- **D010 — resolved 2026-08-07:** `session incognito --worktree` now uses the same main-checkout guard as the other
+  worktree-creating session commands, while ordinary incognito retains the repository-root guard. Rejection occurs
+  before the shared launch seam. A marked fail-first regression, 12 focused CLI tests, all 23 Docker session lifecycle
+  tests, 669 regressions, and final `make pre-commit` cover the boundary. It shipped in PR #142 (`2461e3fa`). See
+  [`align_incognito_worktree_guard`](done/align_incognito_worktree_guard/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -485,12 +485,30 @@ implementation member was activated during admission.
 | 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md)         |
 | 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](done/preserve_newer_workqueue_markers/card.md)                           |
 | 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](done/reject_unknown_resume_strategy/card.md)                               |
-| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](doing/align_incognito_worktree_guard/card.md)                              |
+| 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](done/align_incognito_worktree_guard/card.md)                               |
 
 The first five members retain HIGH-severity priority. D011 goes first because its generic exception contract affects the
 later workqueue member. O006 pins strict manifest classification before D009 changes manifest/index liveness, and D009
 precedes O003 so the concurrent-delete fix can preserve the approved live-versus-absent authority model. The MEDIUM
 members follow as separate review boundaries; D021 depends explicitly on D011.
+
+### Wave 4 admission record
+
+All three HIGH and one MEDIUM Wave 4 findings were rechecked on merged `main` at `2461e3fa`. One disposable pytest
+module passed four assertions of the broken behavior and was removed after evidence capture. A fifth two-run
+characterization corrected D012's stale claim that tracking retained the first backup: sync replaces the tracked path as
+well as creating the newer Forge-bearing backup. No implementation member was activated during admission.
+
+| Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                           |
+| ----- | --------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](todo/rollback_codex_install_transaction/card.md)   |
+| 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](todo/preserve_install_settings_baseline/card.md)   |
+| 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](todo/preserve_legacy_settings_user_edits/card.md) |
+
+D013 and D014 share one rollback transaction: the same pre-mutation Codex snapshot must cover a post-write read-back
+failure and the later manifest commit, so they form one member rather than two partial rollback implementations. It goes
+first because a failed fresh enable otherwise leaves surfaces with no ownership row. D012 follows as the remaining
+HIGH-severity baseline invariant; D019's bounded no-sidecar compatibility path ships last.
 
 ### Suggested coordination boundaries
 
@@ -499,11 +517,11 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
   commands deliberately own overrides.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
-- **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; the first seven shipped through PR #141, and D010 is
-  implementation-verified from merged `main` at `d2ed2349` pending independent review as the final member.
-- **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
-  durable-state classification changes.
+- **[Durable-state/session epic](done/epic_session_durable_state_safety/card.md):** all eight Wave 3 members shipped
+  independently in PRs #134--#138 and #140--#142.
+- **[Installer epic](todo/epic_installer_transaction_safety/card.md):** D013/D014 share one Codex rollback transaction;
+  D012 and D019 remain separate settings-baseline and legacy-value members. All three are parked pending admission
+  review.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit
   status, result-on-stdout, and diagnostics-on-stderr across accepted members.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
