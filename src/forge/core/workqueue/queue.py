@@ -359,7 +359,7 @@ def process_pending_work(
 
     Fast path: if pending dir doesn't exist or is empty, returns immediately.
 
-    For each marker in a bounded round-robin window (up to max_items):
+    For each marker in a bounded rotating window (up to max_items):
     - Acquires per-marker lock (short timeout)
     - Validates marker schema
     - Dispatches to handler by kind (if handler exists)
@@ -370,8 +370,8 @@ def process_pending_work(
 
     Args:
         max_items: Maximum markers to inspect in one invocation. The scan cursor
-            advances past deferred markers, so later work gets a turn on the
-            next invocation without increasing the startup latency bound.
+            advances after windows containing resident deferred or skipped markers,
+            so later work gets a turn without increasing the startup latency bound.
         timeout_s: Lock timeout per marker (default 50ms).
         handlers: Dict mapping kind -> handler function. If None, uses empty dict
                   (markers with no handler are left in place).
@@ -398,23 +398,24 @@ def process_pending_work(
         return result
 
     scan_window = _select_scan_window(queue_dir, markers, max_items=max_items)
-    deferred_seen = False
+    resident_seen = False
     for marker_file in scan_window:
         outcome = _process_single_marker(marker_file, timeout_s=timeout_s, handlers=handlers)
         if isinstance(outcome, _DeferredMarker):
-            deferred_seen = True
+            resident_seen = True
             result.skipped += 1
             result.diagnostics.append(outcome.diagnostic)
         elif outcome is None:
             result.processed += 1
         elif outcome == "skipped":
+            resident_seen = True
             result.skipped += 1
         elif outcome == "failed":
             result.failed += 1
         else:
             result.errors.append(outcome)
 
-    if deferred_seen:
+    if resident_seen:
         _write_scan_cursor(queue_dir, scan_window[-1].name)
     elif scan_window:
         _clear_scan_cursor(queue_dir)
@@ -458,7 +459,7 @@ def _write_scan_cursor(queue_dir: Path, last_marker: str) -> None:
 
 
 def _clear_scan_cursor(queue_dir: Path) -> None:
-    """Clear a stale deferral cursor after a scan completes without deferrals."""
+    """Clear a stale cursor after a nonempty scan completes without resident work."""
     try:
         (queue_dir / _SCAN_CURSOR_FILE).unlink(missing_ok=True)
     except OSError as e:

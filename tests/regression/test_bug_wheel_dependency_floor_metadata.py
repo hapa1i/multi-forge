@@ -40,7 +40,11 @@ def test_distribution_metadata_enforces_security_floors() -> None:
 
     _assert_minimum(requirements["aiohttp"], "3.14.3")
     _assert_minimum(requirements["cryptography"], "50.0.0")
-    assert {"expression", "redis", "uvloop"} <= requirements.keys()
+    assert {"boto3", "expression", "redis", "uvloop"} <= requirements.keys()
     assert not requirements["fastapi"].specifier.contains("0.141.1")
     assert not requirements["starlette"].specifier.contains("1.4.1")
-    assert requirements["litellm"].extras == set()
+    litellm = requirements["litellm"]
+    assert litellm.extras == set()
+    _assert_minimum(litellm, "1.88.0")
+    assert litellm.specifier.contains("1.95.0")
+    assert not litellm.specifier.contains("1.95.1")

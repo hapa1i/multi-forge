@@ -109,6 +109,9 @@ make test                   # ~3 min
 # Other targets
 make pre-commit             # All hooks: ruff, black, isort, mypy, pyright, mdformat
 make clean                  # remove caches
+
+# Clean wheel install with the newest allowed LiteLLM, then start/health/stop it
+./scripts/test-wheel-runtime.sh
 ```
 
 **Why `make` is required:**
@@ -117,6 +120,9 @@ make clean                  # remove caches
 - Starts LiteLLM on 4001 (not dev 4000)
 - Uses `litellm-gemini-test` for isolation
 - Fails loudly on missing prereqs ("never skip")
+
+The clean-wheel smoke deliberately resolves dependencies outside `uv.lock`. Run it whenever the LiteLLM compatibility
+ceiling or Forge-owned proxy dependency set changes; pull-request CI also gates on it.
 
 ### When to Run Integration Tests
 
