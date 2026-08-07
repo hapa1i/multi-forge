@@ -17,6 +17,7 @@ import forge.core.workqueue.queue as workqueue_queue
 from forge.cli.main import _EXEMPT_SUBCOMMANDS, main
 from forge.core.state import StateUnreadableError
 from forge.core.workqueue import (
+    MARKER_SCHEMA_VERSION,
     enqueue_index_marker,
     enqueue_shadow_marker,
     enqueue_stop_marker,
@@ -53,6 +54,27 @@ def _create_test_marker(tmp_path: Path, session_id: str = "test-marker-123") -> 
     )
     assert marker is not None
     return marker
+
+
+def _create_newer_marker(marker_id: str = "a-future") -> tuple[Path, bytes]:
+    queue_dir = pending_work_dir()
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    marker = queue_dir / f"{marker_id}.json"
+    content = (
+        json.dumps(
+            {
+                "schema_version": MARKER_SCHEMA_VERSION + 1,
+                "kind": "future-kind",
+                "marker_id": marker_id,
+                "payload": {"future": [1, 2, 3]},
+                "future_envelope_field": "preserve",
+            },
+            indent=4,
+        )
+        + "\n"
+    ).encode()
+    marker.write_bytes(content)
+    return marker, content
 
 
 class TestStartupQueueProcessing:
@@ -192,6 +214,31 @@ class TestStartupQueueRobustness:
         assert "a-unreadable.json could not be read" in result.stderr
         assert unreadable.read_bytes() == original_bytes
         assert not readable.exists()
+
+    def test_newer_schema_marker_warns_once_and_leaves_json_stdout_clean(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(workqueue_queue, "_warned_newer_schema", False)
+        newer, original = _create_newer_marker()
+        current = _create_test_marker(tmp_path, session_id="z-current")
+
+        first = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert first.exit_code == 0, first.output
+        json.loads(first.stdout)
+        assert first.stderr.count("Warning:") == 1
+        assert "written by newer Forge" in first.stderr
+        assert "Upgrade Forge" in first.stderr
+        assert newer.read_bytes() == original
+        assert not current.exists()
+        assert not (pending_work_dir() / "failed" / newer.name).exists()
+
+        second = CliRunner().invoke(main, ["model", "backend", "list", "--json"])
+
+        assert second.exit_code == 0, second.output
+        json.loads(second.stdout)
+        assert "written by newer Forge" not in second.stderr
+        assert newer.read_bytes() == original
 
 
 def _create_index_marker_with_transcript(tmp_path: Path, session_id: str = "test-idx-123") -> Path:

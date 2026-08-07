@@ -958,18 +958,23 @@ also snapshot the Stop-time `subprocess_proxy`.
 Handlers are passed explicitly as a `handlers` dict (no global registry -- avoids import-order coupling and test state
 leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
-A bounded window containing unreadable, lock-contended, or unhandled resident work advances the scan cursor past the
-whole window. This preserves the startup cap while allowing later actionable markers to run on a subsequent drain.
+Byte preservation is a consumer-drain guarantee. A producer that re-enqueues the same `marker_id` retains the existing
+atomic-replacement behavior, refreshing the current representation of that logical work item.
 
-| Outcome                               | Behavior                                                                               |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| Handler succeeds                      | Delete marker under lock                                                               |
-| Handler raises                        | Keep marker, increment `attempt_count`, write `last_error` under lock                  |
-| Marker read is unreadable (`OSError`) | Leave bytes unchanged and pending; diagnose, skip, and advance the bounded scan cursor |
-| Marker contains malformed JSON        | Move directly to `pending-work/failed/`                                                |
-| Lock contention                       | Skip, leave pending, and advance the bounded scan cursor                               |
-| No handler for kind                   | Skip, leave pending (debug log), and advance the bounded scan cursor                   |
-| `attempt_count >= MAX_ATTEMPTS` (5)   | Move to `pending-work/failed/` (poison marker, preserved for debugging)                |
+A bounded window containing unreadable, newer-schema, lock-contended, or unhandled resident work advances the scan
+cursor past the whole window. This preserves the startup cap while allowing later actionable markers to run on a
+subsequent drain.
+
+| Outcome                                      | Behavior                                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Handler succeeds                             | Delete marker under lock                                                                                |
+| Handler raises                               | Keep marker, increment `attempt_count`, write `last_error` under lock                                   |
+| Marker read is unreadable (`OSError`)        | Leave bytes unchanged and pending; diagnose, skip, and advance the bounded scan cursor                  |
+| `schema_version` is a strictly newer integer | Leave bytes unchanged and pending; diagnose once per process, skip, and advance the bounded scan cursor |
+| Marker contains malformed JSON               | Move directly to `pending-work/failed/`                                                                 |
+| Lock contention                              | Skip, leave pending, and advance the bounded scan cursor                                                |
+| No handler for kind                          | Skip, leave pending (debug log), and advance the bounded scan cursor                                    |
+| `attempt_count >= MAX_ATTEMPTS` (5)          | Move to `pending-work/failed/` (poison marker, preserved for debugging)                                 |
 
 ### B.3 Known marker kinds
 

@@ -34,8 +34,9 @@ contract requires an epic.
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
 sequencing and disposition; this report remains the evidence ledger. Waves 1 and 2 are closed. Wave 3's eight findings
 were reproduced on merged `main` at `dc963a7c` and converted into members under
-[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, D008, and D009
-shipped in PRs #134--#137, and O003 is independently reviewed and awaiting merge as the fifth member.
+[`epic_session_durable_state_safety`](doing/epic_session_durable_state_safety/card.md). D011, O006, D008, D009, and O003
+shipped in PRs #134--#138. D021 is implementation-verified from merged `main` at `de8adaac` and pending independent
+review as the sixth member.
 
 ### Finding fields
 
@@ -266,15 +267,24 @@ implementation outcome below records its completed code and regression work.
   marked regression, focused state/lifecycle tests, both complete Docker session files, regression suite, and unit suite
   cover the boundary. Independent review found no design violations. It shipped in PR #137 (`cce6e8c6`). See
   [`retain_missing_worktree_sessions`](done/retain_missing_worktree_sessions/card.md).
-- **O003 — independently reviewed 2026-08-07:** headless Codex first-turn and resume paths now share one post-turn
-  manifest-presence guard with the interactive frontend. Explicit deletion returns the completed runtime result with a
-  warning, suppresses manifest/index fact reconciliation, and removes only an empty or lock-only shell in the narrower
-  race. Corruption, unreadability, lock timeout, unrelated directory content, normal fact refresh, and rollback remain
-  unchanged. Independent review found no production design violation, exposed and repaired a stale integration-fixture
-  import that broke CLI test collection, and admitted the separate SessionStart receipt-shell race as D049. A marked
-  fail-first regression, 72 focused tests, the live two-turn Codex integration, and 664 regressions cover the production
-  boundary; post-amendment CLI integration collection (166) and final `make pre-commit` passed. See
-  [`preserve_headless_codex_concurrent_delete`](doing/preserve_headless_codex_concurrent_delete/card.md).
+- **O003 — resolved 2026-08-07:** headless Codex first-turn and resume paths now share one post-turn manifest-presence
+  guard with the interactive frontend. Explicit deletion returns the completed runtime result with a warning, suppresses
+  manifest/index fact reconciliation, and removes only an empty or lock-only shell in the narrower race. Corruption,
+  unreadability, lock timeout, unrelated directory content, normal fact refresh, and rollback remain unchanged.
+  Independent review found no production design violation, exposed and repaired a stale integration-fixture import that
+  broke CLI test collection, and admitted the separate SessionStart receipt-shell race as D049. A marked fail-first
+  regression, 72 focused tests, the live two-turn Codex integration, and 664 regressions cover the production boundary;
+  post-amendment CLI integration collection (166) and final `make pre-commit` passed. It shipped in PR #138
+  (`4a601dc2`). See
+  [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md).
+- **D021 — implementation-verified 2026-08-07, pending independent review:** a readable marker with a strictly newer
+  integer schema is now resident deferred work before ordinary validation. The older consumer leaves its bytes and
+  unknown fields untouched, does not dispatch a handler or accrue retry/poison state, emits one actionable diagnostic
+  per process, and advances the bounded scan cursor so later current-schema work remains reachable. Malformed,
+  missing/non-integer/older-schema, lock-contention, absent-handler, handler-failure, and poison outcomes remain
+  distinct. A marked fail-first regression, 82 focused tests, all 10 Docker startup-queue tests, 667 regressions, and
+  8,804 unit tests cover the boundary. See
+  [`preserve_newer_workqueue_markers`](doing/preserve_newer_workqueue_markers/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -460,8 +470,8 @@ implementation member was activated during admission.
 | 2     | O006     | explicit-null `confirmed` leaks raw `AttributeError`                                 | [`reject_non_object_manifest_confirmed`](done/reject_non_object_manifest_confirmed/card.md)                   |
 | 3     | D008     | parent `launch` override creates raw/effective runtime disagreement                  | [`enforce_launch_runtime_override_immutability`](done/enforce_launch_runtime_override_immutability/card.md)   |
 | 4     | D009     | list deletes a row that get accepts through its valid manifest                       | [`retain_missing_worktree_sessions`](done/retain_missing_worktree_sessions/card.md)                           |
-| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](doing/preserve_headless_codex_concurrent_delete/card.md)        |
-| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](todo/preserve_newer_workqueue_markers/card.md)                           |
+| 5     | O003     | headless Codex post-turn update raises and leaves a lock-only directory after delete | [`preserve_headless_codex_concurrent_delete`](done/preserve_headless_codex_concurrent_delete/card.md)         |
+| 6     | D021     | five drains rewrite and move a newer-schema marker to `failed/`                      | [`preserve_newer_workqueue_markers`](doing/preserve_newer_workqueue_markers/card.md)                          |
 | 7     | D022     | unknown strategy runs structured but persists the unknown literal                    | [`reject_unknown_resume_strategy`](todo/reject_unknown_resume_strategy/card.md)                               |
 | 8     | D010     | incognito worktree creation calls the weaker repository guard                        | [`align_incognito_worktree_guard`](todo/align_incognito_worktree_guard/card.md)                               |
 
@@ -478,8 +488,9 @@ members follow as separate review boundaries; D021 depends explicitly on D011.
 - **[Stop/artifact epic](done/epic_stop_artifact_correctness/card.md):** DG1, verification, artifact schema/idempotency,
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](doing/epic_session_durable_state_safety/card.md):** D008–D011, D021–D022, O003, and
-  O006 are reproduced as eight separately reviewable members; D011, O006, D008, and D009 shipped in PRs #134--#137, O003
-  is independently reviewed and awaiting merge, and the remaining members stay parked.
+  O006 are reproduced as eight separately reviewable members; the five HIGH members shipped in PRs #134--#138, D021 is
+  implementation-verified from merged `main` at `de8adaac` pending independent review, and the remaining members stay
+  parked.
 - **Installer epic:** coordinate D012–D014, D019, and related install-transaction findings without mixing them into the
   durable-state classification changes.
 - **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit

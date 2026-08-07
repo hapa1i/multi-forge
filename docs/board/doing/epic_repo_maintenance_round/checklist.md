@@ -1,6 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: merge the independently reviewed O003 without starting D021.
+Current focus: independently review and merge D021 without starting D022.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -50,6 +50,9 @@ Current focus: merge the independently reviewed O003 without starting D021.
 - [x] Activate O003 from merged `main` and create its execution checklist.
 - [x] Implement and behaviorally verify O003 without activating D021.
 - [x] Review O003, repair the stale CLI integration-fixture import, and record the separate D049 receipt-shell race.
+- [x] Merge O003 before activating D021 (PR #138, `4a601dc2`).
+- [x] Activate D021 from merged `main` at `de8adaac` and retain its byte-rewrite regression failure.
+- [x] Implement and behaviorally verify D021 while preserving PR #139's rotating-window semantics.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

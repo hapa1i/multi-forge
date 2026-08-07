@@ -1201,7 +1201,7 @@ not the exiting session.
 | ---------------- | -------------------------- | --------------------------------------------------- |
 | Artifact copy    | ✔ Yes                      | Writes to UUID-named path, overwrites are identical |
 | Verification     | ✔ Yes                      | Stateless check of last message                     |
-| Deferred enqueue | ✔ Yes                      | Marker file is idempotent (same content = no-op)    |
+| Deferred enqueue | ✔ Yes                      | Same marker ID atomically refreshes one work item   |
 
 **Deferred enqueue:** The Stop hook attempts stop and index markers, a handoff marker when memory is enabled, and a
 shadow marker when pending shadow candidates exist. A later eligible CLI startup drains the handoff marker and launches
@@ -1285,10 +1285,12 @@ Each marker is a JSON file with `kind` (routing key), `marker_id` (idempotency k
 retry tracking (`attempt_count`/`last_error`). Handlers are passed as an explicit dict (no global registry). Successful
 handling deletes the marker; poison markers (5+ attempts) move to `pending-work/failed/`. An existing marker that cannot
 be read stays byte-identical and pending without consuming a retry; startup emits a diagnostic and continues with later
-markers. The startup scan remains capped: when a bounded window leaves unreadable, lock-contended, or unhandled markers
-pending, an internal `.scan-cursor` resumes after that window on the next drain so every marker gets a turn. A nonempty
-window with no resident deferred or skipped work clears the cursor; an empty queue simply ignores it. Malformed JSON is
-known-bad content and moves directly to `failed/`.
+markers. A readable marker with a strictly newer integer schema is also left byte-identical and pending: the older
+consumer does not interpret or dispatch its payload, consume a retry, or move it to `failed/`, and startup emits
+actionable upgrade guidance once per process. The startup scan remains capped: when a bounded window leaves unreadable,
+newer-schema, lock-contended, or unhandled markers pending, an internal `.scan-cursor` resumes after that window on the
+next drain so every marker gets a turn. A nonempty window with no resident deferred or skipped work clears the cursor;
+an empty queue simply ignores it. Malformed JSON is known-bad content and moves directly to `failed/`.
 
 > Marker schema, processing contract, and known kinds in
 > [design_appendix.md §B](design_appendix.md#b-work-queue-internals).
