@@ -35,3 +35,6 @@ jobs:
 
       - name: Run regression tests
         run: uv run pytest tests/regression -m regression -v
+
+      - name: Verify clean wheel LiteLLM runtime
+        run: ./scripts/test-wheel-runtime.sh

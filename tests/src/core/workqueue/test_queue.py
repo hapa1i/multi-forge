@@ -388,6 +388,53 @@ class TestProcessPendingWork:
         assert not (pending_work_dir() / "failed" / unreadable.name).exists()
         handler.assert_called_once()
 
+    def test_persistent_resident_windows_rotate_without_exceeding_processing_budget(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        unreadable = [enqueue(kind="test", marker_id=f"a-unreadable-{i}", payload={}) for i in range(5)]
+        unknown = [enqueue(kind="unknown", marker_id=f"m-unknown-{i}", payload={}) for i in range(5)]
+        readable = enqueue(kind="test", marker_id="z-readable", payload={})
+        assert all(path is not None for path in unreadable + unknown)
+        assert readable is not None
+        unreadable_paths = {path for path in unreadable if path is not None}
+        unknown_paths = {path for path in unknown if path is not None}
+        original_bytes = {path: path.read_bytes() for path in unreadable_paths}
+        real_read_json = workqueue_queue.read_json
+
+        def read_with_transient_failure(path: Path) -> dict:
+            if path in unreadable_paths:
+                raise StateUnreadableError(str(path), "simulated transient read failure")
+            return real_read_json(path)
+
+        monkeypatch.setattr(workqueue_queue, "read_json", read_with_transient_failure)
+        handler = MagicMock()
+
+        first = process_pending_work(max_items=5, handlers={"test": handler})
+
+        assert first.processed == 0
+        assert first.skipped == 5
+        assert len(first.diagnostics) == 5
+        assert readable.exists()
+        handler.assert_not_called()
+
+        second = process_pending_work(max_items=5, handlers={"test": handler})
+
+        assert second.processed == 0
+        assert second.skipped == 5
+        assert second.diagnostics == []
+        assert readable.exists()
+        assert all(path.exists() for path in unknown_paths)
+        handler.assert_not_called()
+
+        third = process_pending_work(max_items=5, handlers={"test": handler})
+
+        assert third.processed == 1
+        assert third.skipped == 4
+        assert len(third.diagnostics) == 4
+        assert not readable.exists()
+        assert {path: path.read_bytes() for path in unreadable_paths} == original_bytes
+        handler.assert_called_once()
+
 
 class TestHandlerDispatch:
     """Tests for handler registration and dispatch."""

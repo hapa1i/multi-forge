@@ -7,9 +7,9 @@ license = "Apache-2.0"
 authors = [
     { name = "Habib Farr", email = "hapali@pm.me" },
 ]
-# `uvloop` is pulled in transitively via `litellm[proxy]` and has no cp314 wheel
-# at time of writing; building from source fails on macOS. Lift the upper bound
-# once uvloop ships 3.14 wheels. See https://github.com/hapa1i/multi-forge/issues/1
+# LiteLLM's CLI selects uvloop on non-Windows systems. Keep Python 3.14 outside
+# the supported range until that clean-install/runtime matrix is verified.
+# See https://github.com/hapa1i/multi-forge/issues/1
 requires-python = ">=3.11,<3.14"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -28,26 +28,48 @@ dependencies = [
     "dacite>=1.8.0",
     "click>=8.3.1",
     "coolname>=5.0.0,<6",
-    "rich>=13.9.0",
+    "rich>=13.9.4,<14",
     "pydantic>=2.0.0",
     "openai>=1.0.0",
     "httpx>=0.25.0",
     "tenacity>=8.0.0",
     "python-dotenv>=1.2.2",
-    "pyyaml>=6.0.0",
+    "pyyaml>=6.0.3,<7",
     "ruamel.yaml>=0.18.0",
     "packaging>=21.0",
-    # Proxy dependencies (previously optional, now core).
-    # Plain `fastapi` (no `[standard]` extras): Forge uses none of websockets/
-    # uvloop/httptools/multipart/jinja2. `watchfiles` is declared explicitly
-    # because Forge owns `--reload` (`forge proxy server --reload`).
-    "fastapi>=0.115.14",
-    "uvicorn>=0.31.1",
+    # Proxy dependencies (previously optional, now core). Forge owns the
+    # default-Uvicorn LiteLLM startup set because the upstream `proxy` extra
+    # caps cryptography below Forge's patched floor. This set is start/health
+    # validated through LiteLLM 1.95.0; run scripts/test-wheel-runtime.sh before
+    # raising the ceiling. Alternate servers, databases, and cloud integrations
+    # remain outside Forge's runtime path.
+    "aiohttp>=3.14.3,<4",
+    "apscheduler>=3.11.2,<4",
+    "backoff>=2.2.1,<3",
+    # LiteLLM 1.88+ imports the Focus S3 destination during proxy startup.
+    "boto3>=1.43.1,<2",
+    "cryptography>=50.0.0",
+    # LiteLLM 1.95 imports outbound-credential tagged unions at startup.
+    "expression>=5.6.0,<6",
+    # LiteLLM's proxy imports an internal FastAPI helper absent from newer
+    # releases; keep the lock-proven FastAPI/Starlette pair together.
+    "fastapi>=0.136.3,<0.137",
+    "fastapi-sso>=0.19.0,<1",
+    "orjson>=3.11.6,<4",
+    "pydantic-settings>=2.14.1,<3",
+    "pyjwt>=2.13.0,<3",
+    "python-multipart>=0.0.31,<1",
+    # LiteLLM 1.95 imports its Redis support from the default startup graph.
+    "redis>=5.2.0,<8",
+    "starlette>=1.3.1,<1.4",
+    "uvicorn>=0.33.0,<1",
+    "uvloop>=0.21.0,<1; sys_platform != 'win32'",
     "watchfiles>=0.20",
+    "websockets>=15.0.1,<16",
     # Floor = the gate-proven version for gemini-3.6-flash (see
     # tests/integration/proxy/test_proxy_local_litellm_e2e.py); packaged
     # cost-map pricing for that model first ships in the v1.94 line.
-    "litellm[proxy]>=1.88.0",
+    "litellm>=1.88.0,<=1.95.0",
 ]
 
 [project.scripts]
@@ -125,22 +147,9 @@ disallow_untyped_calls = false
 constraint-dependencies = [
     "filelock>=3.20.3",
     "virtualenv>=20.36.1",
-    "aiohttp>=3.14.3",
-    "cryptography>=50.0.0",
     "mcp>=1.28.1",
-    "python-multipart>=0.0.31",
     "Pygments>=2.20.0",
-    "PyJWT>=2.13.0",
-    "starlette>=1.3.1",
     "pyasn1>=0.6.4",
-]
-# litellm proxy extras can pin vulnerable transitive dependencies before
-# upstream metadata catches up. Forge doesn't use these directly; override to
-# force patched versions required by Dependabot alerts.
-override-dependencies = [
-    "cryptography>=50.0.0",
-    "fastapi-sso>=0.19.0",
-    "python-multipart>=0.0.31",
 ]
 
 [dependency-groups]
