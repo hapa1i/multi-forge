@@ -1285,7 +1285,9 @@ Each marker is a JSON file with `kind` (routing key), `marker_id` (idempotency k
 retry tracking (`attempt_count`/`last_error`). Handlers are passed as an explicit dict (no global registry). Successful
 handling deletes the marker; poison markers (5+ attempts) move to `pending-work/failed/`. An existing marker that cannot
 be read stays byte-identical and pending without consuming a retry; startup emits a diagnostic and continues with later
-markers. Malformed JSON is known-bad content and moves directly to `failed/`.
+markers. The startup scan remains capped: if unreadable markers fill the selected window, an internal `.scan-cursor`
+resumes after that window on the next drain and is cleared after a drain without deferrals. Malformed JSON is known-bad
+content and moves directly to `failed/`.
 
 > Marker schema, processing contract, and known kinds in
 > [design_appendix.md §B](design_appendix.md#b-work-queue-internals).

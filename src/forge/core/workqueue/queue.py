@@ -36,6 +36,7 @@ import json
 import logging
 import re
 import shutil
+from bisect import bisect_right
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -69,6 +70,7 @@ logger = logging.getLogger(__name__)
 # Lock timeouts
 MARKER_LOCK_TIMEOUT_S = 0.1  # 100ms for hooks (must be fast)
 PROCESSOR_LOCK_TIMEOUT_S = 0.05  # 50ms per marker during startup processing
+_SCAN_CURSOR_FILE = ".scan-cursor"
 
 # Regex for safe marker IDs (prevents path traversal)
 # Allow alphanumeric, hyphens, underscores, dots (typical UUID/session ID chars)
@@ -357,7 +359,7 @@ def process_pending_work(
 
     Fast path: if pending dir doesn't exist or is empty, returns immediately.
 
-    For each marker (up to max_items):
+    For each marker in a bounded round-robin window (up to max_items):
     - Acquires per-marker lock (short timeout)
     - Validates marker schema
     - Dispatches to handler by kind (if handler exists)
@@ -367,7 +369,9 @@ def process_pending_work(
     - On poison (attempt_count >= MAX_ATTEMPTS): moves to failed/
 
     Args:
-        max_items: Maximum markers to process in one invocation.
+        max_items: Maximum markers to inspect in one invocation. The scan cursor
+            advances past deferred markers, so later work gets a turn on the
+            next invocation without increasing the startup latency bound.
         timeout_s: Lock timeout per marker (default 50ms).
         handlers: Dict mapping kind -> handler function. If None, uses empty dict
                   (markers with no handler are left in place).
@@ -393,13 +397,16 @@ def process_pending_work(
     if not markers:
         return result
 
-    for marker_file in markers[:max_items]:
+    scan_window = _select_scan_window(queue_dir, markers, max_items=max_items)
+    deferred_seen = False
+    for marker_file in scan_window:
         outcome = _process_single_marker(marker_file, timeout_s=timeout_s, handlers=handlers)
-        if outcome is None:
-            result.processed += 1
-        elif isinstance(outcome, _DeferredMarker):
+        if isinstance(outcome, _DeferredMarker):
+            deferred_seen = True
             result.skipped += 1
             result.diagnostics.append(outcome.diagnostic)
+        elif outcome is None:
+            result.processed += 1
         elif outcome == "skipped":
             result.skipped += 1
         elif outcome == "failed":
@@ -407,7 +414,55 @@ def process_pending_work(
         else:
             result.errors.append(outcome)
 
+    if deferred_seen:
+        _write_scan_cursor(queue_dir, scan_window[-1].name)
+    elif scan_window:
+        _clear_scan_cursor(queue_dir)
+
     return result
+
+
+def _select_scan_window(queue_dir: Path, markers: list[Path], *, max_items: int) -> list[Path]:
+    """Select a bounded round-robin window from the sorted marker snapshot."""
+    if max_items <= 0 or not markers:
+        return []
+
+    marker_names = [marker.name for marker in markers]
+    cursor = _read_scan_cursor(queue_dir)
+    start = bisect_right(marker_names, cursor) if cursor is not None else 0
+    ordered = markers[start:] + markers[:start]
+    return ordered[: min(max_items, len(markers))]
+
+
+def _read_scan_cursor(queue_dir: Path) -> str | None:
+    """Read the best-effort queue scan cursor."""
+    try:
+        data = read_json(queue_dir / _SCAN_CURSOR_FILE)
+    except (StateCorruptedError, StateNotFoundError, StateUnreadableError):
+        return None
+
+    last_marker = data.get("last_marker")
+    return last_marker if isinstance(last_marker, str) else None
+
+
+def _write_scan_cursor(queue_dir: Path, last_marker: str) -> None:
+    """Advance the best-effort queue scan cursor without affecting marker bytes."""
+    try:
+        atomic_write_json(
+            queue_dir / _SCAN_CURSOR_FILE,
+            {"last_marker": last_marker},
+            create_parents=False,
+        )
+    except OSError as e:
+        logger.debug("Failed to advance pending-work scan cursor: %s", e)
+
+
+def _clear_scan_cursor(queue_dir: Path) -> None:
+    """Clear a stale deferral cursor after a scan completes without deferrals."""
+    try:
+        (queue_dir / _SCAN_CURSOR_FILE).unlink(missing_ok=True)
+    except OSError as e:
+        logger.debug("Failed to clear pending-work scan cursor: %s", e)
 
 
 def _process_single_marker(
