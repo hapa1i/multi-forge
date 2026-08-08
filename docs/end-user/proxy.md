@@ -181,7 +181,7 @@ forge proxy template edit <name> # Customize a template (copy-on-first-edit)
 forge proxy template reset <name># Reset to built-in default
 
 # Create / start
-forge proxy create <template> [--name <id>] [--no-start]
+forge proxy create <template> [--name <id>] [--no-start] [--smoke-test] [--json]
 forge proxy start <proxy_id> [--smoke-test]
 forge proxy stop <proxy_id> [--force] [--kill-adopted]
 
@@ -336,6 +336,9 @@ forge proxy create openrouter-openai --no-start
 
 # Start and verify upstream connectivity (sends a real request)
 forge proxy start openrouter-openai --smoke-test
+
+# Create/start and return one scriptable creation + verification result
+forge proxy create openrouter-openai --json --smoke-test
 ```
 
 **Semantics (reuse/adopt/spawn):**
@@ -348,6 +351,10 @@ forge proxy start openrouter-openai --smoke-test
 
 Use `--smoke-test` after first setup or credential changes to verify the proxy can reach its upstream LLM provider.
 Without it, health checks only confirm the local proxy process is alive.
+
+On the normal create/start path, `--json --smoke-test` prints one JSON object: the usual creation fields plus
+`smoke_test.passed` and `smoke_test.detail`. A failed probe exits non-zero but leaves the successfully created, reused,
+or adopted proxy available for inspection and retry. `--no-start` remains config-only and does not run the probe.
 
 If a credential change leaves a local LiteLLM backend in a suspect state, run `forge model backend stop --all` (or
 `forge model backend stop --all --yes` in automation) before restarting proxies. This clears managed local backend
@@ -898,6 +905,9 @@ The create command implements **reuse/adopt/spawn** logic:
 1. **Reuse**: Check registry for existing healthy proxy with matching template
 2. **Adopt**: Check expected default port for orphan proxy (not in registry)
 3. **Spawn**: Start new proxy if neither exists
+
+Optional create-time smoke verification reports against whichever source won. In JSON mode it augments that one creation
+result instead of printing a second document; verification failure does not undo creation.
 
 ### Runtime truth
 

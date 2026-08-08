@@ -13,6 +13,7 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.cli.proxy import _ProxyInfo
 from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
+from forge.proxy.proxy_orchestrator import ProxyStartResult
 from forge.session.identity import make_scoped_key
 
 
@@ -188,6 +189,118 @@ def test_proxy_create_json_output(runner: CliRunner, temp_env: Path, monkeypatch
     assert data["template"] == "litellm-openai"
     assert data["base_url"] == "http://localhost:8085"
     assert data["port"] == 8085
+    assert data["source"] == "adopt"
+    assert "smoke_test" not in data
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize(
+    ("source", "pid"),
+    [("spawn", 4242), ("reuse", 4242), ("adopt", None)],
+)
+@pytest.mark.parametrize(
+    ("smoke_ok", "detail", "expected_exit"),
+    [(True, "upstream replied", 0), (False, "upstream unavailable", 1)],
+    ids=["passed", "failed"],
+)
+def test_proxy_create_json_smoke_is_one_result_for_every_source(
+    runner: CliRunner,
+    temp_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    pid: int | None,
+    smoke_ok: bool,
+    detail: str,
+    expected_exit: int,
+) -> None:
+    """Smoke verification augments creation truth without rolling it back."""
+    entry = ProxyEntry(
+        proxy_id=f"{source}-smoke",
+        template="litellm-openai",
+        base_url="http://localhost:18085",
+        port=18085,
+        pid=pid,
+        status="healthy",
+    )
+    proxy_file = _create_proxy_file(
+        temp_env,
+        entry.proxy_id,
+        "template: litellm-openai\nport: 18085\n",
+    )
+    _create_proxy_registry_from_entries({entry.proxy_id: entry})
+    monkeypatch.setattr("forge.cli.proxy.prune_stale_proxies", lambda: None)
+    monkeypatch.setattr(
+        "forge.cli.proxy.start_proxy",
+        lambda **kwargs: ProxyStartResult(proxy=entry, source=source),
+    )
+    monkeypatch.setattr(
+        "forge.proxy.proxy_orchestrator.smoke_test_proxy",
+        lambda **kwargs: (smoke_ok, detail),
+    )
+
+    result = runner.invoke(
+        main,
+        ["proxy", "create", "litellm-openai", "--port", "18085", "--json", "--smoke-test"],
+    )
+
+    assert result.exit_code == expected_exit
+    assert len(result.stdout.splitlines()) == 1
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "proxy_id": entry.proxy_id,
+        "template": entry.template,
+        "base_url": entry.base_url,
+        "port": entry.port,
+        "pid": entry.pid,
+        "status": entry.status,
+        "source": source,
+        "smoke_test": {"passed": smoke_ok, "detail": detail},
+    }
+    assert proxy_file.exists()
+    assert ProxyRegistryStore().read().proxies[entry.proxy_id] == entry
+
+
+@pytest.mark.parametrize(
+    ("smoke_ok", "message", "expected_exit"),
+    [(True, "Smoke test passed", 0), (False, "Smoke test failed", 1)],
+    ids=["passed", "failed"],
+)
+def test_proxy_create_human_smoke_keeps_existing_status_and_diagnostic(
+    runner: CliRunner,
+    temp_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    smoke_ok: bool,
+    message: str,
+    expected_exit: int,
+) -> None:
+    entry = ProxyEntry(
+        proxy_id="human-smoke",
+        template="litellm-openai",
+        base_url="http://localhost:18085",
+        port=18085,
+        pid=4242,
+        status="healthy",
+    )
+    monkeypatch.setattr("forge.cli.proxy.prune_stale_proxies", lambda: None)
+    monkeypatch.setattr(
+        "forge.cli.proxy.start_proxy",
+        lambda **kwargs: ProxyStartResult(proxy=entry, source="spawn"),
+    )
+    monkeypatch.setattr(
+        "forge.proxy.proxy_orchestrator.smoke_test_proxy",
+        lambda **kwargs: (smoke_ok, "probe detail"),
+    )
+
+    result = runner.invoke(
+        main,
+        ["proxy", "create", "litellm-openai", "--port", "18085", "--smoke-test"],
+    )
+
+    assert result.exit_code == expected_exit
+    assert "Started proxy human-smoke" in result.stdout
+    assert message in result.stdout
+    assert result.stderr == ""
 
 
 # --------------------------------------------------------------------------
@@ -1678,6 +1791,36 @@ class TestProxyCreateNoStart:
     These tests use the real template files from src/forge/config/defaults/templates/
     since the create command validates template existence.
     """
+
+    def test_create_no_start_keeps_config_only_json_when_smoke_flag_is_present(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def unexpected_smoke(**kwargs: object) -> tuple[bool, str]:
+            pytest.fail("--no-start must not run smoke verification")
+
+        monkeypatch.setattr("forge.proxy.proxy_orchestrator.smoke_test_proxy", unexpected_smoke)
+
+        result = runner.invoke(
+            main,
+            [
+                "proxy",
+                "create",
+                "litellm-openai",
+                "--name",
+                "config-only-smoke",
+                "--no-start",
+                "--json",
+                "--smoke-test",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["proxy_id"] == "config-only-smoke"
+        assert payload["status"] == "configured"
+        assert payload["source"] == "created"
+        assert "smoke_test" not in payload
+        assert result.stderr == ""
 
     def test_create_creates_proxy_file_and_registers(self, runner: CliRunner, temp_env: Path) -> None:
         """Create --no-start makes a new proxy file AND registers it in index.json."""

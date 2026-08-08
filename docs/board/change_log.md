@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-08
 
+### Preserve proxy ownership on stop failure
+
+**Goal/outcome**: Make proxy stop/delete failures visible without discarding the registry and configuration needed for
+recovery.
+
+**Key changes**:
+
+- Made refused or failed required stops exit non-zero and retain ownership; delete now completes last-owner teardown
+  inside the registry transaction before removing the row or overlay.
+- Preserved intentional detach/shared/already-stopped outcomes, truthful post-stop rollback, and independent
+  multi-delete progress; synchronized lifecycle docs and bundled QA coverage.
+
+**Verification**: The retained O002 regression failed on `8b997e6a`. After implementation, 168 focused tests, 8,890 unit
+tests (one skip), 685 regressions, all 6 Docker proxy-delete cases, package build, and final pre-commit passed.
+Independent review's stderr assertion was resolved; its separate pre-lock `proxy stop` race remains recorded outside
+O002. Shipped in PR #149 (`c20b8d10`).
+
 ### Unify downstream retention ownership
 
 **Goal/outcome**: Give shared downstream telemetry one global retention policy and one startup pruner without silently

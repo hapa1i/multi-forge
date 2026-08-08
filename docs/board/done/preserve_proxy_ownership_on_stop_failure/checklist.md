@@ -1,6 +1,6 @@
 # Preserve proxy ownership on stop failure checklist
 
-Current focus: independent review is complete; prepare the verified O002 implementation for PR and merge.
+Completed in PR #149 (`c20b8d10`).
 
 ## Activation and reproduction
 
@@ -51,4 +51,4 @@ Current focus: independent review is complete; prepare the verified O002 impleme
   no stale D015/O002 lane references remain; and pass the diff check.
 - [x] Resolve independent review: pin the identity-refusal diagnostic to stderr and record the separate pre-lock
   `proxy stop` shared-ownership race without absorbing it into O002.
-- [ ] Merge before activating D016.
+- [x] Merge before activating D016 (PR #149, `c20b8d10`).

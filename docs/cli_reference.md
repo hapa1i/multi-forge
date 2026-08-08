@@ -269,7 +269,7 @@ registered policy check; auxiliary-consumer lanes freeze at first real dispatch.
 
 | Command                              | Purpose                                                 |
 | ------------------------------------ | ------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it               |
+| `forge proxy create <template>`      | Create/start a proxy; optional JSON smoke result        |
 | `forge proxy list`                   | List all proxies (`--json`)                             |
 | `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
 | `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
@@ -291,6 +291,10 @@ removes a last live registry/config owner only after its required stop succeeds;
 claim. Default adopted detach, `delete --no-kill`, and deletion of one live shared-port alias intentionally leave the
 process running and succeed. Multi-delete continues other IDs, reports deleted/failed totals, and exits non-zero if any
 required stop fails.
+
+`proxy create --json --smoke-test` emits one object with the normal creation fields plus `smoke_test: {passed, detail}`.
+Failed verification exits non-zero while retaining the created/reused/adopted proxy; without `--smoke-test`, the JSON
+shape is unchanged. `--no-start` remains config-only and does not run verification.
 
 ### Telemetry
 

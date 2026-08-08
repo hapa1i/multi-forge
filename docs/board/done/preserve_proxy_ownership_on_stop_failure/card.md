@@ -1,10 +1,10 @@
 # Preserve proxy ownership on stop failure
 
-**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../../doing/epic_cli_proxy_runtime_correctness/card.md).
 
 **Finding**: O002 (HIGH) in [`review_combined.md`](../../review_combined.md#code-and-maintenance-findings).
 
-**Lane**: `doing/` -- active on `fix/preserve-proxy-ownership-on-stop-failure` from merged PR #148 (`8b997e6a`).
+**Lane**: `done/` -- shipped in PR #149 (`c20b8d10`) after independent review.
 
 ## Goal
 

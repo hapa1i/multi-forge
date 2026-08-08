@@ -1,6 +1,6 @@
 # CLI, proxy, and runtime correctness checklist
 
-Current focus: execute O002 proxy stop/delete ownership preservation; D016, D017, O001, O004, and D018 remain parked.
+Current focus: execute D016 proxy-create smoke-test JSON stabilization; D017, O001, O004, and D018 remain parked.
 
 ## Activation and sequencing
 
@@ -11,12 +11,14 @@ Current focus: execute O002 proxy stop/delete ownership preservation; D016, D017
 - [x] Implement and verify D015 without activating any later member.
 - [x] Independently review and merge D015 before moving O002 from `todo/` (PR #148, `8b997e6a`).
 - [x] Start `fix/preserve-proxy-ownership-on-stop-failure`, move D015 to `done/`, and activate O002 from merged `main`.
+- [x] Independently review and merge O002 before moving D016 from `todo/` (PR #149, `c20b8d10`).
+- [x] Start `fix/stabilize-proxy-create-smoke-json`, move O002 to `done/`, and activate D016 from merged `main`.
 
 ## Members
 
 - [x] D015 -- global downstream retention ownership (PR #148, `8b997e6a`).
-- [ ] O002 -- preserve proxy ownership on stop failure (active).
-- [ ] D016 -- stabilize proxy create smoke-test JSON (parked).
+- [x] O002 -- preserve proxy ownership on stop failure (PR #149, `c20b8d10`).
+- [ ] D016 -- stabilize proxy create smoke-test JSON (active).
 - [ ] D017 -- align search corruption failures (parked).
 - [ ] O001 -- forward LiteLLM User-Agent metadata (parked).
 - [ ] O004 -- relay safe Anthropic response headers (parked).
