@@ -14,17 +14,17 @@ Current focus: obtain independent review and merge the verified D019 implementat
 - [x] Remove a legacy scalar only when its current value equals the tracked Forge value.
 - [x] Remove a legacy environment key only when its current value equals the tracked Forge value.
 - [x] Treat missing tracked values as no-ops and preserve modified values while removing unchanged owned siblings.
-- [x] Keep hook canonical matching, permission stable-id matching, sidecar-backed smart-unmerge, D012 baseline selection,
-  runtime survivor behavior, and Codex registration unchanged.
+- [x] Keep hook canonical matching, permission stable-id matching, sidecar-backed smart-unmerge, D012 baseline
+  selection, runtime survivor behavior, and Codex registration unchanged.
 
 ## Acceptance tests
 
-| Test | Fixture | Assertion |
-| ---- | ------- | --------- |
-| Scalar values | equal, modified, and absent tracked values | only the equal value is removed |
-| Environment values | equal, modified, absent, and mixed values | user edits and unrelated keys remain |
-| Hooks and permissions | canonical tracked entries plus unrelated values | existing matching behavior is unchanged |
-| Full disable | legacy row without a sidecar, with and without a baseline file | real installer preserves edits and clears successful ownership |
+| Test                  | Fixture                                                        | Assertion                                                      |
+| --------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
+| Scalar values         | equal, modified, and absent tracked values                     | only the equal value is removed                                |
+| Environment values    | equal, modified, absent, and mixed values                      | user edits and unrelated keys remain                           |
+| Hooks and permissions | canonical tracked entries plus unrelated values                | existing matching behavior is unchanged                        |
+| Full disable          | legacy row without a sidecar, with and without a baseline file | real installer preserves edits and clears successful ownership |
 
 ## Verification and closeout
 
