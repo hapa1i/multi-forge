@@ -1,6 +1,6 @@
 # Preserve user edits during legacy settings removal checklist
 
-Current focus: obtain independent review and merge the verified D019 implementation.
+Current focus: complete -- D019 shipped in PR #146 (`3f3a3c6d`).
 
 ## Activation and reproduction
 
@@ -33,4 +33,5 @@ Current focus: obtain independent review and merge the verified D019 implementat
 - [x] Build a wheel and run a clean-install lifecycle smoke.
 - [x] Run `make test-regression` and final `make pre-commit`.
 - [x] Synchronize end-user guidance, review ledger, change log, member card, and epic cursors.
-- [ ] Obtain independent review and merge before closing the installer transaction epic.
+- [x] Obtain independent review with no findings and merge before closing the installer transaction epic (PR #146,
+  `3f3a3c6d`).

@@ -1,6 +1,6 @@
 # Installer transaction safety checklist
 
-Current focus: independently review and merge D019, then close the installer transaction epic.
+Current focus: closed after all three members shipped through PR #146 (`3f3a3c6d`).
 
 ## Activation and sequencing
 
@@ -21,10 +21,10 @@ Current focus: independently review and merge D019, then close the installer tra
 ## Remaining members
 
 - [x] Ship D012 immutable pre-Forge settings-baseline ownership (PR #145, `f069226f`).
-- [ ] Ship D019 value-aware legacy scalar/environment removal (active).
+- [x] Ship D019 value-aware legacy scalar/environment removal (PR #146, `3f3a3c6d`).
 
 ## Closeout
 
-- [ ] Keep the review ledger, member paths, and parent epic cursor current after each merge.
-- [ ] Close this epic only after all three independently reviewed members ship with their required regression, Docker,
+- [x] Keep the review ledger, member paths, and parent epic cursor current after each merge.
+- [x] Close this epic only after all three independently reviewed members ship with their required regression, Docker,
   and clean-wheel coverage.

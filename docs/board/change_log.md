@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-08
 
+### Close installer safety and sequence CLI/proxy correctness
+
+**Goal/outcome**: Close Wave 4 after D019 shipped and admit the seven remaining Wave 5 HIGH findings as separate parked
+members.
+
+**Key changes**:
+
+- Closed D019 and the installer transaction epic after PR #146, then repointed their parent/member/review-ledger links.
+- Rechecked D015--D018, O001, O002, and O004 on merged `main`; excluded already-shipped O003 and sequenced retention,
+  lifecycle, CLI, request/response metadata, and status-line I/O without activating implementation.
+
+**Verification**: Independent D019 review found no violations; 148 focused host tests, both targeted Docker installer
+cases, and focused Ruff passed. Seven disposable Wave 5 broken-behavior characterizations passed on `3f3a3c6d` and the
+module was removed after evidence capture. Markdown hooks passed; a fragment-aware scan resolved all 178 relative paths
+and 44 fragments across the 19 changed documents. The repository-wide scan found only seven pre-existing fragment
+failures in unchanged documents. No stale Wave 4 lane references remained, and both diff checks passed. The change log
+measured 20,244 tokens / 1,350 lines.
+
 ### Preserve legacy settings user edits
 
 **Goal/outcome**: Make full disable's legacy no-sidecar fallback remove only scalar and environment values that still
@@ -42,7 +60,8 @@ match their tracked Forge values.
 **Verification**: The marked regression failed on merged `main` at `f069226f`. After implementation, 148 focused
 settings/installer/D019 regression tests and 105 CLI tests passed; the broader install slice passed 828 with one skip.
 All 683 marked regressions, the targeted Docker disable case, the clean wheel lifecycle, and final `make pre-commit`
-passed. Independent review and merge remain.
+passed. Independent review found no violations and reran the 148 focused host tests, both targeted Docker installer
+cases, Ruff, and the diff check. Shipped in PR #146 (`3f3a3c6d`).
 
 ### Preserve the installation settings baseline
 

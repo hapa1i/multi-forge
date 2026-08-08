@@ -1,9 +1,9 @@
 # Epic: Installer transaction safety
 
-**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
 
-**Lane**: `doing/` -- D013/D014 shipped in PR #144 and D012 in PR #145; D019 is implemented and awaiting review as the
-final member.
+**Lane**: `done/` -- all three members shipped independently in PRs #144--#146; the coordinated outcome closed on
+2026-08-08.
 
 ## Goal
 
@@ -38,11 +38,11 @@ disable later selects.
 
 ## Members and Sequence
 
-| Order | Findings  | Member                                                                                        | Review boundary                                             |
-| ----- | --------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1     | D013–D014 | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md) | Codex mutation, failure rollback, and final tracking commit |
-| 2     | D012      | [`preserve_install_settings_baseline`](../../done/preserve_install_settings_baseline/card.md) | Immutable pre-Forge baseline across enable/sync and disable |
-| 3     | D019      | [`preserve_legacy_settings_user_edits`](../preserve_legacy_settings_user_edits/card.md)       | Value-aware fallback when no ownership sidecar exists       |
+| Order | Findings  | Member                                                                                  | Review boundary                                             |
+| ----- | --------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1     | D013–D014 | [`rollback_codex_install_transaction`](../rollback_codex_install_transaction/card.md)   | Codex mutation, failure rollback, and final tracking commit |
+| 2     | D012      | [`preserve_install_settings_baseline`](../preserve_install_settings_baseline/card.md)   | Immutable pre-Forge baseline across enable/sync and disable |
+| 3     | D019      | [`preserve_legacy_settings_user_edits`](../preserve_legacy_settings_user_edits/card.md) | Value-aware fallback when no ownership sidecar exists       |
 
 D013 and D014 stay together because one pre-mutation Codex snapshot and one rollback path must cover both the post-write
 read-back boundary and the later manifest commit; splitting them would duplicate the transaction mechanism while
@@ -55,7 +55,7 @@ preserving and reporting a later concurrent edit. Independent review found no de
 in PR #144 (`37a03209`). D012 now retains one immutable settings baseline across enable/sync and both disable paths; its
 review's one LOW tracked-baseline deletion race is closed, and the member shipped in PR #145 (`f069226f`). D019 now
 removes legacy scalar/environment values only when they still match tracking; its fail-first regression plus host,
-Docker, and clean-wheel coverage pass, and independent review/merge remain.
+Docker, and clean-wheel coverage pass. Independent review found no violations, and it shipped in PR #146 (`3f3a3c6d`).
 
 ## Drift Constraints
 
@@ -75,6 +75,7 @@ Docker, and clean-wheel coverage pass, and independent review/merge remain.
 
 ## Closeout
 
-Close this epic only after all three members ship independently, the review ledger records each outcome, the normative
-installer contract matches the implemented rollback and baseline ownership, and enable/sync/disable integration covers
-both Claude and Codex surfaces.
+All three members shipped independently with marked regressions and the required Docker and clean-wheel coverage. The
+review ledger, member cards, normative installer design, and end-user hook guide record exact Codex rollback, immutable
+Claude settings-baseline ownership, and value-aware legacy removal. Wave 5 is coordinated separately by
+[`epic_cli_proxy_runtime_correctness`](../../todo/epic_cli_proxy_runtime_correctness/card.md).

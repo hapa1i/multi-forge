@@ -1,15 +1,21 @@
 # Unify downstream telemetry retention ownership
 
-**Epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Epic**: [`epic_cli_proxy_runtime_correctness`](../epic_cli_proxy_runtime_correctness/card.md).
 
 **Decision**: [`downstream_retention_ownership`](../../done/downstream_retention_ownership/card.md) (DG3; D015).
 
-**Lane**: `todo/` -- accepted Wave 5 implementation work.
+**Lane**: `todo/` -- accepted as the first Wave 5 member; parked until the admission record merges.
 
 ## Goal
 
 Give `~/.forge/telemetry/downstream/` one global retention policy and one startup pruner without silently resolving
 conflicting legacy proxy policies.
+
+## Evidence
+
+Rechecked on merged `main` at `3f3a3c6d` with one 30-day-old downstream shard. Audit's 90-day wrapper preserved it;
+provider trace's subsequent 14-day wrapper deleted the same shard. Both server startup latches still call wrappers that
+delegate to `prune_downstream_records()` over the same directory, so the effective policy is the stricter pair.
 
 ## Scope
 
@@ -25,6 +31,7 @@ conflicting legacy proxy policies.
 - Human and JSON status report configured/effective/source values plus deprecations or conflicts.
 - Tests cover defaults, omitted values, global precedence, identical/conflicting legacy values, one-call startup,
   best-effort errors, cap bootstrap, and current-month retention boundaries.
+- Add a marked D015 regression that fails on the dual-pruner merged-main baseline.
 - `docs/design.md`, `docs/design_appendix.md`, runtime configuration docs, and operator guidance move ownership only
   when the implementation ships.
 

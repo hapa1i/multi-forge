@@ -1,8 +1,8 @@
 # Epic: Repository maintenance round
 
 **Epic** -- coordinating card for the cleanup, bug-fix, refactor, and maintenance findings below. Lane: `doing/` --
-Waves 1--3 are closed. Wave 4's D013/D014 and D012 members shipped in PRs #144 and #145; D019 is implemented and
-awaiting review.
+Waves 1--4 are closed. The seven remaining Wave 5 HIGH findings are reproduced and parked under
+`epic_cli_proxy_runtime_correctness`; no Wave 5 implementation is active.
 
 ## Goal
 
@@ -65,10 +65,10 @@ merged in PR #129 (`5813994c`). Wave 2 closed through
 [`epic_stop_artifact_correctness`](../../done/epic_stop_artifact_correctness/card.md) after its members shipped in PRs
 #130–#132. Wave 3 closed through
 [`epic_session_durable_state_safety`](../../done/epic_session_durable_state_safety/card.md) after all eight members
-shipped in PRs #134--#138 and #140--#142. Wave 4 is coordinated under
-[`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md) as three independently reviewable
-members; D013/D014 shipped in PR #144 after the admission record merged in PR #143, D012 shipped in PR #145, and D019 is
-implemented and awaiting review as the final member.
+shipped in PRs #134--#138 and #140--#142. Wave 4 closed under
+[`epic_installer_transaction_safety`](../../done/epic_installer_transaction_safety/card.md) after its three members
+shipped in PRs #144--#146. Wave 5 is admitted under
+[`epic_cli_proxy_runtime_correctness`](../../todo/epic_cli_proxy_runtime_correctness/card.md) as seven parked members.
 
 | Wave | Findings        | Member                                                                                                              |
 | ---- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -89,8 +89,14 @@ implemented and awaiting review as the final member.
 | 3    | D010            | [`align_incognito_worktree_guard`](../../done/align_incognito_worktree_guard/card.md)                               |
 | 4    | D013–D014       | [`rollback_codex_install_transaction`](../../done/rollback_codex_install_transaction/card.md)                       |
 | 4    | D012            | [`preserve_install_settings_baseline`](../../done/preserve_install_settings_baseline/card.md)                       |
-| 4    | D019            | [`preserve_legacy_settings_user_edits`](../preserve_legacy_settings_user_edits/card.md)                             |
+| 4    | D019            | [`preserve_legacy_settings_user_edits`](../../done/preserve_legacy_settings_user_edits/card.md)                     |
 | 5    | D015            | [`unify_downstream_retention`](../../todo/unify_downstream_retention/card.md)                                       |
+| 5    | O002            | [`preserve_proxy_ownership_on_stop_failure`](../../todo/preserve_proxy_ownership_on_stop_failure/card.md)           |
+| 5    | D016            | [`stabilize_proxy_create_smoke_json`](../../todo/stabilize_proxy_create_smoke_json/card.md)                         |
+| 5    | D017            | [`align_search_corruption_failures`](../../todo/align_search_corruption_failures/card.md)                           |
+| 5    | O001            | [`forward_litellm_user_agent`](../../todo/forward_litellm_user_agent/card.md)                                       |
+| 5    | O004            | [`relay_anthropic_response_headers`](../../todo/relay_anthropic_response_headers/card.md)                           |
+| 5    | D018            | [`make_statusline_sources_segment_lazy`](../../todo/make_statusline_sources_segment_lazy/card.md)                   |
 | 7    | O047–O048       | [`remove_obsolete_proxy_abstractions`](../../todo/remove_obsolete_proxy_abstractions/card.md)                       |
 | 7    | O049            | [`migrate_inert_config_fields`](../../todo/migrate_inert_config_fields/card.md)                                     |
 | 7    | O050            | [`retire_unsafe_index_mutators`](../../todo/retire_unsafe_index_mutators/card.md)                                   |

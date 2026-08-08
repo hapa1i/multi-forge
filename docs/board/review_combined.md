@@ -32,11 +32,10 @@ according to `docs/developer/board_contract.md`; keep independently shippable fi
 contract requires an epic.
 
 **Coordination epic:** [`epic_repo_maintenance_round`](doing/epic_repo_maintenance_round/card.md). The epic owns
-sequencing and disposition; this report remains the evidence ledger. Waves 1--3 are closed after all eight Wave 3
-members shipped through PR #142. Wave 4's four installer findings were rechecked on merged `main` at `2461e3fa` and
-converted into three members under
-[`epic_installer_transaction_safety`](doing/epic_installer_transaction_safety/card.md). D013/D014 shipped in PR #144,
-D012 shipped in PR #145, and D019 is implemented and awaiting review as the final member.
+sequencing and disposition; this report remains the evidence ledger. Waves 1--4 are closed after D019 shipped in PR
+#146. The seven remaining Wave 5 HIGH findings were rechecked on merged `main` at `3f3a3c6d` and converted into parked
+members under [`epic_cli_proxy_runtime_correctness`](todo/epic_cli_proxy_runtime_correctness/card.md). O003 already
+shipped in Wave 3 and is not part of the live Wave 5 set.
 
 ### Finding fields
 
@@ -315,13 +314,14 @@ implementation outcome below records its completed code and regression work.
   Final `make pre-commit` also passes. The parked test-only restore helper and acceptable end-user path simplification
   remain unchanged. It shipped in PR #145 (`f069226f`). See
   [`preserve_install_settings_baseline`](done/preserve_install_settings_baseline/card.md).
-- **D019 — implemented 2026-08-08, pending review/merge:** legacy no-sidecar removal now deletes scalar and environment
-  values only when they still equal their tracked Forge values. Missing and user-modified values remain while matching
-  siblings are removed; hook canonical matching and permission stable-id matching are unchanged. The retained regression
-  failed on `f069226f`, then 148 focused settings/installer/D019 regression tests and 105 CLI tests passed. The broader
-  install slice passed 828 with one skip; all 683 marked regressions, a targeted Docker disable case, the clean wheel
-  lifecycle, and final `make pre-commit` also passed. See
-  [`preserve_legacy_settings_user_edits`](doing/preserve_legacy_settings_user_edits/card.md).
+- **D019 — resolved 2026-08-08:** legacy no-sidecar removal now deletes scalar and environment values only when they
+  still equal their tracked Forge values. Missing and user-modified values remain while matching siblings are removed;
+  hook canonical matching and permission stable-id matching are unchanged. The retained regression failed on `f069226f`,
+  then 148 focused settings/installer/D019 regression tests and 105 CLI tests passed. The broader install slice passed
+  828 with one skip; all 683 marked regressions, a targeted Docker disable case, the clean wheel lifecycle, and final
+  `make pre-commit` also passed. Independent review found no violations and reran the 148 focused host tests, both
+  targeted Docker installer cases, Ruff, and the diff check. It shipped in PR #146 (`3f3a3c6d`). See
+  [`preserve_legacy_settings_user_edits`](done/preserve_legacy_settings_user_edits/card.md).
 
 ## Design Status and Post-Review Admissions
 
@@ -524,16 +524,39 @@ module passed four assertions of the broken behavior and was removed after evide
 characterization corrected D012's stale claim that tracking retained the first backup: sync replaces the tracked path as
 well as creating the newer Forge-bearing backup. No implementation member was activated during admission.
 
-| Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                            |
-| ----- | --------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](done/rollback_codex_install_transaction/card.md)    |
-| 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](done/preserve_install_settings_baseline/card.md)    |
-| 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](doing/preserve_legacy_settings_user_edits/card.md) |
+| Order | Findings  | Reproduced boundary                                                                | Accepted member                                                                           |
+| ----- | --------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1     | D013–D014 | post-Codex read-back or tracking failure leaves untracked files/config state       | [`rollback_codex_install_transaction`](done/rollback_codex_install_transaction/card.md)   |
+| 2     | D012      | second settings run replaces the baseline; disable restores the Forge-bearing copy | [`preserve_install_settings_baseline`](done/preserve_install_settings_baseline/card.md)   |
+| 3     | D019      | legacy scalar/env removal deletes values changed after installation                | [`preserve_legacy_settings_user_edits`](done/preserve_legacy_settings_user_edits/card.md) |
 
 D013 and D014 share one rollback transaction: the same pre-mutation Codex snapshot must cover a post-write read-back
 failure and the later manifest commit, so they form one member rather than two partial rollback implementations. It goes
 first because a failed fresh enable otherwise leaves surfaces with no ownership row. D012 follows as the remaining
 HIGH-severity baseline invariant; D019's bounded no-sidecar compatibility path ships last.
+
+### Wave 5 admission record
+
+The seven remaining HIGH Wave 5 findings were rechecked on merged `main` at `3f3a3c6d`. One disposable pytest module
+passed seven assertions of the broken behavior and was removed after evidence capture. O003 is absent from this set
+because its headless Codex concurrent-delete fix shipped in Wave 3. The current evidence supports every remaining HIGH
+classification; no implementation member was activated during admission.
+
+| Order | Finding | Reproduced boundary                                                          | Accepted member                                                                                     |
+| ----- | ------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1     | D015    | two policies prune one downstream shard; the stricter second pass deletes it | [`unify_downstream_retention`](todo/unify_downstream_retention/card.md)                             |
+| 2     | O002    | stop error exits 0; delete drops ownership and reports success               | [`preserve_proxy_ownership_on_stop_failure`](todo/preserve_proxy_ownership_on_stop_failure/card.md) |
+| 3     | D016    | failed create smoke emits two JSON documents and exits 0                     | [`stabilize_proxy_create_smoke_json`](todo/stabilize_proxy_create_smoke_json/card.md)               |
+| 4     | D017    | corrupt query/status disagree across human and JSON exit status              | [`align_search_corruption_failures`](todo/align_search_corruption_failures/card.md)                 |
+| 5     | O001    | translated LiteLLM detector value cannot enter the User-Agent gate           | [`forward_litellm_user_agent`](todo/forward_litellm_user_agent/card.md)                             |
+| 6     | O004    | Anthropic 429 loses upstream retry and rate-limit response headers           | [`relay_anthropic_response_headers`](todo/relay_anthropic_response_headers/card.md)                 |
+| 7     | D018    | a path/branch-only status line still runs proxy and session discovery        | [`make_statusline_sources_segment_lazy`](todo/make_statusline_sources_segment_lazy/card.md)         |
+
+D015 goes first because its duplicate startup passes can destroy shared telemetry under a policy the operator did not
+choose, and DG3 already defines its config/migration contract. O002 follows because failed process teardown currently
+discards or misreports ownership. D016 and D017 then align machine-readable failure semantics; O001 and O004 are
+independent request/response metadata boundaries. D018 ships last so its segment dependency declaration can preserve the
+default status line while eliminating unrelated hot-path I/O.
 
 ### Suggested coordination boundaries
 
@@ -544,10 +567,10 @@ HIGH-severity baseline invariant; D019's bounded no-sidecar compatibility path s
   and sidecar drain shipped independently in PRs #130–#132.
 - **[Durable-state/session epic](done/epic_session_durable_state_safety/card.md):** all eight Wave 3 members shipped
   independently in PRs #134--#138 and #140--#142.
-- **[Installer epic](doing/epic_installer_transaction_safety/card.md):** D013/D014's shared Codex rollback transaction
-  shipped in PR #144 and D012 in PR #145; D019 is implemented and awaiting review as the final legacy-value member.
-- **CLI contract epic:** group scriptability expectations, not files. Preserve one JSON document, deterministic exit
-  status, result-on-stdout, and diagnostics-on-stderr across accepted members.
+- **[Installer epic](done/epic_installer_transaction_safety/card.md):** all three members shipped independently in PRs
+  #144--#146 with required regression, Docker, and clean-wheel coverage.
+- **[CLI/proxy/runtime epic](todo/epic_cli_proxy_runtime_correctness/card.md):** seven parked members preserve separate
+  review boundaries while sharing scriptability, lifecycle-truth, metadata-relay, retention, and hot-path constraints.
 - **Cleanup epic:** admit only individually verified symbols. Split O092 before scheduling; the unverified ~20-symbol
   tail is not part of an executable deletion set.
 

@@ -4,8 +4,7 @@
 
 **Finding**: D019 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `doing/` -- implemented and verified on `fix/preserve-legacy-settings-user-edits`; awaiting independent review
-and merge after D012 shipped in PR #145.
+**Lane**: `done/` -- shipped in PR #146 (`3f3a3c6d`) after implementation, verification, and independent review.
 
 ## Goal
 
@@ -25,12 +24,12 @@ Rechecked on `f069226f` with a valid legacy installation row and no `.forge.adde
 tracked `statusLine` and a tracked environment value, full disable deleted both; an unrelated environment value
 survived. Hooks and permissions already remove by tracked value and are not the failing branch.
 
-## Implementation Status
+## Implementation Outcome
 
 Legacy `unmerge` now compares scalar and environment values against the values in their tracking entries before removal.
 The marked regression failed on merged `main`, then passed with the focused helper and real-installer cases. Host,
 Docker, and clean-wheel coverage confirm that modified values remain, matching owned siblings are removed, and the
-successful installation row is cleared. Independent review and merge remain before closeout.
+successful installation row is cleared.
 
 ## Expected Behavior
 
@@ -53,3 +52,14 @@ successful installation row is cleared. Independent review and merge remain befo
 - This is a legacy no-sidecar compatibility correction; do not replace the current smart-unmerge path.
 - Do not infer ownership from Forge-looking names or values absent from tracking.
 - Do not change backup retention, D012 baseline selection, runtime-scoped survivor semantics, or Codex registration.
+
+## Verification
+
+The retained regression failed on `f069226f`, where the legacy fallback reduced an edited scalar/environment fixture to
+an empty settings object. After implementation, 148 focused settings, installer, and D019 regression tests passed; the
+branch also recorded 105 CLI tests, 828 broader install tests with one skip, all 683 marked regressions, targeted Docker
+disable coverage, the clean-wheel lifecycle, and final `make pre-commit` passing.
+
+Independent review on merged `main` found no design or standard correctness violations. The same 148 focused host tests,
+both targeted Docker installer cases (including the packaged-wheel lifecycle), focused Ruff, and `git diff --check`
+passed. D019 shipped in PR #146 (`3f3a3c6d`).
