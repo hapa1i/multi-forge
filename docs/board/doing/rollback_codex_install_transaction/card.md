@@ -4,7 +4,8 @@
 
 **Findings**: D013 and D014 (HIGH) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 
-**Lane**: `todo/` -- first Wave 4 implementation member after the admission record merges.
+**Lane**: `doing/` -- implementation, verification, and independent review are complete on
+`fix/rollback-codex-install-transaction`; merge remains.
 
 ## Goal
 
@@ -25,6 +26,9 @@ installed-manifest commit fails.
 Rechecked on `2461e3fa` with real managed-block writes. Injecting `OSError` into the final tracking commit removed the
 new extension file but left the Codex block with no installation row. Injecting `OSError` into registration read-back
 leaked the raw exception and left both the extension file and block without tracking.
+
+The retained marked regression failed on the execution base `afde43bf` at both fault points for missing and pre-existing
+user configs: read-back leaked the raw `OSError`, while tracking failure left the managed block behind.
 
 ## Expected Behavior
 
@@ -52,3 +56,26 @@ leaked the raw exception and left both the extension file and block without trac
 - Do not remove commands outside the managed block or claim Codex trust/enrollment.
 - Do not absorb runtime-disable reconciliation, D012 baseline ownership, or D019 legacy unmerge behavior.
 - Keep the installed-manifest schema and successful tracking fields unchanged.
+
+## Verification
+
+The retained regression failed on `afde43bf` in all four original missing/pre-existing-config cases. After
+implementation, 74 focused Codex-hook/regression tests and the broader 921-test installer/CLI slice passed (one skip),
+as did the 3-test Docker Codex lifecycle slice, all 678 marked regressions, and 8,818 unit tests (one skip, 118
+deselected). A wheel built from the branch passed isolated user-scope Claude+Codex enable/status/disable, and final
+`make pre-commit` passed.
+
+Independent review on 2026-08-08 found no design violations, reproduced the marked regression on `afde43bf`, and passed
+74 focused tests, the 793-test install unit slice, and all 6 Docker Codex installer tests. It identified one stale
+preservation comment and one dead rollback-state construction; both were removed before merge.
+
+## Implementation Outcome
+
+Codex managed-block writes now return an exact pre-write bytes/mode snapshot to the installer transaction. Unexpected
+apply or read-back `OSError` failures use the same typed rollback boundary as final tracking failures, restoring Claude
+settings, newly created extension files, and the Codex config before reporting failure. A config created by the attempt
+is removed; a pre-existing config is restored byte-for-byte with its mode.
+
+Rollback first verifies that the current config still matches Forge's applied bytes and mode. A later edit is preserved
+and reported as an incomplete path instead of being overwritten. Planned absence/conflicts, manual registration,
+idempotent managed blocks, successful tracking fields, and the legacy direct helper's `OSError` boundary are unchanged.

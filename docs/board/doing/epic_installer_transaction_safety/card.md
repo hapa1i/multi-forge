@@ -1,8 +1,9 @@
 # Epic: Installer transaction safety
 
-**Parent epic**: [`epic_repo_maintenance_round`](../../doing/epic_repo_maintenance_round/card.md).
+**Parent epic**: [`epic_repo_maintenance_round`](../epic_repo_maintenance_round/card.md).
 
-**Lane**: `todo/` -- Wave 4 is accepted and sequenced, but no implementation member is active.
+**Lane**: `doing/` -- D013/D014 implementation, verification, and independent review are complete pending merge; D012
+and D019 remain parked.
 
 ## Goal
 
@@ -37,17 +38,21 @@ disable later selects.
 
 ## Members and Sequence
 
-| Order | Findings  | Member                                                                                  | Review boundary                                             |
-| ----- | --------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1     | D013–D014 | [`rollback_codex_install_transaction`](../rollback_codex_install_transaction/card.md)   | Codex mutation, failure rollback, and final tracking commit |
-| 2     | D012      | [`preserve_install_settings_baseline`](../preserve_install_settings_baseline/card.md)   | Immutable pre-Forge baseline across enable/sync and disable |
-| 3     | D019      | [`preserve_legacy_settings_user_edits`](../preserve_legacy_settings_user_edits/card.md) | Value-aware fallback when no ownership sidecar exists       |
+| Order | Findings  | Member                                                                                          | Review boundary                                             |
+| ----- | --------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1     | D013–D014 | [`rollback_codex_install_transaction`](../rollback_codex_install_transaction/card.md)           | Codex mutation, failure rollback, and final tracking commit |
+| 2     | D012      | [`preserve_install_settings_baseline`](../../todo/preserve_install_settings_baseline/card.md)   | Immutable pre-Forge baseline across enable/sync and disable |
+| 3     | D019      | [`preserve_legacy_settings_user_edits`](../../todo/preserve_legacy_settings_user_edits/card.md) | Value-aware fallback when no ownership sidecar exists       |
 
 D013 and D014 stay together because one pre-mutation Codex snapshot and one rollback path must cover both the post-write
 read-back boundary and the later manifest commit; splitting them would duplicate the transaction mechanism while
 deliberately leaving one adjacent fault point live. That member goes first because a failed fresh enable can otherwise
 leave state with no ownership row. D012 follows as the remaining HIGH-severity disable invariant. D019 is the bounded
 legacy compatibility path and ships last.
+
+D013/D014 now restores the exact Codex config bytes/mode across apply, read-back, and final tracking failures while
+preserving and reporting a later concurrent edit. Independent review found no design violations; D012 must not activate
+until that member merges.
 
 ## Drift Constraints
 

@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.runtime.codex_rollouts import codex_home
-from forge.core.state import atomic_write_text
+from forge.core.state import atomic_write_bytes, atomic_write_text
 
 from .exceptions import ForgeInstallError
 from .hook_dispatcher import render_dispatcher_command
@@ -308,6 +308,34 @@ class CodexMergePlan:
     reason: str | None = None
 
 
+@dataclass(frozen=True)
+class CodexConfigRollbackState:
+    """Exact Codex config state immediately before a managed-block write."""
+
+    config_path: Path
+    original_content: bytes | None
+    original_mode: int | None
+    applied_content: bytes
+    applied_mode: int | None
+
+
+@dataclass(frozen=True)
+class CodexMergeResult:
+    """One managed-block apply outcome and its rollback state when changed."""
+
+    backup_path: Path | None
+    rollback_state: CodexConfigRollbackState | None
+
+
+class CodexMergeMutationError(Exception):
+    """Unexpected apply failure with the config state needed for rollback."""
+
+    def __init__(self, cause: OSError, rollback_state: CodexConfigRollbackState) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.rollback_state = rollback_state
+
+
 def plan_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexMergePlan:
     """Decide what merging the managed block into config_path would do.
 
@@ -397,8 +425,8 @@ def backup_codex_config(config_path: Path) -> Path | None:
     return backup_path
 
 
-def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> Path | None:
-    """Install or update the managed block. Returns the backup path (if any).
+def apply_codex_merge_transaction(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexMergeResult:
+    """Install or update the managed block and return exact rollback state.
 
     Caller is expected to have planned first; this re-checks cheaply and
     no-ops on "skip". The merged content is parse-validated before writing,
@@ -409,11 +437,18 @@ def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) ->
     """
     plan = plan_codex_merge(config_path, entries)
     if plan.action == "skip":
-        return None
+        return CodexMergeResult(backup_path=None, rollback_state=None)
     if plan.action == "conflict":
         raise ForgeInstallError(f"Codex config conflict at {config_path}: {plan.reason}")
 
-    text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    if config_path.is_file():
+        original_content = config_path.read_bytes()
+        original_mode = stat.S_IMODE(config_path.stat().st_mode)
+        text = original_content.decode("utf-8")
+    else:
+        original_content = None
+        original_mode = None
+        text = ""
     block = render_codex_block(entries)
 
     split = _split_block(text)
@@ -442,10 +477,75 @@ def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) ->
             f"{', '.join(missing_strs)} not present; file left unmodified"
         )
 
+    applied_content = new_text.encode("utf-8")
     backup_path = backup_codex_config(config_path)
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(config_path, new_text, preserve_existing_mode=True)
-    return backup_path
+    try:
+        atomic_write_text(config_path, new_text, preserve_existing_mode=True)
+        applied_mode = stat.S_IMODE(config_path.stat().st_mode)
+    except OSError as e:
+        try:
+            applied_mode = stat.S_IMODE(config_path.stat().st_mode)
+        except OSError:
+            applied_mode = None
+        rollback_state = CodexConfigRollbackState(
+            config_path=config_path,
+            original_content=original_content,
+            original_mode=original_mode,
+            applied_content=applied_content,
+            applied_mode=applied_mode,
+        )
+        raise CodexMergeMutationError(e, rollback_state) from e
+    rollback_state = CodexConfigRollbackState(
+        config_path=config_path,
+        original_content=original_content,
+        original_mode=original_mode,
+        applied_content=applied_content,
+        applied_mode=applied_mode,
+    )
+    return CodexMergeResult(
+        backup_path=backup_path,
+        rollback_state=rollback_state,
+    )
+
+
+def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> Path | None:
+    """Install or update the managed block. Returns the backup path (if any)."""
+
+    try:
+        return apply_codex_merge_transaction(config_path, entries).backup_path
+    except CodexMergeMutationError as e:
+        # This compatibility entry point predates rollback-state propagation.
+        # Keep its OSError boundary for migration and direct callers.
+        raise e.cause from e
+
+
+def restore_codex_config_rollback_state(state: CodexConfigRollbackState) -> list[str]:
+    """Best-effort restore a Codex config unless it changed after our write."""
+
+    try:
+        path_present = state.config_path.exists() or state.config_path.is_symlink()
+        if not path_present:
+            if state.original_content is None:
+                return []
+            return [f"Codex config '{state.config_path}' changed after Forge wrote it"]
+        if state.config_path.is_symlink() or not state.config_path.is_file():
+            return [f"Codex config '{state.config_path}' changed after Forge wrote it"]
+
+        current_content = state.config_path.read_bytes()
+        current_mode = stat.S_IMODE(state.config_path.stat().st_mode)
+        if current_content == state.original_content and current_mode == state.original_mode:
+            return []
+        if current_content != state.applied_content or state.applied_mode is None or current_mode != state.applied_mode:
+            return [f"Codex config '{state.config_path}' changed after Forge wrote it"]
+
+        if state.original_content is None:
+            state.config_path.unlink(missing_ok=True)
+        else:
+            atomic_write_bytes(state.config_path, state.original_content, mode=state.original_mode)
+    except OSError:
+        return [f"Codex config '{state.config_path}'"]
+    return []
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,6 @@
 # Repository maintenance round checklist
 
-Current focus: review and merge the Wave 3 closeout/Wave 4 admission record, then activate Codex install rollback on a
-separate branch.
+Current focus: merge the independently reviewed D013/D014 member before activating D012.
 
 - [x] Create the execution branch and move the epic and decision cards to `doing/`.
 - [x] Create checklists for the active epic and member cards.
@@ -66,7 +65,11 @@ separate branch.
 - [x] Sequence Wave 4 into three parked members under `epic_installer_transaction_safety` without activating installer
   implementation.
 - [x] Run Wave 4 admission Markdown, relative-link, stale-lane, change-log size, and diff checks.
-- [ ] Review and merge the Wave 4 admission record before activating D013/D014.
+- [x] Review and merge the Wave 4 admission record before activating D013/D014 (PR #143, `afde43bf`).
+- [x] Activate D013/D014 from merged `main` at `afde43bf` and create its execution checklists.
+- [x] Retain D013/D014 regressions and implement exact Codex config rollback across read-back and tracking failures.
+- [x] Independently review D013/D014 (2026-08-08; no design violations).
+- [ ] Merge D013/D014 before activating D012.
 - [ ] Recheck and reproduce later-wave CRITICAL/HIGH findings before their implementation members start.
 - [ ] Sequence later-wave accepted members as each wave reaches its entry conditions.
 

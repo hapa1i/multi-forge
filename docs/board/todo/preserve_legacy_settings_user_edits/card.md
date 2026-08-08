@@ -1,6 +1,6 @@
 # Preserve user edits during legacy settings removal
 
-**Epic**: [`epic_installer_transaction_safety`](../epic_installer_transaction_safety/card.md).
+**Epic**: [`epic_installer_transaction_safety`](../../doing/epic_installer_transaction_safety/card.md).
 
 **Finding**: D019 (MEDIUM) in [`review_combined.md`](../../review_combined.md#design-conformance-findings).
 

@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-08-07
 
+### Restore Codex install transaction rollback
+
+**Goal/outcome**: Restore every owned surface when Codex registration or the final install record fails.
+
+**Key changes**:
+
+- Kept an exact pre-write Codex config snapshot through apply, read-back, and tracking commit; rollback now restores
+  bytes/mode or removes the attempt-created config together with settings ownership and new extension files.
+- Preserved later config edits with an actionable incomplete-path error, while retaining best-effort conflicts and the
+  direct merge helper's `OSError` boundary.
+
+**Verification**: The marked regression failed on the base. After the fix, 74 focused, 921 broader installer/CLI (one
+skip), 678 regression, and 8,818 unit tests (one skip) passed; an isolated wheel-installed enable/status/disable smoke
+and final `make pre-commit` also passed. Independent review found no design violations and passed 793 install unit tests
+plus all 6 Docker Codex installer tests.
+
 ### Close session/state safety and sequence installer transactions
 
 **Goal/outcome**: Close the eight-member Wave 3 boundary and admit Wave 4 as three parked installer transaction fixes.

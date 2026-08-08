@@ -321,7 +321,9 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
 - **registered by `forge extension enable --scope user`** (Codex-owned half of the `hooks` module): the installer writes
   a managed block into `$CODEX_HOME/config.toml` and preserves an existing file's mode during atomic merge/remove.
-  Project/local installs do not write runtime Codex blocks. Skipped with a notice when `codex` is not installed.
+  Project/local installs do not write runtime Codex blocks. Skipped with a notice when `codex` is not installed. If
+  registration verification or the final install record fails, Forge restores the prior config bytes/mode or removes a
+  config created by that attempt; a later edit is preserved and named for manual recovery.
 - registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
   prompted) — Codex hooks only fire from trust-enrolled registrations
 
